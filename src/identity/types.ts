@@ -1,0 +1,54 @@
+/**
+ * RBAC roles for the Finder POS platform.
+ * owner > manager > cashier in terms of privilege.
+ */
+export type Role = "owner" | "manager" | "cashier";
+
+/** Priority ordering — higher index = more privilege. */
+export const ROLE_ORDER: Role[] = ["cashier", "manager", "owner"];
+
+/** Returns true if `actual` is at least as privileged as `required`. */
+export function hasRole(actual: Role, required: Role): boolean {
+  return ROLE_ORDER.indexOf(actual) >= ROLE_ORDER.indexOf(required);
+}
+
+export interface TokenClaims {
+  sub: string;       // userId
+  tenantId: string;
+  role: Role;
+  iat?: number;
+  exp?: number;
+}
+
+/** Row shape from the `users` table (platform schema). */
+export interface UserRow {
+  id: string;
+  tenant_id: string;
+  email: string;
+  password_hash: string;
+  role: Role;
+  created_at: number;
+  updated_at: number;
+}
+
+/** Row shape from the `tenants` table. */
+export interface TenantRow {
+  id: string;
+  name: string;
+  slug: string;
+  created_at: number;
+}
+
+/** Row shape from the `audit_log` table. */
+export interface AuditLogRow {
+  id: string;
+  tenant_id: string;
+  actor_id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  before_state: string | null;
+  after_state: string | null;
+  occurred_at: number;
+  request_id: string | null;
+}

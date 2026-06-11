@@ -1,0 +1,90 @@
+/**
+ * Identity module migrations — platform tables used by all modules.
+ * These must be idempotent (CREATE TABLE IF NOT EXISTS) and run before
+ * any module that depends on tenants/users.
+ *
+ * The Database agent owns contracts/schema.sql with the authoritative DDL;
+ * these migrations mirror that DDL so the backend can bootstrap against
+ * a fresh Postgres instance without the database agent's migration runner.
+ */
+
+export const CREATE_TENANTS_TABLE = `
+CREATE TABLE IF NOT EXISTS tenants (
+  id         TEXT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  slug       TEXT NOT NULL UNIQUE,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL
+);
+`;
+
+export const CREATE_USERS_TABLE = `
+CREATE TABLE IF NOT EXISTS users (
+  id            TEXT PRIMARY KEY,
+  tenant_id     TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  email         TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  role          TEXT NOT NULL DEFAULT 'cashier',
+  created_at    BIGINT NOT NULL,
+  updated_at    BIGINT NOT NULL,
+  UNIQUE (tenant_id, email)
+);
+`;
+
+export const CREATE_AUDIT_LOG_TABLE = `
+CREATE TABLE IF NOT EXISTS audit_log (
+  id           TEXT PRIMARY KEY,
+  tenant_id    TEXT NOT NULL,
+  actor_id     TEXT NOT NULL,
+  action       TEXT NOT NULL,
+  entity_type  TEXT NOT NULL,
+  entity_id    TEXT NOT NULL,
+  before_state TEXT,
+  after_state  TEXT,
+  occurred_at  BIGINT NOT NULL,
+  request_id   TEXT
+);
+`;
+
+export const CREATE_FEATURE_FLAGS_TABLE = `
+CREATE TABLE IF NOT EXISTS feature_flags (
+  id         TEXT PRIMARY KEY,
+  tenant_id  TEXT,
+  flag_key   TEXT NOT NULL,
+  enabled    BOOLEAN NOT NULL DEFAULT FALSE,
+  metadata   TEXT,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL
+);
+`;
+
+/**
+ * Functional unique index: one (global or per-tenant) row per flag_key.
+ * Must be a separate CREATE INDEX statement — Postgres does not support
+ * UNIQUE (expression) inline in CREATE TABLE.
+ */
+export const CREATE_FEATURE_FLAGS_UNIQUE_IDX = `
+CREATE UNIQUE INDEX IF NOT EXISTS feature_flags_tenant_key_uidx
+  ON feature_flags (COALESCE(tenant_id, ''), flag_key);
+`;
+
+export const CREATE_IDEMPOTENCY_KEYS_TABLE = `
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+  id           TEXT PRIMARY KEY,
+  tenant_id    TEXT NOT NULL,
+  key          TEXT NOT NULL,
+  response     TEXT NOT NULL,
+  created_at   BIGINT NOT NULL,
+  expires_at   BIGINT NOT NULL,
+  UNIQUE (tenant_id, key)
+);
+`;
+
+export const IDENTITY_MIGRATIONS = [
+  CREATE_TENANTS_TABLE,
+  CREATE_USERS_TABLE,
+  CREATE_AUDIT_LOG_TABLE,
+  CREATE_FEATURE_FLAGS_TABLE,
+  CREATE_FEATURE_FLAGS_UNIQUE_IDX,
+  CREATE_IDEMPOTENCY_KEYS_TABLE,
+];

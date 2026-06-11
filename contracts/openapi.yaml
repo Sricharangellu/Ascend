@@ -1,10 +1,393 @@
 openapi: 3.0.3
 info:
   title: Finder POS API
-  version: 0.0.0
-  description: Authored by the BACKEND agent. Frontend generates its client from this file.
+  version: 1.0.0
+  description: |
+    Finder POS modular-monolith REST API. Authored by the BACKEND agent.
+    Frontend generates its typed client from this file. All business endpoints
+    require Bearer authentication (JWT issued by POST /api/identity/login).
+
+    ## Authentication
+    Short-lived access tokens (15 min) are issued at login. A refresh token
+    (7 days) allows silent renewal via POST /api/identity/refresh.
+
+    ## Multi-tenancy
+    Every JWT carries a `tenantId` claim. The backend enforces tenant isolation
+    at the application layer (and, once RLS is active, at the database layer).
+    Never pass `tenantId` as a request parameter — it is always derived from
+    the authenticated token.
+
+    ## Error envelope
+    All errors use a consistent envelope:
+    ```json
+    { "error": { "code": "string", "message": "string", "requestId": "string" } }
+    ```
+
 servers:
-  - url: /api/v1
-paths: {}
+  - url: /api
+    description: Finder POS backend (all versions)
+
+# ── Security scheme ──────────────────────────────────────────────────────────
 components:
-  schemas: {}
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT access token. Obtain via POST /api/identity/login.
+        Include as `Authorization: Bearer <token>`.
+
+  schemas:
+
+    # ── Tokens ─────────────────────────────────────────────────────────────────
+    TokenPair:
+      type: object
+      required: [accessToken, refreshToken, expiresIn]
+      properties:
+        accessToken:
+          type: string
+          description: Short-lived JWT (15 min). Include in Authorization header.
+        refreshToken:
+          type: string
+          description: Long-lived refresh token (7 days). Store securely; use to renew.
+        expiresIn:
+          type: integer
+          description: Access token lifetime in seconds (900).
+          example: 900
+
+    # ── Identity ───────────────────────────────────────────────────────────────
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: owner@acmecafe.com
+        password:
+          type: string
+          format: password
+          minLength: 1
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    MeResponse:
+      type: object
+      required: [userId, tenantId, role]
+      properties:
+        userId:
+          type: string
+          example: usr_01jz123abc
+        tenantId:
+          type: string
+          example: ten_01jz456def
+        role:
+          $ref: "#/components/schemas/Role"
+
+    Role:
+      type: string
+      enum: [owner, manager, cashier]
+      description: |
+        RBAC role. Ordered by privilege: owner > manager > cashier.
+        - owner: full access; manage users, settings, reports
+        - manager: manage catalog, inventory, orders; void/refund
+        - cashier: ring up sales, view products, process payments
+
+    # ── Health ─────────────────────────────────────────────────────────────────
+    HealthResponse:
+      type: object
+      required: [status, ts]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        ts:
+          type: integer
+          description: Unix epoch milliseconds
+          example: 1717123456789
+
+    ReadyResponse:
+      type: object
+      required: [status, db, modules, ts]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        db:
+          type: string
+          enum: [connected]
+        modules:
+          type: array
+          items:
+            type: string
+          example: [identity, catalog, inventory, orders, payments, sync]
+        ts:
+          type: integer
+          description: Unix epoch milliseconds
+
+    # ── Feature flags ──────────────────────────────────────────────────────────
+    FlagsResponse:
+      type: object
+      description: |
+        Map of flag_key → enabled (boolean). Tenant-level overrides shadow
+        global defaults. New behaviour ships behind a flag defaulting to false.
+      additionalProperties:
+        type: boolean
+      example:
+        identity.bcrypt_required: true
+        checkout.split_tender: false
+        catalog.bulk_import: false
+
+    # ── Error envelope ─────────────────────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, requestId]
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code.
+              example: unauthenticated
+            message:
+              type: string
+              description: Human-readable explanation (safe to display).
+              example: Missing or malformed Authorization header.
+            requestId:
+              type: string
+              description: Correlates this error to backend logs and traces.
+              example: 01935abc-dead-7f00-b33f-01234567890a
+
+  responses:
+    Unauthorized:
+      description: Authentication required or token invalid/expired.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            missing_header:
+              value:
+                error:
+                  code: unauthenticated
+                  message: Missing or malformed Authorization header.
+                  requestId: 01935abc-dead-7f00-b33f-01234567890a
+            token_expired:
+              value:
+                error:
+                  code: token_expired
+                  message: Access token has expired.
+                  requestId: 01935abc-dead-7f00-b33f-01234567890b
+
+    Forbidden:
+      description: Authenticated but insufficiently privileged.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: forbidden
+              message: "Role 'cashier' is not authorized (requires 'manager' or above)."
+              requestId: 01935abc-dead-7f00-b33f-01234567890c
+
+    TooManyRequests:
+      description: Rate limit exceeded.
+      headers:
+        Retry-After:
+          description: Seconds until the client may retry.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    InternalError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+# ── Default security (override per-path for public endpoints) ────────────────
+security:
+  - bearerAuth: []
+
+# ── Paths ────────────────────────────────────────────────────────────────────
+paths:
+
+  # ── Liveness probe ──────────────────────────────────────────────────────────
+  /healthz:
+    get:
+      summary: Liveness probe
+      description: |
+        Returns 200 if the process is alive. No auth, no DB check.
+        Used by load balancers and container runtimes.
+      operationId: healthz
+      security: []
+      tags: [Platform]
+      responses:
+        "200":
+          description: Process is alive.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  # ── Readiness probe ─────────────────────────────────────────────────────────
+  /readyz:
+    get:
+      summary: Readiness probe
+      description: |
+        Returns 200 if the process is ready to serve traffic (DB reachable).
+        Returns 503 if the DB is unavailable. No auth.
+      operationId: readyz
+      security: []
+      tags: [Platform]
+      responses:
+        "200":
+          description: Service is ready.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadyResponse"
+        "503":
+          description: Service is not ready (DB unavailable).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Auth: login ─────────────────────────────────────────────────────────────
+  /identity/login:
+    post:
+      summary: Authenticate and issue tokens
+      description: |
+        Verify email + password credentials and return a JWT access token
+        (15 min) and a refresh token (7 days). No auth required.
+      operationId: login
+      security: []
+      tags: [Identity]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Credentials accepted. Token pair returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "400":
+          description: Validation error (e.g. malformed email).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid credentials.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── Auth: refresh ───────────────────────────────────────────────────────────
+  /identity/refresh:
+    post:
+      summary: Refresh access token
+      description: |
+        Exchange a valid refresh token for a new token pair. The old refresh
+        token is invalidated (single-use). No auth header required.
+      operationId: refreshToken
+      security: []
+      tags: [Identity]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: New token pair issued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "400":
+          description: Missing refreshToken field.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── Auth: me ────────────────────────────────────────────────────────────────
+  /identity/me:
+    get:
+      summary: Current user identity
+      description: Return the authenticated caller's userId, tenantId, and role.
+      operationId: getMe
+      security:
+        - bearerAuth: []
+      tags: [Identity]
+      responses:
+        "200":
+          description: Caller identity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── Feature flags ───────────────────────────────────────────────────────────
+  /v1/flags:
+    get:
+      summary: Read feature flags for the authenticated tenant
+      description: |
+        Returns all active feature flags for the caller's tenant. Tenant-specific
+        overrides shadow global defaults. All new user-facing behaviour ships
+        behind a flag (default off in production).
+      operationId: getFlags
+      security:
+        - bearerAuth: []
+      tags: [Platform]
+      responses:
+        "200":
+          description: Feature flag map (flag_key → enabled).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlagsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"

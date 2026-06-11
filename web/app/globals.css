@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────
+   Base resets and WCAG-friendly defaults
+───────────────────────────────────────────────────── */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    /* Prevent layout shift from scrollbar gutter */
+    scrollbar-gutter: stable;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900 font-sans antialiased;
+  }
+
+  /* Remove default button styles — components re-apply them explicitly */
+  button {
+    cursor: pointer;
+  }
+
+  /* Visible focus ring for keyboard users (not hidden by default) */
+  :focus-visible {
+    outline: 3px solid theme("colors.brand.600");
+    outline-offset: 2px;
+  }
+
+  /* Accessible skip-to-content link */
+  .skip-link {
+    @apply sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2
+           focus:z-50 focus:px-4 focus:py-2 focus:bg-brand-600 focus:text-white
+           focus:rounded focus:shadow-lg;
+  }
+}
+
+/* ─────────────────────────────────────────────────────
+   Utility classes for touch targets (WCAG 2.5.5)
+───────────────────────────────────────────────────── */
+@layer utilities {
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────
+   Smooth transitions for modals/toasts
+───────────────────────────────────────────────────── */
+@layer components {
+  .animate-slide-in-right {
+    animation: slideInRight 0.2s ease-out forwards;
+  }
+
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.15s ease-out forwards;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
