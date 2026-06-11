@@ -1,0 +1,10 @@
+openapi: 3.0.3
+info:
+  title: Finder POS API
+  version: 0.0.0
+  description: Authored by the BACKEND agent. Frontend generates its client from this file.
+servers:
+  - url: /api/v1
+paths: {}
+components:
+  schemas: {}

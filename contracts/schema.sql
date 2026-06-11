@@ -1,0 +1,3 @@
+-- Canonical DDL — authored by the DATABASE agent.
+-- Wave 0 baseline goes here: tenants, users, roles, audit_log, feature_flags, idempotency_keys.
+-- Every business table MUST carry tenant_id and an RLS policy.

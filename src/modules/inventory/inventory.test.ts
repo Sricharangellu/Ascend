@@ -1,0 +1,307 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { buildApp, type App } from "../../app.js";
+
+// Per-test schema isolation against the shared Postgres instance.
+let __seq = 0;
+const __schema = () => `test_${process.pid}_${Date.now().toString(36)}_${__seq++}`;
+import type { DomainEvent } from "../../shared/types.js";
+
+async function freshApp(): Promise<App> {
+  return await buildApp({ schema: __schema() });
+}
+
+async function call(
+  app: App,
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<{ status: number; json: any }> {
+  const { default: request } = await import("./test-request.js");
+  return request(app.express, method, path, body);
+}
+
+test("missing inventory row reports zeroed stock (no 404)", async () => {
+  const app = await freshApp();
+  const { status, json } = await call(app, "GET", "/api/inventory/prod_nope");
+  assert.equal(status, 200);
+  assert.equal(json.productId, "prod_nope");
+  assert.equal(json.stockQty, 0);
+  assert.equal(json.reorderPt, 0);
+});
+
+test("receive increases stock (201)", async () => {
+  const app = await freshApp();
+  const { status, json } = await call(app, "POST", "/api/inventory/prod_a/receive", {
+    quantity: 10,
+  });
+  assert.equal(status, 201);
+  assert.equal(json.productId, "prod_a");
+  assert.equal(json.stockQty, 10);
+
+  const got = await call(app, "GET", "/api/inventory/prod_a");
+  assert.equal(got.json.stockQty, 10);
+});
+
+test("manual adjust changes stock", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/inventory/prod_b/receive", { quantity: 5 });
+  const { status, json } = await call(app, "POST", "/api/inventory/prod_b/adjust", {
+    delta: 3,
+    reason: "adjustment",
+  });
+  assert.equal(status, 200);
+  assert.equal(json.stockQty, 8);
+});
+
+test("manual adjust rejects a zero delta (400) and records no movement", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/inventory/prod_z/receive", { quantity: 5 });
+  const { status, json } = await call(app, "POST", "/api/inventory/prod_z/adjust", {
+    delta: 0,
+    reason: "adjustment",
+  });
+  assert.equal(status, 400);
+  assert.equal(json.error.code, "validation_error");
+
+  // Stock unchanged and no spurious 'adjustment' movement was written.
+  const stock = await call(app, "GET", "/api/inventory/prod_z");
+  assert.equal(stock.json.stockQty, 5);
+  const moves = await call(app, "GET", "/api/inventory/prod_z/movements");
+  assert.equal(moves.json.filter((m: any) => m.reason === "adjustment").length, 0);
+});
+
+test("manual adjust rejects system-only reasons like 'sale' (400)", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/inventory/prod_s/receive", { quantity: 5 });
+  const { status, json } = await call(app, "POST", "/api/inventory/prod_s/adjust", {
+    delta: -2,
+    reason: "sale",
+  });
+  assert.equal(status, 400);
+  assert.equal(json.error.code, "validation_error");
+
+  // No phantom 'sale' movement that refund-restock would later reverse.
+  const moves = await call(app, "GET", "/api/inventory/prod_s/movements");
+  assert.equal(moves.json.filter((m: any) => m.reason === "sale").length, 0);
+  const stock = await call(app, "GET", "/api/inventory/prod_s");
+  assert.equal(stock.json.stockQty, 5);
+});
+
+test("stock never goes negative (clamp at 0)", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/inventory/prod_c/receive", { quantity: 2 });
+  const { json } = await call(app, "POST", "/api/inventory/prod_c/adjust", {
+    delta: -10,
+    reason: "adjustment",
+  });
+  assert.equal(json.stockQty, 0);
+});
+
+test("clamped adjustment records the applied delta, not the requested one", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/inventory/prod_cl/receive", { quantity: 2 });
+  // Request -10 against 2 on hand; stock floors at 0, so only -2 was applied.
+  await call(app, "POST", "/api/inventory/prod_cl/adjust", {
+    delta: -10,
+    reason: "adjustment",
+  });
+
+  const { json } = await call(app, "GET", "/api/inventory/prod_cl/movements");
+  const adj = json.find((m: any) => m.reason === "adjustment");
+  assert.equal(adj.delta, -2); // applied (clamped), not the requested -10
+
+  // The ledger must reconcile with current stock: sum(deltas) == stock_qty (0).
+  const sum = json.reduce((s: number, m: any) => s + m.delta, 0);
+  assert.equal(sum, 0);
+});
+
+test("refund of an oversold order does not resurrect phantom stock", async () => {
+  const app = await freshApp();
+  // Only 2 units on hand...
+  await call(app, "POST", "/api/inventory/prod_os/receive", { quantity: 2 });
+
+  // ...but an order rings up 5 (an offline oversell). Stock floors at 0 and the
+  // 'sale' movement records the applied -2, not the requested -5.
+  await app.events.publish(
+    "order.created",
+    {
+      id: "ord_os",
+      orderNumber: "FP-OS",
+      stateCode: "CA",
+      totalCents: 2500,
+      lines: [{ productId: "prod_os", quantity: 5, unitCents: 500 }],
+    },
+    "ord_os",
+  );
+  assert.equal((await call(app, "GET", "/api/inventory/prod_os")).json.stockQty, 0);
+
+  // Refunding must restock only what was actually removed (2) — never the
+  // requested 5, which would create 3 phantom units out of nothing.
+  await app.events.publish(
+    "order.refunded",
+    { id: "ord_os", orderNumber: "FP-OS", totalCents: 2500 },
+    "ord_os",
+  );
+  assert.equal((await call(app, "GET", "/api/inventory/prod_os")).json.stockQty, 2);
+});
+
+test("order.created event decrements stock for each line", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/inventory/prod_x/receive", { quantity: 10 });
+  await call(app, "POST", "/api/inventory/prod_y/receive", { quantity: 5 });
+
+  await app.events.publish(
+    "order.created",
+    {
+      id: "ord_1",
+      orderNumber: "FP-1",
+      stateCode: "CA",
+      totalCents: 1500,
+      lines: [
+        { productId: "prod_x", quantity: 2, unitCents: 500 },
+        { productId: "prod_y", quantity: 1, unitCents: 500 },
+      ],
+    },
+    "ord_1",
+  );
+
+  const x = await call(app, "GET", "/api/inventory/prod_x");
+  const y = await call(app, "GET", "/api/inventory/prod_y");
+  assert.equal(x.json.stockQty, 8);
+  assert.equal(y.json.stockQty, 4);
+});
+
+test("order.refunded restocks reversed sale movements", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/inventory/prod_r/receive", { quantity: 10 });
+
+  await app.events.publish(
+    "order.created",
+    {
+      id: "ord_2",
+      orderNumber: "FP-2",
+      stateCode: "CA",
+      totalCents: 1000,
+      lines: [{ productId: "prod_r", quantity: 3, unitCents: 500 }],
+    },
+    "ord_2",
+  );
+
+  let stock = await call(app, "GET", "/api/inventory/prod_r");
+  assert.equal(stock.json.stockQty, 7);
+
+  await app.events.publish(
+    "order.refunded",
+    { id: "ord_2", orderNumber: "FP-2", totalCents: 1000 },
+    "ord_2",
+  );
+
+  stock = await call(app, "GET", "/api/inventory/prod_r");
+  assert.equal(stock.json.stockQty, 10);
+
+  // A 'return' movement should have been recorded.
+  const movements = await call(app, "GET", "/api/inventory/prod_r/movements");
+  assert.ok(movements.json.some((m: any) => m.reason === "return" && m.ref === "ord_2"));
+});
+
+test("redelivered order.refunded does not double-restock (idempotent)", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/inventory/prod_ri/receive", { quantity: 10 });
+
+  await app.events.publish(
+    "order.created",
+    {
+      id: "ord_ri",
+      orderNumber: "FP-RI",
+      stateCode: "CA",
+      totalCents: 1000,
+      lines: [{ productId: "prod_ri", quantity: 3, unitCents: 500 }],
+    },
+    "ord_ri",
+  );
+  assert.equal((await call(app, "GET", "/api/inventory/prod_ri")).json.stockQty, 7);
+
+  // Same refund event delivered twice (e.g. outbox replay). Stock must settle
+  // at 10, not 13 — the second delivery is a no-op.
+  const refund = () =>
+    app.events.publish(
+      "order.refunded",
+      { id: "ord_ri", orderNumber: "FP-RI", totalCents: 1000 },
+      "ord_ri",
+    );
+  await refund();
+  await refund();
+
+  assert.equal((await call(app, "GET", "/api/inventory/prod_ri")).json.stockQty, 10);
+
+  // Exactly one 'return' movement was recorded for the ref.
+  const movements = await call(app, "GET", "/api/inventory/prod_ri/movements");
+  const returns = movements.json.filter(
+    (m: any) => m.reason === "return" && m.ref === "ord_ri",
+  );
+  assert.equal(returns.length, 1);
+});
+
+test("lowStock filter returns only items at/below reorder point", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/inventory/prod_low/receive", { quantity: 2 });
+  await call(app, "PUT", "/api/inventory/prod_low/reorder-point", { reorderPt: 5 });
+  await call(app, "POST", "/api/inventory/prod_high/receive", { quantity: 20 });
+  await call(app, "PUT", "/api/inventory/prod_high/reorder-point", { reorderPt: 5 });
+
+  const { status, json } = await call(app, "GET", "/api/inventory/?lowStock=true");
+  assert.equal(status, 200);
+  assert.ok(Array.isArray(json.items));
+  assert.ok(json.items.some((i: any) => i.product_id === "prod_low"));
+  assert.ok(!json.items.some((i: any) => i.product_id === "prod_high"));
+});
+
+test("list returns Page<T> shape", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/inventory/prod_p/receive", { quantity: 1 });
+  const { json } = await call(app, "GET", "/api/inventory/");
+  assert.ok(Array.isArray(json.items));
+  assert.equal(typeof json.total, "number");
+  assert.equal(typeof json.limit, "number");
+  assert.equal(typeof json.offset, "number");
+});
+
+test("movements history records receive and adjust", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/inventory/prod_m/receive", { quantity: 4 });
+  await call(app, "POST", "/api/inventory/prod_m/adjust", { delta: -1, reason: "adjustment" });
+  const { json } = await call(app, "GET", "/api/inventory/prod_m/movements");
+  assert.equal(json.length, 2);
+  assert.ok(json.some((m: any) => m.reason === "receiving" && m.delta === 4));
+  assert.ok(json.some((m: any) => m.reason === "adjustment" && m.delta === -1));
+  assert.ok(json.every((m: any) => m.id.startsWith("mov_")));
+});
+
+test("reorder-point can be set before any stock exists", async () => {
+  const app = await freshApp();
+  const { status, json } = await call(app, "PUT", "/api/inventory/prod_rp/reorder-point", {
+    reorderPt: 7,
+  });
+  assert.equal(status, 200);
+  assert.equal(json.reorderPt, 7);
+  assert.equal(json.stockQty, 0);
+});
+
+test("inventory.adjusted is emitted on the bus", async () => {
+  const app = await freshApp();
+  const events: DomainEvent[] = [];
+  app.events.on("inventory.adjusted", (e) => { events.push(e); });
+
+  await call(app, "POST", "/api/inventory/prod_evt/receive", { quantity: 6 });
+
+  assert.equal(events.length, 1);
+  const e = events[0];
+  assert.equal(e.type, "inventory.adjusted");
+  assert.equal(e.aggregateId, "prod_evt");
+  const p = e.payload as any;
+  assert.equal(p.productId, "prod_evt");
+  assert.equal(p.delta, 6);
+  assert.equal(p.reason, "receiving");
+  assert.equal(p.stockQty, 6);
+});

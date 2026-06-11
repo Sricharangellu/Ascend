@@ -1,0 +1,28 @@
+{
+  "name": "finder-pos",
+  "version": "2.0.0",
+  "description": "Finder POS - Year 1 Foundation (modular monolith). Offline-first POS backend on Postgres.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx scripts/test.ts",
+    "smoke": "tsx scripts/smoke.ts"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "pg": "^8.21.0",
+    "uuid": "^11.0.5",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.5",
+    "@types/pg": "^8.20.0",
+    "embedded-postgres": "18.4.0-beta.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
