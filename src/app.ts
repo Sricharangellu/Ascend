@@ -10,6 +10,8 @@ import {
   authMiddleware,
   tenantResolver,
   errorEnvelopeMiddleware,
+  metricsMiddleware,
+  renderMetrics,
 } from "./gateway/index.js";
 import { handler } from "./shared/http.js";
 
@@ -48,11 +50,17 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
 
   // ── Global gateway middleware (applied before all /api routes)
   app.use(requestIdMiddleware);
+  app.use(metricsMiddleware);
   app.use(rateLimitMiddleware({ capacity: 120, refillRate: 40 }));
 
   // ── Liveness + readiness probes (no auth — infrastructure-level)
   app.get("/healthz", (_req, res) => {
     res.json({ status: "ok", ts: Date.now() });
+  });
+
+  // ── Prometheus metrics (no auth — scrape target; RED metrics per route)
+  app.get("/metrics", (_req, res) => {
+    res.set("content-type", "text/plain; version=0.0.4").send(renderMetrics());
   });
 
   // ── Service health (documented in README; lists the domain modules)

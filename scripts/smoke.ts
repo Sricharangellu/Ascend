@@ -131,6 +131,14 @@ async function main() {
   assert.equal(r.json.stockQty, 50, "tee restocked");
   ok(`order refunded -> inventory restocked to tee=50`);
 
+  // Observability: the lifecycle above should have produced RED metrics.
+  const m = await fetch(base + "/metrics");
+  const metricsText = await m.text();
+  assert.equal(m.status, 200);
+  assert.match(metricsText, /http_requests_total\{/);
+  assert.match(metricsText, /http_request_duration_ms_count\{/);
+  ok(`/metrics exposes RED metrics (Prometheus format)`);
+
   console.log(`\n✅ SMOKE PASSED — ${step} steps, full POS lifecycle verified end-to-end.\n`);
 }
 
