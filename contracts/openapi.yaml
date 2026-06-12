@@ -24,8 +24,8 @@ info:
     ```
 
 servers:
-  - url: /api
-    description: Finder POS backend (all versions)
+  - url: /
+    description: Finder POS backend origin. Health probes at root (/healthz, /readyz); identity under /api/identity; versioned business routes under /api/v1. Paths below are absolute.
 
 # ── Security scheme ──────────────────────────────────────────────────────────
 components:
@@ -268,7 +268,7 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
 
   # ── Auth: login ─────────────────────────────────────────────────────────────
-  /identity/login:
+  /api/identity/login:
     post:
       summary: Authenticate and issue tokens
       description: |
@@ -308,7 +308,7 @@ paths:
           $ref: "#/components/responses/InternalError"
 
   # ── Auth: refresh ───────────────────────────────────────────────────────────
-  /identity/refresh:
+  /api/identity/refresh:
     post:
       summary: Refresh access token
       description: |
@@ -344,7 +344,7 @@ paths:
           $ref: "#/components/responses/InternalError"
 
   # ── Auth: me ────────────────────────────────────────────────────────────────
-  /identity/me:
+  /api/identity/me:
     get:
       summary: Current user identity
       description: Return the authenticated caller's userId, tenantId, and role.
@@ -367,7 +367,7 @@ paths:
           $ref: "#/components/responses/InternalError"
 
   # ── Feature flags ───────────────────────────────────────────────────────────
-  /v1/flags:
+  /api/v1/flags:
     get:
       summary: Read feature flags for the authenticated tenant
       description: |

@@ -127,7 +127,7 @@ export async function silentRefresh(): Promise<boolean> {
     void RefreshResponse; // type-only import guard
 
     const data = await apiPost<import("@/api-client/types").RefreshResponse>(
-      "/auth/refresh",
+      "/api/identity/refresh",
       { refreshToken },
       { anonymous: true }
     );

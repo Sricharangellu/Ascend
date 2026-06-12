@@ -26,11 +26,15 @@ export class ApiResponseError extends Error {
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-// In a browser, relative URLs like "/api/v1" work fine.
-// In Node (tests / SSR) fetch requires an absolute URL, so we prefix with
-// http://localhost when no origin is available.
+// Callers pass ABSOLUTE backend paths (e.g. "/api/identity/login",
+// "/api/v1/flags", "/healthz") because the backend splits routes across
+// /api/identity/*, /api/v1/* and root — a single version prefix can't serve
+// all three. NEXT_PUBLIC_API_BASE_URL sets the backend ORIGIN in production
+// (e.g. https://finder-pos-backend.vercel.app); empty = same origin.
+// In a browser, same-origin relative URLs work. In Node (tests / SSR) fetch
+// requires an absolute URL, so we prefix with http://localhost.
 function resolveBase(): string {
-  const configured = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
+  const configured = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
   if (typeof window !== "undefined") return configured;
   // Node / test environment — make it absolute
   if (configured.startsWith("http")) return configured;

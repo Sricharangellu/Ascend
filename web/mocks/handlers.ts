@@ -19,8 +19,12 @@ import type {
   UserProfile,
 } from "@/api-client/types";
 
-// Match both relative (browser) and absolute (Node/test) URL forms
-const BASE = "*/api/v1";
+// Match both relative (browser) and absolute (Node/test) URL forms.
+// Paths mirror the real backend surface: identity under /api/identity,
+// versioned business routes under /api/v1, health probes at root.
+const IDENTITY = "*/api/identity";
+const V1 = "*/api/v1";
+const ROOT = "*";
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
@@ -43,8 +47,8 @@ const latency = () =>
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
 export const handlers = [
-  // ── POST /api/v1/auth/login ─────────────────────────────────────────────
-  http.post(`${BASE}/auth/login`, async ({ request }) => {
+  // ── POST /api/identity/login ─────────────────────────────────────────────
+  http.post(`${IDENTITY}/login`, async ({ request }) => {
     await latency();
     const body = (await request.json()) as { email?: string; password?: string };
 
@@ -89,8 +93,8 @@ export const handlers = [
     return HttpResponse.json(response, { status: 200 });
   }),
 
-  // ── POST /api/v1/auth/refresh ────────────────────────────────────────────
-  http.post(`${BASE}/auth/refresh`, async ({ request }) => {
+  // ── POST /api/identity/refresh ───────────────────────────────────────────
+  http.post(`${IDENTITY}/refresh`, async ({ request }) => {
     await latency();
     const body = (await request.json()) as { refreshToken?: string };
 
@@ -115,20 +119,14 @@ export const handlers = [
     return HttpResponse.json(response, { status: 200 });
   }),
 
-  // ── POST /api/v1/auth/logout ─────────────────────────────────────────────
-  http.post(`${BASE}/auth/logout`, async () => {
-    await latency();
-    return new HttpResponse(null, { status: 204 });
-  }),
-
-  // ── GET /api/v1/healthz ──────────────────────────────────────────────────
-  http.get(`${BASE}/healthz`, async () => {
+  // ── GET /healthz (root, unversioned liveness probe) ──────────────────────
+  http.get(`${ROOT}/healthz`, async () => {
     const response: HealthzResponse = { status: "ok", ts: Date.now() };
     return HttpResponse.json(response, { status: 200 });
   }),
 
-  // ── GET /api/v1/readyz ───────────────────────────────────────────────────
-  http.get(`${BASE}/readyz`, async () => {
+  // ── GET /readyz (root, unversioned readiness probe) ──────────────────────
+  http.get(`${ROOT}/readyz`, async () => {
     const response: ReadyzResponse = {
       status: "ready",
       checks: { db: "ok", cache: "ok" },
@@ -137,7 +135,7 @@ export const handlers = [
   }),
 
   // ── GET /api/v1/flags ────────────────────────────────────────────────────
-  http.get(`${BASE}/flags`, async () => {
+  http.get(`${V1}/flags`, async () => {
     await latency();
     const response: FlagsResponse = {
       flags: {

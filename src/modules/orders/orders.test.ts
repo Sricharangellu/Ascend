@@ -170,6 +170,33 @@ test("archived (soft-deleted) product cannot be rung up -> 400 bad_request", asy
   assert.equal(list.json.total, 0);
 });
 
+test("draft (unpublished) product cannot be rung up -> 400 bad_request", async () => {
+  const app = await freshApp();
+  const widget = await makeProduct(app, {
+    sku: "DRAFT-W",
+    name: "Widget",
+    price_cents: 1500,
+    category: "general",
+  });
+
+  // Move the product to 'draft' (not yet released for sale) via catalog PATCH.
+  const drafted = await call(app, "PATCH", `/api/catalog/${widget}`, { status: "draft" });
+  assert.equal(drafted.status, 200);
+  assert.equal(drafted.json.status, "draft");
+
+  const { status, json } = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: widget, quantity: 1 }],
+  });
+  assert.equal(status, 400);
+  assert.equal(json.error.code, "bad_request");
+  assert.match(json.error.message, /draft/);
+
+  // No order should have been created from the rejected request.
+  const list = await call(app, "GET", "/api/orders/");
+  assert.equal(list.json.total, 0);
+});
+
 test("GET /:id returns the order with its lines; 404 when missing", async () => {
   const app = await freshApp();
   const widget = await makeProduct(app, {
@@ -325,4 +352,107 @@ test("order.created fires with the correct payload shape", async () => {
   assert.deepEqual(p.lines[0], { productId: widget, quantity: 2, unitCents: 1500 });
   // payload must NOT leak extra line fields per CONTRACTS.md.
   assert.deepEqual(Object.keys(p.lines[0]).sort(), ["productId", "quantity", "unitCents"]);
+});
+
+// ── Lifecycle guard paths (open -> completed -> refunded/voided) ────────────
+// These cover the conflict/not-found branches in OrdersService.refund/void that
+// the happy-path tests above don't reach.
+
+/** Create an open single-line order; return its created JSON. */
+async function makeOpenOrder(app: App, sku: string): Promise<any> {
+  const widget = await makeProduct(app, { sku, name: "Widget", price_cents: 2000, category: "general" });
+  const { status, json } = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: widget, quantity: 1 }],
+  });
+  assert.equal(status, 201, `order create failed: ${JSON.stringify(json)}`);
+  assert.equal(json.status, "open");
+  return json;
+}
+
+test("refunding a completed (paid) order succeeds — the canonical refund path", async () => {
+  const app = await freshApp();
+  const order = await makeOpenOrder(app, "GUARD-COMPLETE");
+
+  // Pay it off so the order transitions open -> completed via payment.captured.
+  const pay = await call(app, "POST", "/api/payments/", {
+    orderId: order.id,
+    method: "cash",
+    tenderedCents: order.total_cents,
+  });
+  assert.equal(pay.status, 201, `payment failed: ${JSON.stringify(pay.json)}`);
+  const completed = await call(app, "GET", `/api/orders/${order.id}`);
+  assert.equal(completed.json.status, "completed");
+
+  // order.refunded should fire (drives inventory restock).
+  const events: DomainEvent[] = [];
+  app.events.on("order.refunded", (e) => { events.push(e); });
+
+  const refunded = await call(app, "POST", `/api/orders/${order.id}/refund`);
+  assert.equal(refunded.status, 200);
+  assert.equal(refunded.json.status, "refunded");
+  assert.equal(events.length, 1);
+  assert.equal((events[0].payload as any).id, order.id);
+});
+
+test("double refund is rejected with 409 conflict", async () => {
+  const app = await freshApp();
+  const order = await makeOpenOrder(app, "GUARD-DOUBLE-REF");
+
+  const first = await call(app, "POST", `/api/orders/${order.id}/refund`);
+  assert.equal(first.status, 200);
+
+  const second = await call(app, "POST", `/api/orders/${order.id}/refund`);
+  assert.equal(second.status, 409);
+  assert.equal(second.json.error.code, "conflict");
+});
+
+test("refunding a voided order is rejected with 409 conflict", async () => {
+  const app = await freshApp();
+  const order = await makeOpenOrder(app, "GUARD-VOID-THEN-REF");
+
+  const voided = await call(app, "POST", `/api/orders/${order.id}/void`);
+  assert.equal(voided.status, 200);
+  assert.equal(voided.json.status, "voided");
+
+  const refund = await call(app, "POST", `/api/orders/${order.id}/refund`);
+  assert.equal(refund.status, 409);
+  assert.equal(refund.json.error.code, "conflict");
+});
+
+test("voiding a refunded order is rejected with 409 conflict", async () => {
+  const app = await freshApp();
+  const order = await makeOpenOrder(app, "GUARD-REF-THEN-VOID");
+
+  const refunded = await call(app, "POST", `/api/orders/${order.id}/refund`);
+  assert.equal(refunded.status, 200);
+  assert.equal(refunded.json.status, "refunded");
+
+  const voided = await call(app, "POST", `/api/orders/${order.id}/void`);
+  assert.equal(voided.status, 409);
+  assert.equal(voided.json.error.code, "conflict");
+});
+
+test("voiding an already-voided order is rejected with 409 conflict", async () => {
+  const app = await freshApp();
+  const order = await makeOpenOrder(app, "GUARD-DOUBLE-VOID");
+
+  const first = await call(app, "POST", `/api/orders/${order.id}/void`);
+  assert.equal(first.status, 200);
+
+  const second = await call(app, "POST", `/api/orders/${order.id}/void`);
+  assert.equal(second.status, 409);
+  assert.equal(second.json.error.code, "conflict");
+});
+
+test("refund and void of a nonexistent order return 404", async () => {
+  const app = await freshApp();
+
+  const refund = await call(app, "POST", "/api/orders/ord_missing/refund");
+  assert.equal(refund.status, 404);
+  assert.equal(refund.json.error.code, "not_found");
+
+  const voidRes = await call(app, "POST", "/api/orders/ord_missing/void");
+  assert.equal(voidRes.status, 404);
+  assert.equal(voidRes.json.error.code, "not_found");
 });

@@ -97,8 +97,12 @@ export class OrdersService {
       if (!product) {
         throw badRequest(`product '${line.productId}' not found`);
       }
-      if (product.status === "archived") {
-        throw badRequest(`product '${line.productId}' is archived and cannot be sold`);
+      if (product.status !== "active") {
+        // Only published (active) products are sellable. A draft product is not
+        // yet released and an archived one is retired; neither can be rung up.
+        throw badRequest(
+          `product '${line.productId}' is ${product.status} and cannot be sold`,
+        );
       }
       const taxable = product.tax_class !== "exempt";
       const lineGross = product.price_cents * line.quantity;

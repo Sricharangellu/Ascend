@@ -84,13 +84,24 @@ export class CatalogService {
       updated_at: now,
     };
 
-    await this.db.query(
-      `INSERT INTO products
-         (id, sku, name, price_cents, category, tax_class, barcode, status, created_at, updated_at)
-       VALUES
-         (@id, @sku, @name, @price_cents, @category, @tax_class, @barcode, @status, @created_at, @updated_at)`,
-      product as unknown as Record<string, unknown>,
-    );
+    try {
+      await this.db.query(
+        `INSERT INTO products
+           (id, sku, name, price_cents, category, tax_class, barcode, status, created_at, updated_at)
+         VALUES
+           (@id, @sku, @name, @price_cents, @category, @tax_class, @barcode, @status, @created_at, @updated_at)`,
+        product as unknown as Record<string, unknown>,
+      );
+    } catch (err) {
+      // The pre-check above handles the common case, but two concurrent creates
+      // can both pass it and race to INSERT. The sku UNIQUE constraint is the
+      // real guard: translate its violation (Postgres code 23505) into a clean
+      // 409 instead of leaking a raw driver error as a 500.
+      if (isUniqueViolation(err)) {
+        throw conflict(`product with sku '${input.sku}' already exists`);
+      }
+      throw err;
+    }
 
     await this.events.publish(
       "product.created",
@@ -240,4 +251,13 @@ export class CatalogService {
 function clampLimit(limit?: number): number {
   if (!limit || limit <= 0) return 50;
   return Math.min(Math.floor(limit), 200);
+}
+
+/** Postgres signals a unique-constraint breach with SQLSTATE 23505. */
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as { code?: unknown }).code === "23505"
+  );
 }

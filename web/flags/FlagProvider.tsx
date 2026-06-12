@@ -53,7 +53,7 @@ export function FlagProvider({ children }: { children: React.ReactNode }) {
   const fetchFlags = useCallback(async () => {
     if (!isAuthenticated()) return;
     try {
-      const data = await apiGet<FlagsResponse>("/flags");
+      const data = await apiGet<FlagsResponse>("/api/v1/flags");
       setFlags(data.flags ?? {});
     } catch {
       // Silent — keep existing flags; don't crash the app

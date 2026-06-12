@@ -55,6 +55,15 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     res.json({ status: "ok", ts: Date.now() });
   });
 
+  // ── Service health (documented in README; lists the domain modules)
+  app.get("/health", (_req, res) => {
+    res.json({
+      status: "ok",
+      modules: modules.map((m) => m.name),
+      ts: Date.now(),
+    });
+  });
+
   app.get("/readyz", handler(async (_req, res) => {
     await db.one("SELECT 1");
     res.json({
@@ -110,6 +119,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
       storage: "postgres",
       modules: ["identity", ...modules.map((m) => m.name)],
       endpoints: [
+        "/health",
         "/healthz",
         "/readyz",
         "/api/identity/login",

@@ -178,6 +178,21 @@ test("duplicate sku conflicts (409)", async () => {
   assert.equal(json.error.code, "conflict");
 });
 
+test("concurrent duplicate sku still conflicts (409), never leaks a 500", async () => {
+  const app = await freshApp();
+  // Fire both creates concurrently so they can both pass the pre-check and race
+  // to INSERT. Exactly one must win (201); the loser must be a clean 409 from
+  // the sku UNIQUE constraint, never a leaked 500.
+  const [a, b] = await Promise.all([
+    call(app, "POST", "/api/catalog/", { sku: "RACE-1", name: "A", price_cents: 100 }),
+    call(app, "POST", "/api/catalog/", { sku: "RACE-1", name: "B", price_cents: 200 }),
+  ]);
+  const statuses = [a.status, b.status].sort();
+  assert.deepEqual(statuses, [201, 409]);
+  const loser = a.status === 409 ? a : b;
+  assert.equal(loser.json.error.code, "conflict");
+});
+
 test("demo products are seeded on init", async () => {
   const app = await freshApp();
   const { json } = await call(app, "GET", "/api/catalog/?limit=200");

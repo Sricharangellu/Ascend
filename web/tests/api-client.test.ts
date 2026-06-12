@@ -14,7 +14,7 @@ beforeEach(() => {
 describe("apiFetch — login flow", () => {
   it("returns a session on valid credentials", async () => {
     const data = await apiPost<LoginResponse>(
-      "/auth/login",
+      "/api/identity/login",
       { email: "test@example.com", password: "anypassword" },
       { anonymous: true }
     );
@@ -27,7 +27,7 @@ describe("apiFetch — login flow", () => {
   it("throws ApiResponseError on wrong credentials", async () => {
     await expect(
       apiPost(
-        "/auth/login",
+        "/api/identity/login",
         { email: "test@example.com", password: "wrong" },
         { anonymous: true }
       )
@@ -37,7 +37,7 @@ describe("apiFetch — login flow", () => {
   it("ApiResponseError carries code and requestId", async () => {
     try {
       await apiPost(
-        "/auth/login",
+        "/api/identity/login",
         { email: "test@example.com", password: "wrong" },
         { anonymous: true }
       );
@@ -69,7 +69,7 @@ describe("apiFetch — health endpoints", () => {
       role: "cashier",
       tenantId: "t1",
     });
-    const data = await apiGet<{ flags: Record<string, boolean> }>("/flags");
+    const data = await apiGet<{ flags: Record<string, boolean> }>("/api/v1/flags");
     expect(typeof data.flags).toBe("object");
   });
 });

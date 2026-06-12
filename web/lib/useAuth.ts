@@ -76,7 +76,7 @@ export function useAuth(): UseAuthReturn {
       setIsLoading(true);
       try {
         const data = await apiPost<LoginResponse>(
-          "/auth/login",
+          "/api/identity/login",
           { email, password } satisfies LoginRequest,
           { anonymous: true }
         );
@@ -102,11 +102,9 @@ export function useAuth(): UseAuthReturn {
   );
 
   const logout = useCallback(async () => {
-    try {
-      await apiPost("/auth/logout");
-    } catch {
-      // Best-effort — clear session locally regardless
-    } finally {
+    // Logout is client-side only — the backend issues stateless JWTs with no
+    // server-side logout endpoint, so we simply drop the local session.
+    {
       clearSession();
       setUser(null);
       setStatus("unauthenticated");
