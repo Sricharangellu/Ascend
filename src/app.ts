@@ -108,7 +108,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   for (const mod of modules) {
     const router = Router();
     await mod.register({ db, events, router });
-    app.use(`/api/${mod.name}`, router);
+    app.use(`/api/v1/${mod.name}`, router);
   }
 
   // ── Root info

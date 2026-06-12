@@ -10,6 +10,10 @@ import assert from "node:assert/strict";
 import { buildApp } from "../src/app.js";
 import { ensurePg } from "./pg-harness.js";
 
+// Commerce routes are tenant-scoped and require auth; the app needs a JWT secret
+// to issue/verify tokens. Set one for the smoke run if not provided.
+process.env.JWT_SECRET ??= "smoke-secret-finder-pos";
+
 const { url, stop } = await ensurePg();
 const schema = `smoke_${Date.now().toString(36)}`;
 const { express: app, db } = await buildApp({ connectionString: url, schema });
@@ -20,10 +24,14 @@ const addr = server.address();
 const port = typeof addr === "object" && addr ? addr.port : 0;
 const base = `http://127.0.0.1:${port}`;
 
+let authToken: string | null = null;
+
 async function api(method: string, path: string, body?: unknown) {
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (authToken) headers["authorization"] = `Bearer ${authToken}`;
   const res = await fetch(base + path, {
     method,
-    headers: { "content-type": "application/json" },
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const json = res.status === 204 ? null : await res.json();
@@ -41,14 +49,24 @@ async function main() {
   assert.deepEqual(r.json.modules, ["catalog", "inventory", "orders", "payments", "sync"]);
   ok(`health ok, modules: ${r.json.modules.join(", ")}`);
 
-  r = await api("POST", "/api/catalog", {
+  // Authenticate as the seeded demo owner (tenant tnt_demo) — commerce routes require it.
+  r = await api("POST", "/api/identity/login", {
+    email: "owner@finder-pos.dev",
+    password: "FinderDemo!2026",
+  });
+  assert.equal(r.status, 200);
+  authToken = r.json.accessToken;
+  assert.ok(authToken, "got access token");
+  ok(`logged in as ${r.json.user.email} (tenant ${r.json.user.tenantId}, role ${r.json.user.role})`);
+
+  r = await api("POST", "/api/v1/catalog", {
     sku: "TSHIRT-001", name: "Finder Tee", price_cents: 2000, category: "apparel",
   });
   assert.equal(r.status, 201);
   const teeId = r.json.id;
   ok(`created taxable product ${r.json.name} @ $${(r.json.price_cents / 100).toFixed(2)}`);
 
-  r = await api("POST", "/api/catalog", {
+  r = await api("POST", "/api/v1/catalog", {
     sku: "BEANS-001", name: "Organic Beans", price_cents: 1000, category: "groceries",
   });
   assert.equal(r.status, 201);
@@ -56,18 +74,18 @@ async function main() {
   const beansId = r.json.id;
   ok(`created grocery product -> auto tax_class=exempt`);
 
-  await api("POST", `/api/inventory/${teeId}/receive`, { quantity: 50 });
-  await api("POST", `/api/inventory/${beansId}/receive`, { quantity: 30 });
-  r = await api("GET", `/api/inventory/${teeId}`);
+  await api("POST", `/api/v1/inventory/${teeId}/receive`, { quantity: 50 });
+  await api("POST", `/api/v1/inventory/${beansId}/receive`, { quantity: 30 });
+  r = await api("GET", `/api/v1/inventory/${teeId}`);
   assert.equal(r.json.stockQty, 50);
   ok(`received stock: tee=50, beans=30`);
 
-  await api("POST", "/api/sync/online", { online: false });
-  r = await api("GET", "/api/sync/status");
+  await api("POST", "/api/v1/sync/online", { online: false });
+  r = await api("GET", "/api/v1/sync/status");
   assert.equal(r.json.online, false);
   ok(`terminal toggled OFFLINE`);
 
-  r = await api("POST", "/api/orders", {
+  r = await api("POST", "/api/v1/orders", {
     stateCode: "CA",
     lines: [
       { productId: teeId, quantity: 2 },
@@ -81,35 +99,35 @@ async function main() {
   assert.equal(order.total_cents, 5330, "total");
   ok(`order created: subtotal $50.00, CA tax $3.30 (beans exempt), total $53.30`);
 
-  r = await api("GET", `/api/inventory/${teeId}`);
+  r = await api("GET", `/api/v1/inventory/${teeId}`);
   assert.equal(r.json.stockQty, 48, "tee 50-2");
-  r = await api("GET", `/api/inventory/${beansId}`);
+  r = await api("GET", `/api/v1/inventory/${beansId}`);
   assert.equal(r.json.stockQty, 29, "beans 30-1");
   ok(`inventory auto-decremented: tee=48, beans=29`);
 
-  r = await api("POST", "/api/payments", {
+  r = await api("POST", "/api/v1/payments", {
     orderId: order.id, method: "split", cashCents: 4000, cardCents: 1330,
   });
   assert.equal(r.status, 201);
   assert.equal(r.json.status, "captured");
   ok(`split payment captured (cash $40.00 + card $13.30), auth ${r.json.auth_code}`);
 
-  r = await api("GET", "/api/sync/status");
+  r = await api("GET", "/api/v1/sync/status");
   assert.ok(r.json.pending > 0, "events queued while offline");
   assert.equal(r.json.synced, 0, "nothing synced while offline");
   const pendingBefore = r.json.pending;
   ok(`offline outbox holding ${pendingBefore} pending events, 0 synced`);
 
-  r = await api("POST", "/api/sync/online", { online: true });
+  r = await api("POST", "/api/v1/sync/online", { online: true });
   assert.ok(r.json.synced >= pendingBefore, "drained on reconnect");
-  r = await api("GET", "/api/sync/status");
+  r = await api("GET", "/api/v1/sync/status");
   assert.equal(r.json.online, true);
   assert.equal(r.json.pending, 0, "queue drained");
   ok(`reconnected -> ${r.json.synced} events synced to cloud ledger, queue empty`);
 
-  r = await api("POST", `/api/orders/${order.id}/refund`);
+  r = await api("POST", `/api/v1/orders/${order.id}/refund`);
   assert.equal(r.json.status, "refunded");
-  r = await api("GET", `/api/inventory/${teeId}`);
+  r = await api("GET", `/api/v1/inventory/${teeId}`);
   assert.equal(r.json.stockQty, 50, "tee restocked");
   ok(`order refunded -> inventory restocked to tee=50`);
 

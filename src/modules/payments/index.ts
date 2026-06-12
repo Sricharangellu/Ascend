@@ -2,9 +2,11 @@ import type { PosModule, ModuleContext } from "../types.js";
 import { PaymentsService } from "./service.js";
 import { registerRoutes } from "./routes.js";
 
+// Mirrors db/migrations/0002_commerce.sql — db/ is the canonical DDL owner.
 const MIGRATION = `
 CREATE TABLE IF NOT EXISTS payments (
   id            TEXT PRIMARY KEY,
+  tenant_id     TEXT NOT NULL,
   order_id      TEXT NOT NULL,
   method        TEXT NOT NULL,
   amount_cents  BIGINT NOT NULL,
@@ -16,6 +18,7 @@ CREATE TABLE IF NOT EXISTS payments (
   status        TEXT NOT NULL,
   created_at    BIGINT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS payments_tenant_order_idx ON payments (tenant_id, order_id);
 `;
 
 export const paymentsModule: PosModule = {

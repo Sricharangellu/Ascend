@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "next lint",
     "test": "vitest run",
-    "test:components": "vitest run tests/**/*.test.tsx",
+    "test:components": "vitest run tests/Button.test.tsx tests/Input.test.tsx tests/catalogCart.test.tsx",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "generate:client": "openapi-typescript ../contracts/openapi.yaml -o api-client/types.ts",

@@ -29,9 +29,6 @@ export default defineConfig({
     environmentMatchGlobs: [
       ["tests/**/*.test.tsx", "jsdom"],
     ],
-    // Default include: all .ts unit tests run in Node (no DOM deps needed).
-    // .tsx component tests use jsdom and are run separately:
-    //   npm run test:components
-    include: ["tests/**/*.test.ts"],
+    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
   },
 });

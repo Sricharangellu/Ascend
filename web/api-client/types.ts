@@ -155,6 +155,57 @@ export interface Payment {
   createdAt: number;
 }
 
+// ─── Catalog (Wave 1) ─────────────────────────────────────────────────────────
+export interface CatalogListResponse {
+  items: Product[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+// ─── Orders: create/update (Wave 1) ───────────────────────────────────────────
+export interface CreateOrderRequest {
+  lines: Array<{
+    productId: string;
+    quantity: number;
+  }>;
+  stateCode?: string;
+}
+
+export interface UpdateOrderRequest {
+  lines: Array<{
+    productId: string;
+    quantity: number;
+  }>;
+  stateCode?: string;
+}
+
+// ─── Payments: capture (Wave 1) ───────────────────────────────────────────────
+export interface CapturePaymentRequest {
+  orderId: string;
+  method: PaymentMethod;
+  /** integer cents tendered (cash) */
+  cashCents?: number;
+  /** integer cents charged to card */
+  cardCents?: number;
+  /** EMV/card last 4 digits */
+  cardLast4?: string;
+}
+
+// ─── Refund / void (Wave 1) ───────────────────────────────────────────────────
+export interface RefundRequest {
+  reason?: string;
+}
+
+// ─── Sync queue (offline outbox) ──────────────────────────────────────────────
+export interface SyncQueueItem {
+  id: string;
+  type: "create_order" | "capture_payment";
+  payload: unknown;
+  createdAt: number;
+  retryCount: number;
+}
+
 // ─── OpenAPI paths type map ───────────────────────────────────────────────────
 // When openapi-typescript generates from a populated spec, this section will be
 // replaced with a full paths object.  For now we define the shape manually so

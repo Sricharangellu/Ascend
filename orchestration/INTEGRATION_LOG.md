@@ -29,3 +29,13 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
   - Gate re-run: **backend 95/95 + 0 typecheck errors; frontend 28/28.** PASS both sides.
 - **Findings #2 (duplicate schema) & #3 (tenant id type): ACCEPTED FOR NOW, not deploy-blocking.** The backend's in-app migrations (`src/identity/migrations.ts`) are internally consistent and tested, and let the service self-provision its tables on first boot (needed for serverless/Neon). `db/migrations/*` + `contracts/schema.sql` remain the design-canonical source; Wave 1 converges them (backend loads `db/` SQL; add `tenants.uuid UUID` and emit it as the JWT tenant claim). Logged as Wave 1 task #2/#3.
 - Ready to deploy: backend self-migrates on boot; frontend points at the backend origin via `NEXT_PUBLIC_API_BASE_URL`.
+
+## Wave 1 — frontend UI/UX pass (2026-06-12)
+- **Frontend** → enterprise POS terminal UX refined in `web/`: responsive terminal shell, product catalog density/search/category UX, cart controls, tender dialog tabs, receipt dialog, accessible icon controls, and test harness repairs for component coverage.
+- **Consumes** → existing `/api/v1/catalog`, `/api/v1/orders`, `/api/v1/payments`, `/api/v1/flags` client/MSW surfaces already present in `web/api-client/types.ts` + `web/mocks/handlers.ts`.
+- **Verification** → `cd web && npm run typecheck` PASS; `npm test` PASS (80/80); `npm run test:components` PASS (21/21). Dependency-tree repair required restoring missing Rollup/esbuild optional native packages in local `node_modules`; no contract changes proposed.
+
+## Wave 1 — enterprise shell benchmark pass (2026-06-12)
+- **Frontend** → added a Lightspeed X-Series-inspired enterprise POS shell in `web/app/(protected)/terminal/page.tsx`: desktop rail, mobile bottom navigation, store/register selector, device online/offline status, user/role context, and placeholders for Inventory, Customers, Reports, and Settings.
+- **Rationale** → establishes the enterprise navigation frame before building the Wave 2 operations surfaces, while keeping the Register workflow as the first-screen task.
+- **Verification** → `cd web && npm run typecheck` PASS; `npm test` PASS (80/80); `npm run test:components` PASS (21/21); `curl -I http://localhost:3000/terminal` returned 200.

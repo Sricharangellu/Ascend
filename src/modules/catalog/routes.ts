@@ -1,7 +1,8 @@
-import type { Router, Request } from "express";
+import type { Router, Request, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody, notFound, badRequest } from "../../shared/http.js";
 import type { CatalogService, ProductStatus, TaxClass } from "./service.js";
+import type { AuthPayload } from "../../gateway/auth.js";
 
 const taxClassSchema = z.enum(["standard", "exempt"]);
 const statusSchema = z.enum(["active", "draft", "archived"]);
@@ -58,16 +59,23 @@ function readQuery(req: Request) {
   };
 }
 
+function tenantId(res: Response): string {
+  return (res.locals["auth"] as AuthPayload).tenantId;
+}
+
 export function registerRoutes(router: Router, service: CatalogService): void {
   router.post(
     "/",
     handler(async (req, res) => {
       const body = parseBody(createSchema, req.body);
-      const product = await service.create({
-        ...body,
-        tax_class: body.tax_class as TaxClass | undefined,
-        status: body.status as ProductStatus | undefined,
-      });
+      const product = await service.create(
+        {
+          ...body,
+          tax_class: body.tax_class as TaxClass | undefined,
+          status: body.status as ProductStatus | undefined,
+        },
+        tenantId(res),
+      );
       res.status(201).json(product);
     }),
   );
@@ -75,7 +83,7 @@ export function registerRoutes(router: Router, service: CatalogService): void {
   router.get(
     "/",
     handler(async (req, res) => {
-      const page = await service.list(readQuery(req));
+      const page = await service.list(readQuery(req), tenantId(res));
       res.json(page);
     }),
   );
@@ -84,7 +92,7 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     "/:id",
     handler(async (req, res) => {
       const id = String(req.params.id);
-      const product = await service.get(id);
+      const product = await service.get(id, tenantId(res));
       if (!product) throw notFound(`product '${id}' not found`);
       res.json(product);
     }),
@@ -94,7 +102,7 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     "/:id",
     handler(async (req, res) => {
       const body = parseBody(updateSchema, req.body);
-      const product = await service.update(String(req.params.id), body);
+      const product = await service.update(String(req.params.id), body, tenantId(res));
       res.json(product);
     }),
   );
@@ -102,7 +110,7 @@ export function registerRoutes(router: Router, service: CatalogService): void {
   router.delete(
     "/:id",
     handler(async (req, res) => {
-      const product = await service.archive(String(req.params.id));
+      const product = await service.archive(String(req.params.id), tenantId(res));
       res.json(product);
     }),
   );

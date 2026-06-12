@@ -3,13 +3,31 @@
 -- Owner:   DATABASE agent  (sole editor of this file)
 -- Readers: Backend agent (codes against this), Frontend agent (type-gen)
 --
+-- NOTE: The backend's in-app migrations (src/shared/db.ts migration runner)
+-- mirror this file.  When this file is updated, the backend must update its
+-- own migration SQL in the same wave so the two stay in sync.
+--
 -- Change protocol (§4.3 of 00_EXECUTION_PROMPT_BOOK.md):
 --   1. Database agent proposes change via ADR in db/adr/.
 --   2. Orchestrator merges to main; records in contracts/CHANGELOG.md.
 --   3. Contracts move forward only — additive first; breaking = new /v2.
 --
+-- TENANT-ID CONVENTION — RECONCILED 2026-06-12
+-- ─────────────────────────────────────────────
+-- The LIVE system uses tenant ids as TEXT with a 'tnt_' prefix
+-- (e.g. 'tnt_demo').  tenants.id is TEXT PRIMARY KEY.
+--
+-- Wave 0 tables (roles, users, audit_log, feature_flags, idempotency_keys)
+-- were scaffolded with tenant_id UUID.  These are documented below as-is
+-- for Wave 0.  They will be reconciled to TEXT in a future Wave 0 fixup
+-- migration (0001b_foundation_tenant_text.sql) or addressed at Wave 2
+-- hardening.
+--
+-- Wave 1+ tables use tenant_id TEXT NOT NULL uniformly.
+-- RLS policies for Wave 1+ tables compare TEXT = TEXT (no ::uuid cast).
+--
 -- Conventions (cross-cutting, must not be violated):
---   • tenant_id UUID NOT NULL on every business/user table.
+--   • tenant_id TEXT NOT NULL on every Wave 1+ business table.
 --   • RLS REQUIRED on every tenant-scoped table (see db/rls/policies.sql).
 --   • Money      → BIGINT cents.
 --   • Timestamps → BIGINT epoch ms.
@@ -174,140 +192,226 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (
 --   idempotency_keys_ts_idx         ON idempotency_keys (ts)  -- expiry sweeps
 
 -- ===========================================================================
--- WAVE 1 — Core commerce  (UPCOMING — db/migrations/0002_commerce.sql)
--- Tables below are PLACEHOLDERS showing the planned schema.
--- Do not execute this section against a live database yet.
+-- WAVE 1 — Core commerce
+-- Migration: db/migrations/0002_commerce.sql
+-- Published: 2026-06-12
+--
+-- All Wave 1 tables use tenant_id TEXT NOT NULL (tnt_<slug> convention).
+-- RLS ENABLED on all tables; policies use TEXT comparison (no ::uuid cast).
+-- See db/rls/policies.sql for per-table policies.
 -- ===========================================================================
 
 -- ---------------------------------------------------------------------------
 -- products  [catalog]
--- Ported from CONTRACTS.md with tenant_id + BIGINT money + audit columns.
--- RLS: ENABLED
 -- Prefix: prod_
+-- Domain rules:
+--   • category = 'groceries' → tax_class = 'exempt'  (CHECK enforced)
+--   • UNIQUE (tenant_id, sku)
+-- RLS: ENABLED
 -- ---------------------------------------------------------------------------
--- CREATE TABLE IF NOT EXISTS products (
---     id           TEXT    PRIMARY KEY,             -- prod_<uuidv7>
---     tenant_id    UUID    NOT NULL,
---     sku          TEXT    NOT NULL,
---     name         TEXT    NOT NULL,
---     price_cents  BIGINT  NOT NULL,                -- cents
---     category     TEXT    NOT NULL DEFAULT 'general',
---     tax_class    TEXT    NOT NULL DEFAULT 'standard', -- 'standard'|'exempt'
---     barcode      TEXT,
---     status       TEXT    NOT NULL DEFAULT 'active',   -- 'active'|'draft'|'archived'
---     created_at   BIGINT  NOT NULL,
---     updated_at   BIGINT  NOT NULL,
---     CONSTRAINT products_tenant_sku_uq UNIQUE (tenant_id, sku)
--- );
+CREATE TABLE IF NOT EXISTS products (
+    id           TEXT    NOT NULL,
+    tenant_id    TEXT    NOT NULL,              -- tnt_<slug>, e.g. 'tnt_demo'
+    sku          TEXT    NOT NULL,
+    name         TEXT    NOT NULL,
+    price_cents  BIGINT  NOT NULL,              -- cents; >= 0
+    category     TEXT    NOT NULL DEFAULT 'general',
+    tax_class    TEXT    NOT NULL DEFAULT 'standard',
+                         -- 'standard' | 'exempt'
+    barcode      TEXT,
+    status       TEXT    NOT NULL DEFAULT 'active',
+                         -- 'active' | 'draft' | 'archived'
+    created_at   BIGINT  NOT NULL,              -- epoch ms
+    updated_at   BIGINT  NOT NULL,              -- epoch ms
+
+    CONSTRAINT products_pk PRIMARY KEY (id),
+    CONSTRAINT products_tenant_sku_uq UNIQUE (tenant_id, sku),
+    CONSTRAINT products_price_nonneg CHECK (price_cents >= 0),
+    CONSTRAINT products_tax_class_values CHECK (tax_class IN ('standard', 'exempt')),
+    CONSTRAINT products_status_values CHECK (status IN ('active', 'draft', 'archived')),
+    CONSTRAINT products_grocery_exempt CHECK (
+        category <> 'groceries' OR tax_class = 'exempt'
+    )
+);
+-- Indexes:
+--   products_tenant_sku_idx            ON products (tenant_id, sku)
+--   products_tenant_status_created_idx ON products (tenant_id, status, created_at DESC)
+--   products_tenant_category_idx       ON products (tenant_id, category)
+--   products_barcode_idx               ON products (barcode) WHERE barcode IS NOT NULL
 
 -- ---------------------------------------------------------------------------
 -- inventory  [inventory]
+-- PK: (tenant_id, product_id) — composite, avoids a separate surrogate key.
+-- stock_qty updated in-place; full history in inventory_movements.
 -- RLS: ENABLED
 -- ---------------------------------------------------------------------------
--- CREATE TABLE IF NOT EXISTS inventory (
---     id          TEXT    PRIMARY KEY,             -- inv_<uuidv7>
---     tenant_id   UUID    NOT NULL,
---     product_id  TEXT    NOT NULL,
---     stock_qty   INTEGER NOT NULL DEFAULT 0,
---     reorder_pt  INTEGER NOT NULL DEFAULT 0,
---     updated_at  BIGINT  NOT NULL,
---     CONSTRAINT inventory_tenant_product_uq UNIQUE (tenant_id, product_id)
--- );
+CREATE TABLE IF NOT EXISTS inventory (
+    product_id   TEXT    NOT NULL,
+    tenant_id    TEXT    NOT NULL,
+    stock_qty    INTEGER NOT NULL DEFAULT 0,
+    reorder_pt   INTEGER NOT NULL DEFAULT 0,
+    updated_at   BIGINT  NOT NULL,              -- epoch ms
+
+    CONSTRAINT inventory_pk PRIMARY KEY (tenant_id, product_id),
+    CONSTRAINT inventory_stock_nonneg   CHECK (stock_qty >= 0),
+    CONSTRAINT inventory_reorder_nonneg CHECK (reorder_pt >= 0)
+);
+-- Indexes:
+--   inventory_tenant_product_idx ON inventory (tenant_id, product_id)
+--   inventory_tenant_reorder_idx ON inventory (tenant_id, stock_qty)
+--                                   WHERE stock_qty <= reorder_pt  [low-stock alert]
 
 -- ---------------------------------------------------------------------------
 -- inventory_movements  [inventory]
--- RLS: ENABLED
+-- Append-only ledger. Never UPDATE or DELETE app-side.
+-- Prefix: ivm_
+-- RLS: ENABLED (SELECT + INSERT only; no UPDATE/DELETE for app role)
 -- ---------------------------------------------------------------------------
--- CREATE TABLE IF NOT EXISTS inventory_movements (
---     id          TEXT    PRIMARY KEY,             -- ivm_<uuidv7>
---     tenant_id   UUID    NOT NULL,
---     product_id  TEXT    NOT NULL,
---     delta       INTEGER NOT NULL,               -- +receiving, -sale
---     reason      TEXT    NOT NULL,               -- 'receiving'|'sale'|'adjustment'|'return'
---     ref         TEXT,                           -- order id etc.
---     created_at  BIGINT  NOT NULL
--- );
+CREATE TABLE IF NOT EXISTS inventory_movements (
+    id           TEXT    NOT NULL,
+    tenant_id    TEXT    NOT NULL,
+    product_id   TEXT    NOT NULL,
+    delta        INTEGER NOT NULL,
+                         -- positive: receiving/return; negative: sale/adjustment
+    reason       TEXT    NOT NULL,
+                         -- 'receiving' | 'sale' | 'adjustment' | 'return'
+    ref          TEXT,   -- order_id for sale/return; PO ref for receiving; etc.
+    created_at   BIGINT  NOT NULL,              -- epoch ms
+
+    CONSTRAINT inventory_movements_pk PRIMARY KEY (id),
+    CONSTRAINT inventory_movements_reason_values
+        CHECK (reason IN ('receiving', 'sale', 'adjustment', 'return'))
+);
+-- Indexes:
+--   ivm_tenant_product_created_idx ON inventory_movements (tenant_id, product_id, created_at DESC)
+--   ivm_tenant_created_idx         ON inventory_movements (tenant_id, created_at DESC)
+--   ivm_tenant_ref_idx             ON inventory_movements (tenant_id, ref) WHERE ref IS NOT NULL
 
 -- ---------------------------------------------------------------------------
 -- orders  [orders]
--- Status enum: 'open' | 'completed' | 'refunded' | 'voided'
+-- Prefix: ord_
+-- Status lifecycle: open → completed → refunded | voided
 -- State codes: CA | NY | TX | FL  (drives tax engine)
 -- RLS: ENABLED
--- Prefix: ord_
 -- ---------------------------------------------------------------------------
--- CREATE TABLE IF NOT EXISTS orders (
---     id             TEXT    PRIMARY KEY,          -- ord_<uuidv7>
---     tenant_id      UUID    NOT NULL,
---     order_number   TEXT    NOT NULL,
---     state_code     TEXT    NOT NULL,             -- CA|NY|TX|FL
---     status         TEXT    NOT NULL DEFAULT 'open',
---     subtotal_cents BIGINT  NOT NULL,
---     discount_cents BIGINT  NOT NULL DEFAULT 0,
---     tax_cents      BIGINT  NOT NULL,
---     total_cents    BIGINT  NOT NULL,
---     customer_id    TEXT,
---     created_at     BIGINT  NOT NULL,
---     updated_at     BIGINT  NOT NULL
--- );
+CREATE TABLE IF NOT EXISTS orders (
+    id             TEXT    NOT NULL,
+    tenant_id      TEXT    NOT NULL,
+    order_number   TEXT    NOT NULL,
+    state_code     TEXT    NOT NULL,
+                           -- 'CA' | 'NY' | 'TX' | 'FL'
+    status         TEXT    NOT NULL DEFAULT 'open',
+                           -- 'open' | 'completed' | 'refunded' | 'voided'
+    subtotal_cents BIGINT  NOT NULL,
+    discount_cents BIGINT  NOT NULL DEFAULT 0,
+    tax_cents      BIGINT  NOT NULL DEFAULT 0,
+    total_cents    BIGINT  NOT NULL,
+    customer_id    TEXT,                        -- nullable; loyalty hook (Wave 2+)
+    created_at     BIGINT  NOT NULL,            -- epoch ms
+    updated_at     BIGINT  NOT NULL,            -- epoch ms
+
+    CONSTRAINT orders_pk PRIMARY KEY (id),
+    CONSTRAINT orders_tenant_number_uq UNIQUE (tenant_id, order_number),
+    CONSTRAINT orders_state_code_values
+        CHECK (state_code IN ('CA', 'NY', 'TX', 'FL')),
+    CONSTRAINT orders_status_values
+        CHECK (status IN ('open', 'completed', 'refunded', 'voided')),
+    CONSTRAINT orders_subtotal_nonneg CHECK (subtotal_cents >= 0),
+    CONSTRAINT orders_discount_nonneg CHECK (discount_cents >= 0),
+    CONSTRAINT orders_tax_nonneg      CHECK (tax_cents >= 0),
+    CONSTRAINT orders_total_nonneg    CHECK (total_cents >= 0)
+);
+-- Indexes:
+--   orders_tenant_status_created_idx ON orders (tenant_id, status, created_at DESC)
+--   orders_tenant_created_idx        ON orders (tenant_id, created_at DESC)
+--   orders_tenant_number_idx         ON orders (tenant_id, order_number)
+--   orders_tenant_customer_idx       ON orders (tenant_id, customer_id) WHERE customer_id IS NOT NULL
 
 -- ---------------------------------------------------------------------------
 -- order_lines  [orders]
--- RLS: ENABLED
 -- Prefix: oln_
+-- qty and unit_price_cents are source of truth.
+-- line_total_cents is stored (denormalized) for query performance.
+-- RLS: ENABLED
 -- ---------------------------------------------------------------------------
--- CREATE TABLE IF NOT EXISTS order_lines (
---     id           TEXT    PRIMARY KEY,            -- oln_<uuidv7>
---     tenant_id    UUID    NOT NULL,
---     order_id     TEXT    NOT NULL,
---     product_id   TEXT    NOT NULL,
---     name         TEXT    NOT NULL,
---     quantity     INTEGER NOT NULL,
---     unit_cents   BIGINT  NOT NULL,
---     tax_cents    BIGINT  NOT NULL,
---     line_cents   BIGINT  NOT NULL,              -- (unit*qty) - line discount
---     taxable      BOOLEAN NOT NULL
--- );
+CREATE TABLE IF NOT EXISTS order_lines (
+    id               TEXT    NOT NULL,
+    tenant_id        TEXT    NOT NULL,
+    order_id         TEXT    NOT NULL,
+    product_id       TEXT    NOT NULL,
+    qty              INTEGER NOT NULL,
+    unit_price_cents BIGINT  NOT NULL,          -- cents at time of sale (snapshot)
+    line_total_cents BIGINT  NOT NULL,          -- (unit_price * qty) - line discount
+
+    CONSTRAINT order_lines_pk PRIMARY KEY (id),
+    CONSTRAINT order_lines_qty_pos      CHECK (qty > 0),
+    CONSTRAINT order_lines_unit_nonneg  CHECK (unit_price_cents >= 0),
+    CONSTRAINT order_lines_total_nonneg CHECK (line_total_cents >= 0)
+);
+-- Indexes:
+--   oln_tenant_order_idx   ON order_lines (tenant_id, order_id)
+--   oln_tenant_product_idx ON order_lines (tenant_id, product_id)
 
 -- ---------------------------------------------------------------------------
 -- payments  [payments]
--- Method: 'cash' | 'card' | 'split'
--- Status: 'captured' | 'declined'
--- Idempotency: always look up idempotency_keys before inserting.
--- RLS: ENABLED
 -- Prefix: pay_
+-- One row per tender action.  Split tender: method='split',
+--   tendered_cents holds total cash offered, change_cents = tendered - amount.
+-- Idempotency: backend checks idempotency_keys before inserting.
+-- RLS: ENABLED
 -- ---------------------------------------------------------------------------
--- CREATE TABLE IF NOT EXISTS payments (
---     id            TEXT    PRIMARY KEY,           -- pay_<uuidv7>
---     tenant_id     UUID    NOT NULL,
---     order_id      TEXT    NOT NULL,
---     method        TEXT    NOT NULL,              -- 'cash'|'card'|'split'
---     amount_cents  BIGINT  NOT NULL,
---     cash_cents    BIGINT  NOT NULL DEFAULT 0,
---     card_cents    BIGINT  NOT NULL DEFAULT 0,
---     change_cents  BIGINT  NOT NULL DEFAULT 0,
---     card_last4    TEXT,
---     auth_code     TEXT,
---     status        TEXT    NOT NULL,              -- 'captured'|'declined'
---     created_at    BIGINT  NOT NULL
--- );
+CREATE TABLE IF NOT EXISTS payments (
+    id             TEXT    NOT NULL,
+    tenant_id      TEXT    NOT NULL,
+    order_id       TEXT    NOT NULL,
+    method         TEXT    NOT NULL,
+                           -- 'cash' | 'card' | 'split'
+    amount_cents   BIGINT  NOT NULL,            -- total tendered toward order
+    tendered_cents BIGINT  NOT NULL DEFAULT 0,  -- cash tendered (for change calc)
+    change_cents   BIGINT  NOT NULL DEFAULT 0,  -- change given back
+    status         TEXT    NOT NULL,
+                           -- 'captured' | 'declined' | 'refunded'
+    created_at     BIGINT  NOT NULL,            -- epoch ms
+
+    CONSTRAINT payments_pk PRIMARY KEY (id),
+    CONSTRAINT payments_method_values
+        CHECK (method IN ('cash', 'card', 'split')),
+    CONSTRAINT payments_status_values
+        CHECK (status IN ('captured', 'declined', 'refunded')),
+    CONSTRAINT payments_amount_nonneg   CHECK (amount_cents >= 0),
+    CONSTRAINT payments_tendered_nonneg CHECK (tendered_cents >= 0),
+    CONSTRAINT payments_change_nonneg   CHECK (change_cents >= 0)
+);
+-- Indexes:
+--   payments_tenant_order_idx          ON payments (tenant_id, order_id)
+--   payments_tenant_status_created_idx ON payments (tenant_id, status, created_at DESC)
+--   payments_tenant_created_idx        ON payments (tenant_id, created_at DESC)
 
 -- ---------------------------------------------------------------------------
 -- sync_queue  [sync]
--- Outbox table. Events are appended by the EventBus onAny handler.
--- status: 'pending' | 'synced' | 'failed'
+-- Offline outbox.  EventBus onAny handler appends every domain event here.
+-- Push worker marks rows 'synced' on reconnect.
+-- id is BIGSERIAL (ordering by insert sequence, no UUID needed).
 -- RLS: ENABLED
--- Prefix: sq_  (id is BIGSERIAL for ordering; queue semantics)
 -- ---------------------------------------------------------------------------
--- CREATE TABLE IF NOT EXISTS sync_queue (
---     id                BIGSERIAL PRIMARY KEY,
---     tenant_id         UUID    NOT NULL,
---     event_type        TEXT    NOT NULL,
---     payload           JSONB   NOT NULL,
---     status            TEXT    NOT NULL DEFAULT 'pending',
---     attempts          INTEGER NOT NULL DEFAULT 0,
---     created_at        BIGINT  NOT NULL,
---     last_attempted_at BIGINT
--- );
+CREATE TABLE IF NOT EXISTS sync_queue (
+    id                BIGSERIAL PRIMARY KEY,
+    tenant_id         TEXT    NOT NULL,
+    event_type        TEXT    NOT NULL,
+    payload           JSONB   NOT NULL,
+    status            TEXT    NOT NULL DEFAULT 'pending',
+                              -- 'pending' | 'synced' | 'failed'
+    attempts          INTEGER NOT NULL DEFAULT 0,
+    created_at        BIGINT  NOT NULL,         -- epoch ms
+    last_attempted_at BIGINT,                   -- epoch ms, nullable
+
+    CONSTRAINT sync_queue_status_values
+        CHECK (status IN ('pending', 'synced', 'failed')),
+    CONSTRAINT sync_queue_attempts_nonneg CHECK (attempts >= 0)
+);
+-- Indexes:
+--   sq_tenant_status_created_idx ON sync_queue (tenant_id, status, created_at ASC)
+--   sq_tenant_event_type_idx     ON sync_queue (tenant_id, event_type)
 
 -- ===========================================================================
 -- END OF SCHEMA

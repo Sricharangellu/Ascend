@@ -1,6 +1,7 @@
 -- =============================================================================
 -- Row-Level Security Policies — Finder POS
 -- Wave:  0 — Platform foundation
+--         1 — Core commerce (appended 2026-06-12)
 -- Owner: DATABASE agent
 --
 -- DESIGN INTENT
@@ -15,13 +16,38 @@
 -- when the variable is unset. That means a request that forgets to set the
 -- tenant context gets an error, not a data leak. Never use the two-argument
 -- form current_setting('app.tenant_id', true) here (that returns NULL on
--- missing, which compares FALSE to any UUID → 0 rows, which is safe but
--- silent; the error form is better because it surfaces the bug immediately).
+-- missing, which compares FALSE to any tenant_id → 0 rows, which is safe
+-- but silent; the error form is better because it surfaces the bug).
+--
+-- TENANT-ID TYPE — RECONCILIATION NOTE (ratified 2026-06-12)
+-- ────────────────────────────────────────────────────────────
+-- Wave 0 tables (roles, users, audit_log, feature_flags, idempotency_keys)
+-- were initially written with tenant_id UUID.  The LIVE system uses tenant
+-- ids as TEXT with a 'tnt_' prefix (e.g. 'tnt_demo').  Wave 1 and all
+-- future tables use tenant_id TEXT.
+--
+-- RLS DESIGN TARGET vs. WAVE 1 ENABLEMENT
+-- ─────────────────────────────────────────
+-- RLS is the DESIGN TARGET and provides defense-in-depth isolation.
+-- In Wave 1 the backend enforces tenant isolation at the APPLICATION LAYER
+-- (every query includes WHERE tenant_id = $tenantId from the verified JWT).
+-- RLS is NOT yet activated in the backend's in-app provisioning path because
+-- enabling it on the connection used during login would block the pre-auth
+-- tenant lookup (the users/tenants query runs before the JWT tenant_id is
+-- known).
+--
+-- Future enablement path:
+--   1. Introduce a privileged "auth service" DB role that has BYPASSRLS
+--      for the tenants + users tables only (used for login/token-issue).
+--   2. All other app queries use the standard app_user role (no BYPASSRLS).
+--   3. Apply: SET app.tenant_id = '<tnt_...>' per transaction from JWT.
+--   4. With that split in place, enable RLS globally and run the tenancy
+--      test suite (see db/README.md) in CI.
 --
 -- SERVICE ACCOUNT BYPASS
 -- ──────────────────────
--- The migration runner and backup roles are granted BYPASSRLS (superuser or
--- explicit BYPASSRLS privilege). Application roles must NOT have BYPASSRLS.
+-- The migration runner and backup roles are granted BYPASSRLS. Application
+-- roles must NOT have BYPASSRLS.
 -- Example DDL (run once during provisioning, outside this file):
 --   CREATE ROLE app_user NOINHERIT LOGIN;
 --   GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public
@@ -36,6 +62,12 @@
 --       INSERT uses WITH CHECK; UPDATE/DELETE use USING + WITH CHECK.
 -- This matches the recommended PostgreSQL pattern for separating read/write
 -- enforcement.
+--
+-- COMPARISON SYNTAX
+-- ─────────────────
+-- Wave 0 policies (UUID tenant_id):  tenant_id = current_setting(...)::uuid
+-- Wave 1+ policies (TEXT tenant_id): tenant_id = current_setting(...)
+--   NO CAST — TEXT = TEXT comparison.
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -125,17 +157,116 @@ CREATE POLICY tenant_isolation_write ON idempotency_keys
     WITH CHECK (tenant_id = current_setting('app.tenant_id')::uuid);
 
 -- =============================================================================
--- WAVE 1 PLACEHOLDER
--- When Wave 1 commerce tables are added (products, inventory, orders, etc.),
--- append policies here following the same pattern. Each table needs:
---   ALTER TABLE <name> ENABLE ROW LEVEL SECURITY;  -- in the migration file
---   DROP POLICY IF EXISTS tenant_isolation_select ON <name>;
---   CREATE POLICY tenant_isolation_select ON <name> FOR SELECT
---       USING (tenant_id = current_setting('app.tenant_id')::uuid);
---   DROP POLICY IF EXISTS tenant_isolation_write ON <name>;
---   CREATE POLICY tenant_isolation_write ON <name> FOR ALL
---       USING  (tenant_id = current_setting('app.tenant_id')::uuid)
---       WITH CHECK (tenant_id = current_setting('app.tenant_id')::uuid);
+-- WAVE 1 — Core commerce policies
+-- Tables: products, inventory, inventory_movements, orders, order_lines,
+--         payments, sync_queue
+-- tenant_id type: TEXT  (tnt_<slug> — NO ::uuid cast in predicates)
+-- Migration: db/migrations/0002_commerce.sql
+-- Added: 2026-06-12
+-- =============================================================================
+
+-- ============================================================
+-- TABLE: products
+-- ============================================================
+DROP POLICY IF EXISTS tenant_isolation_select ON products;
+CREATE POLICY tenant_isolation_select ON products
+    FOR SELECT
+    USING (tenant_id = current_setting('app.tenant_id'));
+
+DROP POLICY IF EXISTS tenant_isolation_write ON products;
+CREATE POLICY tenant_isolation_write ON products
+    FOR ALL
+    USING  (tenant_id = current_setting('app.tenant_id'))
+    WITH CHECK (tenant_id = current_setting('app.tenant_id'));
+
+-- ============================================================
+-- TABLE: inventory
+-- ============================================================
+DROP POLICY IF EXISTS tenant_isolation_select ON inventory;
+CREATE POLICY tenant_isolation_select ON inventory
+    FOR SELECT
+    USING (tenant_id = current_setting('app.tenant_id'));
+
+DROP POLICY IF EXISTS tenant_isolation_write ON inventory;
+CREATE POLICY tenant_isolation_write ON inventory
+    FOR ALL
+    USING  (tenant_id = current_setting('app.tenant_id'))
+    WITH CHECK (tenant_id = current_setting('app.tenant_id'));
+
+-- ============================================================
+-- TABLE: inventory_movements  (append-only — no UPDATE/DELETE for app role)
+-- ============================================================
+DROP POLICY IF EXISTS tenant_isolation_select ON inventory_movements;
+CREATE POLICY tenant_isolation_select ON inventory_movements
+    FOR SELECT
+    USING (tenant_id = current_setting('app.tenant_id'));
+
+DROP POLICY IF EXISTS tenant_isolation_insert ON inventory_movements;
+CREATE POLICY tenant_isolation_insert ON inventory_movements
+    FOR INSERT
+    WITH CHECK (tenant_id = current_setting('app.tenant_id'));
+
+-- Deliberately NO UPDATE or DELETE policy on inventory_movements.
+-- The ledger is immutable; corrections are made via new adjustment rows.
+
+-- ============================================================
+-- TABLE: orders
+-- ============================================================
+DROP POLICY IF EXISTS tenant_isolation_select ON orders;
+CREATE POLICY tenant_isolation_select ON orders
+    FOR SELECT
+    USING (tenant_id = current_setting('app.tenant_id'));
+
+DROP POLICY IF EXISTS tenant_isolation_write ON orders;
+CREATE POLICY tenant_isolation_write ON orders
+    FOR ALL
+    USING  (tenant_id = current_setting('app.tenant_id'))
+    WITH CHECK (tenant_id = current_setting('app.tenant_id'));
+
+-- ============================================================
+-- TABLE: order_lines
+-- ============================================================
+DROP POLICY IF EXISTS tenant_isolation_select ON order_lines;
+CREATE POLICY tenant_isolation_select ON order_lines
+    FOR SELECT
+    USING (tenant_id = current_setting('app.tenant_id'));
+
+DROP POLICY IF EXISTS tenant_isolation_write ON order_lines;
+CREATE POLICY tenant_isolation_write ON order_lines
+    FOR ALL
+    USING  (tenant_id = current_setting('app.tenant_id'))
+    WITH CHECK (tenant_id = current_setting('app.tenant_id'));
+
+-- ============================================================
+-- TABLE: payments
+-- ============================================================
+DROP POLICY IF EXISTS tenant_isolation_select ON payments;
+CREATE POLICY tenant_isolation_select ON payments
+    FOR SELECT
+    USING (tenant_id = current_setting('app.tenant_id'));
+
+DROP POLICY IF EXISTS tenant_isolation_write ON payments;
+CREATE POLICY tenant_isolation_write ON payments
+    FOR ALL
+    USING  (tenant_id = current_setting('app.tenant_id'))
+    WITH CHECK (tenant_id = current_setting('app.tenant_id'));
+
+-- ============================================================
+-- TABLE: sync_queue
+-- ============================================================
+DROP POLICY IF EXISTS tenant_isolation_select ON sync_queue;
+CREATE POLICY tenant_isolation_select ON sync_queue
+    FOR SELECT
+    USING (tenant_id = current_setting('app.tenant_id'));
+
+DROP POLICY IF EXISTS tenant_isolation_write ON sync_queue;
+CREATE POLICY tenant_isolation_write ON sync_queue
+    FOR ALL
+    USING  (tenant_id = current_setting('app.tenant_id'))
+    WITH CHECK (tenant_id = current_setting('app.tenant_id'));
+
+-- =============================================================================
+-- END OF WAVE 1 POLICIES
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------

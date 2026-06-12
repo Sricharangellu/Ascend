@@ -6,6 +6,7 @@ export type SyncStatus = "pending" | "synced" | "failed";
 
 export interface SyncRow {
   id: number;
+  tenant_id: string;
   event_type: string;
   payload: string; // JSON: { payload, meta }
   status: SyncStatus;
@@ -88,17 +89,21 @@ export class SyncEngine {
   /**
    * Outbox writer. Subscribed to events.onAny, it records EVERY domain event
    * into `sync_queue` as `pending`, bundling payload + meta (aggregateId,
-   * occurredAt) so the cloud can reconstruct the event.
+   * occurredAt) so the cloud can reconstruct the event. Extracts tenantId from
+   * the event payload (all commerce events carry it) so the outbox row is
+   * tenant-scoped. Falls back to 'system' for platform/identity events.
    */
   async enqueue(event: DomainEvent): Promise<void> {
+    const tenantId = (event.payload as Record<string, unknown>)?.["tenantId"] as string | undefined
+      ?? "system";
     const payload = JSON.stringify({
       payload: event.payload,
       meta: { aggregateId: event.aggregateId, occurredAt: event.occurredAt },
     });
     await this.db.query(
-      `INSERT INTO sync_queue (event_type, payload, status, attempts, created_at, last_attempted_at)
-       VALUES (?, ?, 'pending', 0, ?, NULL)`,
-      [event.type, payload, Date.now()],
+      `INSERT INTO sync_queue (tenant_id, event_type, payload, status, attempts, created_at, last_attempted_at)
+       VALUES (@tenant_id, @event_type, @payload, 'pending', 0, @created_at, NULL)`,
+      { tenant_id: tenantId, event_type: event.type, payload, created_at: Date.now() },
     );
   }
 
@@ -108,20 +113,22 @@ export class SyncEngine {
    * Drain pending rows to the cloud ledger. No-op while offline. Selects pending
    * rows with attempts < max, oldest first, batched to 50. Rows inside their
    * backoff window are skipped unless `forceAll`. `now` is injectable for tests.
+   * When `tenantId` is provided, only that tenant's rows are processed.
    */
-  async pushSync(opts: { forceAll?: boolean; now?: number } = {}): Promise<PushResult> {
+  async pushSync(opts: { forceAll?: boolean; now?: number; tenantId?: string } = {}): Promise<PushResult> {
     const result: PushResult = { attempted: 0, synced: 0, failed: 0 };
     if (!this.online) return result;
 
     const now = opts.now ?? Date.now();
     const forceAll = opts.forceAll ?? false;
 
+    const tenantFilter = opts.tenantId ? " AND tenant_id = @tenantId" : "";
     const rows = await this.db.query<SyncRow>(
       `SELECT * FROM sync_queue
-       WHERE status = 'pending' AND attempts < ?
+       WHERE status = 'pending' AND attempts < @maxAttempts${tenantFilter}
        ORDER BY id
        LIMIT 50`,
-      [MAX_ATTEMPTS],
+      { maxAttempts: MAX_ATTEMPTS, tenantId: opts.tenantId ?? null },
     );
 
     for (const row of rows) {
@@ -184,9 +191,16 @@ export class SyncEngine {
 
   // --- Reads ----------------------------------------------------------------
 
-  async counts(): Promise<SyncCounts> {
+  async counts(tenantId?: string): Promise<SyncCounts> {
+    const params: Record<string, unknown> = {};
+    let whereSql = "";
+    if (tenantId) {
+      whereSql = "WHERE tenant_id = @tenantId";
+      params.tenantId = tenantId;
+    }
     const rows = await this.db.query<{ status: SyncStatus; n: number }>(
-      `SELECT status, COUNT(*) AS n FROM sync_queue GROUP BY status`,
+      `SELECT status, COUNT(*) AS n FROM sync_queue ${whereSql} GROUP BY status`,
+      params,
     );
     const counts: SyncCounts = { pending: 0, synced: 0, failed: 0 };
     for (const r of rows) {
@@ -197,16 +211,20 @@ export class SyncEngine {
     return counts;
   }
 
-  async status(): Promise<StatusReport> {
-    return { online: this.online, ...(await this.counts()) };
+  async status(tenantId?: string): Promise<StatusReport> {
+    return { online: this.online, ...(await this.counts(tenantId)) };
   }
 
-  async list(query: ListQueueQuery = {}): Promise<Page<SyncRow>> {
+  async list(query: ListQueueQuery = {}, tenantId?: string): Promise<Page<SyncRow>> {
     const limit = clampLimit(query.limit);
     const offset = query.offset && query.offset > 0 ? Math.floor(query.offset) : 0;
 
     const where: string[] = [];
     const params: Record<string, unknown> = {};
+    if (tenantId) {
+      where.push("tenant_id = @tenantId");
+      params.tenantId = tenantId;
+    }
     if (query.status) {
       where.push("status = @status");
       params.status = query.status;

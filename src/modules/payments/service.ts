@@ -9,6 +9,7 @@ export type PaymentStatus = "captured" | "declined";
 
 export interface PaymentRecord {
   id: string;
+  tenant_id: string;
   order_id: string;
   method: PaymentMethod;
   amount_cents: Cents;
@@ -27,6 +28,8 @@ export interface CapturePaymentInput {
   cashCents?: Cents;
   cardCents?: Cents;
   tenderedCents?: Cents;
+  /** Idempotency key: a retried capture with the same key returns the cached result without re-charging. */
+  idempotencyKey?: string;
 }
 
 interface OrderRow {
@@ -48,11 +51,11 @@ export class PaymentsService {
     private readonly events: EventBus,
   ) {}
 
-  /** Resolve the amount owed from the orders table, enforcing existence/status. */
-  private async loadOrderOwed(orderId: string): Promise<Cents> {
+  /** Resolve the amount owed from the orders table, enforcing existence/status and tenant. */
+  private async loadOrderOwed(orderId: string, tenantId: string): Promise<Cents> {
     const order = await this.db.one<OrderRow>(
-      "SELECT total_cents, status FROM orders WHERE id = ?",
-      [orderId],
+      "SELECT total_cents, status FROM orders WHERE id = @id AND tenant_id = @tenantId",
+      { id: orderId, tenantId },
     );
     if (!order) {
       throw notFound(`order ${orderId} not found`);
@@ -63,8 +66,20 @@ export class PaymentsService {
     return order.total_cents;
   }
 
-  async capture(input: CapturePaymentInput): Promise<PaymentRecord> {
-    const owed = await this.loadOrderOwed(input.orderId);
+  async capture(input: CapturePaymentInput, tenantId: string): Promise<PaymentRecord> {
+    // Payment idempotency: if a key is provided and we already processed it,
+    // return the cached result without re-charging (Wave 1 requirement).
+    if (input.idempotencyKey) {
+      const existing = await this.db.one<{ response: string }>(
+        "SELECT response FROM idempotency_keys WHERE tenant_id = @tenantId AND key = @key",
+        { tenantId, key: input.idempotencyKey },
+      );
+      if (existing) {
+        return JSON.parse(existing.response) as PaymentRecord;
+      }
+    }
+
+    const owed = await this.loadOrderOwed(input.orderId, tenantId);
 
     let cashCents = 0;
     let cardCents = 0;
@@ -129,6 +144,7 @@ export class PaymentsService {
 
     const record: PaymentRecord = {
       id: `pay_${uuidv7()}`,
+      tenant_id: tenantId,
       order_id: input.orderId,
       method: input.method,
       amount_cents: owed,
@@ -143,18 +159,37 @@ export class PaymentsService {
 
     await this.db.query(
       `INSERT INTO payments
-         (id, order_id, method, amount_cents, cash_cents, card_cents,
+         (id, tenant_id, order_id, method, amount_cents, cash_cents, card_cents,
           change_cents, card_last4, auth_code, status, created_at)
        VALUES
-         (@id, @order_id, @method, @amount_cents, @cash_cents, @card_cents,
+         (@id, @tenant_id, @order_id, @method, @amount_cents, @cash_cents, @card_cents,
           @change_cents, @card_last4, @auth_code, @status, @created_at)`,
       record as unknown as Record<string, unknown>,
     );
+
+    // Store the idempotency key so retries return the same record.
+    if (input.idempotencyKey) {
+      const now = Date.now();
+      await this.db.query(
+        `INSERT INTO idempotency_keys (id, tenant_id, key, response, created_at, expires_at)
+         VALUES (@id, @tenantId, @key, @response, @created_at, @expires_at)
+         ON CONFLICT (tenant_id, key) DO NOTHING`,
+        {
+          id: `idk_${uuidv7()}`,
+          tenantId,
+          key: input.idempotencyKey,
+          response: JSON.stringify(record),
+          created_at: now,
+          expires_at: now + 24 * 60 * 60 * 1000, // 24h TTL
+        },
+      );
+    }
 
     await this.events.publish(
       "payment.captured",
       {
         id: record.id,
+        tenantId,
         orderId: record.order_id,
         method: record.method,
         amountCents: record.amount_cents,
@@ -166,18 +201,21 @@ export class PaymentsService {
     return record;
   }
 
-  async get(id: string): Promise<PaymentRecord> {
-    const row = await this.db.one<PaymentRecord>("SELECT * FROM payments WHERE id = ?", [id]);
+  async get(id: string, tenantId: string): Promise<PaymentRecord> {
+    const row = await this.db.one<PaymentRecord>(
+      "SELECT * FROM payments WHERE id = @id AND tenant_id = @tenantId",
+      { id, tenantId },
+    );
     if (!row) {
       throw notFound(`payment ${id} not found`);
     }
     return row;
   }
 
-  async listByOrder(orderId: string): Promise<PaymentRecord[]> {
+  async listByOrder(orderId: string, tenantId: string): Promise<PaymentRecord[]> {
     return this.db.query<PaymentRecord>(
-      "SELECT * FROM payments WHERE order_id = ? ORDER BY created_at ASC",
-      [orderId],
+      "SELECT * FROM payments WHERE order_id = @orderId AND tenant_id = @tenantId ORDER BY created_at ASC",
+      { orderId, tenantId },
     );
   }
 }

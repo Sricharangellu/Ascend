@@ -8,7 +8,7 @@ const child = spawn(
   ["--import", "tsx", "--test", "src/**/*.test.ts"],
   {
     stdio: "inherit",
-    env: { ...process.env, DATABASE_URL: url, PG_POOL_MAX: "1" },
+    env: { ...process.env, DATABASE_URL: url, PG_POOL_MAX: "1", JWT_SECRET: process.env.JWT_SECRET ?? "test-secret-finder-pos" },
   },
 );
 

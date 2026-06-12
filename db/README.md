@@ -1,7 +1,7 @@
 # Finder POS — Database Layer
 
 Owner: **DATABASE agent**
-Wave: 0 — Platform foundation
+Wave: 1 — Core commerce (Wave 0 foundation complete)
 
 ---
 
@@ -14,10 +14,14 @@ db/
 │   ├── 0001_foundation.sql         Wave 0: tenants, users, roles, audit_log,
 │   │                                        feature_flags, idempotency_keys
 │   ├── 0001_foundation.down.sql    Rollback for 0001
-│   └── … (0002_*, 0003_* added each wave)
+│   ├── 0002_commerce.sql           Wave 1: products, inventory,
+│   │                                        inventory_movements, orders,
+│   │                                        order_lines, payments, sync_queue
+│   ├── 0002_commerce.down.sql      Rollback for 0002
+│   └── … (0003_* added Wave 2)
 ├── rls/
 │   └── policies.sql                Row-Level Security policies for every
-│                                   tenant-scoped table
+│                                   tenant-scoped table (Wave 0 + Wave 1)
 ├── seeds/
 │   └── 0001_demo.sql               Demo tenant, owner user, 3 roles, 4 flags
 ├── backup/
@@ -84,26 +88,48 @@ psql "$DATABASE_URL" -f db/seeds/0001_demo.sql
 
 ## Tenancy & Row-Level Security model
 
-### Design principle
+### Tenant-id type convention (reconciled Wave 1, 2026-06-12)
 
-Every business table carries `tenant_id UUID NOT NULL`. The database enforces
-isolation via PostgreSQL Row-Level Security (RLS). No application-layer filter
-can be accidentally omitted — a missing `WHERE tenant_id = ?` clause does not
-cause a cross-tenant data leak because the database policy blocks it.
+Every business table carries `tenant_id NOT NULL`.
 
-### How it works
+- **Wave 0 tables** (roles, users, audit_log, feature_flags, idempotency_keys):
+  `tenant_id UUID` — scaffolded before the live system's TEXT convention was
+  confirmed.  Will be reconciled to TEXT in a future fixup migration.
+- **Wave 1+ tables** (all commerce tables): `tenant_id TEXT` — matches the
+  live backend which uses `tnt_<slug>` ids (e.g. `tnt_demo`).
 
-1. The backend resolves the tenant from the verified JWT on every request.
-2. It executes `SET LOCAL app.tenant_id = '<tenant-uuid>'` inside the
-   transaction before any query.
-3. Every policy on every tenant-scoped table evaluates:
+The backend sets the session variable as TEXT: `SET LOCAL app.tenant_id = 'tnt_demo'`.
 
+### RLS: design target vs. Wave 1 enablement
+
+RLS is the **design target** and provides defense-in-depth. In Wave 1, tenant
+isolation is enforced at the **application layer** (every query includes
+`WHERE tenant_id = $tenantId` from the verified JWT). RLS is defined and
+tables have it enabled (`ENABLE ROW LEVEL SECURITY`) but is not yet wired into
+the backend's connection path because the pre-auth tenant lookup (login) runs
+before the JWT tenant is known.
+
+**Future enablement path:**
+1. Introduce a privileged "auth service" DB role with BYPASSRLS on `tenants`
+   and `users` only (used for login/token-issue).
+2. All other app queries use `app_user` (no BYPASSRLS).
+3. `SET LOCAL app.tenant_id = 'tnt_...'` per transaction from JWT.
+4. Enable RLS globally; run the tenancy test suite in CI.
+
+### How RLS works (once fully enabled)
+
+1. Backend resolves tenant from verified JWT on every request.
+2. Executes `SET LOCAL app.tenant_id = 'tnt_demo'` inside the transaction.
+3. Wave 0 policies evaluate:
    ```sql
    USING (tenant_id = current_setting('app.tenant_id')::uuid)
    ```
-
-4. If `app.tenant_id` is not set, `current_setting()` raises an error
-   (fail-closed — no rows, no leak, and a visible bug).
+4. Wave 1+ policies evaluate (TEXT, no cast):
+   ```sql
+   USING (tenant_id = current_setting('app.tenant_id'))
+   ```
+5. If `app.tenant_id` is not set, `current_setting()` raises an error
+   (fail-closed — no rows, no leak, visible bug).
 
 ### Application role vs. service role
 
@@ -120,15 +146,15 @@ The `app_user` role **must not** have `BYPASSRLS`.
 ```sql
 -- Should return ERROR (not 0 rows) — app.tenant_id unset:
 RESET app.tenant_id;
-SELECT * FROM users;  -- ERROR: unrecognized configuration parameter
+SELECT * FROM products;  -- ERROR: unrecognized configuration parameter
 
 -- Should return 0 rows — wrong tenant:
-SET app.tenant_id = '00000000-0000-0000-0000-000000000099';
-SELECT * FROM users;  -- 0 rows
+SET app.tenant_id = 'tnt_other';
+SELECT * FROM products;  -- 0 rows
 
 -- Should return rows for the correct tenant only:
-SET app.tenant_id = '00000000-0000-7000-a000-000000000001';
-SELECT count(*) FROM users;  -- 1 (demo owner)
+SET app.tenant_id = 'tnt_demo';
+SELECT count(*) FROM products;  -- n rows for demo tenant
 ```
 
 ### Tenant-leading indexes
@@ -136,7 +162,7 @@ SELECT count(*) FROM users;  -- 1 (demo owner)
 Every index on a tenant-scoped table is tenant-leading, e.g.:
 
 ```sql
-CREATE INDEX users_tenant_email_idx ON users (tenant_id, email);
+CREATE INDEX products_tenant_sku_idx ON products (tenant_id, sku);
 ```
 
 This ensures index scans are bounded to one tenant's data, critical for
@@ -146,17 +172,22 @@ query performance at scale (Wave 2 partitioning uses the same key).
 
 ## ID conventions
 
-| Table              | Prefix  | Example                              |
-|--------------------|---------|--------------------------------------|
-| tenants            | `tnt_`  | `tnt_01j0abc...`                     |
-| users              | `usr_`  | `usr_01j0abc...`                     |
-| roles              | `role_` | `role_01j0abc...`                    |
-| audit_log          | `aud_`  | `aud_01j0abc...`                     |
-| feature_flags      | `ff_`   | `ff_01j0abc...`                      |
-| idempotency_keys   | `idk_`  | `idk_01j0abc...`                     |
-| products (Wave 1)  | `prod_` | `prod_01j0abc...`                    |
-| orders (Wave 1)    | `ord_`  | `ord_01j0abc...`                     |
-| payments (Wave 1)  | `pay_`  | `pay_01j0abc...`                     |
+| Table                  | Prefix  | Example                              |
+|------------------------|---------|--------------------------------------|
+| tenants                | `tnt_`  | `tnt_01j0abc...`                     |
+| users                  | `usr_`  | `usr_01j0abc...`                     |
+| roles                  | `role_` | `role_01j0abc...`                    |
+| audit_log              | `aud_`  | `aud_01j0abc...`                     |
+| feature_flags          | `ff_`   | `ff_01j0abc...`                      |
+| idempotency_keys       | `idk_`  | `idk_01j0abc...`                     |
+| products               | `prod_` | `prod_01j0abc...`                    |
+| inventory_movements    | `ivm_`  | `ivm_01j0abc...`                     |
+| orders                 | `ord_`  | `ord_01j0abc...`                     |
+| order_lines            | `oln_`  | `oln_01j0abc...`                     |
+| payments               | `pay_`  | `pay_01j0abc...`                     |
+| sync_queue             | —       | BIGSERIAL integer (sequence order)   |
+
+Note: `inventory` uses a composite PK `(tenant_id, product_id)` — no surrogate id.
 
 IDs are UUID v7 encoded as TEXT with the prefix. UUID v7 is time-ordered,
 which means B-tree inserts are sequential (no page splits at scale).
@@ -219,21 +250,19 @@ is readable and not corrupt. Run daily in CI.
 
 ---
 
-## Wave 1 — Core commerce (upcoming)
+## Wave 1 — Core commerce (complete)
 
-Wave 1 will add:
-
+Migration files:
 ```
-db/migrations/0002_commerce.sql
-db/migrations/0002_commerce.down.sql
+db/migrations/0002_commerce.sql       forward migration
+db/migrations/0002_commerce.down.sql  rollback
 ```
 
-Tables: `products`, `inventory`, `inventory_movements`, `orders`,
-`order_lines`, `payments`, `sync_queue` — all with `tenant_id` + RLS +
-tenant-leading indexes.
+Tables created: `products`, `inventory`, `inventory_movements`, `orders`,
+`order_lines`, `payments`, `sync_queue` — all with `tenant_id TEXT NOT NULL`,
+RLS enabled, and tenant-leading indexes.
 
-RLS policies will be appended to `db/rls/policies.sql` following the same
-pattern as Wave 0.
+RLS policies appended to `db/rls/policies.sql` — TEXT comparison, no `::uuid` cast.
 
 ---
 

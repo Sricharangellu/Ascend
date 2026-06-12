@@ -17,9 +17,9 @@ async function seedOrder(app: App, opts: SeedOpts): Promise<void> {
   const now = Date.now();
   await app.db.query(
     `INSERT INTO orders
-       (id, order_number, state_code, status, subtotal_cents,
+       (id, tenant_id, order_number, state_code, status, subtotal_cents,
         discount_cents, tax_cents, total_cents, customer_id, created_at, updated_at)
-     VALUES (?, ?, 'CA', ?, ?, 0, 0, ?, NULL, ?, ?)`,
+     VALUES (?, 'tnt_demo', ?, 'CA', ?, ?, 0, 0, ?, NULL, ?, ?)`,
     [opts.id, `ON-${opts.id}`, opts.status ?? "open", opts.totalCents, opts.totalCents, now, now],
   );
 }
@@ -44,7 +44,16 @@ function request(
   body?: unknown,
 ): Promise<HttpResult> {
   return new Promise((resolve, reject) => {
-    import("node:http").then(({ default: http }) => {
+    Promise.all([import("node:http"), import("jsonwebtoken")]).then(([{ default: http }, { default: jwt }]) => {
+      const token = jwt.sign(
+        { sub: "usr_demo_owner", tenantId: "tnt_demo", role: "owner" },
+        process.env.JWT_SECRET ?? "test-secret-finder-pos",
+        { expiresIn: "1h" },
+      );
+      const reqPath =
+        path.startsWith("/api/") && !path.startsWith("/api/v1/") && !path.startsWith("/api/identity/")
+          ? path.replace("/api/", "/api/v1/")
+          : path;
       const server = app.express.listen(0, () => {
         const addr = server.address();
         const port = typeof addr === "object" && addr ? addr.port : 0;
@@ -54,8 +63,9 @@ function request(
             host: "127.0.0.1",
             port,
             method,
-            path,
+            path: reqPath,
             headers: {
+              authorization: `Bearer ${token}`,
               "content-type": "application/json",
               ...(data ? { "content-length": Buffer.byteLength(data) } : {}),
             },

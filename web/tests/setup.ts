@@ -9,8 +9,11 @@
  * (component tests).  Pure unit tests (node env) don't need it.
  */
 
-import { beforeAll, afterEach, afterAll } from "vitest";
+import * as matchers from "@testing-library/jest-dom/matchers";
+import { beforeAll, afterEach, afterAll, expect } from "vitest";
 import { server } from "@/mocks/server";
+
+expect.extend(matchers);
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());

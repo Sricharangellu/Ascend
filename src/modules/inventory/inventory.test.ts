@@ -126,7 +126,7 @@ test("refund of an oversold order does not resurrect phantom stock", async () =>
   await app.events.publish(
     "order.created",
     {
-      id: "ord_os",
+      id: "ord_os", tenantId: "tnt_demo",
       orderNumber: "FP-OS",
       stateCode: "CA",
       totalCents: 2500,
@@ -140,7 +140,7 @@ test("refund of an oversold order does not resurrect phantom stock", async () =>
   // requested 5, which would create 3 phantom units out of nothing.
   await app.events.publish(
     "order.refunded",
-    { id: "ord_os", orderNumber: "FP-OS", totalCents: 2500 },
+    { id: "ord_os", tenantId: "tnt_demo", orderNumber: "FP-OS", totalCents: 2500 },
     "ord_os",
   );
   assert.equal((await call(app, "GET", "/api/inventory/prod_os")).json.stockQty, 2);
@@ -154,7 +154,7 @@ test("order.created event decrements stock for each line", async () => {
   await app.events.publish(
     "order.created",
     {
-      id: "ord_1",
+      id: "ord_1", tenantId: "tnt_demo",
       orderNumber: "FP-1",
       stateCode: "CA",
       totalCents: 1500,
@@ -179,7 +179,7 @@ test("order.refunded restocks reversed sale movements", async () => {
   await app.events.publish(
     "order.created",
     {
-      id: "ord_2",
+      id: "ord_2", tenantId: "tnt_demo",
       orderNumber: "FP-2",
       stateCode: "CA",
       totalCents: 1000,
@@ -193,7 +193,7 @@ test("order.refunded restocks reversed sale movements", async () => {
 
   await app.events.publish(
     "order.refunded",
-    { id: "ord_2", orderNumber: "FP-2", totalCents: 1000 },
+    { id: "ord_2", tenantId: "tnt_demo", orderNumber: "FP-2", totalCents: 1000 },
     "ord_2",
   );
 
@@ -212,7 +212,7 @@ test("redelivered order.refunded does not double-restock (idempotent)", async ()
   await app.events.publish(
     "order.created",
     {
-      id: "ord_ri",
+      id: "ord_ri", tenantId: "tnt_demo",
       orderNumber: "FP-RI",
       stateCode: "CA",
       totalCents: 1000,
@@ -227,7 +227,7 @@ test("redelivered order.refunded does not double-restock (idempotent)", async ()
   const refund = () =>
     app.events.publish(
       "order.refunded",
-      { id: "ord_ri", orderNumber: "FP-RI", totalCents: 1000 },
+      { id: "ord_ri", tenantId: "tnt_demo", orderNumber: "FP-RI", totalCents: 1000 },
       "ord_ri",
     );
   await refund();

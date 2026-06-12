@@ -2,6 +2,7 @@ import type { Router, Request, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody, notFound, badRequest } from "../../shared/http.js";
 import type { OrdersService, OrderStatus } from "./service.js";
+import type { AuthPayload } from "../../gateway/auth.js";
 
 const stateSchema = z.enum(["CA", "NY", "TX", "FL"]);
 
@@ -37,12 +38,16 @@ function parseInt0(value: unknown): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+function tenantId(res: Response): string {
+  return (res.locals["auth"] as AuthPayload).tenantId;
+}
+
 export function registerRoutes(router: Router, service: OrdersService): void {
   router.post(
     "/",
     handler(async (req: Request, res: Response) => {
       const body = parseBody(createSchema, req.body);
-      const order = await service.create(body);
+      const order = await service.create(body, tenantId(res));
       res.status(201).json(order);
     }),
   );
@@ -51,11 +56,14 @@ export function registerRoutes(router: Router, service: OrdersService): void {
     "/",
     handler(async (req: Request, res: Response) => {
       const status = readStatusFilter(req.query.status);
-      const page = await service.list({
-        status,
-        limit: parseInt0(req.query.limit),
-        offset: parseInt0(req.query.offset),
-      });
+      const page = await service.list(
+        {
+          status,
+          limit: parseInt0(req.query.limit),
+          offset: parseInt0(req.query.offset),
+        },
+        tenantId(res),
+      );
       res.json(page);
     }),
   );
@@ -64,7 +72,7 @@ export function registerRoutes(router: Router, service: OrdersService): void {
     "/:id",
     handler(async (req: Request, res: Response) => {
       const id = String(req.params.id);
-      const order = await service.get(id);
+      const order = await service.get(id, tenantId(res));
       if (!order) throw notFound(`order '${id}' not found`);
       res.json(order);
     }),
@@ -73,14 +81,14 @@ export function registerRoutes(router: Router, service: OrdersService): void {
   router.post(
     "/:id/refund",
     handler(async (req: Request, res: Response) => {
-      res.json(await service.refund(String(req.params.id)));
+      res.json(await service.refund(String(req.params.id), tenantId(res)));
     }),
   );
 
   router.post(
     "/:id/void",
     handler(async (req: Request, res: Response) => {
-      res.json(await service.void(String(req.params.id)));
+      res.json(await service.void(String(req.params.id), tenantId(res)));
     }),
   );
 }

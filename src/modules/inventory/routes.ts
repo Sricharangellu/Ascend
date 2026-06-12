@@ -1,7 +1,8 @@
-import type { Router, Request } from "express";
+import type { Router, Request, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody } from "../../shared/http.js";
 import type { InventoryService, MovementReason } from "./service.js";
+import type { AuthPayload } from "../../gateway/auth.js";
 
 const receiveSchema = z.object({
   quantity: z.number().int().positive(),
@@ -38,6 +39,10 @@ function readQuery(req: Request) {
   };
 }
 
+function tenantId(res: Response): string {
+  return (res.locals["auth"] as AuthPayload).tenantId;
+}
+
 function present(row: { product_id: string; stock_qty: number; reorder_pt: number; updated_at: number }) {
   return {
     productId: row.product_id,
@@ -51,14 +56,14 @@ export function registerRoutes(router: Router, service: InventoryService): void 
   router.get(
     "/",
     handler(async (req, res) => {
-      res.json(await service.list(readQuery(req)));
+      res.json(await service.list(readQuery(req), tenantId(res)));
     }),
   );
 
   router.get(
     "/:productId",
     handler(async (req, res) => {
-      const row = await service.getStock(String(req.params.productId));
+      const row = await service.getStock(String(req.params.productId), tenantId(res));
       res.json(present(row));
     }),
   );
@@ -66,7 +71,7 @@ export function registerRoutes(router: Router, service: InventoryService): void 
   router.get(
     "/:productId/movements",
     handler(async (req, res) => {
-      res.json(await service.movements(String(req.params.productId)));
+      res.json(await service.movements(String(req.params.productId), tenantId(res)));
     }),
   );
 
@@ -74,7 +79,7 @@ export function registerRoutes(router: Router, service: InventoryService): void 
     "/:productId/receive",
     handler(async (req, res) => {
       const body = parseBody(receiveSchema, req.body);
-      const row = await service.adjust(String(req.params.productId), body.quantity, "receiving");
+      const row = await service.adjust(String(req.params.productId), body.quantity, "receiving", tenantId(res));
       res.status(201).json(present(row));
     }),
   );
@@ -84,7 +89,7 @@ export function registerRoutes(router: Router, service: InventoryService): void 
     handler(async (req, res) => {
       const body = parseBody(adjustSchema, req.body);
       const reason: MovementReason = body.reason ?? "adjustment";
-      const row = await service.adjust(String(req.params.productId), body.delta, reason);
+      const row = await service.adjust(String(req.params.productId), body.delta, reason, tenantId(res));
       res.json(present(row));
     }),
   );
@@ -93,7 +98,7 @@ export function registerRoutes(router: Router, service: InventoryService): void 
     "/:productId/reorder-point",
     handler(async (req, res) => {
       const body = parseBody(reorderSchema, req.body);
-      const row = await service.setReorderPoint(String(req.params.productId), body.reorderPt);
+      const row = await service.setReorderPoint(String(req.params.productId), body.reorderPt, tenantId(res));
       res.json(present(row));
     }),
   );

@@ -10,6 +10,7 @@ export type OrderStatus = "open" | "completed" | "refunded" | "voided";
 
 export interface OrderRow {
   id: string;
+  tenant_id: string;
   order_number: string;
   state_code: StateCode;
   status: OrderStatus;
@@ -24,6 +25,7 @@ export interface OrderRow {
 
 export interface OrderLineRow {
   id: string;
+  tenant_id: string;
   order_id: string;
   product_id: string;
   name: string;
@@ -73,7 +75,7 @@ export class OrdersService {
     private readonly events: EventBus,
   ) {}
 
-  async create(input: CreateOrderInput): Promise<OrderWithLines> {
+  async create(input: CreateOrderInput, tenantId: string): Promise<OrderWithLines> {
     if (input.lines.length === 0) {
       throw badRequest("an order requires at least one line");
     }
@@ -91,8 +93,8 @@ export class OrdersService {
         throw badRequest(`line quantity must be positive for ${line.productId}`);
       }
       const product = await this.db.one<ProductRow>(
-        "SELECT id, name, price_cents, tax_class, status FROM products WHERE id = ?",
-        [line.productId],
+        "SELECT id, name, price_cents, tax_class, status FROM products WHERE id = @id AND tenant_id = @tenantId",
+        { id: line.productId, tenantId },
       );
       if (!product) {
         throw badRequest(`product '${line.productId}' not found`);
@@ -122,6 +124,7 @@ export class OrdersService {
 
     const order: OrderRow = {
       id: orderId,
+      tenant_id: tenantId,
       order_number: orderNumber,
       state_code: input.stateCode,
       status: "open",
@@ -136,6 +139,7 @@ export class OrdersService {
 
     const lines: OrderLineRow[] = resolved.map((r, i) => ({
       id: `oln_${uuidv7()}`,
+      tenant_id: tenantId,
       order_id: orderId,
       product_id: r.product.id,
       name: r.product.name,
@@ -149,11 +153,11 @@ export class OrdersService {
     await this.db.tx(async (tdb) => {
       await tdb.query(
         `INSERT INTO orders
-           (id, order_number, state_code, status, subtotal_cents,
+           (id, tenant_id, order_number, state_code, status, subtotal_cents,
             discount_cents, tax_cents, total_cents, customer_id,
             created_at, updated_at)
          VALUES
-           (@id, @order_number, @state_code, @status, @subtotal_cents,
+           (@id, @tenant_id, @order_number, @state_code, @status, @subtotal_cents,
             @discount_cents, @tax_cents, @total_cents, @customer_id,
             @created_at, @updated_at)`,
         order as unknown as Record<string, unknown>,
@@ -161,10 +165,10 @@ export class OrdersService {
       for (const line of lines) {
         await tdb.query(
           `INSERT INTO order_lines
-             (id, order_id, product_id, name, quantity, unit_cents,
+             (id, tenant_id, order_id, product_id, name, quantity, unit_cents,
               tax_cents, line_cents, taxable)
            VALUES
-             (@id, @order_id, @product_id, @name, @quantity, @unit_cents,
+             (@id, @tenant_id, @order_id, @product_id, @name, @quantity, @unit_cents,
               @tax_cents, @line_cents, @taxable)`,
           line as unknown as Record<string, unknown>,
         );
@@ -175,6 +179,7 @@ export class OrdersService {
       "order.created",
       {
         id: order.id,
+        tenantId,
         orderNumber: order.order_number,
         stateCode: order.state_code,
         totalCents: order.total_cents,
@@ -194,46 +199,48 @@ export class OrdersService {
    * Transition an order to 'completed' (on payment.captured). No-op if missing
    * or already in a terminal/non-open state, so a late event can't resurrect it.
    */
-  async markCompleted(orderId: string): Promise<void> {
+  async markCompleted(orderId: string, tenantId: string): Promise<void> {
     const order = await this.db.one<{ status: OrderStatus }>(
-      "SELECT status FROM orders WHERE id = ?",
-      [orderId],
+      "SELECT status FROM orders WHERE id = @id AND tenant_id = @tenantId",
+      { id: orderId, tenantId },
     );
     if (!order || order.status !== "open") return;
-    await this.db.query("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?", [
-      "completed",
-      Date.now(),
-      orderId,
-    ]);
+    await this.db.query(
+      "UPDATE orders SET status = @status, updated_at = @updated_at WHERE id = @id AND tenant_id = @tenantId",
+      { status: "completed", updated_at: Date.now(), id: orderId, tenantId },
+    );
   }
 
-  async get(id: string): Promise<OrderWithLines | undefined> {
-    const order = await this.db.one<OrderRow>("SELECT * FROM orders WHERE id = ?", [id]);
+  async get(id: string, tenantId: string): Promise<OrderWithLines | undefined> {
+    const order = await this.db.one<OrderRow>(
+      "SELECT * FROM orders WHERE id = @id AND tenant_id = @tenantId",
+      { id, tenantId },
+    );
     if (!order) return undefined;
     const lines = await this.db.query<OrderLineRow>(
-      "SELECT * FROM order_lines WHERE order_id = ? ORDER BY id ASC",
-      [id],
+      "SELECT * FROM order_lines WHERE order_id = @orderId AND tenant_id = @tenantId ORDER BY id ASC",
+      { orderId: id, tenantId },
     );
     return { ...order, lines };
   }
 
-  async getOrThrow(id: string): Promise<OrderWithLines> {
-    const order = await this.get(id);
+  async getOrThrow(id: string, tenantId: string): Promise<OrderWithLines> {
+    const order = await this.get(id, tenantId);
     if (!order) throw notFound(`order '${id}' not found`);
     return order;
   }
 
-  async list(query: ListOrdersQuery = {}): Promise<Page<OrderRow>> {
+  async list(query: ListOrdersQuery = {}, tenantId: string): Promise<Page<OrderRow>> {
     const limit = clampLimit(query.limit);
     const offset = query.offset && query.offset > 0 ? Math.floor(query.offset) : 0;
 
-    const where: string[] = [];
-    const params: Record<string, unknown> = {};
+    const where: string[] = ["tenant_id = @tenantId"];
+    const params: Record<string, unknown> = { tenantId };
     if (query.status) {
       where.push("status = @status");
       params.status = query.status;
     }
-    const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const whereSql = `WHERE ${where.join(" AND ")}`;
 
     const totalRow = await this.db.one<{ n: number }>(
       `SELECT COUNT(*) AS n FROM orders ${whereSql}`,
@@ -251,8 +258,8 @@ export class OrdersService {
     return { items, total, limit, offset };
   }
 
-  async refund(id: string): Promise<OrderWithLines> {
-    const order = await this.getOrThrow(id);
+  async refund(id: string, tenantId: string): Promise<OrderWithLines> {
+    const order = await this.getOrThrow(id, tenantId);
     if (order.status === "refunded") {
       throw conflict(`order '${id}' is already refunded`);
     }
@@ -261,16 +268,16 @@ export class OrdersService {
     }
 
     const updatedAt = Date.now();
-    await this.db.query("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?", [
-      "refunded",
-      updatedAt,
-      id,
-    ]);
+    await this.db.query(
+      "UPDATE orders SET status = @status, updated_at = @updated_at WHERE id = @id AND tenant_id = @tenantId",
+      { status: "refunded", updated_at: updatedAt, id, tenantId },
+    );
 
     await this.events.publish(
       "order.refunded",
       {
         id: order.id,
+        tenantId,
         orderNumber: order.order_number,
         totalCents: order.total_cents,
       },
@@ -280,18 +287,17 @@ export class OrdersService {
     return { ...order, status: "refunded", updated_at: updatedAt };
   }
 
-  async void(id: string): Promise<OrderWithLines> {
-    const order = await this.getOrThrow(id);
+  async void(id: string, tenantId: string): Promise<OrderWithLines> {
+    const order = await this.getOrThrow(id, tenantId);
     if (!VOIDABLE_STATUSES.has(order.status)) {
       throw conflict(`order '${id}' is ${order.status} and cannot be voided`);
     }
 
     const updatedAt = Date.now();
-    await this.db.query("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?", [
-      "voided",
-      updatedAt,
-      id,
-    ]);
+    await this.db.query(
+      "UPDATE orders SET status = @status, updated_at = @updated_at WHERE id = @id AND tenant_id = @tenantId",
+      { status: "voided", updated_at: updatedAt, id, tenantId },
+    );
 
     return { ...order, status: "voided", updated_at: updatedAt };
   }

@@ -10,6 +10,7 @@ export type ProductStatus = "active" | "draft" | "archived";
 
 export interface Product {
   id: string;
+  tenant_id: string;
   sku: string;
   name: string;
   price_cents: Cents;
@@ -63,8 +64,11 @@ export class CatalogService {
     private readonly events: EventBus,
   ) {}
 
-  async create(input: CreateProductInput): Promise<Product> {
-    const existing = await this.db.one("SELECT id FROM products WHERE sku = ?", [input.sku]);
+  async create(input: CreateProductInput, tenantId: string): Promise<Product> {
+    const existing = await this.db.one(
+      "SELECT id FROM products WHERE tenant_id = @tenantId AND sku = @sku",
+      { tenantId, sku: input.sku },
+    );
     if (existing) {
       throw conflict(`product with sku '${input.sku}' already exists`);
     }
@@ -73,6 +77,7 @@ export class CatalogService {
     const category = input.category ?? "general";
     const product: Product = {
       id: `prod_${uuidv7()}`,
+      tenant_id: tenantId,
       sku: input.sku,
       name: input.name,
       price_cents: input.price_cents,
@@ -87,15 +92,15 @@ export class CatalogService {
     try {
       await this.db.query(
         `INSERT INTO products
-           (id, sku, name, price_cents, category, tax_class, barcode, status, created_at, updated_at)
+           (id, tenant_id, sku, name, price_cents, category, tax_class, barcode, status, created_at, updated_at)
          VALUES
-           (@id, @sku, @name, @price_cents, @category, @tax_class, @barcode, @status, @created_at, @updated_at)`,
+           (@id, @tenant_id, @sku, @name, @price_cents, @category, @tax_class, @barcode, @status, @created_at, @updated_at)`,
         product as unknown as Record<string, unknown>,
       );
     } catch (err) {
       // The pre-check above handles the common case, but two concurrent creates
-      // can both pass it and race to INSERT. The sku UNIQUE constraint is the
-      // real guard: translate its violation (Postgres code 23505) into a clean
+      // can both pass it and race to INSERT. The (tenant_id, sku) UNIQUE constraint
+      // is the real guard: translate its violation (Postgres code 23505) into a clean
       // 409 instead of leaking a raw driver error as a 500.
       if (isUniqueViolation(err)) {
         throw conflict(`product with sku '${input.sku}' already exists`);
@@ -119,22 +124,25 @@ export class CatalogService {
     return product;
   }
 
-  async get(id: string): Promise<Product | undefined> {
-    return this.db.one<Product>("SELECT * FROM products WHERE id = ?", [id]);
+  async get(id: string, tenantId: string): Promise<Product | undefined> {
+    return this.db.one<Product>(
+      "SELECT * FROM products WHERE id = @id AND tenant_id = @tenantId",
+      { id, tenantId },
+    );
   }
 
-  async getOrThrow(id: string): Promise<Product> {
-    const product = await this.get(id);
+  async getOrThrow(id: string, tenantId: string): Promise<Product> {
+    const product = await this.get(id, tenantId);
     if (!product) throw notFound(`product '${id}' not found`);
     return product;
   }
 
-  async list(query: ListProductsQuery = {}): Promise<Page<Product>> {
+  async list(query: ListProductsQuery = {}, tenantId: string): Promise<Page<Product>> {
     const limit = clampLimit(query.limit);
     const offset = query.offset && query.offset > 0 ? Math.floor(query.offset) : 0;
 
-    const where: string[] = [];
-    const params: Record<string, unknown> = {};
+    const where: string[] = ["tenant_id = @tenantId"];
+    const params: Record<string, unknown> = { tenantId };
     if (query.category) {
       where.push("category = @category");
       params.category = query.category;
@@ -143,7 +151,7 @@ export class CatalogService {
       where.push("status = @status");
       params.status = query.status;
     }
-    const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const whereSql = `WHERE ${where.join(" AND ")}`;
 
     const totalRow = await this.db.one<{ n: number }>(
       `SELECT COUNT(*) AS n FROM products ${whereSql}`,
@@ -161,8 +169,8 @@ export class CatalogService {
     return { items, total, limit, offset };
   }
 
-  async update(id: string, input: UpdateProductInput): Promise<Product> {
-    const current = await this.getOrThrow(id);
+  async update(id: string, input: UpdateProductInput, tenantId: string): Promise<Product> {
+    const current = await this.getOrThrow(id, tenantId);
 
     const next: Product = { ...current };
     const changed: Partial<Product> = {};
@@ -220,18 +228,22 @@ export class CatalogService {
   }
 
   /** Soft delete: archive the product. */
-  async archive(id: string): Promise<Product> {
-    return this.update(id, { status: "archived" });
+  async archive(id: string, tenantId: string): Promise<Product> {
+    return this.update(id, { status: "archived" }, tenantId);
   }
 
-  async count(): Promise<number> {
-    const row = await this.db.one<{ n: number }>("SELECT COUNT(*) AS n FROM products");
+  async count(tenantId: string): Promise<number> {
+    const row = await this.db.one<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM products WHERE tenant_id = @tenantId",
+      { tenantId },
+    );
     return row?.n ?? 0;
   }
 
-  /** Seed realistic demo products on first init. Idempotent: only seeds when empty. */
+  /** Seed realistic demo products for tnt_demo on first init. Idempotent: only seeds when empty. */
   async seed(): Promise<void> {
-    if ((await this.count()) > 0) return;
+    const DEMO_TENANT_ID = "tnt_demo";
+    if ((await this.count(DEMO_TENANT_ID)) > 0) return;
     const demo: CreateProductInput[] = [
       { sku: "GRO-COFFEE-001", name: "Organic Dark Roast Beans", price_cents: 1499, category: "groceries", barcode: "0123456789012" },
       { sku: "GRO-HONEY-001", name: "Wildflower Honey", price_cents: 899, category: "groceries", barcode: "0123456789029" },
@@ -240,7 +252,7 @@ export class CatalogService {
     ];
     for (const p of demo) {
       try {
-        await this.create(p);
+        await this.create(p, DEMO_TENANT_ID);
       } catch {
         // Tolerate a concurrent seeder racing on the same SKU (cold-start races).
       }
