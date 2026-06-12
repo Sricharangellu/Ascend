@@ -79,3 +79,85 @@ export function rateLimitMiddleware(options: RateLimitOptions = {}) {
     next();
   };
 }
+
+// ── Per-tenant tiered rate limiting (Wave 2) ────────────────────────────────
+
+export interface TierLimit {
+  /** Burst capacity (max tokens). */
+  capacity: number;
+  /** Sustained tokens/second. */
+  refillRate: number;
+}
+
+/** Subscription tiers → sustained RPS + burst. Applied per tenant. */
+export const RATE_TIERS: Record<string, TierLimit> = {
+  standard: { capacity: 60, refillRate: 10 }, // ~600 req/min sustained
+  premium: { capacity: 200, refillRate: 50 }, // ~3k req/min
+  enterprise: { capacity: 600, refillRate: 200 }, // ~12k req/min
+};
+
+export interface TenantRateLimitOptions {
+  /** Tier table (defaults to RATE_TIERS). Override for tests. */
+  tiers?: Record<string, TierLimit>;
+  /** Resolve a tenant's tier. Defaults to "standard" (no tier column yet). */
+  tierOf?: (tenantId: string) => string;
+  /** Key when there is no authenticated tenant (defaults to client IP). */
+  fallbackKey?: (req: Request) => string;
+}
+
+/**
+ * Per-tenant tiered limiter. Must run AFTER authMiddleware so the tenant is
+ * known (keys by `res.locals.auth.tenantId`). Each tenant gets an isolated
+ * bucket sized by its tier, so one tenant's traffic can't starve another's.
+ */
+export function tenantRateLimitMiddleware(options: TenantRateLimitOptions = {}) {
+  const tiers = options.tiers ?? RATE_TIERS;
+  const tierOf = options.tierOf ?? (() => "standard");
+  const fallbackKey =
+    options.fallbackKey ??
+    ((req: Request) =>
+      "ip:" +
+      ((req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ??
+        req.socket.remoteAddress ??
+        "unknown"));
+
+  const buckets = new Map<string, Bucket>();
+  let lastPurgeMs = Date.now();
+
+  return function tenantRateLimit(req: Request, res: Response, next: NextFunction): void {
+    const now = Date.now();
+    if (now - lastPurgeMs > 60_000) {
+      for (const [k, b] of buckets) {
+        if ((now - b.lastRefillMs) / 1000 > 300) buckets.delete(k);
+      }
+      lastPurgeMs = now;
+    }
+
+    const auth = res.locals["auth"] as { tenantId?: string } | undefined;
+    const tenantId = auth?.tenantId;
+    const key = tenantId ? `t:${tenantId}` : fallbackKey(req);
+    const tierName = tenantId ? tierOf(tenantId) : "standard";
+    const cfg = tiers[tierName] ?? tiers["standard"] ?? RATE_TIERS["standard"]!;
+
+    let bucket = buckets.get(key);
+    if (!bucket) {
+      bucket = { tokens: cfg.capacity, lastRefillMs: now };
+      buckets.set(key, bucket);
+    }
+    const elapsedSec = (now - bucket.lastRefillMs) / 1000;
+    bucket.tokens = Math.min(cfg.capacity, bucket.tokens + elapsedSec * cfg.refillRate);
+    bucket.lastRefillMs = now;
+
+    res.setHeader("X-RateLimit-Tier", tierName);
+    res.setHeader("X-RateLimit-Limit", String(cfg.capacity));
+
+    if (bucket.tokens < 1) {
+      res.setHeader("Retry-After", String(Math.ceil((1 - bucket.tokens) / cfg.refillRate)));
+      next(new HttpError(429, "rate_limit_exceeded", "Tenant rate limit exceeded — slow down."));
+      return;
+    }
+    bucket.tokens -= 1;
+    res.setHeader("X-RateLimit-Remaining", String(Math.floor(bucket.tokens)));
+    next();
+  };
+}

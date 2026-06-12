@@ -7,6 +7,7 @@ import { identityModule } from "./identity/index.js";
 import {
   requestIdMiddleware,
   rateLimitMiddleware,
+  tenantRateLimitMiddleware,
   authMiddleware,
   tenantResolver,
   errorEnvelopeMiddleware,
@@ -87,8 +88,8 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   await identityModule.register({ db, events, router: identityRouter });
   app.use("/api/identity", identityRouter);
 
-  // ── Auth middleware applied to all /api/v1/* routes
-  app.use("/api/v1", authMiddleware, tenantResolver);
+  // ── Auth + per-tenant tiered rate limit applied to all /api/v1/* routes
+  app.use("/api/v1", authMiddleware, tenantResolver, tenantRateLimitMiddleware());
 
   // ── Feature flags (tenant-scoped, requires auth)
   app.get(
