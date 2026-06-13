@@ -32,7 +32,9 @@ expiry dates, received via purchasing.
 1. Multi-UPC (scan any UPC) — **DONE + live** (6,473 products imported).
 2. Expiry/batch lots + near-expiry report — **DONE + live** (`inventory_lots`, captured on receive, `/inventory/expiring`). FEFO sale-depletion still TODO.
 3. Vendor list + AP credits (chargebacks + credit memos) — **DONE + live** (`/purchasing/vendors`, `/purchasing/vendor-credits`).
-4. Supplier bills (AP) from POs; then customer invoices (AR) from orders — **next**.
+4. Supplier bills (AP) from POs + customer invoices (AR) from orders — **DONE + live** (`/api/v1/billing/bills|invoices` + `/:id/pay`; received PO auto-drafts a bill).
+
+Remaining: **FEFO sale-depletion** (deplete inventory_lots earliest-expiry-first on sale — touches the live order→inventory path, do carefully) and AP/AR **aging reports**.
 
 Each ships as: migration (self-provisioning, idempotent) + tenant-scoped routes +
 events + MSW mocks + `BACKEND_HANDOFF.md` entry, committed to `backend-cycle3`.

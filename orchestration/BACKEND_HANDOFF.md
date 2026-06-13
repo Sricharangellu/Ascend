@@ -72,6 +72,11 @@ Lightspeed-style restock flow. Receiving emits `purchase_order.received`; invent
 - **Vendor AP credits:** `POST /api/v1/purchasing/vendor-credits {supplierId, type:"chargeback"|"credit_memo", amountCents, reason?, poId?}`, `GET /vendor-credits?supplierId=`, `POST /vendor-credits/:id/void`. Both types reduce the vendor balance shown in the vendor list.
 - MSW mocks added for expiring/vendors/vendor-credits.
 
+## Billing — bills (AP) + invoices (AR) — LIVE
+- `POST /api/v1/billing/bills {supplierId|poId, totalCents?, dueDate?}`, `GET /billing/bills?status=`, `POST /billing/bills/:id/pay {amountCents, method?}` → status open→partial→paid (overpay 400). A **received PO auto-drafts a bill**.
+- `POST /api/v1/billing/invoices {customerId, orderId?, totalCents?, dueDate?}`, `GET /billing/invoices?status=`, `POST /billing/invoices/:id/pay`. Invoice can derive its total from an order.
+- Sequential `BILL-#####` / `INV-#####` numbers. MSW mocks for bills/invoices added. UI: an AP/AR (accounts) surface with aging.
+
 ## Latest backend commit
 - `backend-cycle3` @ **`fc513c2`** (tag `cycle3-backend`): cycle-3 modules + inventory overview + team. Clean fast-forward of `master` (`66af0a6`). Live on finder-pos-backend.vercel.app (11 modules).
 
