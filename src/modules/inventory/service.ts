@@ -29,11 +29,49 @@ export interface ListInventoryQuery {
   offset?: number;
 }
 
+/** Product joined with its stock — the row an inventory management grid renders. */
+export interface ProductStock {
+  id: string;
+  sku: string;
+  name: string;
+  price_cents: number;
+  category: string;
+  status: string;
+  stock_qty: number;
+  reorder_pt: number;
+  low_stock: boolean;
+}
+
 export class InventoryService {
   constructor(
     private readonly db: DB,
     private readonly events: EventBus,
   ) {}
+
+  /**
+   * Inventory overview: every product joined with its on-hand stock + reorder
+   * point (a CQRS-lite read over the shared products + inventory tables).
+   * Tenant-scoped. Powers the inventory management grid.
+   */
+  async overview(tenantId: string): Promise<ProductStock[]> {
+    const rows = await this.db.query<ProductStock & { stock_qty: number; reorder_pt: number }>(
+      `SELECT p.id, p.sku, p.name, p.price_cents, p.category, p.status,
+              COALESCE(i.stock_qty, 0) AS stock_qty,
+              COALESCE(i.reorder_pt, 0) AS reorder_pt
+         FROM products p
+         LEFT JOIN inventory i ON i.product_id = p.id AND i.tenant_id = p.tenant_id
+        WHERE p.tenant_id = @tenantId
+        ORDER BY p.name ASC
+        LIMIT 500`,
+      { tenantId },
+    );
+    return rows.map((r) => ({
+      ...r,
+      stock_qty: Number(r.stock_qty),
+      reorder_pt: Number(r.reorder_pt),
+      low_stock: Number(r.reorder_pt) > 0 && Number(r.stock_qty) <= Number(r.reorder_pt),
+    }));
+  }
 
   /**
    * Current stock for a product. Returns a zeroed row when no inventory row

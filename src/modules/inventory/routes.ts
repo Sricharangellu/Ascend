@@ -60,6 +60,15 @@ export function registerRoutes(router: Router, service: InventoryService): void 
     }),
   );
 
+  // Inventory management grid: products joined with stock. Registered before
+  // /:productId so "overview" isn't captured as a product id.
+  router.get(
+    "/overview",
+    handler(async (_req, res) => {
+      res.json({ items: await service.overview(tenantId(res)) });
+    }),
+  );
+
   router.get(
     "/:productId",
     handler(async (req, res) => {
