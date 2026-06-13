@@ -97,6 +97,17 @@ Different expiry dates are different **lots**. Two supported ways:
 - **PO with multiple lines for the same product** (each line its own `expiryDate`/`lotCode`) → a lot per line on receive.
 FEFO depletion, `/inventory/:id/lots`, expiring/expired reports, and value-at-risk all operate across these lots automatically. UI: a "receive" form should allow adding multiple lot rows for one product.
 
+## Fulfillment / WMS — locations, pick & pack — LIVE
+Item locations, product→location placement, and order pick/pack. Answers "item locations, order picking, packing?".
+- `POST /api/v1/fulfillment/locations {code, name?, kind?:"zone"|"aisle"|"shelf"|"bin"}` → create a bin/location (`code` unique per tenant; 409 on dup). `GET /api/v1/fulfillment/locations` (sorted by code).
+- `POST /api/v1/fulfillment/assign {productId, locationId}` → set a product's primary pick location (upsert).
+- `POST /api/v1/fulfillment/pick-lists {orderId}` → builds a pick list from the order's lines, each resolved to its product's location and **sorted into a pick path (by location code)** so the picker walks the floor once. Idempotent per order (re-POST returns the existing list). Returns `{…, lines:[{id, product_id, name, quantity, picked_qty, location_code, status}]}`.
+- `GET /api/v1/fulfillment/pick-lists` (recent) · `GET /api/v1/fulfillment/pick-lists/:id`.
+- `POST /api/v1/fulfillment/pick-lists/:id/lines/:lineId/pick {quantity?}` → marks a line picked (full qty default); list auto-flips to `picked` when all lines done.
+- `POST /api/v1/fulfillment/pick-lists/:id/pack` → requires all lines picked → list `packed` (ready to hand off / ship); 409 `not_picked` otherwise.
+- Status flow: `picking → picked → packed`. MSW mocks added (locations, assign, pick-lists, pick line, pack — with pick-path sort).
+- Suggested UI: an **Operations → Locations** grid (assign products to bins) and a **Pick & Pack** queue (open order → generate pick list in path order → check off lines → Pack).
+
 ## Latest backend commit
 - `backend-cycle3` @ **`fc513c2`** (tag `cycle3-backend`): cycle-3 modules + inventory overview + team. Clean fast-forward of `master` (`66af0a6`). Live on finder-pos-backend.vercel.app (11 modules).
 
