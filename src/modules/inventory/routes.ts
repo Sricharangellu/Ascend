@@ -78,6 +78,7 @@ export function registerRoutes(router: Router, service: InventoryService): void 
         category: typeof req.query.category === "string" ? req.query.category : undefined,
         status: typeof req.query.status === "string" ? req.query.status : undefined,
         pageSize: typeof req.query.pageSize === "string" ? Number(req.query.pageSize) : undefined,
+        lowStock: req.query.lowStock === "true",
       };
       res.json(await service.levels(q, tenantId(res)));
     }),

@@ -98,7 +98,7 @@ export class InventoryService {
    * tracking, and sales-velocity analytics land (documented stubs, not fabricated).
    */
   async levels(
-    query: { query?: string; category?: string; status?: string; pageSize?: number },
+    query: { query?: string; category?: string; status?: string; pageSize?: number; lowStock?: boolean },
     tenantId: string,
   ): Promise<{ items: InventoryLevel[]; pageSize: number }> {
     const where: string[] = ["p.tenant_id = @tenantId"];
@@ -108,6 +108,10 @@ export class InventoryService {
     if (query.query) {
       where.push("(p.name ILIKE @q OR p.sku ILIKE @q)");
       params["q"] = `%${query.query}%`;
+    }
+    if (query.lowStock) {
+      // at or below a set reorder point (reorder point of 0 = untracked, excluded)
+      where.push("COALESCE(i.reorder_pt, 0) > 0 AND COALESCE(i.stock_qty, 0) <= COALESCE(i.reorder_pt, 0)");
     }
     const pageSize = Math.min(Math.max(query.pageSize ?? 100, 1), 500);
     params["limit"] = pageSize;

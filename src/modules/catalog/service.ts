@@ -137,6 +137,39 @@ export class CatalogService {
     return product;
   }
 
+  /** Bulk upsert products by (tenant_id, sku). Used for catalog import.
+   *  Updates name/price/barcode/category on conflict; tenant-scoped. */
+  async bulkImport(
+    items: Array<{ sku: string; name: string; priceCents: number; barcode?: string | null; category?: string }>,
+    tenantId: string,
+  ): Promise<{ imported: number }> {
+    if (items.length === 0) return { imported: 0 };
+    const now = Date.now();
+    await this.db.tx(async (tdb) => {
+      for (const it of items) {
+        const category = it.category && it.category.trim() ? it.category.trim() : "general";
+        const taxClass = category.toLowerCase() === "groceries" ? "exempt" : "standard";
+        await tdb.query(
+          `INSERT INTO products (id, tenant_id, sku, name, price_cents, category, tax_class, barcode, status, created_at, updated_at)
+           VALUES (@id, @t, @sku, @name, @price, @category, @tax, @barcode, 'active', @now, @now)
+           ON CONFLICT (tenant_id, sku) DO UPDATE SET
+             name = EXCLUDED.name, price_cents = EXCLUDED.price_cents,
+             barcode = EXCLUDED.barcode, category = EXCLUDED.category, updated_at = EXCLUDED.updated_at`,
+          { id: `prod_${uuidv7()}`, t: tenantId, sku: it.sku, name: it.name, price: Math.max(0, Math.round(it.priceCents)), category, tax: taxClass, barcode: it.barcode ?? null, now },
+        );
+      }
+    });
+    return { imported: items.length };
+  }
+
+  /** Look up a sellable product by its barcode (POS scan). Active products only. */
+  async getByBarcode(barcode: string, tenantId: string): Promise<Product | undefined> {
+    return this.db.one<Product>(
+      "SELECT * FROM products WHERE tenant_id = @tenantId AND barcode = @barcode AND status = 'active' LIMIT 1",
+      { tenantId, barcode },
+    );
+  }
+
   async list(query: ListProductsQuery = {}, tenantId: string): Promise<Page<Product>> {
     const limit = clampLimit(query.limit);
     const offset = query.offset && query.offset > 0 ? Math.floor(query.offset) : 0;
