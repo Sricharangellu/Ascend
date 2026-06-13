@@ -72,6 +72,9 @@ const importSchema = z.object({
         priceCents: z.number().int().nonnegative(),
         barcode: z.string().min(1).nullable().optional(),
         category: z.string().min(1).optional(),
+        barcodes: z
+          .array(z.object({ barcode: z.string().min(1), kind: z.string().min(1).optional(), packSize: z.number().int().positive().optional() }))
+          .optional(),
       }),
     )
     .min(1)
@@ -124,6 +127,25 @@ export function registerRoutes(router: Router, service: CatalogService): void {
       const product = await service.getByBarcode(code, tenantId(res));
       if (!product) throw notFound(`no active product with barcode '${code}'`);
       res.json(product);
+    }),
+  );
+
+  router.get(
+    "/:id/barcodes",
+    handler(async (req, res) => {
+      res.json({ items: await service.listBarcodes(String(req.params.id), tenantId(res)) });
+    }),
+  );
+
+  router.post(
+    "/:id/barcodes",
+    handler(async (req, res) => {
+      const b = parseBody(
+        z.object({ barcode: z.string().min(1), kind: z.string().min(1).optional(), packSize: z.number().int().positive().optional() }),
+        req.body,
+      );
+      await service.addBarcode(String(req.params.id), b.barcode, b.kind ?? "alt", b.packSize ?? 1, tenantId(res));
+      res.status(201).json({ ok: true });
     }),
   );
 
