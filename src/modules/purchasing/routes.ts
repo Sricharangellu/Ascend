@@ -24,6 +24,22 @@ const poSchema = z.object({
     .min(1),
 });
 
+const returnSchema = z.object({
+  supplierId: z.string().min(1).optional(),
+  reason: z.enum(["damaged", "expired", "other"]),
+  createCredit: z.boolean().optional(),
+  lines: z
+    .array(
+      z.object({
+        productId: z.string().min(1),
+        quantity: z.number().int().positive(),
+        unitCostCents: z.number().int().nonnegative().optional(),
+        lotId: z.string().min(1).optional(),
+      }),
+    )
+    .min(1),
+});
+
 const vendorCreditSchema = z.object({
   supplierId: z.string().min(1),
   type: z.enum(["chargeback", "credit_memo"]),
@@ -60,6 +76,16 @@ export function registerRoutes(router: Router, service: PurchasingService): void
 
   router.post("/vendor-credits/:id/void", handler(async (req, res) => {
     res.json(await service.voidVendorCredit(String(req.params.id), tenantId(res)));
+  }));
+
+  // Vendor returns / write-offs (damaged + expired) — optionally raise a credit memo.
+  router.post("/returns", handler(async (req, res) => {
+    const b = parseBody(returnSchema, req.body);
+    res.status(201).json(await service.createReturn(b, tenantId(res)));
+  }));
+
+  router.get("/returns", handler(async (_req, res) => {
+    res.json({ items: await service.listReturns(tenantId(res)) });
   }));
 
   router.post("/orders", handler(async (req, res) => {

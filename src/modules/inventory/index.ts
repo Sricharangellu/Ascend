@@ -112,6 +112,21 @@ export const inventoryModule: PosModule = {
         }
       }
     });
+
+    // stock.written_off (damaged/expired/vendor return) -> decrement stock + the specific lot.
+    events.on("stock.written_off", async (event) => {
+      const p = event.payload as {
+        tenantId?: string;
+        returnId?: string;
+        lines?: Array<{ productId: string; quantity: number; lotId?: string | null }>;
+      };
+      const tenantId = p.tenantId ?? "";
+      if (!tenantId) return;
+      for (const line of p.lines ?? []) {
+        await service.adjust(line.productId, -Math.abs(line.quantity), "adjustment", tenantId, p.returnId ?? "");
+        if (line.lotId) await service.decrementLot(line.lotId, line.quantity, tenantId);
+      }
+    });
   },
 };
 

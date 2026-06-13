@@ -103,6 +103,14 @@ export class InventoryService {
     return lot;
   }
 
+  /** Reduce a specific lot's on-hand (e.g. damaged/expired write-off). Never negative. */
+  async decrementLot(lotId: string, qty: number, tenantId: string): Promise<void> {
+    await this.db.query(
+      "UPDATE inventory_lots SET qty_on_hand = GREATEST(0, qty_on_hand - @q) WHERE id = @id AND tenant_id = @tenantId",
+      { q: Math.abs(qty), id: lotId, tenantId },
+    );
+  }
+
   /** Open lots for a product (qty > 0), earliest expiry first (FEFO order). */
   async lots(productId: string, tenantId: string): Promise<InventoryLot[]> {
     return this.db.query<InventoryLot>(

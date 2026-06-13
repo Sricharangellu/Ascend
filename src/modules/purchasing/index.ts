@@ -57,6 +57,30 @@ CREATE TABLE IF NOT EXISTS vendor_credits (
 );
 CREATE INDEX IF NOT EXISTS vendor_credits_tenant_supplier_idx ON vendor_credits (tenant_id, supplier_id, status);`;
 
+// Vendor returns / write-offs of damaged or expired stock.
+const CREATE_VENDOR_RETURNS = `
+CREATE TABLE IF NOT EXISTS vendor_returns (
+  id               TEXT PRIMARY KEY,
+  tenant_id        TEXT NOT NULL,
+  supplier_id      TEXT,
+  reason           TEXT NOT NULL,
+  total_cost_cents BIGINT NOT NULL DEFAULT 0,
+  credit_id        TEXT,
+  status           TEXT NOT NULL DEFAULT 'recorded',
+  created_at       BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS vendor_return_lines (
+  id              TEXT PRIMARY KEY,
+  tenant_id       TEXT NOT NULL,
+  return_id       TEXT NOT NULL,
+  product_id      TEXT NOT NULL,
+  quantity        INTEGER NOT NULL,
+  unit_cost_cents BIGINT NOT NULL DEFAULT 0,
+  lot_id          TEXT
+);
+CREATE INDEX IF NOT EXISTS vendor_returns_tenant_idx ON vendor_returns (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS vendor_return_lines_ret_idx ON vendor_return_lines (tenant_id, return_id);`;
+
 const CREATE_PRODUCT_COSTS = `
 CREATE TABLE IF NOT EXISTS product_costs (
   tenant_id  TEXT NOT NULL,
@@ -75,7 +99,7 @@ CREATE INDEX IF NOT EXISTS suppliers_tenant_idx ON suppliers (tenant_id, created
  *  `purchase_order.received`; inventory listens and increments stock. */
 export const purchasingModule: PosModule = {
   name: "purchasing",
-  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, INDEXES],
+  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES],
   async register({ db, events, router }) {
     const service = new PurchasingService(db, events);
     registerRoutes(router, service);

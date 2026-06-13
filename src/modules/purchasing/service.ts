@@ -10,6 +10,18 @@ import { HttpError } from "../../shared/http.js";
 
 export type POStatus = "ordered" | "received" | "cancelled";
 export type VendorCreditType = "chargeback" | "credit_memo";
+export type ReturnReason = "damaged" | "expired" | "other";
+
+export interface VendorReturn {
+  id: string;
+  tenant_id: string;
+  supplier_id: string | null;
+  reason: ReturnReason;
+  total_cost_cents: number;
+  credit_id: string | null;
+  status: "recorded";
+  created_at: number;
+}
 
 export interface VendorCredit {
   id: string;
@@ -152,6 +164,61 @@ export class PurchasingService {
     if (!vc) throw new HttpError(404, "not_found", `vendor credit '${id}' not found`);
     await this.db.query("UPDATE vendor_credits SET status = 'void', updated_at = @now WHERE id = @id AND tenant_id = @t", { now: Date.now(), id, t: tenantId });
     return { ...vc, status: "void" };
+  }
+
+  // ── Vendor returns / write-offs (damaged + expired) ─────────────────────────
+  /** Record a return/write-off of damaged or expired stock. Reduces inventory
+   *  (and the specific lot) via the `stock.written_off` event, and optionally
+   *  raises a vendor credit memo for the returned value. */
+  async createReturn(
+    input: {
+      supplierId?: string;
+      reason: ReturnReason;
+      lines: Array<{ productId: string; quantity: number; unitCostCents?: number; lotId?: string }>;
+      createCredit?: boolean;
+    },
+    tenantId: string,
+  ): Promise<VendorReturn> {
+    if (input.lines.length === 0) throw new HttpError(400, "bad_request", "at least one line is required");
+    const now = Date.now();
+    const id = `ret_${uuidv7()}`;
+    const total = input.lines.reduce((s, l) => s + l.quantity * (l.unitCostCents ?? 0), 0);
+    await this.db.tx(async (tdb) => {
+      await tdb.query(
+        `INSERT INTO vendor_returns (id, tenant_id, supplier_id, reason, total_cost_cents, credit_id, status, created_at)
+         VALUES (@id,@t,@sup,@reason,@total,NULL,'recorded',@now)`,
+        { id, t: tenantId, sup: input.supplierId ?? null, reason: input.reason, total, now },
+      );
+      for (const l of input.lines) {
+        await tdb.query(
+          `INSERT INTO vendor_return_lines (id, tenant_id, return_id, product_id, quantity, unit_cost_cents, lot_id)
+           VALUES (@id,@t,@ret,@pid,@qty,@cost,@lot)`,
+          { id: `rtl_${uuidv7()}`, t: tenantId, ret: id, pid: l.productId, qty: l.quantity, cost: l.unitCostCents ?? 0, lot: l.lotId ?? null },
+        );
+      }
+    });
+
+    let creditId: string | null = null;
+    if (input.createCredit && input.supplierId && total > 0) {
+      const vc = await this.createVendorCredit(
+        { supplierId: input.supplierId, type: "credit_memo", amountCents: total, reason: `${input.reason} return` },
+        tenantId,
+      );
+      creditId = vc.id;
+      await this.db.query("UPDATE vendor_returns SET credit_id = @c WHERE id = @id AND tenant_id = @t", { c: creditId, id, t: tenantId });
+    }
+
+    await this.events.publish(
+      "stock.written_off",
+      { tenantId, returnId: id, reason: input.reason, lines: input.lines.map((l) => ({ productId: l.productId, quantity: l.quantity, lotId: l.lotId ?? null })) },
+      id,
+    );
+
+    return { id, tenant_id: tenantId, supplier_id: input.supplierId ?? null, reason: input.reason, total_cost_cents: total, credit_id: creditId, status: "recorded", created_at: now };
+  }
+
+  async listReturns(tenantId: string): Promise<VendorReturn[]> {
+    return this.db.query<VendorReturn>("SELECT * FROM vendor_returns WHERE tenant_id = @t ORDER BY created_at DESC LIMIT 500", { t: tenantId });
   }
 
   async createOrder(supplierId: string, lines: POLineInput[], tenantId: string): Promise<PurchaseOrderWithLines> {
