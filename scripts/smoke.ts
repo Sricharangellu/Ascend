@@ -46,7 +46,7 @@ async function main() {
 
   let r = await api("GET", "/health");
   assert.equal(r.status, 200);
-  assert.deepEqual(r.json.modules, ["catalog", "inventory", "orders", "payments", "sync", "reports"]);
+  assert.deepEqual(r.json.modules, ["catalog", "inventory", "orders", "payments", "sync", "customers", "giftcards", "reports"]);
   ok(`health ok, modules: ${r.json.modules.join(", ")}`);
 
   // Authenticate as the seeded demo owner (tenant tnt_demo) — commerce routes require it.

@@ -4,11 +4,14 @@ import { inventoryModule } from "./inventory/index.js";
 import { ordersModule } from "./orders/index.js";
 import { paymentsModule } from "./payments/index.js";
 import { syncModule } from "./sync/index.js";
+import { customersModule } from "./customers/index.js";
+import { giftcardsModule } from "./giftcards/index.js";
+import { webhooksModule } from "./webhooks/index.js";
 import { reportsModule } from "./reports/index.js";
 
 /**
  * Registration order = migration order. Keep dependencies earlier:
- * catalog -> inventory -> orders -> payments -> sync -> reports (read-only).
+ * catalog -> inventory -> orders -> payments -> sync -> customers -> giftcards -> webhooks -> reports.
  */
 export const modules: PosModule[] = [
   catalogModule,
@@ -16,5 +19,8 @@ export const modules: PosModule[] = [
   ordersModule,
   paymentsModule,
   syncModule,
+  customersModule,
+  giftcardsModule,
+  webhooksModule,
   reportsModule,
 ];
