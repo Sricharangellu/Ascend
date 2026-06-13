@@ -113,12 +113,14 @@ export class InventoryService {
     params["limit"] = pageSize;
     const rows = await this.db.query<{
       id: string; sku: string; name: string; category: string; status: string;
-      price_cents: number; stock_qty: number; reorder_pt: number;
+      price_cents: number; stock_qty: number; reorder_pt: number; cost_cents: number | null;
     }>(
       `SELECT p.id, p.sku, p.name, p.category, p.status, p.price_cents,
-              COALESCE(i.stock_qty, 0) AS stock_qty, COALESCE(i.reorder_pt, 0) AS reorder_pt
+              COALESCE(i.stock_qty, 0) AS stock_qty, COALESCE(i.reorder_pt, 0) AS reorder_pt,
+              pc.cost_cents AS cost_cents
          FROM products p
          LEFT JOIN inventory i ON i.product_id = p.id AND i.tenant_id = p.tenant_id
+         LEFT JOIN product_costs pc ON pc.product_id = p.id AND pc.tenant_id = p.tenant_id
         WHERE ${where.join(" AND ")}
         ORDER BY p.name ASC
         LIMIT @limit`,
@@ -135,7 +137,7 @@ export class InventoryService {
         available: onHand,
         reorderPoint,
         lowStock: reorderPoint > 0 && onHand <= reorderPoint,
-        costCents: null,
+        costCents: r.cost_cents == null ? null : Number(r.cost_cents),
         velocity: 0,
       };
     });

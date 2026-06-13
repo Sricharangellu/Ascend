@@ -72,6 +72,21 @@ export const inventoryModule: PosModule = {
       const tenantId = payload.tenantId ?? "";
       if (orderId && tenantId) await service.restockFromOrderRef(orderId, tenantId);
     });
+
+    // purchase_order.received -> increase stock for each received line (reason 'receiving').
+    events.on("purchase_order.received", async (event) => {
+      const payload = event.payload as {
+        tenantId?: string;
+        poId?: string;
+        lines?: Array<{ productId: string; quantity: number }>;
+      };
+      const tenantId = payload.tenantId ?? "";
+      const poId = payload.poId ?? event.aggregateId ?? "";
+      if (!tenantId) return;
+      for (const line of payload.lines ?? []) {
+        await service.adjust(line.productId, line.quantity, "receiving", tenantId, poId);
+      }
+    });
   },
 };
 

@@ -1,0 +1,45 @@
+import type { Router, Response } from "express";
+import { z } from "zod";
+import { handler, parseBody } from "../../shared/http.js";
+import type { AuthPayload } from "../../gateway/auth.js";
+import type { PurchasingService } from "./service.js";
+
+function tenantId(res: Response): string {
+  return (res.locals["auth"] as AuthPayload).tenantId;
+}
+
+const supplierSchema = z.object({ name: z.string().min(1), email: z.string().email().optional() });
+const poSchema = z.object({
+  supplierId: z.string().min(1),
+  lines: z
+    .array(z.object({ productId: z.string().min(1), quantity: z.number().int().positive(), unitCostCents: z.number().int().nonnegative() }))
+    .min(1),
+});
+
+export function registerRoutes(router: Router, service: PurchasingService): void {
+  router.post("/suppliers", handler(async (req, res) => {
+    const b = parseBody(supplierSchema, req.body);
+    res.status(201).json(await service.createSupplier(b.name, b.email, tenantId(res)));
+  }));
+
+  router.get("/suppliers", handler(async (_req, res) => {
+    res.json({ items: await service.listSuppliers(tenantId(res)) });
+  }));
+
+  router.post("/orders", handler(async (req, res) => {
+    const b = parseBody(poSchema, req.body);
+    res.status(201).json(await service.createOrder(b.supplierId, b.lines, tenantId(res)));
+  }));
+
+  router.get("/orders", handler(async (_req, res) => {
+    res.json({ items: await service.listOrders(tenantId(res)) });
+  }));
+
+  router.get("/orders/:id", handler(async (req, res) => {
+    res.json(await service.getOrder(String(req.params.id), tenantId(res)));
+  }));
+
+  router.post("/orders/:id/receive", handler(async (req, res) => {
+    res.json(await service.receive(String(req.params.id), tenantId(res)));
+  }));
+}
