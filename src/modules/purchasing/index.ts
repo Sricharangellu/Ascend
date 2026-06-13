@@ -30,8 +30,32 @@ CREATE TABLE IF NOT EXISTS purchase_order_lines (
   product_id      TEXT NOT NULL,
   quantity        INTEGER NOT NULL,
   unit_cost_cents BIGINT NOT NULL,
-  line_cost_cents BIGINT NOT NULL
+  line_cost_cents BIGINT NOT NULL,
+  expiry_date     BIGINT,
+  lot_code        TEXT
 );`;
+
+// Idempotent upgrade for DBs provisioned before expiry/lot columns existed.
+const ALTER_PO_LINES = `
+ALTER TABLE purchase_order_lines ADD COLUMN IF NOT EXISTS expiry_date BIGINT;
+ALTER TABLE purchase_order_lines ADD COLUMN IF NOT EXISTS lot_code TEXT;`;
+
+// Vendor AP credits: chargebacks (we deduct from the vendor) and credit memos
+// (vendor credits us). Reduce what we owe a supplier.
+const CREATE_VENDOR_CREDITS = `
+CREATE TABLE IF NOT EXISTS vendor_credits (
+  id          TEXT PRIMARY KEY,
+  tenant_id   TEXT NOT NULL,
+  supplier_id TEXT NOT NULL,
+  type        TEXT NOT NULL,
+  amount_cents BIGINT NOT NULL,
+  reason      TEXT,
+  po_id       TEXT,
+  status      TEXT NOT NULL DEFAULT 'open',
+  created_at  BIGINT NOT NULL,
+  updated_at  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS vendor_credits_tenant_supplier_idx ON vendor_credits (tenant_id, supplier_id, status);`;
 
 const CREATE_PRODUCT_COSTS = `
 CREATE TABLE IF NOT EXISTS product_costs (
@@ -51,7 +75,7 @@ CREATE INDEX IF NOT EXISTS suppliers_tenant_idx ON suppliers (tenant_id, created
  *  `purchase_order.received`; inventory listens and increments stock. */
 export const purchasingModule: PosModule = {
   name: "purchasing",
-  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, CREATE_PRODUCT_COSTS, INDEXES],
+  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, INDEXES],
   async register({ db, events, router }) {
     const service = new PurchasingService(db, events);
     registerRoutes(router, service);

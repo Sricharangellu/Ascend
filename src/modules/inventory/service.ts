@@ -59,11 +59,73 @@ export interface ProductStock {
   low_stock: boolean;
 }
 
+/** A received lot of a product with an expiry date (FEFO / shelf-life tracking). */
+export interface InventoryLot {
+  id: string;
+  tenant_id: string;
+  product_id: string;
+  lot_code: string | null;
+  expiry_date: number; // epoch ms
+  qty_on_hand: number;
+  unit_cost_cents: number | null;
+  po_id: string | null;
+  received_at: number;
+}
+
 export class InventoryService {
   constructor(
     private readonly db: DB,
     private readonly events: EventBus,
   ) {}
+
+  /** Record a received lot with an expiry date. */
+  async createLot(
+    input: { productId: string; expiryDate: number; quantity: number; lotCode?: string | null; unitCostCents?: number | null; poId?: string | null },
+    tenantId: string,
+  ): Promise<InventoryLot> {
+    const now = Date.now();
+    const lot: InventoryLot = {
+      id: `lot_${uuidv7()}`,
+      tenant_id: tenantId,
+      product_id: input.productId,
+      lot_code: input.lotCode ?? null,
+      expiry_date: input.expiryDate,
+      qty_on_hand: input.quantity,
+      unit_cost_cents: input.unitCostCents ?? null,
+      po_id: input.poId ?? null,
+      received_at: now,
+    };
+    await this.db.query(
+      `INSERT INTO inventory_lots (id, tenant_id, product_id, lot_code, expiry_date, qty_on_hand, unit_cost_cents, po_id, received_at)
+       VALUES (@id,@tenant_id,@product_id,@lot_code,@expiry_date,@qty_on_hand,@unit_cost_cents,@po_id,@received_at)`,
+      lot as unknown as Record<string, unknown>,
+    );
+    return lot;
+  }
+
+  /** Open lots for a product (qty > 0), earliest expiry first (FEFO order). */
+  async lots(productId: string, tenantId: string): Promise<InventoryLot[]> {
+    return this.db.query<InventoryLot>(
+      "SELECT * FROM inventory_lots WHERE tenant_id = @tenantId AND product_id = @productId AND qty_on_hand > 0 ORDER BY expiry_date ASC",
+      { tenantId, productId },
+    );
+  }
+
+  /** Lots expiring within `days` (qty > 0), with product name — the near-expiry report. */
+  async expiring(days: number, tenantId: string): Promise<Array<InventoryLot & { name: string; days_to_expiry: number }>> {
+    const cutoff = Date.now() + Math.max(0, days) * 86_400_000;
+    const rows = await this.db.query<InventoryLot & { name: string }>(
+      `SELECT l.*, p.name
+         FROM inventory_lots l
+         JOIN products p ON p.id = l.product_id AND p.tenant_id = l.tenant_id
+        WHERE l.tenant_id = @tenantId AND l.qty_on_hand > 0 AND l.expiry_date <= @cutoff
+        ORDER BY l.expiry_date ASC
+        LIMIT 500`,
+      { tenantId, cutoff },
+    );
+    const now = Date.now();
+    return rows.map((r) => ({ ...r, days_to_expiry: Math.floor((Number(r.expiry_date) - now) / 86_400_000) }));
+  }
 
   /**
    * Inventory overview: every product joined with its on-hand stock + reorder

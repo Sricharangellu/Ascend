@@ -12,8 +12,24 @@ const supplierSchema = z.object({ name: z.string().min(1), email: z.string().ema
 const poSchema = z.object({
   supplierId: z.string().min(1),
   lines: z
-    .array(z.object({ productId: z.string().min(1), quantity: z.number().int().positive(), unitCostCents: z.number().int().nonnegative() }))
+    .array(
+      z.object({
+        productId: z.string().min(1),
+        quantity: z.number().int().positive(),
+        unitCostCents: z.number().int().nonnegative(),
+        expiryDate: z.number().int().positive().optional(),
+        lotCode: z.string().min(1).optional(),
+      }),
+    )
     .min(1),
+});
+
+const vendorCreditSchema = z.object({
+  supplierId: z.string().min(1),
+  type: z.enum(["chargeback", "credit_memo"]),
+  amountCents: z.number().int().positive(),
+  reason: z.string().min(1).optional(),
+  poId: z.string().min(1).optional(),
 });
 
 export function registerRoutes(router: Router, service: PurchasingService): void {
@@ -24,6 +40,26 @@ export function registerRoutes(router: Router, service: PurchasingService): void
 
   router.get("/suppliers", handler(async (_req, res) => {
     res.json({ items: await service.listSuppliers(tenantId(res)) });
+  }));
+
+  // Vendor list with spend + open-credit balances.
+  router.get("/vendors", handler(async (_req, res) => {
+    res.json({ items: await service.vendors(tenantId(res)) });
+  }));
+
+  // Vendor AP credits — chargebacks + credit memos.
+  router.post("/vendor-credits", handler(async (req, res) => {
+    const b = parseBody(vendorCreditSchema, req.body);
+    res.status(201).json(await service.createVendorCredit(b, tenantId(res)));
+  }));
+
+  router.get("/vendor-credits", handler(async (req, res) => {
+    const supplierId = typeof req.query.supplierId === "string" ? req.query.supplierId : undefined;
+    res.json({ items: await service.listVendorCredits(tenantId(res), supplierId) });
+  }));
+
+  router.post("/vendor-credits/:id/void", handler(async (req, res) => {
+    res.json(await service.voidVendorCredit(String(req.params.id), tenantId(res)));
   }));
 
   router.post("/orders", handler(async (req, res) => {

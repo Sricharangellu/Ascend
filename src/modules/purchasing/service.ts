@@ -9,6 +9,20 @@ import { HttpError } from "../../shared/http.js";
  *  captured into `product_costs` so the inventory grid can show cost. */
 
 export type POStatus = "ordered" | "received" | "cancelled";
+export type VendorCreditType = "chargeback" | "credit_memo";
+
+export interface VendorCredit {
+  id: string;
+  tenant_id: string;
+  supplier_id: string;
+  type: VendorCreditType;
+  amount_cents: number;
+  reason: string | null;
+  po_id: string | null;
+  status: "open" | "applied" | "void";
+  created_at: number;
+  updated_at: number;
+}
 
 export interface Supplier {
   id: string;
@@ -22,6 +36,8 @@ export interface POLineInput {
   productId: string;
   quantity: number;
   unitCostCents: number;
+  expiryDate?: number | null; // epoch ms — captured into an inventory lot on receive
+  lotCode?: string | null;
 }
 
 export interface PurchaseOrderLine {
@@ -32,6 +48,8 @@ export interface PurchaseOrderLine {
   quantity: number;
   unit_cost_cents: number;
   line_cost_cents: number;
+  expiry_date: number | null;
+  lot_code: string | null;
 }
 
 export interface PurchaseOrder {
@@ -67,6 +85,75 @@ export class PurchasingService {
     return this.db.query<Supplier>("SELECT * FROM suppliers WHERE tenant_id = @tenantId ORDER BY created_at DESC", { tenantId });
   }
 
+  /** Vendor directory with spend + open-credit balances (the vendor list). */
+  async vendors(tenantId: string): Promise<Array<Supplier & { poCount: number; totalSpentCents: number; openCreditsCents: number }>> {
+    const suppliers = await this.listSuppliers(tenantId);
+    const spend = await this.db.query<{ supplier_id: string; po_count: number; spent: number }>(
+      `SELECT supplier_id, COUNT(*)::int AS po_count, COALESCE(SUM(total_cost_cents),0) AS spent
+         FROM purchase_orders WHERE tenant_id = @tenantId AND status = 'received' GROUP BY supplier_id`,
+      { tenantId },
+    );
+    const credits = await this.db.query<{ supplier_id: string; credits: number }>(
+      `SELECT supplier_id, COALESCE(SUM(amount_cents),0) AS credits
+         FROM vendor_credits WHERE tenant_id = @tenantId AND status = 'open' GROUP BY supplier_id`,
+      { tenantId },
+    );
+    const spendMap = new Map(spend.map((s) => [s.supplier_id, s]));
+    const creditMap = new Map(credits.map((c) => [c.supplier_id, Number(c.credits)]));
+    return suppliers.map((s) => ({
+      ...s,
+      poCount: Number(spendMap.get(s.id)?.po_count ?? 0),
+      totalSpentCents: Number(spendMap.get(s.id)?.spent ?? 0),
+      openCreditsCents: creditMap.get(s.id) ?? 0,
+    }));
+  }
+
+  // ── Vendor AP credits: chargebacks + credit memos ───────────────────────────
+  async createVendorCredit(
+    input: { supplierId: string; type: VendorCreditType; amountCents: number; reason?: string; poId?: string },
+    tenantId: string,
+  ): Promise<VendorCredit> {
+    if (input.amountCents <= 0) throw new HttpError(400, "bad_request", "amountCents must be positive");
+    const supplier = await this.db.one("SELECT id FROM suppliers WHERE id = @s AND tenant_id = @t", { s: input.supplierId, t: tenantId });
+    if (!supplier) throw new HttpError(404, "not_found", `supplier '${input.supplierId}' not found`);
+    const now = Date.now();
+    const vc: VendorCredit = {
+      id: `vcr_${uuidv7()}`,
+      tenant_id: tenantId,
+      supplier_id: input.supplierId,
+      type: input.type,
+      amount_cents: input.amountCents,
+      reason: input.reason ?? null,
+      po_id: input.poId ?? null,
+      status: "open",
+      created_at: now,
+      updated_at: now,
+    };
+    await this.db.query(
+      `INSERT INTO vendor_credits (id, tenant_id, supplier_id, type, amount_cents, reason, po_id, status, created_at, updated_at)
+       VALUES (@id,@tenant_id,@supplier_id,@type,@amount_cents,@reason,@po_id,@status,@created_at,@updated_at)`,
+      vc as unknown as Record<string, unknown>,
+    );
+    return vc;
+  }
+
+  async listVendorCredits(tenantId: string, supplierId?: string): Promise<VendorCredit[]> {
+    if (supplierId) {
+      return this.db.query<VendorCredit>(
+        "SELECT * FROM vendor_credits WHERE tenant_id = @t AND supplier_id = @s ORDER BY created_at DESC",
+        { t: tenantId, s: supplierId },
+      );
+    }
+    return this.db.query<VendorCredit>("SELECT * FROM vendor_credits WHERE tenant_id = @t ORDER BY created_at DESC LIMIT 500", { t: tenantId });
+  }
+
+  async voidVendorCredit(id: string, tenantId: string): Promise<VendorCredit> {
+    const vc = await this.db.one<VendorCredit>("SELECT * FROM vendor_credits WHERE id = @id AND tenant_id = @t", { id, t: tenantId });
+    if (!vc) throw new HttpError(404, "not_found", `vendor credit '${id}' not found`);
+    await this.db.query("UPDATE vendor_credits SET status = 'void', updated_at = @now WHERE id = @id AND tenant_id = @t", { now: Date.now(), id, t: tenantId });
+    return { ...vc, status: "void" };
+  }
+
   async createOrder(supplierId: string, lines: POLineInput[], tenantId: string): Promise<PurchaseOrderWithLines> {
     if (lines.length === 0) throw new HttpError(400, "bad_request", "at least one line is required");
     const supplier = await this.db.one("SELECT id FROM suppliers WHERE id = @supplierId AND tenant_id = @tenantId", { supplierId, tenantId });
@@ -81,6 +168,8 @@ export class PurchasingService {
       quantity: l.quantity,
       unit_cost_cents: l.unitCostCents,
       line_cost_cents: l.quantity * l.unitCostCents,
+      expiry_date: l.expiryDate ?? null,
+      lot_code: l.lotCode ?? null,
     }));
     const total = poLines.reduce((s, l) => s + l.line_cost_cents, 0);
     await this.db.tx(async (tdb) => {
@@ -90,7 +179,7 @@ export class PurchasingService {
       );
       for (const l of poLines) {
         await tdb.query(
-          "INSERT INTO purchase_order_lines (id, tenant_id, po_id, product_id, quantity, unit_cost_cents, line_cost_cents) VALUES (@id,@tenant_id,@po_id,@product_id,@quantity,@unit_cost_cents,@line_cost_cents)",
+          "INSERT INTO purchase_order_lines (id, tenant_id, po_id, product_id, quantity, unit_cost_cents, line_cost_cents, expiry_date, lot_code) VALUES (@id,@tenant_id,@po_id,@product_id,@quantity,@unit_cost_cents,@line_cost_cents,@expiry_date,@lot_code)",
           l as unknown as Record<string, unknown>,
         );
       }
@@ -128,7 +217,17 @@ export class PurchasingService {
     });
     await this.events.publish(
       "purchase_order.received",
-      { tenantId, poId: id, lines: po.lines.map((l) => ({ productId: l.product_id, quantity: l.quantity, unitCostCents: l.unit_cost_cents })) },
+      {
+        tenantId,
+        poId: id,
+        lines: po.lines.map((l) => ({
+          productId: l.product_id,
+          quantity: l.quantity,
+          unitCostCents: l.unit_cost_cents,
+          expiryDate: l.expiry_date ?? undefined,
+          lotCode: l.lot_code ?? undefined,
+        })),
+      },
       id,
     );
     return { ...po, status: "received", received_at: now };

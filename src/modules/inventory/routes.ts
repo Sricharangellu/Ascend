@@ -84,11 +84,27 @@ export function registerRoutes(router: Router, service: InventoryService): void 
     }),
   );
 
+  // Near-expiry report — registered before /:productId so "expiring" isn't an id.
+  router.get(
+    "/expiring",
+    handler(async (req, res) => {
+      const days = typeof req.query.days === "string" ? Number(req.query.days) : 30;
+      res.json({ items: await service.expiring(Number.isFinite(days) ? days : 30, tenantId(res)) });
+    }),
+  );
+
   router.get(
     "/:productId",
     handler(async (req, res) => {
       const row = await service.getStock(String(req.params.productId), tenantId(res));
       res.json(present(row));
+    }),
+  );
+
+  router.get(
+    "/:productId/lots",
+    handler(async (req, res) => {
+      res.json({ items: await service.lots(String(req.params.productId), tenantId(res)) });
     }),
   );
 
