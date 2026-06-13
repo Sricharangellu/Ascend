@@ -29,9 +29,10 @@ expiry dates, received via purchasing.
 - **Numbering:** per-tenant sequential bill/invoice numbers.
 
 ## Phasing
-1. Multi-UPC (small, unlocks accurate scanning from the real data) — **in progress**.
-2. Expiry/batch lots + FEFO + near-expiry report.
-3. Supplier bills (AP) from POs; then customer invoices (AR) from orders.
+1. Multi-UPC (scan any UPC) — **DONE + live** (6,473 products imported).
+2. Expiry/batch lots + near-expiry report — **DONE + live** (`inventory_lots`, captured on receive, `/inventory/expiring`). FEFO sale-depletion still TODO.
+3. Vendor list + AP credits (chargebacks + credit memos) — **DONE + live** (`/purchasing/vendors`, `/purchasing/vendor-credits`).
+4. Supplier bills (AP) from POs; then customer invoices (AR) from orders — **next**.
 
 Each ships as: migration (self-provisioning, idempotent) + tenant-scoped routes +
 events + MSW mocks + `BACKEND_HANDOFF.md` entry, committed to `backend-cycle3`.
