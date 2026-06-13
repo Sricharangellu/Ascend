@@ -91,6 +91,12 @@ The damaged/expired → return → credit loop, anchored on the near-expiry repo
 - **Manual receive with expiry:** `POST /api/v1/inventory/:id/receive {quantity, expiryDate?, lotCode?, unitCostCents?}` creates a lot (not just PO receives).
 - Full loss loop: receive (lot) → FEFO sell → expiring/expired report → vendor return/write-off → credit memo. MSW mocks added for expired + expiry-summary.
 
+## One product, multiple expiry dates (per receipt)
+Different expiry dates are different **lots**. Two supported ways:
+- **Single receive, split into lots:** `POST /api/v1/inventory/:id/receive { lots: [{ quantity, expiryDate?, lotCode?, unitCostCents? }, …] }` → total stock + one lot each.
+- **PO with multiple lines for the same product** (each line its own `expiryDate`/`lotCode`) → a lot per line on receive.
+FEFO depletion, `/inventory/:id/lots`, expiring/expired reports, and value-at-risk all operate across these lots automatically. UI: a "receive" form should allow adding multiple lot rows for one product.
+
 ## Latest backend commit
 - `backend-cycle3` @ **`fc513c2`** (tag `cycle3-backend`): cycle-3 modules + inventory overview + team. Clean fast-forward of `master` (`66af0a6`). Live on finder-pos-backend.vercel.app (11 modules).
 
