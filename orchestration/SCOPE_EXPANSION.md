@@ -34,7 +34,9 @@ expiry dates, received via purchasing.
 3. Vendor list + AP credits (chargebacks + credit memos) — **DONE + live** (`/purchasing/vendors`, `/purchasing/vendor-credits`).
 4. Supplier bills (AP) from POs + customer invoices (AR) from orders — **DONE + live** (`/api/v1/billing/bills|invoices` + `/:id/pay`; received PO auto-drafts a bill).
 
-Remaining: **FEFO sale-depletion** (deplete inventory_lots earliest-expiry-first on sale — touches the live order→inventory path, do carefully) and AP/AR **aging reports**.
+5. Expiry lifecycle — **DONE + live**: FEFO sale-depletion, `/inventory/expired`, `/inventory/expiry-summary` (value-at-risk), manual receive with expiry, and vendor returns/write-offs with auto credit memo.
+
+Remaining: AP/AR + credit **aging reports**; lot restoration on refund (refunds restock aggregate but not specific lots); multi-outlet stock (per-outlet inventory).
 
 Each ships as: migration (self-provisioning, idempotent) + tenant-scoped routes +
 events + MSW mocks + `BACKEND_HANDOFF.md` entry, committed to `backend-cycle3`.

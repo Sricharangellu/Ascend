@@ -83,6 +83,14 @@ The damaged/expired → return → credit loop, anchored on the near-expiry repo
 - `GET /api/v1/purchasing/returns` (list). MSW mocks added.
 - Suggested UI: from the **near-expiry report** (`GET /api/v1/inventory/expiring`), let a manager select expiring lots → "Return to vendor" → posts a return with `createCredit:true`. (Pure shrinkage write-off = omit supplierId/createCredit.)
 
+## Expiry lifecycle — complete + live
+- **FEFO depletion:** sales now draw down the earliest-expiring lot first (via `order.created`; no-op for untracked products).
+- `GET /api/v1/inventory/expired` → lots past their date but still on hand (`days_overdue`).
+- `GET /api/v1/inventory/expiring?days=N` → near-expiry (`days_to_expiry`).
+- `GET /api/v1/inventory/expiry-summary?days=N` → `{ expired:{lots,units,valueCents}, expiringSoon:{lots,units,valueCents,withinDays} }` — shrink value-at-risk for a dashboard KPI.
+- **Manual receive with expiry:** `POST /api/v1/inventory/:id/receive {quantity, expiryDate?, lotCode?, unitCostCents?}` creates a lot (not just PO receives).
+- Full loss loop: receive (lot) → FEFO sell → expiring/expired report → vendor return/write-off → credit memo. MSW mocks added for expired + expiry-summary.
+
 ## Latest backend commit
 - `backend-cycle3` @ **`fc513c2`** (tag `cycle3-backend`): cycle-3 modules + inventory overview + team. Clean fast-forward of `master` (`66af0a6`). Live on finder-pos-backend.vercel.app (11 modules).
 
