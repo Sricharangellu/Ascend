@@ -53,8 +53,17 @@ Run:
 cd /Users/sri/Desktop/Desk/Finder/finder-pos
 git status --porcelain
 ```
-- **If output is non-empty**: STOP. Do not modify, stash, or discard
-  anything. Go to §3 "Hard stop: dirty tree" and exit the cycle.
+- **If output is non-empty**: first check whether the *only* untracked
+  entries are stray nested clones of this same repo — i.e. an untracked
+  directory at the repo root whose `<dir>/.git/config` points at
+  `github.com/Sricharangellu/finder-pos` (a leftover sandbox checkout from a
+  previous cloud run, not user work). If so, `rm -rf` that directory only,
+  then re-run `git status --porcelain`. For any other untracked or modified
+  files: STOP. Do not modify, stash, or discard anything. Go to §3 "Hard
+  stop: dirty tree" and exit the cycle.
+- **Never `git clone` into the working tree or create directories at the
+  repo root** outside `web/`/`orchestration/` — doing so leaves a dirty
+  tree that blocks every subsequent scheduled run.
 - **If `.git/index.lock` exists**: check `ps aux | grep -i git`.
   - If a git process IS running: STOP.
   - If NO git process is running AND
