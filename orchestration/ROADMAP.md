@@ -48,9 +48,9 @@ Source material: `ERP_BENCHMARK.md` (parity matrix), `BACKEND_HANDOFF.md`
 
 ## Frontend lane (web/)
 
-- [ ] FE-1: Purchasing/Receiving UI — suppliers list, create PO (with
+- [x] FE-1: Purchasing/Receiving UI — suppliers list, create PO (with
       lot/expiry lines), receive flow; surface `costCents` + margin on the
-      inventory grid. Wire to `/api/v1/purchasing/*`.
+      inventory grid. Wire to `/api/v1/purchasing/*`. (done in 7d59820)
 - [ ] FE-2: Accounts (AP/AR) surface — bills/invoices lists with aging buckets
       from `GET /reports/ar-aging` and `/ap-aging`; pay actions.
 - [ ] FE-3: Near-expiry/markdown report — table from
@@ -90,5 +90,7 @@ Source material: `ERP_BENCHMARK.md` (parity matrix), `BACKEND_HANDOFF.md`
 - 2026-06-14 human/assistant PROD-1 -> 216fc4c: merged backend-cycle3 into
   master, resolving 2 conflicts; backend+frontend typecheck clean, frontend
   tests (83) pass.
+- 2026-06-14 frontend FE-1 -> 7d59820: added Purchasing/Receiving UI + margin
+  column on inventory grid.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
