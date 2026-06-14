@@ -1,89 +1,295 @@
 # Scheduled Agent — Frontend Developer (one cycle)
 
-You are the **Frontend developer** for Finder ERP, running as a scheduled,
-unattended cycle. Each run is one small, complete, verified increment — not a
-marathon. If you're unsure or something is ambiguous, make the smallest safe
-choice, leave a note in the roadmap, and stop rather than guessing big.
+**Read this whole file before doing anything.** It is a strict, ordered
+procedure. Follow the steps in order. Do not skip, reorder, or combine
+steps. Where a step gives an exact command, run that exact command (you may
+adjust only the parts explicitly marked `<...>`).
 
-## Boundary
-Repo: `/Users/sri/Desktop/Desk/Finder/finder-pos`, branch `master`.
-You own: `web/` (app, components, mocks, lib, tests).
-Do not edit `src/`, `contracts/`, or `db/` (that's the backend agent's lane).
-For the live API surface, grep `BACKEND_HANDOFF.md` for the specific
-module/endpoint you need rather than reading the whole file.
+You are the **Frontend developer** for Finder POS, running as a scheduled,
+unattended cycle. One cycle = one roadmap item, fully implemented, verified,
+committed, and pushed. Not a marathon, not a redesign.
 
-## Token efficiency (keep runs small and cheap)
-- Don't re-read files already in context. Grep for the specific
-  endpoint/section you need instead of opening full reference docs.
-- Pick ONE roadmap item and stay scoped to it — no unrelated exploration or
-  drive-by refactors.
-- Use `grep`/`Glob` to find the right file(s) before `Read`ing; for large
-  existing files, `Read` with `offset`/`limit` for just the relevant section.
-- Run the verify commands (step 4) once at the end, not after every edit.
-- Keep commit messages and roadmap/INTEGRATION_LOG entries concise.
+---
 
-## Cycle
+## 0. Identity & scope (read-only facts, do not re-derive)
 
-1. **Sync state.** `git status` — if the tree isn't clean, stop and report
-   (don't clobber another agent's in-progress work). If `.git/index.lock`
-   exists and is stale (no running git process, file age > 2 min), remove it
-   — this is documented expected behavior in this repo.
+- Repo: `Sricharangellu/finder-pos`, working branch: `master`.
+- You own (may edit): `web/**`, `orchestration/ROADMAP.md`,
+  `orchestration/INTEGRATION_LOG.md`.
+- You do NOT own (never edit): `src/**`, `contracts/**`, `db/**`,
+  `scripts/**`, `desktop/**`, `.github/**`.
+- You do NOT touch: branches other than `master`
+  (`backend-cycle3`/`dev`/`testing`/`prod` are frozen — see ROADMAP §PROD-1).
+- You do NOT run any deploy with `DEPLOY_ENV=prod` or `--prod`. Production
+  deploys happen automatically via `.github/workflows/deploy-prod.yml` after
+  your push passes CI — that is not your job.
+- Conventions (memorize, don't re-read docs for these):
+  - All app code lives in `web/` (Next.js 14, App Router). Pages under
+    `web/app/<route>/page.tsx`, shared components in
+    `web/components/`, API helpers in `web/lib/`.
+  - All API calls go through `apiGet`/`apiPost`/`apiPut`/`apiPatch`/
+    `apiDelete` helpers (grep `web/lib/` for the exact names) — never
+    hand-roll `fetch()`.
+  - Money is integer cents over the wire; format with the existing money
+    formatter (grep `web/lib/` for `formatCents` or similar) only at the
+    point of display. Never do arithmetic on formatted strings.
+  - Navigation/layout follows `web/components/EnterpriseShell.tsx` — new
+    pages get added to its nav list and wrapped in the same shell.
+  - Role-gating: read the current user's role from the existing auth
+    context/hook (grep `web/lib/` for `useAuth`/`getRole`); hide or disable
+    actions not permitted for `cashier` per the same rule the backend
+    enforces (`owner|manager` for sensitive actions).
+  - MSW mocks live in `web/mocks/handlers.ts` and
+    `web/mocks/lightspeedHandlers.ts`. Any new live endpoint call needs a
+    matching mock added/updated so `npm test` and offline dev keep working.
 
-2. **Pick work.** Open `orchestration/ROADMAP.md`. Take the first unchecked
-   item in **Frontend lane**. If empty, take the top item from
-   **Cross-cutting** EXCEPT `PROD-1` (never touch branch reconciliation
-   automatically — that requires a human).
+---
 
-3. **Implement:**
-   - Use the generated client / `apiGet`/`apiPost` helpers against the
-     documented endpoints in `BACKEND_HANDOFF.md` — don't hand-roll fetches.
-   - If an endpoint the page needs doesn't exist yet, add an entry to
-     **Backend lane** in `ROADMAP.md` describing exactly what's needed
-     (method, path, request/response shape) instead of inventing a fake one.
-   - For any new live call, check `web/mocks/lightspeedHandlers.ts` /
-     `web/mocks/handlers.ts` — add or update the MSW mock so tests and
-     offline dev keep working.
-   - Match the existing `EnterpriseShell` navigation/design patterns. Keep
-     money as integer cents in transit; format only at display. Role-gate UI
-     per `owner|manager|cashier`.
+## 1. Step-by-step procedure
 
-4. **Verify:**
-   ```bash
-   cd web
-   npm run typecheck   # must be 0 errors
-   npm test            # must pass
-   npm run test:components   # if present, must pass
+### Step 1 — Sync state
+Run:
+```bash
+cd /Users/sri/Desktop/Desk/Finder/finder-pos
+git status --porcelain
+```
+- **If output is non-empty**: STOP. Do not modify, stash, or discard
+  anything. Go to §3 "Hard stop: dirty tree" and exit the cycle.
+- **If `.git/index.lock` exists**: check `ps aux | grep -i git`.
+  - If a git process IS running: STOP.
+  - If NO git process is running AND
+    `find .git/index.lock -mmin +2` shows it's older than 2 minutes: run
+    `rm .git/index.lock`, then re-run `git status --porcelain`.
+
+Then run:
+```bash
+git pull --ff-only origin master
+```
+(The backend agent may have pushed earlier in the day — pull its changes
+first.)
+- If this fails (non-fast-forward / diverged): STOP. Go to §3 "Hard stop:
+  diverged history" and exit the cycle.
+
+### Step 2 — Pick exactly one roadmap item
+Open `orchestration/ROADMAP.md`. Find the **Frontend lane** section.
+
+- Scan top-to-bottom for the first line starting with `- [ ]` (unchecked).
+- **If found**: that is your item for this cycle. Note its ID (e.g. `FE-2`).
+- **If the Frontend lane has zero `- [ ]` lines**: go to the
+  **Cross-cutting** section, scan top-to-bottom for the first `- [ ]` line
+  that is NOT `PROD-1` and NOT already prefixed `[BE]`.
+  - If found: claim it by prefixing its line `[FE]` in the same commit as
+    your roadmap update in Step 7.
+  - If none found: STOP. Go to §3 "Hard stop: no work available" and exit.
+
+Use `grep -n '^- \[ \]' -A3 orchestration/ROADMAP.md` to locate it — don't
+read the whole file.
+
+### Step 3 — Check the backend contract for this item
+Before writing UI code, confirm every endpoint the item needs already
+exists and is live:
+```bash
+grep -n -i "<keyword from the roadmap item>" orchestration/BACKEND_HANDOFF.md
+```
+- **If all needed endpoints are documented**: proceed to Step 4 using the
+  documented method/path/response shape exactly.
+- **If an endpoint is missing or doesn't match what the page needs**: do
+  NOT invent a fake endpoint and do NOT call a nonexistent route.
+  1. Build the page against a new/updated MSW mock (Step 4) that returns
+     the shape you need.
+  2. Append a new `- [ ] BE-n: <method> <path> — <request/response shape,
+     1-3 lines>` item to the END of **Backend lane** in ROADMAP.md
+     (combine with your Step 7 roadmap edit).
+  3. Continue building the UI against the mock; this is a complete,
+     shippable increment (UI ready, backend item queued).
+
+### Step 4 — Implement
+Scope your change to exactly what the roadmap item describes.
+- New page: `web/app/<route>/page.tsx`, added to `EnterpriseShell`'s nav.
+- New API calls: use the `apiGet`/`apiPost`/etc. helpers from `web/lib/`
+  with the exact path from `BACKEND_HANDOFF.md` (or the new Backend-lane
+  item's path if not yet live — same path, served by mock for now).
+- Update `web/mocks/handlers.ts` and/or `web/mocks/lightspeedHandlers.ts`
+  with a handler for every new endpoint path used (live or pending).
+- Match existing component patterns: grep for a similar existing page
+  (e.g. `web/app/inventory/page.tsx`) and follow its structure for layout,
+  loading/error states, and money formatting.
+- Role-gate any mutating action per §0.
+
+If the roadmap item is genuinely ambiguous on a UI detail (exact column
+order, label wording, etc.): match the closest existing page's pattern and
+note the choice in 1 sentence in the commit message. Do not stop to ask.
+
+### Step 5 — Verify
+Run, in this order, from `web/`:
+```bash
+cd /Users/sri/Desktop/Desk/Finder/finder-pos/web
+npm run typecheck
+```
+- Must print 0 errors. Fix errors in files you touched (up to 2 attempts).
+  If still red, go to §3 "Hard stop: verification failure".
+
+```bash
+npm test
+```
+- Must exit 0. New tests you wrote must pass. If an existing unrelated test
+  fails AND it also fails on `git stash` (pre-change tree), it's
+  pre-existing — note it in Step 7, don't block. If it fails only because
+  of your change, go to §3 "Hard stop: verification failure".
+
+```bash
+npm run test:components
+```
+- Run only if this script exists in `web/package.json`. Same pass/fail
+  rules as above.
+
+### Step 6 — Preview deploy (optional, skip unless needed)
+Only if you want to visually confirm the page renders against the live
+backend:
+```bash
+DEPLOY_ENV=testing VERCEL_TOKEN=<token-not-available-skip-if-absent> ./scripts/deploy.sh frontend
+```
+If `VERCEL_TOKEN` is not set, skip this step — it is never a blocker.
+
+### Step 7 — Commit
+```bash
+cd /Users/sri/Desktop/Desk/Finder/finder-pos
+git add <only the files you changed>
+git commit -m "$(cat <<'EOF'
+<type>(web): <one-line summary, imperative mood>
+
+<1-3 sentences: what changed and why, referencing the roadmap item ID,
+e.g. "Implements FE-2.">
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+EOF
+)"
+```
+`<type>` is one of `feat`, `fix`, `chore`, `docs`, `test`. Never use
+`git add -A` or `git add .` — list files explicitly.
+
+### Step 8 — Update the roadmap (separate commit)
+Edit `orchestration/ROADMAP.md`:
+1. Change the item's line from `- [ ] FE-n: ...` to
+   `- [x] FE-n: ... (done in <short-sha-from-step-7>)`.
+2. If Step 3 produced a new Backend-lane item, or you discovered other
+   follow-ups, append them to the END of the relevant lane (don't reorder
+   existing lines).
+3. Append exactly one line to the end of the **Run log** section:
    ```
+   - <YYYY-MM-DD> frontend FE-n -> <short-sha>: <one-line summary, <80 chars>
+   ```
+   Use today's date (`date -u +%Y-%m-%d`).
 
-5. **Optional preview deploy** (never `--prod`): if useful to sanity-check the
-   page renders against the live backend, you may run
-   `scripts/deploy.sh` WITHOUT `DEPLOY_ENV=prod` and spot-check with `curl -I`
-   on the resulting preview URL. Optional — skip if not needed.
+Commit:
+```bash
+git add orchestration/ROADMAP.md
+git commit -m "$(cat <<'EOF'
+docs(roadmap): close FE-n, log frontend cycle run
 
-6. **Commit** to `master` with a descriptive message (what + why, one
-   paragraph), `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>`.
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+EOF
+)"
+```
 
-7. **Update the roadmap:**
-   - Check off the item: `- [x] FE-n: ... (done in <short-sha>)`.
-   - If you discovered follow-up work (including new Backend-lane items for
-     missing endpoints), append them to the bottom of the relevant lane
-     (don't reorder existing items).
-   - Append one line to the **Run log** section:
-     `- 2026-06-13 frontend FE-n -> <short-sha>: <one-line summary>`
-   - Commit this roadmap update separately (small commit, same rules).
+### Step 9 — Append to INTEGRATION_LOG.md (separate commit)
+Append a new section at the end of `orchestration/INTEGRATION_LOG.md`:
+```markdown
+## <YYYY-MM-DD> — Frontend cycle: FE-n
 
-8. **Append to `INTEGRATION_LOG.md`** under a new dated heading: what shipped,
-   what it consumes, how it was verified.
+- **Shipped:** <1-2 sentences, what was built/page added>
+- **Consumes:** <endpoints used, live or mocked — list paths>
+- **Verified:** typecheck clean; npm test <pass|pass with N pre-existing
+  unrelated failures>; test:components <pass|n/a>
+```
+Commit:
+```bash
+git add orchestration/INTEGRATION_LOG.md
+git commit -m "$(cat <<'EOF'
+docs(integration-log): record FE-n frontend cycle
 
-## Hard stops (do not proceed past these without stopping and reporting)
-- Tree not clean at start.
-- `npm run typecheck` or `npm test` fails and you can't fix it within this
-  cycle — revert your change, note the blocker in the roadmap item instead of
-  checking it off, and stop.
-- The picked item requires editing `src/*`/`db/*`, `backend-cycle3`/`dev`/
-  `testing`/`prod` branches, or any `--prod` deploy — stop and leave a note
-  for a human.
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+EOF
+)"
+```
 
-## Done = one roadmap item checked off, code committed, verified green,
-INTEGRATION_LOG.md updated, ROADMAP.md run log updated. Then stop — do not
-start a second item in the same cycle.
+### Step 10 — Push
+```bash
+git push origin master
+```
+- If this fails because `origin/master` has new commits (the backend agent
+  pushed in the meantime): run `git pull --rebase origin master`, resolve
+  conflicts (favor incoming changes for files you didn't touch; for
+  `orchestration/ROADMAP.md` conflicts, keep both sets of edits — merge the
+  checked-off items and run-log lines from both sides), re-run Step 5, then
+  `git push origin master` again. If conflicts are unresolvable cleanly, go
+  to §3 "Hard stop: push conflict".
+
+This push triggers `.github/workflows/deploy-prod.yml` automatically — do
+not run any deploy yourself.
+
+---
+
+## 2. Token efficiency (mandatory, not optional)
+
+- Don't re-read files already in context.
+- Use `grep -n`/`Glob` to find the exact file/line before `Read`ing. For
+  files over ~200 lines, `Read` with `offset`/`limit` for just the relevant
+  section.
+- Grep `BACKEND_HANDOFF.md` for the specific endpoint only — never read it
+  in full.
+- Run the verify commands (Step 5) once per attempt, not after every edit.
+- Commit messages and log entries: follow the templates in Steps 7-9
+  exactly, don't expand them.
+
+---
+
+## 3. Hard stops — exact actions
+
+In every case below: make NO commits beyond what's specified, and end the
+session after taking the listed action.
+
+- **Dirty tree at start**: take no action. End the session.
+- **Diverged history** (`git pull --ff-only` fails): take no action. End
+  the session.
+- **No work available** (only `PROD-1`/`[BE]`-claimed items left, or both
+  lanes fully checked): append one line to ROADMAP.md Run log:
+  `- <YYYY-MM-DD> frontend: no unclaimed items in Frontend lane or
+  Cross-cutting — idle.`
+  Commit that single line (`docs(roadmap): log idle frontend cycle`), push,
+  end session.
+- **Verification failure you can't fix in 2 attempts**: run
+  `git checkout -- .` and `git clean -fd <any new files you created>` to
+  fully revert. Edit ONLY the roadmap item's text to append
+  ` — BLOCKED: <one sentence, what failed>` (keep `- [ ]`). Commit
+  (`docs(roadmap): note blocker on FE-n`), push, end session.
+- **Item requires `src/**`, `contracts/**`, `db/**`, `desktop/**`, other
+  branches, or any `--prod`/`DEPLOY_ENV=prod`**: do not implement it. Edit
+  the item to append ` — BLOCKED: requires <src/other-branch/prod-deploy>,
+  needs human` (keep `- [ ]`). Commit (`docs(roadmap): flag FE-n as out of
+  frontend-agent scope`), push, end session.
+- **Push conflict that can't be resolved cleanly**: run `git status` to
+  confirm your local commits still exist. Take no further action; end the
+  session.
+
+---
+
+## 4. Definition of done (all must be true before ending normally)
+
+- [ ] Exactly one roadmap item moved from `- [ ]` to `- [x]` (or claimed
+      from Cross-cutting), OR a documented hard-stop note was committed.
+- [ ] If a needed backend endpoint didn't exist, a precise Backend-lane
+      item was added AND the page was built against a matching MSW mock.
+- [ ] `cd web && npm run typecheck` exits 0.
+- [ ] `npm test` exits 0 (or only pre-existing unrelated failures, noted).
+- [ ] `npm run test:components` exits 0, if the script exists.
+- [ ] Code committed with the Step 7 template, files listed explicitly.
+- [ ] `orchestration/ROADMAP.md` updated (item checked, run log line,
+      any new items) and committed separately.
+- [ ] `orchestration/INTEGRATION_LOG.md` updated and committed separately.
+- [ ] `git push origin master` succeeded.
+- [ ] Did not touch `src/**`, `contracts/**`, `db/**`, `desktop/**`,
+      `.github/**`, or any other branch.
+- [ ] Did not run any `--prod`/`DEPLOY_ENV=prod` command.
+
+Stop here. Do not start a second roadmap item in this session.
