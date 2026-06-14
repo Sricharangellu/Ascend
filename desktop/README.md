@@ -45,6 +45,23 @@ FINDER_APP_URL=http://localhost:3000 npm start
 
 (Packaged builds always use the production URL baked into `main.js`.)
 
+## Staying up to date
+
+This app always loads the live production site, and production now
+auto-deploys on every push to `master` (see
+`.github/workflows/deploy-prod.yml` — runs typecheck/tests, then
+`scripts/deploy.sh both` with `DEPLOY_ENV=prod`). So whenever the scheduled
+dev-cycle agents (or anyone) push to `master`, the live site updates within
+a few minutes.
+
+The desktop app itself:
+- Reloads automatically when it regains focus, if it's been in the
+  background for more than 10 minutes (avoids interrupting an active
+  checkout).
+- Reloads every 6 hours in the background as a safety net.
+- You can always force a manual refresh: **Finder POS menu → Reload**
+  (or Cmd+R).
+
 ## Notes
 
 - This is a thin wrapper, not an offline app — it requires internet access

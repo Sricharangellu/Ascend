@@ -26,6 +26,26 @@ function createWindow() {
     }
     return { action: "allow" };
   });
+
+  // Pick up new deploys (e.g. from the daily dev-cycle agents + CI auto-deploy
+  // to production) without the user needing to quit/reopen the app.
+  let lastFocusReload = Date.now();
+  win.on("focus", () => {
+    const now = Date.now();
+    // Avoid reloading on every brief focus change; only refresh if the app
+    // has been in the background for a while (so an active checkout isn't
+    // interrupted by a reload moments after switching tabs).
+    if (now - lastFocusReload > 10 * 60 * 1000) {
+      lastFocusReload = now;
+      win.webContents.reload();
+    }
+  });
+
+  // Background safety-net: also reload every 6 hours regardless of focus,
+  // so a long-running idle session doesn't drift too far behind production.
+  setInterval(() => {
+    if (!win.isDestroyed()) win.webContents.reload();
+  }, 6 * 60 * 60 * 1000);
 }
 
 const menuTemplate = [
