@@ -173,6 +173,14 @@ ERP benchmark #13 + #15, and a reusable role guard (#12, partial).
 - **Global search** `GET /api/v1/search?q=&type=` → `{ query, results:{ products, customers, vendors, invoices, salesOrders, quotations, purchaseOrders } }`, case-insensitive contains across name/sku/barcode, company/email, and document numbers. Backs the ⌘K palette (#15).
 - Verified live: seed + flags merge + business KV; cashier mutation 403 / owner 201; search returned products + customers. MSW mocks added.
 
+## Ecommerce — storefront + checkout + customer portal (Wave H) — LIVE
+ERP benchmark #14. Tenant-scoped; reuses the sales engine.
+- **Online flag:** `products.ecommerce` (idempotent ALTER). `PUT /api/v1/ecommerce/products/:productId/online {online}` toggles visibility.
+- **Storefront:** `GET /api/v1/ecommerce/catalog?q=&category=` → active products with `ecommerce=1` only.
+- **Checkout:** `POST /api/v1/ecommerce/checkout {customerId, lines:[{productId, quantity, unitCents?}]}` → creates a **Sales Order on the `ecommerce` channel** (`store_id="ecommerce"`, status pending_approve) via SalesService, so tier pricing + the SO→approve→invoice workflow apply. Online orders thus appear in the normal SO list/queue.
+- **Customer portal:** `GET /api/v1/ecommerce/portal/:customerId/orders` → `{ customer, salesOrders, invoices }` scoped to that customer.
+- Verified live: flag a product → it appears in catalog (others hidden) → checkout → SO-##### on ecommerce store → portal lists it. MSW mocks added.
+
 ## Latest backend commit
 - `backend-cycle3` @ **`fc513c2`** (tag `cycle3-backend`): cycle-3 modules + inventory overview + team. Clean fast-forward of `master` (`66af0a6`). Live on finder-pos-backend.vercel.app (11 modules).
 

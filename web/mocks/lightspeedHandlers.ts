@@ -31,6 +31,9 @@ const TIER_PCT: Record<number, number> = { 1: 10, 2: 7.5, 3: 5, 4: 2.5, 5: 0 };
 const tierPrices = new Map<string, Array<{ tier: number; priceCents: number }>>();
 // Discounts dev store
 let discounts: any[] = [];
+// Ecommerce dev store
+const onlineProducts = new Map<string, any>();
+let ecSoSeq = 0;
 // Settings dev stores
 let shippingMethods: any[] = [];
 let paymentTerms: any[] = [];
@@ -664,6 +667,46 @@ lightspeedHandlers.push(
     if (!d) return HttpResponse.json({ error: { code: "not_found", message: "batch deposit not found", requestId: rid() } }, { status: 404 });
     if (d.status !== "pending_approval") return HttpResponse.json({ error: { code: "conflict", message: `batch deposit is already ${d.status}`, requestId: rid() } }, { status: 409 });
     d.status = "rejected"; d.decided_at = Date.now(); return HttpResponse.json(d);
+  }),
+);
+
+// ── Ecommerce: storefront + checkout + portal ───────────────────────────────
+lightspeedHandlers.push(
+  http.get(`${V1}/ecommerce/catalog`, async ({ request }) => {
+    await lat();
+    const u = new URL(request.url);
+    const q = (u.searchParams.get("q") ?? "").toLowerCase();
+    const cat = u.searchParams.get("category");
+    let items = [...onlineProducts.values()];
+    if (q) items = items.filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
+    if (cat) items = items.filter((p) => p.category === cat);
+    return HttpResponse.json({ items });
+  }),
+  http.put(`${V1}/ecommerce/products/:productId/online`, async ({ params, request }) => {
+    await lat();
+    const id = String(params.productId);
+    const b = (await request.json()) as any;
+    if (b.online) onlineProducts.set(id, { id, sku: `SKU-${id.slice(-4)}`, name: `Product ${id.slice(-4)}`, price_cents: 1500, category: "general" });
+    else onlineProducts.delete(id);
+    return HttpResponse.json({ productId: id, ecommerce: !!b.online });
+  }),
+  http.post(`${V1}/ecommerce/checkout`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as any;
+    const id = `sso_${Math.random().toString(36).slice(2, 12)}`;
+    const total = (b.lines ?? []).reduce((s: number, l: any) => s + (l.unitCents ?? 1500) * l.quantity, 0);
+    const so = { id, tenant_id: "tnt_demo", so_number: `SO-${String(++ecSoSeq).padStart(5, "0")}`, quotation_id: null, customer_id: b.customerId, status: "pending_approve", subtotal_cents: total, discount_cents: 0, total_cents: total, sales_rep_id: null, picker_id: null, store_id: "ecommerce", created_at: Date.now(), updated_at: Date.now(), lines: [] };
+    salesOrders.push(so);
+    return HttpResponse.json(so, { status: 201 });
+  }),
+  http.get(`${V1}/ecommerce/portal/:customerId/orders`, async ({ params }) => {
+    await lat();
+    const cid = String(params.customerId);
+    return HttpResponse.json({
+      customer: { id: cid, name: customers.get(cid)?.name ?? "Customer" },
+      salesOrders: salesOrders.filter((s) => s.customer_id === cid),
+      invoices: [],
+    });
   }),
 );
 

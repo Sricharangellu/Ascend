@@ -18,6 +18,7 @@ import { shippingModule } from "./shipping/index.js";
 import { discountsModule } from "./discounts/index.js";
 import { settingsModule } from "./settings/index.js";
 import { searchModule } from "./search/index.js";
+import { ecommerceModule } from "./ecommerce/index.js";
 import { reportsModule } from "./reports/index.js";
 
 /**
@@ -44,5 +45,6 @@ export const modules: PosModule[] = [
   discountsModule,
   settingsModule,
   searchModule,
+  ecommerceModule,
   reportsModule,
 ];
