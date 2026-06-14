@@ -64,3 +64,8 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Frontend** → upgraded `/reports` with range controls, export/schedule actions, richer revenue KPIs, average order value, refund rate, hourly sales index, payment method bars, order-status table, and top-product list. Kept the existing `SalesSummary` contract and derived additional UI locally.
 - **Backend/API handoff for Claude** → future reporting endpoints should support date range filters and return hourly sales, top products, order status share, payment method breakdowns, and export/scheduled-report actions. Existing `GET /api/v1/reports/summary` remains sufficient for the current frontend fallback.
 - **Verification** → `cd web && npm run typecheck` PASS; `npm test` PASS (82/82); `npm run test:components` PASS (21/21); `curl -I http://localhost:3000/reports` returned 200.
+
+## 2026-06-14 — Frontend cycle: FE-1
+- **Shipped:** New `/purchasing` page (added to nav) with a suppliers list + add-supplier form, a purchase-order list with a manager-gated "Receive" action, and a create-PO form supporting multiple lines with product, quantity, unit cost, and optional lot code/expiry date. Also added a "Margin" column (derived from `priceCents`/`costCents`) to the inventory grid and detail panel.
+- **Consumes:** `GET/POST /api/v1/purchasing/suppliers`, `GET/POST /api/v1/purchasing/orders`, `POST /api/v1/purchasing/orders/:id/receive`, `GET /api/v1/inventory/levels` (existing MSW mocks for all).
+- **Verified:** typecheck clean; npm test pass (83/83); test:components pass.
