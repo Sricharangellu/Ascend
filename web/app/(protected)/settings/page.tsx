@@ -28,11 +28,24 @@ const checkoutControls = [
   { label: "Queue sales when offline", enabled: true },
 ];
 
+const activeSessions = [
+  { device: "Chrome on macOS", location: "San Francisco, CA, US", lastActive: "Active now", current: true },
+  { device: "Safari on iPhone", location: "San Francisco, CA, US", lastActive: "2 hours ago", current: false },
+  { device: "Chrome on Windows", location: "Austin, TX, US", lastActive: "3 days ago", current: false },
+];
+
+const loginHistory = [
+  { time: "2026-06-14 08:12", device: "Chrome on macOS", location: "San Francisco, CA, US", status: "Success" },
+  { time: "2026-06-13 18:47", device: "Safari on iPhone", location: "San Francisco, CA, US", status: "Success" },
+  { time: "2026-06-12 09:03", device: "Chrome on Windows", location: "Austin, TX, US", status: "Success" },
+  { time: "2026-06-11 22:31", device: "Unknown device", location: "Lagos, NG", status: "Blocked" },
+];
+
 export default function SettingsPage() {
   const { flags } = useFlags();
   const role = getUser()?.role ?? "cashier";
   const canManage = role === "owner" || role === "manager";
-  const [selectedSection, setSelectedSection] = useState<"store" | "devices" | "roles" | "flags">("store");
+  const [selectedSection, setSelectedSection] = useState<"store" | "devices" | "roles" | "security" | "flags">("store");
 
   const flagRows = useMemo(() => {
     const merged = {
@@ -61,6 +74,7 @@ export default function SettingsPage() {
             <SectionButton active={selectedSection === "store"} onClick={() => setSelectedSection("store")} label="Store profile" />
             <SectionButton active={selectedSection === "devices"} onClick={() => setSelectedSection("devices")} label="Devices" />
             <SectionButton active={selectedSection === "roles"} onClick={() => setSelectedSection("roles")} label="Roles & access" />
+            <SectionButton active={selectedSection === "security"} onClick={() => setSelectedSection("security")} label="Security" />
             <SectionButton active={selectedSection === "flags"} onClick={() => setSelectedSection("flags")} label="Feature flags" />
           </nav>
         </Card>
@@ -160,6 +174,88 @@ export default function SettingsPage() {
               </table>
             </div>
           </Card>
+          )}
+
+          {selectedSection === "security" && (
+          <>
+          <Card className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Multi-factor authentication</h2>
+                <p className="text-sm text-gray-500">Add an authenticator app, email code, or backup codes to your sign-in.</p>
+              </div>
+              <span className="w-fit rounded bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">Not enabled</span>
+            </div>
+            <p className="text-sm text-gray-500">
+              MFA enrollment isn&apos;t wired up to the backend yet. Once enabled, you&apos;ll be prompted for a
+              second factor at <span className="font-mono">/login/mfa</span> on every sign-in.
+            </p>
+            <div>
+              <Button variant="primary" size="sm" disabled>Set up MFA</Button>
+            </div>
+          </Card>
+
+          <Card className="overflow-hidden p-0">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Active sessions</h2>
+                <p className="text-sm text-gray-500">Devices currently signed in to your account.</p>
+              </div>
+              <Button variant="secondary" size="sm" disabled>Sign out all other sessions</Button>
+            </div>
+            <ul className="divide-y divide-gray-100">
+              {activeSessions.map((session) => (
+                <li key={`${session.device}-${session.location}`} className="grid gap-2 px-4 py-4 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-center">
+                  <span className="font-medium text-gray-900">{session.device}</span>
+                  <span className="text-sm text-gray-500">{session.location}</span>
+                  <span className="text-sm text-gray-500">{session.lastActive}</span>
+                  {session.current ? (
+                    <span className="w-fit rounded bg-success-100 px-2 py-1 text-xs font-semibold text-success-700">
+                      This device
+                    </span>
+                  ) : (
+                    <Button variant="ghost" size="sm" disabled>Sign out</Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Card>
+
+          <Card className="overflow-hidden p-0">
+            <div className="border-b border-gray-200 px-4 py-3">
+              <h2 className="text-base font-semibold text-gray-900">Login history</h2>
+              <p className="text-sm text-gray-500">Recent sign-in attempts on your account.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
+                  <tr>
+                    <th className="px-4 py-3">Time</th>
+                    <th className="px-4 py-3">Device</th>
+                    <th className="px-4 py-3">Location</th>
+                    <th className="px-4 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {loginHistory.map((entry) => (
+                    <tr key={`${entry.time}-${entry.device}`}>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-500">{entry.time}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-gray-900">{entry.device}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-gray-500">{entry.location}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <span className={`inline-flex rounded px-2 py-1 text-xs font-semibold ${
+                          entry.status === "Success" ? "bg-success-100 text-success-700" : "bg-danger-100 text-danger-700"
+                        }`}>
+                          {entry.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+          </>
           )}
 
           {selectedSection === "flags" && (

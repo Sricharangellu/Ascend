@@ -18,11 +18,22 @@ import { Button } from "@/components/Button";
 
 const CODE_LENGTH = 6;
 const MOCK_VALID_CODE = "123456";
+const MOCK_VALID_BACKUP_CODE = "ABCD-1234";
 const RESEND_SECONDS = 30;
+
+type MfaMethod = "authenticator" | "email" | "backup";
+
+const METHODS: { key: MfaMethod; label: string }[] = [
+  { key: "authenticator", label: "Authenticator app" },
+  { key: "email", label: "Email code" },
+  { key: "backup", label: "Backup code" },
+];
 
 export default function MfaPage() {
   const router = useRouter();
+  const [method, setMethod] = useState<MfaMethod>("authenticator");
   const [digits, setDigits] = useState<string[]>(Array(CODE_LENGTH).fill(""));
+  const [backupCode, setBackupCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [resendIn, setResendIn] = useState(RESEND_SECONDS);
@@ -70,9 +81,39 @@ export default function MfaPage() {
     inputsRef.current[Math.min(pasted.length, CODE_LENGTH - 1)]?.focus();
   }
 
+  function switchMethod(next: MfaMethod) {
+    setMethod(next);
+    setError(null);
+    setDigits(Array(CODE_LENGTH).fill(""));
+    setBackupCode("");
+  }
+
   async function handleVerify() {
+    if (method === "backup") {
+      if (!backupCode.trim()) {
+        setError("Enter one of your backup codes.");
+        return;
+      }
+      setVerifying(true);
+      setError(null);
+      // Mocked: no backend MFA-verify endpoint exists yet.
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      setVerifying(false);
+      if (backupCode.trim().toUpperCase() === MOCK_VALID_BACKUP_CODE) {
+        router.replace("/terminal");
+      } else {
+        setError("That backup code didn't work. Each code can only be used once.");
+        setBackupCode("");
+      }
+      return;
+    }
+
     if (code.length !== CODE_LENGTH) {
-      setError("Enter the 6-digit code from your authenticator app.");
+      setError(
+        method === "email"
+          ? "Enter the 6-digit code we emailed you."
+          : "Enter the 6-digit code from your authenticator app."
+      );
       return;
     }
     setVerifying(true);
@@ -95,8 +136,30 @@ export default function MfaPage() {
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Two-factor verification</h2>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Enter the 6-digit code from your authenticator app to continue.
+            {method === "authenticator" && "Enter the 6-digit code from your authenticator app to continue."}
+            {method === "email" && "Enter the 6-digit code we emailed to your account."}
+            {method === "backup" && "Enter one of the backup codes you saved when you set up MFA."}
           </p>
+        </div>
+
+        <div role="tablist" aria-label="Verification method" className="mb-5 grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
+          {METHODS.map((m) => (
+            <button
+              key={m.key}
+              type="button"
+              role="tab"
+              aria-selected={method === m.key}
+              disabled={verifying}
+              onClick={() => switchMethod(m.key)}
+              className={`min-h-[36px] rounded-md px-2 text-xs font-medium transition-colors sm:text-sm ${
+                method === m.key
+                  ? "bg-white text-brand-700 shadow-sm dark:bg-slate-900 dark:text-brand-400"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
         </div>
 
         {error && (
@@ -105,52 +168,78 @@ export default function MfaPage() {
           </div>
         )}
 
-        <fieldset>
-          <legend className="text-sm font-medium text-slate-700 dark:text-slate-200">Verification code</legend>
-          <div className="mt-2 flex justify-between gap-2">
-            {digits.map((digit, index) => (
-              <input
-                key={index}
-                ref={(el) => {
-                  inputsRef.current[index] = el;
-                }}
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={1}
-                value={digit}
-                onChange={(e) => setDigit(index, e.target.value)}
-                onKeyDown={(e) => handleKeyDown(index, e)}
-                onPaste={handlePaste}
-                disabled={verifying}
-                aria-label={`Digit ${index + 1} of ${CODE_LENGTH}`}
-                className="h-12 w-12 rounded-lg border border-slate-300 bg-white/90 text-center text-lg font-semibold text-slate-900 outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800/80 dark:text-white sm:h-14 sm:w-14"
-              />
-            ))}
+        {method === "backup" ? (
+          <div className="flex flex-col gap-1">
+            <label htmlFor="backupCode" className="text-sm font-medium text-slate-700 dark:text-slate-200">
+              Backup code
+            </label>
+            <input
+              id="backupCode"
+              type="text"
+              autoFocus
+              autoComplete="one-time-code"
+              value={backupCode}
+              onChange={(e) => setBackupCode(e.target.value)}
+              disabled={verifying}
+              placeholder="XXXX-XXXX"
+              className="min-h-[44px] w-full rounded-lg border border-slate-300 bg-white/90 px-3 text-center font-mono text-lg tracking-widest text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800/80 dark:text-white dark:placeholder:text-slate-500"
+            />
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Each backup code can only be used once. Generate new codes from Settings after signing in.
+            </p>
           </div>
-        </fieldset>
+        ) : (
+          <fieldset>
+            <legend className="text-sm font-medium text-slate-700 dark:text-slate-200">Verification code</legend>
+            <div className="mt-2 flex justify-between gap-2">
+              {digits.map((digit, index) => (
+                <input
+                  key={index}
+                  ref={(el) => {
+                    inputsRef.current[index] = el;
+                  }}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => setDigit(index, e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(index, e)}
+                  onPaste={handlePaste}
+                  disabled={verifying}
+                  aria-label={`Digit ${index + 1} of ${CODE_LENGTH}`}
+                  className="h-12 w-12 rounded-lg border border-slate-300 bg-white/90 text-center text-lg font-semibold text-slate-900 outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800/80 dark:text-white sm:h-14 sm:w-14"
+                />
+              ))}
+            </div>
+          </fieldset>
+        )}
 
         <Button type="button" fullWidth loading={verifying} disabled={verifying} size="lg" className="mt-6" onClick={() => void handleVerify()}>
           {verifying ? "Verifying…" : "Verify and continue"}
         </Button>
 
-        <div className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">
-          {resendIn > 0 ? (
-            <span>Resend code in {resendIn}s</span>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setResendIn(RESEND_SECONDS)}
-              className="font-medium text-brand-600 hover:underline dark:text-brand-400"
-            >
-              Resend code
-            </button>
-          )}
-        </div>
+        {method === "email" && (
+          <div className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">
+            {resendIn > 0 ? (
+              <span>Resend code in {resendIn}s</span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setResendIn(RESEND_SECONDS)}
+                className="font-medium text-brand-600 hover:underline dark:text-brand-400"
+              >
+                Resend code
+              </button>
+            )}
+          </div>
+        )}
 
         {process.env.NODE_ENV === "development" && (
           <p className="mt-4 text-center text-xs text-slate-400 dark:text-slate-500">
-            Dev mode: use code <span className="font-mono">123456</span>.
+            {method === "backup"
+              ? <>Dev mode: use code <span className="font-mono">ABCD-1234</span>.</>
+              : <>Dev mode: use code <span className="font-mono">123456</span>.</>}
           </p>
         )}
 

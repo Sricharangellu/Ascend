@@ -55,6 +55,14 @@ export default function ForgotPasswordPage() {
             <Link href="/login" className="mt-6 text-sm font-medium text-brand-600 hover:underline dark:text-brand-400">
               &larr; Back to sign in
             </Link>
+            {process.env.NODE_ENV === "development" && (
+              <Link
+                href="/login/reset-password?token=demo"
+                className="mt-3 text-xs text-slate-400 hover:underline dark:text-slate-500"
+              >
+                Dev mode: open reset link
+              </Link>
+            )}
           </div>
         ) : (
           <>
