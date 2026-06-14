@@ -159,6 +159,13 @@ ERP benchmark #6 + real tier pricing for the sales module.
 - **Per-product tier prices:** `PUT /api/v1/sales/products/:productId/tier-prices {prices:{ "1":800, "2":850, … }}` and `GET …/tier-prices`. When an explicit (product,tier) price exists the sales module charges it directly; otherwise it falls back to the tier **discount schedule** (10/7.5/5/2.5/0%) on list price. Quotes/SOs now report `subtotal` at list, `discount` = list−charged, `total` = charged.
 - Verified live: PATCH tier→2 + profile; tier prices set; a tier-2 quote used the explicit price for one line and the schedule for another (total 3550 on 4000 list); financials due computed from invoices.
 
+## Discounts & Promotions engine (Wave F) — LIVE
+ERP benchmark #11. Tenant-scoped, cents.
+- **Rules:** `POST /api/v1/discounts {name, ruleType:simple|volume|bxgy, discountType:fixed|percent, value, applyTo:product|category|cart, targetId?, couponCode?, minOrderCents?, minQty?, buyQty?, getQty?, tierRestriction?:[1..5], startDate?, endDate?, autoApplicable?, usageLimit?, perCustomerLimit?}`. `GET /discounts[?status]`, `GET /discounts/:id`, `PATCH /discounts/:id/status {status}`, `POST /discounts/:id/redeem` (bumps usage; 409 at limit). Coupon codes unique per tenant.
+- **Cart evaluation:** `POST /api/v1/discounts/evaluate {lines:[{productId, category?, quantity, unitCents}], customerTier?, couponCode?}` → `{ subtotalCents, discounts:[{discountId, name, ruleType, amountCents}], totalDiscountCents, netCents }`. Considers active rules in date window that are auto-applicable or coupon-matched, gated by tier restriction + min order/qty + scope (product/category/cart). simple=$/%, volume=% when qty≥minQty, bxgy=free getQty per (buy+get) group at cheapest eligible unit.
+- Verified live: stacked auto 10% + category volume 15% + buy-2-get-1 + tier-gated VIP20 + coupon; tier gating excluded VIP at tier 3; usage-limit redeem returned 409.
+- Suggested UI: Discount list + create form (per benchmark fields) + a checkout hook calling `/evaluate`.
+
 ## Latest backend commit
 - `backend-cycle3` @ **`fc513c2`** (tag `cycle3-backend`): cycle-3 modules + inventory overview + team. Clean fast-forward of `master` (`66af0a6`). Live on finder-pos-backend.vercel.app (11 modules).
 

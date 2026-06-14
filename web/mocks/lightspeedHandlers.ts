@@ -29,6 +29,8 @@ const soLines = new Map<string, any[]>();
 let qtSeq = 0, soSeq = 0;
 const TIER_PCT: Record<number, number> = { 1: 10, 2: 7.5, 3: 5, 4: 2.5, 5: 0 };
 const tierPrices = new Map<string, Array<{ tier: number; priceCents: number }>>();
+// Discounts dev store
+let discounts: any[] = [];
 // Shipping dev stores
 let shipments: any[] = [];
 const shipLines = new Map<string, any[]>();
@@ -655,6 +657,75 @@ lightspeedHandlers.push(
     if (!d) return HttpResponse.json({ error: { code: "not_found", message: "batch deposit not found", requestId: rid() } }, { status: 404 });
     if (d.status !== "pending_approval") return HttpResponse.json({ error: { code: "conflict", message: `batch deposit is already ${d.status}`, requestId: rid() } }, { status: 409 });
     d.status = "rejected"; d.decided_at = Date.now(); return HttpResponse.json(d);
+  }),
+);
+
+// ── Discounts & Promotions engine ───────────────────────────────────────────
+function scopeLines(d: any, lines: any[]): any[] {
+  if (d.apply_to === "cart") return lines;
+  if (d.apply_to === "product") return lines.filter((l) => l.productId === d.target_id);
+  return lines.filter((l) => (l.category ?? "") === d.target_id);
+}
+lightspeedHandlers.push(
+  http.post(`${V1}/discounts`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as any;
+    const d = { id: `dsc_${Math.random().toString(36).slice(2, 12)}`, tenant_id: "tnt_demo", name: b.name, coupon_code: b.couponCode ?? null, rule_type: b.ruleType, discount_type: b.discountType, value: b.value, apply_to: b.applyTo, target_id: b.targetId ?? null, min_order_cents: b.minOrderCents ?? 0, min_qty: b.minQty ?? 0, buy_qty: b.buyQty ?? 0, get_qty: b.getQty ?? 0, tier_restriction: b.tierRestriction?.join(",") ?? null, start_date: b.startDate ?? null, end_date: b.endDate ?? null, status: "active", auto_applicable: b.autoApplicable ? 1 : 0, usage_limit: b.usageLimit ?? null, per_customer_limit: b.perCustomerLimit ?? null, used_count: 0, created_at: Date.now(), updated_at: Date.now() };
+    discounts.push(d); return HttpResponse.json(d, { status: 201 });
+  }),
+  http.get(`${V1}/discounts`, async ({ request }) => {
+    await lat();
+    const status = new URL(request.url).searchParams.get("status");
+    let items = [...discounts].sort((a, b) => b.created_at - a.created_at);
+    if (status) items = items.filter((d) => d.status === status);
+    return HttpResponse.json({ items });
+  }),
+  http.get(`${V1}/discounts/:id`, async ({ params }) => {
+    await lat();
+    const d = discounts.find((x) => x.id === String(params.id));
+    return d ? HttpResponse.json(d) : HttpResponse.json({ error: { code: "not_found", message: "discount not found", requestId: rid() } }, { status: 404 });
+  }),
+  http.patch(`${V1}/discounts/:id/status`, async ({ params, request }) => {
+    await lat();
+    const d = discounts.find((x) => x.id === String(params.id));
+    if (!d) return HttpResponse.json({ error: { code: "not_found", message: "discount not found", requestId: rid() } }, { status: 404 });
+    d.status = ((await request.json()) as any).status; return HttpResponse.json(d);
+  }),
+  http.post(`${V1}/discounts/:id/redeem`, async ({ params }) => {
+    await lat();
+    const d = discounts.find((x) => x.id === String(params.id));
+    if (!d) return HttpResponse.json({ error: { code: "not_found", message: "discount not found", requestId: rid() } }, { status: 404 });
+    if (d.usage_limit !== null && d.used_count >= d.usage_limit) return HttpResponse.json({ error: { code: "conflict", message: "discount usage limit reached", requestId: rid() } }, { status: 409 });
+    d.used_count += 1; return HttpResponse.json(d);
+  }),
+  http.post(`${V1}/discounts/evaluate`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as any;
+    const now = Date.now();
+    const subtotal = b.lines.reduce((s: number, l: any) => s + l.unitCents * l.quantity, 0);
+    const applied: any[] = [];
+    for (const d of discounts) {
+      if (d.status !== "active") continue;
+      if (d.start_date && now < d.start_date) continue;
+      if (d.end_date && now > d.end_date) continue;
+      const couponMatch = d.coupon_code && b.couponCode && d.coupon_code === b.couponCode;
+      if (d.auto_applicable !== 1 && !couponMatch) continue;
+      if (d.tier_restriction) { const t = d.tier_restriction.split(",").map(Number); if (b.customerTier === undefined || !t.includes(b.customerTier)) continue; }
+      if (d.min_order_cents > 0 && subtotal < d.min_order_cents) continue;
+      const sl = scopeLines(d, b.lines);
+      if (sl.length === 0 && d.apply_to !== "cart") continue;
+      const sq = sl.reduce((s: number, l: any) => s + l.quantity, 0);
+      if (d.min_qty > 0 && sq < d.min_qty) continue;
+      if (d.rule_type === "bxgy" && sq < d.buy_qty + d.get_qty) continue;
+      const base = d.apply_to === "cart" ? subtotal : sl.reduce((s: number, l: any) => s + l.unitCents * l.quantity, 0);
+      let amt = 0;
+      if (d.rule_type === "bxgy") { const g = d.buy_qty + d.get_qty; const free = Math.floor(sq / g) * d.get_qty; amt = free * Math.min(...sl.map((l: any) => l.unitCents)); }
+      else if (d.discount_type === "fixed") amt = Math.min(base, d.value);
+      else amt = Math.round((base * d.value) / 100);
+      if (amt > 0) applied.push({ discountId: d.id, name: d.name, ruleType: d.rule_type, amountCents: amt });
+    }
+    const total = Math.min(subtotal, applied.reduce((s, a) => s + a.amountCents, 0));
+    return HttpResponse.json({ subtotalCents: subtotal, discounts: applied, totalDiscountCents: total, netCents: subtotal - total });
   }),
 );
 
