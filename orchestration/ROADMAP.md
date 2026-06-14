@@ -51,8 +51,9 @@ Source material: `ERP_BENCHMARK.md` (parity matrix), `BACKEND_HANDOFF.md`
 - [x] FE-1: Purchasing/Receiving UI — suppliers list, create PO (with
       lot/expiry lines), receive flow; surface `costCents` + margin on the
       inventory grid. Wire to `/api/v1/purchasing/*`. (done in 7d59820)
-- [ ] FE-2: Accounts (AP/AR) surface — bills/invoices lists with aging buckets
-      from `GET /reports/ar-aging` and `/ap-aging`; pay actions.
+- [x] FE-2: Accounts (AP/AR) surface — bills/invoices lists with aging buckets
+      from `GET /reports/ar-aging` and `/ap-aging`; pay actions. (done in
+      a391420)
 - [ ] FE-3: Near-expiry/markdown report — table from
       `GET /api/v1/inventory/expiring` + `/expired`, with a lot column on the
       main inventory grid and a "Return to vendor" action
@@ -92,5 +93,7 @@ Source material: `ERP_BENCHMARK.md` (parity matrix), `BACKEND_HANDOFF.md`
   tests (83) pass.
 - 2026-06-14 frontend FE-1 -> 7d59820: added Purchasing/Receiving UI + margin
   column on inventory grid.
+- 2026-06-14 frontend FE-2 -> a391420: added AP/AR aging surface (AR/AP
+  cards, aging summaries, pay actions) to accounting page.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
