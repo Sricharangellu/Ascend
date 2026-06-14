@@ -69,3 +69,8 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Shipped:** New `/purchasing` page (added to nav) with a suppliers list + add-supplier form, a purchase-order list with a manager-gated "Receive" action, and a create-PO form supporting multiple lines with product, quantity, unit cost, and optional lot code/expiry date. Also added a "Margin" column (derived from `priceCents`/`costCents`) to the inventory grid and detail panel.
 - **Consumes:** `GET/POST /api/v1/purchasing/suppliers`, `GET/POST /api/v1/purchasing/orders`, `POST /api/v1/purchasing/orders/:id/receive`, `GET /api/v1/inventory/levels` (existing MSW mocks for all).
 - **Verified:** typecheck clean; npm test pass (83/83); test:components pass.
+
+## 2026-06-14 — Frontend: enterprise login redesign
+- **Shipped:** Redesigned `/login` as a split-screen enterprise auth experience (`components/AuthShell.tsx`): brand/marketing panel with benefits, trust metrics, and compliance badges, plus a glassmorphism sign-in card with password show/hide, remember me, Caps Lock detection, inline validation, and a persisted light/dark theme toggle (`lib/theme.ts`, Tailwind class-based dark mode). Added `/login/forgot-password` (mocked "check your email" flow) and `/login/mfa` (6-digit code UI, mocked, not yet linked from login).
+- **Consumes:** existing `POST /api/identity/login` only. SSO (Google/Microsoft Azure AD/Okta/Apple) and SAML are presented as disabled "Enterprise plan" placeholders — no backend support exists. MFA verify and password-reset-by-email are mocked client-side pending backend endpoints.
+- **Verified:** typecheck clean; npm test pass (83/83); manual `curl` 200 on /login, /login/forgot-password, /login/mfa.
