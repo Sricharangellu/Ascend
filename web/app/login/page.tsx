@@ -68,8 +68,16 @@ export default function LoginPage() {
     await login(email.trim(), password);
   }
 
-  if (status === "loading" || status === "authenticated") {
+  if (status === "authenticated") {
     return null;
+  }
+
+  if (status === "loading") {
+    return (
+      <AuthShell>
+        <LoginCardSkeleton />
+      </AuthShell>
+    );
   }
 
   return (
@@ -250,7 +258,47 @@ export default function LoginPage() {
         <LockIcon />
         Protected by multi-factor authentication and enterprise-grade encryption.
       </p>
+      <p className="mt-1 text-center text-xs text-slate-400 dark:text-slate-500">
+        Signing in from a new device or location may require additional verification.
+      </p>
     </AuthShell>
+  );
+}
+
+/** Skeleton shown while the silent session check runs, to avoid a layout flash. */
+function LoginCardSkeleton() {
+  return (
+    <div
+      role="status"
+      aria-label="Loading sign-in form"
+      className="animate-pulse rounded-2xl border border-white/40 bg-white/80 p-6 shadow-2xl shadow-slate-900/10 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70 sm:p-8"
+    >
+      <div className="h-7 w-32 rounded bg-slate-200 dark:bg-slate-700" />
+      <div className="mt-2 h-4 w-56 rounded bg-slate-100 dark:bg-slate-800" />
+
+      <div className="mt-6 flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-700" />
+          <div className="h-11 w-full rounded-lg bg-slate-100 dark:bg-slate-800" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-700" />
+          <div className="h-11 w-full rounded-lg bg-slate-100 dark:bg-slate-800" />
+        </div>
+        <div className="h-4 w-40 rounded bg-slate-100 dark:bg-slate-800" />
+        <div className="h-11 w-full rounded-lg bg-slate-200 dark:bg-slate-700" />
+      </div>
+
+      <div className="mt-6 flex items-center gap-3">
+        <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
+        <div className="h-3 w-24 rounded bg-slate-100 dark:bg-slate-800" />
+        <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="h-11 rounded-lg bg-slate-100 dark:bg-slate-800" />
+        <div className="h-11 rounded-lg bg-slate-100 dark:bg-slate-800" />
+      </div>
+    </div>
   );
 }
 
