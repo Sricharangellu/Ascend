@@ -75,13 +75,20 @@ Source material: `ERP_BENCHMARK.md` (parity matrix), `BACKEND_HANDOFF.md`
       the in-memory limiter doesn't share state across serverless instances.
 - [ ] PERF-1: Cursor pagination on the largest list endpoints (orders,
       inventory, invoices, sales orders).
-- [ ] PROD-1: Reconcile `master` with `backend-cycle3`/`dev`/`testing`/`prod`
-      (diverged since commit `af02e27` — see chat history 2026-06-13). Needs a
-      human call on merge strategy; agents should NOT attempt this
-      automatically.
+- [x] PROD-1: Reconciled `master` with `backend-cycle3`/`dev`/`testing`/`prod`
+      (done in `216fc4c`) — merged the 28 Cycle 3 backend commits into
+      `master`. Two conflicts (scripts/smoke.ts, giftcards/service.ts)
+      resolved in favor of master's versions. `backend-cycle3`/`dev`/
+      `testing`/`prod` are now ancestors of `master`; new work goes to
+      `master` only per the agent playbooks. Those branches are left as-is
+      (frozen, no data lost) — no further action needed.
 
 ---
 
 ## Run log (most recent first)
+
+- 2026-06-14 human/assistant PROD-1 -> 216fc4c: merged backend-cycle3 into
+  master, resolving 2 conflicts; backend+frontend typecheck clean, frontend
+  tests (83) pass.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
