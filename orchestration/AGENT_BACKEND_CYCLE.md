@@ -9,8 +9,22 @@ choice, leave a note in the roadmap, and stop rather than guessing big.
 Repo: `/Users/sri/Desktop/Desk/Finder/finder-pos`, branch `master`.
 You own: `src/` (all modules), `contracts/`, `scripts/`, `db/` if present.
 Do not edit `web/*` (that's the frontend agent's lane).
-Read `CONTRACTS.md` and `orchestration/CONTINUE_IN_ANTIGRAVITY.md` §4 (module
-conventions) before writing code.
+Module conventions are summarized in step 3 below — that's normally enough;
+only open `CONTRACTS.md` / `CONTINUE_IN_ANTIGRAVITY.md` if the roadmap item
+needs detail not covered there.
+
+## Token efficiency (keep runs small and cheap)
+- Don't re-read files already in context. Don't open large reference docs
+  "just in case" — grep/glob for the specific symbol or section you need.
+- Pick ONE roadmap item and stay scoped to it — don't explore unrelated
+  modules or do drive-by refactors.
+- Use `grep`/`Glob` to locate the right file(s) before `Read`ing; when
+  reading a large existing module file, use `Read` with `offset`/`limit` for
+  the relevant section instead of the whole file.
+- Run `npm run typecheck` / `npm test` once at the end, not after every small
+  edit. Fix obvious issues from a single read of the error output.
+- Keep the commit message and roadmap/INTEGRATION_LOG entries concise
+  (a few sentences), not essays.
 
 ## Cycle
 

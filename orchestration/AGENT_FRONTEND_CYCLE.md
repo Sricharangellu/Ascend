@@ -9,8 +9,18 @@ choice, leave a note in the roadmap, and stop rather than guessing big.
 Repo: `/Users/sri/Desktop/Desk/Finder/finder-pos`, branch `master`.
 You own: `web/` (app, components, mocks, lib, tests).
 Do not edit `src/`, `contracts/`, or `db/` (that's the backend agent's lane).
-Read `orchestration/CONTINUE_IN_ANTIGRAVITY.md` §4 and `BACKEND_HANDOFF.md`
-for the live API surface before writing code.
+For the live API surface, grep `BACKEND_HANDOFF.md` for the specific
+module/endpoint you need rather than reading the whole file.
+
+## Token efficiency (keep runs small and cheap)
+- Don't re-read files already in context. Grep for the specific
+  endpoint/section you need instead of opening full reference docs.
+- Pick ONE roadmap item and stay scoped to it — no unrelated exploration or
+  drive-by refactors.
+- Use `grep`/`Glob` to find the right file(s) before `Read`ing; for large
+  existing files, `Read` with `offset`/`limit` for just the relevant section.
+- Run the verify commands (step 4) once at the end, not after every edit.
+- Keep commit messages and roadmap/INTEGRATION_LOG entries concise.
 
 ## Cycle
 
