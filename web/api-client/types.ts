@@ -304,6 +304,51 @@ export interface InventoryLevelsResponse {
   items: InventoryLevel[];
 }
 
+export interface Supplier {
+  id: string;
+  name: string;
+  email: string | null;
+}
+
+export interface SuppliersResponse {
+  items: Supplier[];
+}
+
+export interface PurchaseOrderLine {
+  id: string;
+  product_id: string;
+  quantity: number;
+  unit_cost_cents: number;
+  line_cost_cents: number;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  supplier_id: string;
+  status: "ordered" | "received" | string;
+  total_cost_cents: number;
+  created_at: number;
+  received_at: number | null;
+  lines?: PurchaseOrderLine[];
+}
+
+export interface PurchaseOrdersResponse {
+  items: PurchaseOrder[];
+}
+
+export interface CreatePurchaseOrderLineRequest {
+  productId: string;
+  quantity: number;
+  unitCostCents: number;
+  expiryDate?: number;
+  lotCode?: string;
+}
+
+export interface CreatePurchaseOrderRequest {
+  supplierId: string;
+  lines: CreatePurchaseOrderLineRequest[];
+}
+
 export interface RetailCustomer {
   id: string;
   name: string;

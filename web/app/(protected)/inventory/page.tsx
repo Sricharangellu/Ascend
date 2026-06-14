@@ -55,6 +55,12 @@ function formatCost(cents: number | null) {
   return cents === null ? "-" : formatMoney(cents);
 }
 
+function formatMargin(priceCents: number, costCents: number | null) {
+  if (costCents === null || priceCents <= 0) return "-";
+  const margin = ((priceCents - costCents) / priceCents) * 100;
+  return `${margin.toFixed(1)}%`;
+}
+
 function formatVelocity(value: number) {
   return value > 0 ? `${value}/wk` : "Learning";
 }
@@ -214,6 +220,7 @@ export default function InventoryPage() {
                       <th className="px-4 py-3 text-right">On hand</th>
                       <th className="px-4 py-3 text-right">Committed</th>
                       <th className="px-4 py-3 text-right">Avg cost</th>
+                      <th className="px-4 py-3 text-right">Margin</th>
                       <th className="px-4 py-3">Status</th>
                     </tr>
                   </thead>
@@ -238,6 +245,7 @@ export default function InventoryPage() {
                         <td className="whitespace-nowrap px-4 py-3 text-right text-gray-600">{row.onHand}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-right text-gray-600">{row.committed}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-right text-gray-600">{formatCost(row.costCents)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right text-gray-600">{formatMargin(row.priceCents, row.costCents)}</td>
                         <td className="whitespace-nowrap px-4 py-3">
                           <Status label={row.stockStatus} />
                         </td>
@@ -273,6 +281,10 @@ export default function InventoryPage() {
                   <div className="mt-2 flex items-center justify-between text-sm">
                     <span className="text-gray-500">Average cost</span>
                     <span className="font-semibold text-gray-900">{formatCost(selectedRow.costCents)}</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="text-gray-500">Margin</span>
+                    <span className="font-semibold text-gray-900">{formatMargin(selectedRow.priceCents, selectedRow.costCents)}</span>
                   </div>
                   <div className="mt-2 flex items-center justify-between text-sm">
                     <span className="text-gray-500">Velocity</span>

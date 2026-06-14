@@ -21,6 +21,7 @@ import { useOffline } from "@/lib/useOffline";
 type NavKey =
   | "register"
   | "inventory"
+  | "purchasing"
   | "customers"
   | "sales"
   | "accounting"
@@ -39,6 +40,7 @@ const NAV_ITEMS: Array<{
   { key: "register", label: "Register", href: "/terminal", icon: "register" },
   { key: "sales", label: "Sales", href: "/sales", icon: "sales" },
   { key: "inventory", label: "Inventory", href: "/inventory", icon: "inventory" },
+  { key: "purchasing", label: "Purchasing", href: "/purchasing", icon: "purchasing" },
   { key: "shipping", label: "Shipping", href: "/shipping", icon: "shipping" },
   { key: "customers", label: "Customers", href: "/customers", icon: "customers" },
   { key: "discounts", label: "Discounts", href: "/discounts", icon: "discounts" },
@@ -305,6 +307,8 @@ function NavIcon({ name }: { name: NavKey }) {
     case "register":
       return <RegisterIcon />;
     case "inventory":
+      return <InventoryIcon />;
+    case "purchasing":
       return <InventoryIcon />;
     case "customers":
       return <CustomersIcon />;
