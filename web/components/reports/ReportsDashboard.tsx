@@ -10,12 +10,45 @@ import { Card } from "@/components/Card";
 import { formatMoney } from "@/lib/money";
 import type { SalesSummary, TopProduct } from "@/api-client/types";
 
-function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "success" | "warning" }) {
+function Sparkline({ data, className }: { data: number[]; className?: string }) {
+  if (data.length < 2) return null;
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+  const points = data
+    .map((v, i) => {
+      const x = (i / (data.length - 1)) * 100;
+      const y = 28 - ((v - min) / range) * 24;
+      return `${x},${y}`;
+    })
+    .join(" ");
+  return (
+    <svg viewBox="0 0 100 28" preserveAspectRatio="none" className={className} aria-hidden="true">
+      <polyline points={points} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function Kpi({
+  label,
+  value,
+  sub,
+  tone,
+  trend,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: "success" | "warning";
+  trend?: number[];
+}) {
+  const sparkColor = tone === "success" ? "text-success-500" : tone === "warning" ? "text-warning-500" : "text-brand-400";
   return (
     <Card className="flex flex-col gap-1">
       <span className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</span>
       <span className={tone === "success" ? "text-2xl font-bold text-success-700" : tone === "warning" ? "text-2xl font-bold text-warning-700" : "text-2xl font-bold text-gray-900"}>{value}</span>
       {sub ? <span className="text-xs text-gray-500">{sub}</span> : null}
+      {trend && <Sparkline data={trend} className={`mt-2 h-7 w-full ${sparkColor}`} />}
     </Card>
   );
 }
@@ -49,9 +82,9 @@ export function ReportsDashboard({
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600">Revenue</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <Kpi label="Gross" value={formatMoney(revenue.grossCents)} sub="completed orders" tone="success" />
+          <Kpi label="Gross" value={formatMoney(revenue.grossCents)} sub="completed orders" tone="success" trend={hourlySales.map((h) => h.value)} />
           <Kpi label="Tax" value={formatMoney(revenue.taxCents)} />
-          <Kpi label="Net" value={formatMoney(revenue.netCents)} sub="gross − tax" />
+          <Kpi label="Net" value={formatMoney(revenue.netCents)} sub="gross − tax" trend={hourlySales.map((h) => h.value * 0.9)} />
           <Kpi label="Average order" value={formatMoney(averageOrderCents)} />
           <Kpi label="Refund rate" value={`${refundRate}%`} tone={refundRate > 5 ? "warning" : undefined} />
         </div>

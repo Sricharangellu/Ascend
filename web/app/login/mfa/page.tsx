@@ -20,6 +20,13 @@ const CODE_LENGTH = 6;
 const MOCK_VALID_CODE = "123456";
 const MOCK_VALID_BACKUP_CODE = "ABCD-1234";
 const RESEND_SECONDS = 30;
+const SUCCESS_REDIRECT_DELAY_MS = 900;
+
+const MOCK_DEVICE = {
+  recognized: true,
+  browser: "Chrome on macOS",
+  location: "Dallas, TX, US",
+};
 
 type MfaMethod = "authenticator" | "email" | "backup";
 
@@ -36,7 +43,9 @@ export default function MfaPage() {
   const [backupCode, setBackupCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const [success, setSuccess] = useState(false);
   const [resendIn, setResendIn] = useState(RESEND_SECONDS);
+  const [expired, setExpired] = useState(false);
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
   useEffect(() => {
@@ -44,10 +53,13 @@ export default function MfaPage() {
   }, []);
 
   useEffect(() => {
-    if (resendIn <= 0) return;
+    if (resendIn <= 0) {
+      if (method === "email") setExpired(true);
+      return;
+    }
     const timer = setTimeout(() => setResendIn((s) => s - 1), 1000);
     return () => clearTimeout(timer);
-  }, [resendIn]);
+  }, [resendIn, method]);
 
   const code = digits.join("");
 
@@ -86,6 +98,8 @@ export default function MfaPage() {
     setError(null);
     setDigits(Array(CODE_LENGTH).fill(""));
     setBackupCode("");
+    setExpired(false);
+    setResendIn(RESEND_SECONDS);
   }
 
   async function handleVerify() {
@@ -100,6 +114,8 @@ export default function MfaPage() {
       await new Promise((resolve) => setTimeout(resolve, 500));
       setVerifying(false);
       if (backupCode.trim().toUpperCase() === MOCK_VALID_BACKUP_CODE) {
+        setSuccess(true);
+        await new Promise((resolve) => setTimeout(resolve, SUCCESS_REDIRECT_DELAY_MS));
         router.replace("/terminal");
       } else {
         setError("That backup code didn't work. Each code can only be used once.");
@@ -122,12 +138,28 @@ export default function MfaPage() {
     await new Promise((resolve) => setTimeout(resolve, 500));
     setVerifying(false);
     if (code === MOCK_VALID_CODE) {
+      setSuccess(true);
+      await new Promise((resolve) => setTimeout(resolve, SUCCESS_REDIRECT_DELAY_MS));
       router.replace("/terminal");
     } else {
       setError("That code didn't work. Check the app and try again.");
       setDigits(Array(CODE_LENGTH).fill(""));
       inputsRef.current[0]?.focus();
     }
+  }
+
+  if (success) {
+    return (
+      <AuthShell>
+        <div className="rounded-2xl border border-white/40 bg-white/80 p-6 text-center shadow-2xl shadow-slate-900/10 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70 sm:p-8">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success-100 text-success-700 dark:bg-success-700/20 dark:text-success-400">
+            <CheckIcon />
+          </div>
+          <h2 className="mt-4 text-2xl font-bold text-slate-900 dark:text-white">Verification successful</h2>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Redirecting to your dashboard…</p>
+        </div>
+      </AuthShell>
+    );
   }
 
   return (
@@ -141,6 +173,15 @@ export default function MfaPage() {
             {method === "backup" && "Enter one of the backup codes you saved when you set up MFA."}
           </p>
         </div>
+
+        {MOCK_DEVICE.recognized && (
+          <div className="mb-5 flex items-start gap-2 rounded-lg border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-800 dark:border-success-700/40 dark:bg-success-700/10 dark:text-success-300">
+            <span aria-hidden="true">✓</span>
+            <span>
+              Device recognized — {MOCK_DEVICE.browser} · {MOCK_DEVICE.location}
+            </span>
+          </div>
+        )}
 
         <div role="tablist" aria-label="Verification method" className="mb-5 grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
           {METHODS.map((m) => (
@@ -188,6 +229,10 @@ export default function MfaPage() {
               Each backup code can only be used once. Generate new codes from Settings after signing in.
             </p>
           </div>
+        ) : method === "email" && expired ? (
+          <div role="alert" aria-live="assertive" className="rounded-lg border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-800 dark:border-warning-700/40 dark:bg-warning-700/10 dark:text-warning-300">
+            Code expired. Request a new code to continue.
+          </div>
         ) : (
           <fieldset>
             <legend className="text-sm font-medium text-slate-700 dark:text-slate-200">Verification code</legend>
@@ -215,9 +260,11 @@ export default function MfaPage() {
           </fieldset>
         )}
 
-        <Button type="button" fullWidth loading={verifying} disabled={verifying} size="lg" className="mt-6" onClick={() => void handleVerify()}>
-          {verifying ? "Verifying…" : "Verify and continue"}
-        </Button>
+        {!(method === "email" && expired) && (
+          <Button type="button" fullWidth loading={verifying} disabled={verifying} size="lg" className="mt-6" onClick={() => void handleVerify()}>
+            {verifying ? "Verifying…" : "Verify and continue"}
+          </Button>
+        )}
 
         {method === "email" && (
           <div className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">
@@ -226,7 +273,7 @@ export default function MfaPage() {
             ) : (
               <button
                 type="button"
-                onClick={() => setResendIn(RESEND_SECONDS)}
+                onClick={() => { setResendIn(RESEND_SECONDS); setExpired(false); }}
                 className="font-medium text-brand-600 hover:underline dark:text-brand-400"
               >
                 Resend code
@@ -248,5 +295,13 @@ export default function MfaPage() {
         </Link>
       </div>
     </AuthShell>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
   );
 }
