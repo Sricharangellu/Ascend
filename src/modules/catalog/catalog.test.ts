@@ -300,6 +300,73 @@ test("a product cannot be assigned as its own variant parent", async () => {
   assert.equal(json.error.code, "conflict");
 });
 
+test("bulk-update applies a field change to many products at once (BE-7)", async () => {
+  const app = await freshApp();
+  const a = await call(app, "POST", "/api/catalog/", { sku: "BULK-A", name: "A", price_cents: 100, category: "general" });
+  const b = await call(app, "POST", "/api/catalog/", { sku: "BULK-B", name: "B", price_cents: 200, category: "general" });
+
+  const { status, json } = await call(app, "POST", "/api/catalog/bulk-update", {
+    ids: [a.json.id, b.json.id],
+    update: { category: "clearance", status: "draft" },
+  });
+  assert.equal(status, 200);
+  assert.equal(json.updated, 2);
+  assert.ok(json.items.every((p: any) => p.category === "clearance" && p.status === "draft"));
+});
+
+test("bulk-update is manager/owner-gated", async () => {
+  const app = await freshApp();
+  const { default: request } = await import("./test-request.js");
+  const a = await call(app, "POST", "/api/catalog/", { sku: "GATE-A", name: "A", price_cents: 100 });
+  const { status, json } = await request(app.express, "POST", "/api/catalog/bulk-update", { ids: [a.json.id], update: { category: "x" } }, "cashier");
+  assert.equal(status, 403);
+  assert.equal(json.error.code, "forbidden");
+});
+
+test("CSV export round-trips through CSV import (BE-7)", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/catalog/", { sku: "CSV-1", name: "Widget One", price_cents: 1000, category: "general", barcode: "1111111111111" });
+  await call(app, "POST", "/api/catalog/", { sku: "CSV-2", name: "Widget, Two", price_cents: 2000, category: "general" });
+
+  const exported = await call(app, "GET", "/api/catalog/export");
+  assert.equal(exported.status, 200);
+  assert.match(exported.json, /sku,name,price_cents/);
+  assert.match(exported.json, /CSV-1/);
+  assert.match(exported.json, /"Widget, Two"/); // comma-containing field is quoted
+
+  // Re-import the exported CSV into a fresh app (header uses price_cents, which import-csv accepts).
+  const app2 = await freshApp();
+  const imported = await call(app2, "POST", "/api/catalog/import-csv", { csv: exported.json });
+  assert.equal(imported.status, 200);
+  assert.ok(imported.json.imported >= 2);
+
+  const list = await call(app2, "GET", "/api/catalog/?limit=200");
+  assert.ok(list.json.items.some((p: any) => p.sku === "CSV-1" && p.price_cents === 1000));
+  assert.ok(list.json.items.some((p: any) => p.sku === "CSV-2" && p.name === "Widget, Two"));
+});
+
+test("import-csv rejects rows missing required fields", async () => {
+  const app = await freshApp();
+  const { status, json } = await call(app, "POST", "/api/catalog/import-csv", { csv: "sku,name,priceCents\nBAD-1,,100" });
+  assert.equal(status, 400);
+  assert.equal(json.error.code, "bad_request");
+});
+
+test("bulk-barcodes generates EAN-13 barcodes only for products missing one (BE-7)", async () => {
+  const app = await freshApp();
+  const withBarcode = await call(app, "POST", "/api/catalog/", { sku: "BC-HAS", name: "Has barcode", price_cents: 100, barcode: "9999999999999" });
+  const withoutBarcode = await call(app, "POST", "/api/catalog/", { sku: "BC-NONE", name: "No barcode", price_cents: 100 });
+
+  const { status, json } = await call(app, "POST", "/api/catalog/bulk-barcodes", { ids: [withBarcode.json.id, withoutBarcode.json.id] });
+  assert.equal(status, 200);
+  assert.equal(json.generated.length, 1);
+  assert.equal(json.generated[0].id, withoutBarcode.json.id);
+  assert.equal(json.generated[0].barcode.length, 13);
+
+  const updated = await call(app, "GET", `/api/catalog/${withoutBarcode.json.id}`);
+  assert.equal(updated.json.barcode, json.generated[0].barcode);
+});
+
 test("category mutations are manager/owner-gated", async () => {
   const app = await freshApp();
   const { default: request } = await import("./test-request.js");

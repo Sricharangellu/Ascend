@@ -460,6 +460,56 @@ export class CatalogService {
     }
   }
 
+  // ---- Bulk operations (BE-7) ----
+
+  /** Apply the same field update to many products by id (manager-gated route). */
+  async bulkUpdate(ids: string[], input: UpdateProductInput, tenantId: string): Promise<Product[]> {
+    const updated: Product[] = [];
+    for (const id of ids) {
+      updated.push(await this.update(id, input, tenantId));
+    }
+    return updated;
+  }
+
+  /** All products for a tenant, for CSV export. Unpaginated (catalogs are small per tenant). */
+  async listAll(tenantId: string): Promise<Product[]> {
+    return this.db.query<Product>(
+      "SELECT * FROM products WHERE tenant_id = @tenantId ORDER BY sku",
+      { tenantId },
+    );
+  }
+
+  /** Generate and register a barcode for each product that has none. Returns the
+   *  ids that were assigned a new barcode (products that already had one are skipped). */
+  async generateBarcodes(ids: string[], tenantId: string): Promise<Array<{ id: string; barcode: string }>> {
+    const generated: Array<{ id: string; barcode: string }> = [];
+    for (const id of ids) {
+      const product = await this.getOrThrow(id, tenantId);
+      const existing = await this.listBarcodes(id, tenantId);
+      if (product.barcode || existing.length > 0) continue;
+      const barcode = await this.nextBarcode(tenantId);
+      await this.update(id, { barcode }, tenantId);
+      await this.addBarcode(id, barcode, "each", 1, tenantId);
+      generated.push({ id, barcode });
+    }
+    return generated;
+  }
+
+  /** Generate a fresh EAN-13 (GS1 "2" restricted-circulation prefix + random body + check digit),
+   *  retrying on the rare collision with an existing barcode for this tenant. */
+  private async nextBarcode(tenantId: string): Promise<string> {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const body = `2${String(Math.floor(Math.random() * 1e11)).padStart(11, "0")}`;
+      const candidate = body + ean13CheckDigit(body);
+      const taken = await this.db.one(
+        "SELECT 1 FROM product_barcodes WHERE tenant_id = @tenantId AND barcode = @barcode",
+        { tenantId, barcode: candidate },
+      );
+      if (!taken) return candidate;
+    }
+    throw conflict("could not generate a unique barcode, try again");
+  }
+
   // ---- Master/child variants (BE-8) ----
 
   /** Child products (variants) assigned to a master product. */
@@ -571,6 +621,16 @@ export class CatalogService {
       }
     });
   }
+}
+
+/** EAN-13 check digit: sum digits from the right, alternating x1/x3 weights. */
+function ean13CheckDigit(body12: string): string {
+  let sum = 0;
+  for (let i = 0; i < body12.length; i++) {
+    const digit = Number(body12[body12.length - 1 - i]);
+    sum += i % 2 === 0 ? digit * 3 : digit;
+  }
+  return String((10 - (sum % 10)) % 10);
 }
 
 function clampLimit(limit?: number): number {

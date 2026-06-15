@@ -4,6 +4,7 @@ import { handler, parseBody, notFound, badRequest } from "../../shared/http.js";
 import type { CatalogService, ProductStatus, TaxClass } from "./service.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import { requireRole } from "../../gateway/auth.js";
+import { parseCsv, toCsv } from "../../shared/csv.js";
 
 const taxClassSchema = z.enum(["standard", "exempt"]);
 const statusSchema = z.enum(["active", "draft", "archived"]);
@@ -51,19 +52,43 @@ const createSchema = z.object({
   ...detailFieldsSchema,
 });
 
-const updateSchema = z
-  .object({
-    name: z.string().min(1).optional(),
-    price_cents: z.number().int().nonnegative().optional(),
-    category: z.string().min(1).optional(),
-    tax_class: taxClassSchema.optional(),
-    barcode: z.string().min(1).nullable().optional(),
-    status: statusSchema.optional(),
-    ...detailFieldsSchema,
-  })
-  .refine((o) => Object.keys(o).length > 0, {
+const updateFieldsSchema = z.object({
+  name: z.string().min(1).optional(),
+  price_cents: z.number().int().nonnegative().optional(),
+  category: z.string().min(1).optional(),
+  tax_class: taxClassSchema.optional(),
+  barcode: z.string().min(1).nullable().optional(),
+  status: statusSchema.optional(),
+  ...detailFieldsSchema,
+});
+
+const updateSchema = updateFieldsSchema.refine((o) => Object.keys(o).length > 0, {
+  message: "at least one field is required",
+});
+
+const bulkUpdateSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1).max(500),
+  update: updateFieldsSchema.refine((o) => Object.keys(o).length > 0, {
     message: "at least one field is required",
-  });
+  }),
+});
+
+const importCsvSchema = z.object({
+  csv: z.string().min(1),
+});
+
+const bulkBarcodesSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1).max(500),
+});
+
+// BE-7: column order for CSV export — mirrors the columns importCsv accepts
+// (sku/name/priceCents/category/barcode) plus the rest of the product shape.
+const EXPORT_COLUMNS = [
+  "id", "sku", "name", "price_cents", "category", "tax_class", "barcode", "status",
+  "description", "brand", "length_mm", "width_mm", "height_mm", "weight_grams",
+  "image_url", "preferred_vendor_id", "vendor_upc", "min_qty_to_sell", "max_qty_to_sell",
+  "qty_increment", "parent_product_id", "variant_label",
+];
 
 const createCategorySchema = z.object({
   name: z.string().min(1),
@@ -138,6 +163,68 @@ export function registerRoutes(router: Router, service: CatalogService): void {
       }
       const body = parseBody(importSchema, req.body);
       res.status(200).json(await service.bulkImport(body.items, (res.locals["auth"] as AuthPayload).tenantId));
+    }),
+  );
+
+  // BE-7: bulk field update across many SKUs (manager-gated).
+  router.post(
+    "/bulk-update",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const body = parseBody(bulkUpdateSchema, req.body);
+      const update = {
+        ...body.update,
+        tax_class: body.update.tax_class as TaxClass | undefined,
+        status: body.update.status as ProductStatus | undefined,
+      };
+      const items = await service.bulkUpdate(body.ids, update, tenantId(res));
+      res.json({ updated: items.length, items });
+    }),
+  );
+
+  // BE-7: CSV export of the full catalog.
+  router.get(
+    "/export",
+    handler(async (_req, res) => {
+      const items = await service.listAll(tenantId(res));
+      const csv = toCsv(items as unknown as Array<Record<string, unknown>>, EXPORT_COLUMNS);
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", 'attachment; filename="catalog.csv"');
+      res.status(200).send(csv);
+    }),
+  );
+
+  // BE-7: CSV import (upsert by SKU), manager/owner only — wraps bulkImport.
+  router.post(
+    "/import-csv",
+    handler(async (req, res) => {
+      const role = (res.locals["auth"] as AuthPayload).role;
+      if (role !== "owner" && role !== "manager") {
+        throw badRequest("catalog import requires owner or manager");
+      }
+      const body = parseBody(importCsvSchema, req.body);
+      const rows = parseCsv(body.csv);
+      const items = rows.map((row) => ({
+        sku: row.sku ?? "",
+        name: row.name ?? "",
+        priceCents: Number(row.priceCents ?? row.price_cents ?? 0),
+        category: row.category || undefined,
+        barcode: row.barcode || undefined,
+      }));
+      const invalid = items.find((it) => !it.sku || !it.name || !Number.isFinite(it.priceCents));
+      if (invalid) throw badRequest("each CSV row requires sku, name, and a numeric priceCents");
+      res.status(200).json(await service.bulkImport(items, tenantId(res)));
+    }),
+  );
+
+  // BE-7: generate barcodes for SKUs that don't have one yet (manager-gated).
+  router.post(
+    "/bulk-barcodes",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const body = parseBody(bulkBarcodesSchema, req.body);
+      const generated = await service.generateBarcodes(body.ids, tenantId(res));
+      res.json({ generated });
     }),
   );
 
