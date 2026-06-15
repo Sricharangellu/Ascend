@@ -87,6 +87,17 @@ CREATE TABLE IF NOT EXISTS product_categories (
 CREATE INDEX IF NOT EXISTS product_categories_category_idx ON product_categories (tenant_id, category_id);
 `;
 
+// BE-8: master/child product variants. `parent_product_id` is an app-layer
+// self-reference (no FK, matching preferred_vendor_id convention). A "master"
+// row is any product referenced as a parent by at least one other product;
+// masters are conventionally created with price_cents=0 and are excluded from
+// sellable lists (see CatalogService.list excludeMasters + orders guard).
+const ALTER_PRODUCTS_VARIANTS = `
+ALTER TABLE products ADD COLUMN IF NOT EXISTS parent_product_id TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_label TEXT;
+CREATE INDEX IF NOT EXISTS products_tenant_parent_idx ON products (tenant_id, parent_product_id);
+`;
+
 export const catalogModule: PosModule = {
   name: "catalog",
   migrations: [
@@ -97,6 +108,7 @@ export const catalogModule: PosModule = {
     ALTER_PRODUCTS_DETAIL_FIELDS,
     CREATE_CATEGORIES_TABLE,
     CREATE_PRODUCT_CATEGORIES,
+    ALTER_PRODUCTS_VARIANTS,
   ],
   async register({ db, events, router }) {
     const service = new CatalogService(db, events);

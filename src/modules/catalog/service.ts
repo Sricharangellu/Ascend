@@ -32,6 +32,8 @@ export interface Product {
   min_qty_to_sell: number | null;
   max_qty_to_sell: number | null;
   qty_increment: number;
+  parent_product_id: string | null;
+  variant_label: string | null;
 }
 
 export interface CreateProductInput {
@@ -54,6 +56,8 @@ export interface CreateProductInput {
   min_qty_to_sell?: number | null;
   max_qty_to_sell?: number | null;
   qty_increment?: number;
+  parent_product_id?: string | null;
+  variant_label?: string | null;
 }
 
 export interface UpdateProductInput {
@@ -75,6 +79,8 @@ export interface UpdateProductInput {
   min_qty_to_sell?: number | null;
   max_qty_to_sell?: number | null;
   qty_increment?: number;
+  parent_product_id?: string | null;
+  variant_label?: string | null;
 }
 
 export interface Category {
@@ -101,6 +107,9 @@ export interface ListProductsQuery {
   status?: ProductStatus;
   limit?: number;
   offset?: number;
+  /** Exclude master/variant-parent rows (products referenced by another
+   *  product's parent_product_id) — for sellable/browse lists (FE-7). */
+  excludeMasters?: boolean;
 }
 
 /**
@@ -126,6 +135,10 @@ export class CatalogService {
     );
     if (existing) {
       throw conflict(`product with sku '${input.sku}' already exists`);
+    }
+
+    if (input.parent_product_id) {
+      await this.getOrThrow(input.parent_product_id, tenantId);
     }
 
     const now = Date.now();
@@ -154,6 +167,8 @@ export class CatalogService {
       min_qty_to_sell: input.min_qty_to_sell ?? null,
       max_qty_to_sell: input.max_qty_to_sell ?? null,
       qty_increment: input.qty_increment ?? 1,
+      parent_product_id: input.parent_product_id ?? null,
+      variant_label: input.variant_label ?? null,
     };
 
     try {
@@ -161,11 +176,13 @@ export class CatalogService {
         `INSERT INTO products
            (id, tenant_id, sku, name, price_cents, category, tax_class, barcode, status, created_at, updated_at,
             description, brand, length_mm, width_mm, height_mm, weight_grams, image_url,
-            preferred_vendor_id, vendor_upc, min_qty_to_sell, max_qty_to_sell, qty_increment)
+            preferred_vendor_id, vendor_upc, min_qty_to_sell, max_qty_to_sell, qty_increment,
+            parent_product_id, variant_label)
          VALUES
            (@id, @tenant_id, @sku, @name, @price_cents, @category, @tax_class, @barcode, @status, @created_at, @updated_at,
             @description, @brand, @length_mm, @width_mm, @height_mm, @weight_grams, @image_url,
-            @preferred_vendor_id, @vendor_upc, @min_qty_to_sell, @max_qty_to_sell, @qty_increment)`,
+            @preferred_vendor_id, @vendor_upc, @min_qty_to_sell, @max_qty_to_sell, @qty_increment,
+            @parent_product_id, @variant_label)`,
         product as unknown as Record<string, unknown>,
       );
     } catch (err) {
@@ -300,6 +317,9 @@ export class CatalogService {
       where.push("status = @status");
       params.status = query.status;
     }
+    if (query.excludeMasters) {
+      where.push("NOT EXISTS (SELECT 1 FROM products c WHERE c.tenant_id = products.tenant_id AND c.parent_product_id = products.id)");
+    }
     const whereSql = `WHERE ${where.join(" AND ")}`;
 
     const totalRow = await this.db.one<{ n: number }>(
@@ -352,9 +372,15 @@ export class CatalogService {
       changed.tax_class = resolvedTax;
     }
 
+    if (input.parent_product_id) {
+      if (input.parent_product_id === id) throw conflict("a product cannot be its own variant parent");
+      await this.getOrThrow(input.parent_product_id, tenantId);
+    }
+
     const detailFields = [
       "description", "brand", "length_mm", "width_mm", "height_mm", "weight_grams",
       "image_url", "preferred_vendor_id", "vendor_upc", "min_qty_to_sell", "max_qty_to_sell", "qty_increment",
+      "parent_product_id", "variant_label",
     ] as const;
     for (const field of detailFields) {
       const value = input[field];
@@ -390,6 +416,8 @@ export class CatalogService {
          min_qty_to_sell = @min_qty_to_sell,
          max_qty_to_sell = @max_qty_to_sell,
          qty_increment = @qty_increment,
+         parent_product_id = @parent_product_id,
+         variant_label = @variant_label,
          updated_at = @updated_at
        WHERE id = @id`,
       next as unknown as Record<string, unknown>,
@@ -429,6 +457,26 @@ export class CatalogService {
       } catch {
         // Tolerate a concurrent seeder racing on the same SKU (cold-start races).
       }
+    }
+  }
+
+  // ---- Master/child variants (BE-8) ----
+
+  /** Child products (variants) assigned to a master product. */
+  async listVariants(masterId: string, tenantId: string): Promise<Product[]> {
+    await this.getOrThrow(masterId, tenantId);
+    return this.db.query<Product>(
+      "SELECT * FROM products WHERE tenant_id = @tenantId AND parent_product_id = @masterId ORDER BY variant_label, sku",
+      { tenantId, masterId },
+    );
+  }
+
+  /** Bulk-assign the given products as children (variants) of a master product. */
+  async assignVariants(masterId: string, productIds: string[], tenantId: string): Promise<void> {
+    await this.getOrThrow(masterId, tenantId);
+    for (const productId of productIds) {
+      if (productId === masterId) throw conflict("a product cannot be its own variant parent");
+      await this.update(productId, { parent_product_id: masterId }, tenantId);
     }
   }
 

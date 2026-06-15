@@ -197,6 +197,30 @@ test("draft (unpublished) product cannot be rung up -> 400 bad_request", async (
   assert.equal(list.json.total, 0);
 });
 
+test("a master/variant-parent product cannot be rung up -> 400 bad_request", async () => {
+  const app = await freshApp();
+  const master = await makeProduct(app, { sku: "MASTER-W", name: "Widget (master)", price_cents: 0, category: "general" });
+  const child = await makeProduct(app, { sku: "CHILD-W-RED", name: "Widget - Red", price_cents: 1500, category: "general" });
+
+  const assign = await call(app, "POST", `/api/catalog/${master}/variants/assign`, { productIds: [child] });
+  assert.equal(assign.status, 200);
+
+  const { status, json } = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: master, quantity: 1 }],
+  });
+  assert.equal(status, 400);
+  assert.equal(json.error.code, "bad_request");
+  assert.match(json.error.message, /variant master/);
+
+  // The child variant remains sellable.
+  const childSale = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: child, quantity: 1 }],
+  });
+  assert.equal(childSale.status, 201);
+});
+
 test("GET /:id returns the order with its lines; 404 when missing", async () => {
   const app = await freshApp();
   const widget = await makeProduct(app, {

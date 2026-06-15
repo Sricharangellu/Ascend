@@ -266,6 +266,40 @@ test("category tree: create, nest, assign to product, and delete reparents child
   assert.equal(reparented.parent_id, null);
 });
 
+test("variants: assign children to a master, list them, and exclude master from excludeMasters listing (BE-8)", async () => {
+  const app = await freshApp();
+
+  const master = await call(app, "POST", "/api/catalog/", { sku: "VAR-MASTER", name: "T-Shirt", price_cents: 0, category: "apparel" });
+  const small = await call(app, "POST", "/api/catalog/", { sku: "VAR-S", name: "T-Shirt - Small", price_cents: 1999, category: "apparel" });
+  const large = await call(app, "POST", "/api/catalog/", { sku: "VAR-L", name: "T-Shirt - Large", price_cents: 1999, category: "apparel", variant_label: "Large" });
+
+  const assign = await call(app, "POST", `/api/catalog/${master.json.id}/variants/assign`, {
+    productIds: [small.json.id, large.json.id],
+  });
+  assert.equal(assign.status, 200);
+
+  const variants = await call(app, "GET", `/api/catalog/${master.json.id}/variants`);
+  assert.equal(variants.status, 200);
+  assert.equal(variants.json.items.length, 2);
+  assert.ok(variants.json.items.every((p: any) => p.parent_product_id === master.json.id));
+  assert.equal(variants.json.items.find((p: any) => p.id === large.json.id).variant_label, "Large");
+
+  const excluding = await call(app, "GET", "/api/catalog/?excludeMasters=true&limit=200");
+  assert.ok(!excluding.json.items.some((p: any) => p.id === master.json.id));
+  assert.ok(excluding.json.items.some((p: any) => p.id === small.json.id));
+
+  const including = await call(app, "GET", "/api/catalog/?limit=200");
+  assert.ok(including.json.items.some((p: any) => p.id === master.json.id));
+});
+
+test("a product cannot be assigned as its own variant parent", async () => {
+  const app = await freshApp();
+  const product = await call(app, "POST", "/api/catalog/", { sku: "SELF-VAR", name: "Self", price_cents: 100 });
+  const { status, json } = await call(app, "PATCH", `/api/catalog/${product.json.id}`, { parent_product_id: product.json.id });
+  assert.equal(status, 409);
+  assert.equal(json.error.code, "conflict");
+});
+
 test("category mutations are manager/owner-gated", async () => {
   const app = await freshApp();
   const { default: request } = await import("./test-request.js");

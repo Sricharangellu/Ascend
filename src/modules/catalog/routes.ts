@@ -35,6 +35,9 @@ const detailFieldsSchema = {
   min_qty_to_sell: z.number().int().positive().nullable().optional(),
   max_qty_to_sell: z.number().int().positive().nullable().optional(),
   qty_increment: z.number().int().positive().optional(),
+  // BE-8: master/child variants.
+  parent_product_id: z.string().min(1).nullable().optional(),
+  variant_label: z.string().min(1).nullable().optional(),
 };
 
 const createSchema = z.object({
@@ -80,6 +83,10 @@ const setProductCategoriesSchema = z.object({
   categoryIds: z.array(z.string().min(1)),
 });
 
+const assignVariantsSchema = z.object({
+  productIds: z.array(z.string().min(1)).min(1),
+});
+
 function parseInt0(value: unknown): number | undefined {
   if (typeof value !== "string" || value.trim() === "") return undefined;
   const n = Number(value);
@@ -94,6 +101,7 @@ function readQuery(req: Request) {
     status,
     limit: parseInt0(req.query.limit),
     offset: parseInt0(req.query.offset),
+    excludeMasters: req.query.excludeMasters === "true",
   };
 }
 
@@ -244,6 +252,24 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     handler(async (req, res) => {
       const body = parseBody(setProductCategoriesSchema, req.body);
       await service.setProductCategories(String(req.params.id), body.categoryIds, tenantId(res));
+      res.json({ ok: true });
+    }),
+  );
+
+  // Master/child variants (BE-8).
+  router.get(
+    "/:id/variants",
+    handler(async (req, res) => {
+      res.json({ items: await service.listVariants(String(req.params.id), tenantId(res)) });
+    }),
+  );
+
+  router.post(
+    "/:id/variants/assign",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const body = parseBody(assignVariantsSchema, req.body);
+      await service.assignVariants(String(req.params.id), body.productIds, tenantId(res));
       res.json({ ok: true });
     }),
   );

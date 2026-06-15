@@ -65,6 +65,7 @@ interface ProductRow {
   price_cents: Cents;
   tax_class: string;
   status: string;
+  is_master: boolean;
 }
 
 const VOIDABLE_STATUSES = new Set<OrderStatus>(["open", "completed"]);
@@ -93,7 +94,9 @@ export class OrdersService {
         throw badRequest(`line quantity must be positive for ${line.productId}`);
       }
       const product = await this.db.one<ProductRow>(
-        "SELECT id, name, price_cents, tax_class, status FROM products WHERE id = @id AND tenant_id = @tenantId",
+        `SELECT p.id, p.name, p.price_cents, p.tax_class, p.status,
+                EXISTS(SELECT 1 FROM products c WHERE c.tenant_id = p.tenant_id AND c.parent_product_id = p.id) AS is_master
+           FROM products p WHERE p.id = @id AND p.tenant_id = @tenantId`,
         { id: line.productId, tenantId },
       );
       if (!product) {
@@ -104,6 +107,13 @@ export class OrdersService {
         // yet released and an archived one is retired; neither can be rung up.
         throw badRequest(
           `product '${line.productId}' is ${product.status} and cannot be sold`,
+        );
+      }
+      if (product.is_master) {
+        // BE-8: a master/variant-parent row is a grouping placeholder
+        // (price 0 / qty 0) — only its child variants are sellable.
+        throw badRequest(
+          `product '${line.productId}' is a variant master and cannot be sold directly`,
         );
       }
       const taxable = product.tax_class !== "exempt";
