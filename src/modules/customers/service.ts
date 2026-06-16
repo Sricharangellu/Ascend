@@ -24,6 +24,7 @@ export interface Customer {
   sales_rep_id: string | null;
   store_credit_cents: number;
   excess_cents: number;
+  credit_limit_cents: number | null;
   status: string;
   verified: number;
   created_at: number;
@@ -52,6 +53,7 @@ export interface UpdateCustomerInput {
   salesRepId?: string | null;
   status?: string;
   verified?: boolean;
+  creditLimitCents?: number | null;
 }
 
 export interface CustomerFinancials {
@@ -119,6 +121,7 @@ export class CustomersService {
       state: patch.state, billing_address: patch.billingAddress, shipping_address: patch.shippingAddress,
       sales_rep_id: patch.salesRepId, status: patch.status,
       verified: patch.verified === undefined ? undefined : patch.verified ? 1 : 0,
+      credit_limit_cents: patch.creditLimitCents,
     };
     const sets: string[] = [];
     const params: Record<string, unknown> = { id, tenantId, now: Date.now() };

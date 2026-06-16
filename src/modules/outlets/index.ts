@@ -30,11 +30,30 @@ CREATE INDEX IF NOT EXISTS outlets_tenant_idx ON outlets (tenant_id, created_at)
 CREATE INDEX IF NOT EXISTS registers_tenant_outlet_idx ON registers (tenant_id, outlet_id);
 `;
 
+// BE-17: register trading sessions — open with a float, close with counted cash.
+// variance_cents = expected_cash_in_drawer - counted_cash_cents.
+const CREATE_REGISTER_SESSIONS = `
+CREATE TABLE IF NOT EXISTS register_sessions (
+  id                    TEXT PRIMARY KEY,
+  tenant_id             TEXT NOT NULL,
+  register_id           TEXT NOT NULL,
+  opened_by             TEXT NOT NULL,
+  opening_float_cents   BIGINT NOT NULL DEFAULT 0,
+  closing_float_cents   BIGINT,
+  counted_cash_cents    BIGINT,
+  variance_cents        BIGINT,
+  status                TEXT NOT NULL DEFAULT 'open',
+  opened_at             BIGINT NOT NULL,
+  closed_at             BIGINT
+);
+CREATE INDEX IF NOT EXISTS register_sessions_tenant_reg_idx ON register_sessions (tenant_id, register_id, opened_at DESC);
+`;
+
 /** Outlets + registers — Lightspeed-style multi-location core. Seeds a default
  *  "Main Store / Register 1" for the demo tenant so the store selector has data. */
 export const outletsModule: PosModule = {
   name: "outlets",
-  migrations: [CREATE_OUTLETS_TABLE, CREATE_REGISTERS_TABLE, CREATE_OUTLET_INDEXES],
+  migrations: [CREATE_OUTLETS_TABLE, CREATE_REGISTERS_TABLE, CREATE_OUTLET_INDEXES, CREATE_REGISTER_SESSIONS],
   async register({ db, router }) {
     const service = new OutletsService(db);
     await service.seedDefault("tnt_demo");
@@ -43,4 +62,4 @@ export const outletsModule: PosModule = {
 };
 
 export { OutletsService } from "./service.js";
-export type { Outlet, Register, OutletWithRegisters } from "./service.js";
+export type { Outlet, Register, OutletWithRegisters, RegisterSession } from "./service.js";

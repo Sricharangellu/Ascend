@@ -104,7 +104,12 @@ export function registerRoutes(router: Router, service: PurchasingService): void
     res.json(await service.getOrder(String(req.params.id), tenantId(res)));
   }));
 
+  const receiveSchema = z.object({
+    lines: z.array(z.object({ lineId: z.string().min(1), qty: z.number().int().positive() })).min(1),
+  });
+
   router.post("/orders/:id/receive", mgr, handler(async (req, res) => {
-    res.json(await service.receive(String(req.params.id), tenantId(res)));
+    const b = parseBody(receiveSchema, req.body);
+    res.json(await service.receive(String(req.params.id), tenantId(res), b.lines));
   }));
 }

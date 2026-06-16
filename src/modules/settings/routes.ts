@@ -47,4 +47,16 @@ export function registerRoutes(router: Router, service: SettingsService): void {
   // Tax rates
   router.get("/tax-rates", handler(async (_req, res) => res.json({ items: await service.listTaxRates(tenantId(res)) })));
   router.post("/tax-rates", mgr, handler(async (req, res) => res.status(201).json(await service.createTaxRate(parseBody(taxSchema, req.body), tenantId(res)))));
+
+  // Edition presets (BE-18)
+  const editionSchema = z.object({ edition: z.enum(["retail", "wholesale", "enterprise", "hybrid"]) });
+  router.post("/edition", mgr, handler(async (req, res) => {
+    const { edition } = parseBody(editionSchema, req.body);
+    const presets: Record<string, boolean> =
+      edition === "retail"     ? { groupRetailPOS: true,  groupWholesale: false, groupEnterprise: false } :
+      edition === "wholesale"  ? { groupRetailPOS: false, groupWholesale: true,  groupEnterprise: false } :
+      edition === "enterprise" ? { groupRetailPOS: true,  groupWholesale: true,  groupEnterprise: true  } :
+                                 { groupRetailPOS: true,  groupWholesale: true,  groupEnterprise: true  }; // hybrid
+    res.json(await service.setFlags(presets, tenantId(res)));
+  }));
 }

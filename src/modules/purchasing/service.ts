@@ -8,7 +8,7 @@ import { HttpError } from "../../shared/http.js";
  *  and increments stock (modules stay decoupled via events). Unit costs are
  *  captured into `product_costs` so the inventory grid can show cost. */
 
-export type POStatus = "ordered" | "received" | "cancelled";
+export type POStatus = "ordered" | "partially_received" | "received" | "cancelled";
 export type VendorCreditType = "chargeback" | "credit_memo";
 export type ReturnReason = "damaged" | "expired" | "other";
 
@@ -62,6 +62,7 @@ export interface PurchaseOrderLine {
   line_cost_cents: number;
   expiry_date: number | null;
   lot_code: string | null;
+  received_qty: number;
 }
 
 export interface PurchaseOrder {
@@ -237,6 +238,7 @@ export class PurchasingService {
       line_cost_cents: l.quantity * l.unitCostCents,
       expiry_date: l.expiryDate ?? null,
       lot_code: l.lotCode ?? null,
+      received_qty: 0,
     }));
     const total = poLines.reduce((s, l) => s + l.line_cost_cents, 0);
     await this.db.tx(async (tdb) => {
@@ -246,7 +248,7 @@ export class PurchasingService {
       );
       for (const l of poLines) {
         await tdb.query(
-          "INSERT INTO purchase_order_lines (id, tenant_id, po_id, product_id, quantity, unit_cost_cents, line_cost_cents, expiry_date, lot_code) VALUES (@id,@tenant_id,@po_id,@product_id,@quantity,@unit_cost_cents,@line_cost_cents,@expiry_date,@lot_code)",
+          "INSERT INTO purchase_order_lines (id, tenant_id, po_id, product_id, quantity, unit_cost_cents, line_cost_cents, expiry_date, lot_code, received_qty) VALUES (@id,@tenant_id,@po_id,@product_id,@quantity,@unit_cost_cents,@line_cost_cents,@expiry_date,@lot_code,@received_qty)",
           l as unknown as Record<string, unknown>,
         );
       }
@@ -265,38 +267,85 @@ export class PurchasingService {
     return { ...po, lines };
   }
 
-  /** Receive a PO: capture unit costs, mark received, and emit an event so the
-   *  inventory module increments stock. Idempotent-ish: rejects if already received. */
-  async receive(id: string, tenantId: string): Promise<PurchaseOrderWithLines> {
+  /** Partially or fully receive a PO.
+   *
+   * Body: `{ lines: [{ lineId, qty }] }` where qty ≤ remaining on that line.
+   * Each call increments `received_qty` on each referenced line.
+   * PO status: ordered → partially_received → received.
+   * Emits `purchase_order.received` on every receive call (with the qty
+   * actually received this call), so inventory increments immediately. */
+  async receive(
+    id: string,
+    tenantId: string,
+    receiveLines: Array<{ lineId: string; qty: number }>,
+  ): Promise<PurchaseOrderWithLines> {
     const po = await this.getOrder(id, tenantId);
-    if (po.status === "received") throw new HttpError(409, "already_received", "purchase order already received");
+    if (po.status === "received") throw new HttpError(409, "already_received", "purchase order already fully received");
     if (po.status === "cancelled") throw new HttpError(409, "cancelled", "purchase order is cancelled");
+    if (receiveLines.length === 0) throw new HttpError(400, "bad_request", "at least one line is required");
+
+    // Validate each line: must belong to this PO, qty must be ≤ remaining.
+    const lineMap = new Map(po.lines.map((l) => [l.id, l]));
+    for (const rl of receiveLines) {
+      const line = lineMap.get(rl.lineId);
+      if (!line) throw new HttpError(404, "not_found", `line '${rl.lineId}' not found on this PO`);
+      if (rl.qty <= 0) throw new HttpError(400, "bad_request", `qty for line '${rl.lineId}' must be positive`);
+      const remaining = line.quantity - (line.received_qty ?? 0);
+      if (rl.qty > remaining) throw new HttpError(400, "bad_request", `qty ${rl.qty} exceeds remaining ${remaining} on line '${rl.lineId}'`);
+    }
+
     const now = Date.now();
+
+    // Apply the increments and compute new PO status.
     await this.db.tx(async (tdb) => {
-      await tdb.query("UPDATE purchase_orders SET status = 'received', received_at = @now WHERE id = @id AND tenant_id = @tenantId", { now, id, tenantId });
-      for (const l of po.lines) {
+      for (const rl of receiveLines) {
+        await tdb.query(
+          "UPDATE purchase_order_lines SET received_qty = received_qty + @qty WHERE id = @lid AND tenant_id = @tenantId",
+          { qty: rl.qty, lid: rl.lineId, tenantId },
+        );
+        const line = lineMap.get(rl.lineId)!;
         await tdb.query(
           `INSERT INTO product_costs (tenant_id, product_id, cost_cents, updated_at) VALUES (@tenant_id,@product_id,@cost,@now)
            ON CONFLICT (tenant_id, product_id) DO UPDATE SET cost_cents = EXCLUDED.cost_cents, updated_at = EXCLUDED.updated_at`,
-          { tenant_id: tenantId, product_id: l.product_id, cost: l.unit_cost_cents, now },
+          { tenant_id: tenantId, product_id: line.product_id, cost: line.unit_cost_cents, now },
         );
       }
+
+      // Re-read updated lines to determine the new PO status.
+      const updatedLines = await tdb.query<PurchaseOrderLine>(
+        "SELECT * FROM purchase_order_lines WHERE po_id = @id AND tenant_id = @tenantId",
+        { id, tenantId },
+      );
+      const fullyReceived = updatedLines.every((l) => (l.received_qty ?? 0) >= l.quantity);
+      const anyReceived = updatedLines.some((l) => (l.received_qty ?? 0) > 0);
+      const newStatus: POStatus = fullyReceived ? "received" : anyReceived ? "partially_received" : "ordered";
+
+      await tdb.query(
+        "UPDATE purchase_orders SET status = @status, received_at = @receivedAt WHERE id = @id AND tenant_id = @tenantId",
+        { status: newStatus, receivedAt: fullyReceived ? now : null, id, tenantId },
+      );
     });
+
+    // Emit event for the quantities received in this call so inventory can
+    // increment stock immediately (partial receives are cumulative).
+    const receivedLineDetails = receiveLines.map((rl) => {
+      const line = lineMap.get(rl.lineId)!;
+      return {
+        productId: line.product_id,
+        quantity: rl.qty,
+        unitCostCents: line.unit_cost_cents,
+        expiryDate: line.expiry_date ?? undefined,
+        lotCode: line.lot_code ?? undefined,
+      };
+    });
+
     await this.events.publish(
       "purchase_order.received",
-      {
-        tenantId,
-        poId: id,
-        lines: po.lines.map((l) => ({
-          productId: l.product_id,
-          quantity: l.quantity,
-          unitCostCents: l.unit_cost_cents,
-          expiryDate: l.expiry_date ?? undefined,
-          lotCode: l.lot_code ?? undefined,
-        })),
-      },
+      { tenantId, poId: id, lines: receivedLineDetails },
       id,
     );
-    return { ...po, status: "received", received_at: now };
+
+    // Return the refreshed PO.
+    return this.getOrder(id, tenantId);
   }
 }

@@ -245,13 +245,23 @@ export class InventoryService {
     const rows = await this.db.query<{
       id: string; sku: string; name: string; category: string; status: string;
       price_cents: number; stock_qty: number; reorder_pt: number; cost_cents: number | null;
+      committed: number;
     }>(
       `SELECT p.id, p.sku, p.name, p.category, p.status, p.price_cents,
               COALESCE(i.stock_qty, 0) AS stock_qty, COALESCE(i.reorder_pt, 0) AS reorder_pt,
-              pc.cost_cents AS cost_cents
+              pc.cost_cents AS cost_cents,
+              COALESCE(res.committed, 0) AS committed
          FROM products p
          LEFT JOIN inventory i ON i.product_id = p.id AND i.tenant_id = p.tenant_id
          LEFT JOIN product_costs pc ON pc.product_id = p.id AND pc.tenant_id = p.tenant_id
+         LEFT JOIN (
+           SELECT ol.product_id, SUM(ol.quantity) AS committed
+             FROM order_lines ol
+             JOIN orders o ON o.id = ol.order_id
+            WHERE o.tenant_id = @tenantId
+              AND o.status NOT IN ('completed', 'voided', 'refunded')
+            GROUP BY ol.product_id
+         ) res ON res.product_id = p.id
         WHERE ${where.join(" AND ")}
         ORDER BY p.name ASC
         LIMIT @limit`,
@@ -259,13 +269,14 @@ export class InventoryService {
     );
     const items: InventoryLevel[] = rows.map((r) => {
       const onHand = Number(r.stock_qty);
+      const committed = Number(r.committed);
       const reorderPoint = Number(r.reorder_pt);
       return {
         id: r.id, sku: r.sku, name: r.name, category: r.category, status: r.status,
         priceCents: Number(r.price_cents),
         onHand,
-        committed: 0,
-        available: onHand,
+        committed,
+        available: Math.max(0, onHand - committed),
         reorderPoint,
         lowStock: reorderPoint > 0 && onHand <= reorderPoint,
         costCents: r.cost_cents == null ? null : Number(r.cost_cents),
@@ -347,11 +358,16 @@ export class InventoryService {
           "UPDATE inventory SET stock_qty = @stock_qty, updated_at = @updated_at WHERE tenant_id = @tenant_id AND product_id = @product_id",
           { tenant_id: tenantId, product_id: productId, stock_qty: nextQty, updated_at: now },
         );
-      } else {
+      } else if (delta >= 0) {
+        // Only create an inventory row when adding stock (receiving). Sales on
+        // untracked products don't create a row — they pass through the
+        // reservation check silently (untracked = unlimited).
         await tdb.query(
           "INSERT INTO inventory (product_id, tenant_id, stock_qty, reorder_pt, updated_at) VALUES (@product_id, @tenant_id, @stock_qty, @reorder_pt, @updated_at)",
           { product_id: productId, tenant_id: tenantId, stock_qty: nextQty, reorder_pt: reorderPt, updated_at: now },
         );
+      } else {
+        // Negative delta on untracked product: skip row creation, record movement only.
       }
 
       await tdb.query(

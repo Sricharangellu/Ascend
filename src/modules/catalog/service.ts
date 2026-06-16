@@ -34,6 +34,7 @@ export interface Product {
   qty_increment: number;
   parent_product_id: string | null;
   variant_label: string | null;
+  age_restricted: number; // 1|0 (SQLite-style boolean stored as integer)
 }
 
 export interface CreateProductInput {
@@ -58,6 +59,7 @@ export interface CreateProductInput {
   qty_increment?: number;
   parent_product_id?: string | null;
   variant_label?: string | null;
+  age_restricted?: boolean;
 }
 
 export interface UpdateProductInput {
@@ -81,6 +83,7 @@ export interface UpdateProductInput {
   qty_increment?: number;
   parent_product_id?: string | null;
   variant_label?: string | null;
+  age_restricted?: boolean;
 }
 
 export interface Category {
@@ -169,6 +172,7 @@ export class CatalogService {
       qty_increment: input.qty_increment ?? 1,
       parent_product_id: input.parent_product_id ?? null,
       variant_label: input.variant_label ?? null,
+      age_restricted: input.age_restricted ? 1 : 0,
     };
 
     try {
@@ -177,12 +181,12 @@ export class CatalogService {
            (id, tenant_id, sku, name, price_cents, category, tax_class, barcode, status, created_at, updated_at,
             description, brand, length_mm, width_mm, height_mm, weight_grams, image_url,
             preferred_vendor_id, vendor_upc, min_qty_to_sell, max_qty_to_sell, qty_increment,
-            parent_product_id, variant_label)
+            parent_product_id, variant_label, age_restricted)
          VALUES
            (@id, @tenant_id, @sku, @name, @price_cents, @category, @tax_class, @barcode, @status, @created_at, @updated_at,
             @description, @brand, @length_mm, @width_mm, @height_mm, @weight_grams, @image_url,
             @preferred_vendor_id, @vendor_upc, @min_qty_to_sell, @max_qty_to_sell, @qty_increment,
-            @parent_product_id, @variant_label)`,
+            @parent_product_id, @variant_label, @age_restricted)`,
         product as unknown as Record<string, unknown>,
       );
     } catch (err) {
@@ -377,6 +381,14 @@ export class CatalogService {
       await this.getOrThrow(input.parent_product_id, tenantId);
     }
 
+    if (input.age_restricted !== undefined) {
+      const nextVal = input.age_restricted ? 1 : 0;
+      if (nextVal !== current.age_restricted) {
+        (next as unknown as Record<string, unknown>).age_restricted = nextVal;
+        (changed as unknown as Record<string, unknown>).age_restricted = nextVal;
+      }
+    }
+
     const detailFields = [
       "description", "brand", "length_mm", "width_mm", "height_mm", "weight_grams",
       "image_url", "preferred_vendor_id", "vendor_upc", "min_qty_to_sell", "max_qty_to_sell", "qty_increment",
@@ -418,6 +430,7 @@ export class CatalogService {
          qty_increment = @qty_increment,
          parent_product_id = @parent_product_id,
          variant_label = @variant_label,
+         age_restricted = @age_restricted,
          updated_at = @updated_at
        WHERE id = @id`,
       next as unknown as Record<string, unknown>,

@@ -98,6 +98,11 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_label TEXT;
 CREATE INDEX IF NOT EXISTS products_tenant_parent_idx ON products (tenant_id, parent_product_id);
 `;
 
+// BE-16: age-restricted flag — must be verified at register before sale.
+const ALTER_PRODUCTS_AGE = `
+ALTER TABLE products ADD COLUMN IF NOT EXISTS age_restricted INTEGER NOT NULL DEFAULT 0;
+`;
+
 export const catalogModule: PosModule = {
   name: "catalog",
   migrations: [
@@ -109,6 +114,7 @@ export const catalogModule: PosModule = {
     CREATE_CATEGORIES_TABLE,
     CREATE_PRODUCT_CATEGORIES,
     ALTER_PRODUCTS_VARIANTS,
+    ALTER_PRODUCTS_AGE,
   ],
   async register({ db, events, router }) {
     const service = new CatalogService(db, events);

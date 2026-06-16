@@ -59,8 +59,8 @@ type DetailTab = "general" | "transactions" | "financials" | "store-credit";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const INPUT_CLASS =
-  "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-600 focus:ring-2 focus:ring-brand-600 outline-none min-h-[44px]";
-const LABEL_CLASS = "block text-xs font-semibold uppercase text-gray-500 mb-1";
+  "w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-950 focus:ring-2 focus:ring-slate-950 outline-none min-h-[44px]";
+const LABEL_CLASS = "block text-xs font-semibold uppercase text-slate-500 mb-1";
 
 function tierLabel(tier?: number): string {
   if (!tier) return "Standard";
@@ -69,14 +69,14 @@ function tierLabel(tier?: number): string {
 
 function statusColor(status: string) {
   if (status === "active") return "bg-success-100 text-success-700";
-  return "bg-gray-100 text-gray-600";
+  return "bg-slate-100 text-slate-600";
 }
 
 function orderStatusColor(status: string) {
   if (status === "completed") return "bg-success-100 text-success-700";
   if (status === "refunded") return "bg-warning-100 text-warning-700";
   if (status === "voided") return "bg-danger-100 text-danger-700";
-  return "bg-gray-100 text-gray-600";
+  return "bg-slate-100 text-slate-600";
 }
 
 function formatDate(ts: number | null): string {
@@ -94,8 +94,8 @@ function ReadField({ label, value }: { label: string; value: string | null | und
   return (
     <div>
       <p className={LABEL_CLASS}>{label}</p>
-      <div className="min-h-[40px] rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900">
-        {value || <span className="text-gray-400">—</span>}
+      <div className="min-h-[40px] rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-950">
+        {value || <span className="text-slate-400">—</span>}
       </div>
     </div>
   );
@@ -112,23 +112,23 @@ function Skeleton() {
       contentClassName="overflow-y-auto"
     >
       <div className="mx-auto w-full max-w-5xl px-4 py-6">
-        <div className="mb-5 h-4 w-24 animate-pulse rounded bg-gray-200" />
-        <div className="mb-3 h-8 w-64 animate-pulse rounded bg-gray-200" />
+        <div className="mb-5 h-4 w-24 animate-pulse rounded bg-slate-200" />
+        <div className="mb-3 h-8 w-64 animate-pulse rounded bg-slate-200" />
         <div className="flex gap-2 mb-6">
-          <div className="h-6 w-16 animate-pulse rounded-full bg-gray-200" />
-          <div className="h-6 w-16 animate-pulse rounded-full bg-gray-200" />
+          <div className="h-6 w-16 animate-pulse rounded bg-slate-200" />
+          <div className="h-6 w-16 animate-pulse rounded bg-slate-200" />
         </div>
-        <div className="flex gap-1 border-b border-gray-200 mb-6">
+        <div className="flex gap-1 border-b border-slate-200 mb-6">
           {["General", "Transactions", "Financials", "Store Credit"].map((t) => (
-            <div key={t} className="h-10 w-24 animate-pulse rounded-t bg-gray-200 mr-1" />
+            <div key={t} className="h-10 w-24 animate-pulse rounded-t bg-slate-200 mr-1" />
           ))}
         </div>
         <Card>
           <div className="grid gap-4 sm:grid-cols-2">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i}>
-                <div className="mb-1 h-3 w-20 animate-pulse rounded bg-gray-200" />
-                <div className="h-10 animate-pulse rounded-lg bg-gray-200" />
+                <div className="mb-1 h-3 w-20 animate-pulse rounded bg-slate-200" />
+                <div className="h-10 animate-pulse rounded-md bg-slate-200" />
               </div>
             ))}
           </div>
@@ -207,12 +207,12 @@ export default function CustomerDetailPage() {
         <div className="p-6">
           <Link
             href="/customers"
-            className="inline-flex items-center gap-1 text-sm text-brand-700 hover:underline mb-4 block"
+            className="inline-flex items-center gap-1 text-sm text-slate-950 hover:underline mb-4 block"
           >
             <BackIcon /> Back to Customers
           </Link>
           <div
-            className="rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700"
+            className="rounded-md border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700"
             role="alert"
           >
             {error ?? "Customer not found."}
@@ -241,7 +241,7 @@ export default function CustomerDetailPage() {
         <div>
           <Link
             href="/customers"
-            className="inline-flex items-center gap-1 text-sm text-brand-700 hover:underline"
+            className="inline-flex items-center gap-1 text-sm text-slate-950 hover:underline"
           >
             <BackIcon /> Back to Customers
           </Link>
@@ -250,18 +250,18 @@ export default function CustomerDetailPage() {
         {/* Header */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{customer.name}</h1>
+            <h1 className="text-2xl font-bold text-slate-950">{customer.name}</h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="inline-flex rounded-full border border-brand-200 bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700">
+              <span className="inline-flex rounded border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-950">
                 {tierLabel(customer.tier)}
               </span>
               <span
-                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${statusColor(customer.status)}`}
+                className={`inline-flex rounded px-2.5 py-0.5 text-xs font-semibold capitalize ${statusColor(customer.status)}`}
               >
                 {customer.status}
               </span>
               {customer.verified && (
-                <span className="inline-flex rounded-full bg-success-100 px-2.5 py-0.5 text-xs font-semibold text-success-700">
+                <span className="inline-flex rounded bg-success-100 px-2.5 py-0.5 text-xs font-semibold text-success-700">
                   Verified
                 </span>
               )}
@@ -283,7 +283,7 @@ export default function CustomerDetailPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 border-b border-gray-200">
+        <div className="flex gap-1 border-b border-slate-200">
           {tabs.map((tab) => (
             <button
               key={tab.key}
@@ -292,8 +292,8 @@ export default function CustomerDetailPage() {
               className={[
                 "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
                 activeTab === tab.key
-                  ? "border-brand-600 text-brand-700"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
+                  ? "border-slate-950 text-slate-950"
+                  : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300",
               ].join(" ")}
             >
               {tab.label}
@@ -357,6 +357,7 @@ function GeneralTab({
     status: customer.status,
     billingAddress: customer.billingAddress ?? "",
     shippingAddress: customer.shippingAddress ?? "",
+    creditLimitDollars: customer.credit_limit_cents != null ? (customer.credit_limit_cents / 100).toFixed(2) : "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -375,6 +376,7 @@ function GeneralTab({
       status: customer.status,
       billingAddress: customer.billingAddress ?? "",
       shippingAddress: customer.shippingAddress ?? "",
+      creditLimitDollars: customer.credit_limit_cents != null ? (customer.credit_limit_cents / 100).toFixed(2) : "",
     });
   }, [customer]);
 
@@ -385,6 +387,9 @@ function GeneralTab({
   async function handleSave() {
     setSaving(true);
     try {
+      const creditLimitCents = form.creditLimitDollars.trim()
+        ? Math.round(parseFloat(form.creditLimitDollars) * 100)
+        : null;
       const body: Record<string, unknown> = {
         name: form.name || undefined,
         email: form.email || undefined,
@@ -398,6 +403,7 @@ function GeneralTab({
         status: form.status || undefined,
         billingAddress: form.billingAddress || undefined,
         shippingAddress: form.shippingAddress || undefined,
+        creditLimitCents: creditLimitCents !== null && !isNaN(creditLimitCents) ? creditLimitCents : undefined,
       };
       const updated = await apiPatch<Customer>(`/api/v1/customers/${customer.id}`, body);
       onSaved(updated);
@@ -412,8 +418,8 @@ function GeneralTab({
     return (
       <div className="flex flex-col gap-5">
         {/* Edit actions banner */}
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3">
-          <p className="text-sm font-medium text-brand-800">Editing customer profile</p>
+        <div className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-100 px-4 py-3">
+          <p className="text-sm font-medium text-slate-800">Editing customer profile</p>
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={onCancel} disabled={saving}>
               Cancel
@@ -540,6 +546,19 @@ function GeneralTab({
                 <option value="inactive">Inactive</option>
               </select>
             </div>
+            <div>
+              <label className={LABEL_CLASS}>Credit Limit ($, optional)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.creditLimitDollars}
+                onChange={(e) => update("creditLimitDollars", e.target.value)}
+                placeholder="No limit"
+                className={INPUT_CLASS}
+              />
+              <p className="mt-1 text-xs text-slate-400">Leave empty for no credit limit (pay-as-you-go).</p>
+            </div>
           </div>
         </Card>
 
@@ -619,7 +638,7 @@ function TransactionsTab({ summary }: { summary: CustomerSummary | null }) {
   if (!summary) {
     return (
       <Card>
-        <p className="text-sm text-gray-500">Transaction data unavailable.</p>
+        <p className="text-sm text-slate-500">Transaction data unavailable.</p>
       </Card>
     );
   }
@@ -633,11 +652,11 @@ function TransactionsTab({ summary }: { summary: CustomerSummary | null }) {
         description="Showing most recent orders for this customer."
       >
         {orders.length === 0 ? (
-          <p className="text-sm text-gray-500">No transactions yet.</p>
+          <p className="text-sm text-slate-500">No transactions yet.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Order #</th>
                   <th className="px-4 py-3">Status</th>
@@ -645,13 +664,13 @@ function TransactionsTab({ summary }: { summary: CustomerSummary | null }) {
                   <th className="px-4 py-3 text-right">Date</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 bg-white">
+              <tbody className="divide-y divide-slate-100 bg-white">
                 {orders.map((order) => (
-                  <tr key={order.id} className="hover:bg-gray-50">
+                  <tr key={order.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3">
                       <Link
                         href="/sales"
-                        className="font-mono text-xs font-semibold text-brand-700 underline-offset-2 hover:underline"
+                        className="font-mono text-xs font-semibold text-slate-950 underline-offset-2 hover:underline"
                       >
                         {order.orderNumber}
                       </Link>
@@ -663,10 +682,10 @@ function TransactionsTab({ summary }: { summary: CustomerSummary | null }) {
                         {order.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-gray-900">
+                    <td className="px-4 py-3 text-right font-semibold text-slate-950">
                       {formatMoney(order.totalCents)}
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-500">
+                    <td className="px-4 py-3 text-right text-slate-500">
                       {formatDate(order.createdAt)}
                     </td>
                   </tr>
@@ -724,11 +743,22 @@ function FinancialsTab({
           value={summary ? formatMoney(summary.totalSpentCents) : "—"}
           sub="lifetime"
         />
+        {customer.credit_limit_cents != null && (
+          <FinancialMetric
+            label="Credit limit"
+            value={formatMoney(customer.credit_limit_cents)}
+            sub={
+              financials && financials.openInvoicesCents > 0
+                ? `${Math.round((financials.openInvoicesCents / customer.credit_limit_cents) * 100)}% utilized`
+                : "0% utilized"
+            }
+          />
+        )}
       </div>
 
       {financials === null && (
         <div
-          className="rounded-lg border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700"
+          className="rounded-md border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700"
           role="status"
         >
           Financial data could not be loaded. Showing available summary data only.
@@ -749,9 +779,9 @@ function FinancialMetric({
 }) {
   return (
     <Card className="flex flex-col gap-1">
-      <p className="text-xs font-semibold uppercase text-gray-500">{label}</p>
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
-      <p className="text-xs text-gray-500">{sub}</p>
+      <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
+      <p className="text-2xl font-bold text-slate-950">{value}</p>
+      <p className="text-xs text-slate-500">{sub}</p>
     </Card>
   );
 }
@@ -774,18 +804,18 @@ function StoreCreditTab({
       <Card title="Store credit balance">
         <div className="flex flex-col gap-4">
           <div>
-            <p className="text-3xl font-bold text-gray-900">{formatMoney(creditBalance)}</p>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="text-3xl font-bold text-slate-950">{formatMoney(creditBalance)}</p>
+            <p className="mt-1 text-sm text-slate-500">
               Available store credit for {customer.name}
             </p>
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-            <p className="font-medium text-gray-700">Credit management</p>
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            <p className="font-medium text-slate-700">Credit management</p>
             <p className="mt-1">
               Store credit is applied and managed at checkout. To add or redeem credit,
               open a new sale from the{" "}
-              <Link href="/terminal" className="text-brand-700 underline underline-offset-2">
+              <Link href="/terminal" className="text-slate-950 underline underline-offset-2">
                 Register
               </Link>{" "}
               and select the customer at the tender screen.
@@ -800,17 +830,17 @@ function StoreCreditTab({
             {customer.credit_limit_cents !== undefined && (
               <div>
                 <p className={LABEL_CLASS}>Credit limit</p>
-                <p className="text-lg font-bold text-gray-900">
+                <p className="text-lg font-bold text-slate-950">
                   {formatMoney(customer.credit_limit_cents)}
                 </p>
               </div>
             )}
             <div>
               <p className={LABEL_CLASS}>Current balance</p>
-              <p className="text-lg font-bold text-gray-900">{formatMoney(creditBalance)}</p>
+              <p className="text-lg font-bold text-slate-950">{formatMoney(creditBalance)}</p>
             </div>
           </div>
-          <p className="mt-4 text-xs text-gray-400">
+          <p className="mt-4 text-xs text-slate-400">
             Credit management via checkout. Contact support to adjust credit limits.
           </p>
         </Card>

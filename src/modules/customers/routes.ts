@@ -34,6 +34,7 @@ const updateSchema = z.object({
   salesRepId: z.string().nullable().optional(),
   status: z.enum(["active", "inactive"]).optional(),
   verified: z.boolean().optional(),
+  creditLimitCents: z.number().int().nonnegative().nullable().optional(),
 });
 
 export function registerRoutes(router: Router, service: CustomersService): void {

@@ -35,10 +35,11 @@ CREATE TABLE IF NOT EXISTS purchase_order_lines (
   lot_code        TEXT
 );`;
 
-// Idempotent upgrade for DBs provisioned before expiry/lot columns existed.
+// Idempotent upgrade for DBs provisioned before expiry/lot/received_qty columns existed.
 const ALTER_PO_LINES = `
 ALTER TABLE purchase_order_lines ADD COLUMN IF NOT EXISTS expiry_date BIGINT;
-ALTER TABLE purchase_order_lines ADD COLUMN IF NOT EXISTS lot_code TEXT;`;
+ALTER TABLE purchase_order_lines ADD COLUMN IF NOT EXISTS lot_code TEXT;
+ALTER TABLE purchase_order_lines ADD COLUMN IF NOT EXISTS received_qty INTEGER NOT NULL DEFAULT 0;`;
 
 // Vendor AP credits: chargebacks (we deduct from the vendor) and credit memos
 // (vendor credits us). Reduce what we owe a supplier.

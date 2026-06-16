@@ -105,12 +105,12 @@ records, only triaged into "build now" vs. "documented for later."
       `variant_label` on `products`; master rows have price 0/qty 0 and are
       excluded from sellable lists; endpoint to bulk-assign children to a
       master. See `CATALOG_PRODUCT_FINDER.md`. (done in 038eeed)
-- [ ] BE-9: Inventory reservation — on `POST /api/v1/orders`, check
+- [x] BE-9: Inventory reservation — on `POST /api/v1/orders`, check
       `available` (onHand − committed) per line and reject (409
       `insufficient_stock`) if short; increment `committed` on order
       creation, release it on completion/void/refund. Make `committed` in
       `GET /inventory/levels` reflect real reservations (currently
-      hardcoded to 0). See `gaps/INVENTORY_GAPS.md`.
+      hardcoded to 0). See `gaps/INVENTORY_GAPS.md`. (done in this commit)
 - [ ] BE-16: Compliance — age-restriction flag: `products.age_restricted`
       (boolean, default false); `POST /api/v1/sales/sales-orders` and
       `POST /api/v1/orders` reject (400) if any line is age-restricted and

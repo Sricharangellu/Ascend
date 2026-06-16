@@ -20,6 +20,7 @@ const DEFAULT_FLAGS: Record<string, boolean> = {
   quotations: true, achBatchPayout: false, imeiTracking: false, msaReporting: false,
   compositeProducts: false, customerPortal: false, ecommerce: true, commissionTracking: false,
   pickerFulfillment: true, batchDeposits: true,
+  groupRetailPOS: true, groupWholesale: true, groupEnterprise: true,
 };
 
 export class SettingsService {

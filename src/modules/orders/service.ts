@@ -43,6 +43,7 @@ export interface OrderWithLines extends OrderRow {
 export interface CreateOrderLineInput {
   productId: string;
   quantity: number;
+  ageVerified?: boolean; // required true when product.age_restricted (BE-16)
 }
 
 export interface CreateOrderInput {
@@ -66,6 +67,7 @@ interface ProductRow {
   tax_class: string;
   status: string;
   is_master: boolean;
+  age_restricted: number; // 1|0
 }
 
 const VOIDABLE_STATUSES = new Set<OrderStatus>(["open", "completed"]);
@@ -94,7 +96,7 @@ export class OrdersService {
         throw badRequest(`line quantity must be positive for ${line.productId}`);
       }
       const product = await this.db.one<ProductRow>(
-        `SELECT p.id, p.name, p.price_cents, p.tax_class, p.status,
+        `SELECT p.id, p.name, p.price_cents, p.tax_class, p.status, p.age_restricted,
                 EXISTS(SELECT 1 FROM products c WHERE c.tenant_id = p.tenant_id AND c.parent_product_id = p.id) AS is_master
            FROM products p WHERE p.id = @id AND p.tenant_id = @tenantId`,
         { id: line.productId, tenantId },
@@ -116,6 +118,47 @@ export class OrdersService {
           `product '${line.productId}' is a variant master and cannot be sold directly`,
         );
       }
+
+      // BE-16: age-restricted products require cashier age-verification at the
+      // register (FE-12). Here we surface it as a 400 so callers that bypass the
+      // register UI get a clear signal rather than a silent sale.
+      if (product.age_restricted && !line.ageVerified) {
+        throw badRequest(`product '${line.productId}' is age-restricted — set ageVerified: true after ID check`);
+      }
+
+      // BE-9: Inventory reservation — only enforced when the product has an
+      // inventory row (i.e. the tenant actively tracks stock for it). Products
+      // with no inventory row are treated as "untracked" (unlimited) so services,
+      // digital goods, and products not yet received into inventory can still be sold.
+      const stockRow = await this.db.one<{ stock_qty: number }>(
+        "SELECT stock_qty FROM inventory WHERE product_id = @productId AND tenant_id = @tenantId",
+        { productId: line.productId, tenantId },
+      );
+      if (stockRow !== undefined) {
+        const onHand = Number(stockRow.stock_qty);
+        const committedRow = await this.db.one<{ committed: number }>(
+          `SELECT COALESCE(SUM(ol.quantity), 0) AS committed
+             FROM order_lines ol
+             JOIN orders o ON o.id = ol.order_id
+            WHERE ol.product_id = @productId
+              AND o.tenant_id = @tenantId
+              AND o.status NOT IN ('completed', 'voided', 'refunded')`,
+          { productId: line.productId, tenantId },
+        );
+        const committed = committedRow ? Number(committedRow.committed) : 0;
+        const available = onHand - committed;
+        if (line.quantity > available) {
+          const skuRow = await this.db.one<{ sku: string }>(
+            "SELECT sku FROM products WHERE id = @id AND tenant_id = @tenantId",
+            { id: line.productId, tenantId },
+          );
+          const sku = skuRow?.sku ?? line.productId;
+          throw conflict(
+            `Insufficient stock for SKU ${sku}: ${available} available, ${line.quantity} requested`,
+          );
+        }
+      }
+
       const taxable = product.tax_class !== "exempt";
       const lineGross = product.price_cents * line.quantity;
       resolved.push({ input: line, product, taxable, lineGross });

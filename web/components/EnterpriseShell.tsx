@@ -32,24 +32,28 @@ type NavKey =
   | "reports"
   | "settings";
 
+// editionFlag: if set, this nav item is hidden when the corresponding feature
+// flag is false. Items with no editionFlag are always shown.
 const NAV_ITEMS: Array<{
   key: NavKey;
   label: string;
   href: string;
   icon: NavKey;
+  group: "Operate" | "Manage" | "Analyze";
+  editionFlag?: "groupRetailPOS" | "groupWholesale" | "groupEnterprise";
 }> = [
-  { key: "dashboard", label: "Dashboard", href: "/dashboard", icon: "dashboard" },
-  { key: "register", label: "Register", href: "/terminal", icon: "register" },
-  { key: "sales", label: "Sales", href: "/sales", icon: "sales" },
-  { key: "inventory", label: "Inventory", href: "/inventory", icon: "inventory" },
-  { key: "purchasing", label: "Purchasing", href: "/purchasing", icon: "purchasing" },
-  { key: "shipping", label: "Shipping", href: "/shipping", icon: "shipping" },
-  { key: "customers", label: "Customers", href: "/customers", icon: "customers" },
-  { key: "discounts", label: "Discounts", href: "/discounts", icon: "discounts" },
-  { key: "accounting", label: "Accounting", href: "/accounting", icon: "accounting" },
-  { key: "ecommerce", label: "Ecommerce", href: "/ecommerce", icon: "ecommerce" },
-  { key: "reports", label: "Reports", href: "/reports", icon: "reports" },
-  { key: "settings", label: "Settings", href: "/settings", icon: "settings" },
+  { key: "dashboard", label: "Dashboard", href: "/dashboard", icon: "dashboard", group: "Operate" },
+  { key: "register", label: "Register", href: "/terminal", icon: "register", group: "Operate", editionFlag: "groupRetailPOS" },
+  { key: "sales", label: "Sales", href: "/sales", icon: "sales", group: "Operate" },
+  { key: "inventory", label: "Inventory", href: "/inventory", icon: "inventory", group: "Manage" },
+  { key: "purchasing", label: "Purchasing", href: "/purchasing", icon: "purchasing", group: "Manage", editionFlag: "groupWholesale" },
+  { key: "shipping", label: "Shipping", href: "/shipping", icon: "shipping", group: "Manage", editionFlag: "groupWholesale" },
+  { key: "customers", label: "Customers", href: "/customers", icon: "customers", group: "Manage", editionFlag: "groupRetailPOS" },
+  { key: "discounts", label: "Discounts", href: "/discounts", icon: "discounts", group: "Manage", editionFlag: "groupRetailPOS" },
+  { key: "accounting", label: "Accounting", href: "/accounting", icon: "accounting", group: "Analyze", editionFlag: "groupWholesale" },
+  { key: "ecommerce", label: "Ecommerce", href: "/ecommerce", icon: "ecommerce", group: "Analyze", editionFlag: "groupEnterprise" },
+  { key: "reports", label: "Reports", href: "/reports", icon: "reports", group: "Analyze" },
+  { key: "settings", label: "Settings", href: "/settings", icon: "settings", group: "Analyze" },
 ];
 
 interface EnterpriseShellProps {
@@ -60,6 +64,8 @@ interface EnterpriseShellProps {
   banner?: React.ReactNode;
   contentClassName?: string;
 }
+
+const DEFAULT_FLAGS = { groupRetailPOS: true, groupWholesale: true, groupEnterprise: true };
 
 export function EnterpriseShell({
   active,
@@ -72,28 +78,35 @@ export function EnterpriseShell({
   const { user, logout } = useAuth();
   const { isOffline } = useOffline();
   const pathname = usePathname();
+  const [flags, setFlags] = useState<Record<string, boolean>>(DEFAULT_FLAGS);
+
+  useEffect(() => {
+    apiGet<Record<string, boolean>>("/api/v1/settings/feature-flags")
+      .then((f) => setFlags((prev) => ({ ...prev, ...f })))
+      .catch(() => { /* keep defaults */ });
+  }, []);
 
   return (
-    <div className="flex min-h-screen bg-slate-100">
-      <EnterpriseRail active={active} pathname={pathname} />
+    <div className="flex min-h-screen bg-slate-100 text-slate-900">
+      <EnterpriseRail active={active} pathname={pathname} flags={flags} />
 
       <div className="flex min-w-0 flex-1 flex-col pb-16 md:pb-0">
         {banner}
 
-        <header className="z-10 border-b border-gray-200 bg-white shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-4">
+        <header className="z-10 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-5">
             <div className="flex min-w-0 items-center gap-3">
               <div
                 aria-hidden="true"
-                className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white md:hidden"
+                className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-950 text-sm font-bold text-white md:hidden"
               >
                 F
               </div>
               <div className="min-w-0">
-                <span className="block truncate text-base font-semibold text-gray-900 sm:text-lg">
+                <span className="block truncate text-base font-semibold text-slate-950 sm:text-lg">
                   {title}
                 </span>
-                <span className="block truncate text-xs font-medium text-gray-500">
+                <span className="block truncate text-xs font-medium text-slate-500">
                   {subtitle}
                 </span>
               </div>
@@ -112,14 +125,14 @@ export function EnterpriseShell({
 
         <main
           id="terminal-content"
-          className={clsx("flex-1 overflow-hidden", contentClassName)}
+          className={clsx("flex-1 overflow-hidden bg-slate-100", contentClassName)}
           aria-label={title}
         >
           {children}
         </main>
       </div>
 
-      <MobileNav active={active} />
+      <MobileNav active={active} flags={flags} />
     </div>
   );
 }
@@ -127,51 +140,64 @@ export function EnterpriseShell({
 function EnterpriseRail({
   active,
   pathname,
+  flags,
 }: {
   active: NavKey;
   pathname: string;
+  flags: Record<string, boolean>;
 }) {
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => !item.editionFlag || flags[item.editionFlag] !== false,
+  );
+
   return (
-    <aside className="hidden w-20 shrink-0 flex-col border-r border-slate-800 bg-slate-950 text-white md:flex xl:w-64">
-      <div className="flex h-[65px] items-center gap-3 border-b border-slate-800 px-4">
+    <aside className="hidden w-20 shrink-0 flex-col border-r border-slate-200 bg-white text-slate-900 md:flex xl:w-64">
+      <div className="flex h-[65px] items-center gap-3 border-b border-slate-200 px-4">
         <div
           aria-hidden="true"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-base font-bold"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-slate-950 text-base font-bold text-white"
         >
           F
         </div>
         <div className="hidden min-w-0 xl:block">
-          <p className="truncate text-sm font-semibold">Finder POS</p>
-          <p className="truncate text-xs text-slate-400">Retail operations</p>
+          <p className="truncate text-sm font-semibold text-slate-950">Finder POS</p>
+          <p className="truncate text-xs text-slate-500">Enterprise retail suite</p>
         </div>
       </div>
 
-      <nav aria-label="Primary" className="flex flex-1 flex-col gap-1 px-3 py-4">
-        {NAV_ITEMS.map((item) => {
-          const selected = active === item.key || pathname === item.href;
-          return (
-            <Link
-              key={item.key}
-              href={item.href}
-              aria-current={selected ? "page" : undefined}
-              className={clsx(
-                "flex min-h-[48px] items-center justify-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors xl:justify-start",
-                selected
-                  ? "bg-white text-slate-950"
-                  : "text-slate-300 hover:bg-slate-900 hover:text-white"
-              )}
-            >
-              <NavIcon name={item.icon} />
-              <span className="hidden xl:inline">{item.label}</span>
-            </Link>
-          );
-        })}
+      <nav aria-label="Primary" className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 py-4">
+        {(["Operate", "Manage", "Analyze"] as const).map((group) => (
+          <div key={group} className="space-y-1">
+            <p className="hidden px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 xl:block">
+              {group}
+            </p>
+            {visibleItems.filter((item) => item.group === group).map((item) => {
+              const selected = active === item.key || pathname === item.href;
+              return (
+                <Link
+                  key={item.key}
+                  href={item.href}
+                  aria-current={selected ? "page" : undefined}
+                  className={clsx(
+                    "flex min-h-[42px] items-center justify-center gap-3 rounded-md border px-3 text-sm font-medium transition-colors xl:justify-start",
+                    selected
+                      ? "border-slate-300 bg-slate-950 text-white shadow-sm"
+                      : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-950"
+                  )}
+                >
+                  <NavIcon name={item.icon} />
+                  <span className="hidden xl:inline">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
-      <div className="border-t border-slate-800 p-3">
-        <div className="rounded-lg border border-slate-800 bg-slate-900 p-3">
-          <p className="text-xs font-medium text-slate-300 xl:block">Register health</p>
-          <div className="mt-2 flex items-center gap-2 text-xs text-success-500">
+      <div className="border-t border-slate-200 p-3">
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+          <p className="text-xs font-semibold text-slate-600 xl:block">Register health</p>
+          <div className="mt-2 flex items-center gap-2 text-xs text-success-700">
             <span className="h-2 w-2 rounded-full bg-success-500" aria-hidden="true" />
             <span className="hidden xl:inline">Ready for sales</span>
           </div>
@@ -181,20 +207,23 @@ function EnterpriseRail({
   );
 }
 
-function MobileNav({ active }: { active: NavKey }) {
+function MobileNav({ active, flags }: { active: NavKey; flags: Record<string, boolean> }) {
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => !item.editionFlag || flags[item.editionFlag] !== false,
+  );
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-40 flex overflow-x-auto border-t border-gray-200 bg-white shadow-[0_-8px_24px_rgba(15,23,42,0.08)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 flex overflow-x-auto border-t border-slate-200 bg-white shadow-[0_-8px_24px_rgba(15,23,42,0.08)] md:hidden"
     >
-      {NAV_ITEMS.map((item) => (
+      {visibleItems.map((item) => (
         <Link
           key={item.key}
           href={item.href}
           aria-current={active === item.key ? "page" : undefined}
           className={clsx(
             "flex min-h-[56px] min-w-[72px] flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium",
-            active === item.key ? "text-brand-700" : "text-gray-500"
+            active === item.key ? "text-slate-950" : "text-slate-500"
           )}
         >
           <NavIcon name={item.icon} />
@@ -247,13 +276,13 @@ function StoreSwitcher() {
 
   return (
     <label
-      className="hidden items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm md:flex"
+      className="hidden items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm md:flex"
       aria-busy={loading}
     >
       <StoreIcon />
       <span className="sr-only">Current store</span>
       <select
-        className="bg-transparent text-sm font-medium text-gray-800 outline-none"
+        className="bg-transparent text-sm font-medium text-slate-800 outline-none"
         value={selected}
         onChange={(event) => setSelected(event.target.value)}
         aria-label="Current store and register"
@@ -274,7 +303,7 @@ function DeviceStatus({ isOffline }: { isOffline: boolean }) {
       role="status"
       aria-live="polite"
       className={clsx(
-        "inline-flex min-h-[40px] items-center gap-2 rounded-lg border px-3 text-sm font-medium",
+        "inline-flex min-h-[40px] items-center gap-2 rounded-md border px-3 text-sm font-medium",
         isOffline
           ? "border-warning-200 bg-warning-50 text-warning-700"
           : "border-success-200 bg-success-50 text-success-700"
@@ -291,14 +320,14 @@ function UserContext({ name, role }: { name: string; role: string }) {
     <button
       type="button"
       title="User switching coming soon"
-      className="hidden min-h-[40px] items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-left transition-colors hover:bg-gray-50 sm:flex"
+      className="hidden min-h-[40px] items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-left transition-colors hover:bg-slate-50 sm:flex"
     >
       <UserIcon />
       <span className="min-w-0">
-        <span className="block max-w-[9rem] truncate text-sm font-medium text-gray-900">
+        <span className="block max-w-[9rem] truncate text-sm font-medium text-slate-900">
           {name}
         </span>
-        <span className="block text-xs capitalize text-gray-500">{role}</span>
+        <span className="block text-xs capitalize text-slate-500">{role}</span>
       </span>
     </button>
   );
@@ -310,12 +339,22 @@ function NavIcon({ name }: { name: NavKey }) {
       return <DashboardIcon />;
     case "register":
       return <RegisterIcon />;
+    case "sales":
+      return <SalesIcon />;
     case "inventory":
       return <InventoryIcon />;
     case "purchasing":
-      return <InventoryIcon />;
+      return <PurchasingIcon />;
+    case "shipping":
+      return <ShippingIcon />;
     case "customers":
       return <CustomersIcon />;
+    case "discounts":
+      return <DiscountsIcon />;
+    case "accounting":
+      return <AccountingIcon />;
+    case "ecommerce":
+      return <EcommerceIcon />;
     case "reports":
       return <ReportsIcon />;
     case "settings":
@@ -404,6 +443,72 @@ function CustomersIcon() {
       <circle cx="9" cy="7" r="4" />
       <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function SalesIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18" />
+      <path d="M3 12h18" />
+      <path d="M3 18h18" />
+      <path d="M7 6v12" />
+      <path d="M17 6v12" />
+    </svg>
+  );
+}
+
+function PurchasingIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+      <path d="M3 6h18" />
+      <path d="M16 10a4 4 0 0 1-8 0" />
+    </svg>
+  );
+}
+
+function ShippingIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 17h4V5H2v12h3" />
+      <path d="M14 17h1V9h4l3 4v4h-2" />
+      <circle cx="7.5" cy="17.5" r="2.5" />
+      <circle cx="17.5" cy="17.5" r="2.5" />
+    </svg>
+  );
+}
+
+function DiscountsIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 5 5 19" />
+      <circle cx="7" cy="7" r="2" />
+      <circle cx="17" cy="17" r="2" />
+    </svg>
+  );
+}
+
+function AccountingIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <path d="M8 7h8" />
+      <path d="M8 11h2" />
+      <path d="M14 11h2" />
+      <path d="M8 15h2" />
+      <path d="M14 15h2" />
+    </svg>
+  );
+}
+
+function EcommerceIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="21" r="1" />
+      <circle cx="20" cy="21" r="1" />
+      <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6" />
     </svg>
   );
 }

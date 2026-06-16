@@ -61,40 +61,49 @@ export default function ReportsPage() {
       subtitle={`Sales performance · Demo Store · ${range === "today" ? "Today" : range === "7d" ? "Last 7 days" : "Last 30 days"}`}
       contentClassName="overflow-y-auto"
     >
-      <div className="mx-auto w-full max-w-6xl px-4 py-6">
+      <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6">
         {/* Sub-report navigation */}
         {allowed && (
-          <div className="mb-5 flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+            <div>
+              <h1 className="text-lg font-semibold text-slate-950">Reporting center</h1>
+              <p className="mt-1 text-sm text-slate-500">
+                Operational reporting across sales, inventory, and receivables.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
             {([
               { label: "Overview", href: "/reports" },
               { label: "Sales", href: "/reports/sales" },
               { label: "Inventory Valuation", href: "/reports/inventory" },
               { label: "AR Aging", href: "/reports/ar-aging" },
+              { label: "Expiry", href: "/reports/expiry" },
             ] as const).map((link) => (
               <a
                 key={link.href}
                 href={link.href}
-                className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
                   link.href === "/reports"
-                    ? "border-brand-600 bg-brand-600 text-white"
-                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    ? "border-slate-950 bg-slate-950 text-white"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                 }`}
               >
                 {link.label}
               </a>
             ))}
+            </div>
           </div>
         )}
         {allowed && (
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex rounded-md border border-slate-200 bg-white p-1 shadow-sm">
               {(["today", "7d", "30d"] as const).map((item) => (
                 <button
                   key={item}
                   type="button"
                   onClick={() => setRange(item)}
-                  className={`min-h-[40px] rounded-md px-3 text-sm font-medium transition-colors ${
-                    range === item ? "bg-brand-600 text-white" : "text-gray-600 hover:bg-gray-100"
+                  className={`min-h-[38px] rounded px-4 text-sm font-medium transition-colors ${
+                    range === item ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100"
                   }`}
                 >
                   {item === "today" ? "Today" : item === "7d" ? "7 days" : "30 days"}
@@ -102,10 +111,10 @@ export default function ReportsPage() {
               ))}
             </div>
             <div className="flex gap-2">
-              <button className="min-h-[40px] rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50" type="button">
+              <button className="min-h-[40px] rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50" type="button">
                 Export CSV
               </button>
-              <button className="min-h-[40px] rounded-lg bg-brand-600 px-3 text-sm font-medium text-white hover:bg-brand-700" type="button">
+              <button className="min-h-[40px] rounded-md bg-slate-950 px-3 text-sm font-medium text-white hover:bg-slate-800" type="button">
                 Schedule report
               </button>
             </div>
@@ -114,12 +123,12 @@ export default function ReportsPage() {
 
         {!allowed ? (
           <Card>
-            <p role="alert" className="text-sm text-gray-700">
+            <p role="alert" className="text-sm text-slate-700">
               You don&apos;t have access to reports. Ask an owner or manager.
             </p>
           </Card>
         ) : loading ? (
-          <p className="text-sm text-gray-500" aria-busy="true">
+          <p className="text-sm text-slate-500" aria-busy="true">
             Loading…
           </p>
         ) : error ? (

@@ -8,9 +8,18 @@ function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
 
+function userId(res: Response): string {
+  return (res.locals["auth"] as AuthPayload).userId ?? "unknown";
+}
+
 const outletSchema = z.object({ name: z.string().min(1), timezone: z.string().min(1).optional() });
 const registerSchema = z.object({ name: z.string().min(1) });
 const statusSchema = z.object({ status: z.enum(["open", "closed"]) });
+const openSessionSchema = z.object({ openingFloatCents: z.number().int().nonnegative().optional() });
+const closeSessionSchema = z.object({
+  countedCashCents: z.number().int().nonnegative(),
+  closingFloatCents: z.number().int().nonnegative().optional(),
+});
 
 export function registerRoutes(router: Router, service: OutletsService): void {
   // GET /api/v1/outlets — outlets with their registers (powers the store/register selector).
@@ -43,6 +52,31 @@ export function registerRoutes(router: Router, service: OutletsService): void {
     handler(async (req, res) => {
       const body = parseBody(statusSchema, req.body);
       res.json(await service.setRegisterStatus(String(req.params.registerId), body.status, tenantId(res)));
+    }),
+  );
+
+  // BE-17: full session lifecycle with opening float and cash count.
+  router.post(
+    "/registers/:registerId/open",
+    handler(async (req, res) => {
+      const body = parseBody(openSessionSchema, req.body);
+      res.status(201).json(await service.openSession(String(req.params.registerId), body.openingFloatCents ?? 0, userId(res), tenantId(res)));
+    }),
+  );
+
+  router.post(
+    "/registers/:registerId/close",
+    handler(async (req, res) => {
+      const body = parseBody(closeSessionSchema, req.body);
+      res.json(await service.closeSession(String(req.params.registerId), body.countedCashCents, body.closingFloatCents ?? 0, tenantId(res)));
+    }),
+  );
+
+  router.get(
+    "/registers/:registerId/sessions",
+    handler(async (req, res) => {
+      const limit = req.query.limit ? Number(req.query.limit) : 20;
+      res.json({ items: await service.listSessions(String(req.params.registerId), tenantId(res), limit) });
     }),
   );
 }
