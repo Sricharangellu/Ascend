@@ -42,6 +42,8 @@ const TIER_PCT: Record<number, number> = { 1: 10, 2: 7.5, 3: 5, 4: 2.5, 5: 0 };
 const tierPrices = new Map<string, Array<{ tier: number; priceCents: number }>>();
 // Discounts dev store
 let discounts: any[] = [];
+// Register sessions dev store
+const registerSessions = new Map<string, any>();
 // Ecommerce dev store
 const onlineProducts = new Map<string, any>();
 let ecSoSeq = 0;

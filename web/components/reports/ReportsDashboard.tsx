@@ -42,12 +42,13 @@ function Kpi({
   tone?: "success" | "warning";
   trend?: number[];
 }) {
-  const sparkColor = tone === "success" ? "text-success-500" : tone === "warning" ? "text-warning-500" : "text-brand-400";
+  const sparkColor = tone === "success" ? "text-emerald-500" : tone === "warning" ? "text-amber-500" : "text-slate-400";
+  const valueColor = tone === "success" ? "text-emerald-700" : tone === "warning" ? "text-amber-700" : "text-slate-950";
   return (
     <Card className="flex flex-col gap-1">
-      <span className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</span>
-      <span className={tone === "success" ? "text-2xl font-bold text-success-700" : tone === "warning" ? "text-2xl font-bold text-warning-700" : "text-2xl font-bold text-gray-900"}>{value}</span>
-      {sub ? <span className="text-xs text-gray-500">{sub}</span> : null}
+      <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</span>
+      <span className={`text-2xl font-semibold tabular-nums ${valueColor}`}>{value}</span>
+      {sub ? <span className="text-xs text-slate-500">{sub}</span> : null}
       {trend && <Sparkline data={trend} className={`mt-2 h-7 w-full ${sparkColor}`} />}
     </Card>
   );
@@ -78,10 +79,10 @@ export function ReportsDashboard({
   ];
 
   return (
-    <div className="flex flex-col gap-6" aria-label="Sales summary">
+    <div className="flex flex-col gap-5" aria-label="Sales summary">
       <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600">Revenue</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Revenue</h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <Kpi label="Gross" value={formatMoney(revenue.grossCents)} sub="completed orders" tone="success" trend={hourlySales.map((h) => h.value)} />
           <Kpi label="Tax" value={formatMoney(revenue.taxCents)} />
           <Kpi label="Net" value={formatMoney(revenue.netCents)} sub="gross − tax" trend={hourlySales.map((h) => h.value * 0.9)} />
@@ -90,30 +91,30 @@ export function ReportsDashboard({
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600">Sales rhythm</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Sales rhythm</h2>
           <Card className="flex min-h-[17rem] flex-col gap-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-semibold text-gray-900">Hourly sales index</h3>
-                <p className="text-sm text-gray-500">Relative demand across the business day.</p>
+                <h3 className="text-base font-semibold text-slate-950">Hourly sales index</h3>
+                <p className="text-sm text-slate-500">Relative demand across the business day.</p>
               </div>
-              <span className="rounded bg-success-100 px-2 py-1 text-xs font-semibold text-success-700">
+              <span className="rounded bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
                 On pace
               </span>
             </div>
             <div className="flex flex-1 items-end gap-3">
               {hourlySales.map((bar) => (
                 <div key={bar.hour} className="flex flex-1 flex-col items-center gap-2">
-                  <div className="flex h-40 w-full items-end rounded bg-gray-100">
+                  <div className="flex h-40 w-full items-end rounded bg-slate-100">
                     <div
-                      className="w-full rounded bg-brand-600"
+                      className="w-full rounded bg-slate-950"
                       style={{ height: `${bar.value}%` }}
                       aria-label={`${bar.hour}: ${bar.value}% sales index`}
                     />
                   </div>
-                  <span className="text-xs font-medium text-gray-500">{bar.hour}</span>
+                  <span className="text-xs font-medium text-slate-500">{bar.hour}</span>
                 </div>
               ))}
             </div>
@@ -121,15 +122,15 @@ export function ReportsDashboard({
         </section>
 
         <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600">Payments</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Payments</h2>
           <Card className="flex min-h-[17rem] flex-col gap-4">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Captured</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900">{formatMoney(payments.capturedCents)}</p>
-              <p className="text-xs text-gray-500">{payments.capturedCount} successful payments</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Captured</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-950">{formatMoney(payments.capturedCents)}</p>
+              <p className="text-xs text-slate-500">{payments.capturedCount} successful payments</p>
             </div>
             {methods.length === 0 ? (
-              <p className="text-sm text-gray-500">No payments yet</p>
+              <p className="text-sm text-slate-500">No payments yet</p>
             ) : (
               <div className="flex flex-col gap-3">
                 {methods.map(([method, cents]) => {
@@ -139,11 +140,11 @@ export function ReportsDashboard({
                   return (
                     <div key={method}>
                       <div className="mb-1 flex justify-between text-sm">
-                        <span className="capitalize text-gray-600">{method}</span>
-                        <span className="font-semibold text-gray-900">{formatMoney(cents)}</span>
+                        <span className="capitalize text-slate-600">{method}</span>
+                        <span className="font-semibold text-slate-900">{formatMoney(cents)}</span>
                       </div>
-                      <div className="h-2 rounded bg-gray-100">
-                        <div className="h-2 rounded bg-brand-600" style={{ width: `${pct}%` }} />
+                      <div className="h-2 rounded bg-slate-100">
+                        <div className="h-2 rounded bg-slate-950" style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                   );
@@ -154,19 +155,19 @@ export function ReportsDashboard({
         </section>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600">Order status</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Order status</h2>
           <Card className="overflow-hidden p-0">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3 text-right">Count</th>
                   <th className="px-4 py-3 text-right">Share</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100">
                 {[
                   ["Open", orders.open],
                   ["Completed", orders.completed],
@@ -177,9 +178,9 @@ export function ReportsDashboard({
                   const pct = orders.total > 0 ? Math.round((numericCount / orders.total) * 100) : 0;
                   return (
                     <tr key={label}>
-                      <td className="px-4 py-3 font-medium text-gray-900">{label}</td>
-                      <td className="px-4 py-3 text-right text-gray-700">{numericCount}</td>
-                      <td className="px-4 py-3 text-right text-gray-700">{pct}%</td>
+                      <td className="px-4 py-3 font-medium text-slate-950">{label}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-slate-700">{numericCount}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-slate-700">{pct}%</td>
                     </tr>
                   );
                 })}
@@ -189,20 +190,20 @@ export function ReportsDashboard({
         </section>
 
         <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600">Top products</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Top products</h2>
           <Card className="overflow-hidden p-0">
             {topProducts.length === 0 ? (
-              <p className="px-4 py-6 text-sm text-gray-500">No product sales yet.</p>
+              <p className="px-4 py-6 text-sm text-slate-500">No product sales yet.</p>
             ) : (
-              <ul className="divide-y divide-gray-100">
+              <ul className="divide-y divide-slate-100">
                 {topProducts.map((product, index) => (
                   <li key={product.productId} className="grid grid-cols-[2rem_1fr_auto] items-center gap-3 px-4 py-3 text-sm">
-                    <span className="text-xs font-bold text-gray-400">#{index + 1}</span>
+                    <span className="text-xs font-bold text-slate-400">#{index + 1}</span>
                     <span className="min-w-0">
-                      <span className="block truncate font-medium text-gray-900">{product.name}</span>
-                      <span className="block text-xs text-gray-500">{product.units} units</span>
+                      <span className="block truncate font-medium text-slate-950">{product.name}</span>
+                      <span className="block text-xs text-slate-500">{product.units} units</span>
                     </span>
-                    <span className="font-semibold text-gray-900">{formatMoney(product.revenueCents)}</span>
+                    <span className="font-semibold tabular-nums text-slate-900">{formatMoney(product.revenueCents)}</span>
                   </li>
                 ))}
               </ul>

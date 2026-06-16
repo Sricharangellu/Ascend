@@ -2,6 +2,7 @@ import type { Router, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
+import { requireRole } from "../../gateway/auth.js";
 import type { BillingService } from "./service.js";
 
 function tenantId(res: Response): string {
@@ -23,6 +24,7 @@ const invoiceSchema = z.object({
 const paySchema = z.object({ amountCents: z.number().int().positive(), method: z.string().min(1).optional() });
 
 export function registerRoutes(router: Router, service: BillingService): void {
+  const mgr = requireRole("manager");
   // Bills (AP)
   router.post("/bills", handler(async (req, res) => {
     res.status(201).json(await service.createBill(parseBody(billSchema, req.body), tenantId(res)));
@@ -47,5 +49,15 @@ export function registerRoutes(router: Router, service: BillingService): void {
   router.post("/invoices/:id/pay", handler(async (req, res) => {
     const b = parseBody(paySchema, req.body);
     res.json(await service.payInvoice(String(req.params.id), b.amountCents, b.method ?? "transfer", tenantId(res)));
+  }));
+
+  // BE-14: AR dunning — updates dunning_level on overdue open/partial invoices.
+  router.post("/dunning/run", mgr, handler(async (_req, res) => {
+    res.json(await service.runDunning(tenantId(res)));
+  }));
+
+  // BE-12: Compute and store bill variance against received PO lines.
+  router.post("/bills/:id/variance", mgr, handler(async (req, res) => {
+    res.json(await service.computeBillVariance(String(req.params.id), tenantId(res)));
   }));
 }

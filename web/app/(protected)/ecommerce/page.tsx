@@ -27,34 +27,44 @@ export default function EcommercePage() {
   useEffect(() => { void load(); }, [load]);
 
   return (
-    <EnterpriseShell active="ecommerce" title="Ecommerce" subtitle="Online storefront catalog">
-      <div className="space-y-4 p-4">
+    <EnterpriseShell active="ecommerce" title="Ecommerce" subtitle="Online storefront catalog" contentClassName="overflow-y-auto">
+      <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+          <div>
+            <h1 className="text-lg font-semibold text-slate-950">Storefront catalog</h1>
+            <p className="mt-1 text-sm text-slate-500">Review active products available for online merchandising.</p>
+          </div>
+          <div className="rounded-md border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Published items</p>
+            <p className="mt-1 text-xl font-semibold tabular-nums text-slate-950">{items.length}</p>
+          </div>
+        </div>
         {error && <div className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
-        <Card title="Online Catalog" description="Products flagged for ecommerce appear in the storefront.">
-          <div className="mb-3">
+        <Card title="Online Catalog" description="Products flagged for ecommerce appear in the storefront." noPadding>
+          <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search online products…"
-              className="w-full max-w-sm rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
+              className="min-h-[44px] w-full max-w-sm rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
             />
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-left text-gray-500">
-                  <th className="py-2 pr-4">SKU</th><th className="py-2 pr-4">Name</th>
-                  <th className="py-2 pr-4">Category</th><th className="py-2 pr-4 text-right">Price</th>
+                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  <th className="px-5 py-3">SKU</th><th className="px-4 py-3">Name</th>
+                  <th className="px-4 py-3">Category</th><th className="px-5 py-3 text-right">Price</th>
                 </tr>
               </thead>
-              <tbody>
-                {items.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-gray-400">No products published online yet</td></tr>}
+              <tbody className="divide-y divide-slate-100">
+                {items.length === 0 && <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-500">No products published online yet</td></tr>}
                 {items.map((p) => (
-                  <tr key={p.id} className="border-b last:border-0">
-                    <td className="py-2 pr-4 font-mono text-xs">{p.sku}</td>
-                    <td className="py-2 pr-4 font-medium">{p.name}</td>
-                    <td className="py-2 pr-4 text-gray-500">{p.category}</td>
-                    <td className="py-2 pr-4 text-right">{formatMoney(p.price_cents)}</td>
+                  <tr key={p.id} className="hover:bg-slate-50">
+                    <td className="whitespace-nowrap px-5 py-3 font-mono text-xs font-semibold text-slate-700">{p.sku}</td>
+                    <td className="px-4 py-3 font-medium text-slate-950">{p.name}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-500">{p.category}</td>
+                    <td className="whitespace-nowrap px-5 py-3 text-right font-semibold tabular-nums text-slate-950">{formatMoney(p.price_cents)}</td>
                   </tr>
                 ))}
               </tbody>

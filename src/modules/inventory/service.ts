@@ -1,9 +1,10 @@
 import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
+import { HttpError } from "../../shared/http.js";
 import type { Page } from "../../shared/types.js";
 
-export type MovementReason = "receiving" | "sale" | "adjustment" | "return";
+export type MovementReason = "receiving" | "sale" | "adjustment" | "return" | "cycle_count";
 
 export interface InventoryRow {
   product_id: string;
@@ -70,6 +71,27 @@ export interface InventoryLot {
   unit_cost_cents: number | null;
   po_id: string | null;
   received_at: number;
+}
+
+export interface CycleCountSession {
+  id: string;
+  tenant_id: string;
+  status: "open" | "closed";
+  opened_by: string;
+  opened_at: number;
+  closed_at: number | null;
+  note: string | null;
+}
+
+export interface CycleCountLine {
+  id: string;
+  tenant_id: string;
+  session_id: string;
+  product_id: string;
+  expected_qty: number;
+  counted_qty: number | null;
+  variance: number | null;
+  recorded_at: number | null;
 }
 
 export class InventoryService {
@@ -457,6 +479,115 @@ export class InventoryService {
       // sale.delta was negative (e.g. -2); reverse it to restock (+2).
       await this.adjust(sale.product_id, -sale.delta, "return", tenantId, orderId);
     }
+  }
+
+  // ── BE-10: Cycle count sessions ────────────────────────────────────────────
+
+  async openCycleCount(openedBy: string, tenantId: string, note?: string): Promise<CycleCountSession> {
+    const existing = await this.db.one<CycleCountSession>(
+      "SELECT id FROM cycle_count_sessions WHERE tenant_id = @t AND status = 'open' LIMIT 1",
+      { t: tenantId },
+    );
+    if (existing) throw new HttpError(409, "conflict", "An open cycle count session already exists. Close it before opening a new one.");
+
+    const now = Date.now();
+    // Snapshot current expected quantities from the inventory table.
+    const levels = await this.db.query<{ product_id: string; stock_qty: number }>(
+      "SELECT product_id, stock_qty FROM inventory WHERE tenant_id = @t",
+      { t: tenantId },
+    );
+    const session: CycleCountSession = {
+      id: `ccs_${uuidv7()}`, tenant_id: tenantId, status: "open",
+      opened_by: openedBy, opened_at: now, closed_at: null, note: note ?? null,
+    };
+    await this.db.query(
+      "INSERT INTO cycle_count_sessions (id, tenant_id, status, opened_by, opened_at, note) VALUES (@id,@tenant_id,@status,@opened_by,@opened_at,@note)",
+      session as unknown as Record<string, unknown>,
+    );
+    for (const level of levels) {
+      await this.db.query(
+        "INSERT INTO cycle_count_lines (id, tenant_id, session_id, product_id, expected_qty) VALUES (@id,@t,@sid,@pid,@eq)",
+        { id: `ccl_${uuidv7()}`, t: tenantId, sid: session.id, pid: level.product_id, eq: level.stock_qty },
+      );
+    }
+    return session;
+  }
+
+  async recordCycleCountLine(sessionId: string, productId: string, countedQty: number, tenantId: string): Promise<CycleCountLine> {
+    const session = await this.db.one<CycleCountSession>(
+      "SELECT * FROM cycle_count_sessions WHERE id = @id AND tenant_id = @t",
+      { id: sessionId, t: tenantId },
+    );
+    if (!session) throw new HttpError(404, "not_found", `cycle count session '${sessionId}' not found`);
+    if (session.status !== "open") throw new HttpError(409, "conflict", "session is already closed");
+
+    let line = await this.db.one<CycleCountLine>(
+      "SELECT * FROM cycle_count_lines WHERE session_id = @sid AND product_id = @pid AND tenant_id = @t",
+      { sid: sessionId, pid: productId, t: tenantId },
+    );
+    const now = Date.now();
+    if (line) {
+      const variance = countedQty - Number(line.expected_qty);
+      await this.db.query(
+        "UPDATE cycle_count_lines SET counted_qty = @cq, variance = @v, recorded_at = @now WHERE id = @id AND tenant_id = @t",
+        { cq: countedQty, v: variance, now, id: line.id, t: tenantId },
+      );
+      return { ...line, counted_qty: countedQty, variance, recorded_at: now };
+    } else {
+      // Product not in the initial snapshot (added after open) — create a line.
+      line = {
+        id: `ccl_${uuidv7()}`, tenant_id: tenantId, session_id: sessionId,
+        product_id: productId, expected_qty: 0, counted_qty: countedQty,
+        variance: countedQty, recorded_at: now,
+      };
+      await this.db.query(
+        "INSERT INTO cycle_count_lines (id, tenant_id, session_id, product_id, expected_qty, counted_qty, variance, recorded_at) VALUES (@id,@tenant_id,@session_id,@product_id,@expected_qty,@counted_qty,@variance,@recorded_at)",
+        line as unknown as Record<string, unknown>,
+      );
+      return line;
+    }
+  }
+
+  async closeCycleCount(sessionId: string, tenantId: string): Promise<{ session: CycleCountSession; adjustments: number }> {
+    const session = await this.db.one<CycleCountSession>(
+      "SELECT * FROM cycle_count_sessions WHERE id = @id AND tenant_id = @t",
+      { id: sessionId, t: tenantId },
+    );
+    if (!session) throw new HttpError(404, "not_found", `cycle count session '${sessionId}' not found`);
+    if (session.status !== "open") throw new HttpError(409, "conflict", "session is already closed");
+
+    const lines = await this.db.query<CycleCountLine>(
+      "SELECT * FROM cycle_count_lines WHERE session_id = @sid AND tenant_id = @t AND counted_qty IS NOT NULL AND variance != 0",
+      { sid: sessionId, t: tenantId },
+    );
+
+    let adjustments = 0;
+    for (const line of lines) {
+      if (line.variance === null || line.variance === 0) continue;
+      await this.adjust(line.product_id, line.variance, "cycle_count", tenantId, sessionId);
+      adjustments++;
+    }
+
+    const now = Date.now();
+    await this.db.query(
+      "UPDATE cycle_count_sessions SET status = 'closed', closed_at = @now WHERE id = @id AND tenant_id = @t",
+      { now, id: sessionId, t: tenantId },
+    );
+    return { session: { ...session, status: "closed", closed_at: now }, adjustments };
+  }
+
+  async listCycleCounts(tenantId: string): Promise<CycleCountSession[]> {
+    return this.db.query<CycleCountSession>(
+      "SELECT * FROM cycle_count_sessions WHERE tenant_id = @t ORDER BY opened_at DESC LIMIT 50",
+      { t: tenantId },
+    );
+  }
+
+  async getCycleCountLines(sessionId: string, tenantId: string): Promise<CycleCountLine[]> {
+    return this.db.query<CycleCountLine>(
+      "SELECT * FROM cycle_count_lines WHERE session_id = @sid AND tenant_id = @t ORDER BY product_id",
+      { sid: sessionId, t: tenantId },
+    );
   }
 }
 

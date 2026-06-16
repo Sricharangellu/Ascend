@@ -50,13 +50,23 @@ CREATE INDEX IF NOT EXISTS billing_payments_doc_idx ON billing_payments (tenant_
 CREATE INDEX IF NOT EXISTS invoices_tenant_customer_idx ON invoices (tenant_id, customer_id);
 CREATE INDEX IF NOT EXISTS bills_tenant_supplier_idx ON bills (tenant_id, supplier_id);`;
 
+// BE-12: bill variance — signed delta when received total ≠ PO total.
+const ALTER_BILLS_VARIANCE = `
+ALTER TABLE bills ADD COLUMN IF NOT EXISTS variance_cents BIGINT;
+`;
+
+// BE-14: AR dunning level — 1=30d overdue, 2=60d, 3=90d.
+const ALTER_INVOICES_DUNNING = `
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS dunning_level INTEGER NOT NULL DEFAULT 0;
+`;
+
 /** Billing — supplier bills (AP) + customer invoices (AR). A received PO
  *  auto-drafts a bill (via the purchase_order.received event). */
 export const billingModule: PosModule = {
   name: "billing",
-  migrations: [CREATE_BILLS, CREATE_INVOICES, CREATE_PAYMENTS, INDEXES],
+  migrations: [CREATE_BILLS, CREATE_INVOICES, CREATE_PAYMENTS, INDEXES, ALTER_BILLS_VARIANCE, ALTER_INVOICES_DUNNING],
   async register({ db, events, router }) {
-    const service = new BillingService(db);
+    const service = new BillingService(db, events);
     events.on("purchase_order.received", async (event) => {
       const p = event.payload as { tenantId?: string; poId?: string };
       if (p.tenantId && p.poId) await service.billFromPO(p.poId, p.tenantId);
@@ -73,4 +83,4 @@ export const billingModule: PosModule = {
 };
 
 export { BillingService } from "./service.js";
-export type { Bill, Invoice, DocStatus } from "./service.js";
+export type { Bill, Invoice, DocStatus, DunningResult } from "./service.js";

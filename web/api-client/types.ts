@@ -91,8 +91,23 @@ export interface Product {
   taxClass: "standard" | "exempt";
   barcode?: string;
   status: "active" | "draft" | "archived";
+  ageRestricted?: boolean;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface RegisterSession {
+  id: string;
+  tenant_id: string;
+  register_id: string;
+  opened_by: string;
+  opening_float_cents: number;
+  closing_float_cents: number | null;
+  counted_cash_cents: number | null;
+  variance_cents: number | null;
+  status: "open" | "closed";
+  opened_at: number;
+  closed_at: number | null;
 }
 
 // ─── Orders (Wave 1, pre-typed for MSW mocks) ─────────────────────────────────

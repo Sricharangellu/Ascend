@@ -1,5 +1,6 @@
 import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
+import type { EventBus } from "../../shared/events.js";
 import { HttpError } from "../../shared/http.js";
 
 /** Billing — supplier bills (AP) and customer invoices (AR). Tenant-scoped.
@@ -19,6 +20,7 @@ export interface Bill {
   paid_cents: number;
   due_date: number | null;
   issued_at: number;
+  variance_cents: number | null; // BE-12: signed delta when bill ≠ received total
 }
 
 export interface Invoice {
@@ -32,12 +34,18 @@ export interface Invoice {
   paid_cents: number;
   due_date: number | null;
   issued_at: number;
+  dunning_level: number; // 0=current, 1=30d, 2=60d, 3=90d+ (BE-14)
+}
+
+export interface DunningResult {
+  processed: number;
+  byLevel: Record<number, number>;
 }
 
 const DAY = 86_400_000;
 
 export class BillingService {
-  constructor(private readonly db: DB) {}
+  constructor(private readonly db: DB, private readonly events?: EventBus) {}
 
   private async nextNumber(table: string, prefix: string, tenantId: string): Promise<string> {
     const row = await this.db.one<{ c: number }>(`SELECT COUNT(*)::int AS c FROM ${table} WHERE tenant_id = @tenantId`, { tenantId });
@@ -72,6 +80,7 @@ export class BillingService {
       id: `bil_${uuidv7()}`, tenant_id: tenantId, supplier_id: supplierId, po_id: input.poId ?? null,
       bill_number: await this.nextNumber("bills", "BILL", tenantId), status: "open",
       total_cents: total, paid_cents: 0, due_date: input.dueDate ?? now + 30 * DAY, issued_at: now,
+      variance_cents: null,
     };
     await this.db.query(
       `INSERT INTO bills (id, tenant_id, supplier_id, po_id, bill_number, status, total_cents, paid_cents, due_date, issued_at)
@@ -136,6 +145,7 @@ export class BillingService {
       id: `inv_${uuidv7()}`, tenant_id: tenantId, customer_id: input.customerId, order_id: input.orderId ?? null,
       invoice_number: await this.nextNumber("invoices", "INV", tenantId), status: "open",
       total_cents: total, paid_cents: 0, due_date: input.dueDate ?? now + 30 * DAY, issued_at: now,
+      dunning_level: 0,
     };
     await this.db.query(
       `INSERT INTO invoices (id, tenant_id, customer_id, order_id, invoice_number, status, total_cents, paid_cents, due_date, issued_at)
@@ -166,5 +176,62 @@ export class BillingService {
       );
       return { ...inv, paid_cents: paid, status };
     });
+  }
+
+  // ── BE-14: AR dunning ──────────────────────────────────────────────────────────
+  /** Set dunning_level on open/partial invoices by days overdue; emit invoice.overdue. */
+  async runDunning(tenantId: string): Promise<DunningResult> {
+    const now = Date.now();
+    const overdue = await this.db.query<Invoice>(
+      `SELECT * FROM invoices
+         WHERE tenant_id = @t
+           AND status IN ('open', 'partial')
+           AND due_date IS NOT NULL
+           AND due_date < @now`,
+      { t: tenantId, now },
+    );
+
+    const byLevel: Record<number, number> = { 1: 0, 2: 0, 3: 0 };
+    for (const inv of overdue) {
+      const daysOverdue = Math.floor((now - Number(inv.due_date)) / DAY);
+      const level = daysOverdue >= 90 ? 3 : daysOverdue >= 60 ? 2 : 1;
+      if (Number(inv.dunning_level) === level) continue; // already at this level
+      await this.db.query(
+        "UPDATE invoices SET dunning_level = @level WHERE id = @id AND tenant_id = @t",
+        { level, id: inv.id, t: tenantId },
+      );
+      byLevel[level] = (byLevel[level] ?? 0) + 1;
+      await this.events?.publish(
+        "invoice.overdue",
+        { invoiceId: inv.id, customerId: inv.customer_id, tenantId, dunningLevel: level, daysOverdue },
+        inv.id,
+      );
+    }
+    return { processed: overdue.length, byLevel };
+  }
+
+  // ── BE-12: Bill variance ──────────────────────────────────────────────────────
+  /** Compute and store variance_cents for a bill tied to a PO. */
+  async computeBillVariance(billId: string, tenantId: string): Promise<Bill & { variance_cents: number | null }> {
+    const bill = await this.db.one<Bill & { variance_cents: number | null }>(
+      "SELECT * FROM bills WHERE id = @id AND tenant_id = @t",
+      { id: billId, t: tenantId },
+    );
+    if (!bill) throw new HttpError(404, "not_found", `bill '${billId}' not found`);
+    if (!bill.po_id) return bill;
+
+    const receivedRow = await this.db.one<{ total: number }>(
+      `SELECT COALESCE(SUM(received_qty * unit_cost_cents), 0) AS total
+         FROM purchase_order_lines
+        WHERE po_id = @po AND tenant_id = @t`,
+      { po: bill.po_id, t: tenantId },
+    );
+    const receivedTotal = Number(receivedRow?.total ?? 0);
+    const variance = Number(bill.total_cents) - receivedTotal;
+    await this.db.query(
+      "UPDATE bills SET variance_cents = @v WHERE id = @id AND tenant_id = @t",
+      { v: variance, id: billId, t: tenantId },
+    );
+    return { ...bill, variance_cents: variance };
   }
 }

@@ -186,15 +186,15 @@ export default function CustomersPage() {
 
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
           <Card className="overflow-hidden p-0">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
               <div>
-                <h2 className="text-base font-semibold text-gray-900">Customer directory</h2>
-                <p className="text-sm text-gray-500">Fast lookup for returns, loyalty, and clienteling.</p>
+                <h2 className="text-base font-semibold text-slate-950">Customer directory</h2>
+                <p className="text-sm text-slate-500">Fast lookup for returns, loyalty, and clienteling.</p>
               </div>
               <Button variant="primary" size="sm">Add customer</Button>
             </div>
 
-            <div className="grid gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 lg:grid-cols-[minmax(16rem,1fr)_12rem]">
+            <div className="grid gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 lg:grid-cols-[minmax(16rem,1fr)_12rem]">
               <label>
                 <span className="sr-only">Search customers</span>
                 <input
@@ -202,7 +202,7 @@ export default function CustomersPage() {
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search name, email, or phone"
-                  className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600"
+                  className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
                 />
               </label>
               <label>
@@ -210,7 +210,7 @@ export default function CustomersPage() {
                 <select
                   value={segment}
                   onChange={(event) => setSegment(event.target.value as SegmentFilter)}
-                  className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600"
+                  className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
                 >
                   <option value="All">All segments</option>
                   <option value="Loyal">Loyal</option>
@@ -222,28 +222,28 @@ export default function CustomersPage() {
             </div>
 
             {loading ? (
-              <div className="p-6 text-sm text-gray-500" aria-busy="true">Loading customers...</div>
+              <div className="p-6 text-sm text-slate-500" aria-busy="true">Loading customers...</div>
             ) : error ? (
               <div className="p-6 text-sm text-danger-700" role="alert">{error}</div>
             ) : filteredCustomers.length === 0 ? (
-              <div className="p-6 text-sm text-gray-500">No customers match the current filters.</div>
+              <div className="p-6 text-sm text-slate-500">No customers match the current filters.</div>
             ) : (
-              <ul className="divide-y divide-gray-100">
+              <ul className="divide-y divide-slate-100">
                 {filteredCustomers.map((customer) => (
                   <li key={customer.id}>
                     <button
                       type="button"
                       onClick={() => setSelectedId(customer.id)}
                       className={`grid w-full gap-3 px-4 py-4 text-left transition-colors md:grid-cols-[1fr_auto_auto_auto] md:items-center ${
-                        selectedCustomer?.id === customer.id ? "bg-brand-50" : "hover:bg-gray-50"
+                        selectedCustomer?.id === customer.id ? "bg-slate-100" : "hover:bg-slate-50"
                       }`}
                     >
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-gray-900">{customer.name}</p>
-                        <p className="truncate text-sm text-gray-500">{customer.email ?? "No email"}</p>
+                        <p className="truncate font-medium text-slate-950">{customer.name}</p>
+                        <p className="truncate text-sm text-slate-500">{customer.email ?? "No email"}</p>
                       </div>
-                      <span className="text-sm text-gray-600">{customer.visits} visits</span>
-                      <span className="text-sm font-semibold text-gray-900">{formatMoney(customer.spendCents)}</span>
+                      <span className="text-sm text-slate-600">{customer.visits} visits</span>
+                      <span className="text-sm font-semibold text-slate-950">{formatMoney(customer.spendCents)}</span>
                       <SegmentBadge segment={customer.segment} />
                     </button>
                   </li>
@@ -256,9 +256,9 @@ export default function CustomersPage() {
             {selectedCustomer ? (
               <>
                 <div>
-                  <p className="text-xs font-semibold uppercase text-gray-500">Selected customer</p>
-                  <h2 className="mt-1 text-xl font-bold text-gray-900">{selectedCustomer.name}</h2>
-                  <p className="text-sm text-gray-500">{selectedCustomer.email ?? "No email on file"}</p>
+                  <p className="text-xs font-semibold uppercase text-slate-500">Selected customer</p>
+                  <h2 className="mt-1 text-xl font-bold text-slate-950">{selectedCustomer.name}</h2>
+                  <p className="text-sm text-slate-500">{selectedCustomer.email ?? "No email on file"}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -268,43 +268,43 @@ export default function CustomersPage() {
                   <Detail label="Last visit" value={formatLastVisit(selectedCustomer.lastVisitAt)} compact />
                 </div>
 
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm">
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-gray-500">Phone</span>
-                    <span className="font-semibold text-gray-900">{selectedCustomer.phone ?? "No phone"}</span>
+                    <span className="text-slate-500">Phone</span>
+                    <span className="font-semibold text-slate-950">{selectedCustomer.phone ?? "No phone"}</span>
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-3">
-                    <span className="text-gray-500">Average order</span>
-                    <span className="font-semibold text-gray-900">{formatMoney(selectedCustomer.avgOrderCents)}</span>
+                    <span className="text-slate-500">Average order</span>
+                    <span className="font-semibold text-slate-950">{formatMoney(selectedCustomer.avgOrderCents)}</span>
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Recent purchases</h3>
+                  <h3 className="text-sm font-semibold text-slate-950">Recent purchases</h3>
                   {selectedCustomer.recentOrders.length === 0 ? (
-                    <div className="mt-2 rounded-lg border border-gray-200 px-3 py-4 text-sm text-gray-500">
+                    <div className="mt-2 rounded-md border border-slate-200 px-3 py-4 text-sm text-slate-500">
                       No completed orders yet.
                     </div>
                   ) : (
-                    <ul className="mt-2 divide-y divide-gray-100 rounded-lg border border-gray-200">
+                    <ul className="mt-2 divide-y divide-slate-100 rounded-md border border-slate-200">
                       {selectedCustomer.recentOrders.map((item) => (
                         <li key={item.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                           <span className="min-w-0">
-                            <span className="block truncate font-medium text-gray-900">{item.orderNumber}</span>
-                            <span className="block text-xs capitalize text-gray-500">
+                            <span className="block truncate font-medium text-slate-950">{item.orderNumber}</span>
+                            <span className="block text-xs capitalize text-slate-500">
                               {item.status} · {formatOrderDate(item.createdAt)}
                             </span>
                           </span>
-                          <span className="font-semibold text-gray-900">{formatMoney(item.totalCents)}</span>
+                          <span className="font-semibold text-slate-950">{formatMoney(item.totalCents)}</span>
                         </li>
                       ))}
                     </ul>
                   )}
                 </div>
 
-                <div className="rounded-lg border border-brand-200 bg-brand-50 p-4">
-                  <h3 className="text-sm font-semibold text-brand-900">Clienteling note</h3>
-                  <p className="mt-1 text-sm text-brand-800">{selectedCustomer.notes}</p>
+                <div className="rounded-md border border-slate-200 bg-slate-100 p-4">
+                  <h3 className="text-sm font-semibold text-slate-950">Clienteling note</h3>
+                  <p className="mt-1 text-sm text-slate-700">{selectedCustomer.notes}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -313,15 +313,15 @@ export default function CustomersPage() {
                 </div>
               </>
             ) : (
-              <p className="text-sm text-gray-500">Select a customer to inspect profile details.</p>
+              <p className="text-sm text-slate-500">Select a customer to inspect profile details.</p>
             )}
           </Card>
         </div>
 
         <Card className="grid gap-4 lg:grid-cols-[1fr_18rem] lg:items-center">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">Customer display</h2>
-            <p className="mt-1 text-sm text-gray-500">
+            <h2 className="text-base font-semibold text-slate-950">Customer display</h2>
+            <p className="mt-1 text-sm text-slate-500">
               Register 01 is ready for a customer-facing display with cart mirror, loyalty capture, and receipt opt-in.
             </p>
           </div>
@@ -338,18 +338,18 @@ export default function CustomersPage() {
 function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
     <Card className="flex flex-col gap-1">
-      <span className="text-xs font-medium uppercase text-gray-500">{label}</span>
-      <span className="text-2xl font-bold text-gray-900">{value}</span>
-      <span className="text-xs text-gray-500">{detail}</span>
+      <span className="text-xs font-medium uppercase text-slate-500">{label}</span>
+      <span className="text-2xl font-bold text-slate-950">{value}</span>
+      <span className="text-xs text-slate-500">{detail}</span>
     </Card>
   );
 }
 
 function Detail({ label, value, compact }: { label: string; value: string; compact?: boolean }) {
   return (
-    <div className="rounded-lg border border-gray-200 p-3">
-      <p className="text-xs font-medium uppercase text-gray-500">{label}</p>
-      <p className={compact ? "mt-1 text-sm font-bold text-gray-900" : "mt-1 text-lg font-bold text-gray-900"}>
+    <div className="rounded-md border border-slate-200 p-3">
+      <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
+      <p className={compact ? "mt-1 text-sm font-bold text-slate-950" : "mt-1 text-lg font-bold text-slate-950"}>
         {value}
       </p>
     </div>
@@ -363,10 +363,10 @@ function SegmentBadge({ segment }: { segment: Segment }) {
       : segment === "Loyal"
       ? "bg-success-100 text-success-700"
       : segment === "New"
-      ? "bg-brand-100 text-brand-700"
-      : "bg-gray-100 text-gray-700";
+      ? "bg-blue-50 text-blue-700 ring-blue-200"
+      : "bg-slate-100 text-slate-700";
   return (
-    <span className={`inline-flex w-fit rounded px-2 py-1 text-xs font-semibold ${classes}`}>
+    <span className={`inline-flex w-fit rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${classes}`}>
       {segment}
     </span>
   );
@@ -374,9 +374,9 @@ function SegmentBadge({ segment }: { segment: Segment }) {
 
 function DisplayStatus({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-      <p className="text-xs font-medium uppercase text-gray-500">{label}</p>
-      <p className="mt-1 font-semibold text-gray-900">{value}</p>
+    <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+      <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
+      <p className="mt-1 font-semibold text-slate-950">{value}</p>
     </div>
   );
 }

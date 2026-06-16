@@ -19,7 +19,7 @@
   }
 
   body {
-    @apply bg-gray-50 text-gray-900 font-sans antialiased;
+    @apply bg-slate-100 text-slate-900 font-sans antialiased;
   }
 
   /* Remove default button styles — components re-apply them explicitly */

@@ -26,23 +26,23 @@ interface Quotation {
 }
 
 const SO_STATUS_STYLE: Record<string, string> = {
-  pending_approve: "bg-blue-100 text-blue-800",
-  approved: "bg-amber-100 text-amber-800",
-  invoiced: "bg-green-100 text-green-800",
-  partially_invoiced: "bg-amber-100 text-amber-800",
-  cancelled: "bg-red-100 text-red-700",
+  pending_approve: "bg-blue-50 text-blue-700 ring-blue-200",
+  approved: "bg-amber-50 text-amber-700 ring-amber-200",
+  invoiced: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  partially_invoiced: "bg-amber-50 text-amber-700 ring-amber-200",
+  cancelled: "bg-red-50 text-red-700 ring-red-200",
 };
 const QT_STATUS_STYLE: Record<string, string> = {
-  draft: "bg-gray-100 text-gray-700",
-  sent: "bg-blue-100 text-blue-800",
-  accepted: "bg-green-100 text-green-800",
-  expired: "bg-amber-100 text-amber-800",
-  cancelled: "bg-red-100 text-red-700",
+  draft: "bg-slate-100 text-slate-700 ring-slate-200",
+  sent: "bg-blue-50 text-blue-700 ring-blue-200",
+  accepted: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  expired: "bg-amber-50 text-amber-700 ring-amber-200",
+  cancelled: "bg-red-50 text-red-700 ring-red-200",
 };
 
 function Badge({ value, map }: { value: string; map: Record<string, string> }) {
   return (
-    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${map[value] ?? "bg-gray-100 text-gray-700"}`}>
+    <span className={`inline-flex rounded px-2 py-1 text-xs font-semibold capitalize ring-1 ring-inset ${map[value] ?? "bg-slate-100 text-slate-700 ring-slate-200"}`}>
       {value.replace(/_/g, " ")}
     </span>
   );
@@ -86,42 +86,77 @@ export default function SalesPage() {
   };
 
   return (
-    <EnterpriseShell active="sales" title="Sales" subtitle="Quotations → Sales Orders → Invoice">
-      <div className="space-y-4 p-4">
-        {error && <div className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
-        <div className="flex gap-2">
-          <Button variant={tab === "orders" ? "primary" : "ghost"} size="sm" onClick={() => setTab("orders")}>
+    <EnterpriseShell
+      active="sales"
+      title="Sales"
+      subtitle="Quotations · approvals · invoicing"
+      contentClassName="overflow-y-auto"
+    >
+      <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+          <div>
+            <h1 className="text-lg font-semibold text-slate-950">Sales operations</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Manage quotation conversion, approval queues, and invoice readiness.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm sm:w-[26rem]">
+            <SummaryTile label="Open orders" value={String(orders.length)} />
+            <SummaryTile label="Open quotes" value={String(quotes.length)} />
+          </div>
+        </div>
+
+        {error && (
+          <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        <div className="inline-flex rounded-md border border-slate-200 bg-white p-1 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setTab("orders")}
+            className={`min-h-[38px] rounded px-4 text-sm font-medium transition-colors ${
+              tab === "orders" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
             Sales Orders ({orders.length})
-          </Button>
-          <Button variant={tab === "quotes" ? "primary" : "ghost"} size="sm" onClick={() => setTab("quotes")}>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("quotes")}
+            className={`min-h-[38px] rounded px-4 text-sm font-medium transition-colors ${
+              tab === "quotes" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
             Quotations ({quotes.length})
-          </Button>
+          </button>
         </div>
 
         {tab === "orders" ? (
-          <Card title="Sales Orders" description="Approve and invoice open orders.">
+          <Card title="Sales Orders" description="Approve and invoice open orders." noPadding>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b text-left text-gray-500">
-                    <th className="py-2 pr-4">SO #</th>
-                    <th className="py-2 pr-4">Status</th>
-                    <th className="py-2 pr-4">Store</th>
-                    <th className="py-2 pr-4 text-right">Total</th>
-                    <th className="py-2 pr-4 text-right">Actions</th>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    <th className="px-5 py-3">SO #</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Store</th>
+                    <th className="px-4 py-3 text-right">Total</th>
+                    <th className="px-5 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100">
                   {orders.length === 0 && (
-                    <tr><td colSpan={5} className="py-6 text-center text-gray-400">No sales orders</td></tr>
+                    <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-500">No sales orders</td></tr>
                   )}
                   {orders.map((o) => (
-                    <tr key={o.id} className="border-b last:border-0">
-                      <td className="py-2 pr-4 font-medium">{o.so_number}</td>
-                      <td className="py-2 pr-4"><Badge value={o.status} map={SO_STATUS_STYLE} /></td>
-                      <td className="py-2 pr-4 text-gray-500">{o.store_id ?? "—"}</td>
-                      <td className="py-2 pr-4 text-right">{formatMoney(o.total_cents)}</td>
-                      <td className="py-2 pr-4 text-right">
+                    <tr key={o.id} className="hover:bg-slate-50">
+                      <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-950">{o.so_number}</td>
+                      <td className="whitespace-nowrap px-4 py-3"><Badge value={o.status} map={SO_STATUS_STYLE} /></td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">{o.store_id ?? "-"}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-slate-900">{formatMoney(o.total_cents)}</td>
+                      <td className="whitespace-nowrap px-5 py-3 text-right">
                         {o.status === "pending_approve" && (
                           <Button size="sm" variant="ghost" disabled={busy} onClick={() => act(`/api/v1/sales/sales-orders/${o.id}/approve`)}>Approve</Button>
                         )}
@@ -136,27 +171,27 @@ export default function SalesPage() {
             </div>
           </Card>
         ) : (
-          <Card title="Quotations" description="Send, accept, and convert quotes to sales orders.">
+          <Card title="Quotations" description="Send, accept, and convert quotes to sales orders." noPadding>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b text-left text-gray-500">
-                    <th className="py-2 pr-4">Quote #</th>
-                    <th className="py-2 pr-4">Status</th>
-                    <th className="py-2 pr-4 text-right">Total</th>
-                    <th className="py-2 pr-4 text-right">Actions</th>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    <th className="px-5 py-3">Quote #</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Total</th>
+                    <th className="px-5 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100">
                   {quotes.length === 0 && (
-                    <tr><td colSpan={4} className="py-6 text-center text-gray-400">No quotations</td></tr>
+                    <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-500">No quotations</td></tr>
                   )}
                   {quotes.map((q) => (
-                    <tr key={q.id} className="border-b last:border-0">
-                      <td className="py-2 pr-4 font-medium">{q.quote_number}</td>
-                      <td className="py-2 pr-4"><Badge value={q.status} map={QT_STATUS_STYLE} /></td>
-                      <td className="py-2 pr-4 text-right">{formatMoney(q.total_cents)}</td>
-                      <td className="py-2 pr-4 text-right">
+                    <tr key={q.id} className="hover:bg-slate-50">
+                      <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-950">{q.quote_number}</td>
+                      <td className="whitespace-nowrap px-4 py-3"><Badge value={q.status} map={QT_STATUS_STYLE} /></td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-slate-900">{formatMoney(q.total_cents)}</td>
+                      <td className="whitespace-nowrap px-5 py-3 text-right">
                         {q.status === "draft" && <Button size="sm" variant="ghost" disabled={busy} onClick={() => act(`/api/v1/sales/quotations/${q.id}/send`)}>Send</Button>}
                         {q.status === "sent" && <Button size="sm" variant="ghost" disabled={busy} onClick={() => act(`/api/v1/sales/quotations/${q.id}/accept`)}>Accept</Button>}
                         {q.status !== "cancelled" && q.status !== "expired" && (
@@ -172,5 +207,14 @@ export default function SalesPage() {
         )}
       </div>
     </EnterpriseShell>
+  );
+}
+
+function SummaryTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
+      <p className="mt-1 text-xl font-semibold tabular-nums text-slate-950">{value}</p>
+    </div>
   );
 }

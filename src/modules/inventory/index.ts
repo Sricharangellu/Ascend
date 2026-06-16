@@ -46,6 +46,31 @@ interface OrderRefundedPayload {
   totalCents?: number;
 }
 
+// BE-10: cycle count sessions — open, record counted qtys, close (posts variances).
+const CREATE_CYCLE_COUNT_TABLES = `
+CREATE TABLE IF NOT EXISTS cycle_count_sessions (
+  id          TEXT PRIMARY KEY,
+  tenant_id   TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'open',
+  opened_by   TEXT NOT NULL,
+  opened_at   BIGINT NOT NULL,
+  closed_at   BIGINT,
+  note        TEXT
+);
+CREATE TABLE IF NOT EXISTS cycle_count_lines (
+  id           TEXT PRIMARY KEY,
+  tenant_id    TEXT NOT NULL,
+  session_id   TEXT NOT NULL,
+  product_id   TEXT NOT NULL,
+  expected_qty INTEGER NOT NULL DEFAULT 0,
+  counted_qty  INTEGER,
+  variance     INTEGER,
+  recorded_at  BIGINT
+);
+CREATE INDEX IF NOT EXISTS cycle_count_sessions_tenant_idx ON cycle_count_sessions (tenant_id, opened_at DESC);
+CREATE INDEX IF NOT EXISTS cycle_count_lines_session_idx ON cycle_count_lines (tenant_id, session_id);
+`;
+
 export const inventoryModule: PosModule = {
   name: "inventory",
   migrations: [
@@ -66,6 +91,7 @@ export const inventoryModule: PosModule = {
      );`,
     `CREATE INDEX IF NOT EXISTS inventory_lots_expiry_idx ON inventory_lots (tenant_id, expiry_date) WHERE qty_on_hand > 0;
      CREATE INDEX IF NOT EXISTS inventory_lots_product_idx ON inventory_lots (tenant_id, product_id);`,
+    CREATE_CYCLE_COUNT_TABLES,
   ],
   register({ db, events, router }) {
     const service = new InventoryService(db, events);
@@ -138,4 +164,6 @@ export type {
   MovementRow,
   MovementReason,
   ListInventoryQuery,
+  CycleCountSession,
+  CycleCountLine,
 } from "./service.js";

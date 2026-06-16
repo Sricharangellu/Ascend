@@ -1,6 +1,7 @@
 import type { Router, Request, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody } from "../../shared/http.js";
+import { requireRole } from "../../gateway/auth.js";
 import type { InventoryService, MovementReason } from "./service.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 
@@ -68,7 +69,21 @@ function present(row: { product_id: string; stock_qty: number; reorder_pt: numbe
   };
 }
 
+const cycleCountLineSchema = z.object({
+  productId: z.string().min(1),
+  countedQty: z.number().int().nonnegative(),
+});
+
+const openCycleCountSchema = z.object({
+  note: z.string().optional(),
+});
+
+function userId(res: Response): string {
+  return (res.locals["auth"] as AuthPayload).userId ?? "unknown";
+}
+
 export function registerRoutes(router: Router, service: InventoryService): void {
+  const mgr = requireRole("manager");
   router.get(
     "/",
     handler(async (req, res) => {
@@ -198,4 +213,27 @@ export function registerRoutes(router: Router, service: InventoryService): void 
       res.json(present(row));
     }),
   );
+
+  // BE-10: Cycle count sessions ─────────────────────────────────────────────
+  router.get("/counts", handler(async (_req, res) => {
+    res.json({ items: await service.listCycleCounts(tenantId(res)) });
+  }));
+
+  router.post("/counts", mgr, handler(async (req, res) => {
+    const body = parseBody(openCycleCountSchema, req.body);
+    res.status(201).json(await service.openCycleCount(userId(res), tenantId(res), body.note));
+  }));
+
+  router.get("/counts/:id/lines", handler(async (req, res) => {
+    res.json({ items: await service.getCycleCountLines(String(req.params.id), tenantId(res)) });
+  }));
+
+  router.post("/counts/:id/lines", handler(async (req, res) => {
+    const body = parseBody(cycleCountLineSchema, req.body);
+    res.status(201).json(await service.recordCycleCountLine(String(req.params.id), body.productId, body.countedQty, tenantId(res)));
+  }));
+
+  router.post("/counts/:id/close", mgr, handler(async (req, res) => {
+    res.json(await service.closeCycleCount(String(req.params.id), tenantId(res)));
+  }));
 }

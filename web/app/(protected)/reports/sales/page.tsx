@@ -80,7 +80,7 @@ function TableSkeleton({ cols }: { cols: number }) {
           {Array.from({ length: cols }).map((__, j) => (
             <div
               key={j}
-              className="h-5 flex-1 rounded bg-gray-100"
+              className="h-5 flex-1 rounded bg-slate-100"
               style={{ opacity: 1 - i * 0.12 }}
             />
           ))}
@@ -101,14 +101,14 @@ function RangeToggle({
 }) {
   const labels: Record<Range, string> = { today: "Today", "7d": "7 days", "30d": "30 days" };
   return (
-    <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1">
+    <div className="inline-flex rounded-md border border-slate-200 bg-white p-1">
       {(["today", "7d", "30d"] as const).map((r) => (
         <button
           key={r}
           type="button"
           onClick={() => onChange(r)}
           className={`min-h-[40px] rounded-md px-3 text-sm font-medium transition-colors ${
-            value === r ? "bg-brand-600 text-white" : "text-gray-600 hover:bg-gray-100"
+            value === r ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100"
           }`}
         >
           {labels[r]}
@@ -127,7 +127,7 @@ function TabBar({ active, onChange }: { active: Tab; onChange: (t: Tab) => void 
     { key: "product", label: "By Product" },
   ];
   return (
-    <div className="border-b border-gray-200 bg-white">
+    <div className="border-b border-slate-200 bg-white">
       <nav className="-mb-px flex gap-0 px-5" aria-label="Sales breakdown tabs">
         {tabs.map((t) => (
           <button
@@ -136,8 +136,8 @@ function TabBar({ active, onChange }: { active: Tab; onChange: (t: Tab) => void 
             onClick={() => onChange(t.key)}
             className={`min-h-[44px] border-b-2 px-4 text-sm font-medium transition-colors ${
               active === t.key
-                ? "border-brand-600 text-brand-700"
-                : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                ? "border-slate-950 text-slate-950"
+                : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
             }`}
             aria-current={active === t.key ? "page" : undefined}
           >
@@ -276,26 +276,26 @@ export default function SalesReportPage() {
 
 function CategoryTable({ items }: { items: CategoryItem[] }) {
   if (items.length === 0) {
-    return <p className="text-sm text-gray-500">No data for this period.</p>;
+    return <p className="text-sm text-slate-500">No data for this period.</p>;
   }
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <tr className="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
             <th className="pb-2 pr-4">Category</th>
             <th className="pb-2 pr-4 text-right">Orders</th>
             <th className="pb-2 pr-4 text-right">Qty Sold</th>
             <th className="pb-2 text-right">Revenue</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-50">
+        <tbody className="divide-y divide-slate-100">
           {items.map((item) => (
-            <tr key={item.category} className="hover:bg-gray-50">
-              <td className="py-2.5 pr-4 font-medium text-gray-900">{item.category}</td>
-              <td className="py-2.5 pr-4 text-right text-gray-600">{item.orderCount}</td>
-              <td className="py-2.5 pr-4 text-right text-gray-600">{item.qty}</td>
-              <td className="py-2.5 text-right font-semibold text-gray-900">
+            <tr key={item.category} className="hover:bg-slate-50">
+              <td className="py-2.5 pr-4 font-medium text-slate-950">{item.category}</td>
+              <td className="py-2.5 pr-4 text-right text-slate-600">{item.orderCount}</td>
+              <td className="py-2.5 pr-4 text-right text-slate-600">{item.qty}</td>
+              <td className="py-2.5 text-right font-semibold text-slate-950">
                 {formatMoney(item.revenue)}
               </td>
             </tr>
@@ -310,31 +310,31 @@ function CategoryTable({ items }: { items: CategoryItem[] }) {
 
 function CustomerTable({ items }: { items: CustomerItem[] }) {
   if (items.length === 0) {
-    return <p className="text-sm text-gray-500">No data for this period.</p>;
+    return <p className="text-sm text-slate-500">No data for this period.</p>;
   }
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <tr className="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
             <th className="pb-2 pr-4">Customer</th>
             <th className="pb-2 pr-4 text-right">Orders</th>
             <th className="pb-2 text-right">Total Spent</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-50">
+        <tbody className="divide-y divide-slate-100">
           {items.map((item) => (
-            <tr key={item.customer_id} className="hover:bg-gray-50">
+            <tr key={item.customer_id} className="hover:bg-slate-50">
               <td className="py-2.5 pr-4">
                 <Link
                   href={`/customers/${item.customer_id}`}
-                  className="font-medium text-brand-600 hover:text-brand-800 hover:underline"
+                  className="font-medium text-slate-950 hover:text-slate-700 hover:underline"
                 >
                   {item.name}
                 </Link>
               </td>
-              <td className="py-2.5 pr-4 text-right text-gray-600">{item.orderCount}</td>
-              <td className="py-2.5 text-right font-semibold text-gray-900">
+              <td className="py-2.5 pr-4 text-right text-slate-600">{item.orderCount}</td>
+              <td className="py-2.5 text-right font-semibold text-slate-950">
                 {formatMoney(item.totalCents)}
               </td>
             </tr>
@@ -349,13 +349,13 @@ function CustomerTable({ items }: { items: CustomerItem[] }) {
 
 function ProductTable({ items }: { items: ProductItem[] }) {
   if (items.length === 0) {
-    return <p className="text-sm text-gray-500">No data for this period.</p>;
+    return <p className="text-sm text-slate-500">No data for this period.</p>;
   }
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <tr className="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
             <th className="pb-2 pr-4">SKU</th>
             <th className="pb-2 pr-4">Name</th>
             <th className="pb-2 pr-4">Category</th>
@@ -363,21 +363,21 @@ function ProductTable({ items }: { items: ProductItem[] }) {
             <th className="pb-2 text-right">Revenue</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-50">
+        <tbody className="divide-y divide-slate-100">
           {items.map((item) => (
-            <tr key={item.id} className="hover:bg-gray-50">
-              <td className="py-2.5 pr-4 font-mono text-xs text-gray-500">{item.sku}</td>
+            <tr key={item.id} className="hover:bg-slate-50">
+              <td className="py-2.5 pr-4 font-mono text-xs text-slate-500">{item.sku}</td>
               <td className="py-2.5 pr-4">
                 <Link
                   href={`/inventory/products/${item.id}`}
-                  className="font-medium text-brand-600 hover:text-brand-800 hover:underline"
+                  className="font-medium text-slate-950 hover:text-slate-700 hover:underline"
                 >
                   {item.name}
                 </Link>
               </td>
-              <td className="py-2.5 pr-4 text-gray-600">{item.category}</td>
-              <td className="py-2.5 pr-4 text-right text-gray-600">{item.qty}</td>
-              <td className="py-2.5 text-right font-semibold text-gray-900">
+              <td className="py-2.5 pr-4 text-slate-600">{item.category}</td>
+              <td className="py-2.5 pr-4 text-right text-slate-600">{item.qty}</td>
+              <td className="py-2.5 text-right font-semibold text-slate-950">
                 {formatMoney(item.revenue)}
               </td>
             </tr>

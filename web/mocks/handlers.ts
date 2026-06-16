@@ -183,6 +183,18 @@ const MOCK_PRODUCTS: Product[] = [
     createdAt: 1700000000000,
     updatedAt: 1700000000000,
   },
+  {
+    id: "prod_013",
+    sku: "BEER-355ML",
+    name: "Craft Beer (355ml)",
+    priceCents: 699,
+    category: "Alcohol",
+    taxClass: "standard",
+    status: "active",
+    ageRestricted: true,
+    createdAt: 1700000000000,
+    updatedAt: 1700000000000,
+  },
 ];
 
 // ─── Mock order store (in-memory for dev session) ─────────────────────────────

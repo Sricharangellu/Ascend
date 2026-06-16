@@ -68,7 +68,7 @@ function SkeletonBox({ className = "" }: { className?: string }) {
   return (
     <div
       aria-hidden="true"
-      className={`animate-pulse rounded bg-gray-200 ${className}`}
+      className={`animate-pulse rounded bg-slate-200 ${className}`}
     />
   );
 }
@@ -79,20 +79,29 @@ function KpiTile({
   label,
   value,
   loading,
+  tone = "neutral",
 }: {
   label: string;
   value: string | number;
   loading: boolean;
+  tone?: "neutral" | "revenue" | "orders" | "risk";
 }) {
+  const toneClass = {
+    neutral: "border-slate-200 bg-white",
+    revenue: "border-emerald-200 bg-emerald-50",
+    orders: "border-blue-200 bg-blue-50",
+    risk: "border-amber-200 bg-amber-50",
+  }[tone];
+
   return (
-    <div className="rounded-xl border border-gray-100 bg-gray-50 p-5">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+    <div className={`rounded-md border p-4 shadow-sm ${toneClass}`}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
         {label}
       </p>
       {loading ? (
         <SkeletonBox className="mt-2 h-8 w-3/4" />
       ) : (
-        <p className="mt-2 text-2xl font-bold text-gray-900 tabular-nums">
+        <p className="mt-2 text-2xl font-semibold text-slate-950 tabular-nums">
           {value}
         </p>
       )}
@@ -114,12 +123,12 @@ function QuickActionCard({
   return (
     <Link
       href={href}
-      className="flex flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-6 text-center transition-colors hover:border-brand-300 hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+      className="flex min-h-[64px] items-center gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
     >
-      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-100 text-brand-700">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-slate-950 text-white">
         {icon}
       </span>
-      <span className="text-sm font-semibold text-gray-800">{label}</span>
+      <span className="min-w-0 text-sm font-semibold text-slate-800">{label}</span>
     </Link>
   );
 }
@@ -241,17 +250,22 @@ export default function DashboardPage() {
       subtitle={`Overview · Demo Store · ${rangeLabel(range)}`}
       contentClassName="overflow-y-auto"
     >
-      <div className="mx-auto w-full max-w-7xl px-4 py-6 space-y-6">
+      <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6">
 
         {/* ── Date range toggle ──────────────────────────────────────────── */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-lg font-semibold text-gray-900">
-            Business Overview
-          </h1>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+          <div>
+            <h1 className="text-lg font-semibold text-slate-950">
+              Business Overview
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Revenue, orders, inventory movement, and tender mix.
+            </p>
+          </div>
           <div
             role="group"
             aria-label="Date range"
-            className="inline-flex rounded-lg border border-gray-200 bg-white p-1"
+            className="inline-flex rounded-md border border-slate-200 bg-white p-1 shadow-sm"
           >
             {(["today", "7d", "30d"] as const).map((r) => (
               <button
@@ -259,10 +273,10 @@ export default function DashboardPage() {
                 type="button"
                 onClick={() => setRange(r)}
                 aria-pressed={range === r}
-                className={`min-h-[36px] rounded-md px-4 text-sm font-medium transition-colors ${
+                className={`min-h-[36px] rounded px-4 text-sm font-medium transition-colors ${
                   range === r
-                    ? "bg-brand-600 text-white shadow-sm"
-                    : "text-gray-600 hover:bg-gray-100"
+                    ? "bg-slate-950 text-white shadow-sm"
+                    : "text-slate-600 hover:bg-slate-100"
                 }`}
               >
                 {rangeLabel(r)}
@@ -282,14 +296,14 @@ export default function DashboardPage() {
 
         {/* ── KPI tile grid ──────────────────────────────────────────────── */}
         <section aria-label="Key performance indicators">
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <KpiTile label="Revenue" value={formatMoney(gross)} loading={loading} />
-            <KpiTile label="Net Revenue" value={formatMoney(net)} loading={loading} />
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <KpiTile label="Revenue" value={formatMoney(gross)} loading={loading} tone="revenue" />
+            <KpiTile label="Net Revenue" value={formatMoney(net)} loading={loading} tone="revenue" />
             <KpiTile label="Tax Collected" value={formatMoney(tax)} loading={loading} />
             <KpiTile label="Payments Captured" value={formatMoney(capturedCents)} loading={loading} />
-            <KpiTile label="Total Orders" value={totalOrders} loading={loading} />
-            <KpiTile label="Completed Sales" value={completedOrders} loading={loading} />
-            <KpiTile label="Open Orders" value={openOrders} loading={loading} />
+            <KpiTile label="Total Orders" value={totalOrders} loading={loading} tone="orders" />
+            <KpiTile label="Completed Sales" value={completedOrders} loading={loading} tone="orders" />
+            <KpiTile label="Open Orders" value={openOrders} loading={loading} tone="risk" />
             <KpiTile label="Avg Order Value" value={formatMoney(avgOrderCents)} loading={loading} />
           </div>
         </section>
@@ -297,7 +311,7 @@ export default function DashboardPage() {
         {/* ── Top Products & Top Customers ───────────────────────────────── */}
         <section
           aria-label="Top products and customers"
-          className="grid grid-cols-1 gap-6 md:grid-cols-2"
+          className="grid grid-cols-1 gap-5 md:grid-cols-2"
         >
           {/* Top Products */}
           <Card title="Top Products" noPadding>
@@ -308,39 +322,39 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : topProducts.length === 0 ? (
-              <p className="px-5 py-4 text-sm text-gray-500">No data for this period.</p>
+              <p className="px-5 py-4 text-sm text-slate-500">No data for this period.</p>
             ) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50 text-left">
-                    <th className="px-5 py-3 font-medium text-gray-600">Product</th>
-                    <th className="px-3 py-3 font-medium text-gray-600 text-right">Qty</th>
-                    <th className="px-5 py-3 font-medium text-gray-600 text-right">Revenue</th>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-left">
+                    <th className="px-5 py-3 font-medium text-slate-600">Product</th>
+                    <th className="px-3 py-3 font-medium text-slate-600 text-right">Qty</th>
+                    <th className="px-5 py-3 font-medium text-slate-600 text-right">Revenue</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-slate-100">
                   {topProducts.map((p) => (
                     <tr
                       key={p.id}
-                      className="transition-colors hover:bg-gray-50"
+                      className="transition-colors hover:bg-slate-50"
                     >
                       <td className="px-5 py-3">
                         <Link
                           href={`/inventory/products/${p.id}`}
-                          className="font-medium text-brand-600 hover:underline"
+                          className="font-medium text-slate-900 hover:text-brand-700 hover:underline"
                         >
                           {p.name}
                         </Link>
                         {p.category && (
-                          <span className="ml-2 text-xs text-gray-400">
+                          <span className="ml-2 text-xs text-slate-400">
                             {p.category}
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-right tabular-nums text-gray-700">
+                      <td className="px-3 py-3 text-right tabular-nums text-slate-700">
                         {p.qty}
                       </td>
-                      <td className="px-5 py-3 text-right tabular-nums text-gray-700">
+                      <td className="px-5 py-3 text-right tabular-nums text-slate-700">
                         {formatMoney(p.revenue)}
                       </td>
                     </tr>
@@ -359,34 +373,34 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : topCustomers.length === 0 ? (
-              <p className="px-5 py-4 text-sm text-gray-500">No data for this period.</p>
+              <p className="px-5 py-4 text-sm text-slate-500">No data for this period.</p>
             ) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50 text-left">
-                    <th className="px-5 py-3 font-medium text-gray-600">Customer</th>
-                    <th className="px-3 py-3 font-medium text-gray-600 text-right">Orders</th>
-                    <th className="px-5 py-3 font-medium text-gray-600 text-right">Total Spent</th>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-left">
+                    <th className="px-5 py-3 font-medium text-slate-600">Customer</th>
+                    <th className="px-3 py-3 font-medium text-slate-600 text-right">Orders</th>
+                    <th className="px-5 py-3 font-medium text-slate-600 text-right">Total Spent</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-slate-100">
                   {topCustomers.map((c) => (
                     <tr
                       key={c.customer_id}
-                      className="transition-colors hover:bg-gray-50"
+                      className="transition-colors hover:bg-slate-50"
                     >
                       <td className="px-5 py-3">
                         <Link
                           href={`/customers/${c.customer_id}`}
-                          className="font-medium text-brand-600 hover:underline"
+                          className="font-medium text-slate-900 hover:text-brand-700 hover:underline"
                         >
                           {c.name}
                         </Link>
                       </td>
-                      <td className="px-3 py-3 text-right tabular-nums text-gray-700">
+                      <td className="px-3 py-3 text-right tabular-nums text-slate-700">
                         {c.orderCount}
                       </td>
-                      <td className="px-5 py-3 text-right tabular-nums text-gray-700">
+                      <td className="px-5 py-3 text-right tabular-nums text-slate-700">
                         {formatMoney(c.totalCents)}
                       </td>
                     </tr>
@@ -399,10 +413,10 @@ export default function DashboardPage() {
 
         {/* ── Quick-access action grid ───────────────────────────────────── */}
         <section aria-label="Quick actions">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">
             Quick Actions
           </h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <QuickActionCard href="/terminal" label="New Sale" icon={<IconRegister />} />
             <QuickActionCard href="/inventory/products/new" label="Add Product" icon={<IconPlus />} />
             <QuickActionCard href="/reports" label="View Reports" icon={<IconChart />} />
@@ -439,15 +453,15 @@ export default function DashboardPage() {
                   return (
                     <div key={method}>
                       <div className="mb-1 flex items-center justify-between text-sm">
-                        <span className="font-medium capitalize text-gray-700">
+                        <span className="font-medium capitalize text-slate-700">
                           {method}
                         </span>
-                        <span className="tabular-nums text-gray-600">
+                        <span className="tabular-nums text-slate-600">
                           {formatMoney(cents)}{" "}
-                          <span className="text-xs text-gray-400">({pct}%)</span>
+                          <span className="text-xs text-slate-400">({pct}%)</span>
                         </span>
                       </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
                         <div
                           className="h-2 rounded-full bg-brand-500 transition-all"
                           style={{ width: `${pct}%` }}

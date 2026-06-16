@@ -25,8 +25,8 @@ interface DraftLine {
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  ordered: "bg-amber-100 text-amber-800",
-  received: "bg-green-100 text-green-800",
+  ordered: "bg-amber-50 text-amber-700 ring-amber-200",
+  received: "bg-emerald-50 text-emerald-700 ring-emerald-200",
 };
 
 function emptyLine(): DraftLine {
@@ -149,13 +149,13 @@ export default function PurchasingPage() {
 
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
           <Card className="overflow-hidden p-0">
-            <div className="border-b border-gray-200 px-4 py-3">
-              <h2 className="text-base font-semibold text-gray-900">Purchase orders</h2>
-              <p className="text-sm text-gray-500">Track ordered and received stock from suppliers.</p>
+            <div className="border-b border-slate-200 px-4 py-3">
+              <h2 className="text-base font-semibold text-slate-950">Purchase orders</h2>
+              <p className="text-sm text-slate-500">Track ordered and received stock from suppliers.</p>
             </div>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
                   <tr>
                     <th className="px-4 py-3">PO</th>
                     <th className="px-4 py-3">Supplier</th>
@@ -164,22 +164,22 @@ export default function PurchasingPage() {
                     <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
+                <tbody className="divide-y divide-slate-100 bg-white">
                   {orders.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-4 py-6 text-center text-gray-400">No purchase orders yet.</td>
+                      <td colSpan={5} className="px-4 py-6 text-center text-slate-400">No purchase orders yet.</td>
                     </tr>
                   ) : (
                     orders.map((order) => (
                       <tr key={order.id}>
-                        <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-700">{order.id}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-gray-900">{supplierName_(order.supplier_id)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{order.id}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-slate-950">{supplierName_(order.supplier_id)}</td>
                         <td className="whitespace-nowrap px-4 py-3">
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[order.status] ?? "bg-gray-100 text-gray-700"}`}>
+                          <span className={`inline-flex rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${STATUS_STYLE[order.status] ?? "bg-slate-100 text-slate-700 ring-slate-200"}`}>
                             {order.status}
                           </span>
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-gray-900">{formatMoney(order.total_cost_cents)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-950">{formatMoney(order.total_cost_cents)}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-right">
                           {order.status === "ordered" && canManage && (
                             <Button size="sm" variant="primary" disabled={busy} onClick={() => void receiveOrder(order.id)}>
@@ -196,37 +196,37 @@ export default function PurchasingPage() {
           </Card>
 
           <Card>
-            <h2 className="text-base font-semibold text-gray-900">Suppliers</h2>
+            <h2 className="text-base font-semibold text-slate-950">Suppliers</h2>
             <ul className="mt-3 flex flex-col gap-2">
-              {suppliers.length === 0 && <li className="text-sm text-gray-500">No suppliers yet.</li>}
+              {suppliers.length === 0 && <li className="text-sm text-slate-500">No suppliers yet.</li>}
               {suppliers.map((supplier) => (
-                <li key={supplier.id} className="rounded-lg border border-gray-200 px-3 py-2">
-                  <p className="text-sm font-medium text-gray-900">{supplier.name}</p>
-                  <p className="text-xs text-gray-500">{supplier.email ?? "No email on file"}</p>
+                <li key={supplier.id} className="rounded-md border border-slate-200 px-3 py-2">
+                  <p className="text-sm font-medium text-slate-950">{supplier.name}</p>
+                  <p className="text-xs text-slate-500">{supplier.email ?? "No email on file"}</p>
                 </li>
               ))}
             </ul>
 
             {canManage && (
-              <div className="mt-4 flex flex-col gap-2 border-t border-gray-200 pt-4">
+              <div className="mt-4 flex flex-col gap-2 border-t border-slate-200 pt-4">
                 <label className="block">
-                  <span className="text-xs font-medium uppercase text-gray-500">Supplier name</span>
+                  <span className="text-xs font-medium uppercase text-slate-500">Supplier name</span>
                   <input
                     type="text"
                     value={supplierName}
                     onChange={(event) => setSupplierName(event.target.value)}
                     placeholder="e.g. Acme Coffee Co"
-                    className="mt-1 min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600"
+                    className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
                   />
                 </label>
                 <label className="block">
-                  <span className="text-xs font-medium uppercase text-gray-500">Email (optional)</span>
+                  <span className="text-xs font-medium uppercase text-slate-500">Email (optional)</span>
                   <input
                     type="email"
                     value={supplierEmail}
                     onChange={(event) => setSupplierEmail(event.target.value)}
                     placeholder="orders@supplier.example"
-                    className="mt-1 min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600"
+                    className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
                   />
                 </label>
                 <Button variant="secondary" size="sm" disabled={busy || !supplierName.trim()} onClick={() => void addSupplier()}>
@@ -239,15 +239,15 @@ export default function PurchasingPage() {
 
         {canManage && (
           <Card>
-            <h2 className="text-base font-semibold text-gray-900">Create purchase order</h2>
-            <p className="text-sm text-gray-500">Add line items with quantity, unit cost, and optional lot/expiry details.</p>
+            <h2 className="text-base font-semibold text-slate-950">Create purchase order</h2>
+            <p className="text-sm text-slate-500">Add line items with quantity, unit cost, and optional lot/expiry details.</p>
 
             <label className="mt-3 block max-w-sm">
-              <span className="text-xs font-medium uppercase text-gray-500">Supplier</span>
+              <span className="text-xs font-medium uppercase text-slate-500">Supplier</span>
               <select
                 value={poSupplierId}
                 onChange={(event) => setPoSupplierId(event.target.value)}
-                className="mt-1 min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600"
+                className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
               >
                 {suppliers.map((supplier) => (
                   <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
@@ -257,13 +257,13 @@ export default function PurchasingPage() {
 
             <div className="mt-4 flex flex-col gap-3">
               {lines.map((line, index) => (
-                <div key={index} className="grid grid-cols-1 gap-2 rounded-lg border border-gray-200 p-3 sm:grid-cols-5">
+                <div key={index} className="grid grid-cols-1 gap-2 rounded-md border border-slate-200 p-3 sm:grid-cols-5">
                   <label className="block sm:col-span-2">
-                    <span className="text-xs font-medium uppercase text-gray-500">Product</span>
+                    <span className="text-xs font-medium uppercase text-slate-500">Product</span>
                     <select
                       value={line.productId}
                       onChange={(event) => updateLine(index, { productId: event.target.value })}
-                      className="mt-1 min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600"
+                      className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
                     >
                       <option value="">Select product</option>
                       {products.map((product) => (
@@ -272,43 +272,43 @@ export default function PurchasingPage() {
                     </select>
                   </label>
                   <label className="block">
-                    <span className="text-xs font-medium uppercase text-gray-500">Quantity</span>
+                    <span className="text-xs font-medium uppercase text-slate-500">Quantity</span>
                     <input
                       type="number"
                       min="1"
                       value={line.quantity}
                       onChange={(event) => updateLine(index, { quantity: event.target.value })}
-                      className="mt-1 min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600"
+                      className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs font-medium uppercase text-gray-500">Unit cost</span>
+                    <span className="text-xs font-medium uppercase text-slate-500">Unit cost</span>
                     <input
                       type="text"
                       inputMode="decimal"
                       value={line.unitCost}
                       onChange={(event) => updateLine(index, { unitCost: event.target.value })}
                       placeholder="0.00"
-                      className="mt-1 min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600"
+                      className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs font-medium uppercase text-gray-500">Expiry date</span>
+                    <span className="text-xs font-medium uppercase text-slate-500">Expiry date</span>
                     <input
                       type="date"
                       value={line.expiryDate}
                       onChange={(event) => updateLine(index, { expiryDate: event.target.value })}
-                      className="mt-1 min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600"
+                      className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs font-medium uppercase text-gray-500">Lot code</span>
+                    <span className="text-xs font-medium uppercase text-slate-500">Lot code</span>
                     <input
                       type="text"
                       value={line.lotCode}
                       onChange={(event) => updateLine(index, { lotCode: event.target.value })}
                       placeholder="Optional"
-                      className="mt-1 min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600"
+                      className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
                     />
                   </label>
                   {lines.length > 1 && (

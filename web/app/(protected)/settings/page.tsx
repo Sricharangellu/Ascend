@@ -104,8 +104,8 @@ function StoreSection({ canManage, addToast }: { canManage: boolean; addToast: R
       {error && <div className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-gray-900">Store profile</h2>
-          <p className="text-sm text-gray-500">Business identity used on receipts, invoices, and reports.</p>
+          <h2 className="text-base font-semibold text-slate-950">Store profile</h2>
+          <p className="text-sm text-slate-500">Business identity used on receipts, invoices, and reports.</p>
         </div>
         {canManage && !editing && (
           <Button variant="secondary" size="sm" onClick={() => setEditing({ ...data })}>Edit</Button>
@@ -121,12 +121,12 @@ function StoreSection({ canManage, addToast }: { canManage: boolean; addToast: R
         {BUSINESS_FIELDS.map(({ key, label, type }) =>
           editing ? (
             <div key={key}>
-              <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>
               <input
                 type={type ?? "text"}
                 value={String(editing[key] ?? "")}
                 onChange={(e) => setEditing((prev) => ({ ...prev!, [key]: e.target.value }))}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-600 focus:ring-2 focus:ring-brand-600 outline-none"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-950 focus:ring-2 focus:ring-slate-950 outline-none"
               />
             </div>
           ) : (
@@ -192,21 +192,21 @@ function ShippingSection({ canManage, addToast }: { canManage: boolean; addToast
         onCancel={() => setDeleteTarget(null)}
       />
       <Card className="overflow-hidden p-0">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">Shipping methods</h2>
-            <p className="text-sm text-gray-500">Available options at checkout and on invoices.</p>
+            <h2 className="text-base font-semibold text-slate-950">Shipping methods</h2>
+            <p className="text-sm text-slate-500">Available options at checkout and on invoices.</p>
           </div>
           {canManage && !form && (
             <Button variant="primary" size="sm" onClick={() => setForm({ name: "", amountCents: "0", freeLimit: "" })}>Add method</Button>
           )}
         </div>
         {form && canManage && (
-          <div className="border-b bg-gray-50 px-4 py-4">
+          <div className="border-b border-slate-200 bg-slate-50 px-4 py-4">
             <div className="flex flex-wrap gap-3">
-              <input value={form.name} onChange={(e) => setForm((f) => ({ ...f!, name: e.target.value }))} placeholder="Name" className="flex-1 min-w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-600" />
-              <input value={form.amountCents} onChange={(e) => setForm((f) => ({ ...f!, amountCents: e.target.value }))} placeholder="Rate ($)" type="number" min="0" step="0.01" className="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-600" />
-              <input value={form.freeLimit} onChange={(e) => setForm((f) => ({ ...f!, freeLimit: e.target.value }))} placeholder="Free above ($)" type="number" min="0" step="0.01" className="w-36 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+              <input value={form.name} onChange={(e) => setForm((f) => ({ ...f!, name: e.target.value }))} placeholder="Name" className="flex-1 min-w-32 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              <input value={form.amountCents} onChange={(e) => setForm((f) => ({ ...f!, amountCents: e.target.value }))} placeholder="Rate ($)" type="number" min="0" step="0.01" className="w-28 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              <input value={form.freeLimit} onChange={(e) => setForm((f) => ({ ...f!, freeLimit: e.target.value }))} placeholder="Free above ($)" type="number" min="0" step="0.01" className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
               <div className="flex gap-2">
                 <Button size="sm" variant="secondary" onClick={() => setForm(null)}>Cancel</Button>
                 <Button size="sm" variant="primary" loading={busy} disabled={!form.name.trim()} onClick={add}>Add</Button>
@@ -215,9 +215,9 @@ function ShippingSection({ canManage, addToast }: { canManage: boolean; addToast
           </div>
         )}
         <table className="w-full text-sm">
-          <thead><tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500"><th className="px-4 py-3">Name</th><th className="px-4 py-3">Rate</th><th className="px-4 py-3">Free above</th>{canManage && <th className="px-4 py-3" />}</tr></thead>
-          <tbody className="divide-y divide-gray-100">
-            {items.length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400">No shipping methods yet</td></tr>}
+          <thead><tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"><th className="px-4 py-3">Name</th><th className="px-4 py-3">Rate</th><th className="px-4 py-3">Free above</th>{canManage && <th className="px-4 py-3" />}</tr></thead>
+          <tbody className="divide-y divide-slate-100">
+            {items.length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400">No shipping methods yet</td></tr>}
             {items.map((m) => (
               <tr key={m.id}>
                 <td className="px-4 py-3 font-medium">{m.name}</td>
@@ -260,19 +260,19 @@ function TermsSection({ canManage, addToast }: { canManage: boolean; addToast: R
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
         <div>
-          <h2 className="text-base font-semibold text-gray-900">Payment terms</h2>
-          <p className="text-sm text-gray-500">Net terms available on invoices and sales orders.</p>
+          <h2 className="text-base font-semibold text-slate-950">Payment terms</h2>
+          <p className="text-sm text-slate-500">Net terms available on invoices and sales orders.</p>
         </div>
         {canManage && !form && <Button variant="primary" size="sm" onClick={() => setForm({ name: "", daysDue: "30", description: "" })}>Add term</Button>}
       </div>
       {form && canManage && (
-        <div className="border-b bg-gray-50 px-4 py-4">
+        <div className="border-b border-slate-200 bg-slate-50 px-4 py-4">
           <div className="flex flex-wrap gap-3">
-            <input value={form.name} onChange={(e) => setForm((f) => ({ ...f!, name: e.target.value }))} placeholder='e.g. "Net 30"' className="flex-1 min-w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-600" />
-            <input value={form.daysDue} onChange={(e) => setForm((f) => ({ ...f!, daysDue: e.target.value }))} placeholder="Days due" type="number" min="0" className="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-600" />
-            <input value={form.description} onChange={(e) => setForm((f) => ({ ...f!, description: e.target.value }))} placeholder="Description (optional)" className="flex-1 min-w-48 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+            <input value={form.name} onChange={(e) => setForm((f) => ({ ...f!, name: e.target.value }))} placeholder='e.g. "Net 30"' className="flex-1 min-w-32 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+            <input value={form.daysDue} onChange={(e) => setForm((f) => ({ ...f!, daysDue: e.target.value }))} placeholder="Days due" type="number" min="0" className="w-28 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+            <input value={form.description} onChange={(e) => setForm((f) => ({ ...f!, description: e.target.value }))} placeholder="Description (optional)" className="flex-1 min-w-48 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
             <div className="flex gap-2">
               <Button size="sm" variant="secondary" onClick={() => setForm(null)}>Cancel</Button>
               <Button size="sm" variant="primary" loading={busy} disabled={!form.name.trim()} onClick={add}>Add</Button>
@@ -281,14 +281,14 @@ function TermsSection({ canManage, addToast }: { canManage: boolean; addToast: R
         </div>
       )}
       <table className="w-full text-sm">
-        <thead><tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500"><th className="px-4 py-3">Name</th><th className="px-4 py-3">Days due</th><th className="px-4 py-3">Description</th></tr></thead>
-        <tbody className="divide-y divide-gray-100">
-          {items.length === 0 && <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-400">No payment terms yet</td></tr>}
+        <thead><tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"><th className="px-4 py-3">Name</th><th className="px-4 py-3">Days due</th><th className="px-4 py-3">Description</th></tr></thead>
+        <tbody className="divide-y divide-slate-100">
+          {items.length === 0 && <tr><td colSpan={3} className="px-4 py-6 text-center text-slate-400">No payment terms yet</td></tr>}
           {items.map((t) => (
             <tr key={t.id}>
               <td className="px-4 py-3 font-medium">{t.name}</td>
               <td className="px-4 py-3">{t.daysDue}</td>
-              <td className="px-4 py-3 text-gray-500">{t.description ?? "—"}</td>
+              <td className="px-4 py-3 text-slate-500">{t.description ?? "—"}</td>
             </tr>
           ))}
         </tbody>
@@ -325,22 +325,22 @@ function ModesSection({ canManage, addToast }: { canManage: boolean; addToast: R
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
         <div>
-          <h2 className="text-base font-semibold text-gray-900">Payment modes</h2>
-          <p className="text-sm text-gray-500">Tender types accepted at checkout (cash, card, etc.).</p>
+          <h2 className="text-base font-semibold text-slate-950">Payment modes</h2>
+          <p className="text-sm text-slate-500">Tender types accepted at checkout (cash, card, etc.).</p>
         </div>
         {canManage && !adding && <Button variant="primary" size="sm" onClick={() => setAdding(true)}>Add mode</Button>}
       </div>
       {adding && canManage && (
-        <div className="border-b bg-gray-50 px-4 py-4 flex gap-3">
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder='e.g. "Bank transfer"' className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+        <div className="border-b border-slate-200 bg-slate-50 px-4 py-4 flex gap-3">
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder='e.g. "Bank transfer"' className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
           <Button size="sm" variant="secondary" onClick={() => { setAdding(false); setName(""); }}>Cancel</Button>
           <Button size="sm" variant="primary" loading={busy} disabled={!name.trim()} onClick={add}>Add</Button>
         </div>
       )}
-      <ul className="divide-y divide-gray-100">
-        {items.length === 0 && <li className="px-4 py-6 text-center text-sm text-gray-400">No payment modes yet</li>}
+      <ul className="divide-y divide-slate-100">
+        {items.length === 0 && <li className="px-4 py-6 text-center text-sm text-slate-400">No payment modes yet</li>}
         {items.map((m) => <li key={m.id} className="flex items-center gap-3 px-4 py-3 text-sm"><span className="font-medium">{m.name}</span></li>)}
       </ul>
     </Card>
@@ -379,20 +379,20 @@ function TaxSection({ canManage, addToast }: { canManage: boolean; addToast: Ret
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
         <div>
-          <h2 className="text-base font-semibold text-gray-900">Tax rates</h2>
-          <p className="text-sm text-gray-500">Configured rates applied to line items at checkout.</p>
+          <h2 className="text-base font-semibold text-slate-950">Tax rates</h2>
+          <p className="text-sm text-slate-500">Configured rates applied to line items at checkout.</p>
         </div>
         {canManage && !form && <Button variant="primary" size="sm" onClick={() => setForm({ name: "", ratePct: "", category: "", state: "" })}>Add rate</Button>}
       </div>
       {form && canManage && (
-        <div className="border-b bg-gray-50 px-4 py-4">
+        <div className="border-b border-slate-200 bg-slate-50 px-4 py-4">
           <div className="flex flex-wrap gap-3">
-            <input value={form.name} onChange={(e) => setForm((f) => ({ ...f!, name: e.target.value }))} placeholder='e.g. "CA Sales Tax"' className="flex-1 min-w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-600" />
-            <input value={form.ratePct} onChange={(e) => setForm((f) => ({ ...f!, ratePct: e.target.value }))} placeholder="Rate %" type="number" min="0" step="0.01" className="w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-600" />
-            <input value={form.category} onChange={(e) => setForm((f) => ({ ...f!, category: e.target.value }))} placeholder="Category (optional)" className="flex-1 min-w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-600" />
-            <input value={form.state} onChange={(e) => setForm((f) => ({ ...f!, state: e.target.value }))} placeholder="State (optional)" className="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+            <input value={form.name} onChange={(e) => setForm((f) => ({ ...f!, name: e.target.value }))} placeholder='e.g. "CA Sales Tax"' className="flex-1 min-w-32 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+            <input value={form.ratePct} onChange={(e) => setForm((f) => ({ ...f!, ratePct: e.target.value }))} placeholder="Rate %" type="number" min="0" step="0.01" className="w-24 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+            <input value={form.category} onChange={(e) => setForm((f) => ({ ...f!, category: e.target.value }))} placeholder="Category (optional)" className="flex-1 min-w-32 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+            <input value={form.state} onChange={(e) => setForm((f) => ({ ...f!, state: e.target.value }))} placeholder="State (optional)" className="w-28 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
             <div className="flex gap-2">
               <Button size="sm" variant="secondary" onClick={() => setForm(null)}>Cancel</Button>
               <Button size="sm" variant="primary" loading={busy} disabled={!form.name.trim() || !form.ratePct} onClick={add}>Add</Button>
@@ -401,15 +401,15 @@ function TaxSection({ canManage, addToast }: { canManage: boolean; addToast: Ret
         </div>
       )}
       <table className="w-full text-sm">
-        <thead><tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500"><th className="px-4 py-3">Name</th><th className="px-4 py-3">Rate</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">State</th></tr></thead>
-        <tbody className="divide-y divide-gray-100">
-          {items.length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400">No tax rates yet</td></tr>}
+        <thead><tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"><th className="px-4 py-3">Name</th><th className="px-4 py-3">Rate</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">State</th></tr></thead>
+        <tbody className="divide-y divide-slate-100">
+          {items.length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400">No tax rates yet</td></tr>}
           {items.map((t) => (
             <tr key={t.id}>
               <td className="px-4 py-3 font-medium">{t.name}</td>
               <td className="px-4 py-3">{(t.rateBps / 100).toFixed(2)}%</td>
-              <td className="px-4 py-3 text-gray-500">{t.applyToCategory ?? "All"}</td>
-              <td className="px-4 py-3 text-gray-500">{t.state ?? "—"}</td>
+              <td className="px-4 py-3 text-slate-500">{t.applyToCategory ?? "All"}</td>
+              <td className="px-4 py-3 text-slate-500">{t.state ?? "—"}</td>
             </tr>
           ))}
         </tbody>
@@ -452,10 +452,10 @@ function FlagsSection({ canManage, addToast }: { canManage: boolean; addToast: R
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
         <div>
-          <h2 className="text-base font-semibold text-gray-900">Feature flags</h2>
-          <p className="text-sm text-gray-500">Per-tenant toggles. Manager or owner required to change.</p>
+          <h2 className="text-base font-semibold text-slate-950">Feature flags</h2>
+          <p className="text-sm text-slate-500">Per-tenant toggles. Manager or owner required to change.</p>
         </div>
         {canManage && hasDirty && (
           <div className="flex gap-2">
@@ -464,17 +464,17 @@ function FlagsSection({ canManage, addToast }: { canManage: boolean; addToast: R
           </div>
         )}
       </div>
-      <ul className="divide-y divide-gray-100">
-        {Object.entries(merged).length === 0 && <li className="px-4 py-6 text-center text-sm text-gray-400">No feature flags configured</li>}
+      <ul className="divide-y divide-slate-100">
+        {Object.entries(merged).length === 0 && <li className="px-4 py-6 text-center text-sm text-slate-400">No feature flags configured</li>}
         {Object.entries(merged).sort(([a], [b]) => a.localeCompare(b)).map(([key, enabled]) => (
           <li key={key} className="flex items-center justify-between gap-4 px-4 py-3">
-            <span className="font-mono text-sm font-semibold text-gray-900">{key}</span>
+            <span className="font-mono text-sm font-semibold text-slate-950">{key}</span>
             <button
               type="button"
               disabled={!canManage}
               aria-pressed={enabled}
               onClick={() => toggle(key)}
-              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${enabled ? "bg-brand-600" : "bg-gray-300"} ${!canManage ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${enabled ? "bg-slate-950" : "bg-slate-300"} ${!canManage ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
             >
               <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-6" : "translate-x-1"}`} />
               <span className="sr-only">{key}</span>
@@ -494,17 +494,17 @@ function SecuritySection() {
       <Card className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">Multi-factor authentication</h2>
-            <p className="text-sm text-gray-500">Add an extra layer of sign-in security to your account.</p>
+            <h2 className="text-base font-semibold text-slate-950">Multi-factor authentication</h2>
+            <p className="text-sm text-slate-500">Add an extra layer of sign-in security to your account.</p>
           </div>
-          <span className="rounded bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">Not enabled</span>
+          <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Not enabled</span>
         </div>
-        <p className="text-sm text-gray-500">MFA enrollment is not yet wired to the backend. Once implemented, you'll be prompted for a second factor at <span className="font-mono">/login/mfa</span> on every sign-in.</p>
+        <p className="text-sm text-slate-500">MFA enrollment is not yet wired to the backend. Once implemented, you'll be prompted for a second factor at <span className="font-mono">/login/mfa</span> on every sign-in.</p>
         <Button variant="primary" size="sm" disabled>Set up MFA</Button>
       </Card>
 
       <Card className="flex flex-col gap-3">
-        <h2 className="text-base font-semibold text-gray-900">Security posture</h2>
+        <h2 className="text-base font-semibold text-slate-950">Security posture</h2>
         <div className="flex flex-col gap-2 text-sm">
           <SecurityRow label="Role-based access" value="Enabled" ok />
           <SecurityRow label="Access token TTL" value="15 minutes" ok />
@@ -523,18 +523,18 @@ function SecuritySection() {
 
 function ReadField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-      <p className="text-xs font-medium uppercase text-gray-500">{label}</p>
-      <p className="mt-1 font-semibold text-gray-900 break-words">{value}</p>
+    <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+      <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
+      <p className="mt-1 font-semibold text-slate-950 break-words">{value}</p>
     </div>
   );
 }
 
 function SecurityRow({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
-      <span className="text-gray-600">{label}</span>
-      <span className={`font-semibold ${ok ? "text-green-700" : "text-gray-500"}`}>{value}</span>
+    <div className="flex items-center justify-between gap-3 rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
+      <span className="text-slate-600">{label}</span>
+      <span className={`font-semibold ${ok ? "text-emerald-700" : "text-slate-500"}`}>{value}</span>
     </div>
   );
 }
@@ -544,7 +544,7 @@ function SectionButton({ active, label, onClick }: { active: boolean; label: str
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-[44px] rounded-lg px-3 text-left text-sm font-medium transition-colors ${active ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}
+      className={`min-h-[44px] rounded-md px-3 text-left text-sm font-medium transition-colors ${active ? "bg-slate-950 text-white" : "text-slate-700 hover:bg-slate-100"}`}
     >
       {label}
     </button>

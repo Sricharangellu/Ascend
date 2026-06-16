@@ -13,21 +13,21 @@ interface Account { id: string; code: string; name: string; type: string; is_act
 interface Deposit { id: string; batch_number: string; status: string; total_cents: number; account_id: string; created_at: number; }
 
 const TYPE_STYLE: Record<string, string> = {
-  asset: "bg-blue-100 text-blue-800",
-  liability: "bg-amber-100 text-amber-800",
-  income: "bg-green-100 text-green-800",
-  expense: "bg-red-100 text-red-700",
+  asset: "bg-blue-50 text-blue-700 ring-blue-200",
+  liability: "bg-amber-50 text-amber-700 ring-amber-200",
+  income: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  expense: "bg-red-50 text-red-700 ring-red-200",
 };
 const DEP_STYLE: Record<string, string> = {
-  pending_approval: "bg-amber-100 text-amber-800",
-  approved: "bg-green-100 text-green-800",
-  rejected: "bg-red-100 text-red-700",
+  pending_approval: "bg-amber-50 text-amber-700 ring-amber-200",
+  approved: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  rejected: "bg-red-50 text-red-700 ring-red-200",
 };
 const BILLING_STYLE: Record<BillingStatus, string> = {
-  open: "bg-blue-100 text-blue-800",
-  partial: "bg-amber-100 text-amber-800",
-  paid: "bg-green-100 text-green-800",
-  void: "bg-gray-100 text-gray-500",
+  open: "bg-blue-50 text-blue-700 ring-blue-200",
+  partial: "bg-amber-50 text-amber-700 ring-amber-200",
+  paid: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  void: "bg-slate-100 text-slate-500 ring-slate-200",
 };
 
 function formatDate(ms: number | null) {
@@ -109,31 +109,36 @@ export default function AccountingPage() {
   };
 
   return (
-    <EnterpriseShell active="accounting" title="Accounting" subtitle="Chart of Accounts & Batch Deposits">
-      <div className="space-y-4 p-4">
+    <EnterpriseShell active="accounting" title="Accounting" subtitle="Chart of Accounts & Batch Deposits" contentClassName="overflow-y-auto">
+      <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6">
+        <div className="border-b border-slate-200 pb-4">
+          <h1 className="text-lg font-semibold text-slate-950">Accounting operations</h1>
+          <p className="mt-1 text-sm text-slate-500">Manage account mapping, deposit approvals, receivables, and payables.</p>
+        </div>
         {error && <div className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
 
         <Card
           title="Chart of Accounts"
           description="Typed account tree used across products, shipping, and bills."
+          noPadding
         >
-          <div className="mb-3">
+          <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
             {accounts.length === 0 && <Button size="sm" disabled={busy} onClick={seed}>Seed standard COA</Button>}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-left text-gray-500">
-                  <th className="py-2 pr-4">Code</th><th className="py-2 pr-4">Name</th><th className="py-2 pr-4">Type</th>
+                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  <th className="px-4 py-3">Code</th><th className="px-4 py-3">Name</th><th className="px-4 py-3">Type</th>
                 </tr>
               </thead>
               <tbody>
-                {accounts.length === 0 && <tr><td colSpan={3} className="py-6 text-center text-gray-400">No accounts — seed to get started</td></tr>}
+                {accounts.length === 0 && <tr><td colSpan={3} className="px-4 py-8 text-center text-slate-500">No accounts — seed to get started</td></tr>}
                 {accounts.map((a) => (
-                  <tr key={a.id} className="border-b last:border-0">
-                    <td className="py-2 pr-4 font-mono text-xs">{a.code}</td>
-                    <td className="py-2 pr-4">{a.name}</td>
-                    <td className="py-2 pr-4"><span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_STYLE[a.type] ?? "bg-gray-100"}`}>{a.type}</span></td>
+                  <tr key={a.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                    <td className="px-4 py-3 font-mono text-xs text-slate-700">{a.code}</td>
+                    <td className="px-4 py-3">{a.name}</td>
+                    <td className="px-4 py-3"><span className={`rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${TYPE_STYLE[a.type] ?? "bg-slate-100 text-slate-700 ring-slate-200"}`}>{a.type}</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -141,23 +146,23 @@ export default function AccountingPage() {
           </div>
         </Card>
 
-        <Card title="Batch Deposits" description="Group received payments into bank deposits for approval.">
+        <Card title="Batch Deposits" description="Group received payments into bank deposits for approval." noPadding>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-left text-gray-500">
-                  <th className="py-2 pr-4">Batch #</th><th className="py-2 pr-4">Status</th>
-                  <th className="py-2 pr-4 text-right">Total</th><th className="py-2 pr-4 text-right">Actions</th>
+                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  <th className="px-4 py-3">Batch #</th><th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {deposits.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-gray-400">No batch deposits</td></tr>}
+                {deposits.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">No batch deposits</td></tr>}
                 {deposits.map((d) => (
-                  <tr key={d.id} className="border-b last:border-0">
-                    <td className="py-2 pr-4 font-medium">{d.batch_number}</td>
-                    <td className="py-2 pr-4"><span className={`rounded-full px-2 py-0.5 text-xs font-medium ${DEP_STYLE[d.status] ?? "bg-gray-100"}`}>{d.status.replace(/_/g, " ")}</span></td>
-                    <td className="py-2 pr-4 text-right">{formatMoney(d.total_cents)}</td>
-                    <td className="py-2 pr-4 text-right">
+                  <tr key={d.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium text-slate-950">{d.batch_number}</td>
+                    <td className="px-4 py-3"><span className={`rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${DEP_STYLE[d.status] ?? "bg-slate-100 text-slate-700 ring-slate-200"}`}>{d.status.replace(/_/g, " ")}</span></td>
+                    <td className="px-4 py-3 text-right">{formatMoney(d.total_cents)}</td>
+                    <td className="px-4 py-3 text-right">
                       {d.status === "pending_approval" && (
                         <span className="flex justify-end gap-1">
                           <Button size="sm" variant="ghost" disabled={busy} onClick={() => decide(d.id, "approve")}>Approve</Button>
@@ -177,24 +182,24 @@ export default function AccountingPage() {
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-left text-gray-500">
-                  <th className="py-2 pr-4">Invoice #</th><th className="py-2 pr-4">Status</th>
-                  <th className="py-2 pr-4">Due</th>
-                  <th className="py-2 pr-4 text-right">Total</th><th className="py-2 pr-4 text-right">Paid</th>
-                  <th className="py-2 pr-4 text-right">Due amount</th><th className="py-2 pr-4 text-right">Actions</th>
+                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  <th className="px-4 py-3">Invoice #</th><th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Due</th>
+                  <th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Paid</th>
+                  <th className="px-4 py-3 text-right">Due amount</th><th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {invoices.length === 0 && <tr><td colSpan={7} className="py-6 text-center text-gray-400">No invoices</td></tr>}
+                {invoices.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No invoices</td></tr>}
                 {invoices.map((inv) => (
-                  <tr key={inv.id} className="border-b last:border-0">
-                    <td className="py-2 pr-4 font-medium">{inv.invoice_number}</td>
-                    <td className="py-2 pr-4"><span className={`rounded-full px-2 py-0.5 text-xs font-medium ${BILLING_STYLE[inv.status]}`}>{inv.status}</span></td>
-                    <td className="py-2 pr-4 text-gray-500">{formatDate(inv.due_date)}</td>
-                    <td className="py-2 pr-4 text-right">{formatMoney(inv.total_cents)}</td>
-                    <td className="py-2 pr-4 text-right">{formatMoney(inv.paid_cents)}</td>
-                    <td className="py-2 pr-4 text-right">{formatMoney(inv.total_cents - inv.paid_cents)}</td>
-                    <td className="py-2 pr-4 text-right">
+                  <tr key={inv.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium text-slate-950">{inv.invoice_number}</td>
+                    <td className="px-4 py-3"><span className={`rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${BILLING_STYLE[inv.status]}`}>{inv.status}</span></td>
+                    <td className="px-4 py-3 text-slate-500">{formatDate(inv.due_date)}</td>
+                    <td className="px-4 py-3 text-right">{formatMoney(inv.total_cents)}</td>
+                    <td className="px-4 py-3 text-right">{formatMoney(inv.paid_cents)}</td>
+                    <td className="px-4 py-3 text-right">{formatMoney(inv.total_cents - inv.paid_cents)}</td>
+                    <td className="px-4 py-3 text-right">
                       {canPay && inv.status !== "paid" && inv.status !== "void" && (
                         <PayControl busy={busy} max={inv.total_cents - inv.paid_cents} onPay={(cents) => payInvoice(inv.id, cents)} />
                       )}
@@ -211,24 +216,24 @@ export default function AccountingPage() {
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-left text-gray-500">
-                  <th className="py-2 pr-4">Bill #</th><th className="py-2 pr-4">Status</th>
-                  <th className="py-2 pr-4">Due</th>
-                  <th className="py-2 pr-4 text-right">Total</th><th className="py-2 pr-4 text-right">Paid</th>
-                  <th className="py-2 pr-4 text-right">Due amount</th><th className="py-2 pr-4 text-right">Actions</th>
+                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  <th className="px-4 py-3">Bill #</th><th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Due</th>
+                  <th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Paid</th>
+                  <th className="px-4 py-3 text-right">Due amount</th><th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {bills.length === 0 && <tr><td colSpan={7} className="py-6 text-center text-gray-400">No bills</td></tr>}
+                {bills.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No bills</td></tr>}
                 {bills.map((bill) => (
-                  <tr key={bill.id} className="border-b last:border-0">
-                    <td className="py-2 pr-4 font-medium">{bill.bill_number}</td>
-                    <td className="py-2 pr-4"><span className={`rounded-full px-2 py-0.5 text-xs font-medium ${BILLING_STYLE[bill.status]}`}>{bill.status}</span></td>
-                    <td className="py-2 pr-4 text-gray-500">{formatDate(bill.due_date)}</td>
-                    <td className="py-2 pr-4 text-right">{formatMoney(bill.total_cents)}</td>
-                    <td className="py-2 pr-4 text-right">{formatMoney(bill.paid_cents)}</td>
-                    <td className="py-2 pr-4 text-right">{formatMoney(bill.total_cents - bill.paid_cents)}</td>
-                    <td className="py-2 pr-4 text-right">
+                  <tr key={bill.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium text-slate-950">{bill.bill_number}</td>
+                    <td className="px-4 py-3"><span className={`rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${BILLING_STYLE[bill.status]}`}>{bill.status}</span></td>
+                    <td className="px-4 py-3 text-slate-500">{formatDate(bill.due_date)}</td>
+                    <td className="px-4 py-3 text-right">{formatMoney(bill.total_cents)}</td>
+                    <td className="px-4 py-3 text-right">{formatMoney(bill.paid_cents)}</td>
+                    <td className="px-4 py-3 text-right">{formatMoney(bill.total_cents - bill.paid_cents)}</td>
+                    <td className="px-4 py-3 text-right">
                       {canPay && bill.status !== "paid" && bill.status !== "void" && (
                         <PayControl busy={busy} max={bill.total_cents - bill.paid_cents} onPay={(cents) => payBill(bill.id, cents)} />
                       )}
@@ -256,14 +261,14 @@ function AgingSummary({ report }: { report: AgingReport }) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
       {AGING_BUCKETS.map(({ key, label }) => (
-        <div key={key} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-          <p className="text-xs font-medium uppercase text-gray-500">{label}</p>
-          <p className="mt-1 text-sm font-semibold text-gray-900">{formatMoney(report.totals[key])}</p>
+        <div key={key} className="rounded-md border border-slate-200 bg-slate-50 p-3">
+          <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
+          <p className="mt-1 text-sm font-semibold text-slate-950">{formatMoney(report.totals[key])}</p>
         </div>
       ))}
-      <div className="col-span-2 rounded-lg border border-gray-200 bg-gray-100 p-3 sm:col-span-5">
-        <p className="text-xs font-medium uppercase text-gray-500">Total outstanding</p>
-        <p className="mt-1 text-sm font-semibold text-gray-900">{formatMoney(report.totals.total)}</p>
+      <div className="col-span-2 rounded-md border border-slate-200 bg-slate-100 p-3 sm:col-span-5">
+        <p className="text-xs font-medium uppercase text-slate-500">Total outstanding</p>
+        <p className="mt-1 text-sm font-semibold text-slate-950">{formatMoney(report.totals.total)}</p>
       </div>
     </div>
   );
@@ -289,7 +294,7 @@ function PayControl({ max, busy, onPay }: { max: number; busy: boolean; onPay: (
         onChange={(e) => setAmount(e.target.value)}
         disabled={busy}
         aria-label="Payment amount"
-        className="w-20 rounded border border-gray-300 px-1.5 py-1 text-right text-xs outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+        className="w-20 rounded border border-slate-300 px-1.5 py-1 text-right text-xs outline-none focus:border-slate-950 focus:ring-1 focus:ring-slate-950"
       />
       <Button
         size="sm"

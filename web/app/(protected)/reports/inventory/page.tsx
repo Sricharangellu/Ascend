@@ -39,9 +39,9 @@ interface InventoryValuationResponse {
 
 function CardSkeleton() {
   return (
-    <div className="animate-pulse rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="mb-2 h-3 w-20 rounded bg-gray-100" />
-      <div className="h-7 w-32 rounded bg-gray-100" />
+    <div className="animate-pulse rounded-md border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-2 h-3 w-20 rounded bg-slate-100" />
+      <div className="h-7 w-32 rounded bg-slate-100" />
     </div>
   );
 }
@@ -54,7 +54,7 @@ function TableSkeleton() {
           {Array.from({ length: 8 }).map((__, j) => (
             <div
               key={j}
-              className="h-5 flex-1 rounded bg-gray-100"
+              className="h-5 flex-1 rounded bg-slate-100"
               style={{ opacity: 1 - i * 0.1 }}
             />
           ))}
@@ -74,9 +74,9 @@ function SummaryCard({
   value: string | number;
 }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-gray-900">{value}</p>
+    <div className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-1 text-2xl font-bold text-slate-950">{value}</p>
     </div>
   );
 }
@@ -168,12 +168,12 @@ export default function InventoryReportPage() {
             {loading ? (
               <TableSkeleton />
             ) : error ? null : items.length === 0 ? (
-              <p className="text-sm text-gray-500">No inventory data available.</p>
+              <p className="text-sm text-slate-500">No inventory data available.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <tr className="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                       <th className="pb-2 pr-4">SKU</th>
                       <th className="pb-2 pr-4">Name</th>
                       <th className="pb-2 pr-4">Category</th>
@@ -184,25 +184,25 @@ export default function InventoryReportPage() {
                       <th className="pb-2 text-right">Total Retail</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-slate-100">
                     {items.map((item) => (
-                      <tr key={item.sku} className="hover:bg-gray-50">
-                        <td className="py-2.5 pr-4 font-mono text-xs text-gray-500">
+                      <tr key={item.sku} className="hover:bg-slate-50">
+                        <td className="py-2.5 pr-4 font-mono text-xs text-slate-500">
                           {item.sku}
                         </td>
-                        <td className="py-2.5 pr-4 font-medium text-gray-900">{item.name}</td>
-                        <td className="py-2.5 pr-4 text-gray-600">{item.category}</td>
-                        <td className="py-2.5 pr-4 text-right text-gray-600">{item.onHand}</td>
-                        <td className="py-2.5 pr-4 text-right text-gray-600">
+                        <td className="py-2.5 pr-4 font-medium text-slate-950">{item.name}</td>
+                        <td className="py-2.5 pr-4 text-slate-600">{item.category}</td>
+                        <td className="py-2.5 pr-4 text-right text-slate-600">{item.onHand}</td>
+                        <td className="py-2.5 pr-4 text-right text-slate-600">
                           {formatMoney(item.costCents)}
                         </td>
-                        <td className="py-2.5 pr-4 text-right text-gray-600">
+                        <td className="py-2.5 pr-4 text-right text-slate-600">
                           {formatMoney(item.retailCents)}
                         </td>
-                        <td className="py-2.5 pr-4 text-right font-medium text-gray-900">
+                        <td className="py-2.5 pr-4 text-right font-medium text-slate-950">
                           {formatMoney(item.totalCostCents)}
                         </td>
-                        <td className="py-2.5 text-right font-semibold text-gray-900">
+                        <td className="py-2.5 text-right font-semibold text-slate-950">
                           {formatMoney(item.totalRetailCents)}
                         </td>
                       </tr>
@@ -210,14 +210,14 @@ export default function InventoryReportPage() {
                   </tbody>
                   {summary && (
                     <tfoot>
-                      <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
-                        <td colSpan={6} className="py-2.5 pr-4 text-gray-700">
+                      <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold">
+                        <td colSpan={6} className="py-2.5 pr-4 text-slate-700">
                           Totals
                         </td>
-                        <td className="py-2.5 pr-4 text-right text-gray-900">
+                        <td className="py-2.5 pr-4 text-right text-slate-950">
                           {formatMoney(summary.totalCostCents)}
                         </td>
-                        <td className="py-2.5 text-right text-gray-900">
+                        <td className="py-2.5 text-right text-slate-950">
                           {formatMoney(summary.totalRetailCents)}
                         </td>
                       </tr>

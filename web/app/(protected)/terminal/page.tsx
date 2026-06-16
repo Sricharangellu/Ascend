@@ -171,7 +171,7 @@ function TerminalInner() {
       </div>
 
       {/* Right: Cart panel on desktop; bottom drawer on tablet/mobile */}
-      <div className="h-[42vh] shrink-0 overflow-hidden border-t border-gray-200 lg:h-auto lg:w-80 lg:border-l lg:border-t-0 xl:w-96">
+      <div className="h-[42vh] shrink-0 overflow-hidden border-t border-slate-200 lg:h-auto lg:w-80 lg:border-l lg:border-t-0 xl:w-96">
         <CartPanel
           cart={cart}
           onCharge={handleCharge}

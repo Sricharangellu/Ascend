@@ -87,7 +87,7 @@ function StatusBadge({ status }: { status: string }) {
       ? "bg-success-100 text-success-700"
       : status === "archived"
       ? "bg-danger-100 text-danger-700"
-      : "bg-gray-100 text-gray-600";
+      : "bg-slate-100 text-slate-600";
   return (
     <span className={`inline-flex rounded px-2 py-1 text-xs font-semibold capitalize ${classes}`}>
       {status}
@@ -369,7 +369,7 @@ export default function InventoryPage() {
         </div>
 
         {/* Tab switcher */}
-        <div className="flex gap-1 border-b border-gray-200">
+        <div className="flex gap-1 border-b border-slate-200">
           <TabButton
             active={activeTab === "ledger"}
             onClick={() => setActiveTab("ledger")}
@@ -387,12 +387,12 @@ export default function InventoryPage() {
         {activeTab === "ledger" && (
           <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
             <Card className="overflow-hidden p-0">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
                 <div>
-                  <h2 className="text-base font-semibold text-gray-900">
+                  <h2 className="text-base font-semibold text-slate-950">
                     Stock ledger
                   </h2>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-slate-500">
                     Operational view for counts, receiving, and reorder decisions.
                   </p>
                 </div>
@@ -406,7 +406,7 @@ export default function InventoryPage() {
                 </div>
               </div>
 
-              <div className="grid gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 lg:grid-cols-[minmax(16rem,1fr)_12rem_10rem]">
+              <div className="grid gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 lg:grid-cols-[minmax(16rem,1fr)_12rem_10rem]">
                 <label className="block">
                   <span className="sr-only">Search inventory</span>
                   <input
@@ -414,7 +414,7 @@ export default function InventoryPage() {
                     value={ledgerQuery}
                     onChange={(e) => setLedgerQuery(e.target.value)}
                     placeholder="Search SKU or product"
-                    className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600"
+                    className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
                   />
                 </label>
                 <label className="block">
@@ -422,7 +422,7 @@ export default function InventoryPage() {
                   <select
                     value={ledgerCategory}
                     onChange={(e) => setLedgerCategory(e.target.value)}
-                    className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600"
+                    className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
                   >
                     {ledgerCategories.map((item) => (
                       <option key={item} value={item}>
@@ -438,7 +438,7 @@ export default function InventoryPage() {
                     onChange={(e) =>
                       setLedgerStatus(e.target.value as StockStatusFilter)
                     }
-                    className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600"
+                    className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
                   >
                     <option value="All">All statuses</option>
                     <option value="Healthy">Healthy</option>
@@ -449,7 +449,7 @@ export default function InventoryPage() {
               </div>
 
               {ledgerLoading ? (
-                <div className="p-6 text-sm text-gray-500" aria-busy="true">
+                <div className="p-6 text-sm text-slate-500" aria-busy="true">
                   Loading inventory...
                 </div>
               ) : ledgerError ? (
@@ -457,13 +457,13 @@ export default function InventoryPage() {
                   {ledgerError}
                 </div>
               ) : filteredRows.length === 0 ? (
-                <div className="p-6 text-sm text-gray-500">
+                <div className="p-6 text-sm text-slate-500">
                   No inventory rows match the current filters.
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead className="bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
                       <tr>
                         <th className="px-4 py-3">SKU</th>
                         <th className="px-4 py-3">Product</th>
@@ -476,44 +476,44 @@ export default function InventoryPage() {
                         <th className="px-4 py-3">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white">
+                    <tbody className="divide-y divide-slate-100 bg-white">
                       {filteredRows.map((row) => (
                         <tr
                           key={row.sku}
                           className={
                             selectedRow?.sku === row.sku
-                              ? "bg-brand-50"
-                              : "hover:bg-gray-50"
+                              ? "bg-slate-100"
+                              : "hover:bg-slate-50"
                           }
                         >
                           <td className="whitespace-nowrap px-4 py-3">
                             <button
                               type="button"
                               onClick={() => setSelectedSku(row.sku)}
-                              className="font-mono text-xs font-semibold text-brand-700 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-600"
+                              className="font-mono text-xs font-semibold text-slate-900 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-950"
                             >
                               {row.sku}
                             </button>
                           </td>
-                          <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900">
+                          <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-950">
                             {row.name}
                           </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                          <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                             {row.category}
                           </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-gray-900">
+                          <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-950">
                             {row.available}
                           </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right text-gray-600">
+                          <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">
                             {row.onHand}
                           </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right text-gray-600">
+                          <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">
                             {row.committed}
                           </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right text-gray-600">
+                          <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">
                             {formatCost(row.costCents)}
                           </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right text-gray-600">
+                          <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">
                             {formatMargin(row.priceCents, row.costCents)}
                           </td>
                           <td className="whitespace-nowrap px-4 py-3">
@@ -531,13 +531,13 @@ export default function InventoryPage() {
               {selectedRow ? (
                 <div className="flex flex-col gap-5">
                   <div>
-                    <p className="text-xs font-semibold uppercase text-gray-500">
+                    <p className="text-xs font-semibold uppercase text-slate-500">
                       Selected SKU
                     </p>
-                    <h2 className="mt-1 text-xl font-bold text-gray-900">
+                    <h2 className="mt-1 text-xl font-bold text-slate-950">
                       {selectedRow.name}
                     </h2>
-                    <p className="font-mono text-xs text-gray-500">
+                    <p className="font-mono text-xs text-slate-500">
                       {selectedRow.sku}
                     </p>
                   </div>
@@ -555,28 +555,28 @@ export default function InventoryPage() {
                     />
                   </div>
 
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-500">Sell price</span>
-                      <span className="font-semibold text-gray-900">
+                      <span className="text-slate-500">Sell price</span>
+                      <span className="font-semibold text-slate-950">
                         {formatMoney(selectedRow.priceCents)}
                       </span>
                     </div>
                     <div className="mt-2 flex items-center justify-between text-sm">
-                      <span className="text-gray-500">Average cost</span>
-                      <span className="font-semibold text-gray-900">
+                      <span className="text-slate-500">Average cost</span>
+                      <span className="font-semibold text-slate-950">
                         {formatCost(selectedRow.costCents)}
                       </span>
                     </div>
                     <div className="mt-2 flex items-center justify-between text-sm">
-                      <span className="text-gray-500">Margin</span>
-                      <span className="font-semibold text-gray-900">
+                      <span className="text-slate-500">Margin</span>
+                      <span className="font-semibold text-slate-950">
                         {formatMargin(selectedRow.priceCents, selectedRow.costCents)}
                       </span>
                     </div>
                     <div className="mt-2 flex items-center justify-between text-sm">
-                      <span className="text-gray-500">Velocity</span>
-                      <span className="font-semibold text-gray-900">
+                      <span className="text-slate-500">Velocity</span>
+                      <span className="font-semibold text-slate-950">
                         {formatVelocity(selectedRow.velocity)}
                       </span>
                     </div>
@@ -592,7 +592,7 @@ export default function InventoryPage() {
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-slate-500">
                   Select a SKU to inspect stock details.
                 </p>
               )}
@@ -603,13 +603,13 @@ export default function InventoryPage() {
         {activeTab === "catalog" && (
           <Card className="overflow-hidden p-0">
             {/* Catalog toolbar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
               <div>
-                <h2 className="text-base font-semibold text-gray-900">
+                <h2 className="text-base font-semibold text-slate-950">
                   Product catalog
                 </h2>
                 {selectedIds.size > 0 && (
-                  <p className="text-sm text-brand-700">
+                  <p className="text-sm text-slate-900">
                     {selectedIds.size} product{selectedIds.size !== 1 ? "s" : ""}{" "}
                     selected
                   </p>
@@ -639,7 +639,7 @@ export default function InventoryPage() {
                     </svg>
                   </Button>
                   {actionsOpen && (
-                    <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-gray-200 bg-white shadow-lg">
+                    <div className="absolute right-0 z-20 mt-1 w-44 rounded-md border border-slate-200 bg-white shadow-lg">
                       <div className="py-1">
                         <DropdownItem onClick={() => void handleBulkStatus("active")}>
                           Set Active
@@ -650,7 +650,7 @@ export default function InventoryPage() {
                         <DropdownItem onClick={() => void handleBulkStatus("archived")}>
                           Set Archived
                         </DropdownItem>
-                        <div className="my-1 border-t border-gray-100" />
+                        <div className="my-1 border-t border-slate-100" />
                         <DropdownItem onClick={handleExportCSV}>
                           Export CSV
                         </DropdownItem>
@@ -669,7 +669,7 @@ export default function InventoryPage() {
             </div>
 
             {/* Filters */}
-            <div className="grid gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 lg:grid-cols-[minmax(16rem,1fr)_14rem_10rem]">
+            <div className="grid gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 lg:grid-cols-[minmax(16rem,1fr)_14rem_10rem]">
               <label className="block">
                 <span className="sr-only">Search catalog</span>
                 <input
@@ -677,7 +677,7 @@ export default function InventoryPage() {
                   value={catalogQuery}
                   onChange={(e) => setCatalogQuery(e.target.value)}
                   placeholder="Search SKU or product name"
-                  className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600"
+                  className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
                 />
               </label>
               <label className="block">
@@ -685,7 +685,7 @@ export default function InventoryPage() {
                 <select
                   value={catalogCategory}
                   onChange={(e) => setCatalogCategory(e.target.value)}
-                  className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600"
+                  className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
                 >
                   {catalogCategoryOptions.map((name) => (
                     <option key={name} value={name}>
@@ -701,7 +701,7 @@ export default function InventoryPage() {
                   onChange={(e) =>
                     setCatalogStatus(e.target.value as CatalogStatusFilter)
                   }
-                  className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600"
+                  className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
                 >
                   <option value="All">All statuses</option>
                   <option value="active">Active</option>
@@ -712,7 +712,7 @@ export default function InventoryPage() {
             </div>
 
             {catalogLoading ? (
-              <div className="p-6 text-sm text-gray-500" aria-busy="true">
+              <div className="p-6 text-sm text-slate-500" aria-busy="true">
                 Loading...
               </div>
             ) : catalogError ? (
@@ -720,13 +720,13 @@ export default function InventoryPage() {
                 {catalogError}
               </div>
             ) : filteredProducts.length === 0 ? (
-              <div className="p-6 text-sm text-gray-500">
+              <div className="p-6 text-sm text-slate-500">
                 No products match the current filters.
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
                     <tr>
                       <th className="px-4 py-3">
                         <input
@@ -737,7 +737,7 @@ export default function InventoryPage() {
                           }}
                           onChange={toggleSelectAll}
                           aria-label="Select all products"
-                          className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-600"
+                          className="h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-slate-950"
                         />
                       </th>
                       <th className="px-4 py-3">SKU</th>
@@ -748,14 +748,14 @@ export default function InventoryPage() {
                       <th className="px-4 py-3">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
+                  <tbody className="divide-y divide-slate-100 bg-white">
                     {filteredProducts.map((product) => (
                       <tr
                         key={product.id}
                         className={
                           selectedIds.has(product.id)
-                            ? "bg-brand-50"
-                            : "hover:bg-gray-50"
+                            ? "bg-slate-100"
+                            : "hover:bg-slate-50"
                         }
                       >
                         <td className="px-4 py-3">
@@ -764,32 +764,32 @@ export default function InventoryPage() {
                             checked={selectedIds.has(product.id)}
                             onChange={() => toggleSelectOne(product.id)}
                             aria-label={`Select ${product.name}`}
-                            className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-600"
+                            className="h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-slate-950"
                           />
                         </td>
                         <td className="whitespace-nowrap px-4 py-3">
                           <Link
                             href={`/inventory/products/${product.id}`}
-                            className="font-mono text-xs font-semibold text-brand-700 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-600"
+                            className="font-mono text-xs font-semibold text-slate-900 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-950"
                           >
                             {product.sku}
                           </Link>
                         </td>
-                        <td className="px-4 py-3 font-medium text-gray-900">
+                        <td className="px-4 py-3 font-medium text-slate-950">
                           {product.name}
                           {product.parent_product_id && (
-                            <span className="ml-2 inline-flex rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">
+                            <span className="ml-2 inline-flex rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">
                               variant
                             </span>
                           )}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                        <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                           {product.brand ?? "-"}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                        <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                           {product.category || "-"}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-gray-900">
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-950">
                           {formatMoney(product.price_cents)}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3">
@@ -827,8 +827,8 @@ function TabButton({
       className={[
         "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
         active
-          ? "border-brand-600 text-brand-700"
-          : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
+          ? "border-slate-950 text-slate-950"
+          : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300",
       ].join(" ")}
     >
       {children}
@@ -848,7 +848,7 @@ function DropdownItem({
     <button
       type="button"
       onClick={onClick}
-      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+      className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
     >
       {children}
     </button>
@@ -857,9 +857,9 @@ function DropdownItem({
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-gray-200 p-3">
-      <p className="text-xs font-medium uppercase text-gray-500">{label}</p>
-      <p className="mt-1 text-lg font-bold text-gray-900">{value}</p>
+    <div className="rounded-md border border-slate-200 p-3">
+      <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-bold text-slate-950">{value}</p>
     </div>
   );
 }
@@ -877,17 +877,17 @@ function Metric({
 }) {
   return (
     <Card className="flex flex-col gap-1">
-      <span className="text-xs font-medium uppercase text-gray-500">{label}</span>
+      <span className="text-xs font-medium uppercase text-slate-500">{label}</span>
       <span
         className={
           tone === "warning"
             ? "text-2xl font-bold text-warning-700"
-            : "text-2xl font-bold text-gray-900"
+            : "text-2xl font-bold text-slate-950"
         }
       >
         {value}
       </span>
-      <span className="text-xs text-gray-500">{detail}</span>
+      <span className="text-xs text-slate-500">{detail}</span>
     </Card>
   );
 }
@@ -897,11 +897,11 @@ function LedgerStatus({ label }: { label: StockStatus }) {
     label === "Reorder"
       ? "bg-warning-100 text-warning-700"
       : label === "Watch"
-      ? "bg-brand-100 text-brand-700"
+      ? "bg-blue-50 text-blue-700 ring-blue-200"
       : "bg-success-100 text-success-700";
   return (
     <span
-      className={`inline-flex rounded px-2 py-1 text-xs font-semibold ${classes}`}
+      className={`inline-flex rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${classes}`}
     >
       {label}
     </span>

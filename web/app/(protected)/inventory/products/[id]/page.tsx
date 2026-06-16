@@ -18,8 +18,8 @@ import type {
 type DetailTab = "general" | "categories" | "pricing" | "variants";
 
 const INPUT_CLASS =
-  "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-600 focus:ring-2 focus:ring-brand-600 outline-none";
-const LABEL_CLASS = "block text-sm font-medium text-gray-700 mb-1";
+  "w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-950 focus:ring-2 focus:ring-slate-950 outline-none";
+const LABEL_CLASS = "block text-sm font-medium text-slate-700 mb-1";
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -68,7 +68,7 @@ export default function ProductDetailPage() {
         subtitle="Loading..."
         contentClassName="overflow-y-auto"
       >
-        <div className="p-6 text-sm text-gray-500">Loading...</div>
+        <div className="p-6 text-sm text-slate-500">Loading...</div>
       </EnterpriseShell>
     );
   }
@@ -100,7 +100,7 @@ export default function ProductDetailPage() {
         <div>
           <Link
             href="/inventory"
-            className="inline-flex items-center gap-1 text-sm text-brand-700 hover:underline"
+            className="inline-flex items-center gap-1 text-sm text-slate-950 hover:underline"
           >
             <svg
               aria-hidden="true"
@@ -118,7 +118,7 @@ export default function ProductDetailPage() {
         </div>
 
         {/* Tab navigation */}
-        <div className="flex gap-1 border-b border-gray-200">
+        <div className="flex gap-1 border-b border-slate-200">
           {(["general", "categories", "pricing", "variants"] as DetailTab[]).map(
             (tab) => (
               <button
@@ -128,8 +128,8 @@ export default function ProductDetailPage() {
                 className={[
                   "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors capitalize",
                   activeTab === tab
-                    ? "border-brand-600 text-brand-700"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
+                    ? "border-slate-950 text-slate-950"
+                    : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300",
                 ].join(" ")}
               >
                 {tab}
@@ -245,7 +245,7 @@ function GeneralTab({
           </div>
           <div>
             <label className={LABEL_CLASS}>SKU</label>
-            <code className="block w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+            <code className="block w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
               {product.sku}
             </code>
           </div>
@@ -292,7 +292,7 @@ function GeneralTab({
               <img
                 src={form.image_url}
                 alt="Product"
-                className="mt-2 h-24 w-24 rounded-lg border border-gray-200 object-cover"
+                className="mt-2 h-24 w-24 rounded-md border border-slate-200 object-cover"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = "none";
                 }}
@@ -401,12 +401,12 @@ function GeneralTab({
       </Card>
 
       {saveError && (
-        <div className="rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
+        <div className="rounded-md border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
           {saveError}
         </div>
       )}
       {saved && (
-        <div className="rounded-lg border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700" role="status">
+        <div className="rounded-md border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700" role="status">
           Changes saved successfully.
         </div>
       )}
@@ -494,7 +494,7 @@ function CategoriesTab({ productId }: { productId: string }) {
   }
 
   if (loading) {
-    return <div className="p-6 text-sm text-gray-500">Loading...</div>;
+    return <div className="p-6 text-sm text-slate-500">Loading...</div>;
   }
 
   if (error) {
@@ -514,7 +514,7 @@ function CategoriesTab({ productId }: { productId: string }) {
     <div className="flex flex-col gap-5">
       <Card title="Assign categories">
         {allCategories.length === 0 ? (
-          <p className="text-sm text-gray-500">No categories defined yet.</p>
+          <p className="text-sm text-slate-500">No categories defined yet.</p>
         ) : (
           <div className="flex flex-col gap-2">
             {roots.map((root) => (
@@ -524,9 +524,9 @@ function CategoriesTab({ productId }: { productId: string }) {
                     type="checkbox"
                     checked={assigned.has(root.id)}
                     onChange={() => toggleCategory(root.id)}
-                    className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-600"
+                    className="h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-slate-950"
                   />
-                  <span className="font-medium text-gray-800">{root.name}</span>
+                  <span className="font-medium text-slate-800">{root.name}</span>
                 </label>
                 {children(root.id).map((child) => (
                   <label
@@ -537,9 +537,9 @@ function CategoriesTab({ productId }: { productId: string }) {
                       type="checkbox"
                       checked={assigned.has(child.id)}
                       onChange={() => toggleCategory(child.id)}
-                      className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-600"
+                      className="h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-slate-950"
                     />
-                    <span className="text-gray-700">{child.name}</span>
+                    <span className="text-slate-700">{child.name}</span>
                   </label>
                 ))}
               </div>
@@ -549,12 +549,12 @@ function CategoriesTab({ productId }: { productId: string }) {
       </Card>
 
       {saveError && (
-        <div className="rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
+        <div className="rounded-md border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
           {saveError}
         </div>
       )}
       {saved && (
-        <div className="rounded-lg border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700" role="status">
+        <div className="rounded-md border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700" role="status">
           Categories saved.
         </div>
       )}
@@ -617,7 +617,7 @@ function PricingTab({
         <div className="max-w-xs">
           <label className={LABEL_CLASS}>Sell price (USD)</label>
           <div className="relative">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">
               $
             </span>
             <input
@@ -629,11 +629,11 @@ function PricingTab({
               }}
               min={0}
               step="0.01"
-              className="w-full rounded-lg border border-gray-300 py-2 pl-7 pr-3 text-sm focus:border-brand-600 focus:ring-2 focus:ring-brand-600 outline-none"
+              className="w-full rounded-md border border-slate-300 py-2 pl-7 pr-3 text-sm focus:border-slate-950 focus:ring-2 focus:ring-slate-950 outline-none"
             />
           </div>
           {valid && (
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-slate-500">
               Formatted: {formatMoney(priceCents)}
             </p>
           )}
@@ -641,13 +641,13 @@ function PricingTab({
       </Card>
 
       <Card title="Cost &amp; margin">
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm">
-          <p className="text-gray-600">
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm">
+          <p className="text-slate-600">
             Avg cost is tracked via purchasing/receiving. View cost and margin on
             the{" "}
             <Link
               href="/inventory"
-              className="text-brand-700 underline underline-offset-2"
+              className="text-slate-950 underline underline-offset-2"
             >
               Stock ledger
             </Link>
@@ -657,12 +657,12 @@ function PricingTab({
       </Card>
 
       {saveError && (
-        <div className="rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
+        <div className="rounded-md border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
           {saveError}
         </div>
       )}
       {saved && (
-        <div className="rounded-lg border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700" role="status">
+        <div className="rounded-md border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700" role="status">
           Price saved.
         </div>
       )}
@@ -753,17 +753,17 @@ function VariantsTab({ product }: { product: CatalogProduct }) {
     return (
       <div className="flex flex-col gap-5">
         <Card title="Variant info">
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-slate-700">
             This product is a variant. Parent product ID:{" "}
             <Link
               href={`/inventory/products/${product.parent_product_id}`}
-              className="font-mono text-brand-700 underline underline-offset-2"
+              className="font-mono text-slate-950 underline underline-offset-2"
             >
               {product.parent_product_id}
             </Link>
           </p>
           {product.variant_label && (
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-slate-600">
               Variant label:{" "}
               <span className="font-medium">{product.variant_label}</span>
             </p>
@@ -777,19 +777,19 @@ function VariantsTab({ product }: { product: CatalogProduct }) {
     <div className="flex flex-col gap-5">
       <Card title="Child variants">
         {variantsLoading ? (
-          <div className="text-sm text-gray-500">Loading...</div>
+          <div className="text-sm text-slate-500">Loading...</div>
         ) : variantsError ? (
           <div className="text-sm text-danger-700" role="alert">
             {variantsError}
           </div>
         ) : variants.length === 0 ? (
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-slate-500">
             No child variants assigned yet.
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
                 <tr>
                   <th className="px-4 py-3">SKU</th>
                   <th className="px-4 py-3">Name</th>
@@ -797,21 +797,21 @@ function VariantsTab({ product }: { product: CatalogProduct }) {
                   <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 bg-white">
+              <tbody className="divide-y divide-slate-100 bg-white">
                 {variants.map((v) => (
-                  <tr key={v.id} className="hover:bg-gray-50">
+                  <tr key={v.id} className="hover:bg-slate-50">
                     <td className="whitespace-nowrap px-4 py-3">
                       <Link
                         href={`/inventory/products/${v.id}`}
-                        className="font-mono text-xs font-semibold text-brand-700 underline-offset-2 hover:underline"
+                        className="font-mono text-xs font-semibold text-slate-950 underline-offset-2 hover:underline"
                       >
                         {v.sku}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 font-medium text-gray-900">
+                    <td className="px-4 py-3 font-medium text-slate-950">
                       {v.name}
                     </td>
-                    <td className="px-4 py-3 text-gray-600">
+                    <td className="px-4 py-3 text-slate-600">
                       {v.variant_label ?? "-"}
                     </td>
                     <td className="px-4 py-3">
@@ -821,7 +821,7 @@ function VariantsTab({ product }: { product: CatalogProduct }) {
                             ? "bg-success-100 text-success-700"
                             : v.status === "archived"
                             ? "bg-danger-100 text-danger-700"
-                            : "bg-gray-100 text-gray-600"
+                            : "bg-slate-100 text-slate-600"
                         }`}
                       >
                         {v.status}
@@ -836,7 +836,7 @@ function VariantsTab({ product }: { product: CatalogProduct }) {
       </Card>
 
       <Card title="Assign children by product ID">
-        <p className="mb-3 text-sm text-gray-600">
+        <p className="mb-3 text-sm text-slate-600">
           Enter product IDs (one per line or comma-separated) to assign them as
           children of this master product.
         </p>

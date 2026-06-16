@@ -11,8 +11,8 @@ import { apiPost, ApiResponseError } from "@/api-client/client";
 import type { CatalogProduct } from "@/api-client/types";
 
 const INPUT_CLASS =
-  "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-600 focus:ring-2 focus:ring-brand-600 outline-none";
-const LABEL_CLASS = "block text-sm font-medium text-gray-700 mb-1";
+  "w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-950 focus:ring-2 focus:ring-slate-950 outline-none";
+const LABEL_CLASS = "block text-sm font-medium text-slate-700 mb-1";
 
 export default function NewProductPage() {
   const router = useRouter();
@@ -91,7 +91,7 @@ export default function NewProductPage() {
         <div>
           <Link
             href="/inventory"
-            className="inline-flex items-center gap-1 text-sm text-brand-700 hover:underline"
+            className="inline-flex items-center gap-1 text-sm text-slate-950 hover:underline"
           >
             <svg
               aria-hidden="true"
@@ -159,7 +159,7 @@ export default function NewProductPage() {
                   Price (USD) <span className="text-danger-600">*</span>
                 </label>
                 <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">
                     $
                   </span>
                   <input
@@ -170,7 +170,7 @@ export default function NewProductPage() {
                     placeholder="0.00"
                     min={0}
                     step="0.01"
-                    className={`w-full rounded-lg border py-2 pl-7 pr-3 text-sm focus:border-brand-600 focus:ring-2 focus:ring-brand-600 outline-none${fieldErrors.priceInput ? " border-danger-500" : " border-gray-300"}`}
+                    className={`w-full rounded-md border py-2 pl-7 pr-3 text-sm focus:border-slate-950 focus:ring-2 focus:ring-slate-950 outline-none${fieldErrors.priceInput ? " border-danger-500" : " border-slate-300"}`}
                     aria-describedby={
                       fieldErrors.priceInput ? "price-err" : undefined
                     }
@@ -235,7 +235,7 @@ export default function NewProductPage() {
 
             {error && (
               <div
-                className="mt-4 rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700"
+                className="mt-4 rounded-md border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700"
                 role="alert"
               >
                 {error}
