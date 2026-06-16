@@ -33,10 +33,22 @@ const INDEXES = `
 CREATE INDEX IF NOT EXISTS discounts_tenant_status_idx ON discounts (tenant_id, status, created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS discounts_coupon_uidx ON discounts (tenant_id, coupon_code) WHERE coupon_code IS NOT NULL;`;
 
+// BE-5: per-customer discount usage tracking.
+const CREATE_DISCOUNT_USAGES = `
+CREATE TABLE IF NOT EXISTS discount_usages (
+  id          TEXT PRIMARY KEY,
+  tenant_id   TEXT NOT NULL,
+  discount_id TEXT NOT NULL,
+  customer_id TEXT NOT NULL,
+  order_id    TEXT,
+  used_at     BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS discount_usages_customer_idx ON discount_usages (tenant_id, discount_id, customer_id);`;
+
 /** Discounts & Promotions engine (ERP benchmark #11). */
 export const discountsModule: PosModule = {
   name: "discounts",
-  migrations: [CREATE_DISCOUNTS, INDEXES],
+  migrations: [CREATE_DISCOUNTS, INDEXES, CREATE_DISCOUNT_USAGES],
   register({ db, router }) {
     registerRoutes(router, new DiscountsService(db));
   },

@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { v7 as uuidv7 } from "uuid";
+import { createHash } from "node:crypto";
 import type { DB } from "../shared/db.js";
 import type { EventBus } from "../shared/events.js";
 import { HttpError } from "../shared/http.js";
@@ -97,6 +98,19 @@ export class IdentityService {
 
     const pair = this.issueTokens(user.id, user.tenant_id, user.role);
 
+    const rtkId = `rtk_${uuidv7()}`;
+    await this.db.query(
+      "INSERT INTO refresh_tokens (id, tenant_id, user_id, token_hash, expires_at, created_at) VALUES (@id, @tenantId, @userId, @hash, @exp, @now)",
+      {
+        id: rtkId,
+        tenantId: user.tenant_id,
+        userId: user.id,
+        hash: this.hashToken(pair.refreshToken),
+        exp: Date.now() + 7 * 24 * 60 * 60 * 1000,
+        now: Date.now(),
+      },
+    );
+
     await this.events.publish(
       "identity.login",
       { userId: user.id, tenantId: user.tenant_id, role: user.role },
@@ -147,7 +161,8 @@ export class IdentityService {
   }
 
   /**
-   * Verify a refresh token and issue a new token pair.
+   * Verify a refresh token (single-use rotation) and issue a new token pair.
+   * The incoming token is revoked immediately; a new token is stored in its place.
    */
   async refresh(refreshToken: string): Promise<TokenPair> {
     const secret = this.getSecret();
@@ -161,6 +176,22 @@ export class IdentityService {
       throw new HttpError(401, "unauthenticated", "Invalid refresh token.");
     }
 
+    // Single-use check: look up the hash in the DB.
+    const hash = this.hashToken(refreshToken);
+    const row = await this.db.one<{ id: string }>(
+      "SELECT id FROM refresh_tokens WHERE token_hash = @hash AND revoked_at IS NULL AND expires_at > @now",
+      { hash, now: Date.now() },
+    );
+    if (!row) {
+      throw new HttpError(401, "invalid_token", "Refresh token is invalid or expired.");
+    }
+
+    // Revoke the old token (single-use: cannot be reused).
+    await this.db.query(
+      "UPDATE refresh_tokens SET revoked_at = @now WHERE id = @id",
+      { now: Date.now(), id: row.id },
+    );
+
     // Confirm user still exists and role hasn't changed.
     const user = await this.db.one<UserRow>(
       "SELECT * FROM users WHERE id = @id AND tenant_id = @tenantId",
@@ -170,7 +201,34 @@ export class IdentityService {
       throw new HttpError(401, "unauthenticated", "User no longer exists.");
     }
 
-    return this.issueTokens(user.id, user.tenant_id, user.role);
+    const pair = this.issueTokens(user.id, user.tenant_id, user.role);
+
+    // Store the new refresh token hash.
+    const newRtkId = `rtk_${uuidv7()}`;
+    await this.db.query(
+      "INSERT INTO refresh_tokens (id, tenant_id, user_id, token_hash, expires_at, created_at) VALUES (@id, @tenantId, @userId, @hash, @exp, @now)",
+      {
+        id: newRtkId,
+        tenantId: user.tenant_id,
+        userId: user.id,
+        hash: this.hashToken(pair.refreshToken),
+        exp: Date.now() + 7 * 24 * 60 * 60 * 1000,
+        now: Date.now(),
+      },
+    );
+
+    return pair;
+  }
+
+  /**
+   * Revoke a specific refresh token (used by /logout).
+   */
+  async revokeRefreshToken(refreshToken: string, tenantId: string): Promise<void> {
+    const hash = this.hashToken(refreshToken);
+    await this.db.query(
+      "UPDATE refresh_tokens SET revoked_at = @now WHERE token_hash = @hash AND tenant_id = @t AND revoked_at IS NULL",
+      { now: Date.now(), hash, t: tenantId },
+    );
   }
 
   /**
@@ -252,6 +310,10 @@ export class IdentityService {
   }
 
   // ── Internal helpers ────────────────────────────────────────────────────────
+
+  private hashToken(token: string): string {
+    return createHash("sha256").update(token).digest("hex");
+  }
 
   private issueTokens(userId: string, tenantId: string, role: Role): TokenPair {
     const secret = this.getSecret();

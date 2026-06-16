@@ -38,6 +38,21 @@ export function registerIdentityRoutes(router: Router, service: IdentityService)
     }),
   );
 
+  // /logout can be called both authenticated and unauthenticated (token may be expired).
+  // We gracefully handle missing auth by falling back to a tenantId from the request body.
+  router.post(
+    "/logout",
+    handler(async (req, res) => {
+      const { refreshToken } = req.body as { refreshToken?: string };
+      if (refreshToken) {
+        const auth = res.locals["auth"] as { tenantId?: string } | undefined;
+        const tenantId = auth?.tenantId ?? (req.body as Record<string, unknown>).tenantId as string ?? "";
+        await service.revokeRefreshToken(refreshToken, tenantId);
+      }
+      res.json({ ok: true });
+    }),
+  );
+
   // /me is protected — auth middleware must be mounted on this router upstream.
   router.get(
     "/me",

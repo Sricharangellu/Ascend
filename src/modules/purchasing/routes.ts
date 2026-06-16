@@ -105,11 +105,17 @@ export function registerRoutes(router: Router, service: PurchasingService): void
   }));
 
   const receiveSchema = z.object({
-    lines: z.array(z.object({ lineId: z.string().min(1), qty: z.number().int().positive() })).min(1),
+    lines: z.array(z.object({
+      lineId: z.string().min(1),
+      qty: z.number().int().positive().optional(),
+      quantity: z.number().int().positive().optional(),
+    })).min(1),
   });
 
   router.post("/orders/:id/receive", mgr, handler(async (req, res) => {
     const b = parseBody(receiveSchema, req.body);
-    res.json(await service.receive(String(req.params.id), tenantId(res), b.lines));
+    // Support both `qty` (legacy) and `quantity` (BE-11) field names.
+    const lines = b.lines.map((l) => ({ lineId: l.lineId, qty: l.qty ?? l.quantity ?? 1 }));
+    res.json(await service.receive(String(req.params.id), tenantId(res), lines));
   }));
 }

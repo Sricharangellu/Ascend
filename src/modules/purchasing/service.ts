@@ -70,6 +70,7 @@ export interface PurchaseOrder {
   tenant_id: string;
   supplier_id: string;
   status: POStatus;
+  receive_status: string;
   total_cost_cents: number;
   created_at: number;
   received_at: number | null;
@@ -253,7 +254,7 @@ export class PurchasingService {
         );
       }
     });
-    return { id: poId, tenant_id: tenantId, supplier_id: supplierId, status: "ordered", total_cost_cents: total, created_at: now, received_at: null, lines: poLines };
+    return { id: poId, tenant_id: tenantId, supplier_id: supplierId, status: "ordered", receive_status: "pending", total_cost_cents: total, created_at: now, received_at: null, lines: poLines };
   }
 
   async listOrders(tenantId: string): Promise<PurchaseOrder[]> {
@@ -319,10 +320,11 @@ export class PurchasingService {
       const fullyReceived = updatedLines.every((l) => (l.received_qty ?? 0) >= l.quantity);
       const anyReceived = updatedLines.some((l) => (l.received_qty ?? 0) > 0);
       const newStatus: POStatus = fullyReceived ? "received" : anyReceived ? "partially_received" : "ordered";
+      const receiveStatus = fullyReceived ? "received" : anyReceived ? "partially_received" : "pending";
 
       await tdb.query(
-        "UPDATE purchase_orders SET status = @status, received_at = @receivedAt WHERE id = @id AND tenant_id = @tenantId",
-        { status: newStatus, receivedAt: fullyReceived ? now : null, id, tenantId },
+        "UPDATE purchase_orders SET status = @status, receive_status = @receiveStatus, received_at = @receivedAt WHERE id = @id AND tenant_id = @tenantId",
+        { status: newStatus, receiveStatus, receivedAt: fullyReceived ? now : null, id, tenantId },
       );
     });
 
@@ -347,5 +349,15 @@ export class PurchasingService {
 
     // Return the refreshed PO.
     return this.getOrder(id, tenantId);
+  }
+
+  /** BE-11: Named alias for partial PO receiving — accepts per-line quantities.
+   *  Delegates to `receive()` which already handles partial receives. */
+  async receiveLines(
+    poId: string,
+    lines: Array<{ lineId: string; quantity: number }>,
+    tenantId: string,
+  ): Promise<PurchaseOrderWithLines> {
+    return this.receive(poId, tenantId, lines.map((l) => ({ lineId: l.lineId, qty: l.quantity })));
   }
 }

@@ -138,11 +138,33 @@ export class DiscountsService {
     return { ...d, status };
   }
 
-  /** Increment usage, enforcing usage_limit. */
-  async redeem(id: string, tenantId: string): Promise<Discount> {
+  /** Increment usage, enforcing usage_limit and per_customer_limit.
+   *  Pass `customerId` for per-customer tracking (BE-5). */
+  async redeem(id: string, tenantId: string, customerId?: string, orderId?: string): Promise<Discount> {
     const d = await this.get(id, tenantId);
     if (d.usage_limit !== null && Number(d.used_count) >= Number(d.usage_limit)) throw conflict("discount usage limit reached");
+
+    // BE-5: enforce per-customer limit when customerId is provided.
+    if (d.per_customer_limit !== null && customerId) {
+      const usageRow = await this.db.one<{ cnt: number }>(
+        "SELECT COUNT(*)::int AS cnt FROM discount_usages WHERE tenant_id = @t AND discount_id = @d AND customer_id = @c",
+        { t: tenantId, d: id, c: customerId },
+      );
+      if (Number(usageRow?.cnt ?? 0) >= Number(d.per_customer_limit)) {
+        throw conflict(`This discount has already been used ${d.per_customer_limit} time(s) by this customer`);
+      }
+    }
+
     await this.db.query("UPDATE discounts SET used_count = used_count + 1, updated_at = @now WHERE id = @id AND tenant_id = @t", { now: Date.now(), id, t: tenantId });
+
+    // Record per-customer usage for BE-5 tracking.
+    if (customerId) {
+      await this.db.query(
+        "INSERT INTO discount_usages (id, tenant_id, discount_id, customer_id, order_id, used_at) VALUES (@id,@t,@d,@c,@o,@now)",
+        { id: `dku_${uuidv7()}`, t: tenantId, d: id, c: customerId, o: orderId ?? null, now: Date.now() },
+      );
+    }
+
     return { ...d, used_count: Number(d.used_count) + 1 };
   }
 

@@ -118,9 +118,11 @@ export function openDb(options: OpenDbOptions = {}): DB {
   const schema = options.schema ?? "public";
   const pool = new Pool({
     connectionString,
-    max: options.max ?? Number(process.env.PG_POOL_MAX ?? 5),
-    idleTimeoutMillis: 1000,
+    max: options.max ?? Number(process.env.PG_POOL_MAX ?? 10),
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
     allowExitOnIdle: true,
+    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
     options: `-c search_path=${schema}`,
   });
   return makeDb(pool, { isTx: false, pool });

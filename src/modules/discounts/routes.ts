@@ -59,8 +59,14 @@ export function registerRoutes(router: Router, service: DiscountsService): void 
     const b = parseBody(statusSchema, req.body);
     res.json(await service.setStatus(String(req.params.id), b.status, tenantId(res)));
   }));
+  const redeemSchema = z.object({
+    customerId: z.string().min(1).optional(),
+    orderId: z.string().min(1).optional(),
+  }).optional();
+
   router.post("/:id/redeem", handler(async (req, res) => {
-    res.json(await service.redeem(String(req.params.id), tenantId(res)));
+    const b = req.body && Object.keys(req.body).length > 0 ? parseBody(redeemSchema as z.ZodTypeAny, req.body) : undefined;
+    res.json(await service.redeem(String(req.params.id), tenantId(res), b?.customerId, b?.orderId));
   }));
   router.post("/evaluate", handler(async (req, res) => {
     res.json(await service.evaluate(parseBody(evaluateSchema, req.body), tenantId(res)));

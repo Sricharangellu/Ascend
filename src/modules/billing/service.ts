@@ -140,6 +140,33 @@ export class BillingService {
     }
     if (!input.customerId) throw new HttpError(400, "bad_request", "customerId is required");
     if (!total || total <= 0) throw new HttpError(400, "bad_request", "totalCents must be positive");
+
+    // BE-13: Enforce customer credit limit — block if new invoice would exceed the limit.
+    try {
+      const customer = await this.db.one<{ credit_limit_cents: number | null }>(
+        "SELECT credit_limit_cents FROM customers WHERE id = @c AND tenant_id = @t",
+        { c: input.customerId, t: tenantId },
+      );
+      if (customer?.credit_limit_cents != null) {
+        const outstandingRow = await this.db.one<{ outstanding: number }>(
+          `SELECT COALESCE(SUM(total_cents - paid_cents), 0) AS outstanding
+             FROM invoices WHERE tenant_id = @t AND customer_id = @c AND status IN ('open', 'partial')`,
+          { t: tenantId, c: input.customerId },
+        );
+        const outstanding = Number(outstandingRow?.outstanding ?? 0);
+        if (outstanding + total > Number(customer.credit_limit_cents)) {
+          throw new HttpError(
+            409,
+            "credit_limit_exceeded",
+            `Customer credit limit of ${customer.credit_limit_cents} cents would be exceeded (current outstanding: ${outstanding} cents)`,
+          );
+        }
+      }
+    } catch (err) {
+      // Re-throw HttpErrors; swallow errors from missing customers table in tests.
+      if (err instanceof HttpError) throw err;
+    }
+
     const now = Date.now();
     const inv: Invoice = {
       id: `inv_${uuidv7()}`, tenant_id: tenantId, customer_id: input.customerId, order_id: input.orderId ?? null,

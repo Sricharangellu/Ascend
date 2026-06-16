@@ -167,7 +167,7 @@ test("archived (soft-deleted) product cannot be rung up -> 400 bad_request", asy
 
   // No order should have been created from the rejected request.
   const list = await call(app, "GET", "/api/orders/");
-  assert.equal(list.json.total, 0);
+  assert.equal(list.json.items.length, 0);
 });
 
 test("draft (unpublished) product cannot be rung up -> 400 bad_request", async () => {
@@ -194,7 +194,7 @@ test("draft (unpublished) product cannot be rung up -> 400 bad_request", async (
 
   // No order should have been created from the rejected request.
   const list = await call(app, "GET", "/api/orders/");
-  assert.equal(list.json.total, 0);
+  assert.equal(list.json.items.length, 0);
 });
 
 test("a master/variant-parent product cannot be rung up -> 400 bad_request", async () => {
@@ -246,7 +246,7 @@ test("GET /:id returns the order with its lines; 404 when missing", async () => 
   assert.equal(missing.json.error.code, "not_found");
 });
 
-test("GET / lists orders with Page<T> shape", async () => {
+test("GET / lists orders with CursorPage shape", async () => {
   const app = await freshApp();
   const widget = await makeProduct(app, {
     sku: "LIST-W",
@@ -260,10 +260,8 @@ test("GET / lists orders with Page<T> shape", async () => {
   const { status, json } = await call(app, "GET", "/api/orders/");
   assert.equal(status, 200);
   assert.ok(Array.isArray(json.items));
-  assert.equal(typeof json.total, "number");
   assert.equal(typeof json.limit, "number");
-  assert.equal(typeof json.offset, "number");
-  assert.ok(json.total >= 2);
+  assert.ok(json.items.length >= 2);
 });
 
 test("GET /?status= filters by status and rejects unknown values with 400", async () => {
@@ -288,11 +286,11 @@ test("GET /?status= filters by status and rejects unknown values with 400", asyn
   // Valid filter returns only the matching orders.
   const refunded = await call(app, "GET", "/api/orders/?status=refunded");
   assert.equal(refunded.status, 200);
-  assert.equal(refunded.json.total, 1);
+  assert.equal(refunded.json.items.length, 1);
   assert.equal(refunded.json.items[0].id, toRefund.json.id);
 
   const openList = await call(app, "GET", "/api/orders/?status=open");
-  assert.equal(openList.json.total, 1);
+  assert.equal(openList.json.items.length, 1);
   assert.equal(openList.json.items[0].id, open.json.id);
 
   // Unknown status is a bad request, not a silently-empty page.

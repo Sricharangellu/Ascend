@@ -2,7 +2,7 @@ import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import type { Cents } from "../../shared/money.js";
-import type { Page, StateCode } from "../../shared/types.js";
+import type { StateCode } from "../../shared/types.js";
 import { notFound, badRequest, conflict } from "../../shared/http.js";
 import { computeOrderTax, type TaxableLine } from "./tax.js";
 
@@ -57,6 +57,13 @@ export interface ListOrdersQuery {
   status?: OrderStatus;
   limit?: number;
   offset?: number;
+  cursor?: string;
+}
+
+export interface CursorPage<T> {
+  items: T[];
+  nextCursor: string | null;
+  limit: number;
 }
 
 /** product columns owned by the catalog module (read-only, by id). */
@@ -283,9 +290,13 @@ export class OrdersService {
     return order;
   }
 
-  async list(query: ListOrdersQuery = {}, tenantId: string): Promise<Page<OrderRow>> {
+  async list(query: ListOrdersQuery = {}, tenantId: string): Promise<CursorPage<OrderRow>> {
     const limit = clampLimit(query.limit);
-    const offset = query.offset && query.offset > 0 ? Math.floor(query.offset) : 0;
+
+    // Decode cursor if provided.
+    const cur = query.cursor
+      ? (JSON.parse(Buffer.from(query.cursor, "base64url").toString()) as { at: number; id: string })
+      : null;
 
     const where: string[] = ["tenant_id = @tenantId"];
     const params: Record<string, unknown> = { tenantId };
@@ -293,22 +304,27 @@ export class OrdersService {
       where.push("status = @status");
       params.status = query.status;
     }
+    if (cur) {
+      where.push("(created_at, id) < (@curAt, @curId)");
+      params.curAt = cur.at;
+      params.curId = cur.id;
+    }
     const whereSql = `WHERE ${where.join(" AND ")}`;
-
-    const totalRow = await this.db.one<{ n: number }>(
-      `SELECT COUNT(*) AS n FROM orders ${whereSql}`,
-      params,
-    );
-    const total = totalRow?.n ?? 0;
 
     const items = await this.db.query<OrderRow>(
       `SELECT * FROM orders ${whereSql}
        ORDER BY created_at DESC, id DESC
-       LIMIT @limit OFFSET @offset`,
-      { ...params, limit, offset },
+       LIMIT @limit`,
+      { ...params, limit },
     );
 
-    return { items, total, limit, offset };
+    const lastItem = items[items.length - 1];
+    const nextCursor =
+      items.length === limit && lastItem
+        ? Buffer.from(JSON.stringify({ at: lastItem.created_at, id: lastItem.id })).toString("base64url")
+        : null;
+
+    return { items, nextCursor, limit };
   }
 
   async refund(id: string, tenantId: string): Promise<OrderWithLines> {

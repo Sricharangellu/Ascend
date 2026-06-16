@@ -1,4 +1,5 @@
 import express, { Router, type Express } from "express";
+import { createHash } from "node:crypto";
 import { openDb, type DB } from "./shared/db.js";
 import { EventBus } from "./shared/events.js";
 import { errorMiddleware } from "./shared/http.js";
@@ -41,12 +42,29 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
 
   await db.exec(`CREATE SCHEMA IF NOT EXISTS "${schema}"`);
 
+  // Schema migration tracker — prevents re-running migrations on every cold start
+  await db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+    hash   TEXT PRIMARY KEY,
+    name   TEXT NOT NULL,
+    ran_at BIGINT NOT NULL
+  )`);
+
+  async function runIfNew(sql: string, name: string): Promise<void> {
+    const hash = createHash("sha256").update(sql.trim()).digest("hex").slice(0, 24);
+    const existing = await db.one<{ hash: string }>("SELECT hash FROM schema_migrations WHERE hash = @hash", { hash });
+    if (existing) return;
+    await db.exec(sql);
+    await db.query("INSERT INTO schema_migrations (hash, name, ran_at) VALUES (@hash, @name, @now)", { hash, name, now: Date.now() });
+  }
+
   // ── Identity migrations run first (platform tables: tenants, users, audit_log, etc.)
-  for (const sql of identityModule.migrations) await db.exec(sql);
+  for (const sql of identityModule.migrations) await runIfNew(sql, `identity`);
 
   // ── Domain module migrations
   for (const mod of modules) {
-    for (const sql of mod.migrations) await db.exec(sql);
+    for (const [i, sql] of mod.migrations.entries()) {
+      await runIfNew(sql, `${mod.name}[${i}]`);
+    }
   }
 
   // ── Global gateway middleware (applied before all /api routes)

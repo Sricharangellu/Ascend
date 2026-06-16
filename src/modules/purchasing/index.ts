@@ -41,6 +41,11 @@ ALTER TABLE purchase_order_lines ADD COLUMN IF NOT EXISTS expiry_date BIGINT;
 ALTER TABLE purchase_order_lines ADD COLUMN IF NOT EXISTS lot_code TEXT;
 ALTER TABLE purchase_order_lines ADD COLUMN IF NOT EXISTS received_qty INTEGER NOT NULL DEFAULT 0;`;
 
+// BE-11: partial PO receiving — receive_status + remaining_qty columns.
+const ALTER_PO_RECEIVE_STATUS = `
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS receive_status TEXT NOT NULL DEFAULT 'pending';
+ALTER TABLE purchase_order_lines ADD COLUMN IF NOT EXISTS remaining_qty INTEGER;`;
+
 // Vendor AP credits: chargebacks (we deduct from the vendor) and credit memos
 // (vendor credits us). Reduce what we owe a supplier.
 const CREATE_VENDOR_CREDITS = `
@@ -100,7 +105,7 @@ CREATE INDEX IF NOT EXISTS suppliers_tenant_idx ON suppliers (tenant_id, created
  *  `purchase_order.received`; inventory listens and increments stock. */
 export const purchasingModule: PosModule = {
   name: "purchasing",
-  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES],
+  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES],
   async register({ db, events, router }) {
     const service = new PurchasingService(db, events);
     registerRoutes(router, service);

@@ -56,11 +56,13 @@ export function registerRoutes(router: Router, service: OrdersService): void {
     "/",
     handler(async (req: Request, res: Response) => {
       const status = readStatusFilter(req.query.status);
+      const cursor = typeof req.query.cursor === "string" && req.query.cursor !== "" ? req.query.cursor : undefined;
       const page = await service.list(
         {
           status,
           limit: parseInt0(req.query.limit),
           offset: parseInt0(req.query.offset),
+          cursor,
         },
         tenantId(res),
       );
