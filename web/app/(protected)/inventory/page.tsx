@@ -366,7 +366,6 @@ export default function InventoryPage() {
             value={formatMoney(metrics.value)}
             detail="using tracked cost"
           />
-          <Metric label="Pending transfers" value="2" detail="receiving today" />
         </div>
 
         {/* Tab switcher */}
