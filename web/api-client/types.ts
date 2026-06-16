@@ -463,3 +463,61 @@ export interface RecordPaymentRequest {
   amountCents: number;
   method?: string;
 }
+
+// ─── Catalog (BE-6/BE-7/BE-8) ────────────────────────────────────────────────
+export interface CatalogProduct {
+  id: string;
+  sku: string;
+  name: string;
+  /** integer cents */
+  price_cents: number;
+  /** legacy single category string */
+  category: string;
+  tax_class: "standard" | "exempt";
+  barcode?: string;
+  status: "active" | "draft" | "archived";
+  description?: string;
+  brand?: string;
+  length_mm?: number;
+  width_mm?: number;
+  height_mm?: number;
+  weight_grams?: number;
+  image_url?: string;
+  preferred_vendor_id?: string;
+  vendor_upc?: string;
+  min_qty_to_sell?: number;
+  max_qty_to_sell?: number;
+  qty_increment?: number;
+  parent_product_id?: string;
+  variant_label?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CatalogCategory {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  tenant_id: string;
+}
+
+export interface CatalogProductsResponse {
+  items: CatalogProduct[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface CatalogCategoriesResponse {
+  items: CatalogCategory[];
+}
+
+export interface CatalogBarcode {
+  barcode: string;
+  kind: string;
+  packSize?: number;
+}
+
+export interface CatalogBarcodesResponse {
+  items: CatalogBarcode[];
+}

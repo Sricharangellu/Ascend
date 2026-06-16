@@ -180,15 +180,17 @@ records, only triaged into "build now" vs. "documented for later."
 - [ ] FE-6: Audit existing `web/mocks/lightspeedHandlers.ts` against live
       backend routes; flip any still-mocked endpoints used by built pages to
       live `apiGet`/`apiPost` calls.
-- [ ] FE-7: Catalog filter/bulk-select UI on `/inventory` — category-tree
+- [x] FE-7: Catalog filter/bulk-select UI on `/inventory` — category-tree
       filter, row checkboxes + "Actions" menu (bulk status/category update,
       CSV export), consuming BE-6/BE-7. See `CATALOG_PRODUCT_FINDER.md`.
-- [ ] FE-8: Product detail/edit page (`/inventory/products/[id]`) with
+      (done)
+- [x] FE-8: Product detail/edit page (`/inventory/products/[id]`) with
       General, Categories, Price (live cost/price/margin/markup), Manage Qty,
       and Image sections, consuming BE-6. See `CATALOG_PRODUCT_FINDER.md`.
-- [ ] FE-9: Variants UI — master/child editor on the product detail page plus
+      (done)
+- [x] FE-9: Variants UI — master/child editor on the product detail page plus
       a visual distinction for master rows in the `/inventory` list,
-      consuming BE-8. See `CATALOG_PRODUCT_FINDER.md`.
+      consuming BE-8. See `CATALOG_PRODUCT_FINDER.md`. (done)
 - [ ] FE-11: Discounts — rule builder on `/discounts`: create/edit form
       covering `ruleType` (simple/volume/bxgy), `discountType`
       (fixed/percent), `applyTo`, `tierRestriction`,
@@ -246,5 +248,10 @@ records, only triaged into "build now" vs. "documented for later."
   orders guard against selling a master row).
 - 2026-06-14 backend BE-7 -> 904d3b6: added bulk-update, CSV import/export,
   and bulk EAN-13 barcode generation to the catalog module.
+
+- 2026-06-16 frontend FE-7/FE-8/FE-9: fully functional product catalog UI —
+  Catalog tab on /inventory (filter, bulk-select, bulk-status, CSV export,
+  New product button); /inventory/products/[id] detail page (General,
+  Categories, Pricing, Variants tabs); /inventory/products/new create form.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
