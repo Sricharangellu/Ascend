@@ -10,7 +10,7 @@ import { apiGet, apiPut, apiPost, apiDelete } from "@/api-client/client";
 import { useToast } from "@/components/Toast";
 import { formatMoney } from "@/lib/money";
 
-type Section = "store" | "shipping" | "terms" | "modes" | "tax" | "flags" | "security";
+type Section = "store" | "shipping" | "terms" | "modes" | "tax" | "flags" | "security" | "coa" | "deposits";
 
 interface Business { [key: string]: unknown }
 interface ShippingMethod { id: string; name: string; amountCents: number; freeLimitCents?: number; ecommerce?: boolean; sequence?: number }
@@ -29,7 +29,7 @@ export default function SettingsPage() {
       <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-5 px-4 py-6 xl:grid-cols-[16rem_1fr]">
         <Card className="h-fit p-2">
           <nav aria-label="Settings sections" className="flex flex-col gap-1">
-            {(["store", "shipping", "terms", "modes", "tax", "flags", "security"] as Section[]).map((s) => (
+            {(["store", "shipping", "terms", "modes", "tax", "flags", "security", "coa", "deposits"] as Section[]).map((s) => (
               <SectionButton key={s} active={section === s} onClick={() => setSection(s)} label={sectionLabel(s)} />
             ))}
           </nav>
@@ -43,6 +43,8 @@ export default function SettingsPage() {
           {section === "tax" && <TaxSection canManage={canManage} addToast={addToast} />}
           {section === "flags" && <FlagsSection canManage={canManage} addToast={addToast} />}
           {section === "security" && <SecuritySection />}
+          {section === "coa" && <CoaSection canManage={canManage} addToast={addToast} />}
+          {section === "deposits" && <DepositsSection canManage={canManage} addToast={addToast} />}
         </div>
       </div>
     </EnterpriseShell>
@@ -50,7 +52,7 @@ export default function SettingsPage() {
 }
 
 function sectionLabel(s: Section): string {
-  return { store: "Store profile", shipping: "Shipping methods", terms: "Payment terms", modes: "Payment modes", tax: "Tax rates", flags: "Feature flags", security: "Security" }[s];
+  return { store: "Store profile", shipping: "Shipping methods", terms: "Payment terms", modes: "Payment modes", tax: "Tax rates", flags: "Feature flags", security: "Security", coa: "Chart of Accounts", deposits: "Deposits" }[s];
 }
 
 // ─── Store Profile ────────────────────────────────────────────────────────────
@@ -516,6 +518,213 @@ function SecuritySection() {
         </div>
       </Card>
     </div>
+  );
+}
+
+// ─── Chart of Accounts ───────────────────────────────────────────────────────
+
+interface CoaAccount {
+  id: string;
+  code: string;
+  name: string;
+  type: "asset" | "liability" | "income" | "expense" | string;
+  parent_id?: string | null;
+}
+
+function CoaSection({ canManage, addToast }: { canManage: boolean; addToast: ReturnType<typeof useToast>["addToast"] }) {
+  const [accounts, setAccounts] = useState<CoaAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ code: "", name: "", type: "asset" });
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    apiGet<{ items: CoaAccount[] }>("/api/v1/accounting/accounts")
+      .then(r => setAccounts(r.items ?? []))
+      .catch(() => setAccounts([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const add = async () => {
+    if (!form.code.trim() || !form.name.trim()) return;
+    setBusy(true);
+    try {
+      await apiPost("/api/v1/accounting/accounts", { code: form.code.trim(), name: form.name.trim(), type: form.type });
+      setShowAdd(false);
+      setForm({ code: "", name: "", type: "asset" });
+      load();
+      addToast({ title: "Account added", variant: "success" });
+    } catch (e) {
+      addToast({ title: "Failed", description: e instanceof Error ? e.message : "Unknown error", variant: "error" });
+    } finally { setBusy(false); }
+  };
+
+  const typeOrder = ["asset", "liability", "income", "expense"];
+  const grouped = typeOrder.reduce<Record<string, CoaAccount[]>>((acc, t) => {
+    acc[t] = accounts.filter(a => a.type === t);
+    return acc;
+  }, {});
+  // also capture any unexpected types
+  accounts.forEach(a => {
+    if (!typeOrder.includes(a.type)) {
+      if (!grouped[a.type]) grouped[a.type] = [];
+      grouped[a.type]!.push(a);
+    }
+  });
+
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+        <div>
+          <h2 className="text-base font-semibold text-slate-950">Chart of Accounts</h2>
+          <p className="text-sm text-slate-500">General ledger accounts grouped by type.</p>
+        </div>
+        {canManage && !showAdd && <Button variant="primary" size="sm" onClick={() => setShowAdd(true)}>Add account</Button>}
+      </div>
+      {showAdd && canManage && (
+        <div className="border-b border-slate-200 bg-slate-50 px-4 py-4">
+          <div className="flex flex-wrap gap-3">
+            <input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder="Code (e.g. 1000)" className="w-28 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Account name" className="flex-1 min-w-40 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+            <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950">
+              <option value="asset">Asset</option>
+              <option value="liability">Liability</option>
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+            </select>
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setShowAdd(false)}>Cancel</Button>
+              <Button size="sm" variant="primary" loading={busy} disabled={!form.code.trim() || !form.name.trim()} onClick={add}>Add</Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {loading ? (
+        <div className="px-4 py-8 text-center text-sm text-slate-400">Loading accounts…</div>
+      ) : accounts.length === 0 ? (
+        <div className="px-4 py-8 text-center text-sm text-slate-400">No accounts yet. Add your first account above.</div>
+      ) : (
+        <div className="divide-y divide-slate-100">
+          {Object.entries(grouped).filter(([, rows]) => rows.length > 0).map(([type, rows]) => (
+            <div key={type}>
+              <div className="bg-slate-50 px-4 py-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{type}</span>
+              </div>
+              <table className="w-full text-sm">
+                <tbody className="divide-y divide-slate-100">
+                  {rows.sort((a, b) => a.code.localeCompare(b.code)).map(account => (
+                    <tr key={account.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 w-24"><span className="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded">{account.code}</span></td>
+                      <td className="px-4 py-3 font-medium text-slate-900">{account.name}</td>
+                      <td className="px-4 py-3 text-slate-500 capitalize">{account.type}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ─── Deposits ─────────────────────────────────────────────────────────────────
+
+interface Deposit {
+  id: string;
+  deposit_number: string;
+  status: string;
+  total_cents: number;
+  created_at: number;
+  note?: string;
+}
+
+function DepositsSection({ canManage, addToast }: { canManage: boolean; addToast: ReturnType<typeof useToast>["addToast"] }) {
+  const [deposits, setDeposits] = useState<Deposit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ amountCents: "", note: "" });
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    apiGet<{ items: Deposit[] }>("/api/v1/accounting/deposits")
+      .then(r => setDeposits(r.items ?? []))
+      .catch(() => setDeposits([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const add = async () => {
+    const cents = Math.round(parseFloat(form.amountCents || "0") * 100);
+    if (cents <= 0) return;
+    setBusy(true);
+    try {
+      await apiPost("/api/v1/accounting/deposits", { totalCents: cents, note: form.note.trim() || undefined });
+      setShowAdd(false);
+      setForm({ amountCents: "", note: "" });
+      load();
+      addToast({ title: "Deposit created", variant: "success" });
+    } catch (e) {
+      addToast({ title: "Failed", description: e instanceof Error ? e.message : "Unknown error", variant: "error" });
+    } finally { setBusy(false); }
+  };
+
+  const statusColor = (s: string) => {
+    if (s === "completed" || s === "deposited") return "text-emerald-700";
+    if (s === "pending") return "text-amber-700";
+    return "text-slate-500";
+  };
+
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+        <div>
+          <h2 className="text-base font-semibold text-slate-950">Batch Deposits</h2>
+          <p className="text-sm text-slate-500">Record cash and payment deposits to the bank.</p>
+        </div>
+        {canManage && !showAdd && <Button variant="primary" size="sm" onClick={() => setShowAdd(true)}>New deposit</Button>}
+      </div>
+      {showAdd && canManage && (
+        <div className="border-b border-slate-200 bg-slate-50 px-4 py-4">
+          <div className="flex flex-wrap gap-3">
+            <input value={form.amountCents} onChange={e => setForm(f => ({ ...f, amountCents: e.target.value }))} placeholder="Amount ($)" type="number" min="0" step="0.01" className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+            <input value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} placeholder="Note (optional)" className="flex-1 min-w-40 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setShowAdd(false)}>Cancel</Button>
+              <Button size="sm" variant="primary" loading={busy} disabled={parseFloat(form.amountCents || "0") <= 0} onClick={add}>Create</Button>
+            </div>
+          </div>
+        </div>
+      )}
+      <table className="w-full text-sm">
+        <thead><tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+          <th className="px-4 py-3">Deposit #</th>
+          <th className="px-4 py-3">Status</th>
+          <th className="px-4 py-3">Amount</th>
+          <th className="px-4 py-3">Date</th>
+          <th className="px-4 py-3">Note</th>
+        </tr></thead>
+        <tbody className="divide-y divide-slate-100">
+          {loading && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">Loading…</td></tr>}
+          {!loading && deposits.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No deposits yet</td></tr>}
+          {deposits.map(d => (
+            <tr key={d.id}>
+              <td className="px-4 py-3 font-medium">{d.deposit_number}</td>
+              <td className={`px-4 py-3 capitalize font-medium ${statusColor(d.status)}`}>{d.status}</td>
+              <td className="px-4 py-3">{formatMoney(d.total_cents)}</td>
+              <td className="px-4 py-3 text-slate-500">{new Date(d.created_at).toLocaleDateString()}</td>
+              <td className="px-4 py-3 text-slate-500">{d.note ?? "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
   );
 }
 

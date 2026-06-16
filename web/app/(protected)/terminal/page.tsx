@@ -29,6 +29,7 @@ import { CartPanel } from "@/components/terminal/CartPanel";
 import { TenderScreen } from "@/components/terminal/TenderScreen";
 import { ReceiptView } from "@/components/terminal/ReceiptView";
 import { OfflineQueueBanner } from "@/components/terminal/OfflineQueueBanner";
+import { RegisterSessionGuard } from "@/components/terminal/RegisterSessionGuard";
 import { useFlag } from "@/flags/useFlag";
 
 // ─── Terminal inner (has access to cart context) ──────────────────────────────
@@ -43,6 +44,7 @@ function TerminalInner() {
   const [screen, setScreen] = useState<"terminal" | "tender" | "receipt">("terminal");
   const [completedPayment, setCompletedPayment] = useState<Payment | null>(null);
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
+  const [ageVerified, setAgeVerified] = useState(false);
 
   // Debounce ref for order sync
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -80,6 +82,7 @@ function TerminalInner() {
       lines: lines.map((l) => ({
         productId: l.product.id,
         quantity: l.quantity,
+        ...(l.product.ageRestricted ? { ageVerified } : {}),
       })),
     };
 
@@ -116,7 +119,7 @@ function TerminalInner() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cart.state.lines, isOffline]);
+  }, [cart.state.lines, isOffline, ageVerified]);
 
   const handleAddProduct = useCallback(
     (product: Product) => {
@@ -149,12 +152,14 @@ function TerminalInner() {
     setCompletedPayment(null);
     setCompletedOrder(null);
     setScreen("terminal");
+    setAgeVerified(false);
     addToast({ title: "New sale started", variant: "info" });
   }, [cart, addToast]);
 
   const handleClearCart = useCallback(() => {
     cart.clearCart();
     orderIdRef.current = null;
+    setAgeVerified(false);
   }, [cart]);
 
   return (
@@ -165,20 +170,26 @@ function TerminalInner() {
       banner={<OfflineQueueBanner />}
       contentClassName="flex flex-1 flex-col overflow-hidden lg:flex-row"
     >
-      {/* Left: Product grid */}
-      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-        <ProductGrid onAddProduct={handleAddProduct} />
-      </div>
+      <RegisterSessionGuard registerId="reg_01">
+        <div className="flex flex-1 flex-col overflow-hidden lg:flex-row h-full">
+          {/* Left: Product grid */}
+          <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
+            <ProductGrid onAddProduct={handleAddProduct} />
+          </div>
 
-      {/* Right: Cart panel on desktop; bottom drawer on tablet/mobile */}
-      <div className="h-[42vh] shrink-0 overflow-hidden border-t border-slate-200 lg:h-auto lg:w-80 lg:border-l lg:border-t-0 xl:w-96">
-        <CartPanel
-          cart={cart}
-          onCharge={handleCharge}
-          onClear={handleClearCart}
-          role={user?.role}
-        />
-      </div>
+          {/* Right: Cart panel on desktop; bottom drawer on tablet/mobile */}
+          <div className="h-[42vh] shrink-0 overflow-hidden border-t border-slate-200 lg:h-auto lg:w-80 lg:border-l lg:border-t-0 xl:w-96">
+            <CartPanel
+              cart={cart}
+              onCharge={handleCharge}
+              onClear={handleClearCart}
+              role={user?.role}
+              ageVerified={ageVerified}
+              onAgeVerifiedChange={setAgeVerified}
+            />
+          </div>
+        </div>
+      </RegisterSessionGuard>
 
       {/* ── Overlays ──────────────────────────────────────────────────────── */}
       {screen === "tender" && cart.state.order && (

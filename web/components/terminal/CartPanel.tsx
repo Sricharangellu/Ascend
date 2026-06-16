@@ -21,9 +21,11 @@ interface CartPanelProps {
   onClear: () => void;
   /** Role of the current user — cashier may not void a completed order */
   role?: "owner" | "manager" | "cashier";
+  ageVerified?: boolean;
+  onAgeVerifiedChange?: (v: boolean) => void;
 }
 
-export function CartPanel({ cart, onCharge, onClear, role }: CartPanelProps) {
+export function CartPanel({ cart, onCharge, onClear, role, ageVerified, onAgeVerifiedChange }: CartPanelProps) {
   const { state, setQty, removeProduct, itemCount, localSubtotalCents } = cart;
   const { lines, order, syncing } = state;
 
@@ -35,7 +37,8 @@ export function CartPanel({ cart, onCharge, onClear, role }: CartPanelProps) {
   const tax = order?.taxCents ?? 0;
   const total = order?.totalCents ?? localSubtotalCents;
 
-  const canCharge = !isEmpty && !syncing && order !== null;
+  const hasAgeRestricted = lines.some(l => l.product.ageRestricted);
+  const canCharge = !isEmpty && !syncing && order !== null && (!hasAgeRestricted || ageVerified);
   const canClear = role === "owner" || role === "manager" || role === "cashier";
 
   return (
@@ -126,6 +129,30 @@ export function CartPanel({ cart, onCharge, onClear, role }: CartPanelProps) {
               Calculating totals…
             </p>
           )}
+        </div>
+      )}
+
+      {/* ── Age verification banner ─────────────────────────────────────── */}
+      {hasAgeRestricted && (
+        <div className="flex-none mx-4 mb-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <div className="flex items-start gap-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mt-0.5 shrink-0 text-amber-600" aria-hidden="true">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-amber-800">Age-Restricted Item</p>
+              <p className="text-xs text-amber-700 mt-0.5">Cart contains an age-restricted product. Verify customer ID before charging.</p>
+              <label className="mt-2 flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={ageVerified ?? false}
+                  onChange={e => onAgeVerifiedChange?.(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                />
+                <span className="text-xs font-medium text-amber-800">Customer ID verified — age confirmed</span>
+              </label>
+            </div>
+          </div>
         </div>
       )}
 

@@ -30,7 +30,8 @@ type NavKey =
   | "discounts"
   | "ecommerce"
   | "reports"
-  | "settings";
+  | "settings"
+  | "operations";
 
 // editionFlag: if set, this nav item is hidden when the corresponding feature
 // flag is false. Items with no editionFlag are always shown.
@@ -46,6 +47,7 @@ const NAV_ITEMS: Array<{
   { key: "register", label: "Register", href: "/terminal", icon: "register", group: "Operate", editionFlag: "groupRetailPOS" },
   { key: "sales", label: "Sales", href: "/sales", icon: "sales", group: "Operate" },
   { key: "inventory", label: "Inventory", href: "/inventory", icon: "inventory", group: "Manage" },
+  { key: "operations", label: "Operations", href: "/operations", icon: "operations", group: "Manage" },
   { key: "purchasing", label: "Purchasing", href: "/purchasing", icon: "purchasing", group: "Manage", editionFlag: "groupWholesale" },
   { key: "shipping", label: "Shipping", href: "/shipping", icon: "shipping", group: "Manage", editionFlag: "groupWholesale" },
   { key: "customers", label: "Customers", href: "/customers", icon: "customers", group: "Manage", editionFlag: "groupRetailPOS" },
@@ -343,6 +345,8 @@ function NavIcon({ name }: { name: NavKey }) {
       return <SalesIcon />;
     case "inventory":
       return <InventoryIcon />;
+    case "operations":
+      return <OperationsIcon />;
     case "purchasing":
       return <PurchasingIcon />;
     case "shipping":
@@ -432,6 +436,15 @@ function InventoryIcon() {
       <path d="M21 8a2 2 0 0 0-1-1.73L13 2.27a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
       <path d="m3.3 7 8.7 5 8.7-5" />
       <path d="M12 22V12" />
+    </svg>
+  );
+}
+
+function OperationsIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v11m0 0H5a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-4" />
+      <path d="M9 14v7" />
     </svg>
   );
 }
