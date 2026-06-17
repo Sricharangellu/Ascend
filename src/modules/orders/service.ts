@@ -19,6 +19,7 @@ export interface OrderRow {
   tax_cents: Cents;
   total_cents: Cents;
   customer_id: string | null;
+  store_id: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -51,6 +52,7 @@ export interface CreateOrderInput {
   lines: CreateOrderLineInput[];
   discountCents?: Cents;
   customerId?: string | null;
+  storeId?: string | null;
 }
 
 export interface ListOrdersQuery {
@@ -58,6 +60,7 @@ export interface ListOrdersQuery {
   limit?: number;
   offset?: number;
   cursor?: string;
+  storeId?: string;
 }
 
 export interface CursorPage<T> {
@@ -193,6 +196,7 @@ export class OrdersService {
       tax_cents: computed.taxCents,
       total_cents: computed.totalCents,
       customer_id: input.customerId ?? null,
+      store_id: input.storeId ?? null,
       created_at: now,
       updated_at: now,
     };
@@ -214,11 +218,11 @@ export class OrdersService {
       await tdb.query(
         `INSERT INTO orders
            (id, tenant_id, order_number, state_code, status, subtotal_cents,
-            discount_cents, tax_cents, total_cents, customer_id,
+            discount_cents, tax_cents, total_cents, customer_id, store_id,
             created_at, updated_at)
          VALUES
            (@id, @tenant_id, @order_number, @state_code, @status, @subtotal_cents,
-            @discount_cents, @tax_cents, @total_cents, @customer_id,
+            @discount_cents, @tax_cents, @total_cents, @customer_id, @store_id,
             @created_at, @updated_at)`,
         order as unknown as Record<string, unknown>,
       );
@@ -303,6 +307,10 @@ export class OrdersService {
     if (query.status) {
       where.push("status = @status");
       params.status = query.status;
+    }
+    if (query.storeId) {
+      where.push("store_id = @storeId");
+      params.storeId = query.storeId;
     }
     if (cur) {
       where.push("(created_at, id) < (@curAt, @curId)");

@@ -3,6 +3,17 @@ import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import { HttpError } from "../../shared/http.js";
 
+export interface CursorPage<T> {
+  items: T[];
+  nextCursor: string | null;
+  limit: number;
+}
+
+function clampLimit(limit?: number): number {
+  if (!limit || limit <= 0) return 50;
+  return Math.min(Math.floor(limit), 200);
+}
+
 /** Customers + loyalty. Tenant-scoped. Points are earned on payment.captured
  *  ($1 net spent = 1 point) and redeemed at 100 points = $5.00. */
 
@@ -296,11 +307,28 @@ export class CustomersService {
     );
   }
 
-  async list(tenantId: string): Promise<Customer[]> {
-    return this.db.query<Customer>(
-      "SELECT * FROM customers WHERE tenant_id = @tenantId ORDER BY created_at DESC LIMIT 200",
-      { tenantId },
+  async list(tenantId: string, query: { cursor?: string; limit?: number } = {}): Promise<CursorPage<Customer>> {
+    const limit = clampLimit(query.limit);
+    const cur = query.cursor
+      ? (JSON.parse(Buffer.from(query.cursor, "base64url").toString()) as { at: number; id: string })
+      : null;
+    const where = ["tenant_id = @tenantId"];
+    const params: Record<string, unknown> = { tenantId };
+    if (cur) {
+      where.push("(created_at, id) < (@curAt, @curId)");
+      params.curAt = cur.at;
+      params.curId = cur.id;
+    }
+    const items = await this.db.query<Customer>(
+      `SELECT * FROM customers WHERE ${where.join(" AND ")} ORDER BY created_at DESC, id DESC LIMIT @limit`,
+      { ...params, limit },
     );
+    const last = items[items.length - 1];
+    const nextCursor =
+      items.length === limit && last
+        ? Buffer.from(JSON.stringify({ at: last.created_at, id: last.id })).toString("base64url")
+        : null;
+    return { items, nextCursor, limit };
   }
 
   /** Update editable profile fields. Only provided keys change. */

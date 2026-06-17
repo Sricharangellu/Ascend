@@ -40,9 +40,17 @@ CREATE TABLE IF NOT EXISTS order_lines (
 CREATE INDEX IF NOT EXISTS oln_tenant_order_idx ON order_lines (tenant_id, order_id);
 `;
 
+// S2-MULTI-STORE-FILTER: store_id links each order to the outlet it was
+// created at so managers scoped to one store can be filtered server-side.
+// NULL = legacy orders created before multi-store was enabled.
+const ALTER_ORDERS_STORE_ID = `
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS store_id TEXT;
+CREATE INDEX IF NOT EXISTS orders_tenant_store_idx ON orders (tenant_id, store_id, created_at DESC);
+`;
+
 export const ordersModule: PosModule = {
   name: "orders",
-  migrations: [dropLegacyNoTenant("order_lines"), dropLegacyNoTenant("orders"), CREATE_ORDERS_TABLE, CREATE_ORDER_LINES_TABLE],
+  migrations: [dropLegacyNoTenant("order_lines"), dropLegacyNoTenant("orders"), CREATE_ORDERS_TABLE, CREATE_ORDER_LINES_TABLE, ALTER_ORDERS_STORE_ID],
   register(ctx: ModuleContext): void {
     const service = new OrdersService(ctx.db, ctx.events);
     registerRoutes(ctx.router, service);

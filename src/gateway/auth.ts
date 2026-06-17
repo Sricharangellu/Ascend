@@ -8,6 +8,8 @@ export interface AuthPayload {
   tenantId: string;
   userId: string;
   role: Role;
+  /** Store IDs this user is allowed to access. Empty array = all stores (owner/manager default). */
+  storeIds: string[];
 }
 
 // Augment Express Request so downstream handlers can read the auth context.
@@ -64,6 +66,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
       tenantId: String(payload["tenantId"] ?? ""),
       userId: String(payload["sub"] ?? ""),
       role: (payload["role"] as Role) ?? "cashier",
+      storeIds: Array.isArray(payload["storeIds"]) ? (payload["storeIds"] as string[]).map(String) : [],
     };
     if (!auth.tenantId || !auth.userId) {
       next(new HttpError(401, "unauthenticated", "Token is missing required claims."));

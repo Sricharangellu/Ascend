@@ -89,8 +89,10 @@ export function registerRoutes(router: Router, service: CustomersService): void 
 
   router.get(
     "/",
-    handler(async (_req, res) => {
-      res.json({ items: await service.list(tenantId(res)) });
+    handler(async (req, res) => {
+      const cursor = typeof req.query.cursor === "string" && req.query.cursor !== "" ? req.query.cursor : undefined;
+      const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
+      res.json(await service.list(tenantId(res), { cursor, limit }));
     }),
   );
 

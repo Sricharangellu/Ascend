@@ -25,11 +25,13 @@ const createSchema = z.object({
       z.object({
         productId: z.string().min(1),
         quantity: z.number().int().positive(),
+        ageVerified: z.boolean().optional(),
       }),
     )
     .min(1),
   discountCents: z.number().int().nonnegative().optional(),
   customerId: z.string().min(1).nullable().optional(),
+  storeId: z.string().min(1).nullable().optional(),
 });
 
 function parseInt0(value: unknown): number | undefined {
@@ -42,11 +44,20 @@ function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
 
+function auth(res: Response): AuthPayload {
+  return res.locals["auth"] as AuthPayload;
+}
+
 export function registerRoutes(router: Router, service: OrdersService): void {
   router.post(
     "/",
     handler(async (req: Request, res: Response) => {
       const body = parseBody(createSchema, req.body);
+      const { storeIds } = auth(res);
+      // If the user is scoped to specific stores and a storeId is provided, validate it.
+      if (body.storeId && storeIds.length > 0 && !storeIds.includes(body.storeId)) {
+        throw badRequest(`storeId '${body.storeId}' is not in your allowed stores`);
+      }
       const order = await service.create(body, tenantId(res));
       res.status(201).json(order);
     }),
@@ -57,12 +68,22 @@ export function registerRoutes(router: Router, service: OrdersService): void {
     handler(async (req: Request, res: Response) => {
       const status = readStatusFilter(req.query.status);
       const cursor = typeof req.query.cursor === "string" && req.query.cursor !== "" ? req.query.cursor : undefined;
+      const { storeIds } = auth(res);
+      const requestedStore = typeof req.query.storeId === "string" && req.query.storeId !== "" ? req.query.storeId : undefined;
+      // Users scoped to specific stores cannot query outside their allowed set.
+      if (requestedStore && storeIds.length > 0 && !storeIds.includes(requestedStore)) {
+        throw badRequest(`storeId '${requestedStore}' is not in your allowed stores`);
+      }
+      // If the user has store restrictions and no specific store filter was requested,
+      // implicitly restrict to their first allowed store (prevents cross-store data leak).
+      const storeId = requestedStore ?? (storeIds.length === 1 ? storeIds[0] : requestedStore);
       const page = await service.list(
         {
           status,
           limit: parseInt0(req.query.limit),
           offset: parseInt0(req.query.offset),
           cursor,
+          storeId,
         },
         tenantId(res),
       );

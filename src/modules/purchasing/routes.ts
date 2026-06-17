@@ -145,8 +145,10 @@ export function registerRoutes(router: Router, service: PurchasingService): void
     res.status(201).json(await service.createOrder(b.supplierId, b.lines, tenantId(res)));
   }));
 
-  router.get("/orders", handler(async (_req, res) => {
-    res.json({ items: await service.listOrders(tenantId(res)) });
+  router.get("/orders", handler(async (req, res) => {
+    const cursor = typeof req.query.cursor === "string" && req.query.cursor !== "" ? req.query.cursor : undefined;
+    const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
+    res.json(await service.listOrders(tenantId(res), { cursor, limit }));
   }));
 
   router.get("/orders/:id", handler(async (req, res) => {

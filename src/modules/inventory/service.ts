@@ -272,9 +272,9 @@ export class InventoryService {
    * tracking, and sales-velocity analytics land (documented stubs, not fabricated).
    */
   async levels(
-    query: { query?: string; category?: string; status?: string; pageSize?: number; lowStock?: boolean },
+    query: { query?: string; category?: string; status?: string; pageSize?: number; lowStock?: boolean; cursor?: string },
     tenantId: string,
-  ): Promise<{ items: InventoryLevel[]; pageSize: number }> {
+  ): Promise<{ items: InventoryLevel[]; pageSize: number; nextCursor: string | null }> {
     const where: string[] = ["p.tenant_id = @tenantId"];
     const params: Record<string, unknown> = { tenantId };
     if (query.category) { where.push("p.category = @category"); params["category"] = query.category; }
@@ -286,6 +286,15 @@ export class InventoryService {
     if (query.lowStock) {
       // at or below a set reorder point (reorder point of 0 = untracked, excluded)
       where.push("COALESCE(i.reorder_pt, 0) > 0 AND COALESCE(i.stock_qty, 0) <= COALESCE(i.reorder_pt, 0)");
+    }
+    const cur = query.cursor
+      ? (JSON.parse(Buffer.from(query.cursor, "base64url").toString()) as { name: string; id: string })
+      : null;
+    if (cur) {
+      // ASC name order: next page starts after (name, id) of last item.
+      where.push("(p.name, p.id) > (@curName, @curId)");
+      params["curName"] = cur.name;
+      params["curId"] = cur.id;
     }
     const pageSize = Math.min(Math.max(query.pageSize ?? 100, 1), 500);
     params["limit"] = pageSize;
@@ -310,7 +319,7 @@ export class InventoryService {
             GROUP BY ol.product_id
          ) res ON res.product_id = p.id
         WHERE ${where.join(" AND ")}
-        ORDER BY p.name ASC
+        ORDER BY p.name ASC, p.id ASC
         LIMIT @limit`,
       params,
     );
@@ -330,7 +339,12 @@ export class InventoryService {
         velocity: 0,
       };
     });
-    return { items, pageSize };
+    const last = rows[rows.length - 1];
+    const nextCursor =
+      rows.length === pageSize && last
+        ? Buffer.from(JSON.stringify({ name: last.name, id: last.id })).toString("base64url")
+        : null;
+    return { items, pageSize, nextCursor };
   }
 
   /**
