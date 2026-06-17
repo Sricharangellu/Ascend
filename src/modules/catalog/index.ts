@@ -103,6 +103,14 @@ const ALTER_PRODUCTS_AGE = `
 ALTER TABLE products ADD COLUMN IF NOT EXISTS age_restricted INTEGER NOT NULL DEFAULT 0;
 `;
 
+// Expiry date: denormalized cache of the soonest active lot expiry from inventory_lots.
+// Written by InventoryService.syncProductExpiry() on every lot create/depletion.
+// NULL = no lot tracking (non-perishable) or all lots fully depleted.
+const ALTER_PRODUCTS_EXPIRY = `
+ALTER TABLE products ADD COLUMN IF NOT EXISTS expiry_date BIGINT;
+CREATE INDEX IF NOT EXISTS products_tenant_expiry_idx ON products (tenant_id, expiry_date) WHERE expiry_date IS NOT NULL;
+`;
+
 // XLSX import schema: all 71 columns from the product export mapped to normalized columns.
 // Prices → cents (BIGINT). Physical measures use native integer units (mg, ml, oz×100).
 // Multi-unit UPCs (single/box/case/upc1/upc2) live in product_barcodes; these columns
@@ -159,6 +167,7 @@ export const catalogModule: PosModule = {
     CREATE_PRODUCT_CATEGORIES,
     ALTER_PRODUCTS_VARIANTS,
     ALTER_PRODUCTS_AGE,
+    ALTER_PRODUCTS_EXPIRY,
     ALTER_PRODUCTS_XLSX_FIELDS,
   ],
   async register({ db, events, router }) {

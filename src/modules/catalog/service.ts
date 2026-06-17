@@ -80,6 +80,8 @@ export interface Product {
   composite_product: number;
   track_inventory: number;
   track_inventory_by_imei: number;
+  // Expiry — denormalized MIN(lot.expiry_date) written by InventoryService.syncProductExpiry()
+  expiry_date: number | null;
 }
 
 export interface CreateProductInput {
@@ -287,6 +289,8 @@ export class CatalogService {
       composite_product: input.composite_product ? 1 : 0,
       track_inventory: input.track_inventory !== false ? 1 : 0,
       track_inventory_by_imei: input.track_inventory_by_imei ? 1 : 0,
+      // Expiry cache — null on create; written by InventoryService.syncProductExpiry()
+      expiry_date: null,
     };
 
     try {

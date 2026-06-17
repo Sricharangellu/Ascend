@@ -100,7 +100,7 @@ export class InventoryService {
     private readonly events: EventBus,
   ) {}
 
-  /** Record a received lot with an expiry date. */
+  /** Record a received lot with an expiry date, then sync the product's expiry cache. */
   async createLot(
     input: { productId: string; expiryDate: number; quantity: number; lotCode?: string | null; unitCostCents?: number | null; poId?: string | null },
     tenantId: string,
@@ -122,15 +122,37 @@ export class InventoryService {
        VALUES (@id,@tenant_id,@product_id,@lot_code,@expiry_date,@qty_on_hand,@unit_cost_cents,@po_id,@received_at)`,
       lot as unknown as Record<string, unknown>,
     );
+    // Sync the denormalized expiry cache on the product row (soonest active lot).
+    await this.syncProductExpiry(input.productId, tenantId);
     return lot;
+  }
+
+  /** Recompute products.expiry_date = MIN(expiry_date) across all active lots (qty > 0).
+   *  NULL when no lots remain. Called after every lot creation and FEFO depletion. */
+  async syncProductExpiry(productId: string, tenantId: string): Promise<void> {
+    const row = await this.db.one<{ min_expiry: number | null }>(
+      `SELECT MIN(expiry_date) AS min_expiry
+         FROM inventory_lots
+        WHERE tenant_id = @tenantId AND product_id = @productId AND qty_on_hand > 0`,
+      { tenantId, productId },
+    );
+    await this.db.query(
+      "UPDATE products SET expiry_date = @expiry, updated_at = @now WHERE id = @productId AND tenant_id = @tenantId",
+      { expiry: row?.min_expiry ?? null, now: Date.now(), productId, tenantId },
+    );
   }
 
   /** Reduce a specific lot's on-hand (e.g. damaged/expired write-off). Never negative. */
   async decrementLot(lotId: string, qty: number, tenantId: string): Promise<void> {
+    const lot = await this.db.one<{ product_id: string }>(
+      "SELECT product_id FROM inventory_lots WHERE id = @id AND tenant_id = @tenantId",
+      { id: lotId, tenantId },
+    );
     await this.db.query(
       "UPDATE inventory_lots SET qty_on_hand = GREATEST(0, qty_on_hand - @q) WHERE id = @id AND tenant_id = @tenantId",
       { q: Math.abs(qty), id: lotId, tenantId },
     );
+    if (lot) await this.syncProductExpiry(lot.product_id, tenantId);
   }
 
   /** Open lots for a product (qty > 0), earliest expiry first (FEFO order). */
@@ -146,21 +168,24 @@ export class InventoryService {
   async depleteFefo(productId: string, qty: number, tenantId: string): Promise<number> {
     let remaining = Math.abs(qty);
     if (remaining <= 0) return 0;
-    return this.db.tx(async (tdb) => {
+    const drawn = await this.db.tx(async (tdb) => {
       const lots = await tdb.query<{ id: string; qty_on_hand: number }>(
         "SELECT id, qty_on_hand FROM inventory_lots WHERE tenant_id = @tenantId AND product_id = @productId AND qty_on_hand > 0 ORDER BY expiry_date ASC FOR UPDATE",
         { tenantId, productId },
       );
-      let drawn = 0;
+      let d = 0;
       for (const lot of lots) {
         if (remaining <= 0) break;
         const take = Math.min(Number(lot.qty_on_hand), remaining);
         await tdb.query("UPDATE inventory_lots SET qty_on_hand = qty_on_hand - @take WHERE id = @id AND tenant_id = @tenantId", { take, id: lot.id, tenantId });
         remaining -= take;
-        drawn += take;
+        d += take;
       }
-      return drawn;
+      return d;
     });
+    // Sync product expiry cache after lots change (soonest lot may now be a newer batch).
+    if (drawn > 0) await this.syncProductExpiry(productId, tenantId);
+    return drawn;
   }
 
   /** Lots already past their expiry date but still on hand (must be pulled). */
