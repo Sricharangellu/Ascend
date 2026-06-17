@@ -123,6 +123,7 @@ export interface PurchaseOrderLine {
   raw_cost_price_cents: number | null;
   unit_price_cents: number | null;
   line_cost_cents: number;
+  landed_cost_cents: number;   // allocated share of freight + other charges
   expiry_date: number | null;
   lot_code: string | null;
   received_qty: number;
@@ -137,6 +138,8 @@ export interface PurchaseOrder {
   status: POStatus;
   receive_status: string;
   total_cost_cents: number;
+  freight_cost_cents: number;
+  other_charges_cents: number;
   notes: string | null;
   created_at: number;
   received_at: number | null;
@@ -407,6 +410,7 @@ export class PurchasingService {
       raw_cost_price_cents: l.rawCostPriceCents ?? null,
       unit_price_cents: l.unitPriceCents ?? null,
       line_cost_cents: l.quantity * l.unitCostCents,
+      landed_cost_cents: 0,
       expiry_date: l.expiryDate ?? null,
       lot_code: l.lotCode ?? null,
       received_qty: 0,
@@ -436,7 +440,8 @@ export class PurchasingService {
     return {
       id: poId, tenant_id: tenantId, supplier_id: supplierId, po_number: poNumber,
       status: "ordered", receive_status: "pending", total_cost_cents: total,
-      notes: null, created_at: now, received_at: null, lines: poLines,
+      freight_cost_cents: 0, other_charges_cents: 0, notes: null,
+      created_at: now, received_at: null, lines: poLines,
     };
   }
 
@@ -449,6 +454,54 @@ export class PurchasingService {
     if (!po) throw new HttpError(404, "not_found", `purchase order '${id}' not found`);
     const lines = await this.db.query<PurchaseOrderLine>("SELECT * FROM purchase_order_lines WHERE po_id = @id AND tenant_id = @tenantId", { id, tenantId });
     return { ...po, lines };
+  }
+
+  /** Apply freight and other charges to a PO, distributing them across lines by value.
+   *
+   * Distribution method: value (proportional to each line's goods cost).
+   *   line_landed_cost = total_extra × (line_cost / goods_total)
+   * Rounding remainder goes to the largest line to keep totals exact.
+   * Can be called multiple times — each call replaces the previous allocation. */
+  async applyLandedCosts(
+    poId: string,
+    tenantId: string,
+    freightCents: number,
+    otherChargesCents: number,
+  ): Promise<PurchaseOrderWithLines> {
+    const po = await this.getOrder(poId, tenantId);
+    if (po.status === "received") throw new HttpError(409, "already_received", "cannot modify landed costs on a fully-received PO");
+    if (freightCents < 0 || otherChargesCents < 0) throw new HttpError(400, "bad_request", "costs must be non-negative");
+
+    const totalExtra = freightCents + otherChargesCents;
+    const goodsTotal = po.lines.reduce((s, l) => s + Number(l.line_cost_cents), 0);
+
+    // Distribute proportionally by value; accumulate to detect rounding remainder.
+    let allocated = 0;
+    const allocations: Array<{ id: string; share: number }> = po.lines.map((l, i) => {
+      const isLast = i === po.lines.length - 1;
+      const share = isLast
+        ? totalExtra - allocated
+        : goodsTotal === 0
+        ? Math.round(totalExtra / po.lines.length)
+        : Math.round(totalExtra * (Number(l.line_cost_cents) / goodsTotal));
+      allocated += share;
+      return { id: l.id, share };
+    });
+
+    await this.db.tx(async (tdb) => {
+      for (const { id, share } of allocations) {
+        await tdb.query(
+          "UPDATE purchase_order_lines SET landed_cost_cents = @share WHERE id = @id AND tenant_id = @tenantId",
+          { share, id, tenantId },
+        );
+      }
+      await tdb.query(
+        "UPDATE purchase_orders SET freight_cost_cents = @freight, other_charges_cents = @other WHERE id = @id AND tenant_id = @tenantId",
+        { freight: freightCents, other: otherChargesCents, id: poId, tenantId },
+      );
+    });
+
+    return this.getOrder(poId, tenantId);
   }
 
   /** Partially or fully receive a PO.
@@ -488,10 +541,14 @@ export class PurchasingService {
           { qty: rl.qty, lid: rl.lineId, tenantId },
         );
         const line = lineMap.get(rl.lineId)!;
+        // True unit cost = (goods cost + landed cost share) / quantity.
+        const landedUnitCost = Math.round(
+          (line.line_cost_cents + (line.landed_cost_cents ?? 0)) / line.quantity,
+        );
         await tdb.query(
           `INSERT INTO product_costs (tenant_id, product_id, cost_cents, updated_at) VALUES (@tenant_id,@product_id,@cost,@now)
            ON CONFLICT (tenant_id, product_id) DO UPDATE SET cost_cents = EXCLUDED.cost_cents, updated_at = EXCLUDED.updated_at`,
-          { tenant_id: tenantId, product_id: line.product_id, cost: line.unit_cost_cents, now },
+          { tenant_id: tenantId, product_id: line.product_id, cost: landedUnitCost, now },
         );
       }
 

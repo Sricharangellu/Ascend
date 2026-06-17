@@ -154,11 +154,22 @@ CREATE INDEX IF NOT EXISTS suppliers_tenant_type_idx ON suppliers (tenant_id, ve
 CREATE INDEX IF NOT EXISTS suppliers_tenant_status_idx ON suppliers (tenant_id, status);
 `;
 
+// Landed costs: freight and other charges applied to a PO after goods are invoiced.
+// freight_cost_cents + other_charges_cents sit on the PO; the total is distributed
+// to lines proportionally by line_cost / goods_total (value method — most common).
+// landed_cost_cents on each line = the line's share of total extra charges.
+// On receive, product_costs records (line_cost + landed_cost) / qty as the true unit cost.
+const ALTER_PO_LANDED_COSTS = `
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS freight_cost_cents BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS other_charges_cents BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE purchase_order_lines ADD COLUMN IF NOT EXISTS landed_cost_cents BIGINT NOT NULL DEFAULT 0;
+`;
+
 /** Purchasing — suppliers, purchase orders, receiving. Receiving emits
  *  `purchase_order.received`; inventory listens and increments stock. */
 export const purchasingModule: PosModule = {
   name: "purchasing",
-  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS],
+  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_PO_LANDED_COSTS],
   async register({ db, events, router }) {
     const service = new PurchasingService(db, events);
     registerRoutes(router, service);

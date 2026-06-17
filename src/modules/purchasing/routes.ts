@@ -167,4 +167,23 @@ export function registerRoutes(router: Router, service: PurchasingService): void
     const lines = b.lines.map((l) => ({ lineId: l.lineId, qty: l.qty ?? l.quantity ?? 1 }));
     res.json(await service.receive(String(req.params.id), tenantId(res), lines));
   }));
+
+  // Landed costs: freight and other charges distributed proportionally across PO lines.
+  // POST before receiving — applies value-method allocation to landed_cost_cents per line.
+  // Receiving then uses (line_cost + landed_cost) / qty as the true unit cost in product_costs.
+  router.post("/orders/:id/landed-costs", mgr, handler(async (req, res) => {
+    const b = parseBody(
+      z.object({
+        freightCents: z.number().int().nonnegative(),
+        otherChargesCents: z.number().int().nonnegative().optional(),
+      }),
+      req.body,
+    );
+    res.json(await service.applyLandedCosts(
+      String(req.params.id),
+      tenantId(res),
+      b.freightCents,
+      b.otherChargesCents ?? 0,
+    ));
+  }));
 }
