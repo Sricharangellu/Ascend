@@ -21,24 +21,68 @@ function readStatusFilter(value: unknown): ProductStatus | undefined {
   return value as ProductStatus;
 }
 
-// BE-6: optional product detail fields (description/brand/dimensions/weight/image/
-// preferred vendor/qty-sell limits). Dimensions are millimeters, weight is grams.
+// Product detail fields — all optional/nullable. Groups mirror the Product interface.
 const detailFieldsSchema = {
+  // Descriptive
   description: z.string().nullable().optional(),
+  short_description: z.string().nullable().optional(),
+  full_description: z.string().nullable().optional(),
+  alternative_name: z.string().nullable().optional(),
+  model_name: z.string().nullable().optional(),
+  manufacturer: z.string().nullable().optional(),
   brand: z.string().nullable().optional(),
+  tags: z.string().nullable().optional(),           // comma-separated
+  url_alias: z.string().nullable().optional(),
+  // Pricing
+  msrp_cents: z.number().int().nonnegative().nullable().optional(),
+  min_selling_price_cents: z.number().int().nonnegative().nullable().optional(),
+  raw_cost_price_cents: z.number().int().nonnegative().nullable().optional(),
+  // Physical dimensions (integers in base units)
   length_mm: z.number().int().positive().nullable().optional(),
   width_mm: z.number().int().positive().nullable().optional(),
   height_mm: z.number().int().positive().nullable().optional(),
   weight_grams: z.number().int().positive().nullable().optional(),
+  size: z.string().nullable().optional(),
+  unit_description: z.string().nullable().optional(),
+  nicotine_strength_mg: z.number().int().nonnegative().nullable().optional(),
+  volume_ml: z.number().int().positive().nullable().optional(),
+  oz_per_product_x100: z.number().int().nonnegative().nullable().optional(),
+  // Media
   image_url: z.string().url().nullable().optional(),
+  // Compliance / regulatory
+  state_description: z.string().nullable().optional(),
+  federal_description: z.string().nullable().optional(),
+  msa_category_code: z.string().nullable().optional(),
+  msa_promotion_indicator: z.boolean().optional(),
+  msa_promotion_description: z.string().nullable().optional(),
+  msa_manufacturer_description: z.string().nullable().optional(),
+  // SEO
+  meta_title: z.string().nullable().optional(),
+  meta_keywords: z.string().nullable().optional(),
+  meta_description: z.string().nullable().optional(),
+  // Vendor / supply chain
   preferred_vendor_id: z.string().min(1).nullable().optional(),
+  preferred_vendor_name: z.string().nullable().optional(),
+  primary_vendor: z.string().nullable().optional(),
   vendor_upc: z.string().min(1).nullable().optional(),
+  drop_shipment: z.boolean().optional(),
+  reorder_quantity: z.number().int().positive().nullable().optional(),
+  // Qty limits
   min_qty_to_sell: z.number().int().positive().nullable().optional(),
   max_qty_to_sell: z.number().int().positive().nullable().optional(),
   qty_increment: z.number().int().positive().optional(),
-  // BE-8: master/child variants.
+  // Variant (BE-8)
   parent_product_id: z.string().min(1).nullable().optional(),
   variant_label: z.string().min(1).nullable().optional(),
+  // Operational flags
+  age_restricted: z.boolean().optional(),
+  returnable: z.boolean().optional(),
+  service_product: z.boolean().optional(),
+  customer_specific: z.boolean().optional(),
+  exclude_from_po: z.boolean().optional(),
+  composite_product: z.boolean().optional(),
+  track_inventory: z.boolean().optional(),
+  track_inventory_by_imei: z.boolean().optional(),
 };
 
 const createSchema = z.object({

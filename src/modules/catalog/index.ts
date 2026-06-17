@@ -103,6 +103,50 @@ const ALTER_PRODUCTS_AGE = `
 ALTER TABLE products ADD COLUMN IF NOT EXISTS age_restricted INTEGER NOT NULL DEFAULT 0;
 `;
 
+// XLSX import schema: all 71 columns from the product export mapped to normalized columns.
+// Prices → cents (BIGINT). Physical measures use native integer units (mg, ml, oz×100).
+// Multi-unit UPCs (single/box/case/upc1/upc2) live in product_barcodes; these columns
+// are product-level attributes that can't be derived from a barcode scan alone.
+const ALTER_PRODUCTS_XLSX_FIELDS = `
+ALTER TABLE products ADD COLUMN IF NOT EXISTS url_alias TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS short_description TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS full_description TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS alternative_name TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS model_name TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS manufacturer TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS msrp_cents BIGINT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS min_selling_price_cents BIGINT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS raw_cost_price_cents BIGINT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS tags TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS size TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS unit_description TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS nicotine_strength_mg INTEGER;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS volume_ml INTEGER;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS oz_per_product_x100 BIGINT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS state_description TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS federal_description TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS msa_category_code TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS msa_promotion_indicator INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS msa_promotion_description TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS msa_manufacturer_description TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS meta_title TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS meta_keywords TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS meta_description TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS preferred_vendor_name TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS primary_vendor TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS drop_shipment INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS reorder_quantity INTEGER;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS returnable INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS service_product INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS customer_specific INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS exclude_from_po INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS composite_product INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS track_inventory INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS track_inventory_by_imei INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS products_tenant_msa_idx ON products (tenant_id, msa_category_code) WHERE msa_category_code IS NOT NULL;
+CREATE INDEX IF NOT EXISTS products_tenant_service_idx ON products (tenant_id, service_product);
+`;
+
 export const catalogModule: PosModule = {
   name: "catalog",
   migrations: [
@@ -115,6 +159,7 @@ export const catalogModule: PosModule = {
     CREATE_PRODUCT_CATEGORIES,
     ALTER_PRODUCTS_VARIANTS,
     ALTER_PRODUCTS_AGE,
+    ALTER_PRODUCTS_XLSX_FIELDS,
   ],
   async register({ db, events, router }) {
     const service = new CatalogService(db, events);

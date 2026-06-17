@@ -20,21 +20,66 @@ export interface Product {
   status: ProductStatus;
   created_at: number;
   updated_at: number;
+  // Core descriptive fields
   description: string | null;
+  short_description: string | null;
+  full_description: string | null;
+  alternative_name: string | null;
+  model_name: string | null;
+  manufacturer: string | null;
   brand: string | null;
+  tags: string | null;             // comma-separated
+  url_alias: string | null;
+  // Pricing
+  msrp_cents: Cents | null;
+  min_selling_price_cents: Cents | null;
+  raw_cost_price_cents: Cents | null;
+  // Physical dimensions
   length_mm: number | null;
   width_mm: number | null;
   height_mm: number | null;
   weight_grams: number | null;
+  size: string | null;
+  unit_description: string | null;  // "each", "pack of 12", etc.
+  nicotine_strength_mg: number | null;
+  volume_ml: number | null;
+  oz_per_product_x100: number | null; // ounces × 100 (supports 1.5oz = 150)
+  // Images & media
   image_url: string | null;
+  // Compliance / regulatory
+  state_description: string | null;
+  federal_description: string | null;
+  msa_category_code: string | null;
+  msa_promotion_indicator: number;  // 1|0
+  msa_promotion_description: string | null;
+  msa_manufacturer_description: string | null;
+  // SEO
+  meta_title: string | null;
+  meta_keywords: string | null;
+  meta_description: string | null;
+  // Vendor / supply chain
   preferred_vendor_id: string | null;
+  preferred_vendor_name: string | null;
+  primary_vendor: string | null;
   vendor_upc: string | null;
+  drop_shipment: number;    // 1|0
+  reorder_quantity: number | null;
+  // Qty limits
   min_qty_to_sell: number | null;
   max_qty_to_sell: number | null;
   qty_increment: number;
+  // Variant / master
   parent_product_id: string | null;
   variant_label: string | null;
-  age_restricted: number; // 1|0 (SQLite-style boolean stored as integer)
+  // Operational flags (1|0)
+  age_restricted: number;
+  returnable: number;
+  service_product: number;
+  customer_specific: number;
+  exclude_from_po: number;
+  composite_product: number;
+  track_inventory: number;
+  track_inventory_by_imei: number;
 }
 
 export interface CreateProductInput {
@@ -45,46 +90,70 @@ export interface CreateProductInput {
   tax_class?: TaxClass;
   barcode?: string | null;
   status?: ProductStatus;
+  // Descriptive
   description?: string | null;
+  short_description?: string | null;
+  full_description?: string | null;
+  alternative_name?: string | null;
+  model_name?: string | null;
+  manufacturer?: string | null;
   brand?: string | null;
+  tags?: string | null;
+  url_alias?: string | null;
+  // Pricing
+  msrp_cents?: Cents | null;
+  min_selling_price_cents?: Cents | null;
+  raw_cost_price_cents?: Cents | null;
+  // Physical
   length_mm?: number | null;
   width_mm?: number | null;
   height_mm?: number | null;
   weight_grams?: number | null;
+  size?: string | null;
+  unit_description?: string | null;
+  nicotine_strength_mg?: number | null;
+  volume_ml?: number | null;
+  oz_per_product_x100?: number | null;
+  // Media
   image_url?: string | null;
+  // Compliance
+  state_description?: string | null;
+  federal_description?: string | null;
+  msa_category_code?: string | null;
+  msa_promotion_indicator?: boolean;
+  msa_promotion_description?: string | null;
+  msa_manufacturer_description?: string | null;
+  // SEO
+  meta_title?: string | null;
+  meta_keywords?: string | null;
+  meta_description?: string | null;
+  // Vendor
   preferred_vendor_id?: string | null;
+  preferred_vendor_name?: string | null;
+  primary_vendor?: string | null;
   vendor_upc?: string | null;
+  drop_shipment?: boolean;
+  reorder_quantity?: number | null;
+  // Qty limits
   min_qty_to_sell?: number | null;
   max_qty_to_sell?: number | null;
   qty_increment?: number;
+  // Variant
   parent_product_id?: string | null;
   variant_label?: string | null;
+  // Flags
   age_restricted?: boolean;
+  returnable?: boolean;
+  service_product?: boolean;
+  customer_specific?: boolean;
+  exclude_from_po?: boolean;
+  composite_product?: boolean;
+  track_inventory?: boolean;
+  track_inventory_by_imei?: boolean;
 }
 
-export interface UpdateProductInput {
-  name?: string;
-  price_cents?: Cents;
-  category?: string;
-  tax_class?: TaxClass;
-  barcode?: string | null;
-  status?: ProductStatus;
-  description?: string | null;
-  brand?: string | null;
-  length_mm?: number | null;
-  width_mm?: number | null;
-  height_mm?: number | null;
-  weight_grams?: number | null;
-  image_url?: string | null;
-  preferred_vendor_id?: string | null;
-  vendor_upc?: string | null;
-  min_qty_to_sell?: number | null;
-  max_qty_to_sell?: number | null;
-  qty_increment?: number;
-  parent_product_id?: string | null;
-  variant_label?: string | null;
-  age_restricted?: boolean;
-}
+// UpdateProductInput mirrors CreateProductInput but all fields optional (sku is immutable).
+export type UpdateProductInput = Omit<Partial<CreateProductInput>, "sku">;
 
 export interface Category {
   id: string;
@@ -158,35 +227,94 @@ export class CatalogService {
       status: input.status ?? "active",
       created_at: now,
       updated_at: now,
+      // Descriptive
       description: input.description ?? null,
+      short_description: input.short_description ?? null,
+      full_description: input.full_description ?? null,
+      alternative_name: input.alternative_name ?? null,
+      model_name: input.model_name ?? null,
+      manufacturer: input.manufacturer ?? null,
       brand: input.brand ?? null,
+      tags: input.tags ?? null,
+      url_alias: input.url_alias ?? null,
+      // Pricing
+      msrp_cents: input.msrp_cents ?? null,
+      min_selling_price_cents: input.min_selling_price_cents ?? null,
+      raw_cost_price_cents: input.raw_cost_price_cents ?? null,
+      // Physical
       length_mm: input.length_mm ?? null,
       width_mm: input.width_mm ?? null,
       height_mm: input.height_mm ?? null,
       weight_grams: input.weight_grams ?? null,
+      size: input.size ?? null,
+      unit_description: input.unit_description ?? null,
+      nicotine_strength_mg: input.nicotine_strength_mg ?? null,
+      volume_ml: input.volume_ml ?? null,
+      oz_per_product_x100: input.oz_per_product_x100 ?? null,
+      // Media
       image_url: input.image_url ?? null,
+      // Compliance
+      state_description: input.state_description ?? null,
+      federal_description: input.federal_description ?? null,
+      msa_category_code: input.msa_category_code ?? null,
+      msa_promotion_indicator: input.msa_promotion_indicator ? 1 : 0,
+      msa_promotion_description: input.msa_promotion_description ?? null,
+      msa_manufacturer_description: input.msa_manufacturer_description ?? null,
+      // SEO
+      meta_title: input.meta_title ?? null,
+      meta_keywords: input.meta_keywords ?? null,
+      meta_description: input.meta_description ?? null,
+      // Vendor
       preferred_vendor_id: input.preferred_vendor_id ?? null,
+      preferred_vendor_name: input.preferred_vendor_name ?? null,
+      primary_vendor: input.primary_vendor ?? null,
       vendor_upc: input.vendor_upc ?? null,
+      drop_shipment: input.drop_shipment ? 1 : 0,
+      reorder_quantity: input.reorder_quantity ?? null,
+      // Qty limits
       min_qty_to_sell: input.min_qty_to_sell ?? null,
       max_qty_to_sell: input.max_qty_to_sell ?? null,
       qty_increment: input.qty_increment ?? 1,
+      // Variant
       parent_product_id: input.parent_product_id ?? null,
       variant_label: input.variant_label ?? null,
+      // Flags
       age_restricted: input.age_restricted ? 1 : 0,
+      returnable: input.returnable !== false ? 1 : 0,
+      service_product: input.service_product ? 1 : 0,
+      customer_specific: input.customer_specific ? 1 : 0,
+      exclude_from_po: input.exclude_from_po ? 1 : 0,
+      composite_product: input.composite_product ? 1 : 0,
+      track_inventory: input.track_inventory !== false ? 1 : 0,
+      track_inventory_by_imei: input.track_inventory_by_imei ? 1 : 0,
     };
 
     try {
       await this.db.query(
         `INSERT INTO products
            (id, tenant_id, sku, name, price_cents, category, tax_class, barcode, status, created_at, updated_at,
-            description, brand, length_mm, width_mm, height_mm, weight_grams, image_url,
-            preferred_vendor_id, vendor_upc, min_qty_to_sell, max_qty_to_sell, qty_increment,
-            parent_product_id, variant_label, age_restricted)
+            description, short_description, full_description, alternative_name, model_name, manufacturer, brand, tags, url_alias,
+            msrp_cents, min_selling_price_cents, raw_cost_price_cents,
+            length_mm, width_mm, height_mm, weight_grams, size, unit_description, nicotine_strength_mg, volume_ml, oz_per_product_x100,
+            image_url,
+            state_description, federal_description, msa_category_code, msa_promotion_indicator, msa_promotion_description, msa_manufacturer_description,
+            meta_title, meta_keywords, meta_description,
+            preferred_vendor_id, preferred_vendor_name, primary_vendor, vendor_upc, drop_shipment, reorder_quantity,
+            min_qty_to_sell, max_qty_to_sell, qty_increment,
+            parent_product_id, variant_label,
+            age_restricted, returnable, service_product, customer_specific, exclude_from_po, composite_product, track_inventory, track_inventory_by_imei)
          VALUES
            (@id, @tenant_id, @sku, @name, @price_cents, @category, @tax_class, @barcode, @status, @created_at, @updated_at,
-            @description, @brand, @length_mm, @width_mm, @height_mm, @weight_grams, @image_url,
-            @preferred_vendor_id, @vendor_upc, @min_qty_to_sell, @max_qty_to_sell, @qty_increment,
-            @parent_product_id, @variant_label, @age_restricted)`,
+            @description, @short_description, @full_description, @alternative_name, @model_name, @manufacturer, @brand, @tags, @url_alias,
+            @msrp_cents, @min_selling_price_cents, @raw_cost_price_cents,
+            @length_mm, @width_mm, @height_mm, @weight_grams, @size, @unit_description, @nicotine_strength_mg, @volume_ml, @oz_per_product_x100,
+            @image_url,
+            @state_description, @federal_description, @msa_category_code, @msa_promotion_indicator, @msa_promotion_description, @msa_manufacturer_description,
+            @meta_title, @meta_keywords, @meta_description,
+            @preferred_vendor_id, @preferred_vendor_name, @primary_vendor, @vendor_upc, @drop_shipment, @reorder_quantity,
+            @min_qty_to_sell, @max_qty_to_sell, @qty_increment,
+            @parent_product_id, @variant_label,
+            @age_restricted, @returnable, @service_product, @customer_specific, @exclude_from_po, @composite_product, @track_inventory, @track_inventory_by_imei)`,
         product as unknown as Record<string, unknown>,
       );
     } catch (err) {
@@ -381,22 +509,49 @@ export class CatalogService {
       await this.getOrThrow(input.parent_product_id, tenantId);
     }
 
-    if (input.age_restricted !== undefined) {
-      const nextVal = input.age_restricted ? 1 : 0;
-      if (nextVal !== current.age_restricted) {
-        (next as unknown as Record<string, unknown>).age_restricted = nextVal;
-        (changed as unknown as Record<string, unknown>).age_restricted = nextVal;
+    // Boolean flag fields — convert boolean input → integer storage.
+    const boolFlags: Array<[keyof UpdateProductInput, keyof Product]> = [
+      ["age_restricted", "age_restricted"],
+      ["msa_promotion_indicator", "msa_promotion_indicator"],
+      ["drop_shipment", "drop_shipment"],
+      ["returnable", "returnable"],
+      ["service_product", "service_product"],
+      ["customer_specific", "customer_specific"],
+      ["exclude_from_po", "exclude_from_po"],
+      ["composite_product", "composite_product"],
+      ["track_inventory", "track_inventory"],
+      ["track_inventory_by_imei", "track_inventory_by_imei"],
+    ];
+    for (const [inputKey, productKey] of boolFlags) {
+      const value = input[inputKey];
+      if (value !== undefined) {
+        const nextVal = value ? 1 : 0;
+        if (nextVal !== (current as unknown as Record<string, unknown>)[productKey]) {
+          (next as unknown as Record<string, unknown>)[productKey] = nextVal;
+          (changed as unknown as Record<string, unknown>)[productKey] = nextVal;
+        }
       }
     }
 
+    // Nullable text + numeric fields — pass through as-is.
     const detailFields = [
-      "description", "brand", "length_mm", "width_mm", "height_mm", "weight_grams",
-      "image_url", "preferred_vendor_id", "vendor_upc", "min_qty_to_sell", "max_qty_to_sell", "qty_increment",
+      "description", "short_description", "full_description", "alternative_name",
+      "model_name", "manufacturer", "brand", "tags", "url_alias",
+      "msrp_cents", "min_selling_price_cents", "raw_cost_price_cents",
+      "length_mm", "width_mm", "height_mm", "weight_grams",
+      "size", "unit_description", "nicotine_strength_mg", "volume_ml", "oz_per_product_x100",
+      "image_url",
+      "state_description", "federal_description",
+      "msa_category_code", "msa_promotion_description", "msa_manufacturer_description",
+      "meta_title", "meta_keywords", "meta_description",
+      "preferred_vendor_id", "preferred_vendor_name", "primary_vendor",
+      "vendor_upc", "reorder_quantity",
+      "min_qty_to_sell", "max_qty_to_sell", "qty_increment",
       "parent_product_id", "variant_label",
     ] as const;
     for (const field of detailFields) {
-      const value = input[field];
-      if (value !== undefined && value !== current[field]) {
+      const value = (input as Record<string, unknown>)[field];
+      if (value !== undefined && value !== (current as unknown as Record<string, unknown>)[field]) {
         (next as unknown as Record<string, unknown>)[field] = value;
         (changed as unknown as Record<string, unknown>)[field] = value;
       }
@@ -410,27 +565,29 @@ export class CatalogService {
 
     await this.db.query(
       `UPDATE products SET
-         name = @name,
-         price_cents = @price_cents,
-         category = @category,
-         tax_class = @tax_class,
-         barcode = @barcode,
-         status = @status,
-         description = @description,
-         brand = @brand,
-         length_mm = @length_mm,
-         width_mm = @width_mm,
-         height_mm = @height_mm,
-         weight_grams = @weight_grams,
+         name = @name, price_cents = @price_cents, category = @category, tax_class = @tax_class,
+         barcode = @barcode, status = @status,
+         description = @description, short_description = @short_description, full_description = @full_description,
+         alternative_name = @alternative_name, model_name = @model_name, manufacturer = @manufacturer,
+         brand = @brand, tags = @tags, url_alias = @url_alias,
+         msrp_cents = @msrp_cents, min_selling_price_cents = @min_selling_price_cents, raw_cost_price_cents = @raw_cost_price_cents,
+         length_mm = @length_mm, width_mm = @width_mm, height_mm = @height_mm, weight_grams = @weight_grams,
+         size = @size, unit_description = @unit_description, nicotine_strength_mg = @nicotine_strength_mg,
+         volume_ml = @volume_ml, oz_per_product_x100 = @oz_per_product_x100,
          image_url = @image_url,
-         preferred_vendor_id = @preferred_vendor_id,
-         vendor_upc = @vendor_upc,
-         min_qty_to_sell = @min_qty_to_sell,
-         max_qty_to_sell = @max_qty_to_sell,
-         qty_increment = @qty_increment,
-         parent_product_id = @parent_product_id,
-         variant_label = @variant_label,
-         age_restricted = @age_restricted,
+         state_description = @state_description, federal_description = @federal_description,
+         msa_category_code = @msa_category_code, msa_promotion_indicator = @msa_promotion_indicator,
+         msa_promotion_description = @msa_promotion_description, msa_manufacturer_description = @msa_manufacturer_description,
+         meta_title = @meta_title, meta_keywords = @meta_keywords, meta_description = @meta_description,
+         preferred_vendor_id = @preferred_vendor_id, preferred_vendor_name = @preferred_vendor_name,
+         primary_vendor = @primary_vendor, vendor_upc = @vendor_upc,
+         drop_shipment = @drop_shipment, reorder_quantity = @reorder_quantity,
+         min_qty_to_sell = @min_qty_to_sell, max_qty_to_sell = @max_qty_to_sell, qty_increment = @qty_increment,
+         parent_product_id = @parent_product_id, variant_label = @variant_label,
+         age_restricted = @age_restricted, returnable = @returnable, service_product = @service_product,
+         customer_specific = @customer_specific, exclude_from_po = @exclude_from_po,
+         composite_product = @composite_product, track_inventory = @track_inventory,
+         track_inventory_by_imei = @track_inventory_by_imei,
          updated_at = @updated_at
        WHERE id = @id`,
       next as unknown as Record<string, unknown>,
