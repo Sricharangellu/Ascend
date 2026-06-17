@@ -50,6 +50,21 @@ export class EcommerceService {
     return this.sales.createSalesOrder({ customerId: input.customerId, lines: input.lines, storeId: ECOMMERCE_STORE }, tenantId);
   }
 
+  /** Admin view: all online orders across all customers for this tenant. */
+  async orders(tenantId: string, since?: number, limit = 100) {
+    const where = ["so.tenant_id = @t", "so.store_id = 'ecommerce'"];
+    const params: Record<string, unknown> = { t: tenantId, lim: limit };
+    if (since !== undefined) { where.push("so.created_at >= @since"); params.since = since; }
+    return this.db.query(
+      `SELECT so.id, so.so_number, so.customer_id, c.name AS customer_name, so.status, so.total_cents, so.store_id, so.created_at
+       FROM sales_orders so
+       LEFT JOIN customers c ON c.id = so.customer_id AND c.tenant_id = so.tenant_id
+       WHERE ${where.join(" AND ")}
+       ORDER BY so.created_at DESC LIMIT @lim`,
+      params,
+    );
+  }
+
   /** Customer portal: the customer's own sales orders + invoices. */
   async portal(customerId: string, tenantId: string) {
     const c = await this.db.one("SELECT id, name FROM customers WHERE id = @c AND tenant_id = @t", { c: customerId, t: tenantId });

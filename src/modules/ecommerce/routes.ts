@@ -1,4 +1,4 @@
-import type { Router, Response } from "express";
+import type { Router, Request, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
@@ -6,6 +6,23 @@ import type { EcommerceService } from "./service.js";
 
 function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
+}
+
+/** Map a `range` query param (today | 7d | 30d | all) to an epoch-ms lower bound. */
+function sinceFromRange(req: Request): number | undefined {
+  const range = typeof req.query.range === "string" ? req.query.range : "all";
+  const now = Date.now();
+  const DAY = 86_400_000;
+  switch (range) {
+    case "today": {
+      const d = new Date();
+      d.setUTCHours(0, 0, 0, 0);
+      return d.getTime();
+    }
+    case "7d": return now - 7 * DAY;
+    case "30d": return now - 30 * DAY;
+    default: return undefined; // all-time
+  }
 }
 
 const onlineSchema = z.object({ online: z.boolean() });
@@ -33,5 +50,11 @@ export function registerRoutes(router: Router, service: EcommerceService): void 
   }));
   router.get("/portal/:customerId/orders", handler(async (req, res) => {
     res.json(await service.portal(String(req.params.customerId), tenantId(res)));
+  }));
+  // GET /api/v1/ecommerce/orders?range=today|7d|30d — all online orders (admin view)
+  router.get("/orders", handler(async (req, res) => {
+    const since = sinceFromRange(req);
+    const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 100;
+    res.json({ items: await service.orders(tenantId(res), since, limit) });
   }));
 }

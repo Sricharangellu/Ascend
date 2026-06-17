@@ -85,8 +85,8 @@ export function registerRoutes(router: Router, service: ReportsService): void {
     res.json({ items: await service.salesByVendor(tenantId(res), sinceFromRange(req)) });
   }));
 
-  // GET /api/v1/reports/pnl?range=… — P&L: revenue, COGS, gross profit, expenses, net.
-  router.get("/pnl", handler(async (req, res) => {
+  // GET /api/v1/reports/p-l?range=… — P&L: revenue, COGS, gross profit, expenses, net.
+  router.get("/p-l", handler(async (req, res) => {
     res.json(await service.pnl(tenantId(res), sinceFromRange(req)));
   }));
 }

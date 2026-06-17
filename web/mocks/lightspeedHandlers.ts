@@ -316,6 +316,21 @@ export const lightspeedHandlers = [
     });
   }),
 
+  http.post(`${V1}/outlets`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as { name?: string; timezone?: string };
+    if (!b.name) return HttpResponse.json({ error: { code: "VALIDATION_ERROR", message: "name required", requestId: rid() } }, { status: 400 });
+    const outlet = { id: `otl_${Math.random().toString(36).slice(2, 10)}`, tenant_id: "tnt_demo", name: b.name, timezone: b.timezone ?? "UTC", registers: [], created_at: Date.now(), updated_at: Date.now() };
+    return HttpResponse.json(outlet, { status: 201 });
+  }),
+  http.post(`${V1}/outlets/:outletId/registers`, async ({ params, request }) => {
+    await lat();
+    const b = (await request.json()) as { name?: string };
+    if (!b.name) return HttpResponse.json({ error: { code: "VALIDATION_ERROR", message: "name required", requestId: rid() } }, { status: 400 });
+    const register = { id: `reg_${Math.random().toString(36).slice(2, 10)}`, tenant_id: "tnt_demo", outlet_id: String(params.outletId), name: b.name, status: "closed" as const, created_at: Date.now(), updated_at: Date.now() };
+    return HttpResponse.json(register, { status: 201 });
+  }),
+
   // ── Inventory levels (frontend-requested shape) ───────────────────────────
   http.get(`${V1}/inventory/levels`, async () => {
     await lat();
@@ -753,6 +768,16 @@ lightspeedHandlers.push(
       customer: { id: cid, name: customers.get(cid)?.name ?? "Customer" },
       salesOrders: salesOrders.filter((s) => s.customer_id === cid),
       invoices: [],
+    });
+  }),
+  http.get(`${V1}/ecommerce/orders`, async () => {
+    await lat();
+    return HttpResponse.json({
+      items: [
+        { id: "eco_1", so_number: "SO-00001", customer_id: "cust_1", customer_name: "Alice Johnson", status: "pending_approve", total_cents: 12500, store_id: "ecommerce", created_at: Date.now() - 3600000 },
+        { id: "eco_2", so_number: "SO-00002", customer_id: "cust_2", customer_name: "Bob Smith", status: "confirmed", total_cents: 8750, store_id: "ecommerce", created_at: Date.now() - 7200000 },
+        { id: "eco_3", so_number: "SO-00003", customer_id: "cust_3", customer_name: "Carol Davis", status: "invoiced", total_cents: 22000, store_id: "ecommerce", created_at: Date.now() - 86400000 },
+      ],
     });
   }),
 );
