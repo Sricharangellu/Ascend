@@ -17,6 +17,7 @@ import { apiGet } from "@/api-client/client";
 import type { OutletsResponse } from "@/api-client/types";
 import { useAuth } from "@/lib/useAuth";
 import { useOffline } from "@/lib/useOffline";
+import { useAccountMode } from "@/lib/useAccountMode";
 
 type NavKey =
   | "dashboard"
@@ -67,8 +68,6 @@ interface EnterpriseShellProps {
   contentClassName?: string;
 }
 
-const DEFAULT_FLAGS = { groupRetailPOS: true, groupWholesale: true, groupEnterprise: true };
-
 export function EnterpriseShell({
   active,
   title,
@@ -80,13 +79,7 @@ export function EnterpriseShell({
   const { user, logout } = useAuth();
   const { isOffline } = useOffline();
   const pathname = usePathname();
-  const [flags, setFlags] = useState<Record<string, boolean>>(DEFAULT_FLAGS);
-
-  useEffect(() => {
-    apiGet<Record<string, boolean>>("/api/v1/settings/feature-flags")
-      .then((f) => setFlags((prev) => ({ ...prev, ...f })))
-      .catch(() => { /* keep defaults */ });
-  }, []);
+  const { editionFlags: flags } = useAccountMode();
 
   return (
     <div className="flex min-h-screen bg-slate-100 text-slate-900">

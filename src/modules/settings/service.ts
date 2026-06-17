@@ -46,7 +46,11 @@ export class SettingsService {
     await this.kvSet("business", merged, tenantId);
     return merged;
   }
-  async getFlags(tenantId: string) { return { ...DEFAULT_FLAGS, ...(await this.kvGet("feature_flags", tenantId, {} as Record<string, boolean>)) }; }
+  async getFlags(tenantId: string) {
+    const flags = { ...DEFAULT_FLAGS, ...(await this.kvGet("feature_flags", tenantId, {} as Record<string, boolean>)) };
+    const accountMode = flags["groupEnterprise"] ? "ENTERPRISE" : flags["groupWholesale"] ? "WHOLESALE" : "RETAIL";
+    return { ...flags, accountMode };
+  }
   async setFlags(patch: Record<string, boolean>, tenantId: string) {
     const cur = await this.kvGet("feature_flags", tenantId, {} as Record<string, boolean>);
     const merged = { ...cur, ...patch };

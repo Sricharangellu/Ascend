@@ -34,6 +34,8 @@ export interface Product {
   msrp_cents: Cents | null;
   min_selling_price_cents: Cents | null;
   raw_cost_price_cents: Cents | null;
+  wholesale_price_cents: Cents | null;
+  enterprise_price_cents: Cents | null;
   // Physical dimensions
   length_mm: number | null;
   width_mm: number | null;
@@ -106,6 +108,8 @@ export interface CreateProductInput {
   msrp_cents?: Cents | null;
   min_selling_price_cents?: Cents | null;
   raw_cost_price_cents?: Cents | null;
+  wholesale_price_cents?: Cents | null;
+  enterprise_price_cents?: Cents | null;
   // Physical
   length_mm?: number | null;
   width_mm?: number | null;
@@ -243,6 +247,8 @@ export class CatalogService {
       msrp_cents: input.msrp_cents ?? null,
       min_selling_price_cents: input.min_selling_price_cents ?? null,
       raw_cost_price_cents: input.raw_cost_price_cents ?? null,
+      wholesale_price_cents: input.wholesale_price_cents ?? null,
+      enterprise_price_cents: input.enterprise_price_cents ?? null,
       // Physical
       length_mm: input.length_mm ?? null,
       width_mm: input.width_mm ?? null,
@@ -298,7 +304,7 @@ export class CatalogService {
         `INSERT INTO products
            (id, tenant_id, sku, name, price_cents, category, tax_class, barcode, status, created_at, updated_at,
             description, short_description, full_description, alternative_name, model_name, manufacturer, brand, tags, url_alias,
-            msrp_cents, min_selling_price_cents, raw_cost_price_cents,
+            msrp_cents, min_selling_price_cents, raw_cost_price_cents, wholesale_price_cents, enterprise_price_cents,
             length_mm, width_mm, height_mm, weight_grams, size, unit_description, nicotine_strength_mg, volume_ml, oz_per_product_x100,
             image_url,
             state_description, federal_description, msa_category_code, msa_promotion_indicator, msa_promotion_description, msa_manufacturer_description,
@@ -310,7 +316,7 @@ export class CatalogService {
          VALUES
            (@id, @tenant_id, @sku, @name, @price_cents, @category, @tax_class, @barcode, @status, @created_at, @updated_at,
             @description, @short_description, @full_description, @alternative_name, @model_name, @manufacturer, @brand, @tags, @url_alias,
-            @msrp_cents, @min_selling_price_cents, @raw_cost_price_cents,
+            @msrp_cents, @min_selling_price_cents, @raw_cost_price_cents, @wholesale_price_cents, @enterprise_price_cents,
             @length_mm, @width_mm, @height_mm, @weight_grams, @size, @unit_description, @nicotine_strength_mg, @volume_ml, @oz_per_product_x100,
             @image_url,
             @state_description, @federal_description, @msa_category_code, @msa_promotion_indicator, @msa_promotion_description, @msa_manufacturer_description,
@@ -541,7 +547,7 @@ export class CatalogService {
     const detailFields = [
       "description", "short_description", "full_description", "alternative_name",
       "model_name", "manufacturer", "brand", "tags", "url_alias",
-      "msrp_cents", "min_selling_price_cents", "raw_cost_price_cents",
+      "msrp_cents", "min_selling_price_cents", "raw_cost_price_cents", "wholesale_price_cents", "enterprise_price_cents",
       "length_mm", "width_mm", "height_mm", "weight_grams",
       "size", "unit_description", "nicotine_strength_mg", "volume_ml", "oz_per_product_x100",
       "image_url",
@@ -575,6 +581,7 @@ export class CatalogService {
          alternative_name = @alternative_name, model_name = @model_name, manufacturer = @manufacturer,
          brand = @brand, tags = @tags, url_alias = @url_alias,
          msrp_cents = @msrp_cents, min_selling_price_cents = @min_selling_price_cents, raw_cost_price_cents = @raw_cost_price_cents,
+         wholesale_price_cents = @wholesale_price_cents, enterprise_price_cents = @enterprise_price_cents,
          length_mm = @length_mm, width_mm = @width_mm, height_mm = @height_mm, weight_grams = @weight_grams,
          size = @size, unit_description = @unit_description, nicotine_strength_mg = @nicotine_strength_mg,
          volume_ml = @volume_ml, oz_per_product_x100 = @oz_per_product_x100,

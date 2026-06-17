@@ -13,6 +13,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { AccountModeProvider } from "@/lib/useAccountMode";
 
 export default function ProtectedLayout({
   children,
@@ -47,9 +48,9 @@ export default function ProtectedLayout({
   }
 
   return (
-    <>
+    <AccountModeProvider>
       <OfflineBanner />
       {children}
-    </>
+    </AccountModeProvider>
   );
 }

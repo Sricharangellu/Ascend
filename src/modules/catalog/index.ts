@@ -155,6 +155,13 @@ CREATE INDEX IF NOT EXISTS products_tenant_msa_idx ON products (tenant_id, msa_c
 CREATE INDEX IF NOT EXISTS products_tenant_service_idx ON products (tenant_id, service_product);
 `;
 
+// Account-mode tiered pricing: one retail price (price_cents, already exists) plus
+// optional wholesale and enterprise override prices. Null = fall back to retail price.
+const ALTER_PRODUCTS_TIERED_PRICING = `
+ALTER TABLE products ADD COLUMN IF NOT EXISTS wholesale_price_cents BIGINT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS enterprise_price_cents BIGINT;
+`;
+
 export const catalogModule: PosModule = {
   name: "catalog",
   migrations: [
@@ -169,6 +176,7 @@ export const catalogModule: PosModule = {
     ALTER_PRODUCTS_AGE,
     ALTER_PRODUCTS_EXPIRY,
     ALTER_PRODUCTS_XLSX_FIELDS,
+    ALTER_PRODUCTS_TIERED_PRICING,
   ],
   async register({ db, events, router }) {
     const service = new CatalogService(db, events);

@@ -37,6 +37,8 @@ const detailFieldsSchema = {
   msrp_cents: z.number().int().nonnegative().nullable().optional(),
   min_selling_price_cents: z.number().int().nonnegative().nullable().optional(),
   raw_cost_price_cents: z.number().int().nonnegative().nullable().optional(),
+  wholesale_price_cents: z.number().int().nonnegative().nullable().optional(),
+  enterprise_price_cents: z.number().int().nonnegative().nullable().optional(),
   // Physical dimensions (integers in base units)
   length_mm: z.number().int().positive().nullable().optional(),
   width_mm: z.number().int().positive().nullable().optional(),
