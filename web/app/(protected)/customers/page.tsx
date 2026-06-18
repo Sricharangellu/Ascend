@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery, invalidateQuery } from "@/lib/useQuery";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
@@ -126,9 +127,6 @@ function formatOrderDate(timestamp: number) {
 }
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<CustomerView[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [segment, setSegment] = useState<SegmentFilter>("All");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -176,17 +174,10 @@ export default function CustomersPage() {
       await apiPost("/api/v1/customers", payload);
       setShowNewCustomer(false);
       setForm(emptyForm());
-      // Reload the customer list
-      const data = await apiGet<CustomersResponse>("/api/v1/customers");
-      const summaries = await Promise.all(
-        data.items.map(async (customer) => {
-          try { return await apiGet<CustomerSummary>(`/api/v1/customers/${customer.id}/summary`); }
-          catch { return fallbackSummary(customer); }
-        })
-      );
-      const next = summaries.map(toCustomerView);
-      setCustomers(next);
-      setSelectedId(next[0]?.id ?? null);
+      // Invalidate cache so the next render re-fetches.
+      invalidateQuery("customers:list");
+      setShowNewCustomer(false);
+      setForm(emptyForm());
     } catch (err) {
       setSaveError(err instanceof ApiResponseError ? err.message : "Failed to create customer.");
     } finally {
@@ -194,45 +185,28 @@ export default function CustomersPage() {
     }
   }
 
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-
-    apiGet<CustomersResponse>("/api/v1/customers", { signal: controller.signal })
-      .then(async (data) => {
-        const summaries = await Promise.all(
-          data.items.map(async (customer) => {
-            try {
-              return await apiGet<CustomerSummary>(`/api/v1/customers/${customer.id}/summary`, {
-                signal: controller.signal,
-              });
-            } catch {
-              return fallbackSummary(customer);
-            }
-          })
-        );
-        if (controller.signal.aborted) return;
-        const nextCustomers = summaries.map(toCustomerView);
-        setCustomers(nextCustomers);
-        setSelectedId((current) =>
-          current && nextCustomers.some((customer) => customer.id === current)
-            ? current
-            : nextCustomers[0]?.id ?? null
-        );
-        setError(null);
+  async function fetchCustomerList(): Promise<CustomerView[]> {
+    const data = await apiGet<CustomersResponse>("/api/v1/customers");
+    const summaries = await Promise.all(
+      data.items.map(async (customer) => {
+        try { return await apiGet<CustomerSummary>(`/api/v1/customers/${customer.id}/summary`); }
+        catch { return fallbackSummary(customer); }
       })
-      .catch((err) => {
-        if (controller.signal.aborted) return;
-        setError(err instanceof ApiResponseError ? err.message : "Could not load customers.");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
+    );
+    return summaries.map(toCustomerView);
+  }
 
-    return () => {
-      controller.abort();
-    };
-  }, []);
+  const { data: customersData, loading, error } =
+    useQuery<CustomerView[]>("customers:list", fetchCustomerList, { staleMs: 60_000 });
+  const customers = customersData ?? [];
+
+  // Auto-select first customer when list loads.
+  useMemo(() => {
+    if (customers.length > 0 && selectedId === null) {
+      setSelectedId(customers[0]?.id ?? null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customers.length]);
 
   const filteredCustomers = useMemo(() => {
     const q = query.trim().toLowerCase();

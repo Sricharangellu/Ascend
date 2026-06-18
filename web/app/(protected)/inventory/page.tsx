@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@/lib/useQuery";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
@@ -113,19 +114,12 @@ export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("ledger");
 
   // Stock ledger state
-  const [rows, setRows] = useState<InventoryRow[]>([]);
-  const [ledgerLoading, setLedgerLoading] = useState(true);
-  const [ledgerError, setLedgerError] = useState<string | null>(null);
   const [ledgerQuery, setLedgerQuery] = useState("");
   const [ledgerCategory, setLedgerCategory] = useState("All");
   const [ledgerStatus, setLedgerStatus] = useState<StockStatusFilter>("All");
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
 
   // Catalog state
-  const [products, setProducts] = useState<CatalogProduct[]>([]);
-  const [categories, setCategories] = useState<CatalogCategory[]>([]);
-  const [catalogLoading, setCatalogLoading] = useState(false);
-  const [catalogError, setCatalogError] = useState<string | null>(null);
   const [catalogQuery, setCatalogQuery] = useState("");
   const [catalogCategory, setCatalogCategory] = useState("All");
   const [catalogStatus, setCatalogStatus] = useState<CatalogStatusFilter>("All");
@@ -135,72 +129,38 @@ export default function InventoryPage() {
   const actionsRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  // Load stock ledger
-  useEffect(() => {
-    const controller = new AbortController();
-    setLedgerLoading(true);
-    apiGet<InventoryLevelsResponse>("/api/v1/inventory/levels?pageSize=200", {
-      signal: controller.signal,
-    })
-      .then((data) => {
-        const nextRows = data.items.map(toInventoryRow);
-        setRows(nextRows);
-        setSelectedSku((current) =>
-          current && nextRows.some((row) => row.sku === current)
-            ? current
-            : nextRows[0]?.sku ?? null
-        );
-        setLedgerError(null);
-      })
-      .catch((err) => {
-        if (controller.signal.aborted) return;
-        setLedgerError(
-          err instanceof ApiResponseError ? err.message : "Could not load inventory."
-        );
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLedgerLoading(false);
-      });
-    return () => {
-      controller.abort();
-    };
-  }, []);
+  // Load stock ledger via useQuery (SWR caching)
+  const { data: ledgerData, loading: ledgerLoading, error: ledgerError } =
+    useQuery("inventory:levels", () => apiGet<InventoryLevelsResponse>("/api/v1/inventory/levels?pageSize=200"), { staleMs: 30_000 });
+  const rows = useMemo(() => {
+    const nextRows = (ledgerData?.items ?? []).map(toInventoryRow);
+    if (nextRows.length > 0 && selectedSku === null) {
+      setSelectedSku(nextRows[0]?.sku ?? null);
+    }
+    return nextRows;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ledgerData]);
 
-  // Load catalog data when catalog tab is first shown
-  useEffect(() => {
-    if (activeTab !== "catalog") return;
-    if (products.length > 0 || catalogLoading) return;
-
-    const controller = new AbortController();
-    setCatalogLoading(true);
-
-    Promise.all([
-      apiGet<CatalogProductsResponse>("/api/v1/catalog?limit=200&excludeMasters=true", {
-        signal: controller.signal,
-      }),
-      apiGet<CatalogCategoriesResponse>("/api/v1/catalog/categories", {
-        signal: controller.signal,
-      }),
-    ])
-      .then(([productsData, categoriesData]) => {
-        setProducts(productsData.items);
-        setCategories(categoriesData.items);
-        setCatalogError(null);
-      })
-      .catch((err) => {
-        if (controller.signal.aborted) return;
-        setCatalogError(
-          err instanceof ApiResponseError ? err.message : "Could not load catalog."
-        );
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setCatalogLoading(false);
-      });
-
-    return () => {
-      controller.abort();
-    };
-  }, [activeTab, products.length, catalogLoading]);
+  // Load catalog data when catalog tab is first shown (lazy, cached)
+  const { data: productsData, loading: catalogProductsLoading, error: catalogProductsError } =
+    useQuery("inventory:catalog-products", () => apiGet<CatalogProductsResponse>("/api/v1/catalog?limit=200&excludeMasters=true"), {
+      staleMs: 60_000,
+      enabled: activeTab === "catalog",
+    });
+  const { data: categoriesData, loading: catalogCategoriesLoading } =
+    useQuery("inventory:catalog-categories", () => apiGet<CatalogCategoriesResponse>("/api/v1/catalog/categories"), {
+      staleMs: 60_000,
+      enabled: activeTab === "catalog",
+    });
+  // Local override state for optimistic updates after mutations.
+  const [productsOverride, setProductsOverride] = useState<CatalogProduct[] | null>(null);
+  const [catalogMutationError, setCatalogMutationError] = useState<string | null>(null);
+  const products = productsOverride ?? productsData?.items ?? [];
+  // Sync override when fresh data arrives (clear stale override).
+  useEffect(() => { if (productsData) setProductsOverride(null); }, [productsData]);
+  const categories = categoriesData?.items ?? [];
+  const catalogLoading = catalogProductsLoading || catalogCategoriesLoading;
+  const catalogError = catalogProductsError ?? catalogMutationError;
 
   // Close actions dropdown when clicking outside
   useEffect(() => {
@@ -307,12 +267,12 @@ export default function InventoryPage() {
     setActionsOpen(false);
     try {
       await apiPost("/api/v1/catalog/bulk-update", { ids, update: { status } });
-      setProducts((prev) =>
-        prev.map((p) => (selectedIds.has(p.id) ? { ...p, status } : p))
+      setProductsOverride((prev) =>
+        (prev ?? products).map((p) => (selectedIds.has(p.id) ? { ...p, status } : p))
       );
       setSelectedIds(new Set());
     } catch (err) {
-      setCatalogError(
+      setCatalogMutationError(
         err instanceof ApiResponseError ? err.message : "Bulk update failed."
       );
     } finally {

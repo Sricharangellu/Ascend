@@ -7,7 +7,8 @@
  * and a payment-method breakdown — all driven by a date-range picker.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
+import { useQuery } from "@/lib/useQuery";
 import Link from "next/link";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
@@ -191,43 +192,30 @@ function rangeLabel(range: Range): string {
 export default function DashboardPage() {
   const [range, setRange] = useState<Range>("7d");
 
-  const [summary, setSummary] = useState<SummaryResponse | null>(null);
-  const [topProducts, setTopProducts] = useState<TopProductItem[]>([]);
-  const [topCustomers, setTopCustomers] = useState<TopCustomerItem[]>([]);
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchAll = useCallback(
-    async (signal: AbortSignal) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const [summaryData, productsData, customersData] = await Promise.all([
-          apiGet<SummaryResponse>(`/api/v1/reports/summary?range=${range}`, { signal }),
-          apiGet<TopProductsResponse>(`/api/v1/reports/top-products?range=${range}&limit=5`, { signal }),
-          apiGet<TopCustomersResponse>(`/api/v1/reports/sales-by-customer?range=${range}`, { signal }),
-        ]);
-        setSummary(summaryData);
-        setTopProducts(productsData.items);
-        setTopCustomers(customersData.items);
-      } catch (err) {
-        if ((err as { name?: string }).name === "AbortError") return;
-        setError(
-          err instanceof ApiResponseError ? err.message : "Failed to load dashboard data."
-        );
-      } finally {
-        setLoading(false);
-      }
-    },
-    [range]
+  const fetchSummary = useCallback(
+    () => apiGet<SummaryResponse>(`/api/v1/reports/summary?range=${range}`),
+    [range],
+  );
+  const fetchTopProducts = useCallback(
+    () => apiGet<TopProductsResponse>(`/api/v1/reports/top-products?range=${range}&limit=5`),
+    [range],
+  );
+  const fetchTopCustomers = useCallback(
+    () => apiGet<TopCustomersResponse>(`/api/v1/reports/sales-by-customer?range=${range}`),
+    [range],
   );
 
-  useEffect(() => {
-    const controller = new AbortController();
-    void fetchAll(controller.signal);
-    return () => controller.abort();
-  }, [fetchAll]);
+  const { data: summary, loading: loadingSummary, error: errorSummary } =
+    useQuery(`dashboard:summary:${range}`, fetchSummary, { staleMs: 60_000 });
+  const { data: topProductsData, loading: loadingProducts } =
+    useQuery(`dashboard:top-products:${range}`, fetchTopProducts, { staleMs: 60_000 });
+  const { data: topCustomersData, loading: loadingCustomers } =
+    useQuery(`dashboard:top-customers:${range}`, fetchTopCustomers, { staleMs: 60_000 });
+
+  const topProducts = topProductsData?.items ?? [];
+  const topCustomers = topCustomersData?.items ?? [];
+  const loading = loadingSummary || loadingProducts || loadingCustomers;
+  const error = errorSummary;
 
   // ── Derived KPI values ────────────────────────────────────────────────────
 
