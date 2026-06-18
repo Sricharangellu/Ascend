@@ -24,6 +24,7 @@ import { reportsModule } from "./reports/index.js";
 import { insightsModule } from "./insights/index.js";
 import { workflowsModule } from "./workflows/index.js";
 import { ssoModule } from "./sso/index.js";
+import { monitoringModule } from "./monitoring/index.js";
 
 /**
  * Registration order = migration order. Keep dependencies earlier:
@@ -55,4 +56,5 @@ export const modules: PosModule[] = [
   insightsModule,
   workflowsModule,
   ssoModule,
+  monitoringModule,
 ];

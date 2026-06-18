@@ -4,6 +4,7 @@ import { ToastProvider } from "@/components/Toast";
 import { GlobalErrorBoundary } from "@/components/ErrorBoundary";
 import { FlagProvider } from "@/flags/FlagProvider";
 import MockWorkerInit from "@/mocks/MockWorkerInit";
+import { ErrorMonitor } from "@/components/ErrorMonitor";
 
 export const metadata: Metadata = {
   title: {
@@ -39,6 +40,8 @@ export default function RootLayout({
 
         {/* Initialise MSW browser worker in development */}
         <MockWorkerInit />
+        {/* Install global JS error handlers for monitoring */}
+        <ErrorMonitor />
 
         <GlobalErrorBoundary>
           <FlagProvider>

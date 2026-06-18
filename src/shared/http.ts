@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { ZodError, type ZodSchema } from "zod";
+import { logError, contextFromRequest } from "./monitoring.js";
 
 /** Thrown by services/routes to signal a 4xx with a stable error code. */
 export class HttpError extends Error {
@@ -44,7 +45,7 @@ function flatten(err: ZodError): string {
 /** Express error-handling middleware. Mount last. */
 export function errorMiddleware(
   err: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction,
 ) {
@@ -53,7 +54,7 @@ export function errorMiddleware(
     return;
   }
   // Security: never echo raw error text (it can leak SQL/stack internals). Log
-  // the detail server-side; return a generic message to the client.
-  console.error("[unhandled]", err instanceof Error ? err.stack ?? err.message : err);
+  // structured detail server-side; return a generic message to the client.
+  logError(err, { ...contextFromRequest(req), statusCode: 500 });
   res.status(500).json({ error: { code: "internal", message: "internal error" } });
 }
