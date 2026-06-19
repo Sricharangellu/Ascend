@@ -80,16 +80,16 @@ records, only triaged into "build now" vs. "documented for later."
       vendor-credits/returns/PO-receive, discounts create/status, accounting
       deposit create, sales-order cancel/void, giftcard/customer redeem
       overrides. List each route touched in the commit message. (done)
-- [ ] BE-2: Refresh-token rotation/revocation — make refresh tokens single-use
+- [x] BE-2: Refresh-token rotation/revocation — make refresh tokens single-use
       (rotate on `/api/identity/refresh`, invalidate the old one), add a
       revocation check on logout. Add tests.
-- [ ] BE-3: Reports — add `sales-by-rep` and `sales-by-vendor` pivots plus a
+- [x] BE-3: Reports — add `sales-by-rep` and `sales-by-vendor` pivots plus a
       basic P&L (`GET /api/v1/reports/pnl?range=`) using existing
       income/expense accounts from the COA.
-- [ ] BE-4: Multi-store filter — add `storeIds[]` to the JWT (from `outlets`)
+- [x] BE-4: Multi-store filter — add `storeIds[]` to the JWT (from `outlets`)
       and accept `?storeIds=` on the major list endpoints (orders, inventory,
       sales-orders, invoices) filtering by `store_id`.
-- [ ] BE-5: Per-customer discount usage limit enforcement at redeem time
+- [x] BE-5: Per-customer discount usage limit enforcement at redeem time
       (SECURITY_AUDIT M2 follow-up #4) — `discounts.evaluate`/`redeem` should
       check `per_customer_limit` against a usage ledger keyed by customer.
 - [x] BE-6: Catalog — category tree (`categories` table with `parent_id` +
@@ -111,44 +111,44 @@ records, only triaged into "build now" vs. "documented for later."
       creation, release it on completion/void/refund. Make `committed` in
       `GET /inventory/levels` reflect real reservations (currently
       hardcoded to 0). See `gaps/INVENTORY_GAPS.md`. (done in this commit)
-- [ ] BE-16: Compliance — age-restriction flag: `products.age_restricted`
+- [x] BE-16: Compliance — age-restriction flag: `products.age_restricted`
       (boolean, default false); `POST /api/v1/sales/sales-orders` and
       `POST /api/v1/orders` reject (400) if any line is age-restricted and
       the request lacks `ageVerified: true`. See
       `gaps/SETTINGS_TEAM_COMPLIANCE_GAPS.md`.
-- [ ] BE-13: Customers — credit limit: add `credit_limit_cents` (nullable)
+- [x] BE-13: Customers — credit limit: add `credit_limit_cents` (nullable)
       to `customers`; enforce on `POST /sales-orders` and `POST /invoices`
       (409 `credit_limit_exceeded` for `cashier`, allowed with a logged
       override for `manager`/`owner`). Surface `creditLimitCents` +
       `creditAvailableCents` in the customer financial summary. See
       `gaps/SALES_ORDERS_GAPS.md`.
-- [ ] BE-11: Purchasing — partial PO receiving: `POST
+- [x] BE-11: Purchasing — partial PO receiving: `POST
       /api/v1/purchasing/orders/:id/receive` accepts a `quantity` per line
       (≤ remaining); PO status tracks
       `open → partially_received → received`, repeatable until fully
       received. See `gaps/PURCHASING_GAPS.md`.
-- [ ] BE-12: Purchasing — bill variance flag: when an auto-drafted bill's
+- [x] BE-12: Purchasing — bill variance flag: when an auto-drafted bill's
       total ≠ `sum(receivedQty * unitCost)` across all receives for its PO,
       set `bills.variance_cents` (signed) and surface it in
       `GET /billing/bills`. See `gaps/PURCHASING_GAPS.md`.
-- [ ] BE-14: Accounting — AR dunning: for invoices `> 30/60/90` days
+- [x] BE-14: Accounting — AR dunning: for invoices `> 30/60/90` days
       overdue (reuse `ar-aging` query), set `invoices.dunning_level` and
       emit `invoice.overdue` (consumed by `webhooks`). See
       `gaps/ACCOUNTING_GAPS.md`.
-- [ ] BE-17: Outlets — register sessions:
+- [x] BE-17: Outlets — register sessions:
       `POST /registers/:id/open` (starting cash float),
       `POST /registers/:id/close` (counted cash, computes variance against
       float + cash-tender sales since open); read endpoint for session
       history. See `gaps/SETTINGS_TEAM_COMPLIANCE_GAPS.md`.
-- [ ] BE-10: Cycle count sessions —
+- [x] BE-10: Cycle count sessions —
       `POST /api/v1/inventory/counts` (open session with expected qtys per
       SKU), `POST /:id/lines` (record counted qty), `POST /:id/close`
       (manager-gated; posts variances as `inventory_movements`
       adjustments). See `gaps/INVENTORY_GAPS.md`.
-- [ ] BE-15: Shipping — add optional `tracking_number` + `carrier` text
+- [x] BE-15: Shipping — add optional `tracking_number` + `carrier` text
       fields to shipping orders, settable on `POST /:id/ship`. No carrier
       API integration. See `gaps/FULFILLMENT_SHIPPING_GAPS.md`.
-- [ ] BE-18: Edition presets — extend `DEFAULT_FLAGS`
+- [x] BE-18: Edition presets — extend `DEFAULT_FLAGS`
       (`src/modules/settings/service.ts`) with `groupRetailPOS`,
       `groupWholesale`, `groupEnterprise` (all default `true`). Add
       `POST /api/v1/settings/edition` (manager-gated, body:
@@ -167,14 +167,14 @@ records, only triaged into "build now" vs. "documented for later."
 - [x] FE-2: Accounts (AP/AR) surface — bills/invoices lists with aging buckets
       from `GET /reports/ar-aging` and `/ap-aging`; pay actions. (done in
       a391420)
-- [ ] FE-3: Near-expiry/markdown report — table from
+- [x] FE-3: Near-expiry/markdown report — table from
       `GET /api/v1/inventory/expiring` + `/expired`, with a lot column on the
       main inventory grid and a "Return to vendor" action
       (`/purchasing/returns`).
-- [ ] FE-4: Operations — Locations grid (assign products to bins via
+- [x] FE-4: Operations — Locations grid (assign products to bins via
       `/fulfillment/assign`) + Pick & Pack queue
       (`/fulfillment/pick-lists`, pick line, pack).
-- [ ] FE-5: Settings — Chart of Accounts tree editor
+- [x] FE-5: Settings — Chart of Accounts tree editor
       (`/accounting/accounts*`) + Batch Deposits list/create/approve
       (`/accounting/deposits*`).
 - [ ] FE-6: Audit existing `web/mocks/lightspeedHandlers.ts` against live
@@ -198,7 +198,7 @@ records, only triaged into "build now" vs. "documented for later."
       `autoApplicable`, `usageLimit`/`perCustomerLimit`, coupon code.
       Consumes existing `/api/v1/discounts*` endpoints. See
       `gaps/DISCOUNTS_GAPS.md`. (done)
-- [ ] FE-10: Customers — show `creditLimitCents`/`creditAvailableCents` on
+- [x] FE-10: Customers — show `creditLimitCents`/`creditAvailableCents` on
       the customer detail panel; warn (or block, with manager override) on
       SO/invoice creation when a customer is over their credit limit,
       consuming BE-13. See `gaps/SALES_ORDERS_GAPS.md`.
@@ -206,7 +206,7 @@ records, only triaged into "build now" vs. "documented for later."
       when any line is `age_restricted` (consumes BE-16); register
       open/close screen with running cash-variance summary (consumes
       BE-17). See `gaps/SETTINGS_TEAM_COMPLIANCE_GAPS.md`. (done)
-- [ ] FE-13: Edition-aware navigation — read `/feature-flags` at app load;
+- [x] FE-13: Edition-aware navigation — read `/feature-flags` at app load;
       hide nav sections/routes for disabled groups (`groupWholesale` hides
       Sales Orders/Purchasing/Accounting, `groupRetailPOS` hides Gift
       Cards/Register Sessions). Add a "Business type" picker on
@@ -253,5 +253,9 @@ records, only triaged into "build now" vs. "documented for later."
   Catalog tab on /inventory (filter, bulk-select, bulk-status, CSV export,
   New product button); /inventory/products/[id] detail page (General,
   Categories, Pricing, Variants tabs); /inventory/products/new create form.
+
+- 2026-06-18 human/assistant S4-CHARTS: revenue-trend endpoint + SVG LineChart/BarChart components + dashboard revenue trend + hourly bar chart cards.
+- 2026-06-18 human/assistant S4-LOYALTY: loyalty_tier_rules table + CRUD + auto-upgrade in awardPoints + Loyalty Tiers section in /settings.
+- 2026-06-18 human/assistant ROADMAP: marked BE-2..18, FE-3..5, FE-10, FE-13 as done (all were implemented in prior sessions).
 
 _Agents append a one-line entry here each run: date, agent, item, commit._

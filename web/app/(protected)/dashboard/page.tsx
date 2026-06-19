@@ -3,8 +3,8 @@
 /**
  * /dashboard — POS management overview.
  *
- * Shows KPI tiles, top products, top customers, quick-access action links,
- * and a payment-method breakdown — all driven by a date-range picker.
+ * Shows KPI tiles, revenue trend chart, top products, top customers,
+ * sales-by-hour bar chart, quick-access action links, and payment breakdown.
  */
 
 import { useState, useCallback } from "react";
@@ -12,8 +12,10 @@ import { useQuery } from "@/lib/useQuery";
 import Link from "next/link";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
-import { apiGet, ApiResponseError } from "@/api-client/client";
+import { apiGet } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
+import { LineChart } from "@/components/charts/LineChart";
+import { BarChart } from "@/components/charts/BarChart";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -62,6 +64,25 @@ interface TopCustomerItem {
 interface TopCustomersResponse {
   items: TopCustomerItem[];
 }
+
+interface TrendDay {
+  date: string;
+  label: string;
+  revenueCents: number;
+  orderCount: number;
+}
+
+interface TrendResponse { items: TrendDay[]; }
+
+interface HourlyBucket {
+  hour: number;
+  label: string;
+  orderCount: number;
+  revenueCents: number;
+  value: number;
+}
+
+interface HourlyResponse { items: HourlyBucket[]; }
 
 // ─── Skeleton primitives ──────────────────────────────────────────────────────
 
@@ -204,6 +225,15 @@ export default function DashboardPage() {
     () => apiGet<TopCustomersResponse>(`/api/v1/reports/sales-by-customer?range=${range}`),
     [range],
   );
+  const trendRange = range === "today" ? "7d" : range;
+  const fetchTrend = useCallback(
+    () => apiGet<TrendResponse>(`/api/v1/reports/revenue-trend?range=${trendRange}`),
+    [trendRange],
+  );
+  const fetchHourly = useCallback(
+    () => apiGet<HourlyResponse>(`/api/v1/reports/hourly?range=${range}`),
+    [range],
+  );
 
   const { data: summary, loading: loadingSummary, error: errorSummary } =
     useQuery(`dashboard:summary:${range}`, fetchSummary, { staleMs: 60_000 });
@@ -211,11 +241,18 @@ export default function DashboardPage() {
     useQuery(`dashboard:top-products:${range}`, fetchTopProducts, { staleMs: 60_000 });
   const { data: topCustomersData, loading: loadingCustomers } =
     useQuery(`dashboard:top-customers:${range}`, fetchTopCustomers, { staleMs: 60_000 });
+  const { data: trendData, loading: loadingTrend } =
+    useQuery(`dashboard:trend:${trendRange}`, fetchTrend, { staleMs: 60_000 });
+  const { data: hourlyData, loading: loadingHourly } =
+    useQuery(`dashboard:hourly:${range}`, fetchHourly, { staleMs: 60_000 });
 
   const topProducts = topProductsData?.items ?? [];
   const topCustomers = topCustomersData?.items ?? [];
   const loading = loadingSummary || loadingProducts || loadingCustomers;
   const error = errorSummary;
+
+  const trendPoints = (trendData?.items ?? []).map((d) => ({ label: d.label, value: d.revenueCents }));
+  const hourlyPoints = (hourlyData?.items ?? []).map((d) => ({ label: d.label, value: d.revenueCents }));
 
   // ── Derived KPI values ────────────────────────────────────────────────────
 
@@ -225,11 +262,8 @@ export default function DashboardPage() {
   const totalOrders = summary?.orders.total ?? 0;
   const completedOrders = summary?.orders.completed ?? 0;
   const openOrders = summary?.orders.open ?? 0;
-  const capturedCents = summary?.payments.capturedCents ?? 0;
   const avgOrderCents =
     completedOrders > 0 ? Math.trunc(gross / completedOrders) : 0;
-  const byMethod = summary?.payments.byMethod ?? {};
-  const methodEntries = Object.entries(byMethod);
 
   return (
     <EnterpriseShell
@@ -288,12 +322,78 @@ export default function DashboardPage() {
             <KpiTile label="Revenue" value={formatMoney(gross)} loading={loading} tone="revenue" />
             <KpiTile label="Net Revenue" value={formatMoney(net)} loading={loading} tone="revenue" />
             <KpiTile label="Tax Collected" value={formatMoney(tax)} loading={loading} />
-            <KpiTile label="Payments Captured" value={formatMoney(capturedCents)} loading={loading} />
+            <KpiTile label="Payments Captured" value={formatMoney(summary?.payments.capturedCents ?? 0)} loading={loading} />
             <KpiTile label="Total Orders" value={totalOrders} loading={loading} tone="orders" />
             <KpiTile label="Completed Sales" value={completedOrders} loading={loading} tone="orders" />
             <KpiTile label="Open Orders" value={openOrders} loading={loading} tone="risk" />
             <KpiTile label="Avg Order Value" value={formatMoney(avgOrderCents)} loading={loading} />
           </div>
+        </section>
+
+        {/* ── Revenue Trend ──────────────────────────────────────────────── */}
+        <section aria-label="Revenue trend">
+          <Card
+            title={`Revenue Trend — Last ${trendRange === "7d" ? "7 Days" : "30 Days"}`}
+            noPadding
+          >
+            <div className="px-5 pb-4 pt-2">
+              <LineChart
+                data={trendPoints}
+                height={200}
+                color="#10b981"
+                loading={loadingTrend}
+                formatValue={(v) => formatMoney(v)}
+              />
+            </div>
+          </Card>
+        </section>
+
+        {/* ── Sales by Hour + Top Products ───────────────────────────────── */}
+        <section
+          aria-label="Sales patterns"
+          className="grid grid-cols-1 gap-5 lg:grid-cols-2"
+        >
+          <Card title="Sales by Hour" noPadding>
+            <div className="px-5 pb-4 pt-2">
+              <BarChart
+                data={hourlyPoints}
+                height={160}
+                color="#6366f1"
+                loading={loadingHourly}
+                showEveryNthLabel={4}
+                formatValue={(v) => formatMoney(v)}
+              />
+            </div>
+          </Card>
+
+          {/* Inventory value summary tile */}
+          <Card title="Revenue Mix by Payment Method" noPadding>
+            {loading ? (
+              <div className="space-y-3 px-5 py-4">
+                {[...Array(3)].map((_, i) => <SkeletonBox key={i} className="h-6 w-full" />)}
+              </div>
+            ) : Object.entries(summary?.payments.byMethod ?? {}).length === 0 ? (
+              <p className="px-5 py-4 text-sm text-slate-400">No payments in this period.</p>
+            ) : (
+              <div className="space-y-3 px-5 py-4">
+                {Object.entries(summary?.payments.byMethod ?? {}).map(([method, cents]) => {
+                  const total = Object.values(summary?.payments.byMethod ?? {}).reduce((s, v) => s + v, 0);
+                  const pct = total > 0 ? Math.round((cents / total) * 100) : 0;
+                  return (
+                    <div key={method}>
+                      <div className="mb-1 flex items-center justify-between text-sm">
+                        <span className="font-medium capitalize text-slate-700">{method}</span>
+                        <span className="tabular-nums text-slate-600">{formatMoney(cents)} <span className="text-xs text-slate-400">({pct}%)</span></span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-2 rounded-full bg-brand-500 transition-all" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
         </section>
 
         {/* ── Top Products & Top Customers ───────────────────────────────── */}
@@ -412,61 +512,6 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* ── Payment breakdown ──────────────────────────────────────────── */}
-        {loading && (
-          <section aria-label="Payment method breakdown" aria-busy="true">
-            <Card title="Payment Methods">
-              <div className="space-y-3">
-                {[...Array(3)].map((_, i) => (
-                  <SkeletonBox key={i} className="h-8 w-full" />
-                ))}
-              </div>
-            </Card>
-          </section>
-        )}
-
-        {!loading && methodEntries.length > 0 && (
-          <section aria-label="Payment method breakdown">
-            <Card title="Payment Methods">
-              <div className="space-y-3">
-                {methodEntries.map(([method, cents]) => {
-                  const totalMethodCents = methodEntries.reduce(
-                    (sum, [, v]) => sum + v,
-                    0
-                  );
-                  const pct =
-                    totalMethodCents > 0
-                      ? Math.round((cents / totalMethodCents) * 100)
-                      : 0;
-                  return (
-                    <div key={method}>
-                      <div className="mb-1 flex items-center justify-between text-sm">
-                        <span className="font-medium capitalize text-slate-700">
-                          {method}
-                        </span>
-                        <span className="tabular-nums text-slate-600">
-                          {formatMoney(cents)}{" "}
-                          <span className="text-xs text-slate-400">({pct}%)</span>
-                        </span>
-                      </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                        <div
-                          className="h-2 rounded-full bg-brand-500 transition-all"
-                          style={{ width: `${pct}%` }}
-                          role="progressbar"
-                          aria-valuenow={pct}
-                          aria-valuemin={0}
-                          aria-valuemax={100}
-                          aria-label={`${method}: ${pct}%`}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
-          </section>
-        )}
 
       </div>
     </EnterpriseShell>

@@ -136,4 +136,34 @@ export function registerRoutes(router: Router, service: CustomersService): void 
       res.json(result);
     }),
   );
+
+  router.get("/:id/loyalty", handler(async (req, res) => {
+    res.json(await service.loyaltySummary(String(req.params.id), tenantId(res)));
+  }));
+
+  // ── Loyalty tier rules (/api/v1/customers/loyalty-tiers) ──────────────────
+  const tierSchema = z.object({
+    name: z.string().min(1),
+    tierLevel: z.number().int().min(1).max(5),
+    minPoints: z.number().int().nonnegative(),
+    pointMultiplier: z.number().positive().max(10),
+    discountPct: z.number().nonnegative().max(100),
+  });
+
+  router.get("/loyalty-tiers", handler(async (_req, res) => {
+    res.json({ items: await service.listTierRules(tenantId(res)) });
+  }));
+
+  router.put("/loyalty-tiers/:level", requireRole("manager"), handler(async (req, res) => {
+    const level = parseInt(String(req.params.level), 10);
+    if (isNaN(level) || level < 1 || level > 5) throw Object.assign(new Error("tier level must be 1–5"), { status: 400 });
+    const body = parseBody(tierSchema, req.body);
+    res.json(await service.upsertTierRule(tenantId(res), { ...body, tierLevel: level }));
+  }));
+
+  router.delete("/loyalty-tiers/:level", requireRole("manager"), handler(async (req, res) => {
+    const level = parseInt(String(req.params.level), 10);
+    await service.deleteTierRule(tenantId(res), level);
+    res.status(204).end();
+  }));
 }

@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import type { Product } from "@/api-client/types";
+import type { TerminalProduct as Product } from "@/api-client/types";
 
 // ── Inline the reducer logic (avoids "use client" directive issues in Node) ──
 

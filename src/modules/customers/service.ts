@@ -14,6 +14,37 @@ function clampLimit(limit?: number): number {
   return Math.min(Math.floor(limit), 200);
 }
 
+export interface LoyaltyTierRule {
+  id: string;
+  tenant_id: string;
+  name: string;
+  tier_level: number;
+  min_points: number;
+  point_multiplier: number;
+  discount_pct: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface CreateTierRuleInput {
+  name: string;
+  tierLevel: number;
+  minPoints: number;
+  pointMultiplier: number;
+  discountPct: number;
+}
+
+export interface LoyaltySummary {
+  customerId: string;
+  currentPoints: number;
+  currentTierLevel: number;
+  currentTierName: string | null;
+  pointMultiplier: number;
+  discountPct: number;
+  nextTierName: string | null;
+  pointsToNextTier: number | null;
+}
+
 /** Customers + loyalty. Tenant-scoped. Points are earned on payment.captured
  *  ($1 net spent = 1 point) and redeemed at 100 points = $5.00. */
 
@@ -410,21 +441,6 @@ export class CustomersService {
     };
   }
 
-  /** Add points to a customer (idempotency is the caller's concern). */
-  async awardPoints(customerId: string, points: number, tenantId: string): Promise<void> {
-    if (points <= 0) return;
-    await this.db.query(
-      `UPDATE customers SET points = points + @points, updated_at = @now
-       WHERE id = @id AND tenant_id = @tenantId`,
-      { points, now: Date.now(), id: customerId, tenantId },
-    );
-    await this.events.publish(
-      "loyalty.points_awarded",
-      { customerId, tenantId, points },
-      customerId,
-    );
-  }
-
   /** Redeem points for a cash-value discount. Must be a positive multiple of 100. */
   async redeem(
     customerId: string,
@@ -490,5 +506,104 @@ export class CustomersService {
       { orderId, tenantId },
     );
     return row?.customer_id ?? null;
+  }
+
+  // ── Loyalty tier rules ───────────────────────────────────────────────────────
+
+  async listTierRules(tenantId: string): Promise<LoyaltyTierRule[]> {
+    return this.db.query<LoyaltyTierRule>(
+      "SELECT * FROM loyalty_tier_rules WHERE tenant_id = @t ORDER BY tier_level ASC",
+      { t: tenantId },
+    );
+  }
+
+  async upsertTierRule(tenantId: string, input: CreateTierRuleInput): Promise<LoyaltyTierRule> {
+    const existing = await this.db.one<LoyaltyTierRule>(
+      "SELECT * FROM loyalty_tier_rules WHERE tenant_id = @t AND tier_level = @l",
+      { t: tenantId, l: input.tierLevel },
+    );
+    const now = Date.now();
+    if (existing) {
+      await this.db.query(
+        `UPDATE loyalty_tier_rules SET name=@name, min_points=@mp, point_multiplier=@pm, discount_pct=@dp, updated_at=@now
+         WHERE tenant_id=@t AND tier_level=@l`,
+        { name: input.name, mp: input.minPoints, pm: input.pointMultiplier, dp: input.discountPct, now, t: tenantId, l: input.tierLevel },
+      );
+      return { ...existing, name: input.name, min_points: input.minPoints, point_multiplier: input.pointMultiplier, discount_pct: input.discountPct, updated_at: now };
+    }
+    const rule: LoyaltyTierRule = {
+      id: uuidv7(), tenant_id: tenantId, name: input.name, tier_level: input.tierLevel,
+      min_points: input.minPoints, point_multiplier: input.pointMultiplier, discount_pct: input.discountPct,
+      created_at: now, updated_at: now,
+    };
+    await this.db.query(
+      `INSERT INTO loyalty_tier_rules (id,tenant_id,name,tier_level,min_points,point_multiplier,discount_pct,created_at,updated_at)
+       VALUES (@id,@t,@name,@l,@mp,@pm,@dp,@now,@now)`,
+      { id: rule.id, t: tenantId, name: rule.name, l: rule.tier_level, mp: rule.min_points, pm: rule.point_multiplier, dp: rule.discount_pct, now },
+    );
+    return rule;
+  }
+
+  async deleteTierRule(tenantId: string, tierLevel: number): Promise<void> {
+    await this.db.query(
+      "DELETE FROM loyalty_tier_rules WHERE tenant_id = @t AND tier_level = @l",
+      { t: tenantId, l: tierLevel },
+    );
+  }
+
+  /** Add points and auto-upgrade tier if the customer now qualifies for a higher one. */
+  async awardPoints(customerId: string, points: number, tenantId: string): Promise<void> {
+    if (points <= 0) return;
+    await this.db.query(
+      `UPDATE customers SET points = points + @points, updated_at = @now
+       WHERE id = @id AND tenant_id = @tenantId`,
+      { points, now: Date.now(), id: customerId, tenantId },
+    );
+    // Auto-upgrade tier if tier rules are configured
+    const rules = await this.listTierRules(tenantId);
+    if (rules.length > 0) {
+      const customer = await this.db.one<{ points: number; tier: number }>(
+        "SELECT points, tier FROM customers WHERE id = @id AND tenant_id = @t",
+        { id: customerId, t: tenantId },
+      );
+      if (customer) {
+        const currentPoints = Number(customer.points);
+        const bestTier = rules
+          .filter((r) => currentPoints >= r.min_points)
+          .sort((a, b) => b.tier_level - a.tier_level)[0];
+        if (bestTier && bestTier.tier_level > Number(customer.tier)) {
+          await this.db.query(
+            "UPDATE customers SET tier = @tier, updated_at = @now WHERE id = @id AND tenant_id = @t",
+            { tier: bestTier.tier_level, now: Date.now(), id: customerId, t: tenantId },
+          );
+          await this.events.publish("loyalty.tier_upgraded", { customerId, tenantId, newTier: bestTier.tier_level, tierName: bestTier.name }, customerId);
+        }
+      }
+    }
+    await this.events.publish(
+      "loyalty.points_awarded",
+      { customerId, tenantId, points },
+      customerId,
+    );
+  }
+
+  /** Loyalty summary: current tier info + points to next tier. */
+  async loyaltySummary(customerId: string, tenantId: string): Promise<LoyaltySummary> {
+    const customer = await this.get(customerId, tenantId);
+    if (!customer) throw new HttpError(404, "not_found", `customer '${customerId}' not found`);
+    const rules = await this.listTierRules(tenantId);
+    const currentPoints = Number(customer.points);
+    const currentRule = rules.find((r) => r.tier_level === Number(customer.tier)) ?? null;
+    const nextRule = rules.find((r) => r.tier_level > Number(customer.tier) && r.min_points > currentPoints) ?? null;
+    return {
+      customerId,
+      currentPoints,
+      currentTierLevel: Number(customer.tier),
+      currentTierName: currentRule?.name ?? null,
+      pointMultiplier: currentRule?.point_multiplier ?? 1.0,
+      discountPct: currentRule?.discount_pct ?? 0.0,
+      nextTierName: nextRule?.name ?? null,
+      pointsToNextTier: nextRule ? nextRule.min_points - currentPoints : null,
+    };
   }
 }

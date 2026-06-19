@@ -80,8 +80,9 @@ export interface Page<T> {
   pageSize: number;
 }
 
-// ─── Products (Wave 1, pre-typed for MSW mocks) ───────────────────────────────
-export interface Product {
+// ─── Products (Wave 1 terminal/cart types — camelCase, used by register flow) ──
+/** Lightweight terminal product used by the register/cart flow (Wave 1). */
+export interface TerminalProduct {
   id: string;
   sku: string;
   name: string;
@@ -172,7 +173,7 @@ export interface Payment {
 
 // ─── Catalog (Wave 1) ─────────────────────────────────────────────────────────
 export interface CatalogListResponse {
-  items: Product[];
+  items: TerminalProduct[];
   total: number;
   page: number;
   pageSize: number;
@@ -763,6 +764,114 @@ export interface OnlineOrder {
 
 export interface OnlineOrdersResponse {
   items: OnlineOrder[];
+}
+
+// ─── Catalog ──────────────────────────────────────────────────────────────────
+
+export type ProductStatus = "active" | "draft" | "archived";
+export type TaxClass = "standard" | "exempt";
+
+export interface Product {
+  id: string;
+  tenant_id: string;
+  sku: string;
+  name: string;
+  price_cents: number;
+  category: string;
+  tax_class: TaxClass;
+  barcode: string | null;
+  status: ProductStatus;
+  created_at: number;
+  updated_at: number;
+  // Descriptive
+  description: string | null;
+  brand: string | null;
+  manufacturer: string | null;
+  tags: string | null;
+  image_url: string | null;
+  // Pricing
+  msrp_cents: number | null;
+  raw_cost_price_cents: number | null;
+  wholesale_price_cents: number | null;
+  // Dimensions
+  weight_grams: number | null;
+  // Vendor
+  preferred_vendor_id: string | null;
+  preferred_vendor_name: string | null;
+  vendor_upc: string | null;
+  reorder_quantity: number | null;
+  // Qty limits
+  min_qty_to_sell: number | null;
+  max_qty_to_sell: number | null;
+  qty_increment: number;
+  // Variant
+  parent_product_id: string | null;
+  variant_label: string | null;
+  // Flags (1|0)
+  age_restricted: number;
+  returnable: number;
+  track_inventory: number;
+  ecommerce: number;
+}
+
+export interface ProductsResponse {
+  items: Product[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  created_at: number;
+}
+
+export interface CategoriesResponse {
+  items: Category[];
+}
+
+// ─── Workflows ────────────────────────────────────────────────────────────────
+
+export type TriggerCondition =
+  | "age_verification"
+  | "loyalty_capture"
+  | "id_scan"
+  | "customer_required"
+  | "signature_required"
+  | "custom_prompt";
+
+export type StepType = "prompt" | "gate" | "capture" | "external_api";
+
+export interface WorkflowStep {
+  id: string;
+  workflowId: string;
+  tenantId: string;
+  name: string;
+  stepType: StepType;
+  triggerCondition: TriggerCondition;
+  config: Record<string, unknown>;
+  position: number;
+  enabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface WorkflowDefinition {
+  id: string;
+  tenantId: string;
+  name: string;
+  description: string | null;
+  outletId: string | null;
+  enabled: boolean;
+  steps: WorkflowStep[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface WorkflowsResponse {
+  items: WorkflowDefinition[];
 }
 
 // ─── Global Search (⌘K command palette) ──────────────────────────────────────

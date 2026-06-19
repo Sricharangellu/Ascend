@@ -22,7 +22,7 @@ import { useCart, useCartReducer, CartContext } from "@/lib/useCart";
 import { useToast } from "@/components/Toast";
 import { enqueue } from "@/lib/syncOutbox";
 import { apiPost, apiPut, ApiResponseError } from "@/api-client/client";
-import type { Order, Payment, Product } from "@/api-client/types";
+import type { Order, Payment, TerminalProduct as Product } from "@/api-client/types";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { ProductGrid } from "@/components/terminal/ProductGrid";
 import { CartPanel } from "@/components/terminal/CartPanel";

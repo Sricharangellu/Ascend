@@ -84,6 +84,24 @@ ALTER TABLE customers ADD COLUMN IF NOT EXISTS country TEXT;
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS county TEXT;
 `;
 
+// Configurable loyalty tier rules: Bronze/Silver/Gold/Platinum (or any names).
+// tier_level maps to customers.tier (1 = entry/lowest, 5 = top). Each rule sets
+// the point multiplier earned and the auto-discount on purchase for that tier.
+const CREATE_LOYALTY_TIER_RULES = `
+CREATE TABLE IF NOT EXISTS loyalty_tier_rules (
+  id               TEXT PRIMARY KEY,
+  tenant_id        TEXT NOT NULL,
+  name             TEXT NOT NULL,
+  tier_level       INTEGER NOT NULL,
+  min_points       INTEGER NOT NULL DEFAULT 0,
+  point_multiplier REAL NOT NULL DEFAULT 1.0,
+  discount_pct     REAL NOT NULL DEFAULT 0.0,
+  created_at       BIGINT NOT NULL,
+  updated_at       BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS loyalty_tier_rules_tenant_level_idx ON loyalty_tier_rules (tenant_id, tier_level);
+`;
+
 /**
  * Customers + loyalty. Tenant-scoped. Reacts to `payment.captured`: looks up the
  * paid order's customer and awards loyalty points ($1 net spent = 1 point).
@@ -91,7 +109,7 @@ ALTER TABLE customers ADD COLUMN IF NOT EXISTS county TEXT;
  */
 export const customersModule: PosModule = {
   name: "customers",
-  migrations: [CREATE_CUSTOMERS_TABLE, CREATE_CUSTOMERS_INDEXES, ADD_PROFILE_COLUMNS, ADD_CUSTOMER_TYPE_FIELDS, ADD_CUSTOMER_XLSX_FIELDS],
+  migrations: [CREATE_CUSTOMERS_TABLE, CREATE_CUSTOMERS_INDEXES, ADD_PROFILE_COLUMNS, ADD_CUSTOMER_TYPE_FIELDS, ADD_CUSTOMER_XLSX_FIELDS, CREATE_LOYALTY_TIER_RULES],
   async register({ db, events, router }) {
     const service = new CustomersService(db, events);
 

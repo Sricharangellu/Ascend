@@ -17,7 +17,7 @@ import {
   useReducer,
   type Dispatch,
 } from "react";
-import type { Product, Order } from "@/api-client/types";
+import type { TerminalProduct as Product, Order } from "@/api-client/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

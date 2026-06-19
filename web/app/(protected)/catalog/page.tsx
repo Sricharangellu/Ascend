@@ -1,0 +1,690 @@
+"use client";
+
+/**
+ * /catalog — Product catalog management.
+ * Two tabs: Products (filterable list, create/edit modal, archive)
+ *           Categories (CRUD list).
+ * Fetches GET /api/v1/catalog and /api/v1/catalog/categories.
+ */
+
+import { useEffect, useState, useCallback } from "react";
+import { EnterpriseShell } from "@/components/EnterpriseShell";
+import { Card } from "@/components/Card";
+import { Badge } from "@/components/Badge";
+import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
+import type { Product, ProductsResponse, Category, CategoriesResponse, ProductStatus, TaxClass } from "@/api-client/types";
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function centsToDisplay(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+function statusBadge(s: ProductStatus): "green" | "yellow" | "gray" {
+  if (s === "active")   return "green";
+  if (s === "draft")    return "yellow";
+  return "gray";
+}
+
+// ── Product Form Modal ────────────────────────────────────────────────────────
+
+interface ProductFormState {
+  name: string;
+  sku: string;
+  price_cents: string;
+  category: string;
+  barcode: string;
+  tax_class: TaxClass;
+  status: ProductStatus;
+  brand: string;
+  description: string;
+  msrp_cents: string;
+  raw_cost_price_cents: string;
+  age_restricted: boolean;
+  track_inventory: boolean;
+}
+
+function emptyForm(): ProductFormState {
+  return {
+    name: "", sku: "", price_cents: "", category: "",
+    barcode: "", tax_class: "standard", status: "draft",
+    brand: "", description: "", msrp_cents: "", raw_cost_price_cents: "",
+    age_restricted: false, track_inventory: true,
+  };
+}
+
+function productToForm(p: Product): ProductFormState {
+  return {
+    name: p.name, sku: p.sku,
+    price_cents: String(p.price_cents),
+    category: p.category, barcode: p.barcode ?? "",
+    tax_class: p.tax_class, status: p.status,
+    brand: p.brand ?? "", description: p.description ?? "",
+    msrp_cents: p.msrp_cents != null ? String(p.msrp_cents) : "",
+    raw_cost_price_cents: p.raw_cost_price_cents != null ? String(p.raw_cost_price_cents) : "",
+    age_restricted: p.age_restricted === 1,
+    track_inventory: p.track_inventory === 1,
+  };
+}
+
+function formToBody(f: ProductFormState): Record<string, unknown> {
+  return {
+    name: f.name.trim(),
+    sku:  f.sku.trim(),
+    price_cents: Math.round(parseFloat(f.price_cents) * 100),
+    category: f.category.trim() || "Uncategorized",
+    barcode: f.barcode.trim() || null,
+    tax_class: f.tax_class,
+    status: f.status,
+    brand: f.brand.trim() || null,
+    description: f.description.trim() || null,
+    msrp_cents: f.msrp_cents ? Math.round(parseFloat(f.msrp_cents) * 100) : null,
+    raw_cost_price_cents: f.raw_cost_price_cents ? Math.round(parseFloat(f.raw_cost_price_cents) * 100) : null,
+    age_restricted: f.age_restricted,
+    track_inventory: f.track_inventory,
+  };
+}
+
+function ProductFormModal({
+  initial,
+  categories,
+  onSave,
+  onClose,
+}: {
+  initial?: Product;
+  categories: Category[];
+  onSave: (body: Record<string, unknown>) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState<ProductFormState>(initial ? productToForm(initial) : emptyForm());
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const set = (k: keyof ProductFormState, v: string | boolean) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim()) { setErr("Product name is required."); return; }
+    if (!form.sku.trim())  { setErr("SKU is required."); return; }
+    const price = parseFloat(form.price_cents);
+    if (!Number.isFinite(price) || price < 0) { setErr("Price must be a valid number."); return; }
+    setSaving(true); setErr(null);
+    try {
+      await onSave(formToBody(form));
+      onClose();
+    } catch (ex) {
+      setErr(ex instanceof ApiResponseError ? ex.message : "Save failed.");
+      setSaving(false);
+    }
+  };
+
+  const inputCls = "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const labelCls = "mb-1 block text-sm font-medium text-slate-700";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-2xl rounded-xl bg-white shadow-xl flex flex-col max-h-[90vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <h2 className="text-base font-semibold text-slate-950">
+            {initial ? "Edit product" : "New product"}
+          </h2>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+        </div>
+
+        {/* Body */}
+        <form id="product-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-5 py-4">
+          {err && (
+            <p role="alert" className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>
+          )}
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label className={labelCls}>Name <span className="text-red-500">*</span></label>
+              <input type="text" value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Product name" className={inputCls} required />
+            </div>
+
+            <div>
+              <label className={labelCls}>SKU <span className="text-red-500">*</span></label>
+              <input type="text" value={form.sku} onChange={(e) => set("sku", e.target.value)} placeholder="BEV-001" className={inputCls} required />
+            </div>
+
+            <div>
+              <label className={labelCls}>Barcode</label>
+              <input type="text" value={form.barcode} onChange={(e) => set("barcode", e.target.value)} placeholder="012345678901" className={inputCls} />
+            </div>
+
+            <div>
+              <label className={labelCls}>Sell price ($) <span className="text-red-500">*</span></label>
+              <input type="number" step="0.01" min="0" value={form.price_cents} onChange={(e) => set("price_cents", e.target.value)} placeholder="0.00" className={inputCls} required />
+            </div>
+
+            <div>
+              <label className={labelCls}>MSRP ($)</label>
+              <input type="number" step="0.01" min="0" value={form.msrp_cents} onChange={(e) => set("msrp_cents", e.target.value)} placeholder="0.00" className={inputCls} />
+            </div>
+
+            <div>
+              <label className={labelCls}>Cost price ($)</label>
+              <input type="number" step="0.01" min="0" value={form.raw_cost_price_cents} onChange={(e) => set("raw_cost_price_cents", e.target.value)} placeholder="0.00" className={inputCls} />
+            </div>
+
+            <div>
+              <label className={labelCls}>Category</label>
+              {categories.length > 0 ? (
+                <select value={form.category} onChange={(e) => set("category", e.target.value)} className={inputCls}>
+                  <option value="">— Select category —</option>
+                  {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+                </select>
+              ) : (
+                <input type="text" value={form.category} onChange={(e) => set("category", e.target.value)} placeholder="e.g. Beverages" className={inputCls} />
+              )}
+            </div>
+
+            <div>
+              <label className={labelCls}>Tax class</label>
+              <select value={form.tax_class} onChange={(e) => set("tax_class", e.target.value as TaxClass)} className={inputCls}>
+                <option value="standard">Standard</option>
+                <option value="exempt">Tax exempt</option>
+              </select>
+            </div>
+
+            <div>
+              <label className={labelCls}>Status</label>
+              <select value={form.status} onChange={(e) => set("status", e.target.value as ProductStatus)} className={inputCls}>
+                <option value="active">Active</option>
+                <option value="draft">Draft</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+
+            <div>
+              <label className={labelCls}>Brand</label>
+              <input type="text" value={form.brand} onChange={(e) => set("brand", e.target.value)} placeholder="Brand name" className={inputCls} />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className={labelCls}>Description</label>
+              <textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={2} placeholder="Short product description" className={`${inputCls} resize-none`} />
+            </div>
+
+            <div className="sm:col-span-2 flex flex-wrap gap-5">
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" checked={form.age_restricted} onChange={(e) => set("age_restricted", e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-600" />
+                Age restricted
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" checked={form.track_inventory} onChange={(e) => set("track_inventory", e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-600" />
+                Track inventory
+              </label>
+            </div>
+          </div>
+        </form>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+          <button type="submit" form="product-form" disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60">
+            {saving ? "Saving…" : initial ? "Save changes" : "Create product"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Products Tab ──────────────────────────────────────────────────────────────
+
+function ProductsTab({ categories }: { categories: Category[] }) {
+  const [products, setProducts]     = useState<Product[]>([]);
+  const [total, setTotal]           = useState(0);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
+
+  const [filterStatus, setFilterStatus]     = useState<string>("");
+  const [filterCategory, setFilterCategory] = useState<string>("");
+  const [search, setSearch]                 = useState<string>("");
+  const [debouncedQ, setDebouncedQ]         = useState<string>("");
+
+  const [showCreate, setShowCreate] = useState(false);
+  const [editTarget, setEditTarget] = useState<Product | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<Product | null>(null);
+  const [archiving, setArchiving]   = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const params = new URLSearchParams({ limit: "50", offset: "0" });
+      if (filterStatus)   params.set("status",   filterStatus);
+      if (filterCategory) params.set("category", filterCategory);
+      if (debouncedQ)     params.set("q",        debouncedQ);
+      const data = await apiGet<ProductsResponse>(`/api/v1/catalog?${params}`);
+      setProducts(data.items ?? []);
+      setTotal(data.total ?? 0);
+    } catch (err) {
+      setError(err instanceof ApiResponseError ? err.message : "Failed to load products.");
+    } finally {
+      setLoading(false);
+    }
+  }, [filterStatus, filterCategory, debouncedQ]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleCreate = async (body: Record<string, unknown>) => {
+    await apiPost("/api/v1/catalog", body);
+    await load();
+  };
+
+  const handleEdit = async (body: Record<string, unknown>) => {
+    if (!editTarget) return;
+    await apiPatch(`/api/v1/catalog/${editTarget.id}`, body);
+    await load();
+  };
+
+  const handleArchive = async () => {
+    if (!archiveTarget) return;
+    setArchiving(true); setActionError(null);
+    try {
+      await apiDelete(`/api/v1/catalog/${archiveTarget.id}`);
+      setArchiveTarget(null);
+      await load();
+    } catch (err) {
+      setActionError(err instanceof ApiResponseError ? err.message : "Archive failed.");
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  return (
+    <>
+      <Card className="overflow-hidden p-0">
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 px-4 py-3">
+          <div className="flex-1 min-w-[160px]">
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name, SKU, barcode…"
+              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="draft">Draft</option>
+            <option value="archived">Archived</option>
+          </select>
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All categories</option>
+            {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+          </select>
+          <button
+            type="button"
+            onClick={() => { setShowCreate(true); setActionError(null); }}
+            className="ml-auto rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            + New product
+          </button>
+        </div>
+
+        {actionError && (
+          <div className="border-b border-red-100 bg-red-50 px-4 py-2">
+            <p className="text-sm text-red-700">{actionError}</p>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="px-4 py-10 text-center">
+            <p className="text-sm text-slate-500" aria-busy="true">Loading…</p>
+          </div>
+        ) : error ? (
+          <div className="px-4 py-6">
+            <p role="alert" className="text-sm text-red-700">{error}</p>
+          </div>
+        ) : products.length === 0 ? (
+          <div className="px-4 py-12 text-center">
+            <p className="text-sm text-slate-500">No products found.</p>
+            {(filterStatus || filterCategory || debouncedQ) && (
+              <button type="button" onClick={() => { setFilterStatus(""); setFilterCategory(""); setSearch(""); }} className="mt-2 text-xs text-blue-600 hover:underline">
+                Clear filters
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    <th className="px-4 py-3">Product</th>
+                    <th className="px-4 py-3">SKU</th>
+                    <th className="px-4 py-3">Category</th>
+                    <th className="px-4 py-3 text-right">Price</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {products.map((p) => (
+                    <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3">
+                        <div>
+                          <p className="font-medium text-slate-950">{p.name}</p>
+                          {p.brand && <p className="text-xs text-slate-400">{p.brand}</p>}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-slate-600">{p.sku}</td>
+                      <td className="px-4 py-3 text-slate-600">{p.category}</td>
+                      <td className="px-4 py-3 text-right font-medium text-slate-900">
+                        {centsToDisplay(p.price_cents)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant={statusBadge(p.status)}>
+                            {p.status.charAt(0).toUpperCase() + p.status.slice(1)}
+                          </Badge>
+                          {p.age_restricted === 1 && (
+                            <span className="rounded-md bg-orange-50 px-1.5 py-0.5 text-xs font-medium text-orange-700 ring-1 ring-orange-200">18+</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { setEditTarget(p); setActionError(null); }}
+                            className="rounded border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                          >
+                            Edit
+                          </button>
+                          {p.status !== "archived" && (
+                            <button
+                              type="button"
+                              onClick={() => { setArchiveTarget(p); setActionError(null); }}
+                              className="rounded border border-slate-200 px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
+                            >
+                              Archive
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="border-t border-slate-200 px-4 py-2 text-xs text-slate-400">
+              Showing {products.length} of {total} products
+            </div>
+          </>
+        )}
+      </Card>
+
+      {/* Modals */}
+      {showCreate && (
+        <ProductFormModal
+          categories={categories}
+          onSave={handleCreate}
+          onClose={() => setShowCreate(false)}
+        />
+      )}
+      {editTarget && (
+        <ProductFormModal
+          initial={editTarget}
+          categories={categories}
+          onSave={handleEdit}
+          onClose={() => setEditTarget(null)}
+        />
+      )}
+      {archiveTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setArchiveTarget(null)}>
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-base font-semibold text-slate-950">Archive &ldquo;{archiveTarget.name}&rdquo;?</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              The product will be set to archived and hidden from active views. You can restore it by editing the status.
+            </p>
+            {actionError && <p className="mt-3 text-sm text-red-700">{actionError}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setArchiveTarget(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+              <button type="button" onClick={handleArchive} disabled={archiving} className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60">
+                {archiving ? "Archiving…" : "Archive"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── Categories Tab ────────────────────────────────────────────────────────────
+
+function CategoriesTab() {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
+
+  const [newName, setNewName]       = useState("");
+  const [creating, setCreating]     = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const [editTarget, setEditTarget]     = useState<Category | null>(null);
+  const [editName, setEditName]         = useState("");
+  const [editSaving, setEditSaving]     = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
+  const [deleting, setDeleting]         = useState(false);
+  const [actionError, setActionError]   = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const data = await apiGet<CategoriesResponse>("/api/v1/catalog/categories");
+      setCategories(data.items ?? []);
+    } catch (err) {
+      setError(err instanceof ApiResponseError ? err.message : "Failed to load categories.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    setCreating(true); setCreateError(null);
+    try {
+      await apiPost("/api/v1/catalog/categories", { name: newName.trim() });
+      setNewName(""); await load();
+    } catch (err) {
+      setCreateError(err instanceof ApiResponseError ? err.message : "Create failed.");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const startEdit = (c: Category) => { setEditTarget(c); setEditName(c.name); setActionError(null); };
+
+  const handleEditSave = async () => {
+    if (!editTarget || !editName.trim()) return;
+    setEditSaving(true); setActionError(null);
+    try {
+      await apiPatch(`/api/v1/catalog/categories/${editTarget.id}`, { name: editName.trim() });
+      setEditTarget(null); await load();
+    } catch (err) {
+      setActionError(err instanceof ApiResponseError ? err.message : "Save failed.");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true); setActionError(null);
+    try {
+      await apiDelete(`/api/v1/catalog/categories/${deleteTarget.id}`);
+      setDeleteTarget(null); await load();
+    } catch (err) {
+      setActionError(err instanceof ApiResponseError ? err.message : "Delete failed.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  if (loading) return <p className="py-6 text-sm text-slate-500" aria-busy="true">Loading…</p>;
+  if (error)   return <p role="alert" className="py-6 text-sm text-red-700">{error}</p>;
+
+  return (
+    <>
+      <Card className="overflow-hidden p-0">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <h2 className="text-base font-semibold text-slate-950">Product categories</h2>
+          <p className="text-sm text-slate-500">{categories.length} {categories.length === 1 ? "category" : "categories"}</p>
+        </div>
+
+        {actionError && (
+          <div className="border-b border-red-100 bg-red-50 px-4 py-2">
+            <p className="text-sm text-red-700">{actionError}</p>
+          </div>
+        )}
+
+        {categories.length === 0 ? (
+          <div className="px-4 py-10 text-center text-sm text-slate-500">No categories yet.</div>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {categories.map((c) => (
+              <li key={c.id} className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50">
+                {editTarget?.id === c.id ? (
+                  <div className="flex flex-1 items-center gap-2">
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      autoFocus
+                    />
+                    <button type="button" onClick={handleEditSave} disabled={editSaving} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-60">
+                      {editSaving ? "…" : "Save"}
+                    </button>
+                    <button type="button" onClick={() => setEditTarget(null)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100">
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <span className="text-sm font-medium text-slate-950">{c.name}</span>
+                    <div className="flex shrink-0 gap-2">
+                      <button type="button" onClick={() => startEdit(c)} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100">Edit</button>
+                      <button type="button" onClick={() => { setDeleteTarget(c); setActionError(null); }} className="rounded border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50">Delete</button>
+                    </div>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Add category inline form */}
+        <form onSubmit={handleCreate} className="flex items-center gap-2 border-t border-slate-200 px-4 py-3">
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="New category name…"
+            className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button type="submit" disabled={creating || !newName.trim()} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60">
+            {creating ? "Adding…" : "Add"}
+          </button>
+        </form>
+        {createError && <p className="px-4 pb-2 text-xs text-red-700">{createError}</p>}
+      </Card>
+
+      {/* Delete confirm */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDeleteTarget(null)}>
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-base font-semibold text-slate-950">Delete &ldquo;{deleteTarget.name}&rdquo;?</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Deleting a category won&apos;t remove products, but they will no longer be grouped under this category.
+            </p>
+            {actionError && <p className="mt-3 text-sm text-red-700">{actionError}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setDeleteTarget(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+              <button type="button" onClick={handleDelete} disabled={deleting} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60">
+                {deleting ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
+type Tab = "products" | "categories";
+
+export default function CatalogPage() {
+  const [tab, setTab] = useState<Tab>("products");
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  // Pre-load categories so ProductsTab can use them for the filter dropdown
+  useEffect(() => {
+    apiGet<CategoriesResponse>("/api/v1/catalog/categories")
+      .then((d) => setCategories(d.items ?? []))
+      .catch(() => {/* non-fatal */});
+  }, []);
+
+  const tabCls = (t: Tab) =>
+    `px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+      tab === t
+        ? "border-blue-600 text-blue-600"
+        : "border-transparent text-slate-500 hover:text-slate-700"
+    }`;
+
+  return (
+    <EnterpriseShell
+      active="catalog"
+      title="Catalog"
+      subtitle="Products and category management"
+      contentClassName="overflow-y-auto"
+    >
+      <div className="mx-auto w-full max-w-6xl space-y-4 px-4 py-5 sm:px-6">
+        {/* Tabs */}
+        <div className="flex gap-1 border-b border-slate-200">
+          <button type="button" onClick={() => setTab("products")} className={tabCls("products")}>
+            Products
+          </button>
+          <button type="button" onClick={() => setTab("categories")} className={tabCls("categories")}>
+            Categories
+          </button>
+        </div>
+
+        {tab === "products"   && <ProductsTab   categories={categories} />}
+        {tab === "categories" && <CategoriesTab />}
+      </div>
+    </EnterpriseShell>
+  );
+}

@@ -521,6 +521,305 @@ export const lightspeedHandlers = [
     ];
   })(),
 
+  // ── Catalog ───────────────────────────────────────────────────────────────
+  ...(() => {
+    let prodSeq = 10;
+    let catSeq  = 10;
+
+    let categories: Array<{ id: string; name: string; parent_id: string | null; created_at: number }> = [
+      { id: "cat_1", name: "Beverages",  parent_id: null, created_at: Date.now() - 120 * 86_400_000 },
+      { id: "cat_2", name: "Snacks",     parent_id: null, created_at: Date.now() - 120 * 86_400_000 },
+      { id: "cat_3", name: "Tobacco",    parent_id: null, created_at: Date.now() - 120 * 86_400_000 },
+    ];
+
+    const now = Date.now();
+    let products: Array<Record<string, unknown>> = [
+      { id: "prod_1", tenant_id: "t1", sku: "BEV-001", name: "Spring Water 500ml", price_cents: 199, category: "Beverages", tax_class: "standard", barcode: "012345678901", status: "active", created_at: now - 90*86_400_000, updated_at: now - 10*86_400_000, description: null, brand: "AquaPure", manufacturer: null, tags: "water,hydration", image_url: null, msrp_cents: 249, raw_cost_price_cents: 80, wholesale_price_cents: 150, weight_grams: 510, preferred_vendor_id: null, preferred_vendor_name: null, vendor_upc: null, reorder_quantity: 48, min_qty_to_sell: 1, max_qty_to_sell: null, qty_increment: 1, parent_product_id: null, variant_label: null, age_restricted: 0, returnable: 1, track_inventory: 1, ecommerce: 1 },
+      { id: "prod_2", tenant_id: "t1", sku: "BEV-002", name: "Orange Juice 1L", price_cents: 349, category: "Beverages", tax_class: "standard", barcode: "012345678902", status: "active", created_at: now - 88*86_400_000, updated_at: now - 5*86_400_000, description: "Fresh squeezed taste", brand: "SunCrest", manufacturer: null, tags: "juice,breakfast", image_url: null, msrp_cents: 399, raw_cost_price_cents: 140, wholesale_price_cents: 260, weight_grams: 1050, preferred_vendor_id: null, preferred_vendor_name: null, vendor_upc: null, reorder_quantity: 24, min_qty_to_sell: 1, max_qty_to_sell: null, qty_increment: 1, parent_product_id: null, variant_label: null, age_restricted: 0, returnable: 1, track_inventory: 1, ecommerce: 0 },
+      { id: "prod_3", tenant_id: "t1", sku: "SNK-001", name: "Potato Chips 150g", price_cents: 299, category: "Snacks", tax_class: "standard", barcode: "012345678903", status: "active", created_at: now - 60*86_400_000, updated_at: now - 2*86_400_000, description: null, brand: "CrunchKing", manufacturer: "CrunchKing Foods Ltd", tags: "chips,snacks", image_url: null, msrp_cents: 349, raw_cost_price_cents: 110, wholesale_price_cents: 200, weight_grams: 155, preferred_vendor_id: null, preferred_vendor_name: null, vendor_upc: null, reorder_quantity: 36, min_qty_to_sell: 1, max_qty_to_sell: null, qty_increment: 1, parent_product_id: null, variant_label: null, age_restricted: 0, returnable: 0, track_inventory: 1, ecommerce: 1 },
+      { id: "prod_4", tenant_id: "t1", sku: "SNK-002", name: "Mixed Nuts 200g", price_cents: 599, category: "Snacks", tax_class: "standard", barcode: "012345678904", status: "active", created_at: now - 45*86_400_000, updated_at: now - 1*86_400_000, description: "Roasted cashews, almonds & peanuts", brand: "NutHouse", manufacturer: null, tags: "nuts,healthy", image_url: null, msrp_cents: 649, raw_cost_price_cents: 250, wholesale_price_cents: 450, weight_grams: 210, preferred_vendor_id: null, preferred_vendor_name: null, vendor_upc: null, reorder_quantity: 24, min_qty_to_sell: 1, max_qty_to_sell: null, qty_increment: 1, parent_product_id: null, variant_label: null, age_restricted: 0, returnable: 0, track_inventory: 1, ecommerce: 1 },
+      { id: "prod_5", tenant_id: "t1", sku: "TOB-001", name: "Classic Cigarettes 20pk", price_cents: 1299, category: "Tobacco", tax_class: "exempt", barcode: "012345678905", status: "active", created_at: now - 100*86_400_000, updated_at: now - 3*86_400_000, description: null, brand: "RedLeaf", manufacturer: "RedLeaf Tobacco Co", tags: "tobacco,cigarettes", image_url: null, msrp_cents: null, raw_cost_price_cents: 850, wholesale_price_cents: 1100, weight_grams: 25, preferred_vendor_id: null, preferred_vendor_name: null, vendor_upc: null, reorder_quantity: 100, min_qty_to_sell: 1, max_qty_to_sell: null, qty_increment: 1, parent_product_id: null, variant_label: null, age_restricted: 1, returnable: 0, track_inventory: 1, ecommerce: 0 },
+      { id: "prod_6", tenant_id: "t1", sku: "BEV-003", name: "Energy Drink 250ml", price_cents: 249, category: "Beverages", tax_class: "standard", barcode: "012345678906", status: "draft", created_at: now - 5*86_400_000, updated_at: now - 1*86_400_000, description: "New SKU pending approval", brand: "BoltUp", manufacturer: null, tags: "energy,drink", image_url: null, msrp_cents: 299, raw_cost_price_cents: 100, wholesale_price_cents: 180, weight_grams: 270, preferred_vendor_id: null, preferred_vendor_name: null, vendor_upc: null, reorder_quantity: 48, min_qty_to_sell: 1, max_qty_to_sell: null, qty_increment: 1, parent_product_id: null, variant_label: null, age_restricted: 0, returnable: 0, track_inventory: 1, ecommerce: 0 },
+    ];
+
+    function applyFilters(
+      list: typeof products,
+      category?: string,
+      status?: string,
+      q?: string,
+    ) {
+      return list.filter((p) => {
+        if (category && p.category !== category) return false;
+        if (status && p.status !== status) return false;
+        if (q) {
+          const lq = q.toLowerCase();
+          if (
+            !String(p.name).toLowerCase().includes(lq) &&
+            !String(p.sku).toLowerCase().includes(lq) &&
+            !String(p.barcode ?? "").includes(lq)
+          ) return false;
+        }
+        return true;
+      });
+    }
+
+    return [
+      // ── Products ──────────────────────────────────────────────────────────
+      http.get(`${V1}/catalog`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const category = url.searchParams.get("category") ?? undefined;
+        const status   = url.searchParams.get("status")   ?? undefined;
+        const q        = url.searchParams.get("q")        ?? undefined;
+        const limit    = Number(url.searchParams.get("limit") ?? 50);
+        const offset   = Number(url.searchParams.get("offset") ?? 0);
+        const filtered = applyFilters(products, category, status, q);
+        return HttpResponse.json({
+          items: filtered.slice(offset, offset + limit),
+          total: filtered.length,
+          limit,
+          offset,
+        });
+      }),
+
+      http.post(`${V1}/catalog`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as Record<string, unknown>;
+        const p = {
+          id: `prod_${++prodSeq}`, tenant_id: "t1",
+          sku: b.sku, name: b.name, price_cents: b.price_cents,
+          category: b.category ?? "Uncategorized",
+          tax_class: b.tax_class ?? "standard",
+          barcode: b.barcode ?? null, status: b.status ?? "draft",
+          created_at: Date.now(), updated_at: Date.now(),
+          description: b.description ?? null, brand: b.brand ?? null,
+          manufacturer: null, tags: null, image_url: null,
+          msrp_cents: b.msrp_cents ?? null, raw_cost_price_cents: b.raw_cost_price_cents ?? null,
+          wholesale_price_cents: null, weight_grams: null,
+          preferred_vendor_id: null, preferred_vendor_name: null, vendor_upc: null,
+          reorder_quantity: b.reorder_quantity ?? null,
+          min_qty_to_sell: null, max_qty_to_sell: null, qty_increment: 1,
+          parent_product_id: null, variant_label: null,
+          age_restricted: b.age_restricted ? 1 : 0, returnable: 1,
+          track_inventory: 1, ecommerce: 0,
+        };
+        products.push(p);
+        return HttpResponse.json(p, { status: 201 });
+      }),
+
+      http.get(`${V1}/catalog/:id`, async ({ params }) => {
+        await lat();
+        const p = products.find((x) => x.id === String(params["id"]));
+        if (!p) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json(p);
+      }),
+
+      http.patch(`${V1}/catalog/:id`, async ({ params, request }) => {
+        await lat();
+        const b = (await request.json()) as Record<string, unknown>;
+        const idx = products.findIndex((x) => x.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        products[idx] = { ...products[idx], ...b, updated_at: Date.now() };
+        return HttpResponse.json(products[idx]);
+      }),
+
+      http.delete(`${V1}/catalog/:id`, async ({ params }) => {
+        await lat();
+        const idx = products.findIndex((x) => x.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        products[idx] = { ...products[idx], status: "archived", updated_at: Date.now() };
+        return HttpResponse.json(products[idx]);
+      }),
+
+      http.get(`${V1}/catalog/barcode/:code`, async ({ params }) => {
+        await lat();
+        const p = products.find((x) => x.barcode === String(params["code"]));
+        if (!p) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json(p);
+      }),
+
+      // ── Categories ────────────────────────────────────────────────────────
+      http.get(`${V1}/catalog/categories`, async () => {
+        await lat();
+        return HttpResponse.json({ items: categories });
+      }),
+
+      http.post(`${V1}/catalog/categories`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as { name: string; parent_id?: string | null };
+        const cat = { id: `cat_${++catSeq}`, name: b.name, parent_id: b.parent_id ?? null, created_at: Date.now() };
+        categories.push(cat);
+        return HttpResponse.json(cat, { status: 201 });
+      }),
+
+      http.patch(`${V1}/catalog/categories/:id`, async ({ params, request }) => {
+        await lat();
+        const b = (await request.json()) as Partial<{ name: string; parent_id: string | null }>;
+        const idx = categories.findIndex((c) => c.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        categories[idx] = { ...categories[idx], ...b };
+        return HttpResponse.json(categories[idx]);
+      }),
+
+      http.delete(`${V1}/catalog/categories/:id`, async ({ params }) => {
+        await lat();
+        const before = categories.length;
+        categories = categories.filter((c) => c.id !== String(params["id"]));
+        if (categories.length === before) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return new HttpResponse(null, { status: 204 });
+      }),
+    ];
+  })(),
+
+  // ── Workflows ─────────────────────────────────────────────────────────────
+  ...(() => {
+    let wfSeq   = 10;
+    let stepSeq = 10;
+
+    type Step = {
+      id: string; workflowId: string; tenantId: string; name: string;
+      stepType: string; triggerCondition: string;
+      config: Record<string, unknown>; position: number;
+      enabled: boolean; createdAt: number; updatedAt: number;
+    };
+    type WF = {
+      id: string; tenantId: string; name: string; description: string | null;
+      outletId: string | null; enabled: boolean; steps: Step[];
+      createdAt: number; updatedAt: number;
+    };
+
+    const now = Date.now();
+    let workflows: WF[] = [
+      {
+        id: "wf_demo_1", tenantId: "t1",
+        name: "Age Verification",
+        description: "Require age check before selling restricted items",
+        outletId: null, enabled: true,
+        createdAt: now - 60 * 86_400_000, updatedAt: now - 10 * 86_400_000,
+        steps: [
+          {
+            id: "step_demo_1", workflowId: "wf_demo_1", tenantId: "t1",
+            name: "Prompt cashier for ID",
+            stepType: "prompt", triggerCondition: "age_verification",
+            config: { message: "Check customer ID before proceeding." },
+            position: 1, enabled: true,
+            createdAt: now - 60 * 86_400_000, updatedAt: now - 10 * 86_400_000,
+          },
+          {
+            id: "step_demo_2", workflowId: "wf_demo_1", tenantId: "t1",
+            name: "Gate: confirm 18+",
+            stepType: "gate", triggerCondition: "age_verification",
+            config: { minAge: 18 },
+            position: 2, enabled: true,
+            createdAt: now - 60 * 86_400_000, updatedAt: now - 10 * 86_400_000,
+          },
+        ],
+      },
+      {
+        id: "wf_demo_2", tenantId: "t1",
+        name: "Loyalty Capture",
+        description: "Capture loyalty member info at checkout",
+        outletId: null, enabled: false,
+        createdAt: now - 30 * 86_400_000, updatedAt: now - 5 * 86_400_000,
+        steps: [
+          {
+            id: "step_demo_3", workflowId: "wf_demo_2", tenantId: "t1",
+            name: "Ask for loyalty ID",
+            stepType: "capture", triggerCondition: "loyalty_capture",
+            config: { field: "loyalty_id", label: "Loyalty card number" },
+            position: 1, enabled: true,
+            createdAt: now - 30 * 86_400_000, updatedAt: now - 5 * 86_400_000,
+          },
+        ],
+      },
+    ];
+
+    function withSteps(wf: WF) { return { ...wf, steps: workflows.find((w) => w.id === wf.id)?.steps ?? [] }; }
+
+    return [
+      http.get(`${V1}/workflows`, async () => {
+        await lat();
+        return HttpResponse.json({ items: workflows });
+      }),
+
+      http.get(`${V1}/workflows/:id`, async ({ params }) => {
+        await lat();
+        const wf = workflows.find((w) => w.id === String(params["id"]));
+        if (!wf) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json(wf);
+      }),
+
+      http.post(`${V1}/workflows`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as { name: string; description?: string; outletId?: string | null };
+        const wf: WF = {
+          id: `wf_${++wfSeq}`, tenantId: "t1", name: b.name,
+          description: b.description ?? null, outletId: b.outletId ?? null,
+          enabled: false, steps: [],
+          createdAt: Date.now(), updatedAt: Date.now(),
+        };
+        workflows.push(wf);
+        return HttpResponse.json(wf, { status: 201 });
+      }),
+
+      http.patch(`${V1}/workflows/:id`, async ({ params, request }) => {
+        await lat();
+        const b = (await request.json()) as Partial<{ name: string; description: string; enabled: boolean; outletId: string | null }>;
+        const idx = workflows.findIndex((w) => w.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        workflows[idx] = { ...workflows[idx], ...b, updatedAt: Date.now() };
+        return HttpResponse.json(withSteps(workflows[idx]));
+      }),
+
+      http.delete(`${V1}/workflows/:id`, async ({ params }) => {
+        await lat();
+        const before = workflows.length;
+        workflows = workflows.filter((w) => w.id !== String(params["id"]));
+        if (workflows.length === before) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return new HttpResponse(null, { status: 204 });
+      }),
+
+      // Steps
+      http.post(`${V1}/workflows/:workflowId/steps`, async ({ params, request }) => {
+        await lat();
+        const wfId = String(params["workflowId"]);
+        const wf = workflows.find((w) => w.id === wfId);
+        if (!wf) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const b = (await request.json()) as { name: string; stepType: string; triggerCondition: string; config?: Record<string, unknown>; position?: number };
+        const step: Step = {
+          id: `step_${++stepSeq}`, workflowId: wfId, tenantId: "t1",
+          name: b.name, stepType: b.stepType, triggerCondition: b.triggerCondition,
+          config: b.config ?? {},
+          position: b.position ?? wf.steps.length + 1,
+          enabled: true, createdAt: Date.now(), updatedAt: Date.now(),
+        };
+        wf.steps.push(step);
+        return HttpResponse.json(step, { status: 201 });
+      }),
+
+      http.patch(`${V1}/workflows/:workflowId/steps/:stepId`, async ({ params, request }) => {
+        await lat();
+        const wf = workflows.find((w) => w.id === String(params["workflowId"]));
+        if (!wf) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const b = (await request.json()) as Partial<{ name: string; enabled: boolean; config: Record<string, unknown> }>;
+        const idx = wf.steps.findIndex((s) => s.id === String(params["stepId"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        wf.steps[idx] = { ...wf.steps[idx], ...b, updatedAt: Date.now() };
+        return HttpResponse.json(wf.steps[idx]);
+      }),
+
+      http.delete(`${V1}/workflows/:workflowId/steps/:stepId`, async ({ params }) => {
+        await lat();
+        const wf = workflows.find((w) => w.id === String(params["workflowId"]));
+        if (!wf) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const before = wf.steps.length;
+        wf.steps = wf.steps.filter((s) => s.id !== String(params["stepId"]));
+        if (wf.steps.length === before) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return new HttpResponse(null, { status: 204 });
+      }),
+    ];
+  })(),
+
   // ── Webhooks (Settings → Webhooks) ────────────────────────────────────────
   http.get(`${V1}/webhooks`, async () => {
     await lat();

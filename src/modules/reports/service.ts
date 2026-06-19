@@ -26,6 +26,13 @@ export interface HourlyBucket {
   value: number;       // 0–100 index relative to the busiest hour
 }
 
+export interface TrendDay {
+  date: string;          // "YYYY-MM-DD"
+  label: string;         // "Mon", "Jun 18", etc.
+  revenueCents: number;
+  orderCount: number;
+}
+
 function hourLabel(h: number): string {
   const period = h < 12 ? "AM" : "PM";
   const display = h % 12 === 0 ? 12 : h % 12;
@@ -398,5 +405,30 @@ export class ReportsService {
       return { productId: r.product_id, name: r.name, stockQty: qty, costCents: cost, retailCents: retail, costValueCents: costValue, retailValueCents: retailValue };
     });
     return { rows: out, totalCostCents: totalCost, totalRetailCents: totalRetail };
+  }
+
+  // ── Revenue trend ────────────────────────────────────────────────────────────
+
+  async revenueTrend(tenantId: string, days: 7 | 30 | 90): Promise<TrendDay[]> {
+    const since = Date.now() - days * 86_400_000;
+    const rows = await this.db.query<{ day: string; revenue: number; cnt: number }>(
+      `SELECT to_char(to_timestamp(created_at / 1000.0), 'YYYY-MM-DD') AS day,
+              COALESCE(SUM(total_cents), 0) AS revenue,
+              COUNT(*)::int AS cnt
+         FROM orders
+        WHERE tenant_id = @tenantId AND status = 'completed' AND created_at >= @since
+        GROUP BY day ORDER BY day`,
+      { tenantId, since },
+    );
+    const byDay = new Map(rows.map((r) => [r.day, { revenueCents: Number(r.revenue), orderCount: Number(r.cnt) }]));
+    return Array.from({ length: days }, (_, i) => {
+      const d = new Date(Date.now() - (days - 1 - i) * 86_400_000);
+      const key = d.toISOString().slice(0, 10);
+      const entry = byDay.get(key) ?? { revenueCents: 0, orderCount: 0 };
+      const label = days <= 7
+        ? d.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" })
+        : d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+      return { date: key, label, revenueCents: entry.revenueCents, orderCount: entry.orderCount };
+    });
   }
 }

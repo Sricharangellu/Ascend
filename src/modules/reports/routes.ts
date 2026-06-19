@@ -89,4 +89,11 @@ export function registerRoutes(router: Router, service: ReportsService): void {
   router.get("/p-l", handler(async (req, res) => {
     res.json(await service.pnl(tenantId(res), sinceFromRange(req)));
   }));
+
+  // GET /api/v1/reports/revenue-trend?range=7d|30d|90d — daily revenue series.
+  router.get("/revenue-trend", handler(async (req, res) => {
+    const r = typeof req.query.range === "string" ? req.query.range : "7d";
+    const days: 7 | 30 | 90 = r === "30d" ? 30 : r === "90d" ? 90 : 7;
+    res.json({ items: await service.revenueTrend(tenantId(res), days) });
+  }));
 }

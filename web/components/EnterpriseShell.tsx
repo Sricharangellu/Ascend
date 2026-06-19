@@ -37,7 +37,8 @@ type NavKey =
   | "operations"
   | "team"
   | "insights"
-  | "finance";
+  | "finance"
+  | "catalog";
 
 // editionFlag: if set, this nav item is hidden when the corresponding feature
 // flag is false. Items with no editionFlag are always shown.
@@ -53,6 +54,7 @@ const NAV_ITEMS: Array<{
   { key: "register", label: "Register", href: "/terminal", icon: "register", group: "Operate", editionFlag: "groupRetailPOS" },
   { key: "sales", label: "Sales", href: "/sales", icon: "sales", group: "Operate" },
   { key: "orders", label: "Orders", href: "/orders", icon: "orders", group: "Operate" },
+  { key: "catalog",   label: "Catalog",   href: "/catalog",   icon: "catalog",   group: "Manage" },
   { key: "inventory", label: "Inventory", href: "/inventory", icon: "inventory", group: "Manage" },
   { key: "operations", label: "Operations", href: "/operations", icon: "operations", group: "Manage" },
   { key: "purchasing", label: "Purchasing", href: "/purchasing", icon: "purchasing", group: "Manage", editionFlag: "groupWholesale" },
@@ -402,6 +404,8 @@ function NavIcon({ name }: { name: NavKey }) {
       return <InsightsIcon />;
     case "finance":
       return <FinanceIcon />;
+    case "catalog":
+      return <CatalogIcon />;
     default:
       return <ReportsIcon />;
   }
@@ -627,6 +631,19 @@ function SettingsIcon() {
     <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" />
       <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.21.39.6.6 1 .6H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1.4Z" />
+    </svg>
+  );
+}
+
+function CatalogIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 5h18" />
+      <path d="M3 9h18" />
+      <rect x="3" y="13" width="7" height="7" rx="1" />
+      <path d="M14 13h7" />
+      <path d="M14 17h7" />
+      <path d="M14 20h4" />
     </svg>
   );
 }

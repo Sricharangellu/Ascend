@@ -17,7 +17,7 @@ import type {
   ReadyzResponse,
   FlagsResponse,
   UserProfile,
-  Product,
+  TerminalProduct,
   CatalogListResponse,
   Order,
   OrderLine,
@@ -48,7 +48,7 @@ const VALID_REFRESH_TOKEN = "mock-refresh-token-dev";
 
 // ─── Mock catalog ─────────────────────────────────────────────────────────────
 
-const MOCK_PRODUCTS: Product[] = [
+const MOCK_PRODUCTS: TerminalProduct[] = [
   {
     id: "prod_001",
     sku: "LATTE-12",
@@ -773,6 +773,59 @@ export const handlers = [
       payments: { capturedCount: 3, capturedCents: 6497, byMethod: { cash: 3247, card: 3250 } },
     };
     return HttpResponse.json(response, { status: 200 });
+  }),
+
+  // ── Revenue trend (S4-CHARTS) ────────────────────────────────────────────────
+  http.get(`${V1}/reports/revenue-trend`, async ({ request }) => {
+    await latency();
+    const url = new URL(request.url);
+    const days = url.searchParams.get("range") === "30d" ? 30 : 7;
+    const items = Array.from({ length: days }, (_, i) => {
+      const d = new Date(Date.now() - (days - 1 - i) * 86_400_000);
+      const label = days <= 7
+        ? d.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" })
+        : d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+      return { date: d.toISOString().slice(0, 10), label, revenueCents: Math.floor(Math.random() * 50000) + 10000, orderCount: Math.floor(Math.random() * 20) + 5 };
+    });
+    return HttpResponse.json({ items });
+  }),
+
+  http.get(`${V1}/reports/hourly`, async () => {
+    await latency();
+    const items = Array.from({ length: 24 }, (_, hour) => {
+      const period = hour < 12 ? "AM" : "PM";
+      const h12 = hour % 12 === 0 ? 12 : hour % 12;
+      const label = `${h12} ${period}`;
+      const peak = hour >= 10 && hour <= 14 ? 1.5 : hour >= 17 && hour <= 19 ? 1.2 : 0.3;
+      const revenueCents = Math.floor(Math.random() * 15000 * peak);
+      return { hour, label, orderCount: Math.floor(revenueCents / 2500), revenueCents, value: Math.floor(revenueCents / 200) };
+    });
+    return HttpResponse.json({ items });
+  }),
+
+  // ── Loyalty tier rules (S4-LOYALTY) ─────────────────────────────────────────
+  http.get(`${V1}/customers/loyalty-tiers`, async () => {
+    await latency();
+    return HttpResponse.json({ items: [] });
+  }),
+
+  http.put(`${V1}/customers/loyalty-tiers/:level`, async () => {
+    await latency();
+    return HttpResponse.json({}, { status: 200 });
+  }),
+
+  http.delete(`${V1}/customers/loyalty-tiers/:level`, async () => {
+    await latency();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.get(`${V1}/customers/:id/loyalty`, async ({ params }) => {
+    await latency();
+    return HttpResponse.json({
+      customerId: params.id, currentPoints: 350, currentTierLevel: 1,
+      currentTierName: "Bronze", pointMultiplier: 1.0, discountPct: 0,
+      nextTierName: "Silver", pointsToNextTier: 150,
+    });
   }),
 
   // Cycle-3 modules (customers, gift cards, webhooks, inventory overview, team).

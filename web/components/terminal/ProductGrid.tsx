@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { apiGet } from "@/api-client/client";
-import type { Product, CatalogListResponse } from "@/api-client/types";
+import type { TerminalProduct as Product, CatalogListResponse } from "@/api-client/types";
 import { formatMoney } from "@/lib/money";
 
 interface ProductGridProps {
