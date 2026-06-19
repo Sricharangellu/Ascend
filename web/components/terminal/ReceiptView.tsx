@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { apiPost } from "@/api-client/client";
+import { useToast } from "@/components/Toast";
 import type { Order, Payment } from "@/api-client/types";
 import { formatMoney } from "@/lib/money";
 import { Button } from "@/components/Button";
@@ -30,7 +31,11 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
   const [currentOrder, setCurrentOrder] = useState<Order>(order);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailAddr, setEmailAddr] = useState("");
+  const [showEmailInput, setShowEmailInput] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
   const newSaleRef = useRef<HTMLButtonElement>(null);
+  const { addToast } = useToast();
 
   // Focus the "New Sale" button on mount
   useEffect(() => {
@@ -42,6 +47,22 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
   const canVoid =
     currentOrder.status === "completed" &&
     (role === "owner" || role === "manager");
+
+  const handleSendEmail = useCallback(async () => {
+    const addr = emailAddr.trim();
+    if (!addr) return;
+    setSendingEmail(true);
+    try {
+      await apiPost(`/api/v1/orders/${currentOrder.id}/email-receipt`, { email: addr });
+      addToast({ title: `Receipt sent to ${addr}`, variant: "success" });
+      setShowEmailInput(false);
+      setEmailAddr("");
+    } catch (err) {
+      addToast({ title: "Failed to send receipt", description: err instanceof Error ? err.message : undefined, variant: "error" });
+    } finally {
+      setSendingEmail(false);
+    }
+  }, [currentOrder.id, emailAddr, addToast]);
 
   const handleRefund = useCallback(async () => {
     setLoading(true);
@@ -210,6 +231,29 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
           >
             New Sale
           </Button>
+
+          {/* Email receipt */}
+          {!showEmailInput ? (
+            <Button variant="ghost" size="sm" fullWidth onClick={() => setShowEmailInput(true)}>
+              Email Receipt
+            </Button>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={emailAddr}
+                onChange={(e) => setEmailAddr(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") void handleSendEmail(); if (e.key === "Escape") { setShowEmailInput(false); setEmailAddr(""); } }}
+                placeholder="customer@email.com"
+                autoFocus
+                className="flex-1 min-w-0 rounded border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+              />
+              <Button variant="primary" size="sm" loading={sendingEmail} disabled={!emailAddr.trim() || sendingEmail} onClick={() => void handleSendEmail()}>
+                Send
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => { setShowEmailInput(false); setEmailAddr(""); }}>✕</Button>
+            </div>
+          )}
 
           {(canRefund || canVoid) && (
             <div className="flex gap-2">

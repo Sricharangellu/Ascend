@@ -61,4 +61,29 @@ export function registerRoutes(router: Router, service: SettingsService): void {
                                  { groupRetailPOS: true,  groupWholesale: true,  groupEnterprise: true  }; // hybrid
     res.json(await service.setFlags(presets, tenantId(res)));
   }));
+
+  // Email config — sender address + optional API key label (key itself never returned).
+  const emailConfigSchema = z.object({
+    fromAddress: z.string().email(),
+    storeName: z.string().min(1).optional(),
+    provider: z.enum(["sendgrid", "webhook", "none"]).optional(),
+    webhookUrl: z.string().url().optional(),
+  });
+
+  router.get("/email-config", mgr, handler(async (_req, res) => {
+    const cfg = await service.getBusiness(tenantId(res));
+    const { email_from, email_store_name, email_provider, email_webhook_url } = cfg;
+    res.json({ fromAddress: email_from ?? null, storeName: email_store_name ?? null, provider: email_provider ?? "none", webhookUrl: email_webhook_url ?? null });
+  }));
+
+  router.put("/email-config", mgr, handler(async (req, res) => {
+    const body = parseBody(emailConfigSchema, req.body);
+    await service.setBusiness({
+      email_from: body.fromAddress,
+      email_store_name: body.storeName,
+      email_provider: body.provider ?? "none",
+      email_webhook_url: body.webhookUrl,
+    }, tenantId(res));
+    res.json({ ok: true });
+  }));
 }

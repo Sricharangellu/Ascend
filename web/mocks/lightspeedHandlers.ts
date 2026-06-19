@@ -532,14 +532,30 @@ export const lightspeedHandlers = [
       { id: "cat_3", name: "Tobacco",    parent_id: null, created_at: Date.now() - 120 * 86_400_000 },
     ];
 
+    // Products are stored and returned in TerminalProduct shape (camelCase) so
+    // ProductGrid and the barcode scanner both receive the right field names.
     const now = Date.now();
-    let products: Array<Record<string, unknown>> = [
-      { id: "prod_1", tenant_id: "t1", sku: "BEV-001", name: "Spring Water 500ml", price_cents: 199, category: "Beverages", tax_class: "standard", barcode: "012345678901", status: "active", created_at: now - 90*86_400_000, updated_at: now - 10*86_400_000, description: null, brand: "AquaPure", manufacturer: null, tags: "water,hydration", image_url: null, msrp_cents: 249, raw_cost_price_cents: 80, wholesale_price_cents: 150, weight_grams: 510, preferred_vendor_id: null, preferred_vendor_name: null, vendor_upc: null, reorder_quantity: 48, min_qty_to_sell: 1, max_qty_to_sell: null, qty_increment: 1, parent_product_id: null, variant_label: null, age_restricted: 0, returnable: 1, track_inventory: 1, ecommerce: 1 },
-      { id: "prod_2", tenant_id: "t1", sku: "BEV-002", name: "Orange Juice 1L", price_cents: 349, category: "Beverages", tax_class: "standard", barcode: "012345678902", status: "active", created_at: now - 88*86_400_000, updated_at: now - 5*86_400_000, description: "Fresh squeezed taste", brand: "SunCrest", manufacturer: null, tags: "juice,breakfast", image_url: null, msrp_cents: 399, raw_cost_price_cents: 140, wholesale_price_cents: 260, weight_grams: 1050, preferred_vendor_id: null, preferred_vendor_name: null, vendor_upc: null, reorder_quantity: 24, min_qty_to_sell: 1, max_qty_to_sell: null, qty_increment: 1, parent_product_id: null, variant_label: null, age_restricted: 0, returnable: 1, track_inventory: 1, ecommerce: 0 },
-      { id: "prod_3", tenant_id: "t1", sku: "SNK-001", name: "Potato Chips 150g", price_cents: 299, category: "Snacks", tax_class: "standard", barcode: "012345678903", status: "active", created_at: now - 60*86_400_000, updated_at: now - 2*86_400_000, description: null, brand: "CrunchKing", manufacturer: "CrunchKing Foods Ltd", tags: "chips,snacks", image_url: null, msrp_cents: 349, raw_cost_price_cents: 110, wholesale_price_cents: 200, weight_grams: 155, preferred_vendor_id: null, preferred_vendor_name: null, vendor_upc: null, reorder_quantity: 36, min_qty_to_sell: 1, max_qty_to_sell: null, qty_increment: 1, parent_product_id: null, variant_label: null, age_restricted: 0, returnable: 0, track_inventory: 1, ecommerce: 1 },
-      { id: "prod_4", tenant_id: "t1", sku: "SNK-002", name: "Mixed Nuts 200g", price_cents: 599, category: "Snacks", tax_class: "standard", barcode: "012345678904", status: "active", created_at: now - 45*86_400_000, updated_at: now - 1*86_400_000, description: "Roasted cashews, almonds & peanuts", brand: "NutHouse", manufacturer: null, tags: "nuts,healthy", image_url: null, msrp_cents: 649, raw_cost_price_cents: 250, wholesale_price_cents: 450, weight_grams: 210, preferred_vendor_id: null, preferred_vendor_name: null, vendor_upc: null, reorder_quantity: 24, min_qty_to_sell: 1, max_qty_to_sell: null, qty_increment: 1, parent_product_id: null, variant_label: null, age_restricted: 0, returnable: 0, track_inventory: 1, ecommerce: 1 },
-      { id: "prod_5", tenant_id: "t1", sku: "TOB-001", name: "Classic Cigarettes 20pk", price_cents: 1299, category: "Tobacco", tax_class: "exempt", barcode: "012345678905", status: "active", created_at: now - 100*86_400_000, updated_at: now - 3*86_400_000, description: null, brand: "RedLeaf", manufacturer: "RedLeaf Tobacco Co", tags: "tobacco,cigarettes", image_url: null, msrp_cents: null, raw_cost_price_cents: 850, wholesale_price_cents: 1100, weight_grams: 25, preferred_vendor_id: null, preferred_vendor_name: null, vendor_upc: null, reorder_quantity: 100, min_qty_to_sell: 1, max_qty_to_sell: null, qty_increment: 1, parent_product_id: null, variant_label: null, age_restricted: 1, returnable: 0, track_inventory: 1, ecommerce: 0 },
-      { id: "prod_6", tenant_id: "t1", sku: "BEV-003", name: "Energy Drink 250ml", price_cents: 249, category: "Beverages", tax_class: "standard", barcode: "012345678906", status: "draft", created_at: now - 5*86_400_000, updated_at: now - 1*86_400_000, description: "New SKU pending approval", brand: "BoltUp", manufacturer: null, tags: "energy,drink", image_url: null, msrp_cents: 299, raw_cost_price_cents: 100, wholesale_price_cents: 180, weight_grams: 270, preferred_vendor_id: null, preferred_vendor_name: null, vendor_upc: null, reorder_quantity: 48, min_qty_to_sell: 1, max_qty_to_sell: null, qty_increment: 1, parent_product_id: null, variant_label: null, age_restricted: 0, returnable: 0, track_inventory: 1, ecommerce: 0 },
+    const mkProduct = (
+      id: string, sku: string, name: string, priceCents: number,
+      category: string, taxClass: "standard" | "exempt", barcode: string,
+      status: "active" | "draft" | "archived", ageRestricted: boolean,
+      costCents: number, createdDaysAgo: number,
+    ) => ({
+      id, sku, name, priceCents, category, taxClass, barcode, status, ageRestricted,
+      createdAt: now - createdDaysAgo * 86_400_000, updatedAt: now - Math.floor(createdDaysAgo / 3) * 86_400_000,
+      // Extended fields used by catalog management pages (snake_case subset)
+      price_cents: priceCents, tax_class: taxClass, age_restricted: ageRestricted ? 1 : 0,
+      raw_cost_price_cents: costCents, description: null, brand: null,
+      image_url: null, msrp_cents: null, parent_product_id: null, variant_label: null,
+    });
+
+    let products = [
+      mkProduct("prod_1","BEV-001","Spring Water 500ml",199,"Beverages","standard","012345678901","active",false,80,90),
+      mkProduct("prod_2","BEV-002","Orange Juice 1L",349,"Beverages","standard","012345678902","active",false,140,88),
+      mkProduct("prod_3","SNK-001","Potato Chips 150g",299,"Snacks","standard","012345678903","active",false,110,60),
+      mkProduct("prod_4","SNK-002","Mixed Nuts 200g",599,"Snacks","standard","012345678904","active",false,250,45),
+      mkProduct("prod_5","TOB-001","Classic Cigarettes 20pk",1299,"Tobacco","exempt","012345678905","active",true,850,100),
+      mkProduct("prod_6","BEV-003","Energy Drink 250ml",249,"Beverages","standard","012345678906","draft",false,100,5),
     ];
 
     function applyFilters(
@@ -585,24 +601,16 @@ export const lightspeedHandlers = [
       http.post(`${V1}/catalog`, async ({ request }) => {
         await lat();
         const b = (await request.json()) as Record<string, unknown>;
-        const p = {
-          id: `prod_${++prodSeq}`, tenant_id: "t1",
-          sku: b.sku, name: b.name, price_cents: b.price_cents,
-          category: b.category ?? "Uncategorized",
-          tax_class: b.tax_class ?? "standard",
-          barcode: b.barcode ?? null, status: b.status ?? "draft",
-          created_at: Date.now(), updated_at: Date.now(),
-          description: b.description ?? null, brand: b.brand ?? null,
-          manufacturer: null, tags: null, image_url: null,
-          msrp_cents: b.msrp_cents ?? null, raw_cost_price_cents: b.raw_cost_price_cents ?? null,
-          wholesale_price_cents: null, weight_grams: null,
-          preferred_vendor_id: null, preferred_vendor_name: null, vendor_upc: null,
-          reorder_quantity: b.reorder_quantity ?? null,
-          min_qty_to_sell: null, max_qty_to_sell: null, qty_increment: 1,
-          parent_product_id: null, variant_label: null,
-          age_restricted: b.age_restricted ? 1 : 0, returnable: 1,
-          track_inventory: 1, ecommerce: 0,
-        };
+        const pc = Number(b.price_cents ?? b.priceCents ?? 0);
+        const p = mkProduct(
+          `prod_${++prodSeq}`, String(b.sku ?? ""), String(b.name ?? ""), pc,
+          String(b.category ?? "Uncategorized"),
+          (b.tax_class ?? b.taxClass ?? "standard") as "standard" | "exempt",
+          String(b.barcode ?? ""),
+          (b.status ?? "draft") as "active" | "draft" | "archived",
+          !!(b.age_restricted ?? b.ageRestricted),
+          Number(b.raw_cost_price_cents ?? 0), 0,
+        );
         products.push(p);
         return HttpResponse.json(p, { status: 201 });
       }),
@@ -633,8 +641,9 @@ export const lightspeedHandlers = [
 
       http.get(`${V1}/catalog/barcode/:code`, async ({ params }) => {
         await lat();
-        const p = products.find((x) => x.barcode === String(params["code"]));
-        if (!p) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const code = String(params["code"]);
+        const p = products.find((x) => x.barcode === code || x.sku === code);
+        if (!p) return HttpResponse.json({ error: { code: "not_found", message: `No active product with barcode '${code}'` } }, { status: 404 });
         return HttpResponse.json(p);
       }),
 

@@ -3,6 +3,8 @@ import { z } from "zod";
 import { handler, parseBody, notFound, badRequest } from "../../shared/http.js";
 import type { OrdersService, OrderStatus } from "./service.js";
 import type { AuthPayload } from "../../gateway/auth.js";
+import { sendEmail } from "../../shared/email.js";
+import { Money } from "../../shared/money.js";
 
 const stateSchema = z.enum(["CA", "NY", "TX", "FL"]);
 
@@ -126,6 +128,68 @@ export function registerRoutes(router: Router, service: OrdersService): void {
     "/:id/void",
     handler(async (req: Request, res: Response) => {
       res.json(await service.void(String(req.params.id), tenantId(res)));
+    }),
+  );
+
+  // POST /:id/email-receipt — send (or preview) an order receipt via email.
+  const emailReceiptSchema = z.object({
+    email: z.string().email().optional(),
+    storeName: z.string().optional(),
+  });
+
+  router.post(
+    "/:id/email-receipt",
+    handler(async (req: Request, res: Response) => {
+      const id = String(req.params.id);
+      const body = parseBody(emailReceiptSchema, req.body);
+      const order = await service.getOrThrow(id, tenantId(res));
+
+      const to = body.email ?? (
+        order.customer_id
+          ? await service.customerEmail(order.customer_id, tenantId(res))
+          : null
+      );
+      if (!to) throw badRequest("provide an email address or attach a customer with an email");
+
+      const storeName = body.storeName ?? process.env["STORE_NAME"] ?? "FinderPOS";
+      const date = new Date(Number(order.created_at)).toLocaleString("en-US", { timeZone: "UTC" });
+      const linesHtml = order.lines.map((l) =>
+        `<tr><td style="padding:4px 8px">${l.name}</td><td style="padding:4px 8px;text-align:right">×${l.quantity}</td><td style="padding:4px 8px;text-align:right">$${Money.toDollars(Number(l.line_cents))}</td></tr>`
+      ).join("\n");
+      const linesText = order.lines.map((l) =>
+        `  ${l.name} ×${l.quantity}   $${Money.toDollars(Number(l.line_cents))}`
+      ).join("\n");
+
+      const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:480px;margin:0 auto">
+<h2 style="margin-bottom:4px">${storeName}</h2>
+<p style="color:#666;margin-top:0">Order #${order.order_number} &mdash; ${date}</p>
+<table style="width:100%;border-collapse:collapse;margin:16px 0">
+<thead><tr style="background:#f5f5f5"><th style="padding:4px 8px;text-align:left">Item</th><th style="padding:4px 8px;text-align:right">Qty</th><th style="padding:4px 8px;text-align:right">Amount</th></tr></thead>
+<tbody>${linesHtml}</tbody>
+<tfoot>
+<tr><td colspan="2" style="padding:4px 8px;text-align:right;color:#666">Subtotal</td><td style="padding:4px 8px;text-align:right">$${Money.toDollars(Number(order.subtotal_cents))}</td></tr>
+<tr><td colspan="2" style="padding:4px 8px;text-align:right;color:#666">Tax</td><td style="padding:4px 8px;text-align:right">$${Money.toDollars(Number(order.tax_cents))}</td></tr>
+<tr style="font-weight:bold"><td colspan="2" style="padding:6px 8px;text-align:right">Total</td><td style="padding:6px 8px;text-align:right">$${Money.toDollars(Number(order.total_cents))}</td></tr>
+</tfoot></table>
+<p style="color:#888;font-size:12px">Thank you for shopping with ${storeName}.</p>
+</body></html>`;
+
+      const text = [
+        `${storeName}`,
+        `Order #${order.order_number} — ${date}`,
+        ``,
+        linesText,
+        ``,
+        `  Subtotal  $${Money.toDollars(Number(order.subtotal_cents))}`,
+        `  Tax       $${Money.toDollars(Number(order.tax_cents))}`,
+        `  Total     $${Money.toDollars(Number(order.total_cents))}`,
+        ``,
+        `Thank you for shopping with ${storeName}.`,
+      ].join("\n");
+
+      const from = process.env["EMAIL_FROM"] ?? `receipts@${storeName.toLowerCase().replace(/\s+/g, "")}.com`;
+      const result = await sendEmail({ to, from, subject: `Your receipt from ${storeName} — Order #${order.order_number}`, text, html });
+      res.json({ sent: result.sent, to, orderId: id, ...(result.preview ? { preview: result.preview } : {}) });
     }),
   );
 }

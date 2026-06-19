@@ -775,6 +775,24 @@ export const handlers = [
     return HttpResponse.json(response, { status: 200 });
   }),
 
+  // ── Email receipt (S5-EMAIL) ─────────────────────────────────────────────────
+  http.post(`${V1}/orders/:id/email-receipt`, async () => {
+    await latency();
+    return HttpResponse.json({ sent: false, to: "customer@example.com", preview: "<p>Receipt preview</p>" });
+  }),
+
+  // ── Sales by category (S5-ANALYTICS) ─────────────────────────────────────────
+  http.get(`${V1}/reports/sales-by-category`, async () => {
+    await latency();
+    const cats = [
+      { key: "Beverages", name: "Beverages", units: 84, revenueCents: 28400 },
+      { key: "Snacks", name: "Snacks", units: 62, revenueCents: 22100 },
+      { key: "Tobacco", name: "Tobacco", units: 40, revenueCents: 51960 },
+      { key: "Apparel", name: "Apparel", units: 18, revenueCents: 39600 },
+    ];
+    return HttpResponse.json({ items: cats });
+  }),
+
   // ── Revenue trend (S4-CHARTS) ────────────────────────────────────────────────
   http.get(`${V1}/reports/revenue-trend`, async ({ request }) => {
     await latency();

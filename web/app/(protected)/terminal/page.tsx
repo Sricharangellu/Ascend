@@ -21,8 +21,9 @@ import { useOffline } from "@/lib/useOffline";
 import { useCart, useCartReducer, CartContext } from "@/lib/useCart";
 import { useToast } from "@/components/Toast";
 import { enqueue } from "@/lib/syncOutbox";
-import { apiPost, apiPut, ApiResponseError } from "@/api-client/client";
+import { apiGet, apiPost, apiPut, ApiResponseError } from "@/api-client/client";
 import type { Order, Payment, TerminalProduct as Product } from "@/api-client/types";
+import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { ProductGrid } from "@/components/terminal/ProductGrid";
 import { CartPanel } from "@/components/terminal/CartPanel";
@@ -127,6 +128,20 @@ function TerminalInner() {
     },
     [cart]
   );
+
+  // Keyboard-wedge barcode scanner: look up product by barcode and add to cart.
+  const handleBarcodeScan = useCallback(async (code: string) => {
+    if (screen !== "terminal") return;
+    try {
+      const product = await apiGet<Product>(`/api/v1/catalog/barcode/${encodeURIComponent(code)}`);
+      cart.addProduct(product);
+      addToast({ title: `Added: ${product.name}`, variant: "success" });
+    } catch {
+      addToast({ title: `Barcode not found: ${code}`, variant: "error" });
+    }
+  }, [screen, cart, addToast]);
+
+  useBarcodeScanner({ onScan: handleBarcodeScan });
 
   const handleCharge = useCallback(() => {
     if (!cart.state.order) return;

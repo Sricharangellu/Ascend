@@ -378,6 +378,14 @@ export class OrdersService {
     return order;
   }
 
+  async customerEmail(customerId: string, tenantId: string): Promise<string | null> {
+    const row = await this.db.one<{ email: string | null }>(
+      "SELECT email FROM customers WHERE id = @id AND tenant_id = @t",
+      { id: customerId, t: tenantId },
+    );
+    return row?.email ?? null;
+  }
+
   async list(query: ListOrdersQuery = {}, tenantId: string): Promise<CursorPage<OrderRow>> {
     const limit = clampLimit(query.limit);
 

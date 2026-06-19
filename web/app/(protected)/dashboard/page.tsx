@@ -84,6 +84,15 @@ interface HourlyBucket {
 
 interface HourlyResponse { items: HourlyBucket[]; }
 
+interface CategoryItem {
+  key: string;
+  name: string;
+  units: number;
+  revenueCents: number;
+}
+
+interface CategoryResponse { items: CategoryItem[]; }
+
 // ─── Skeleton primitives ──────────────────────────────────────────────────────
 
 function SkeletonBox({ className = "" }: { className?: string }) {
@@ -234,6 +243,10 @@ export default function DashboardPage() {
     () => apiGet<HourlyResponse>(`/api/v1/reports/hourly?range=${range}`),
     [range],
   );
+  const fetchCategory = useCallback(
+    () => apiGet<CategoryResponse>(`/api/v1/reports/sales-by-category?range=${range}`),
+    [range],
+  );
 
   const { data: summary, loading: loadingSummary, error: errorSummary } =
     useQuery(`dashboard:summary:${range}`, fetchSummary, { staleMs: 60_000 });
@@ -245,6 +258,8 @@ export default function DashboardPage() {
     useQuery(`dashboard:trend:${trendRange}`, fetchTrend, { staleMs: 60_000 });
   const { data: hourlyData, loading: loadingHourly } =
     useQuery(`dashboard:hourly:${range}`, fetchHourly, { staleMs: 60_000 });
+  const { data: categoryData, loading: loadingCategory } =
+    useQuery(`dashboard:category:${range}`, fetchCategory, { staleMs: 60_000 });
 
   const topProducts = topProductsData?.items ?? [];
   const topCustomers = topCustomersData?.items ?? [];
@@ -253,6 +268,7 @@ export default function DashboardPage() {
 
   const trendPoints = (trendData?.items ?? []).map((d) => ({ label: d.label, value: d.revenueCents }));
   const hourlyPoints = (hourlyData?.items ?? []).map((d) => ({ label: d.label, value: d.revenueCents }));
+  const categoryItems = (categoryData?.items ?? []).slice(0, 6);
 
   // ── Derived KPI values ────────────────────────────────────────────────────
 
@@ -498,6 +514,39 @@ export default function DashboardPage() {
             )}
           </Card>
         </section>
+
+        {/* ── Sales by Category ─────────────────────────────────────────── */}
+        {(loadingCategory || categoryItems.length > 0) && (
+          <section aria-label="Sales by category">
+            <Card title="Sales by Category" noPadding>
+              {loadingCategory ? (
+                <div className="space-y-2 px-5 py-4">
+                  {[...Array(4)].map((_, i) => <SkeletonBox key={i} className="h-7 w-full" />)}
+                </div>
+              ) : (
+                <div className="px-5 py-3 space-y-2">
+                  {(() => {
+                    const maxRev = Math.max(...categoryItems.map(c => c.revenueCents), 1);
+                    return categoryItems.map((c) => {
+                      const pct = Math.round((c.revenueCents / maxRev) * 100);
+                      return (
+                        <div key={c.key}>
+                          <div className="flex items-center justify-between mb-1 text-sm">
+                            <span className="font-medium text-slate-700">{c.name}</span>
+                            <span className="tabular-nums text-slate-500">{formatMoney(c.revenueCents)}</span>
+                          </div>
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                            <div className="h-2 rounded-full bg-violet-500 transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              )}
+            </Card>
+          </section>
+        )}
 
         {/* ── Quick-access action grid ───────────────────────────────────── */}
         <section aria-label="Quick actions">
