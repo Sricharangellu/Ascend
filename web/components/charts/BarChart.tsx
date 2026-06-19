@@ -63,7 +63,7 @@ export function BarChart({
         />
         <YAxis hide />
         <Tooltip
-          formatter={(v: number) => [formatValue(v), ""]}
+          formatter={(v: unknown) => [formatValue(Number(v)), ""]}
           contentStyle={{
             backgroundColor: "white",
             border: "1px solid #E5E5E5",
