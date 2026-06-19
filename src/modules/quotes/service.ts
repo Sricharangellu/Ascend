@@ -46,7 +46,7 @@ export class QuotesService {
 
     for (const l of input.lines) {
       await this.db.query(
-        `INSERT INTO quotation_lines (id, tenant_id, quote_id, product_id, sku, name, quantity, unit_cents, discount_cents, tax_cents, line_cents, created_at)
+        `INSERT INTO quote_lines (id, tenant_id, quote_id, product_id, sku, name, quantity, unit_cents, discount_cents, tax_cents, line_cents, created_at)
          VALUES (@id, @t, @qid, @pid, @sku, @name, @qty, @unit, @disc, @tax, @line, @now)`,
         { id: `qtl_${uuidv7()}`, t: tenantId, qid: id, pid: l.productId, sku: l.sku ?? '', name: l.name, qty: l.quantity, unit: l.unitCents, disc: l.discountCents ?? 0, tax: l.taxCents ?? 0, line: l.unitCents * l.quantity - (l.discountCents ?? 0) + (l.taxCents ?? 0), now }
       );
@@ -58,7 +58,7 @@ export class QuotesService {
   async get(id: string, tenantId: string) {
     const quote = await this.db.one<Record<string, unknown>>("SELECT * FROM quotations WHERE id = @id AND tenant_id = @t", { id, t: tenantId });
     if (!quote) throw new HttpError(404, "not_found", `Quote '${id}' not found`);
-    const lines = await this.db.query("SELECT * FROM quotation_lines WHERE quote_id = @id AND tenant_id = @t ORDER BY created_at ASC", { id, t: tenantId });
+    const lines = await this.db.query("SELECT * FROM quote_lines WHERE quote_id = @id AND tenant_id = @t ORDER BY created_at ASC", { id, t: tenantId });
     return { ...quote, lines };
   }
 
