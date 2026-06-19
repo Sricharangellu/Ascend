@@ -1548,3 +1548,68 @@ lightspeedHandlers.push(
     ]});
   }),
 );
+
+// ── Sprint 9A: Sync / Integrations / Import-Export handlers ─────────────────
+
+// In-memory stores for sync module
+let companyIntegrations: any[] = [];
+const importBatches: any[] = [
+  { id: "imp_1", import_type: "customers", file_name: "customers-jan.csv", status: "completed", total_rows: 142, success_rows: 140, failed_rows: 2, created_at: Date.now() - 3 * 86_400_000, completed_at: Date.now() - 3 * 86_400_000 + 120_000 },
+  { id: "imp_2", import_type: "products", file_name: "catalog-q1.csv", status: "failed", total_rows: 88, success_rows: 0, failed_rows: 88, created_at: Date.now() - 86_400_000, completed_at: null },
+];
+const exportBatches: any[] = [
+  { id: "exp_1", export_type: "products", status: "completed", total_rows: 312, file_url: "/api/v1/catalog/export", created_at: Date.now() - 2 * 86_400_000 },
+];
+let importSeq = 3;
+
+lightspeedHandlers.push(
+  // ── Integration providers ──────────────────────────────────────────────────
+  http.get(`${V1}/sync/integration-providers`, async () => {
+    await lat();
+    return HttpResponse.json({ items: [
+      { id: "prov_shopify", name: "Shopify", provider_type: "ecommerce", is_active: true },
+      { id: "prov_quickbooks", name: "QuickBooks", provider_type: "accounting", is_active: true },
+      { id: "prov_stripe", name: "Stripe", provider_type: "payment", is_active: true },
+      { id: "prov_avalara", name: "Avalara", provider_type: "tax", is_active: true },
+      { id: "prov_shipstation", name: "ShipStation", provider_type: "shipping", is_active: true },
+      { id: "prov_sendgrid", name: "SendGrid", provider_type: "email", is_active: true },
+    ] });
+  }),
+
+  // ── Company integrations ───────────────────────────────────────────────────
+  http.get(`${V1}/sync/integrations`, async () => {
+    await lat();
+    return HttpResponse.json({ items: companyIntegrations });
+  }),
+  http.post(`${V1}/sync/integrations`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as { providerId: string; status: string };
+    // Update or insert
+    const idx = companyIntegrations.findIndex((i: any) => i.provider_id === b.providerId);
+    if (idx >= 0) {
+      companyIntegrations[idx] = { ...companyIntegrations[idx], status: b.status };
+    } else {
+      companyIntegrations.push({ id: `int_${Math.random().toString(36).slice(2, 10)}`, provider_id: b.providerId, status: b.status, last_sync_at: null });
+    }
+    return HttpResponse.json({ ok: true }, { status: 200 });
+  }),
+
+  // ── Import batches ─────────────────────────────────────────────────────────
+  http.get(`${V1}/sync/import-batches`, async () => {
+    await lat();
+    return HttpResponse.json({ items: importBatches });
+  }),
+  http.post(`${V1}/sync/import-batches`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as { importType: string; fileName: string };
+    const batch = { id: `imp_${importSeq++}`, import_type: b.importType, file_name: b.fileName, status: "pending", total_rows: 0, success_rows: 0, failed_rows: 0, created_at: Date.now(), completed_at: null };
+    importBatches.unshift(batch);
+    return HttpResponse.json(batch, { status: 201 });
+  }),
+
+  // ── Export batches ─────────────────────────────────────────────────────────
+  http.get(`${V1}/sync/export-batches`, async () => {
+    await lat();
+    return HttpResponse.json({ items: exportBatches });
+  }),
+);
