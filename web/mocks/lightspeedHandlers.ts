@@ -627,7 +627,7 @@ export const lightspeedHandlers = [
         const b = (await request.json()) as Record<string, unknown>;
         const idx = products.findIndex((x) => x.id === String(params["id"]));
         if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        products[idx] = { ...products[idx], ...b, updated_at: Date.now() };
+        products[idx] = { ...products[idx], ...b, updatedAt: Date.now() };
         return HttpResponse.json(products[idx]);
       }),
 
@@ -635,7 +635,7 @@ export const lightspeedHandlers = [
         await lat();
         const idx = products.findIndex((x) => x.id === String(params["id"]));
         if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        products[idx] = { ...products[idx], status: "archived", updated_at: Date.now() };
+        products[idx] = { ...products[idx], status: "archived", updatedAt: Date.now() };
         return HttpResponse.json(products[idx]);
       }),
 

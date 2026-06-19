@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
+import { clsx } from "clsx";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
@@ -24,6 +25,39 @@ function statusBadge(s: ProductStatus): "green" | "yellow" | "gray" {
   if (s === "active")   return "green";
   if (s === "draft")    return "yellow";
   return "gray";
+}
+
+function productStatusStyle(status: ProductStatus) {
+  if (status === "active") {
+    return {
+      row: "border-l-success-500 bg-success-50/30 hover:bg-success-50/70",
+      card: "border-l-success-500 bg-success-50/30",
+      dot: "bg-success-500",
+    };
+  }
+  if (status === "draft") {
+    return {
+      row: "border-l-warning-500 bg-warning-50/30 hover:bg-warning-50/70",
+      card: "border-l-warning-500 bg-warning-50/30",
+      dot: "bg-warning-500",
+    };
+  }
+  return {
+    row: "border-l-slate-300 bg-slate-50/70 text-slate-500 hover:bg-slate-100",
+    card: "border-l-slate-300 bg-slate-50/80",
+    dot: "bg-slate-400",
+  };
+}
+
+function metricToneClass(tone: "neutral" | "success" | "warning" | "muted" | "restricted") {
+  const tones = {
+    neutral: "border-slate-200 bg-white",
+    success: "border-success-200 bg-success-50",
+    warning: "border-warning-200 bg-warning-50",
+    muted: "border-slate-200 bg-slate-50",
+    restricted: "border-orange-200 bg-orange-50",
+  };
+  return tones[tone];
 }
 
 // ── Product Form Modal ────────────────────────────────────────────────────────
@@ -260,6 +294,11 @@ function ProductsTab({ categories }: { categories: Category[] }) {
   const archivedCount = products.filter((p) => p.status === "archived").length;
   const restrictedCount = products.filter((p) => p.age_restricted === 1).length;
   const hasFilters = Boolean(filterStatus || filterCategory || debouncedQ);
+  const filterSummary = [
+    filterStatus ? `Status: ${filterStatus}` : null,
+    filterCategory ? `Category: ${filterCategory}` : null,
+    debouncedQ ? `Search: ${debouncedQ}` : null,
+  ].filter(Boolean);
   const clearFilters = () => {
     setFilterStatus("");
     setFilterCategory("");
@@ -320,11 +359,11 @@ function ProductsTab({ categories }: { categories: Category[] }) {
   return (
     <>
       <Card className="overflow-hidden p-0">
-        <div className="grid gap-px border-b border-slate-200 bg-slate-200 sm:grid-cols-4">
-          <CatalogMetric label="Visible products" value={products.length} helper={`${total} total`} />
-          <CatalogMetric label="Active" value={activeCount} helper={`${draftCount} draft`} />
-          <CatalogMetric label="Archived" value={archivedCount} helper="Hidden from sale" />
-          <CatalogMetric label="Age restricted" value={restrictedCount} helper="ID check needed" />
+        <div className="grid gap-2 border-b border-slate-200 bg-slate-100 p-3 sm:grid-cols-4">
+          <CatalogMetric label="Visible products" value={products.length} helper={`${total} total`} tone={hasFilters ? "neutral" : "muted"} active={hasFilters} />
+          <CatalogMetric label="Active" value={activeCount} helper={`${draftCount} draft`} tone="success" active={filterStatus === "active"} />
+          <CatalogMetric label="Archived" value={archivedCount} helper="Hidden from sale" tone="muted" active={filterStatus === "archived"} />
+          <CatalogMetric label="Age restricted" value={restrictedCount} helper="ID check needed" tone="restricted" active={restrictedCount > 0} />
         </div>
 
         {/* Toolbar */}
@@ -379,6 +418,20 @@ function ProductsTab({ categories }: { categories: Category[] }) {
           </div>
         )}
 
+        {hasFilters && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-brand-50 px-4 py-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-brand-700">Filtered</span>
+            {filterSummary.map((label) => (
+              <span key={label} className="rounded-full border border-brand-200 bg-white px-2.5 py-1 text-xs font-medium text-brand-700">
+                {label}
+              </span>
+            ))}
+            <button type="button" onClick={clearFilters} className="ml-auto text-xs font-medium text-brand-700 hover:underline">
+              Clear
+            </button>
+          </div>
+        )}
+
         {loading ? (
           <div className="px-4 py-10 text-center">
             <p className="text-sm text-slate-500" aria-busy="true">Loading…</p>
@@ -411,12 +464,17 @@ function ProductsTab({ categories }: { categories: Category[] }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {products.map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                  {products.map((p) => {
+                    const style = productStatusStyle(p.status);
+                    return (
+                    <tr key={p.id} className={clsx("border-l-4 transition-colors", style.row)}>
                       <td className="px-4 py-3">
-                        <div>
-                          <p className="font-medium text-slate-950">{p.name}</p>
+                        <div className="flex items-start gap-2">
+                          <span className={clsx("mt-1.5 h-2 w-2 shrink-0 rounded-full", style.dot)} aria-hidden="true" />
+                          <div className="min-w-0">
+                          <p className={clsx("font-medium", p.status === "archived" ? "text-slate-600" : "text-slate-950")}>{p.name}</p>
                           {p.brand && <p className="text-xs text-slate-400">{p.brand}</p>}
+                          </div>
                         </div>
                       </td>
                       <td className="px-4 py-3 font-mono text-xs text-slate-600">{p.sku}</td>
@@ -455,7 +513,8 @@ function ProductsTab({ categories }: { categories: Category[] }) {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -499,16 +558,16 @@ function ProductsTab({ categories }: { categories: Category[] }) {
       )}
       {archiveTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setArchiveTarget(null)}>
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-sm rounded-md bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-base font-semibold text-slate-950">Archive &ldquo;{archiveTarget.name}&rdquo;?</h2>
             <p className="mt-2 text-sm text-slate-600">
               The product will be set to archived and hidden from active views. You can restore it by editing the status.
             </p>
             {actionError && <p className="mt-3 text-sm text-red-700">{actionError}</p>}
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setArchiveTarget(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
-              <button type="button" onClick={handleArchive} disabled={archiving} className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60">
-                {archiving ? "Archiving…" : "Archive"}
+              <button type="button" onClick={() => setArchiveTarget(null)} className="min-h-[40px] rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+              <button type="button" onClick={handleArchive} disabled={archiving} className="min-h-[40px] rounded-md bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60">
+                {archiving ? "Archiving..." : "Archive"}
               </button>
             </div>
           </div>
@@ -522,13 +581,17 @@ function CatalogMetric({
   label,
   value,
   helper,
+  tone = "neutral",
+  active = false,
 }: {
   label: string;
   value: number;
   helper: string;
+  tone?: "neutral" | "success" | "warning" | "muted" | "restricted";
+  active?: boolean;
 }) {
   return (
-    <div className="bg-white px-4 py-3">
+    <div className={clsx("rounded-md border px-4 py-3 transition-colors", metricToneClass(tone), active && "ring-2 ring-brand-200")}>
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
       <div className="mt-1 flex items-baseline gap-2">
         <span className="text-xl font-semibold tabular-nums text-slate-950">{value}</span>
@@ -547,12 +610,16 @@ function ProductListCard({
   onEdit: () => void;
   onArchive: () => void;
 }) {
+  const style = productStatusStyle(product.status);
   return (
-    <article className="space-y-3 bg-white px-4 py-4">
+    <article className={clsx("space-y-3 border-l-4 px-4 py-4", style.card)}>
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="truncate text-sm font-semibold text-slate-950">{product.name}</h3>
+        <div className="flex min-w-0 items-start gap-2">
+          <span className={clsx("mt-1.5 h-2 w-2 shrink-0 rounded-full", style.dot)} aria-hidden="true" />
+          <div className="min-w-0">
+          <h3 className={clsx("truncate text-sm font-semibold", product.status === "archived" ? "text-slate-600" : "text-slate-950")}>{product.name}</h3>
           <p className="mt-1 font-mono text-xs text-slate-500">{product.sku}</p>
+          </div>
         </div>
         <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-950">
           {centsToDisplay(product.price_cents)}
