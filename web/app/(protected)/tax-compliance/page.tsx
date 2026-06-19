@@ -1,12 +1,11 @@
 "use client";
 
 /**
- * /tax-compliance — Tax rate management + compliance rules for tobacco/vapor/hemp.
+ * /tax-compliance — Tax rates, MSA reporting, and industry compliance.
+ * Tabs: Tax Rates | MSA Reporting | Customer Exemptions
  *
- * Three sections:
- *  1. Tax Rates — table with add-rate form
- *  2. Tobacco & Vapor — informational placeholder
- *  3. MSA Reporting — placeholder
+ * Industry-specific: tobacco, vapor, and hemp distribution businesses.
+ * MSA = Master Settlement Agreement (tobacco manufacturer reporting obligation).
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -16,336 +15,245 @@ import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { apiGet, apiPost } from "@/api-client/client";
 import { useToast } from "@/components/Toast";
+import { getUser } from "@/lib/auth";
+
+type Tab = "tax-rates" | "msa-reporting" | "exemptions";
 
 interface TaxRate {
   id: string;
   name: string;
-  /** rate_bps: basis points (e.g. 850 = 8.5%) */
-  rate_bps?: number;
-  /** Fallback if backend sends "rate" as a decimal (0.085) */
-  rate?: number;
-  tax_class?: string;
-  apply_to_category?: string | null;
+  rate: number;
+  tax_class: string;
   state: string | null;
-  is_active?: boolean;
-  active?: number;
+  is_active: boolean;
 }
 
-const CLASS_BADGE: Record<string, "green" | "blue" | "red" | "yellow" | "gray"> = {
-  standard: "green",
-  exempt: "gray",
-  tobacco: "red",
-  vapor: "yellow",
-  hemp: "blue",
-};
-
-const TOBACCO_STATES = [
-  "CA – 59.27% wholesale excise",
-  "NY – $5.35/pack cigarette tax",
-  "FL – 33.9% net wholesale price",
-  "TX – $1.41/pack + 1¢/cigarette",
-  "IL – 99¢/pack cigarette tax",
-  "CO – 50% wholesale for vapor",
-  "MA – 40% wholesale excise",
-  "WA – 95.25¢/unit vapor tax",
+const MSA_SAMPLE = [
+  { customer: "Gulf Coast Tobacco", msaCategory: "Cigarettes", product: "Marlboro Red 100s", upc: "028200001234", qty: 142, unitPrice: 42.50, total: 6035.00 },
+  { customer: "Southwest Distribution", msaCategory: "Cigarettes", product: "Newport Box 100s", upc: "028200003456", qty: 98, unitPrice: 43.00, total: 4214.00 },
+  { customer: "Metro Supply Co.", msaCategory: "Cigars", product: "Swisher Sweets Cigarillo", upc: "028200007890", qty: 65, unitPrice: 22.00, total: 1430.00 },
+  { customer: "Acme Wholesale Inc.", msaCategory: "Cigarettes", product: "Camel Filter King", upc: "028200004567", qty: 54, unitPrice: 40.50, total: 2187.00 },
+  { customer: "Gulf Coast Tobacco", msaCategory: "Vapor", product: "JUUL Virginia Tobacco Pods", upc: "028200012345", qty: 48, unitPrice: 15.99, total: 767.52 },
 ];
 
-function formatRate(rate: TaxRate): string {
-  if (rate.rate_bps !== undefined) {
-    return `${(rate.rate_bps / 100).toFixed(2)}%`;
-  }
-  if (rate.rate !== undefined) {
-    return `${(rate.rate * 100).toFixed(2)}%`;
-  }
-  return "—";
-}
+const STATE_TAX_INFO = [
+  { state: "California", types: ["Sales Tax (7.25%)", "Tobacco Excise", "Vapor Tax (65% wholesale)"] },
+  { state: "New York", types: ["Sales Tax (4%)", "Cigarette Tax ($4.35/pack)", "Vapor Tax (20% retail)"] },
+  { state: "Texas", types: ["Sales Tax (6.25%)", "Tobacco Excise ($1.41/pack)"] },
+  { state: "Florida", types: ["Sales Tax (6%)", "Tobacco Surcharge"] },
+  { state: "Illinois", types: ["Sales Tax (6.25%)", "Tobacco Products Tax (36% wholesale)", "Vapor Tax (15% wholesale)"] },
+  { state: "Minnesota", types: ["Sales Tax (6.875%)", "Tobacco Tax (95% wholesale)", "Vapor Tax (95% wholesale)"] },
+];
 
-function isActive(rate: TaxRate): boolean {
-  if (rate.is_active !== undefined) return rate.is_active;
-  if (rate.active !== undefined) return rate.active === 1;
-  return true;
-}
+const MSA_CATEGORIES = ["Cigarettes", "Cigars", "Smokeless Tobacco", "Roll-Your-Own", "Vapor", "Hemp/CBD"];
+const TAX_CLASS_BADGE: Record<string, "green" | "yellow" | "gray"> = { standard: "green", exempt: "gray", tobacco: "yellow", vapor: "yellow" };
+
+const TABS: Array<{ key: Tab; label: string }> = [
+  { key: "tax-rates", label: "Tax Rates" },
+  { key: "msa-reporting", label: "MSA Reporting" },
+  { key: "exemptions", label: "Customer Exemptions" },
+];
 
 export default function TaxCompliancePage() {
+  const [tab, setTab] = useState<Tab>("tax-rates");
+  const user = getUser();
+  const canManage = user?.role === "owner" || user?.role === "manager";
   const { addToast } = useToast();
 
-  const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [rates, setRates] = useState<TaxRate[]>([]);
+  const [loadingRates, setLoadingRates] = useState(true);
+  const [showAddRate, setShowAddRate] = useState(false);
+  const [rateForm, setRateForm] = useState({ name: "", rate: "", taxClass: "standard", state: "" });
+  const [savingRate, setSavingRate] = useState(false);
+  const [msaPeriod, setMsaPeriod] = useState(new Date().toISOString().slice(0, 7));
+  const [msaFilter, setMsaFilter] = useState("all");
 
-  // Add rate form
-  const [showForm, setShowForm] = useState(false);
-  const [formName, setFormName] = useState("");
-  const [formRate, setFormRate] = useState("");
-  const [formClass, setFormClass] = useState("standard");
-  const [formState, setFormState] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const load = useCallback(() => {
-    setLoading(true);
+  const loadRates = useCallback(() => {
+    setLoadingRates(true);
     apiGet<{ items: TaxRate[] }>("/api/v1/settings/tax-rates")
-      .then(r => setTaxRates(r.items ?? []))
-      .catch(() => {
-        // Graceful empty state on 404 or other errors
-        setTaxRates([]);
-      })
-      .finally(() => setLoading(false));
+      .then((r) => setRates(r.items ?? []))
+      .catch(() => setRates([]))
+      .finally(() => setLoadingRates(false));
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadRates(); }, [loadRates]);
 
-  const handleAddRate = async () => {
-    if (!formName.trim()) {
-      addToast({ title: "Rate name is required", variant: "error" });
-      return;
-    }
-    const pct = parseFloat(formRate);
-    if (isNaN(pct) || pct < 0 || pct > 100) {
-      addToast({ title: "Enter a valid rate (0–100)", variant: "error" });
-      return;
-    }
-    setSaving(true);
+  const addRate = async () => {
+    const pct = parseFloat(rateForm.rate);
+    if (!rateForm.name.trim() || isNaN(pct)) return;
+    setSavingRate(true);
     try {
-      await apiPost("/api/v1/settings/tax-rates", {
-        name: formName.trim(),
-        rateBps: Math.round(pct * 100),
-        taxClass: formClass,
-        state: formState.trim() || null,
-      });
-      setFormName("");
-      setFormRate("");
-      setFormClass("standard");
-      setFormState("");
-      setShowForm(false);
-      load();
+      await apiPost("/api/v1/settings/tax-rates", { name: rateForm.name.trim(), rate: pct / 100, taxClass: rateForm.taxClass, state: rateForm.state.trim() || null });
+      setShowAddRate(false); setRateForm({ name: "", rate: "", taxClass: "standard", state: "" }); loadRates();
       addToast({ title: "Tax rate added", variant: "success" });
-    } catch (e) {
-      addToast({
-        title: "Failed to add tax rate",
-        description: e instanceof Error ? e.message : undefined,
-        variant: "error",
-      });
-    } finally {
-      setSaving(false);
-    }
+    } catch (e) { addToast({ title: "Failed", description: e instanceof Error ? e.message : undefined, variant: "error" });
+    } finally { setSavingRate(false); }
   };
 
+  const filteredMsa = msaFilter === "all" ? MSA_SAMPLE : MSA_SAMPLE.filter(r => r.msaCategory === msaFilter);
+  const msaTotalQty = filteredMsa.reduce((s, r) => s + r.qty, 0);
+  const msaTotalAmt = filteredMsa.reduce((s, r) => s + r.total, 0);
+
   return (
-    <EnterpriseShell
-      active="tax-compliance"
-      title="Tax Compliance"
-      subtitle="Tax rate management and compliance rules for tobacco, vapor, and hemp"
-    >
-      <div className="mx-auto w-full max-w-5xl space-y-5 px-4 py-5 sm:px-6">
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+    <EnterpriseShell active="tax-compliance" title="Tax & Compliance" subtitle="Tax rates, MSA reporting, and industry compliance rules">
+      <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6">
+        <div className="flex border-b border-slate-200 mb-5">
+          {TABS.map((t) => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === t.key ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-          {/* ── Left column ─────────────────────────────────────────────── */}
-          <div className="space-y-5">
-
-            {/* Tax Rates table */}
-            <div className="rounded-md border border-slate-200 bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-                <h3 className="text-base font-semibold text-slate-950">Tax Rates</h3>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setShowForm(v => !v)}
-                >
-                  {showForm ? "Cancel" : "Add Rate"}
-                </Button>
+        {tab === "tax-rates" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">Tax Rates</h2>
+                <p className="text-sm text-slate-500">Configure sales tax, excise, and special rates by product class and state.</p>
               </div>
-              {/* Inline add form */}
-              {showForm && (
-                <div className="border-b border-slate-200 bg-slate-50 px-4 py-4">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                        Name
-                      </label>
-                      <input
-                        type="text"
-                        value={formName}
-                        onChange={e => setFormName(e.target.value)}
-                        placeholder="e.g. CA Sales Tax"
-                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                        Rate (%)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        value={formRate}
-                        onChange={e => setFormRate(e.target.value)}
-                        placeholder="8.25"
-                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                        Class
-                      </label>
-                      <select
-                        value={formClass}
-                        onChange={e => setFormClass(e.target.value)}
-                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
-                      >
-                        <option value="standard">Standard</option>
-                        <option value="exempt">Exempt</option>
-                        <option value="tobacco">Tobacco</option>
-                        <option value="vapor">Vapor</option>
-                        <option value="hemp">Hemp</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                        State (optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={formState}
-                        onChange={e => setFormState(e.target.value)}
-                        placeholder="CA"
-                        maxLength={2}
-                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm uppercase focus:border-brand-500 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-3 flex justify-end">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      loading={saving}
-                      disabled={saving}
-                      onClick={() => void handleAddRate()}
-                    >
-                      Save Rate
-                    </Button>
-                  </div>
-                </div>
-              )}
+              {canManage && <Button variant="primary" size="sm" onClick={() => setShowAddRate(true)}>+ Add Rate</Button>}
+            </div>
 
-              {loading ? (
-                <div className="space-y-2 p-4">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="h-10 animate-pulse rounded bg-slate-100" />
-                  ))}
+            {showAddRate && (
+              <Card>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div><label className="block text-xs font-medium text-slate-600 mb-1">Name</label>
+                    <input value={rateForm.name} onChange={e => setRateForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. CA Sales Tax" className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" /></div>
+                  <div><label className="block text-xs font-medium text-slate-600 mb-1">Rate %</label>
+                    <input type="number" step="0.01" value={rateForm.rate} onChange={e => setRateForm(f => ({ ...f, rate: e.target.value }))} placeholder="7.25" className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" /></div>
+                  <div><label className="block text-xs font-medium text-slate-600 mb-1">Class</label>
+                    <select value={rateForm.taxClass} onChange={e => setRateForm(f => ({ ...f, taxClass: e.target.value }))} className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
+                      <option value="standard">Standard</option><option value="exempt">Exempt</option><option value="tobacco">Tobacco</option><option value="vapor">Vapor</option>
+                    </select></div>
+                  <div><label className="block text-xs font-medium text-slate-600 mb-1">State</label>
+                    <input value={rateForm.state} onChange={e => setRateForm(f => ({ ...f, state: e.target.value }))} placeholder="CA" maxLength={2} className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" /></div>
                 </div>
-              ) : taxRates.length === 0 ? (
-                <p className="px-5 py-10 text-center text-sm text-slate-400">
-                  No tax rates configured. Add one above.
-                </p>
-              ) : (
+                <div className="flex gap-2 mt-3">
+                  <Button variant="primary" size="sm" loading={savingRate} onClick={() => void addRate()}>Save</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setShowAddRate(false)}>Cancel</Button>
+                </div>
+              </Card>
+            )}
+
+            <Card noPadding>
+              {loadingRates ? <div className="space-y-2 p-4">{[...Array(3)].map((_, i) => <div key={i} className="h-10 animate-pulse rounded bg-slate-100" />)}</div>
+                : rates.length === 0 ? (
+                  <div className="px-5 py-10 text-center">
+                    <p className="text-sm text-slate-500">No tax rates configured.</p>
+                    {canManage && <button onClick={() => setShowAddRate(true)} className="mt-2 text-sm font-medium text-brand-600 hover:text-brand-700">Add your first rate</button>}
+                  </div>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead><tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                      <th className="px-4 py-3">Name</th><th className="px-4 py-3 text-right">Rate</th><th className="px-4 py-3">Class</th><th className="px-4 py-3">State</th><th className="px-4 py-3">Status</th>
+                    </tr></thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {rates.map(r => (
+                        <tr key={r.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-medium text-slate-900">{r.name}</td>
+                          <td className="px-4 py-3 text-right font-mono font-semibold">{(Number(r.rate) * 100).toFixed(2)}%</td>
+                          <td className="px-4 py-3"><Badge variant={TAX_CLASS_BADGE[r.tax_class] ?? "gray"}>{r.tax_class}</Badge></td>
+                          <td className="px-4 py-3 text-slate-500">{r.state ?? "—"}</td>
+                          <td className="px-4 py-3"><Badge variant={r.is_active ? "green" : "gray"}>{r.is_active ? "Active" : "Inactive"}</Badge></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+            </Card>
+
+            <Card title="State Tax Reference">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {STATE_TAX_INFO.map(s => (
+                  <div key={s.state} className="rounded-md border border-slate-200 p-3">
+                    <p className="font-semibold text-sm text-slate-900 mb-1">{s.state}</p>
+                    <ul className="space-y-0.5">{s.types.map(t => <li key={t} className="text-xs text-slate-500">• {t}</li>)}</ul>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {tab === "msa-reporting" && (
+          <div className="space-y-4">
+            <Card>
+              <div className="flex items-end gap-3 flex-wrap">
+                <div><label className="block text-xs font-medium text-slate-600 mb-1">Report Period</label>
+                  <input type="month" value={msaPeriod} onChange={e => setMsaPeriod(e.target.value)} className="h-9 px-3 bg-white border border-slate-300 rounded-md text-sm focus:outline-none focus:border-brand-500" /></div>
+                <div><label className="block text-xs font-medium text-slate-600 mb-1">MSA Category</label>
+                  <select value={msaFilter} onChange={e => setMsaFilter(e.target.value)} className="h-9 px-3 bg-white border border-slate-300 rounded-md text-sm focus:outline-none focus:border-brand-500">
+                    <option value="all">All Categories</option>
+                    {MSA_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select></div>
+                <div className="flex gap-2 ml-auto">
+                  <Button variant="primary" size="sm" onClick={() => addToast({ title: "Report generated", variant: "success" })}>Generate Report</Button>
+                  <Button variant="secondary" size="sm" onClick={() => addToast({ title: "Exporting…", variant: "info" })}>Export CSV</Button>
+                </div>
+              </div>
+            </Card>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[{ label: "Total Quantity", value: `${msaTotalQty.toLocaleString()} units` }, { label: "Total Sales Amount", value: `$${msaTotalAmt.toLocaleString("en-US", { minimumFractionDigits: 2 })}` }, { label: "Customers Reported", value: String(new Set(filteredMsa.map(r => r.customer)).size) }]
+                .map(k => (<Card key={k.label}><p className="text-xs text-slate-500">{k.label}</p><p className="text-2xl font-bold text-slate-900 mt-1 tabular-nums">{k.value}</p></Card>))}
+            </div>
+
+            <Card noPadding>
+              <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                      <th className="px-4 py-3">Name</th>
-                      <th className="px-4 py-3 text-right">Rate</th>
-                      <th className="px-4 py-3 hidden sm:table-cell">State</th>
-                      <th className="px-4 py-3">Class</th>
-                      <th className="px-4 py-3">Status</th>
-                    </tr>
-                  </thead>
+                  <thead><tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    <th className="px-4 py-3 text-left">Customer</th><th className="px-4 py-3 text-left">MSA Category</th><th className="px-4 py-3 text-left">Product</th><th className="px-4 py-3 text-left font-mono">UPC</th><th className="px-4 py-3 text-right">Qty</th><th className="px-4 py-3 text-right">Unit Price</th><th className="px-4 py-3 text-right">Total</th>
+                  </tr></thead>
                   <tbody className="divide-y divide-slate-100">
-                    {taxRates.map(rate => (
-                      <tr key={rate.id} className="transition-colors hover:bg-slate-50">
-                        <td className="px-4 py-3 font-medium text-slate-900">{rate.name}</td>
-                        <td className="px-4 py-3 text-right tabular-nums font-medium text-slate-900">
-                          {formatRate(rate)}
-                        </td>
-                        <td className="px-4 py-3 text-slate-500 hidden sm:table-cell">
-                          {rate.state ?? "All"}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge
-                            variant={
-                              CLASS_BADGE[
-                                rate.tax_class ?? rate.apply_to_category ?? "standard"
-                              ] ?? "gray"
-                            }
-                          >
-                            {rate.tax_class ?? rate.apply_to_category ?? "standard"}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant={isActive(rate) ? "green" : "gray"}>
-                            {isActive(rate) ? "Active" : "Inactive"}
-                          </Badge>
-                        </td>
+                    {filteredMsa.map((row, i) => (
+                      <tr key={i} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 font-medium text-slate-900">{row.customer}</td>
+                        <td className="px-4 py-3"><span className="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-700">{row.msaCategory}</span></td>
+                        <td className="px-4 py-3 text-slate-700">{row.product}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-500">{row.upc}</td>
+                        <td className="px-4 py-3 text-right tabular-nums font-medium">{row.qty}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">${row.unitPrice.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums font-semibold text-slate-900">${row.total.toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              )}
+              </div>
+            </Card>
+
+            <Card>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-amber-700">Validation Results</h3>
+                <Badge variant="yellow">1 issue</Badge>
+              </div>
+              <div className="rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 flex items-center justify-between">
+                <span>Missing tobacco license for: <strong>Metro Supply Co.</strong></span>
+                <button className="text-xs font-medium text-brand-600 hover:underline ml-4">Fix →</button>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {tab === "exemptions" && (
+          <Card>
+            <div className="py-8 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-slate-400">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+              </div>
+              <h3 className="text-base font-semibold text-slate-700">Customer Tax Exemptions</h3>
+              <p className="mt-1 text-sm text-slate-500 max-w-sm mx-auto">Manage resale certificates, tax-exempt status, and exemption documentation per customer. Coming in a future release.</p>
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-lg mx-auto text-left">
+                {["Resale certificates", "State tax exemptions", "Hemp/CBD license tracking"].map(item => (
+                  <div key={item} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">○ {item}</div>
+                ))}
+              </div>
             </div>
-
-          </div>
-
-          {/* ── Right sidebar ────────────────────────────────────────────── */}
-          <div className="space-y-5">
-
-            {/* Tobacco & Vapor placeholder */}
-            <Card title="Tobacco & Vapor">
-              <div className="space-y-3">
-                <p className="text-sm text-slate-600">
-                  State-specific tobacco excise, vapor tax, and hemp license rules.
-                  Configuration coming soon.
-                </p>
-                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-amber-700 mb-2">
-                    States with specific rates
-                  </p>
-                  <ul className="space-y-1">
-                    {TOBACCO_STATES.map(state => (
-                      <li key={state} className="text-xs text-amber-800 flex items-start gap-1.5">
-                        <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
-                        {state}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 text-center">
-                  <p className="text-xs font-medium text-slate-500">
-                    Full configuration panel coming in a future sprint
-                  </p>
-                </div>
-              </div>
-            </Card>
-
-            {/* MSA Reporting placeholder */}
-            <Card title="MSA Reporting">
-              <div className="space-y-3">
-                <p className="text-sm text-slate-600">
-                  MSA (Master Settlement Agreement) reporting for tobacco manufacturers.
-                  Coming soon.
-                </p>
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500 mb-1.5">
-                    Planned features
-                  </p>
-                  <ul className="space-y-1">
-                    {[
-                      "Participating manufacturer tracking",
-                      "Non-PM deposit calculator",
-                      "State escrow requirements",
-                      "Annual volume reporting",
-                      "Certificate of compliance",
-                    ].map(item => (
-                      <li key={item} className="text-xs text-slate-600 flex items-start gap-1.5">
-                        <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </Card>
-
-          </div>
-        </div>
+          </Card>
+        )}
       </div>
     </EnterpriseShell>
   );

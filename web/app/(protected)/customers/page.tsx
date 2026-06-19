@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, invalidateQuery } from "@/lib/useQuery";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
@@ -198,15 +198,14 @@ export default function CustomersPage() {
 
   const { data: customersData, loading, error } =
     useQuery<CustomerView[]>("customers:list", fetchCustomerList, { staleMs: 60_000 });
-  const customers = customersData ?? [];
+  const customers = useMemo(() => customersData ?? [], [customersData]);
 
   // Auto-select first customer when list loads.
-  useMemo(() => {
+  useEffect(() => {
     if (customers.length > 0 && selectedId === null) {
       setSelectedId(customers[0]?.id ?? null);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customers.length]);
+  }, [customers, selectedId]);
 
   const filteredCustomers = useMemo(() => {
     const q = query.trim().toLowerCase();

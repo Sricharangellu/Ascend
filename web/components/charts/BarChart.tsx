@@ -1,5 +1,16 @@
 "use client";
 
+import {
+  ResponsiveContainer,
+  BarChart as RBarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Cell,
+} from "recharts";
+
 export interface BarChartPoint {
   label: string;
   value: number;
@@ -14,20 +25,16 @@ interface BarChartProps {
   showEveryNthLabel?: number;
 }
 
-const PAD = { top: 8, right: 8, bottom: 28, left: 8 };
-
 export function BarChart({
   data,
   height = 160,
-  color = "#3b82f6",
-  formatValue = String,
+  color = "#1B45F4",
+  formatValue = (v) => String(v),
   loading = false,
   showEveryNthLabel = 4,
 }: BarChartProps) {
   if (loading) {
-    return (
-      <div className="animate-pulse rounded bg-slate-100" style={{ height }} />
-    );
+    return <div className="animate-pulse rounded bg-slate-100" style={{ height }} />;
   }
   if (!data.length) {
     return (
@@ -37,53 +44,45 @@ export function BarChart({
     );
   }
 
-  const W = 600;
-  const H = height;
-  const innerW = W - PAD.left - PAD.right;
-  const innerH = H - PAD.top - PAD.bottom;
-
   const maxVal = Math.max(...data.map((d) => d.value), 1);
-  const barW = innerW / data.length;
-  const gap = Math.max(1, barW * 0.15);
+
+  const tickFormatter = (_: unknown, index: number) =>
+    index % showEveryNthLabel === 0 ? data[index]?.label ?? "" : "";
 
   return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      className="w-full"
-      style={{ height }}
-      aria-hidden="true"
-    >
-      {data.map((d, i) => {
-        const barH = (d.value / maxVal) * innerH;
-        const x = PAD.left + i * barW + gap / 2;
-        const y = PAD.top + innerH - barH;
-        const w = barW - gap;
-        return (
-          <g key={i}>
-            <title>{`${d.label}: ${formatValue(d.value)}`}</title>
-            <rect
-              x={x}
-              y={y}
-              width={Math.max(w, 1)}
-              height={Math.max(barH, 1)}
-              rx="2"
-              fill={d.value > 0 ? color : "#e2e8f0"}
-              fillOpacity={d.value > 0 ? 0.85 : 1}
+    <ResponsiveContainer width="100%" height={height}>
+      <RBarChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barCategoryGap="20%">
+        <CartesianGrid strokeDasharray="4 4" stroke="#E5E5E5" vertical={false} />
+        <XAxis
+          dataKey="label"
+          tick={{ fontSize: 10, fill: "#A3A3A3" }}
+          axisLine={false}
+          tickLine={false}
+          tickFormatter={tickFormatter}
+          interval={0}
+        />
+        <YAxis hide />
+        <Tooltip
+          formatter={(v: number) => [formatValue(v), ""]}
+          contentStyle={{
+            backgroundColor: "white",
+            border: "1px solid #E5E5E5",
+            borderRadius: "6px",
+            boxShadow: "0 4px 12px rgba(17,17,17,0.08)",
+            fontSize: "12px",
+          }}
+          labelStyle={{ color: "#111111", fontWeight: 600 }}
+        />
+        <Bar dataKey="value" radius={[2, 2, 0, 0]}>
+          {data.map((entry, index) => (
+            <Cell
+              key={index}
+              fill={entry.value > 0 ? color : "#E5E5E5"}
+              fillOpacity={entry.value === maxVal ? 1 : 0.7}
             />
-            {i % showEveryNthLabel === 0 && (
-              <text
-                x={x + w / 2}
-                y={H - 6}
-                textAnchor="middle"
-                fontSize="10"
-                fill="#94a3b8"
-              >
-                {d.label}
-              </text>
-            )}
-          </g>
-        );
-      })}
-    </svg>
+          ))}
+        </Bar>
+      </RBarChart>
+    </ResponsiveContainer>
   );
 }

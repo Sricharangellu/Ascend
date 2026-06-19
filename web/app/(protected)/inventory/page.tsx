@@ -155,10 +155,13 @@ export default function InventoryPage() {
   // Local override state for optimistic updates after mutations.
   const [productsOverride, setProductsOverride] = useState<CatalogProduct[] | null>(null);
   const [catalogMutationError, setCatalogMutationError] = useState<string | null>(null);
-  const products = productsOverride ?? productsData?.items ?? [];
+  const products = useMemo(
+    () => productsOverride ?? productsData?.items ?? [],
+    [productsData, productsOverride],
+  );
   // Sync override when fresh data arrives (clear stale override).
   useEffect(() => { if (productsData) setProductsOverride(null); }, [productsData]);
-  const categories = categoriesData?.items ?? [];
+  const categories = useMemo(() => categoriesData?.items ?? [], [categoriesData]);
   const catalogLoading = catalogProductsLoading || catalogCategoriesLoading;
   const catalogError = catalogProductsError ?? catalogMutationError;
 

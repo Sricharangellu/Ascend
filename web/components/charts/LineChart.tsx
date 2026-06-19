@@ -1,5 +1,17 @@
 "use client";
 
+import {
+  ResponsiveContainer,
+  LineChart as RLineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Area,
+  ComposedChart,
+} from "recharts";
+
 export interface LineChartPoint {
   label: string;
   value: number;
@@ -14,26 +26,16 @@ interface LineChartProps {
   showDots?: boolean;
 }
 
-const PAD = { top: 12, right: 16, bottom: 32, left: 52 };
-
-function ticks(min: number, max: number, count: number): number[] {
-  if (max === min) return [min];
-  const step = (max - min) / (count - 1);
-  return Array.from({ length: count }, (_, i) => min + i * step);
-}
-
 export function LineChart({
   data,
   height = 220,
-  color = "#3b82f6",
-  formatValue = String,
+  color = "#1B45F4",
+  formatValue = (v) => String(v),
   loading = false,
   showDots = true,
 }: LineChartProps) {
   if (loading) {
-    return (
-      <div className="animate-pulse rounded bg-slate-100" style={{ height }} />
-    );
+    return <div className="animate-pulse rounded bg-slate-100" style={{ height }} />;
   }
   if (!data.length) {
     return (
@@ -43,115 +45,58 @@ export function LineChart({
     );
   }
 
-  const W = 600; // internal viewBox width
-  const H = height;
-  const innerW = W - PAD.left - PAD.right;
-  const innerH = H - PAD.top - PAD.bottom;
-
-  const maxVal = Math.max(...data.map((d) => d.value), 1);
-  const minVal = Math.min(...data.map((d) => d.value), 0);
-
-  const xScale = (i: number) => PAD.left + (i / (data.length - 1 || 1)) * innerW;
-  const yScale = (v: number) => PAD.top + innerH - ((v - minVal) / (maxVal - minVal || 1)) * innerH;
-
-  const points = data.map((d, i) => `${xScale(i)},${yScale(d.value)}`).join(" ");
-  const areaPath = [
-    `M ${xScale(0)},${PAD.top + innerH}`,
-    ...data.map((d, i) => `L ${xScale(i)},${yScale(d.value)}`),
-    `L ${xScale(data.length - 1)},${PAD.top + innerH}`,
-    "Z",
-  ].join(" ");
-
-  const yTickValues = ticks(minVal, maxVal, 4);
-
-  // Show at most 8 x-axis labels to avoid crowding
-  const xLabelEvery = Math.ceil(data.length / 8);
-
-  const fillId = `area-${color.replace("#", "")}`;
+  const chartData = data.map((d) => ({ label: d.label, value: d.value }));
 
   return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      className="w-full"
-      style={{ height }}
-      aria-hidden="true"
-    >
-      <defs>
-        <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.18" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
-
-      {/* Y-axis grid lines + labels */}
-      {yTickValues.map((v, i) => {
-        const y = yScale(v);
-        return (
-          <g key={i}>
-            <line
-              x1={PAD.left}
-              y1={y}
-              x2={PAD.left + innerW}
-              y2={y}
-              stroke="#e2e8f0"
-              strokeWidth="1"
-            />
-            <text
-              x={PAD.left - 6}
-              y={y + 4}
-              textAnchor="end"
-              fontSize="11"
-              fill="#94a3b8"
-            >
-              {formatValue(v)}
-            </text>
-          </g>
-        );
-      })}
-
-      {/* Area fill */}
-      <path d={areaPath} fill={`url(#${fillId})`} />
-
-      {/* Line */}
-      <polyline
-        points={points}
-        fill="none"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-
-      {/* Dots */}
-      {showDots &&
-        data.map((d, i) => (
-          <circle
-            key={i}
-            cx={xScale(i)}
-            cy={yScale(d.value)}
-            r="3"
-            fill="white"
-            stroke={color}
-            strokeWidth="2"
-          />
-        ))}
-
-      {/* X-axis labels */}
-      {data.map((d, i) => {
-        if (i % xLabelEvery !== 0 && i !== data.length - 1) return null;
-        return (
-          <text
-            key={i}
-            x={xScale(i)}
-            y={H - 8}
-            textAnchor="middle"
-            fontSize="11"
-            fill="#94a3b8"
-          >
-            {d.label}
-          </text>
-        );
-      })}
-    </svg>
+    <ResponsiveContainer width="100%" height={height}>
+      <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+        <defs>
+          <linearGradient id={`gradient-${color.replace("#", "")}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor={color} stopOpacity={0.15} />
+            <stop offset="95%" stopColor={color} stopOpacity={0.01} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="4 4" stroke="#E5E5E5" vertical={false} />
+        <XAxis
+          dataKey="label"
+          tick={{ fontSize: 11, fill: "#A3A3A3" }}
+          axisLine={false}
+          tickLine={false}
+          interval="preserveStartEnd"
+        />
+        <YAxis
+          tick={{ fontSize: 11, fill: "#A3A3A3" }}
+          axisLine={false}
+          tickLine={false}
+          tickFormatter={formatValue}
+          width={56}
+        />
+        <Tooltip
+          formatter={(v: number) => [formatValue(v), ""]}
+          contentStyle={{
+            backgroundColor: "white",
+            border: "1px solid #E5E5E5",
+            borderRadius: "6px",
+            boxShadow: "0 4px 12px rgba(17,17,17,0.08)",
+            fontSize: "12px",
+          }}
+          labelStyle={{ color: "#111111", fontWeight: 600 }}
+        />
+        <Area
+          type="monotone"
+          dataKey="value"
+          fill={`url(#gradient-${color.replace("#", "")})`}
+          stroke="none"
+        />
+        <Line
+          type="monotone"
+          dataKey="value"
+          stroke={color}
+          strokeWidth={2}
+          dot={showDots ? { r: 3, fill: "white", strokeWidth: 2, stroke: color } : false}
+          activeDot={{ r: 5, fill: color }}
+        />
+      </ComposedChart>
+    </ResponsiveContainer>
   );
 }

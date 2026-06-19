@@ -1,29 +1,23 @@
 "use client";
 
-/**
- * /imports-exports — File import management and CSV export.
- *
- * Two tabs:
- *  1. Imports — new import form + import history table
- *  2. Exports — export buttons + export history table
- */
-
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
-import { apiGet, apiPost } from "@/api-client/client";
-import { useToast } from "@/components/Toast";
+import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
+import { getAccessToken } from "@/lib/auth";
+import { hasRole } from "@/lib/auth";
 
 interface ImportBatch {
   id: string;
   import_type: string;
-  file_name: string;
-  status: "pending" | "processing" | "completed" | "failed";
+  file_name: string | null;
+  status: string;
   total_rows: number;
   success_rows: number;
   failed_rows: number;
+  error_summary: string | null;
   created_at: number;
   completed_at: number | null;
 }
@@ -31,29 +25,37 @@ interface ImportBatch {
 interface ExportBatch {
   id: string;
   export_type: string;
-  status: "pending" | "processing" | "completed" | "failed";
+  status: string;
   total_rows: number;
   file_url: string | null;
   created_at: number;
+  completed_at: number | null;
 }
 
-const IMPORT_TYPES = [
-  { value: "customers", label: "Customers" },
-  { value: "products", label: "Products" },
-  { value: "vendors", label: "Vendors" },
-  { value: "invoices", label: "Invoices" },
-  { value: "purchase_orders", label: "Purchase Orders" },
-];
+interface CsvPreviewRow {
+  row: number;
+  sku: string;
+  name: string;
+  price: string;
+  category: string;
+  valid: boolean;
+  issue: string | null;
+}
 
-const STATUS_BADGE: Record<string, "yellow" | "blue" | "green" | "red"> = {
-  pending: "yellow",
-  processing: "blue",
-  completed: "green",
-  failed: "red",
-};
+interface ImportResult {
+  created?: number;
+  updated?: number;
+  items?: unknown[];
+}
 
-function fmtDate(ms: number | null): string {
-  if (!ms) return "—";
+const TEMPLATE = [
+  "sku,name,priceCents,category,barcode",
+  "COFFEE-001,House Blend,1299,Coffee,012345678901",
+  "PASTRY-001,Butter Croissant,450,Pastry,012345678902",
+].join("\n");
+
+function fmtDate(ms: number | null) {
+  if (!ms) return "-";
   return new Date(ms).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
@@ -63,347 +65,332 @@ function fmtDate(ms: number | null): string {
 }
 
 export default function ImportsExportsPage() {
-  const { addToast } = useToast();
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const [tab, setTab] = useState<"imports" | "exports">("imports");
-
-  // Imports state
-  const [importBatches, setImportBatches] = useState<ImportBatch[]>([]);
-  const [loadingImports, setLoadingImports] = useState(true);
-  const [importType, setImportType] = useState("customers");
+  const [csv, setCsv] = useState("");
   const [fileName, setFileName] = useState("");
-  const [importing, setImporting] = useState(false);
-
-  // Exports state
+  const [importBatches, setImportBatches] = useState<ImportBatch[]>([]);
   const [exportBatches, setExportBatches] = useState<ExportBatch[]>([]);
-  const [loadingExports, setLoadingExports] = useState(true);
-  const [exporting, setExporting] = useState<string | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const canManage = hasRole("manager");
 
-  const loadImports = useCallback(() => {
-    setLoadingImports(true);
-    apiGet<{ items: ImportBatch[] }>("/api/v1/sync/import-batches")
-      .then(r => setImportBatches(r.items ?? []))
-      .catch(() => addToast({ title: "Failed to load import history", variant: "error" }))
-      .finally(() => setLoadingImports(false));
-  }, [addToast]);
-
-  const loadExports = useCallback(() => {
-    setLoadingExports(true);
-    apiGet<{ items: ExportBatch[] }>("/api/v1/sync/export-batches")
-      .then(r => setExportBatches(r.items ?? []))
-      .catch(() => addToast({ title: "Failed to load export history", variant: "error" }))
-      .finally(() => setLoadingExports(false));
-  }, [addToast]);
+  const loadHistory = useCallback(async () => {
+    try {
+      const [importsRes, exportsRes] = await Promise.all([
+        apiGet<{ items: ImportBatch[] }>("/api/v1/sync/import-batches").catch(() => ({ items: [] as ImportBatch[] })),
+        apiGet<{ items: ExportBatch[] }>("/api/v1/sync/export-batches").catch(() => ({ items: [] as ExportBatch[] })),
+      ]);
+      setImportBatches(importsRes.items ?? []);
+      setExportBatches(exportsRes.items ?? []);
+    } catch {
+      setImportBatches([]);
+      setExportBatches([]);
+    }
+  }, []);
 
   useEffect(() => {
-    loadImports();
-    loadExports();
-  }, [loadImports, loadExports]);
+    void loadHistory();
+  }, [loadHistory]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) setFileName(file.name);
+  const preview = useMemo(() => parsePreview(csv), [csv]);
+  const validRows = preview.filter((row) => row.valid).length;
+  const invalidRows = preview.length - validRows;
+
+  const readFile = async (file: File | undefined) => {
+    if (!file) return;
+    setFileName(file.name);
+    setCsv(await file.text());
+    setResult(null);
+    setError(null);
   };
 
-  const handleImport = async () => {
-    if (!fileName) {
-      addToast({ title: "Please choose a CSV file first", variant: "error" });
-      return;
-    }
-    setImporting(true);
+  const importCatalog = async () => {
+    if (!csv.trim() || invalidRows > 0 || !canManage) return;
+    setBusy(true);
+    setError(null);
+    setResult(null);
     try {
-      await apiPost("/api/v1/sync/import-batches", {
-        importType,
-        fileName,
-      });
-      setFileName("");
-      if (fileRef.current) fileRef.current.value = "";
-      loadImports();
-      addToast({ title: "Import queued successfully", variant: "success" });
-    } catch (e) {
-      addToast({
-        title: "Import failed",
-        description: e instanceof Error ? e.message : undefined,
-        variant: "error",
-      });
+      const response = await apiPost<ImportResult>("/api/v1/catalog/import-csv", { csv });
+      setResult(response);
+      await loadHistory();
+    } catch (err) {
+      setError(err instanceof ApiResponseError ? err.message : "Catalog import failed.");
     } finally {
-      setImporting(false);
+      setBusy(false);
     }
   };
 
-  const handleExport = async (exportType: string, url: string) => {
-    setExporting(exportType);
+  const exportCatalog = async () => {
+    setBusy(true);
+    setError(null);
     try {
-      const token = typeof window !== "undefined"
-        ? (localStorage.getItem("access_token") ?? "")
-        : "";
-      const resp = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
+      const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+      const token = getAccessToken();
+      const response = await fetch(`${base}/api/v1/catalog/export`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
-      if (!resp.ok) throw new Error(`Export failed: ${resp.statusText}`);
-      const blob = await resp.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = objectUrl;
-      a.download = `${exportType}-export-${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(objectUrl);
-      loadExports();
-      addToast({ title: `${exportType} export started`, variant: "success" });
-    } catch (e) {
-      addToast({
-        title: "Export failed",
-        description: e instanceof Error ? e.message : undefined,
-        variant: "error",
-      });
+      if (!response.ok) throw new Error(`Export failed (${response.status})`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "finder-catalog.csv";
+      anchor.click();
+      URL.revokeObjectURL(url);
+      await loadHistory();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Catalog export failed.");
     } finally {
-      setExporting(null);
+      setBusy(false);
     }
+  };
+
+  const downloadTemplate = () => {
+    const blob = new Blob([TEMPLATE], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "finder-catalog-import-template.csv";
+    anchor.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
-    <EnterpriseShell
-      active="imports-exports"
-      title="Imports / Exports"
-      subtitle="Bulk data movement for catalog, customers, vendors, and inventory"
-    >
-      <div className="mx-auto w-full max-w-5xl space-y-5 px-4 py-5 sm:px-6">
+    <EnterpriseShell active="imports-exports" title="Imports/Exports" subtitle="Bulk catalog onboarding, validation, and data packages" contentClassName="overflow-y-auto">
+      <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6">
+        {error && (
+          <div className="rounded-md border border-danger-100 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
+            {error}
+          </div>
+        )}
+        {result && (
+          <div className="rounded-md border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700" role="status">
+            Import completed. Created {result.created ?? 0}, updated {result.updated ?? 0}, processed {result.items?.length ?? validRows} rows.
+          </div>
+        )}
 
-        {/* ── Tab bar ──────────────────────────────────────────────────────── */}
-        <div className="flex gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1" style={{ width: "fit-content" }}>
-          {(["imports", "exports"] as const).map(t => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              className={`rounded-md px-5 py-1.5 text-sm font-medium capitalize transition-colors ${
-                tab === t
-                  ? "bg-white shadow-sm text-slate-900"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
+        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <Metric label="Preview rows" value={preview.length} helper={fileName || "No file selected"} tone="neutral" />
+          <Metric label="Valid rows" value={validRows} helper="Ready to import" tone="success" />
+          <Metric label="Invalid rows" value={invalidRows} helper="Fix before import" tone={invalidRows > 0 ? "danger" : "neutral"} />
+          <Metric label="Import batches" value={importBatches.length} helper="Tracked history" tone="brand" />
+          <Metric label="Export batches" value={exportBatches.length} helper="Generated packages" tone="neutral" />
+        </section>
 
-        {/* ── Imports tab ──────────────────────────────────────────────────── */}
-        {tab === "imports" && (
-          <>
-            <Card title="New Import">
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                      Import Type
-                    </label>
-                    <select
-                      value={importType}
-                      onChange={e => setImportType(e.target.value)}
-                      className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none"
-                    >
-                      {IMPORT_TYPES.map(opt => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                      CSV File
-                    </label>
-                    <div className="flex gap-2">
-                      <div
-                        className="flex flex-1 cursor-pointer items-center gap-2 rounded-md border border-dashed border-slate-300 px-3 py-2.5 text-sm transition-colors hover:border-slate-400"
-                        onClick={() => fileRef.current?.click()}
-                      >
-                        <svg
-                          className="h-4 w-4 shrink-0 text-slate-400"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={1.5}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-                          />
-                        </svg>
-                        <span className={fileName ? "text-slate-800" : "text-slate-400"}>
-                          {fileName || "Choose CSV file"}
-                        </span>
-                      </div>
-                      <input
-                        ref={fileRef}
-                        type="file"
-                        accept=".csv"
-                        className="hidden"
-                        onChange={handleFileChange}
-                      />
-                      <Button
-                        variant="primary"
-                        loading={importing}
-                        disabled={importing}
-                        onClick={() => void handleImport()}
-                      >
-                        Import
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
+          <Card className="overflow-hidden p-0">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+              <div>
+                <h2 className="text-base font-semibold text-slate-950">Catalog CSV Import</h2>
+                <p className="text-sm text-slate-500">Required columns: SKU, name, and numeric priceCents.</p>
               </div>
-            </Card>
+              <label className="inline-flex min-h-[40px] cursor-pointer items-center rounded-md border border-brand-300 bg-white px-4 text-sm font-medium text-brand-700 hover:bg-brand-50">
+                Choose CSV
+                <input type="file" accept=".csv,text/csv" className="sr-only" onChange={(event) => void readFile(event.target.files?.[0])} />
+              </label>
+            </div>
 
-            <Card title="Import History" noPadding>
-              {loadingImports ? (
-                <div className="space-y-2 p-4">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="h-10 animate-pulse rounded bg-slate-100" />
-                  ))}
-                </div>
-              ) : importBatches.length === 0 ? (
-                <p className="px-5 py-10 text-center text-sm text-slate-400">
-                  No imports yet.
-                </p>
-              ) : (
+            <div className="border-b border-slate-200 p-4">
+              <textarea
+                value={csv}
+                onChange={(event) => {
+                  setCsv(event.target.value);
+                  setFileName("Pasted CSV");
+                  setResult(null);
+                }}
+                rows={7}
+                spellCheck={false}
+                placeholder={TEMPLATE}
+                className="w-full resize-y rounded-md border border-slate-300 px-3 py-2 font-mono text-xs leading-5 focus:outline-none focus:ring-2 focus:ring-brand-600"
+              />
+            </div>
+
+            {preview.length === 0 ? (
+              <div className="px-4 py-10 text-center text-sm text-slate-500">Choose a CSV file or paste CSV content to preview rows.</div>
+            ) : (
+              <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                      <th className="px-4 py-3">Type</th>
-                      <th className="px-4 py-3">File</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3 text-right">Rows</th>
-                      <th className="px-4 py-3 hidden md:table-cell">Date</th>
+                  <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3">Row</th>
+                      <th className="px-4 py-3">SKU</th>
+                      <th className="px-4 py-3">Name</th>
+                      <th className="px-4 py-3 text-right">Price cents</th>
+                      <th className="px-4 py-3">Category</th>
+                      <th className="px-4 py-3">Validation</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {importBatches.map(batch => (
-                      <tr key={batch.id} className="transition-colors hover:bg-slate-50">
+                    {preview.slice(0, 50).map((row) => (
+                      <tr key={row.row} className={row.valid ? "hover:bg-slate-50" : "bg-danger-50/50"}>
+                        <td className="px-4 py-3 text-slate-500">{row.row}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-700">{row.sku || "-"}</td>
+                        <td className="px-4 py-3 font-medium text-slate-900">{row.name || "-"}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-slate-700">{row.price || "-"}</td>
+                        <td className="px-4 py-3 text-slate-600">{row.category || "general"}</td>
                         <td className="px-4 py-3">
-                          <span className="capitalize font-medium text-slate-900">
-                            {batch.import_type.replace(/_/g, " ")}
-                          </span>
-                        </td>
-                        <td className="max-w-[160px] truncate px-4 py-3 text-slate-600">
-                          {batch.file_name}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant={STATUS_BADGE[batch.status] ?? "gray"}>
-                            {batch.status}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums text-slate-700">
-                          {batch.success_rows}/{batch.total_rows}
-                          {batch.failed_rows > 0 && (
-                            <span className="ml-1 text-xs text-red-500">
-                              ({batch.failed_rows} failed)
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">
-                          {fmtDate(batch.created_at)}
+                          <Badge variant={row.valid ? "green" : "red"}>{row.valid ? "ready" : row.issue ?? "invalid"}</Badge>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              )}
-            </Card>
-          </>
-        )}
+              </div>
+            )}
 
-        {/* ── Exports tab ──────────────────────────────────────────────────── */}
-        {tab === "exports" && (
-          <>
-            <Card title="Export Data">
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  variant="secondary"
-                  loading={exporting === "products"}
-                  disabled={!!exporting}
-                  onClick={() => void handleExport("products", "/api/v1/catalog/export")}
-                >
-                  Export Products (CSV)
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs text-slate-500">{preview.length > 50 ? `Showing first 50 of ${preview.length} rows` : `${preview.length} rows previewed`}</p>
+              <Button variant="primary" size="sm" loading={busy} disabled={!canManage || preview.length === 0 || invalidRows > 0} onClick={() => void importCatalog()}>
+                Import catalog
+              </Button>
+            </div>
+          </Card>
+
+          <div className="space-y-5">
+            <Card title="Export Center">
+              <div className="space-y-3">
+                <Button variant="primary" size="sm" fullWidth disabled={busy} onClick={() => void exportCatalog()}>
+                  Export catalog CSV
                 </Button>
-                <Button
-                  variant="secondary"
-                  loading={exporting === "customers"}
-                  disabled={!!exporting}
-                  onClick={() => void handleExport("customers", "/api/v1/customers/export")}
-                >
-                  Export Customers (CSV)
+                <Button variant="secondary" size="sm" fullWidth onClick={downloadTemplate}>
+                  Download import template
                 </Button>
               </div>
             </Card>
 
-            <Card title="Export History" noPadding>
-              {loadingExports ? (
-                <div className="space-y-2 p-4">
-                  {[...Array(2)].map((_, i) => (
-                    <div key={i} className="h-10 animate-pulse rounded bg-slate-100" />
-                  ))}
-                </div>
-              ) : exportBatches.length === 0 ? (
-                <p className="px-5 py-10 text-center text-sm text-slate-400">
-                  No exports yet.
-                </p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                      <th className="px-4 py-3">Type</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3 text-right hidden sm:table-cell">Rows</th>
-                      <th className="px-4 py-3 hidden md:table-cell">Date</th>
-                      <th className="px-4 py-3" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {exportBatches.map(batch => (
-                      <tr key={batch.id} className="transition-colors hover:bg-slate-50">
-                        <td className="px-4 py-3">
-                          <span className="capitalize font-medium text-slate-900">
-                            {batch.export_type.replace(/_/g, " ")}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant={STATUS_BADGE[batch.status] ?? "gray"}>
-                            {batch.status}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums text-slate-700 hidden sm:table-cell">
-                          {batch.total_rows.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">
-                          {fmtDate(batch.created_at)}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          {batch.file_url && batch.status === "completed" && (
-                            <a
-                              href={batch.file_url}
-                              download
-                              className="text-xs font-medium text-brand-600 hover:text-brand-700"
-                            >
-                              Download
-                            </a>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+            <Card title="Import Rules">
+              <ul className="space-y-2 text-sm text-slate-600">
+                <li>SKU is the upsert key.</li>
+                <li>Name and priceCents are required.</li>
+                <li>priceCents must be an integer.</li>
+                <li>Category and barcode are optional.</li>
+                <li>Existing SKUs are updated.</li>
+              </ul>
             </Card>
-          </>
-        )}
+          </div>
+        </section>
 
+        <section className="grid gap-5 lg:grid-cols-2">
+          <BatchCard title="Import History" empty="No tracked import batches.">
+            {importBatches.slice(0, 10).map((batch) => (
+              <BatchItem
+                key={batch.id}
+                title={`${batch.import_type} · ${batch.file_name ?? batch.id}`}
+                subtitle={`${batch.success_rows}/${batch.total_rows} successful · ${batch.failed_rows} failed`}
+                status={batch.status}
+                date={batch.completed_at ?? batch.created_at}
+              />
+            ))}
+          </BatchCard>
+          <BatchCard title="Export History" empty="No tracked export batches.">
+            {exportBatches.slice(0, 10).map((batch) => (
+              <BatchItem
+                key={batch.id}
+                title={`${batch.export_type} · ${batch.total_rows} rows`}
+                subtitle={batch.file_url ?? "No file URL recorded"}
+                status={batch.status}
+                date={batch.completed_at ?? batch.created_at}
+              />
+            ))}
+          </BatchCard>
+        </section>
       </div>
     </EnterpriseShell>
+  );
+}
+
+function parsePreview(csv: string): CsvPreviewRow[] {
+  const lines = csv.split(/\r?\n/).filter((line) => line.trim());
+  if (lines.length < 2) return [];
+  const headers = splitCsvLine(lines[0]!).map((value) => value.trim());
+  const index = (names: string[]) => headers.findIndex((header) => names.includes(header));
+  const skuIndex = index(["sku"]);
+  const nameIndex = index(["name"]);
+  const priceIndex = index(["priceCents", "price_cents"]);
+  const categoryIndex = index(["category"]);
+
+  return lines.slice(1).map((line, rowIndex) => {
+    const values = splitCsvLine(line);
+    const sku = skuIndex >= 0 ? values[skuIndex]?.trim() ?? "" : "";
+    const name = nameIndex >= 0 ? values[nameIndex]?.trim() ?? "" : "";
+    const price = priceIndex >= 0 ? values[priceIndex]?.trim() ?? "" : "";
+    const category = categoryIndex >= 0 ? values[categoryIndex]?.trim() ?? "" : "";
+    let issue: string | null = null;
+    if (skuIndex < 0 || nameIndex < 0 || priceIndex < 0) issue = "missing columns";
+    else if (!sku) issue = "missing SKU";
+    else if (!name) issue = "missing name";
+    else if (!/^\d+$/.test(price)) issue = "invalid price";
+    return { row: rowIndex + 2, sku, name, price, category, valid: issue === null, issue };
+  });
+}
+
+function splitCsvLine(line: string) {
+  const values: string[] = [];
+  let current = "";
+  let quoted = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    if (char === '"') {
+      if (quoted && line[i + 1] === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (char === "," && !quoted) {
+      values.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  values.push(current);
+  return values;
+}
+
+function Metric({
+  label,
+  value,
+  helper,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  helper: string;
+  tone: "neutral" | "success" | "brand" | "danger";
+}) {
+  const toneClass = {
+    neutral: "border-slate-200 bg-white",
+    success: "border-success-200 bg-success-50",
+    brand: "border-brand-200 bg-brand-50",
+    danger: "border-danger-200 bg-danger-50",
+  }[tone];
+  return (
+    <div className={`rounded-md border p-4 shadow-sm ${toneClass}`}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
+      <p className="mt-1 text-xl font-semibold tabular-nums text-slate-950">{value}</p>
+      <p className="mt-1 truncate text-xs text-slate-500">{helper}</p>
+    </div>
+  );
+}
+
+function BatchCard({ title, empty, children }: { title: string; empty: string; children: React.ReactNode[] }) {
+  return (
+    <Card title={title} noPadding>
+      {children.length === 0 ? <p className="px-5 py-4 text-sm text-slate-500">{empty}</p> : <div className="divide-y divide-slate-100">{children}</div>}
+    </Card>
+  );
+}
+
+function BatchItem({ title, subtitle, status, date }: { title: string; subtitle: string; status: string; date: number }) {
+  const variant = status === "completed" || status === "success" ? "green" : status === "failed" ? "red" : "yellow";
+  return (
+    <div className="flex items-start justify-between gap-3 px-5 py-3">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-slate-950">{title}</p>
+        <p className="mt-1 truncate text-xs text-slate-500">{subtitle} · {fmtDate(date)}</p>
+      </div>
+      <Badge variant={variant}>{status}</Badge>
+    </div>
   );
 }
