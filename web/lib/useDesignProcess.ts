@@ -1,7 +1,8 @@
 "use client";
 
 import { useReducer, useCallback, useMemo } from "react";
-import { v7 as uuidv7 } from "uuid";
+
+const uuidv7 = () => crypto.randomUUID();
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
