@@ -112,6 +112,81 @@ export const ADD_CUSTOM_ROLE_TO_USERS = `
 ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_role_id TEXT REFERENCES custom_roles(id) ON DELETE SET NULL;
 `;
 
+export const CREATE_LOGIN_EVENTS_TABLE = `
+CREATE TABLE IF NOT EXISTS login_events (
+  id             TEXT PRIMARY KEY,
+  tenant_id      TEXT,
+  user_id        TEXT,
+  email          TEXT NOT NULL,
+  success        BOOLEAN NOT NULL,
+  failure_reason TEXT,
+  ip_address     TEXT,
+  user_agent     TEXT,
+  created_at     BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS login_events_tenant_idx ON login_events (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS login_events_user_idx ON login_events (user_id, created_at DESC) WHERE user_id IS NOT NULL;
+`;
+
+export const CREATE_DEVICES_TABLE = `
+CREATE TABLE IF NOT EXISTS devices (
+  id                TEXT PRIMARY KEY,
+  tenant_id         TEXT NOT NULL,
+  outlet_id         TEXT,
+  register_id       TEXT,
+  device_name       TEXT NOT NULL,
+  device_type       TEXT NOT NULL DEFAULT 'pos_terminal',
+  device_identifier TEXT,
+  app_version       TEXT,
+  trusted           BOOLEAN NOT NULL DEFAULT false,
+  last_seen_at      BIGINT,
+  status            TEXT NOT NULL DEFAULT 'active',
+  created_at        BIGINT NOT NULL,
+  updated_at        BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS devices_tenant_idx ON devices (tenant_id, status);
+`;
+
+export const CREATE_AUDIT_ENHANCEMENT_TABLES = `
+CREATE TABLE IF NOT EXISTS entity_change_logs (
+  id          TEXT PRIMARY KEY,
+  tenant_id   TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  entity_id   TEXT NOT NULL,
+  change_type TEXT NOT NULL,
+  old_values  TEXT,
+  new_values  TEXT,
+  changed_by  TEXT,
+  changed_at  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS entity_change_logs_entity_idx ON entity_change_logs (tenant_id, entity_type, entity_id, changed_at DESC);
+
+CREATE TABLE IF NOT EXISTS price_change_logs (
+  id          TEXT PRIMARY KEY,
+  tenant_id   TEXT NOT NULL,
+  product_id  TEXT NOT NULL,
+  old_price   BIGINT,
+  new_price   BIGINT,
+  price_type  TEXT NOT NULL DEFAULT 'retail',
+  changed_by  TEXT,
+  changed_at  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS price_change_logs_product_idx ON price_change_logs (tenant_id, product_id, changed_at DESC);
+
+CREATE TABLE IF NOT EXISTS security_events (
+  id          TEXT PRIMARY KEY,
+  tenant_id   TEXT,
+  user_id     TEXT,
+  event_type  TEXT NOT NULL,
+  severity    TEXT NOT NULL DEFAULT 'info',
+  ip_address  TEXT,
+  user_agent  TEXT,
+  details     TEXT,
+  created_at  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS security_events_tenant_idx ON security_events (tenant_id, created_at DESC) WHERE tenant_id IS NOT NULL;
+`;
+
 export const IDENTITY_MIGRATIONS = [
   CREATE_TENANTS_TABLE,
   CREATE_USERS_TABLE,
@@ -122,4 +197,7 @@ export const IDENTITY_MIGRATIONS = [
   CREATE_REFRESH_TOKENS_TABLE,
   CREATE_CUSTOM_ROLES_TABLE,
   ADD_CUSTOM_ROLE_TO_USERS,
+  CREATE_LOGIN_EVENTS_TABLE,
+  CREATE_DEVICES_TABLE,
+  CREATE_AUDIT_ENHANCEMENT_TABLES,
 ];
