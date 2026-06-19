@@ -1,5 +1,6 @@
 import express, { Router, type Express } from "express";
 import { createHash } from "node:crypto";
+import helmet from "helmet";
 import { openDb, type DB } from "./shared/db.js";
 import { EventBus } from "./shared/events.js";
 import { errorMiddleware } from "./shared/http.js";
@@ -42,6 +43,16 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   const events = new EventBus();
   const app = express();
   app.use(express.json());
+  app.use(helmet({
+    contentSecurityPolicy: false, // disabled — API-only server, no HTML served
+    crossOriginEmbedderPolicy: false,
+  }));
+  app.use((_req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    next();
+  });
 
   await db.exec(`CREATE SCHEMA IF NOT EXISTS "${schema}"`);
 
