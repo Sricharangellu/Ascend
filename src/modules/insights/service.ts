@@ -352,4 +352,61 @@ export class InsightsService {
       belowReorderPoint: r.current_stock <= r.reorder_point,
     }));
   }
+
+  // ── Auto-create draft POs from reorder recommendations ──────────────────────
+
+  /**
+   * Groups all below-reorder-point products by preferred_vendor_id and creates
+   * one draft PO per vendor group. Returns the list of created PO IDs.
+   * Products with no preferred vendor go into a single "unassigned" PO.
+   */
+  async createReorderPOs(tenantId: string, createdBy: string): Promise<{ created: number; pos: Array<{ id: string; supplierId: string | null; lineCount: number }> }> {
+    const recs = await this.reorderRecommendations(tenantId, 90);
+    const belowPoint = recs.filter((r) => r.belowReorderPoint && (r.reorderQuantity ?? 0) > 0);
+    if (belowPoint.length === 0) return { created: 0, pos: [] };
+
+    // Group by supplierId (null = unassigned)
+    const groups = new Map<string | null, typeof belowPoint>();
+    for (const rec of belowPoint) {
+      const key = rec.supplierId ?? null;
+      const list = groups.get(key) ?? [];
+      list.push(rec);
+      groups.set(key, list);
+    }
+
+    const now = Date.now();
+    const result: Array<{ id: string; supplierId: string | null; lineCount: number }> = [];
+
+    for (const [supplierId, lines] of groups) {
+      const poId = uuidv7();
+      const poNumber = `AUTO-${now.toString(36).toUpperCase().slice(-6)}`;
+
+      // Fetch supplier name if available
+      let supplierName = "Unassigned";
+      if (supplierId) {
+        const s = await this.db.one<{ name: string }>("SELECT name FROM suppliers WHERE id = @id AND tenant_id = @t", { id: supplierId, t: tenantId });
+        if (s) supplierName = s.name;
+      }
+
+      await this.db.query(
+        `INSERT INTO purchase_orders (id, tenant_id, po_number, supplier_id, supplier_name, status, notes, created_by, expected_date, created_at, updated_at)
+         VALUES (@id, @t, @num, @sid, @sname, 'draft', @notes, @by, @exp, @now, @now)`,
+        { id: poId, t: tenantId, num: poNumber, sid: supplierId, sname: supplierName, notes: "Auto-generated from reorder recommendations", by: createdBy, exp: now + 14 * 86_400_000, now },
+      );
+
+      for (const line of lines) {
+        const lineId = uuidv7();
+        const qty = line.reorderQuantity ?? Math.max(1, line.reorderPoint - line.currentStock);
+        await this.db.query(
+          `INSERT INTO po_lines (id, tenant_id, po_id, product_id, sku, name, ordered_qty, received_qty, unit_cost_cents, line_cost_cents, status)
+           VALUES (@id, @t, @po, @pid, @sku, @name, @qty, 0, 0, 0, 'pending')`,
+          { id: lineId, t: tenantId, po: poId, pid: line.productId, sku: line.sku, name: line.name, qty },
+        );
+      }
+
+      result.push({ id: poId, supplierId, lineCount: lines.length });
+    }
+
+    return { created: result.length, pos: result };
+  }
 }

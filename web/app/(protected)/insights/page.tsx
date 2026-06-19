@@ -313,6 +313,24 @@ function ForecastingTab() {
   const [reorder, setReorder] = useState<ReorderRec[]>([]);
   const [topSellers, setTopSellers] = useState<OrderRec[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creatingPOs, setCreatingPOs] = useState(false);
+  const { addToast } = useToast();
+
+  const handleCreateReorderPOs = useCallback(async () => {
+    setCreatingPOs(true);
+    try {
+      const result = await apiPost<{ created: number; pos: Array<{ id: string; supplierId: string | null; lineCount: number }> }>(
+        "/api/v1/insights/create-reorder-pos", {},
+      );
+      if (result.created === 0) {
+        addToast({ title: "No POs needed", description: "All products above reorder point", variant: "info" });
+      } else {
+        addToast({ title: `${result.created} draft PO${result.created > 1 ? "s" : ""} created`, description: `Go to Purchasing to review`, variant: "success" });
+      }
+    } catch (e) {
+      addToast({ title: "Failed to create POs", description: e instanceof Error ? e.message : undefined, variant: "error" });
+    } finally { setCreatingPOs(false); }
+  }, [addToast]);
 
   useEffect(() => {
     let cancelled = false;
@@ -336,11 +354,18 @@ function ForecastingTab() {
     <div className="space-y-6">
       {/* Reorder recommendations */}
       <Card className="overflow-hidden p-0">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="text-base font-semibold text-slate-950">Reorder recommendations</h2>
-          <p className="text-sm text-slate-500">
-            Products at or below reorder point, or projected to run out before lead time.
-          </p>
+        <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3">
+          <div>
+            <h2 className="text-base font-semibold text-slate-950">Reorder recommendations</h2>
+            <p className="text-sm text-slate-500">
+              Products at or below reorder point, or projected to run out before lead time.
+            </p>
+          </div>
+          {reorder.some(r => r.belowReorderPoint) && (
+            <Button variant="primary" size="sm" loading={creatingPOs} onClick={() => void handleCreateReorderPOs()}>
+              Create Draft POs
+            </Button>
+          )}
         </div>
         {reorder.length === 0 ? (
           <div className="px-4 py-10 text-center">

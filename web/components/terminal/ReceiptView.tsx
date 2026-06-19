@@ -232,12 +232,18 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
             New Sale
           </Button>
 
-          {/* Email receipt */}
-          {!showEmailInput ? (
+          {/* Print + Email row */}
+          <div className={`flex gap-2${showEmailInput ? " hidden" : ""}`}>
+            <Button variant="ghost" size="sm" fullWidth onClick={() => window.print()}>
+              Print Receipt
+            </Button>
             <Button variant="ghost" size="sm" fullWidth onClick={() => setShowEmailInput(true)}>
               Email Receipt
             </Button>
-          ) : (
+          </div>
+
+          {/* Email receipt inline form */}
+          {showEmailInput && (
             <div className="flex gap-2">
               <input
                 type="email"
@@ -248,12 +254,11 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
                 autoFocus
                 className="flex-1 min-w-0 rounded border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
               />
-              <Button variant="primary" size="sm" loading={sendingEmail} disabled={!emailAddr.trim() || sendingEmail} onClick={() => void handleSendEmail()}>
-                Send
-              </Button>
+              <Button variant="primary" size="sm" loading={sendingEmail} disabled={!emailAddr.trim() || sendingEmail} onClick={() => void handleSendEmail()}>Send</Button>
               <Button variant="ghost" size="sm" onClick={() => { setShowEmailInput(false); setEmailAddr(""); }}>✕</Button>
             </div>
           )}
+
 
           {(canRefund || canVoid) && (
             <div className="flex gap-2">

@@ -17,6 +17,8 @@ import {
 } from "./gateway/index.js";
 import { handler } from "./shared/http.js";
 import { bootstrapOrchestration } from "./orchestration/index.js";
+import { SseBroker } from "./shared/sse.js";
+import type { AuthPayload } from "./gateway/auth.js";
 
 export interface App {
   express: Express;
@@ -166,6 +168,37 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
 
   // ── Orchestration layer (workflows, sagas, command handlers, background jobs)
   bootstrapOrchestration(db, events);
+
+  // ── Server-Sent Events stream — GET /api/v1/stream
+  const sseBroker = new SseBroker();
+
+  // Forward relevant domain events to the SSE broker.
+  events.on("order.created", (e) => {
+    const p = e.payload as { tenantId?: string; orderNumber?: string; totalCents?: number };
+    if (p.tenantId) sseBroker.broadcast(p.tenantId, { type: "order_created", data: { orderNumber: p.orderNumber, totalCents: p.totalCents } });
+  });
+  events.on("payment.captured", (e) => {
+    const p = e.payload as { tenantId?: string; orderId?: string; amountCents?: number };
+    if (p.tenantId) sseBroker.broadcast(p.tenantId, { type: "payment_captured", data: { orderId: p.orderId, amountCents: p.amountCents } });
+  });
+  events.on("inventory.adjusted", async (e) => {
+    const p = e.payload as { tenantId?: string; productId?: string; newQty?: number; reorderPt?: number; name?: string };
+    if (p.tenantId && p.newQty !== undefined && p.reorderPt !== undefined && p.reorderPt > 0 && p.newQty <= p.reorderPt) {
+      sseBroker.broadcast(p.tenantId, { type: "low_stock", data: { productId: p.productId, name: p.name, currentStock: p.newQty, reorderPoint: p.reorderPt } });
+    }
+  });
+  events.on("loyalty.tier_upgraded", (e) => {
+    const p = e.payload as { tenantId?: string; customerId?: string; tierName?: string };
+    if (p.tenantId) sseBroker.broadcast(p.tenantId, { type: "tier_upgraded", data: { customerId: p.customerId, tierName: p.tierName } });
+  });
+
+  app.get("/api/v1/stream", (req, res) => {
+    const auth = res.locals["auth"] as AuthPayload | undefined;
+    if (!auth?.tenantId) { res.status(401).end(); return; }
+    sseBroker.connect(auth.tenantId, res);
+    // Keep the connection open — cleanup handled by the broker on 'close' event.
+    req.on("close", () => { /* broker handles it */ });
+  });
 
   // ── Error handling (errorEnvelope must be last)
   app.use(errorMiddleware);

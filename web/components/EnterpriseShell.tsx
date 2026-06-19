@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { clsx } from "clsx";
 import { Button } from "@/components/Button";
 import { CommandPalette } from "@/components/CommandPalette";
+import { NotificationBell } from "@/components/NotificationBell";
 import { apiGet } from "@/api-client/client";
 import type { OutletsResponse } from "@/api-client/types";
 import { useAuth } from "@/lib/useAuth";
@@ -147,6 +148,7 @@ export function EnterpriseShell({
                 <kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] text-slate-400">⌘K</kbd>
               </button>
               <StoreSwitcher />
+              <NotificationBell />
               <DeviceStatus isOffline={isOffline} />
               {user && <UserContext name={user.name} role={user.role} />}
               <Button variant="ghost" size="sm" onClick={() => void logout()}>

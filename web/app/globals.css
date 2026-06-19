@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Print receipt ────────────────────────────────────────────────────────── */
+@media print {
+  /* Hide everything except the receipt modal content */
+  body > * { display: none !important; }
+  [role="dialog"] { display: block !important; position: static !important; width: 80mm !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; }
+  [role="dialog"] > .fixed,
+  [role="dialog"] [aria-hidden="true"],
+  [role="dialog"] [aria-label="Close tender screen"] { display: none !important; }
+  /* Strip backgrounds, show borders cleanly */
+  * { background: white !important; color: black !important; box-shadow: none !important; }
+  /* Ensure the receipt content fills the page */
+  @page { size: 80mm auto; margin: 4mm; }
+}
+
 /* ─────────────────────────────────────────────────────
    Base resets and WCAG-friendly defaults
 ───────────────────────────────────────────────────── */

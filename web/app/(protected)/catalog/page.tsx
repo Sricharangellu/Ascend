@@ -56,12 +56,12 @@ function emptyForm(): ProductFormState {
 function productToForm(p: Product): ProductFormState {
   return {
     name: p.name, sku: p.sku,
-    price_cents: String(p.price_cents),
+    price_cents: (p.price_cents / 100).toFixed(2),
     category: p.category, barcode: p.barcode ?? "",
     tax_class: p.tax_class, status: p.status,
     brand: p.brand ?? "", description: p.description ?? "",
-    msrp_cents: p.msrp_cents != null ? String(p.msrp_cents) : "",
-    raw_cost_price_cents: p.raw_cost_price_cents != null ? String(p.raw_cost_price_cents) : "",
+    msrp_cents: p.msrp_cents != null ? (p.msrp_cents / 100).toFixed(2) : "",
+    raw_cost_price_cents: p.raw_cost_price_cents != null ? (p.raw_cost_price_cents / 100).toFixed(2) : "",
     age_restricted: p.age_restricted === 1,
     track_inventory: p.track_inventory === 1,
   };
@@ -119,13 +119,13 @@ function ProductFormModal({
     }
   };
 
-  const inputCls = "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const inputCls = "w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-600";
   const labelCls = "mb-1 block text-sm font-medium text-slate-700";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-2xl rounded-xl bg-white shadow-xl flex flex-col max-h-[90vh]"
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-md bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -133,7 +133,7 @@ function ProductFormModal({
           <h2 className="text-base font-semibold text-slate-950">
             {initial ? "Edit product" : "New product"}
           </h2>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+          <button type="button" onClick={onClose} aria-label="Close product form" className="flex h-9 w-9 items-center justify-center rounded-md text-xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-600">&times;</button>
         </div>
 
         {/* Body */}
@@ -214,11 +214,11 @@ function ProductFormModal({
 
             <div className="sm:col-span-2 flex flex-wrap gap-5">
               <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" checked={form.age_restricted} onChange={(e) => set("age_restricted", e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-600" />
+                <input type="checkbox" checked={form.age_restricted} onChange={(e) => set("age_restricted", e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-brand-600" />
                 Age restricted
               </label>
               <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" checked={form.track_inventory} onChange={(e) => set("track_inventory", e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-600" />
+                <input type="checkbox" checked={form.track_inventory} onChange={(e) => set("track_inventory", e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-brand-600" />
                 Track inventory
               </label>
             </div>
@@ -227,9 +227,9 @@ function ProductFormModal({
 
         {/* Footer */}
         <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
-          <button type="submit" form="product-form" disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60">
-            {saving ? "Saving…" : initial ? "Save changes" : "Create product"}
+          <button type="button" onClick={onClose} className="min-h-[40px] rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+          <button type="submit" form="product-form" disabled={saving} className="min-h-[40px] rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60">
+            {saving ? "Saving..." : initial ? "Save changes" : "Create product"}
           </button>
         </div>
       </div>
@@ -255,6 +255,17 @@ function ProductsTab({ categories }: { categories: Category[] }) {
   const [archiveTarget, setArchiveTarget] = useState<Product | null>(null);
   const [archiving, setArchiving]   = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const activeCount = products.filter((p) => p.status === "active").length;
+  const draftCount = products.filter((p) => p.status === "draft").length;
+  const archivedCount = products.filter((p) => p.status === "archived").length;
+  const restrictedCount = products.filter((p) => p.age_restricted === 1).length;
+  const hasFilters = Boolean(filterStatus || filterCategory || debouncedQ);
+  const clearFilters = () => {
+    setFilterStatus("");
+    setFilterCategory("");
+    setSearch("");
+    setDebouncedQ("");
+  };
 
   // Debounce search
   useEffect(() => {
@@ -309,39 +320,54 @@ function ProductsTab({ categories }: { categories: Category[] }) {
   return (
     <>
       <Card className="overflow-hidden p-0">
+        <div className="grid gap-px border-b border-slate-200 bg-slate-200 sm:grid-cols-4">
+          <CatalogMetric label="Visible products" value={products.length} helper={`${total} total`} />
+          <CatalogMetric label="Active" value={activeCount} helper={`${draftCount} draft`} />
+          <CatalogMetric label="Archived" value={archivedCount} helper="Hidden from sale" />
+          <CatalogMetric label="Age restricted" value={restrictedCount} helper="ID check needed" />
+        </div>
+
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 px-4 py-3">
-          <div className="flex-1 min-w-[160px]">
+        <div className="grid gap-3 border-b border-slate-200 px-4 py-3 lg:grid-cols-[minmax(220px,1fr)_auto_auto_auto]">
+          <div className="min-w-0">
+            <label htmlFor="catalog-search" className="sr-only">Search products</label>
             <input
+              id="catalog-search"
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name, SKU, barcode…"
-              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="min-h-[40px] w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
             />
           </div>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">All statuses</option>
-            <option value="active">Active</option>
-            <option value="draft">Draft</option>
-            <option value="archived">Archived</option>
-          </select>
-          <select
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-            className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">All categories</option>
-            {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
-          </select>
+          <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-500 sm:min-w-[150px]">
+            Status
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="min-h-[40px] rounded-md border border-slate-200 px-2 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-600"
+            >
+              <option value="">All statuses</option>
+              <option value="active">Active</option>
+              <option value="draft">Draft</option>
+              <option value="archived">Archived</option>
+            </select>
+          </label>
+          <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-500 sm:min-w-[180px]">
+            Category
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="min-h-[40px] rounded-md border border-slate-200 px-2 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-600"
+            >
+              <option value="">All categories</option>
+              {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+            </select>
+          </label>
           <button
             type="button"
             onClick={() => { setShowCreate(true); setActionError(null); }}
-            className="ml-auto rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+            className="min-h-[40px] rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
           >
             + New product
           </button>
@@ -364,15 +390,15 @@ function ProductsTab({ categories }: { categories: Category[] }) {
         ) : products.length === 0 ? (
           <div className="px-4 py-12 text-center">
             <p className="text-sm text-slate-500">No products found.</p>
-            {(filterStatus || filterCategory || debouncedQ) && (
-              <button type="button" onClick={() => { setFilterStatus(""); setFilterCategory(""); setSearch(""); }} className="mt-2 text-xs text-blue-600 hover:underline">
+            {hasFilters && (
+              <button type="button" onClick={clearFilters} className="mt-2 text-xs text-brand-600 hover:underline">
                 Clear filters
               </button>
             )}
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
@@ -413,7 +439,7 @@ function ProductsTab({ categories }: { categories: Category[] }) {
                           <button
                             type="button"
                             onClick={() => { setEditTarget(p); setActionError(null); }}
-                            className="rounded border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                            className="min-h-[32px] rounded-md border border-slate-200 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
                           >
                             Edit
                           </button>
@@ -421,7 +447,7 @@ function ProductsTab({ categories }: { categories: Category[] }) {
                             <button
                               type="button"
                               onClick={() => { setArchiveTarget(p); setActionError(null); }}
-                              className="rounded border border-slate-200 px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
+                              className="min-h-[32px] rounded-md border border-slate-200 px-3 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
                             >
                               Archive
                             </button>
@@ -433,8 +459,23 @@ function ProductsTab({ categories }: { categories: Category[] }) {
                 </tbody>
               </table>
             </div>
-            <div className="border-t border-slate-200 px-4 py-2 text-xs text-slate-400">
-              Showing {products.length} of {total} products
+            <div className="divide-y divide-slate-100 md:hidden">
+              {products.map((p) => (
+                <ProductListCard
+                  key={p.id}
+                  product={p}
+                  onEdit={() => { setEditTarget(p); setActionError(null); }}
+                  onArchive={() => { setArchiveTarget(p); setActionError(null); }}
+                />
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-4 py-3 text-xs text-slate-500">
+              <span>Showing {products.length} of {total} products</span>
+              {hasFilters && (
+                <button type="button" onClick={clearFilters} className="font-medium text-brand-600 hover:underline">
+                  Clear filters
+                </button>
+              )}
             </div>
           </>
         )}
@@ -474,6 +515,68 @@ function ProductsTab({ categories }: { categories: Category[] }) {
         </div>
       )}
     </>
+  );
+}
+
+function CatalogMetric({
+  label,
+  value,
+  helper,
+}: {
+  label: string;
+  value: number;
+  helper: string;
+}) {
+  return (
+    <div className="bg-white px-4 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
+      <div className="mt-1 flex items-baseline gap-2">
+        <span className="text-xl font-semibold tabular-nums text-slate-950">{value}</span>
+        <span className="text-xs text-slate-500">{helper}</span>
+      </div>
+    </div>
+  );
+}
+
+function ProductListCard({
+  product,
+  onEdit,
+  onArchive,
+}: {
+  product: Product;
+  onEdit: () => void;
+  onArchive: () => void;
+}) {
+  return (
+    <article className="space-y-3 bg-white px-4 py-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="truncate text-sm font-semibold text-slate-950">{product.name}</h3>
+          <p className="mt-1 font-mono text-xs text-slate-500">{product.sku}</p>
+        </div>
+        <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-950">
+          {centsToDisplay(product.price_cents)}
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant={statusBadge(product.status)}>{product.status.charAt(0).toUpperCase() + product.status.slice(1)}</Badge>
+        <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{product.category}</span>
+        {product.brand && <span className="text-xs text-slate-500">{product.brand}</span>}
+        {product.age_restricted === 1 && (
+          <span className="rounded-md bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700 ring-1 ring-orange-200">18+</span>
+        )}
+      </div>
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onEdit} className="min-h-[36px] rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-700 hover:bg-slate-100">
+          Edit
+        </button>
+        {product.status !== "archived" && (
+          <button type="button" onClick={onArchive} className="min-h-[36px] rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-500 hover:bg-slate-100">
+            Archive
+          </button>
+        )}
+      </div>
+    </article>
   );
 }
 
@@ -580,13 +683,13 @@ function CategoriesTab() {
                       type="text"
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="min-h-[40px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
                       autoFocus
                     />
-                    <button type="button" onClick={handleEditSave} disabled={editSaving} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-60">
-                      {editSaving ? "…" : "Save"}
+                    <button type="button" onClick={handleEditSave} disabled={editSaving} className="min-h-[40px] rounded-md bg-brand-600 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-60">
+                      {editSaving ? "..." : "Save"}
                     </button>
-                    <button type="button" onClick={() => setEditTarget(null)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100">
+                    <button type="button" onClick={() => setEditTarget(null)} className="min-h-[40px] rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100">
                       Cancel
                     </button>
                   </div>
@@ -594,8 +697,8 @@ function CategoriesTab() {
                   <>
                     <span className="text-sm font-medium text-slate-950">{c.name}</span>
                     <div className="flex shrink-0 gap-2">
-                      <button type="button" onClick={() => startEdit(c)} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100">Edit</button>
-                      <button type="button" onClick={() => { setDeleteTarget(c); setActionError(null); }} className="rounded border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50">Delete</button>
+                      <button type="button" onClick={() => startEdit(c)} className="min-h-[32px] rounded-md border border-slate-200 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100">Edit</button>
+                      <button type="button" onClick={() => { setDeleteTarget(c); setActionError(null); }} className="min-h-[32px] rounded-md border border-red-200 px-3 py-1 text-xs text-red-600 hover:bg-red-50">Delete</button>
                     </div>
                   </>
                 )}
@@ -610,11 +713,11 @@ function CategoriesTab() {
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="New category name…"
-            className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="New category name..."
+            className="min-h-[40px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
           />
-          <button type="submit" disabled={creating || !newName.trim()} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60">
-            {creating ? "Adding…" : "Add"}
+          <button type="submit" disabled={creating || !newName.trim()} className="min-h-[40px] rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60">
+            {creating ? "Adding..." : "Add"}
           </button>
         </form>
         {createError && <p className="px-4 pb-2 text-xs text-red-700">{createError}</p>}
@@ -623,16 +726,16 @@ function CategoriesTab() {
       {/* Delete confirm */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDeleteTarget(null)}>
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-sm rounded-md bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-base font-semibold text-slate-950">Delete &ldquo;{deleteTarget.name}&rdquo;?</h2>
             <p className="mt-2 text-sm text-slate-600">
               Deleting a category won&apos;t remove products, but they will no longer be grouped under this category.
             </p>
             {actionError && <p className="mt-3 text-sm text-red-700">{actionError}</p>}
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setDeleteTarget(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
-              <button type="button" onClick={handleDelete} disabled={deleting} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60">
-                {deleting ? "Deleting…" : "Delete"}
+              <button type="button" onClick={() => setDeleteTarget(null)} className="min-h-[40px] rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+              <button type="button" onClick={handleDelete} disabled={deleting} className="min-h-[40px] rounded-md bg-danger-600 px-4 py-2 text-sm font-medium text-white hover:bg-danger-700 disabled:opacity-60">
+                {deleting ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>

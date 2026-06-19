@@ -5,6 +5,10 @@ import { requireRole } from "../../gateway/auth.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import type { InsightsService } from "./service.js";
 
+function userId(res: Response): string {
+  return (res.locals["auth"] as AuthPayload).userId;
+}
+
 function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
@@ -117,6 +121,16 @@ export function registerRoutes(router: Router, service: InsightsService): void {
       res.json({
         items: await service.orderRecommendations(tenantId(res), lookbackDays, limit),
       });
+    }),
+  );
+
+  // POST /api/v1/insights/create-reorder-pos — create draft POs for below-reorder-point products.
+  router.post(
+    "/create-reorder-pos",
+    requireRole("manager"),
+    handler(async (_req, res) => {
+      const result = await service.createReorderPOs(tenantId(res), userId(res));
+      res.status(result.created > 0 ? 201 : 200).json(result);
     }),
   );
 }
