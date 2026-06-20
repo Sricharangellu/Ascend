@@ -32,6 +32,7 @@ import { TenderScreen } from "@/components/terminal/TenderScreen";
 import { ReceiptView } from "@/components/terminal/ReceiptView";
 import { OfflineQueueBanner } from "@/components/terminal/OfflineQueueBanner";
 import { RegisterSessionGuard } from "@/components/terminal/RegisterSessionGuard";
+import { ShortcutsOverlay } from "@/components/terminal/ShortcutsOverlay";
 import { useFlag } from "@/flags/useFlag";
 import { ScanToast } from "@/components/ScanToast";
 
@@ -50,6 +51,22 @@ function TerminalInner() {
   const [ageVerified, setAgeVerified] = useState(false);
   const [returnMode, setReturnMode] = useState(false);
   const [scannedName, setScannedName] = useState<string | null>(null);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  // Keyboard shortcut: ? toggles shortcuts overlay
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (
+        e.key === "?" &&
+        !(e.target instanceof HTMLInputElement) &&
+        !(e.target instanceof HTMLTextAreaElement)
+      ) {
+        setShortcutsOpen((prev) => !prev);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
 
   // Debounce ref for order sync
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -225,6 +242,7 @@ function TerminalInner() {
             isOffline={isOffline}
             returnMode={returnMode}
             itemCount={cart.itemCount}
+            onShortcuts={() => setShortcutsOpen(true)}
           />
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
             {/* Left: Product grid */}
@@ -279,6 +297,7 @@ function TerminalInner() {
       )}
 
       <ScanToast productName={scannedName} onDismiss={() => setScannedName(null)} />
+      <ShortcutsOverlay open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </EnterpriseShell>
   );
 }
@@ -288,11 +307,13 @@ function CheckoutStatusStrip({
   isOffline,
   returnMode,
   itemCount,
+  onShortcuts,
 }: {
   cashier: string;
   isOffline: boolean;
   returnMode: boolean;
   itemCount: number;
+  onShortcuts: () => void;
 }) {
   return (
     <div className="flex flex-none flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-3 py-2 text-xs sm:px-4">
@@ -303,6 +324,15 @@ function CheckoutStatusStrip({
       <StatusPill label="Network" value={isOffline ? "Offline queue" : "Online"} tone={isOffline ? "warning" : "success"} />
       <StatusPill label="Cart" value={`${itemCount} item${itemCount === 1 ? "" : "s"}`} tone={itemCount > 0 ? "brand" : "neutral"} />
       {returnMode && <StatusPill label="Mode" value="Return" tone="warning" />}
+      <button
+        type="button"
+        onClick={onShortcuts}
+        className="ml-auto flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-sm font-bold text-slate-500 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        aria-label="Keyboard shortcuts"
+        title="Keyboard shortcuts (?)"
+      >
+        ?
+      </button>
     </div>
   );
 }
