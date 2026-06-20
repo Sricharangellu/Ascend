@@ -8,6 +8,7 @@ import { Table } from "@/components/Table";
 import { Modal } from "@/components/Modal";
 import { apiGet, apiPost, apiPatch } from "@/api-client/client";
 import type { FulfillmentLocation, PickList, Register, Outlet } from "@/api-client/types";
+import { useToast } from "@/components/Toast";
 
 interface InventoryLocation {
   id: string;
@@ -18,6 +19,13 @@ interface InventoryLocation {
   is_sellable: boolean;
   is_receiving_location: boolean;
   is_active: boolean;
+}
+
+interface TransferForm {
+  fromLocationId: string;
+  toLocationId: string;
+  productQuery: string;
+  quantity: number;
 }
 
 export default function OperationsPage() {
@@ -234,12 +242,19 @@ const LOC_TYPE_BADGE: Record<string, "blue" | "gray" | "red" | "yellow"> = {
 };
 
 function StockLocationsTab() {
+  const { addToast } = useToast();
   const [items, setItems] = useState<InventoryLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ code: "", name: "", location_type: "floor", outlet_id: "", is_sellable: false, is_receiving_location: false });
   const [busy, setBusy] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
+
+  // Transfer modal state
+  const [transferLoc, setTransferLoc] = useState<InventoryLocation | null>(null);
+  const [transferForm, setTransferForm] = useState<TransferForm>({ fromLocationId: "", toLocationId: "", productQuery: "", quantity: 1 });
+  const [transferring, setTransferring] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -276,6 +291,42 @@ function StockLocationsTab() {
       setItems(prev => prev.map(l => l.id === loc.id ? { ...l, is_active: !l.is_active } : l));
     } finally { setToggling(null); }
   };
+
+  const openTransferModal = (loc: InventoryLocation) => {
+    setTransferLoc(loc);
+    setTransferForm({ fromLocationId: loc.id, toLocationId: "", productQuery: "", quantity: 1 });
+    setTransferError(null);
+  };
+
+  const closeTransferModal = () => {
+    setTransferLoc(null);
+    setTransferError(null);
+  };
+
+  const handleTransfer = async () => {
+    if (!transferForm.toLocationId || !transferForm.productQuery.trim() || transferForm.quantity < 1) {
+      setTransferError("Please fill in all fields.");
+      return;
+    }
+    setTransferring(true);
+    setTransferError(null);
+    try {
+      await apiPost("/api/v1/inventory/transfers", {
+        from_location_id: transferForm.fromLocationId,
+        to_location_id: transferForm.toLocationId,
+        product_id: transferForm.productQuery.trim(),
+        quantity: transferForm.quantity,
+      });
+      addToast({ title: "Stock transferred successfully.", variant: "success" });
+      closeTransferModal();
+    } catch {
+      setTransferError("Transfer failed. Please try again.");
+    } finally {
+      setTransferring(false);
+    }
+  };
+
+  const otherLocations = items.filter(l => l.id !== transferForm.fromLocationId && l.is_active);
 
   return (
     <div className="space-y-4">
@@ -317,7 +368,7 @@ function StockLocationsTab() {
       <div className="overflow-x-auto rounded-lg border border-gray-200">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
+            <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
               <th className="px-4 py-3">Code</th>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Type</th>
@@ -325,11 +376,12 @@ function StockLocationsTab() {
               <th className="px-4 py-3">Sellable</th>
               <th className="px-4 py-3">Receiving</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {loading && <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">Loading…</td></tr>}
-            {!loading && items.length === 0 && <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">No stock locations yet. Create one above.</td></tr>}
+            {loading && <tr><td colSpan={8} className="px-4 py-6 text-center text-gray-400">Loading…</td></tr>}
+            {!loading && items.length === 0 && <tr><td colSpan={8} className="px-4 py-6 text-center text-gray-400">No stock locations yet. Create one above.</td></tr>}
             {items.map(loc => (
               <tr key={loc.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3">
@@ -358,11 +410,92 @@ function StockLocationsTab() {
                     <span className="sr-only">{loc.is_active ? "Active" : "Inactive"}</span>
                   </button>
                 </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <button
+                    onClick={() => openTransferModal(loc)}
+                    className="text-xs text-slate-600 hover:text-slate-900 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded ml-2"
+                    aria-label={`Transfer stock from ${loc.name}`}
+                  >
+                    Transfer
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Transfer Stock Modal */}
+      <Modal
+        open={transferLoc !== null}
+        onClose={closeTransferModal}
+        title="Transfer Stock"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={closeTransferModal}>Cancel</Button>
+            <Button variant="primary" loading={transferring} onClick={() => void handleTransfer()}>Transfer Stock</Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {/* From Location (read-only) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">From Location</label>
+            <select
+              disabled
+              value={transferForm.fromLocationId}
+              className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-500 cursor-not-allowed"
+            >
+              {transferLoc && (
+                <option value={transferLoc.id}>{transferLoc.name} ({transferLoc.code})</option>
+              )}
+            </select>
+          </div>
+
+          {/* To Location */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">To Location</label>
+            <select
+              value={transferForm.toLocationId}
+              onChange={e => setTransferForm(f => ({ ...f, toLocationId: e.target.value }))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="">Select destination…</option>
+              {otherLocations.map(l => (
+                <option key={l.id} value={l.id}>{l.name} ({l.code})</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Product search */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
+            <input
+              type="text"
+              value={transferForm.productQuery}
+              onChange={e => setTransferForm(f => ({ ...f, productQuery: e.target.value }))}
+              placeholder="Enter product ID or name…"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Quantity */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+            <input
+              type="number"
+              min={1}
+              value={transferForm.quantity}
+              onChange={e => setTransferForm(f => ({ ...f, quantity: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
+          {transferError && (
+            <p role="alert" className="text-sm text-red-600">{transferError}</p>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }
