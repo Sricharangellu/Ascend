@@ -403,6 +403,34 @@ export const lightspeedHandlers = [
       ],
     });
   }),
+  http.get(`${V1}/customers/:id/loyalty`, async ({ params }) => {
+    await lat();
+    const c = customers.get(String(params.id));
+    // Simulate a silver-tier member with ~420 pts
+    const pts = c?.points ?? 420;
+    const tier = pts >= 1000 ? "platinum" : pts >= 500 ? "gold" : pts >= 200 ? "silver" : "bronze";
+    const tierNames: Record<string, string> = { bronze: "Bronze", silver: "Silver", gold: "Gold", platinum: "Platinum" };
+    const nextTier: Record<string, string | null> = { bronze: "Silver", silver: "Gold", gold: "Platinum", platinum: null };
+    const thresholds: Record<string, number> = { bronze: 200, silver: 500, gold: 1000, platinum: 9999 };
+    const multiplier: Record<string, number> = { bronze: 1, silver: 1.5, gold: 2, platinum: 3 };
+    const discount: Record<string, number> = { bronze: 0, silver: 5, gold: 10, platinum: 15 };
+    const nextTierKey = nextTier[tier];
+    const pointsToNext = nextTierKey ? thresholds[nextTierKey] - pts : null;
+    return HttpResponse.json({
+      currentPoints: pts,
+      lifetimePoints: pts + 1230,
+      currentTierLevel: tier,
+      currentTierName: tierNames[tier],
+      nextTierName: nextTierKey ? tierNames[nextTierKey] : null,
+      pointsToNextTier: pointsToNext,
+      pointMultiplier: multiplier[tier],
+      discountPct: discount[tier],
+      redemptionHistory: [
+        { id: "rdm_1", rewardName: "5% Off Voucher", pointsSpent: 100, redeemedAt: Date.now() - 86400000 * 14 },
+        { id: "rdm_2", rewardName: "Free Shipping", pointsSpent: 50, redeemedAt: Date.now() - 86400000 * 30 },
+      ],
+    });
+  }),
   http.get(`${V1}/customers/:id`, async ({ params }) => {
     await lat();
     const c = customers.get(String(params.id));
@@ -613,6 +641,20 @@ export const lightspeedHandlers = [
         );
         products.push(p);
         return HttpResponse.json(p, { status: 201 });
+      }),
+
+      http.get(`${V1}/catalog/:id/stock`, async ({ params }) => {
+        await lat();
+        const id = String(params["id"]);
+        const p = products.find((x) => x.id === id);
+        if (!p) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json({
+          product_id: id,
+          locations: [
+            { location_id: "loc_1", location_code: "MAIN-FLR", location_name: "Main Floor", quantity_on_hand: 48, quantity_committed: 6, quantity_available: 42, average_cost_cents: p.raw_cost_price_cents },
+            { location_id: "loc_2", location_code: "WAREHOUSE", location_name: "Warehouse", quantity_on_hand: 120, quantity_committed: 0, quantity_available: 120, average_cost_cents: p.raw_cost_price_cents },
+          ],
+        });
       }),
 
       http.get(`${V1}/catalog/:id`, async ({ params }) => {

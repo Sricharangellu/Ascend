@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
@@ -274,6 +275,7 @@ function ProductFormModal({
 // ── Products Tab ──────────────────────────────────────────────────────────────
 
 function ProductsTab({ categories }: { categories: Category[] }) {
+  const router = useRouter();
   const [products, setProducts]     = useState<Product[]>([]);
   const [total, setTotal]           = useState(0);
   const [loading, setLoading]       = useState(true);
@@ -494,6 +496,13 @@ function ProductsTab({ categories }: { categories: Category[] }) {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => router.push(`/catalog/${p.id}`)}
+                            className="min-h-[32px] rounded-md border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                          >
+                            View
+                          </button>
                           <button
                             type="button"
                             onClick={() => { setEditTarget(p); setActionError(null); }}
