@@ -33,6 +33,7 @@ import { ReceiptView } from "@/components/terminal/ReceiptView";
 import { OfflineQueueBanner } from "@/components/terminal/OfflineQueueBanner";
 import { RegisterSessionGuard } from "@/components/terminal/RegisterSessionGuard";
 import { useFlag } from "@/flags/useFlag";
+import { ScanToast } from "@/components/ScanToast";
 
 // ─── Terminal inner (has access to cart context) ──────────────────────────────
 
@@ -48,6 +49,7 @@ function TerminalInner() {
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
   const [ageVerified, setAgeVerified] = useState(false);
   const [returnMode, setReturnMode] = useState(false);
+  const [scannedName, setScannedName] = useState<string | null>(null);
 
   // Debounce ref for order sync
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -137,7 +139,7 @@ function TerminalInner() {
     try {
       const product = await apiGet<Product>(`/api/v1/catalog/barcode/${encodeURIComponent(code)}`);
       cart.addProduct(product);
-      addToast({ title: `Added: ${product.name}`, variant: "success" });
+      setScannedName(product.name);
     } catch {
       addToast({ title: `Barcode not found: ${code}`, variant: "error" });
     }
@@ -275,6 +277,8 @@ function TerminalInner() {
           role={user?.role ?? "cashier"}
         />
       )}
+
+      <ScanToast productName={scannedName} onDismiss={() => setScannedName(null)} />
     </EnterpriseShell>
   );
 }
