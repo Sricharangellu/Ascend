@@ -971,6 +971,40 @@ export const handlers = [
     ];
   })(),
 
+  // ── POST /api/v1/imports/products (Sprint 15) ───────────────────────────────
+  http.post(`${V1}/imports/products`, async ({ request }) => {
+    await latency();
+    const body = (await request.json()) as { csv?: string; mappings?: unknown };
+    const lines = (body.csv ?? "").split(/\r?\n/).filter((l: string) => l.trim());
+    const total = Math.max(0, lines.length - 1);
+    return HttpResponse.json(
+      { batch_id: `imp_${Math.random().toString(36).slice(2, 14)}`, total, status: "processing" },
+      { status: 201 }
+    );
+  }),
+
+  // ── GET /api/v1/customers/search (Sprint 15) ─────────────────────────────────
+  http.get(`${V1}/customers/search`, async ({ request }) => {
+    await latency();
+    const q = new URL(request.url).searchParams.get("q")?.toLowerCase() ?? "";
+    const seed = [
+      { id: "cust_dup_001", name: "Jane Smith", email: "jane.smith@example.com", phone: "555-0101" },
+      { id: "cust_dup_002", name: "Robert Johnson", email: "rjohnson@example.com", phone: "555-0202" },
+      { id: "cust_dup_003", name: "Maria Garcia", email: "maria.garcia@example.com", phone: "555-0303" },
+    ];
+    const filtered = q
+      ? seed.filter((c) => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q))
+      : seed;
+    return HttpResponse.json(filtered);
+  }),
+
+  // ── POST /api/v1/customers/:id/merge (Sprint 15) ─────────────────────────────
+  http.post(`${V1}/customers/:id/merge`, async ({ params, request }) => {
+    await latency();
+    const { merge_from_id } = (await request.json()) as { merge_from_id: string };
+    return HttpResponse.json({ success: true, merged_from_id: merge_from_id, primary_id: String(params.id) });
+  }),
+
   // ── MFA (Sprint 10C) ─────────────────────────────────────────────────────────
   http.get("*/api/identity/mfa/status", async () => { await latency(); return HttpResponse.json({ enabled: false, setupRequired: true }); }),
   http.post("*/api/identity/mfa/setup", async () => { await latency(); return HttpResponse.json({ secret: "JBSWY3DPEHPK3PXP", otpauthUrl: "otpauth://totp/FinderPOS:demo@example.com?secret=JBSWY3DPEHPK3PXP&issuer=FinderPOS" }); }),

@@ -13,6 +13,11 @@ import { useToast } from "@/components/Toast";
 import { getUser } from "@/lib/auth";
 import { Badge } from "@/components/Badge";
 
+// ─── Merge Types ──────────────────────────────────────────────────────────────
+
+interface CustomerSearchResult { id: string; name: string; email: string; phone: string; }
+type MergeStep = "search" | "confirm";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Customer {
@@ -114,6 +119,164 @@ function ReadField({ label, value }: { label: string; value: string | null | und
   );
 }
 
+// ─── Merge Modal ──────────────────────────────────────────────────────────────
+
+function MergeModal({
+  primary,
+  onClose,
+  onMerged,
+}: {
+  primary: { id: string; name: string; email: string | null; points: number };
+  onClose: () => void;
+  onMerged: () => void;
+}) {
+  const [step, setStep] = useState<MergeStep>("search");
+  const [query, setQuery] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [results, setResults] = useState<CustomerSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [duplicate, setDuplicate] = useState<CustomerSearchResult | null>(null);
+  const [merging, setMerging] = useState(false);
+  const [mergeError, setMergeError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(query), 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  useEffect(() => {
+    if (!debouncedQ.trim()) { setResults([]); return; }
+    setSearching(true);
+    apiGet<CustomerSearchResult[]>(`/api/v1/customers/search?q=${encodeURIComponent(debouncedQ)}`)
+      .then((r) => setResults(Array.isArray(r) ? r.filter(c => c.id !== primary.id).slice(0, 5) : []))
+      .catch(() => setResults([]))
+      .finally(() => setSearching(false));
+  }, [debouncedQ, primary.id]);
+
+  const handleConfirmMerge = async () => {
+    if (!duplicate) return;
+    setMerging(true); setMergeError(null);
+    try {
+      await apiPost(`/api/v1/customers/${primary.id}/merge`, { merge_from_id: duplicate.id });
+      onMerged();
+      onClose();
+    } catch (err) {
+      setMergeError(err instanceof ApiResponseError ? err.message : "Merge failed.");
+    } finally {
+      setMerging(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-md bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <h2 className="text-base font-semibold text-slate-950">Merge duplicate customer</h2>
+          <button type="button" onClick={onClose} aria-label="Close merge modal" className="flex h-9 w-9 items-center justify-center rounded-md text-xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-600">&times;</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {step === "search" && (
+            <div className="space-y-4">
+              <p className="text-sm text-slate-600">
+                Search for the duplicate record to merge into <span className="font-semibold text-slate-950">{primary.name}</span>. The primary record&apos;s name and email will be kept; loyalty points will be summed.
+              </p>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Search by name or email</label>
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Type to search…"
+                  className={INPUT_CLASS}
+                  autoFocus
+                />
+              </div>
+
+              {searching && (
+                <p className="text-sm text-slate-400" aria-busy="true">Searching…</p>
+              )}
+
+              {!searching && debouncedQ && results.length === 0 && (
+                <p className="text-sm text-slate-500">No customers found matching &ldquo;{debouncedQ}&rdquo;.</p>
+              )}
+
+              {results.length > 0 && (
+                <ul className="divide-y divide-slate-100 rounded-md border border-slate-200">
+                  {results.map((r) => (
+                    <li key={r.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-950">{r.name}</p>
+                        <p className="text-xs text-slate-500">{r.email} &middot; {r.phone}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setDuplicate(r); setStep("confirm"); }}
+                        className="shrink-0 rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        Merge into this record
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {step === "confirm" && duplicate && (
+            <div className="space-y-4">
+              <p className="text-sm text-slate-600">
+                You are about to merge <span className="font-semibold text-slate-950">{duplicate.name}</span> into <span className="font-semibold text-slate-950">{primary.name}</span>. This cannot be undone.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-md border border-success-200 bg-success-50 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-success-700">Kept (Primary)</p>
+                  <p className="mt-1 text-sm font-medium text-slate-950">{primary.name}</p>
+                  <p className="text-xs text-slate-600">{primary.email ?? "—"}</p>
+                  <p className="mt-1 text-xs text-slate-500">Points: {primary.points} + duplicate&apos;s points</p>
+                  <p className="text-xs text-slate-500">All orders from duplicate will be reassigned here</p>
+                </div>
+                <div className="rounded-md border border-danger-200 bg-danger-50 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-danger-700">Deleted (Duplicate)</p>
+                  <p className="mt-1 text-sm font-medium text-slate-950">{duplicate.name}</p>
+                  <p className="text-xs text-slate-600">{duplicate.email}</p>
+                  <p className="mt-1 text-xs text-slate-500">{duplicate.phone}</p>
+                </div>
+              </div>
+              {mergeError && (
+                <p role="alert" className="rounded-md bg-danger-50 px-3 py-2 text-sm text-danger-700">{mergeError}</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between gap-2 border-t border-slate-200 px-5 py-3">
+          {step === "confirm" ? (
+            <>
+              <button type="button" onClick={() => setStep("search")} className="min-h-[40px] rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Back</button>
+              <button
+                type="button"
+                onClick={() => void handleConfirmMerge()}
+                disabled={merging}
+                className="min-h-[40px] rounded-md bg-danger-600 px-4 py-2 text-sm font-medium text-white hover:bg-danger-700 disabled:opacity-60"
+              >
+                {merging ? "Merging…" : "Confirm Merge"}
+              </button>
+            </>
+          ) : (
+            <button type="button" onClick={onClose} className="min-h-[40px] rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
 function Skeleton() {
@@ -167,6 +330,7 @@ export default function CustomerDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("general");
   const [editMode, setEditMode] = useState(false);
+  const [showMerge, setShowMerge] = useState(false);
 
   const user = getUser();
   const canEdit = user?.role === "owner" || user?.role === "manager";
@@ -291,16 +455,25 @@ export default function CustomerDetailPage() {
           </div>
 
           {canEdit && (
-            <Button
-              variant={editMode ? "secondary" : "primary"}
-              size="sm"
-              onClick={() => {
-                setEditMode((prev) => !prev);
-                setActiveTab("general");
-              }}
-            >
-              {editMode ? "Cancel edit" : "Edit"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowMerge(true)}
+              >
+                Merge duplicate
+              </Button>
+              <Button
+                variant={editMode ? "secondary" : "primary"}
+                size="sm"
+                onClick={() => {
+                  setEditMode((prev) => !prev);
+                  setActiveTab("general");
+                }}
+              >
+                {editMode ? "Cancel edit" : "Edit"}
+              </Button>
+            </div>
           )}
         </div>
 
@@ -355,6 +528,17 @@ export default function CustomerDetailPage() {
         <ContactsPanel customerId={customerId} canEdit={canEdit} addToast={addToast} />
         <NotesPanel customerId={customerId} canEdit={canEdit} addToast={addToast} />
       </div>
+
+      {showMerge && (
+        <MergeModal
+          primary={{ id: customer.id, name: customer.name, email: customer.email, points: customer.points }}
+          onClose={() => setShowMerge(false)}
+          onMerged={() => {
+            addToast({ title: "Merged successfully. Duplicate record deleted.", variant: "success" });
+            loadData();
+          }}
+        />
+      )}
     </EnterpriseShell>
   );
 }
