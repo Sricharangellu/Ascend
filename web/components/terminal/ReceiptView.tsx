@@ -19,6 +19,7 @@ import type { Order, Payment } from "@/api-client/types";
 import { formatMoney } from "@/lib/money";
 import { Button } from "@/components/Button";
 import type { Role } from "@/api-client/types";
+import { ThermalReceipt } from "@/components/ThermalReceipt";
 
 interface ReceiptViewProps {
   order: Order;
@@ -240,6 +241,28 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
               <ReceiptRow label="Auth code" value={payment.authCode} className="text-gray-400 text-xs" />
             )}
           </div>
+
+          {/* Hidden thermal receipt — revealed by print CSS */}
+          <div className="mt-4 hidden print:block">
+            <ThermalReceipt
+              storeName="FinderPOS Demo Store"
+              receiptNumber={currentOrder.orderNumber}
+              dateTime={new Date(currentOrder.createdAt).toLocaleString()}
+              lineItems={currentOrder.lines.map((l) => ({
+                name: l.name,
+                quantity: l.quantity,
+                price_cents: l.unitCents,
+                total_cents: l.lineCents,
+              }))}
+              subtotal_cents={currentOrder.subtotalCents}
+              tax_cents={currentOrder.taxCents}
+              discount_cents={currentOrder.discountCents}
+              total_cents={currentOrder.totalCents}
+              paymentMethod={payment.method.charAt(0).toUpperCase() + payment.method.slice(1)}
+              amountTendered_cents={payment.cashCents > 0 ? payment.cashCents + payment.cardCents : undefined}
+              change_cents={payment.changeCents > 0 ? payment.changeCents : undefined}
+            />
+          </div>
         </div>
 
         {/* Actions */}
@@ -257,9 +280,18 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
 
           {/* Print + Email row */}
           <div className={`flex gap-2${showEmailInput ? " hidden" : ""}`}>
-            <Button variant="ghost" size="sm" fullWidth onClick={() => window.print()}>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="6 9 6 2 18 2 18 9"/>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                <rect x="6" y="14" width="12" height="8"/>
+              </svg>
               Print Receipt
-            </Button>
+            </button>
             <Button variant="ghost" size="sm" fullWidth onClick={() => setShowEmailInput(true)}>
               Email Receipt
             </Button>
