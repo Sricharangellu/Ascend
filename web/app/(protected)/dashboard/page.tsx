@@ -7,7 +7,7 @@
  * sales-by-hour bar chart, quick-access action links, and payment breakdown.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQuery } from "@/lib/useQuery";
 import Link from "next/link";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
@@ -237,8 +237,28 @@ function rangeLabel(range: Range): string {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+interface LowStockItem {
+  id: string; sku: string; name: string; category: string;
+  onHand: number; reorderPoint: number; lowStock: boolean;
+}
+
+interface DashNotification {
+  id: string; type: string; severity: string; title: string; body: string; read: boolean; created_at: number;
+}
+
 export default function DashboardPage() {
   const [range, setRange] = useState<Range>("7d");
+  const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
+  const [recentNotifs, setRecentNotifs] = useState<DashNotification[]>([]);
+
+  useEffect(() => {
+    apiGet<{ items: LowStockItem[] }>("/api/v1/inventory/levels?pageSize=200")
+      .then(d => setLowStock((d.items ?? []).filter(i => i.lowStock).slice(0, 5)))
+      .catch(() => {/* silent */});
+    apiGet<{ items: DashNotification[] }>("/api/v1/notifications?limit=5")
+      .then(d => setRecentNotifs(d.items ?? []))
+      .catch(() => {/* silent */});
+  }, []);
 
   const fetchSummary = useCallback(
     () => apiGet<SummaryResponse>(`/api/v1/reports/summary?range=${range}`),
@@ -630,6 +650,62 @@ export default function DashboardPage() {
           </div>
         </section>
 
+        {/* ── Operational widgets ────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+          {/* Low stock alerts */}
+          <Card>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-slate-900">Low Stock Alerts</h2>
+              <Link href="/inventory" className="text-xs text-blue-600 hover:underline">View all →</Link>
+            </div>
+            {lowStock.length === 0 ? (
+              <p className="text-sm text-slate-400 py-4 text-center">All stock levels are healthy.</p>
+            ) : (
+              <ul className="space-y-2">
+                {lowStock.map(item => (
+                  <li key={item.id} className="flex items-center justify-between rounded-lg bg-amber-50 border border-amber-100 px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">{item.name}</p>
+                      <p className="text-xs text-slate-500 font-mono">{item.sku} · {item.category}</p>
+                    </div>
+                    <div className="text-right shrink-0 ml-3">
+                      <p className="text-sm font-semibold text-amber-700">{item.onHand} left</p>
+                      <p className="text-xs text-slate-400">reorder at {item.reorderPoint}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          {/* Recent notifications */}
+          <Card>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-slate-900">Recent Alerts</h2>
+              <Link href="/notifications" className="text-xs text-blue-600 hover:underline">View all →</Link>
+            </div>
+            {recentNotifs.length === 0 ? (
+              <p className="text-sm text-slate-400 py-4 text-center">No recent alerts.</p>
+            ) : (
+              <ul className="space-y-2">
+                {recentNotifs.map(n => {
+                  const sevColor = n.severity === "critical" ? "bg-red-50 border-red-100" : n.severity === "warning" ? "bg-amber-50 border-amber-100" : "bg-blue-50 border-blue-100";
+                  const dotColor = n.severity === "critical" ? "bg-red-500" : n.severity === "warning" ? "bg-amber-400" : "bg-blue-400";
+                  return (
+                    <li key={n.id} className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 ${sevColor}`}>
+                      <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dotColor}`} aria-hidden="true" />
+                      <div className="min-w-0">
+                        <p className={`text-sm font-medium ${n.read ? "text-slate-600" : "text-slate-900"}`}>{n.title}</p>
+                        <p className="text-xs text-slate-500 truncate">{n.body}</p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
+        </div>
 
       </div>
     </EnterpriseShell>

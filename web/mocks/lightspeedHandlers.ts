@@ -2471,4 +2471,53 @@ lightspeedHandlers.push(
       }),
     ];
   })(),
+
+  // ── Sync / Integrations status endpoints ──────────────────────────────────
+  http.get(`${V1}/sync/status`, async () => {
+    await lat();
+    return HttpResponse.json({ online: true, pending: 2, synced: 1847, failed: 0 });
+  }),
+  http.get(`${V1}/sync/queue`, async () => {
+    await lat();
+    const now = Date.now();
+    return HttpResponse.json({ items: [
+      { id: 1, event_type: "order.created", status: "pending", attempts: 0, created_at: now - 30000, last_attempted_at: null },
+      { id: 2, event_type: "product.updated", status: "pending", attempts: 1, created_at: now - 120000, last_attempted_at: now - 60000 },
+      { id: 3, event_type: "customer.created", status: "synced", attempts: 1, created_at: now - 600000, last_attempted_at: now - 590000 },
+    ] });
+  }),
+  http.post(`${V1}/sync/push`, async () => {
+    await lat();
+    return HttpResponse.json({ ok: true, queued: 2 });
+  }),
+
+  // ── Customer loyalty tiers (settings) ────────────────────────────────────
+  ...(() => {
+    let loyaltyTiers = [
+      { id: "ltier_1", tier_level: 1, name: "Bronze",   min_points: 0,    point_multiplier: 1.0, discount_pct: 0  },
+      { id: "ltier_2", tier_level: 2, name: "Silver",   min_points: 500,  point_multiplier: 1.25, discount_pct: 2 },
+      { id: "ltier_3", tier_level: 3, name: "Gold",     min_points: 1500, point_multiplier: 1.5, discount_pct: 5  },
+      { id: "ltier_4", tier_level: 4, name: "Platinum", min_points: 5000, point_multiplier: 2.0, discount_pct: 10 },
+    ];
+    return [
+      http.get(`${V1}/customers/loyalty-tiers`, async () => {
+        await lat();
+        return HttpResponse.json({ items: loyaltyTiers });
+      }),
+      http.put(`${V1}/customers/loyalty-tiers/:level`, async ({ params, request }) => {
+        await lat();
+        const level = Number(params["level"]);
+        const b = (await request.json()) as Partial<typeof loyaltyTiers[0]>;
+        const idx = loyaltyTiers.findIndex(t => t.tier_level === level);
+        if (idx !== -1) loyaltyTiers[idx] = { ...loyaltyTiers[idx], ...b };
+        return HttpResponse.json(loyaltyTiers[idx] ?? b);
+      }),
+    ];
+  })(),
+
+  // ── Imports (product CSV import) ──────────────────────────────────────────
+  http.post(`${V1}/imports/products`, async () => {
+    await lat();
+    return HttpResponse.json({ batch_id: `batch_${Date.now()}`, total: 12, status: "queued" }, { status: 201 });
+  }),
 );
