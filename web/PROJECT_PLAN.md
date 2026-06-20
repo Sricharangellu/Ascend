@@ -50,17 +50,15 @@ FinderPOS is a full-stack enterprise POS platform targeting retail, wholesale, a
 
 ### Right now (next 1–3 tasks)
 
-- **End of day Z-report** — Every POS needs a daily close report. Add `/reports/end-of-day` showing: cash drawer balance, total sales by tender type, transaction count, tax collected, top items sold, voids/refunds. Cashiers run this at shift end. High business value, no frontend exists yet.
+- **Bulk product import wizard** — The imports page tracks CSV batches but has no upload UI. Add a step-by-step wizard: upload CSV → map columns → preview rows → import with progress. Merchants need this to load their catalog before going live — it's a launch blocker.
 
-- **Stock transfer between locations** — The stock locations tab shows per-location inventory but there's no way to move stock from one location to another. Add a "Transfer Stock" action in Operations → Stock Locations that opens a transfer modal: from-location, to-location, product, quantity.
+- **Price label printing** — Add a "Print Labels" action in the catalog that generates a printable page of 2"×1" shelf labels (product name, barcode, price). Stores need shelf labels when stocking shelves. Builds on the thermal receipt CSS-print approach.
 
-- **Terminal keyboard shortcuts** — The terminal has no keyboard shortcut reference. Add a `?` help button that shows a shortcuts overlay: `/` to search products, `Enter` to add top result, `Esc` to clear, numeric `*` for quantity, `F1–F4` for payment types. Critical for cashier productivity.
+- **Customer merge / deduplication** — The CRM has no way to merge duplicate customer records. Add a "Merge" action on the customer detail page that lets staff search for a duplicate and merge the two records (loyalty points, order history combined).
 
 ### Coming up (next wave of work)
 
-- **Deploy Sprints 11–14 to Vercel** — Push everything live once Sprint 14 is done. Run `bash deploy.sh` from `web/`.
-
-- **Bulk product import wizard** — The imports page tracks CSV import batches but there's no file upload UI. Add a step-by-step wizard: upload CSV → map columns → preview → import with progress bar.
+- **Deploy Sprints 11–15 to Vercel** — Push everything live after Sprint 15 is done. Run `bash deploy.sh` from `web/`.
 
 - **Vendor quotations backend** — The vendor quotes tab in Purchasing is mock-only. Build real backend endpoints (`POST /purchasing/vendor-quotes`, `PATCH /purchasing/vendor-quotes/:id/accept`, etc.).
 
@@ -90,7 +88,7 @@ FinderPOS is a full-stack enterprise POS platform targeting retail, wholesale, a
 
 ## What to build next
 
-The end-of-day Z-report is the single most important missing feature for a live POS deployment — without it, cashiers cannot close out their shift, which means the system cannot be used in a real store. After that, stock transfers between locations close the loop on the inventory location feature (you can view stock per location but not move it). The terminal keyboard shortcuts overlay is a fast, high-impact change that makes the terminal feel production-ready. All three are self-contained with no blockers.
+The bulk product import wizard is the highest-priority remaining feature — merchants cannot populate their catalog without it, so it's a go-live blocker. Price label printing is a fast win that builds on the existing thermal-receipt CSS-print approach. Customer merge/dedup rounds out the CRM for stores with legacy data migrations. All three are self-contained with no blockers.
 
 ---
 

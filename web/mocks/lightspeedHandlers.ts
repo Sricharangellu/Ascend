@@ -348,6 +348,22 @@ export const lightspeedHandlers = [
     });
   }),
 
+  // ── Inventory transfers ───────────────────────────────────────────────────
+  http.post(`${V1}/inventory/transfers`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as { from_location_id: string; to_location_id: string; product_id: string; quantity: number; note?: string };
+    return HttpResponse.json({
+      id: `xfr_${Date.now()}`,
+      from_location_id: b.from_location_id,
+      to_location_id: b.to_location_id,
+      product_id: b.product_id,
+      quantity: b.quantity,
+      note: b.note ?? null,
+      status: "completed",
+      created_at: Date.now(),
+    }, { status: 201 });
+  }),
+
   // ── Customers + loyalty ───────────────────────────────────────────────────
   http.get(`${V1}/customers`, async () => {
     await lat();
@@ -687,6 +703,23 @@ export const lightspeedHandlers = [
         const p = products.find((x) => x.barcode === code || x.sku === code);
         if (!p) return HttpResponse.json({ error: { code: "not_found", message: `No active product with barcode '${code}'` } }, { status: 404 });
         return HttpResponse.json(p);
+      }),
+
+      // ── Bulk operations ───────────────────────────────────────────────────
+      http.post(`${V1}/catalog/bulk-update`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as { ids: string[]; update: Record<string, unknown> };
+        let updated = 0;
+        for (const id of b.ids) {
+          const idx = products.findIndex(p => p.id === id);
+          if (idx !== -1) { products[idx] = { ...products[idx], ...b.update, updatedAt: Date.now() }; updated++; }
+        }
+        return HttpResponse.json({ updated });
+      }),
+
+      http.post(`${V1}/catalog/import-csv`, async () => {
+        await lat();
+        return HttpResponse.json({ imported: 3, skipped: 0, errors: [] }, { status: 200 });
       }),
 
       // ── Categories ────────────────────────────────────────────────────────
@@ -1223,6 +1256,7 @@ lightspeedHandlers.push(
   http.post(`${V1}/settings/payment-modes`, async ({ request }) => { await lat(); const b = (await request.json()) as any; const r = { id: `pm_${++pmSeq}`, tenant_id: "tnt_demo", name: b.name, active: 1 }; paymentModes.push(r); return HttpResponse.json(r, { status: 201 }); }),
   http.get(`${V1}/settings/tax-rates`, async () => { await lat(); return HttpResponse.json({ items: taxRates }); }),
   http.post(`${V1}/settings/tax-rates`, async ({ request }) => { await lat(); const b = (await request.json()) as any; const r = { id: `tax_${++txSeq}`, tenant_id: "tnt_demo", name: b.name, rate_bps: b.rateBps, apply_to_category: b.applyToCategory ?? null, state: b.state ?? null, active: 1 }; taxRates.push(r); return HttpResponse.json(r, { status: 201 }); }),
+  http.post(`${V1}/settings/edition`, async ({ request }) => { await lat(); const b = (await request.json()) as { edition: string }; return HttpResponse.json({ ok: true, edition: b.edition }); }),
   http.get(`${V1}/search`, async ({ request }) => {
     await lat();
     const q = (new URL(request.url).searchParams.get("q") ?? "").toLowerCase();
@@ -2232,6 +2266,162 @@ lightspeedHandlers.push(
         if (action) filtered = filtered.filter(e => e.action === action);
         filtered.sort((a, b) => b.created_at - a.created_at);
         return HttpResponse.json({ items: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset });
+      }),
+    ];
+  })(),
+
+  // ── Terminal: Orders, Payments, Register Sessions ─────────────────────────
+  ...(() => {
+    let orderSeq = 100;
+    let paymentSeq = 1;
+
+    interface TermOrder {
+      id: string; orderNumber: string; stateCode: string; status: string;
+      subtotalCents: number; discountCents: number; taxCents: number; totalCents: number;
+      customerId?: string;
+      lines: Array<{ id: string; orderId: string; productId: string; name: string; quantity: number; unitCents: number; taxCents: number; lineCents: number; taxable: boolean }>;
+      createdAt: number; updatedAt: number;
+    }
+
+    const termOrders = new Map<string, TermOrder>();
+
+    const buildOrder = (id: string, num: number, body: Record<string, unknown>, status = "open"): TermOrder => {
+      const lines = (Array.isArray(body.lines) ? body.lines : []) as Array<{ productId: string; quantity: number; name?: string; unitCents?: number }>;
+      const now = Date.now();
+      const orderLines = lines.map((l, i) => {
+        const qty = l.quantity ?? 1;
+        const unit = l.unitCents ?? 999;
+        const line = qty * unit;
+        const tax = Math.round(line * 0.0875);
+        return { id: `ol_${num}_${i}`, orderId: id, productId: l.productId, name: l.name ?? l.productId, quantity: qty, unitCents: unit, taxCents: tax, lineCents: line, taxable: true };
+      });
+      const subtotal = orderLines.reduce((s, l) => s + l.lineCents, 0);
+      const tax = orderLines.reduce((s, l) => s + l.taxCents, 0);
+      return { id, orderNumber: `FP-${String(num).padStart(4, "0")}`, stateCode: String(body.stateCode ?? "TX"), status, subtotalCents: subtotal, discountCents: 0, taxCents: tax, totalCents: subtotal + tax, customerId: body.customerId as string | undefined, lines: orderLines, createdAt: now, updatedAt: now };
+    };
+
+    const registerSessions = new Map<string, { id: string; registerId: string; status: string; openingFloatCents: number; openedAt: number }>();
+
+    return [
+      // Orders CRUD
+      http.post(`${V1}/orders`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as Record<string, unknown>;
+        const num = ++orderSeq;
+        const id = `ord_t_${num}`;
+        const order = buildOrder(id, num, b);
+        termOrders.set(id, order);
+        return HttpResponse.json(order, { status: 201 });
+      }),
+
+      http.put(`${V1}/orders/:id`, async ({ params, request }) => {
+        await lat();
+        const id = String(params["id"]);
+        const b = (await request.json()) as Record<string, unknown>;
+        const existing = termOrders.get(id);
+        if (!existing) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const updated = buildOrder(id, orderSeq, b, existing.status);
+        termOrders.set(id, updated);
+        return HttpResponse.json(updated);
+      }),
+
+      http.get(`${V1}/orders`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const status = url.searchParams.get("status");
+        const limit = Number(url.searchParams.get("limit") ?? 50);
+        const offset = Number(url.searchParams.get("offset") ?? 0);
+        let all = Array.from(termOrders.values());
+        if (status) all = all.filter(o => o.status === status);
+        all.sort((a, b) => b.createdAt - a.createdAt);
+        return HttpResponse.json({ items: all.slice(offset, offset + limit), total: all.length });
+      }),
+
+      http.get(`${V1}/orders/:id`, async ({ params }) => {
+        await lat();
+        const order = termOrders.get(String(params["id"]));
+        if (!order) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json(order);
+      }),
+
+      http.post(`${V1}/orders/:id/refund`, async ({ params }) => {
+        await lat();
+        const id = String(params["id"]);
+        const order = termOrders.get(id);
+        if (!order) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const updated = { ...order, status: "refunded", updatedAt: Date.now() };
+        termOrders.set(id, updated);
+        return HttpResponse.json(updated);
+      }),
+
+      http.post(`${V1}/orders/:id/void`, async ({ params }) => {
+        await lat();
+        const id = String(params["id"]);
+        const order = termOrders.get(id);
+        if (!order) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const updated = { ...order, status: "voided", updatedAt: Date.now() };
+        termOrders.set(id, updated);
+        return HttpResponse.json(updated);
+      }),
+
+      http.post(`${V1}/orders/:id/email-receipt`, async () => {
+        await lat();
+        return HttpResponse.json({ ok: true });
+      }),
+
+      // Payments
+      http.post(`${V1}/payments`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as { orderId: string; method: string; cashCents?: number; cardCents?: number; cardLast4?: string; amountCents?: number };
+        const order = termOrders.get(b.orderId);
+        const total = order?.totalCents ?? b.amountCents ?? 0;
+        const cashCents = b.cashCents ?? (b.method === "cash" ? total : 0);
+        const cardCents = b.cardCents ?? (b.method === "card" ? total : 0);
+        const change = Math.max(0, cashCents - total);
+        const payment = {
+          id: `pay_${++paymentSeq}`,
+          orderId: b.orderId,
+          method: b.method,
+          amountCents: total,
+          cashCents: Math.min(cashCents, total + change),
+          cardCents,
+          changeCents: change,
+          cardLast4: b.cardLast4,
+          authCode: b.method !== "cash" ? `AUTH${Math.floor(Math.random() * 999999).toString().padStart(6, "0")}` : undefined,
+          status: "captured",
+          createdAt: Date.now(),
+        };
+        if (order) {
+          termOrders.set(b.orderId, { ...order, status: "completed", updatedAt: Date.now() });
+        }
+        return HttpResponse.json(payment, { status: 201 });
+      }),
+
+      // Register sessions (for RegisterSessionGuard)
+      http.get(`${V1}/outlets/registers/:registerId/sessions`, async ({ params }) => {
+        await lat();
+        const reg = String(params["registerId"]);
+        const session = registerSessions.get(reg);
+        return HttpResponse.json({ items: session ? [session] : [] });
+      }),
+
+      http.post(`${V1}/outlets/registers/:registerId/open`, async ({ params, request }) => {
+        await lat();
+        const reg = String(params["registerId"]);
+        const b = (await request.json()) as { openingFloatCents?: number };
+        const session = { id: `sess_${reg}_${Date.now()}`, registerId: reg, status: "open", openingFloatCents: b.openingFloatCents ?? 0, openedAt: Date.now() };
+        registerSessions.set(reg, session);
+        return HttpResponse.json(session, { status: 201 });
+      }),
+
+      http.post(`${V1}/outlets/registers/:registerId/close`, async ({ params }) => {
+        await lat();
+        const reg = String(params["registerId"]);
+        const session = registerSessions.get(reg);
+        if (!session) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const closed = { ...session, status: "closed", closedAt: Date.now() };
+        registerSessions.set(reg, closed);
+        return HttpResponse.json(closed);
       }),
     ];
   })(),
