@@ -6,8 +6,24 @@ import { Button } from "@/components/Button";
 import { Badge, statusBadge } from "@/components/Badge";
 import { Table } from "@/components/Table";
 import { Modal } from "@/components/Modal";
+import { Skeleton } from "@/components/Skeleton";
 import { apiGet, apiPost, apiPatch } from "@/api-client/client";
 import type { FulfillmentLocation, PickList, Register, Outlet } from "@/api-client/types";
+
+interface StockItem {
+  product_id: string;
+  product_name: string;
+  sku: string;
+  quantity_on_hand: number;
+  quantity_reserved: number;
+  quantity_available: number;
+}
+
+interface LocationStockResponse {
+  locationId: string;
+  locationName: string;
+  items: StockItem[];
+}
 
 interface InventoryLocation {
   id: string;
@@ -241,6 +257,28 @@ function StockLocationsTab() {
   const [busy, setBusy] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
 
+  // Stock-by-location modal state
+  const [stockModalLoc, setStockModalLoc] = useState<InventoryLocation | null>(null);
+  const [stockData, setStockData] = useState<LocationStockResponse | null>(null);
+  const [stockLoading, setStockLoading] = useState(false);
+
+  const openStockModal = useCallback(async (loc: InventoryLocation) => {
+    setStockModalLoc(loc);
+    setStockData(null);
+    setStockLoading(true);
+    try {
+      const data = await apiGet<LocationStockResponse>(`/api/v1/inventory/locations/${loc.id}/stock`);
+      setStockData(data);
+    } finally {
+      setStockLoading(false);
+    }
+  }, []);
+
+  const closeStockModal = useCallback(() => {
+    setStockModalLoc(null);
+    setStockData(null);
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -317,7 +355,7 @@ function StockLocationsTab() {
       <div className="overflow-x-auto rounded-lg border border-gray-200">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
+            <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
               <th className="px-4 py-3">Code</th>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Type</th>
@@ -325,11 +363,12 @@ function StockLocationsTab() {
               <th className="px-4 py-3">Sellable</th>
               <th className="px-4 py-3">Receiving</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {loading && <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">Loading…</td></tr>}
-            {!loading && items.length === 0 && <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">No stock locations yet. Create one above.</td></tr>}
+            {loading && <tr><td colSpan={8} className="px-4 py-6 text-center text-gray-400">Loading…</td></tr>}
+            {!loading && items.length === 0 && <tr><td colSpan={8} className="px-4 py-6 text-center text-gray-400">No stock locations yet. Create one above.</td></tr>}
             {items.map(loc => (
               <tr key={loc.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3">
@@ -358,11 +397,69 @@ function StockLocationsTab() {
                     <span className="sr-only">{loc.is_active ? "Active" : "Inactive"}</span>
                   </button>
                 </td>
+                <td className="px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => void openStockModal(loc)}
+                    className="text-xs font-medium text-brand-600 hover:text-brand-800 hover:underline focus:outline-none focus-visible:underline"
+                  >
+                    View Stock
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Stock-by-location modal */}
+      <Modal
+        open={stockModalLoc !== null}
+        onClose={closeStockModal}
+        title={stockModalLoc ? `Stock — ${stockModalLoc.name}` : "Stock"}
+        size="lg"
+      >
+        {stockLoading && (
+          <div className="space-y-3">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+        )}
+        {!stockLoading && stockData && stockData.items.length === 0 && (
+          <p className="py-6 text-center text-sm text-gray-400">No stock recorded for this location.</p>
+        )}
+        {!stockLoading && stockData && stockData.items.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  <th className="px-4 py-3">SKU</th>
+                  <th className="px-4 py-3">Product</th>
+                  <th className="px-4 py-3 text-right">On Hand</th>
+                  <th className="px-4 py-3 text-right">Reserved</th>
+                  <th className="px-4 py-3 text-right">Available</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {stockData.items.map((item) => (
+                  <tr key={item.product_id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{item.sku}</span>
+                    </td>
+                    <td className="px-4 py-3 font-medium text-gray-900">{item.product_name}</td>
+                    <td className="px-4 py-3 text-right text-gray-700">{item.quantity_on_hand}</td>
+                    <td className="px-4 py-3 text-right text-gray-500">{item.quantity_reserved}</td>
+                    <td className={`px-4 py-3 text-right font-semibold ${item.quantity_available > 0 ? "text-green-700" : "text-red-600"}`}>
+                      {item.quantity_available}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
