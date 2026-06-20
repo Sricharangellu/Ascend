@@ -1005,6 +1005,17 @@ export const handlers = [
       }),
     ];
   })(),
+
+  // ── Settings: Currencies (Sprint 11) ─────────────────────────────────────────
+  http.get(`${V1}/settings/currencies`, async () => {
+    await latency();
+    return HttpResponse.json({ items: [
+      { currency_code: "USD", currency_name: "US Dollar",       symbol: "$",  exchange_rate: 1.0,  is_base: true,  is_active: true },
+      { currency_code: "EUR", currency_name: "Euro",            symbol: "€",  exchange_rate: 0.92, is_base: false, is_active: true },
+      { currency_code: "GBP", currency_name: "British Pound",   symbol: "£",  exchange_rate: 0.79, is_base: false, is_active: true },
+      { currency_code: "CAD", currency_name: "Canadian Dollar", symbol: "C$", exchange_rate: 1.36, is_base: false, is_active: true },
+    ]});
+  }),
 ];
 
 // ─── Helper ───────────────────────────────────────────────────────────────────

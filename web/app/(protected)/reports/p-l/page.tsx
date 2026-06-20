@@ -13,6 +13,15 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { formatMoney } from "@/lib/money";
 import { ReportsSubNav } from "@/components/reports/ReportsSubNav";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -93,6 +102,61 @@ function KpiSkeleton() {
         </div>
       ))}
     </div>
+  );
+}
+
+// ─── P&L Overview Chart ───────────────────────────────────────────────────────
+
+function PLChart({ pnl, rangeLabel }: { pnl: PLResponse; rangeLabel: string }) {
+  const chartData = [
+    { name: "Revenue",      value: pnl.revenue.grossCents },
+    { name: "COGS",         value: pnl.cogs.costCents },
+    { name: "Gross Profit", value: pnl.grossProfit.cents },
+    { name: "Op. Expenses", value: pnl.opex.cents },
+    { name: "Net Income",   value: pnl.netProfit.cents },
+  ];
+
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="border-b border-slate-200 px-4 py-3">
+        <h3 className="text-base font-semibold text-slate-950">P&amp;L Overview</h3>
+        <p className="mt-0.5 text-sm text-slate-500">{rangeLabel}</p>
+      </div>
+      <div className="px-4 py-4">
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
+            <CartesianGrid strokeDasharray="4 4" stroke="#E2E8F0" vertical={false} />
+            <XAxis
+              dataKey="name"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fontSize: 11, fill: "#94A3B8" }}
+            />
+            <YAxis
+              width={72}
+              axisLine={false}
+              tickLine={false}
+              tick={{ fontSize: 11, fill: "#94A3B8" }}
+              tickFormatter={(v: number) => formatMoney(v)}
+            />
+            <Tooltip
+              formatter={(v: number) => [formatMoney(v), "Amount"]}
+              contentStyle={{
+                backgroundColor: "white",
+                border: "1px solid #E2E8F0",
+                borderRadius: "6px",
+                fontSize: "12px",
+              }}
+            />
+            <Bar
+              dataKey="value"
+              fill="#2563eb"
+              radius={[4, 4, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
   );
 }
 
@@ -180,6 +244,9 @@ export default function PLReportPage() {
               </Card>
             ) : data ? (
               <>
+                {/* P&L Overview chart */}
+                <PLChart pnl={data} rangeLabel={rangeLabel} />
+
                 {/* Revenue section */}
                 <div>
                   <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">

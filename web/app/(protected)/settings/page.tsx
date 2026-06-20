@@ -9,9 +9,10 @@ import { getUser } from "@/lib/auth";
 import { apiGet, apiPut, apiPost, apiDelete } from "@/api-client/client";
 import { useToast } from "@/components/Toast";
 import { formatMoney } from "@/lib/money";
+import { Badge } from "@/components/Badge";
 import type { ShippingMethod, PaymentTerm, PaymentMode, TaxRate, Account, Deposit } from "@/api-client/types";
 
-type Section = "store" | "shipping" | "terms" | "modes" | "tax" | "flags" | "security" | "coa" | "deposits" | "loyalty" | "api-keys";
+type Section = "store" | "shipping" | "terms" | "modes" | "tax" | "flags" | "security" | "coa" | "deposits" | "loyalty" | "api-keys" | "currencies";
 
 interface Business { [key: string]: unknown }
 
@@ -26,7 +27,7 @@ export default function SettingsPage() {
       <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-5 px-4 py-6 xl:grid-cols-[16rem_1fr]">
         <Card className="h-fit p-2">
           <nav aria-label="Settings sections" className="flex flex-col gap-1">
-            {(["store", "shipping", "terms", "modes", "tax", "flags", "security", "coa", "deposits", "loyalty", "api-keys"] as Section[]).map((s) => (
+            {(["store", "shipping", "terms", "modes", "tax", "flags", "security", "coa", "deposits", "loyalty", "api-keys", "currencies"] as Section[]).map((s) => (
               <SectionButton key={s} active={section === s} onClick={() => setSection(s)} label={sectionLabel(s)} />
             ))}
           </nav>
@@ -44,6 +45,7 @@ export default function SettingsPage() {
           {section === "deposits" && <DepositsSection canManage={canManage} addToast={addToast} />}
           {section === "loyalty" && <LoyaltyTiersSection canManage={canManage} addToast={addToast} />}
           {section === "api-keys" && <ApiKeysSection canManage={canManage} addToast={addToast} />}
+          {section === "currencies" && <CurrenciesSection />}
         </div>
       </div>
     </EnterpriseShell>
@@ -51,7 +53,7 @@ export default function SettingsPage() {
 }
 
 function sectionLabel(s: Section): string {
-  return { store: "Store profile", shipping: "Shipping methods", terms: "Payment terms", modes: "Payment modes", tax: "Tax rates", flags: "Feature flags", security: "Security", coa: "Chart of Accounts", deposits: "Deposits", loyalty: "Loyalty Tiers", "api-keys": "API Keys" }[s];
+  return { store: "Store profile", shipping: "Shipping methods", terms: "Payment terms", modes: "Payment modes", tax: "Tax rates", flags: "Feature flags", security: "Security", coa: "Chart of Accounts", deposits: "Deposits", loyalty: "Loyalty Tiers", "api-keys": "API Keys", currencies: "Currencies" }[s];
 }
 
 // ─── Store Profile ────────────────────────────────────────────────────────────
@@ -1263,6 +1265,91 @@ function ApiKeysSection({ canManage, addToast }: { canManage: boolean; addToast:
         </table>
       </Card>
     </>
+  );
+}
+
+// ─── Currencies ───────────────────────────────────────────────────────────────
+
+interface Currency {
+  currency_code: string;
+  currency_name: string;
+  symbol: string;
+  exchange_rate: number;
+  is_base: boolean;
+  is_active: boolean;
+}
+
+function CurrenciesSection() {
+  const [items, setItems] = useState<Currency[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiGet<{ items: Currency[] }>("/api/v1/settings/currencies")
+      .then((r) => setItems(r.items ?? []))
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Card className="overflow-hidden p-0">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <h2 className="text-base font-semibold text-slate-950">Currencies</h2>
+          <p className="text-sm text-slate-500">Exchange rates and supported currencies for multi-currency orders</p>
+        </div>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <th className="px-4 py-3">Symbol</th>
+              <th className="px-4 py-3">Code</th>
+              <th className="px-4 py-3">Name</th>
+              <th className="px-4 py-3">Exchange Rate</th>
+              <th className="px-4 py-3">Base</th>
+              <th className="px-4 py-3">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {loading && (
+              <tr>
+                <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
+                  Loading…
+                </td>
+              </tr>
+            )}
+            {!loading && items.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
+                  No currencies configured
+                </td>
+              </tr>
+            )}
+            {items.map((c) => (
+              <tr key={c.currency_code} className="hover:bg-slate-50">
+                <td className="px-4 py-3 font-semibold text-slate-950">{c.symbol}</td>
+                <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-700">{c.currency_code}</td>
+                <td className="px-4 py-3 text-slate-700">{c.currency_name}</td>
+                <td className="px-4 py-3 text-slate-600">
+                  {c.is_base
+                    ? <span className="text-slate-400">Base currency</span>
+                    : `1 ${items.find((x) => x.is_base)?.currency_code ?? "USD"} = ${c.exchange_rate} ${c.currency_code}`}
+                </td>
+                <td className="px-4 py-3">
+                  {c.is_base ? <Badge variant="green">Base</Badge> : <span className="text-slate-400">—</span>}
+                </td>
+                <td className="px-4 py-3">
+                  {c.is_active
+                    ? <Badge variant="green">Active</Badge>
+                    : <Badge variant="gray">Inactive</Badge>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+      <div className="rounded-md border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+        Exchange rates are updated manually. To set a new base currency or add currencies, contact support or update via the API.
+      </div>
+    </div>
   );
 }
 

@@ -11,6 +11,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { formatMoney } from "@/lib/money";
 import { useToast } from "@/components/Toast";
 import { getUser } from "@/lib/auth";
+import { Badge } from "@/components/Badge";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,17 @@ interface CustomerFinancials {
 }
 
 type DetailTab = "general" | "transactions" | "financials" | "store-credit";
+
+interface CustomerLoyalty {
+  customerId: string;
+  currentPoints: number;
+  currentTierLevel: number;
+  currentTierName: string | null;
+  pointMultiplier: number;
+  discountPct: number;
+  nextTierName: string | null;
+  pointsToNextTier: number | null;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -149,6 +161,8 @@ export default function CustomerDetailPage() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [summary, setSummary] = useState<CustomerSummary | null>(null);
   const [financials, setFinancials] = useState<CustomerFinancials | null>(null);
+  const [loyalty, setLoyalty] = useState<CustomerLoyalty | null>(null);
+  const [loyaltyLoading, setLoyaltyLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("general");
@@ -160,6 +174,7 @@ export default function CustomerDetailPage() {
   const loadData = useCallback(() => {
     const controller = new AbortController();
     setLoading(true);
+    setLoyaltyLoading(true);
     setError(null);
 
     Promise.all([
@@ -186,6 +201,12 @@ export default function CustomerDetailPage() {
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
+
+    // Load loyalty data independently so a missing endpoint doesn't break the page
+    apiGet<CustomerLoyalty>(`/api/v1/customers/${customerId}/loyalty`, { signal: controller.signal })
+      .then((loy) => { if (!controller.signal.aborted) setLoyalty(loy); })
+      .catch(() => { if (!controller.signal.aborted) setLoyalty(null); })
+      .finally(() => { if (!controller.signal.aborted) setLoyaltyLoading(false); });
 
     return controller;
   }, [customerId]);
@@ -326,12 +347,113 @@ export default function CustomerDetailPage() {
           <StoreCreditTab customer={customer} financials={financials} canEdit={canEdit} />
         )}
 
+        {/* Loyalty card */}
+        <LoyaltyCard loyalty={loyalty} loading={loyaltyLoading} />
+
         {/* Sub-panels: Addresses, Contacts, Notes */}
         <AddressesPanel customerId={customerId} canEdit={canEdit} addToast={addToast} />
         <ContactsPanel customerId={customerId} canEdit={canEdit} addToast={addToast} />
         <NotesPanel customerId={customerId} canEdit={canEdit} addToast={addToast} />
       </div>
     </EnterpriseShell>
+  );
+}
+
+// ─── Loyalty Card ─────────────────────────────────────────────────────────────
+
+const TIER_BADGE_COLOR: Record<number, string> = {
+  1: "bg-amber-100 text-amber-800",
+  2: "bg-slate-100 text-slate-700",
+  3: "bg-yellow-100 text-yellow-800",
+  4: "bg-violet-100 text-violet-700",
+};
+
+function LoyaltyCard({
+  loyalty,
+  loading,
+}: {
+  loyalty: CustomerLoyalty | null;
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <Card title="Loyalty">
+        <div className="space-y-2">
+          <div className="h-4 w-48 animate-pulse rounded bg-slate-100" />
+          <div className="h-4 w-32 animate-pulse rounded bg-slate-100" />
+        </div>
+      </Card>
+    );
+  }
+
+  if (!loyalty || loyalty.currentTierName === null) {
+    return (
+      <Card title="Loyalty">
+        <p className="text-sm text-slate-500">
+          No tier configured — set up loyalty tiers in Settings
+        </p>
+      </Card>
+    );
+  }
+
+  const tierBadgeClass =
+    TIER_BADGE_COLOR[loyalty.currentTierLevel] ?? "bg-slate-100 text-slate-700";
+
+  const progressPct =
+    loyalty.pointsToNextTier !== null && loyalty.currentPoints !== undefined
+      ? Math.min(
+          100,
+          Math.round(
+            (loyalty.currentPoints /
+              (loyalty.currentPoints + loyalty.pointsToNextTier)) *
+              100,
+          ),
+        )
+      : 100;
+
+  return (
+    <Card title="Loyalty">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-8">
+        {/* Left: tier info */}
+        <div className="flex flex-col gap-2">
+          <span
+            className={`inline-flex w-fit rounded-full px-2.5 py-0.5 text-xs font-semibold ${tierBadgeClass}`}
+          >
+            {loyalty.currentTierName}
+          </span>
+          <p className="text-2xl font-bold tabular-nums text-slate-950">
+            {loyalty.currentPoints.toLocaleString()}{" "}
+            <span className="text-sm font-normal text-slate-500">pts</span>
+          </p>
+          <p className="text-sm text-slate-500">{loyalty.pointMultiplier}× earn</p>
+          {loyalty.discountPct > 0 && (
+            <Badge variant="green">{loyalty.discountPct}% discount on purchases</Badge>
+          )}
+        </div>
+
+        {/* Right: progress to next tier */}
+        <div className="flex-1">
+          {loyalty.nextTierName !== null && loyalty.pointsToNextTier !== null ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-slate-600">
+                <span className="font-semibold text-slate-950">
+                  {loyalty.pointsToNextTier.toLocaleString()} pts
+                </span>{" "}
+                to {loyalty.nextTierName}
+              </p>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-2 rounded-full bg-blue-600 transition-all"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm font-semibold text-violet-700">Top tier 🎉</p>
+          )}
+        </div>
+      </div>
+    </Card>
   );
 }
 
