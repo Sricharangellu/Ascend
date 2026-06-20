@@ -273,6 +273,91 @@ function ProductFormModal({
 
 // ── Products Tab ──────────────────────────────────────────────────────────────
 
+// ── Print Labels ──────────────────────────────────────────────────────────────
+
+function formatMoneyHTML(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+function printLabels(products: Product[]) {
+  const win = window.open("", "_blank");
+  if (!win) return;
+  win.document.write(`<!doctype html><html><head><title>Labels</title><style>
+    body { margin: 0; font-family: monospace; }
+    .sheet { display: grid; grid-template-columns: repeat(4, 2in); gap: 0.125in; padding: 0.25in; }
+    .label { width: 2in; height: 1in; border: 1px solid #ccc; padding: 4px; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
+    .name { font-size: 9px; font-weight: bold; line-height: 1.2; }
+    .sku { font-size: 7px; color: #888; }
+    .barcode-box { flex: 1; background: #f3f3f3; margin: 2px 0; display: flex; align-items: center; justify-content: center; font-size: 6px; color: #555; }
+    .price { font-size: 13px; font-weight: bold; text-align: right; }
+    @media print { @page { margin: 0.25in; } }
+  </style></head><body><div class="sheet">${products.map(p => `
+    <div class="label">
+      <div class="name">${p.name}</div>
+      <div class="sku">${p.sku}</div>
+      <div class="barcode-box">${p.barcode ?? p.sku}</div>
+      <div class="price">${formatMoneyHTML(p.price_cents)}</div>
+    </div>`).join("")}</div><script>window.onload=()=>{window.print();window.close();}<\/script></body></html>`);
+  win.document.close();
+}
+
+function PrintLabelsModal({
+  selected,
+  onClose,
+}: {
+  selected: Product[];
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="flex max-h-[80vh] w-full max-w-md flex-col rounded-md bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <h2 className="text-base font-semibold text-slate-950">Print Labels</h2>
+          <button type="button" onClick={onClose} aria-label="Close print labels" className="flex h-9 w-9 items-center justify-center rounded-md text-xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-600">&times;</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {selected.length === 0 ? (
+            <p className="text-sm text-slate-500">Select products first using the checkboxes.</p>
+          ) : (
+            <>
+              <p className="mb-3 text-sm text-slate-600">{selected.length} product{selected.length !== 1 ? "s" : ""} selected for printing:</p>
+              <ul className="divide-y divide-slate-100 rounded-md border border-slate-200">
+                {selected.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-2 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-950">{p.name}</p>
+                      <p className="font-mono text-xs text-slate-500">{p.sku}</p>
+                    </div>
+                    <span className="shrink-0 text-sm font-semibold text-slate-950">{formatMoneyHTML(p.price_cents)}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+          <button type="button" onClick={onClose} className="min-h-[40px] rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+          <button
+            type="button"
+            disabled={selected.length === 0}
+            onClick={() => { printLabels(selected); onClose(); }}
+            className="min-h-[40px] rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+          >
+            Print
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Products Tab ──────────────────────────────────────────────────────────────
+
 function ProductsTab({ categories }: { categories: Category[] }) {
   const [products, setProducts]     = useState<Product[]>([]);
   const [total, setTotal]           = useState(0);
@@ -283,6 +368,9 @@ function ProductsTab({ categories }: { categories: Category[] }) {
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [search, setSearch]                 = useState<string>("");
   const [debouncedQ, setDebouncedQ]         = useState<string>("");
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showPrintLabels, setShowPrintLabels] = useState(false);
 
   const [showCreate, setShowCreate] = useState(false);
   const [editTarget, setEditTarget] = useState<Product | null>(null);
@@ -311,6 +399,25 @@ function ProductsTab({ categories }: { categories: Category[] }) {
     const t = setTimeout(() => setDebouncedQ(search), 300);
     return () => clearTimeout(t);
   }, [search]);
+
+  const selectedProducts = products.filter((p: Product) => selectedIds.has(p.id));
+  const allSelected = products.length > 0 && products.every((p: Product) => selectedIds.has(p.id));
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev: Set<string>) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set<string>());
+    } else {
+      setSelectedIds(new Set<string>(products.map((p: Product) => p.id)));
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -367,7 +474,7 @@ function ProductsTab({ categories }: { categories: Category[] }) {
         </div>
 
         {/* Toolbar */}
-        <div className="grid gap-3 border-b border-slate-200 px-4 py-3 lg:grid-cols-[minmax(220px,1fr)_auto_auto_auto]">
+        <div className="grid gap-3 border-b border-slate-200 px-4 py-3 lg:grid-cols-[minmax(220px,1fr)_auto_auto_auto_auto]">
           <div className="min-w-0">
             <label htmlFor="catalog-search" className="sr-only">Search products</label>
             <input
@@ -403,6 +510,13 @@ function ProductsTab({ categories }: { categories: Category[] }) {
               {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
             </select>
           </label>
+          <button
+            type="button"
+            onClick={() => setShowPrintLabels(true)}
+            className="min-h-[40px] rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Print Labels{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
+          </button>
           <button
             type="button"
             onClick={() => { setShowCreate(true); setActionError(null); }}
@@ -455,6 +569,15 @@ function ProductsTab({ categories }: { categories: Category[] }) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    <th className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={toggleSelectAll}
+                        aria-label="Select all products"
+                        className="h-4 w-4 rounded border-slate-300"
+                      />
+                    </th>
                     <th className="px-4 py-3">Product</th>
                     <th className="px-4 py-3">SKU</th>
                     <th className="px-4 py-3">Category</th>
@@ -466,8 +589,18 @@ function ProductsTab({ categories }: { categories: Category[] }) {
                 <tbody className="divide-y divide-slate-100">
                   {products.map((p) => {
                     const style = productStatusStyle(p.status);
+                    const isSelected = selectedIds.has(p.id);
                     return (
-                    <tr key={p.id} className={clsx("border-l-4 transition-colors", style.row)}>
+                    <tr key={p.id} className={clsx("border-l-4 transition-colors", style.row, isSelected && "ring-1 ring-inset ring-brand-200")}>
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(p.id)}
+                          aria-label={`Select ${p.name}`}
+                          className="h-4 w-4 rounded border-slate-300"
+                        />
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-start gap-2">
                           <span className={clsx("mt-1.5 h-2 w-2 shrink-0 rounded-full", style.dot)} aria-hidden="true" />
@@ -541,6 +674,12 @@ function ProductsTab({ categories }: { categories: Category[] }) {
       </Card>
 
       {/* Modals */}
+      {showPrintLabels && (
+        <PrintLabelsModal
+          selected={selectedProducts}
+          onClose={() => setShowPrintLabels(false)}
+        />
+      )}
       {showCreate && (
         <ProductFormModal
           categories={categories}
