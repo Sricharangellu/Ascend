@@ -974,6 +974,31 @@ export const handlers = [
   // Cycle-3 modules (customers, gift cards, webhooks, inventory overview, team).
   // Maintained in a separate file to avoid cross-agent edit collisions.
   ...lightspeedHandlers,
+
+  // ── API Keys (Sprint 10B) ────────────────────────────────────────────────────
+  ...(() => {
+    let apiKeys: Array<{ id: string; name: string; key_prefix: string; scopes: string; last_used_at: string | null; expires_at: string | null; created_at: string }> = [];
+    return [
+      http.get(`${IDENTITY}/api-keys`, async () => {
+        await delay(Math.floor(Math.random() * 120) + 60);
+        return HttpResponse.json({ items: apiKeys });
+      }),
+      http.post(`${IDENTITY}/api-keys`, async ({ request }) => {
+        await delay(Math.floor(Math.random() * 120) + 60);
+        const b = (await request.json()) as { name?: string; scopes?: string; expiresAt?: string };
+        const prefix = "fpk_demo_ke";
+        const key = `fpk_demo_key_shown_once_${Math.random().toString(36).slice(2, 10)}`;
+        const id = `apk_${Math.random().toString(36).slice(2, 10)}`;
+        apiKeys.push({ id, name: b.name ?? "Unnamed key", key_prefix: prefix, scopes: b.scopes ?? "[]", last_used_at: null, expires_at: b.expiresAt ?? null, created_at: new Date().toISOString() });
+        return HttpResponse.json({ id, key, prefix }, { status: 201 });
+      }),
+      http.delete(`${IDENTITY}/api-keys/:id`, async ({ params }) => {
+        await delay(Math.floor(Math.random() * 120) + 60);
+        apiKeys = apiKeys.filter(k => k.id !== String(params.id));
+        return new HttpResponse(null, { status: 204 });
+      }),
+    ];
+  })(),
 ];
 
 // ─── Helper ───────────────────────────────────────────────────────────────────

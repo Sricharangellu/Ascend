@@ -6,7 +6,8 @@ import Link from "next/link";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
-import { apiGet, apiPatch, ApiResponseError } from "@/api-client/client";
+import { apiGet, apiPost, apiDelete, apiPatch, ApiResponseError } from "@/api-client/client";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { formatMoney } from "@/lib/money";
 import { useToast } from "@/components/Toast";
 import { getUser } from "@/lib/auth";
@@ -324,6 +325,11 @@ export default function CustomerDetailPage() {
         {activeTab === "store-credit" && (
           <StoreCreditTab customer={customer} financials={financials} canEdit={canEdit} />
         )}
+
+        {/* Sub-panels: Addresses, Contacts, Notes */}
+        <AddressesPanel customerId={customerId} canEdit={canEdit} addToast={addToast} />
+        <ContactsPanel customerId={customerId} canEdit={canEdit} addToast={addToast} />
+        <NotesPanel customerId={customerId} canEdit={canEdit} addToast={addToast} />
       </div>
     </EnterpriseShell>
   );
@@ -846,6 +852,435 @@ function StoreCreditTab({
         </Card>
       )}
     </div>
+  );
+}
+
+// ─── Addresses Sub-panel ──────────────────────────────────────────────────────
+
+interface CustomerAddress {
+  id: string;
+  address_type: string;
+  address_line1: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+  is_default: boolean;
+}
+
+function AddressesPanel({ customerId, canEdit, addToast }: { customerId: string; canEdit: boolean; addToast: ReturnType<typeof useToast>["addToast"] }) {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<CustomerAddress[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ address_type: "billing", address_line1: "", city: "", state: "", zip: "", is_default: false });
+  const [busy, setBusy] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<CustomerAddress | null>(null);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    apiGet<{ items: CustomerAddress[] }>(`/api/v1/customers/${customerId}/addresses`)
+      .then(r => setItems(r.items ?? []))
+      .catch(() => setItems([]))
+      .finally(() => { setLoading(false); setLoaded(true); });
+  }, [customerId]);
+
+  const toggle = () => {
+    setOpen(v => {
+      if (!v && !loaded) load();
+      return !v;
+    });
+  };
+
+  const add = async () => {
+    if (!form.address_line1.trim() || !form.city.trim()) return;
+    setBusy(true);
+    try {
+      await apiPost(`/api/v1/customers/${customerId}/addresses`, form);
+      setShowForm(false);
+      setForm({ address_type: "billing", address_line1: "", city: "", state: "", zip: "", is_default: false });
+      load();
+      addToast({ title: "Address added", variant: "success" });
+    } catch (e) {
+      addToast({ title: "Failed", description: e instanceof Error ? e.message : "Unknown error", variant: "error" });
+    } finally { setBusy(false); }
+  };
+
+  const remove = async (id: string) => {
+    setBusy(true);
+    try {
+      await apiDelete(`/api/v1/customers/${customerId}/addresses/${id}`);
+      setDeleteTarget(null);
+      load();
+      addToast({ title: "Address removed", variant: "success" });
+    } catch (e) {
+      addToast({ title: "Failed", description: e instanceof Error ? e.message : "Unknown error", variant: "error" });
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Remove address"
+        message={`Remove this ${deleteTarget?.address_type} address?`}
+        confirmLabel="Remove"
+        destructive
+        onConfirm={() => deleteTarget && void remove(deleteTarget.id)}
+        onCancel={() => setDeleteTarget(null)}
+      />
+      <Card className="overflow-hidden p-0">
+        <button
+          type="button"
+          onClick={toggle}
+          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-slate-950">Addresses</span>
+            {loaded && (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{items.length}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {open && canEdit && (
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={e => { e.stopPropagation(); setShowForm(v => !v); }}
+                onKeyDown={e => { if (e.key === "Enter") { e.stopPropagation(); setShowForm(v => !v); } }}
+                className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700"
+              >
+                Add
+              </span>
+            )}
+            <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
+        </button>
+
+        {open && (
+          <div className="border-t border-slate-200">
+            {showForm && canEdit && (
+              <div className="border-b border-slate-200 bg-slate-50 px-4 py-4 space-y-3">
+                <div className="flex flex-wrap gap-3">
+                  <select value={form.address_type} onChange={e => setForm(f => ({ ...f, address_type: e.target.value }))} className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950">
+                    <option value="billing">Billing</option>
+                    <option value="shipping">Shipping</option>
+                  </select>
+                  <input value={form.address_line1} onChange={e => setForm(f => ({ ...f, address_line1: e.target.value }))} placeholder="Address line 1" className="flex-1 min-w-48 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+                  <input value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} placeholder="City" className="w-32 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+                  <input value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value }))} placeholder="State" className="w-20 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+                  <input value={form.zip} onChange={e => setForm(f => ({ ...f, zip: e.target.value }))} placeholder="ZIP" className="w-24 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+                </div>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                    <input type="checkbox" checked={form.is_default} onChange={e => setForm(f => ({ ...f, is_default: e.target.checked }))} className="h-4 w-4 rounded border-slate-300 accent-blue-600" />
+                    Set as default
+                  </label>
+                  <div className="ml-auto flex gap-2">
+                    <Button size="sm" variant="secondary" onClick={() => setShowForm(false)}>Cancel</Button>
+                    <Button size="sm" variant="primary" loading={busy} disabled={!form.address_line1.trim() || !form.city.trim()} onClick={() => void add()}>Add</Button>
+                  </div>
+                </div>
+              </div>
+            )}
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3">Address</th>
+                  <th className="px-4 py-3">City / State / ZIP</th>
+                  <th className="px-4 py-3">Default</th>
+                  {canEdit && <th className="px-4 py-3" />}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {loading && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">Loading…</td></tr>}
+                {!loading && items.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No addresses yet.</td></tr>}
+                {items.map(addr => (
+                  <tr key={addr.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 capitalize text-slate-700">{addr.address_type}</td>
+                    <td className="px-4 py-3">{addr.address_line1}</td>
+                    <td className="px-4 py-3 text-slate-500">{addr.city}, {addr.state} {addr.zip}</td>
+                    <td className="px-4 py-3">
+                      {addr.is_default ? (
+                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">Default</span>
+                      ) : "—"}
+                    </td>
+                    {canEdit && (
+                      <td className="px-4 py-3 text-right">
+                        <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(addr)}>Remove</Button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </>
+  );
+}
+
+// ─── Contacts Sub-panel ───────────────────────────────────────────────────────
+
+interface CustomerContact {
+  id: string;
+  contact_name: string;
+  title: string | null;
+  email: string | null;
+  phone: string | null;
+  is_primary: boolean;
+}
+
+function ContactsPanel({ customerId, canEdit, addToast }: { customerId: string; canEdit: boolean; addToast: ReturnType<typeof useToast>["addToast"] }) {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<CustomerContact[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ contact_name: "", title: "", email: "", phone: "", is_primary: false });
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    apiGet<{ items: CustomerContact[] }>(`/api/v1/customers/${customerId}/contacts`)
+      .then(r => setItems(r.items ?? []))
+      .catch(() => setItems([]))
+      .finally(() => { setLoading(false); setLoaded(true); });
+  }, [customerId]);
+
+  const toggle = () => {
+    setOpen(v => {
+      if (!v && !loaded) load();
+      return !v;
+    });
+  };
+
+  const add = async () => {
+    if (!form.contact_name.trim()) return;
+    setBusy(true);
+    try {
+      await apiPost(`/api/v1/customers/${customerId}/contacts`, {
+        contact_name: form.contact_name.trim(),
+        title: form.title.trim() || undefined,
+        email: form.email.trim() || undefined,
+        phone: form.phone.trim() || undefined,
+        is_primary: form.is_primary,
+      });
+      setShowForm(false);
+      setForm({ contact_name: "", title: "", email: "", phone: "", is_primary: false });
+      load();
+      addToast({ title: "Contact added", variant: "success" });
+    } catch (e) {
+      addToast({ title: "Failed", description: e instanceof Error ? e.message : "Unknown error", variant: "error" });
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <Card className="overflow-hidden p-0">
+      <button
+        type="button"
+        onClick={toggle}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-slate-950">Contacts</span>
+          {loaded && (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{items.length}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {open && canEdit && (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={e => { e.stopPropagation(); setShowForm(v => !v); }}
+              onKeyDown={e => { if (e.key === "Enter") { e.stopPropagation(); setShowForm(v => !v); } }}
+              className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700"
+            >
+              Add
+            </span>
+          )}
+          <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}>
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </div>
+      </button>
+
+      {open && (
+        <div className="border-t border-slate-200">
+          {showForm && canEdit && (
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-4 space-y-3">
+              <div className="flex flex-wrap gap-3">
+                <input value={form.contact_name} onChange={e => setForm(f => ({ ...f, contact_name: e.target.value }))} placeholder="Name (required)" className="flex-1 min-w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+                <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Title" className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+                <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="Email" className="w-48 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+                <input type="tel" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="Phone" className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              </div>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                  <input type="checkbox" checked={form.is_primary} onChange={e => setForm(f => ({ ...f, is_primary: e.target.checked }))} className="h-4 w-4 rounded border-slate-300 accent-blue-600" />
+                  Primary contact
+                </label>
+                <div className="ml-auto flex gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => setShowForm(false)}>Cancel</Button>
+                  <Button size="sm" variant="primary" loading={busy} disabled={!form.contact_name.trim()} onClick={() => void add()}>Add</Button>
+                </div>
+              </div>
+            </div>
+          )}
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Title</th>
+                <th className="px-4 py-3">Email</th>
+                <th className="px-4 py-3">Phone</th>
+                <th className="px-4 py-3">Primary</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">Loading…</td></tr>}
+              {!loading && items.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No contacts yet.</td></tr>}
+              {items.map(contact => (
+                <tr key={contact.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-3 font-medium">{contact.contact_name}</td>
+                  <td className="px-4 py-3 text-slate-500">{contact.title ?? "—"}</td>
+                  <td className="px-4 py-3 text-slate-500">{contact.email ?? "—"}</td>
+                  <td className="px-4 py-3 text-slate-500">{contact.phone ?? "—"}</td>
+                  <td className="px-4 py-3">
+                    {contact.is_primary ? (
+                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">Primary</span>
+                    ) : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ─── Notes Sub-panel ──────────────────────────────────────────────────────────
+
+interface CustomerNote {
+  id: string;
+  note_type: string;
+  content: string;
+  created_at: string;
+}
+
+const NOTE_TYPE_BADGE: Record<string, string> = {
+  general: "bg-gray-100 text-gray-700",
+  billing: "bg-blue-100 text-blue-700",
+  compliance: "bg-yellow-100 text-yellow-800",
+  internal: "bg-purple-100 text-purple-700",
+};
+
+function NotesPanel({ customerId, canEdit, addToast }: { customerId: string; canEdit: boolean; addToast: ReturnType<typeof useToast>["addToast"] }) {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<CustomerNote[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [content, setContent] = useState("");
+  const [noteType, setNoteType] = useState("general");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    apiGet<{ items: CustomerNote[] }>(`/api/v1/customers/${customerId}/notes`)
+      .then(r => setItems(r.items ?? []))
+      .catch(() => setItems([]))
+      .finally(() => { setLoading(false); setLoaded(true); });
+  }, [customerId]);
+
+  const toggle = () => {
+    setOpen(v => {
+      if (!v && !loaded) load();
+      return !v;
+    });
+  };
+
+  const addNote = async () => {
+    if (!content.trim()) return;
+    setBusy(true);
+    try {
+      await apiPost(`/api/v1/customers/${customerId}/notes`, { note_type: noteType, content: content.trim() });
+      setContent("");
+      setNoteType("general");
+      load();
+      addToast({ title: "Note added", variant: "success" });
+    } catch (e) {
+      addToast({ title: "Failed", description: e instanceof Error ? e.message : "Unknown error", variant: "error" });
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <Card className="overflow-hidden p-0">
+      <button
+        type="button"
+        onClick={toggle}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-slate-950">Notes</span>
+          {loaded && (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{items.length}</span>
+          )}
+        </div>
+        <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="border-t border-slate-200">
+          {loading && <div className="px-4 py-6 text-center text-sm text-slate-400">Loading…</div>}
+          {!loading && items.length === 0 && <div className="px-4 py-4 text-sm text-slate-400">No notes yet.</div>}
+          {items.length > 0 && (
+            <ul className="divide-y divide-slate-100">
+              {items.map(note => (
+                <li key={note.id} className="flex items-start gap-3 px-4 py-3">
+                  <span className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${NOTE_TYPE_BADGE[note.note_type] ?? "bg-gray-100 text-gray-700"}`}>
+                    {note.note_type}
+                  </span>
+                  <p className="flex-1 text-sm text-slate-700">{note.content}</p>
+                  <span className="shrink-0 text-xs text-slate-400">{new Date(note.created_at).toLocaleDateString()}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {canEdit && (
+            <div className="border-t border-slate-200 bg-slate-50 px-4 py-4 space-y-3">
+              <div className="flex gap-3">
+                <select value={noteType} onChange={e => setNoteType(e.target.value)} className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950">
+                  <option value="general">General</option>
+                  <option value="billing">Billing</option>
+                  <option value="compliance">Compliance</option>
+                  <option value="internal">Internal</option>
+                </select>
+                <textarea
+                  value={content}
+                  onChange={e => setContent(e.target.value)}
+                  rows={2}
+                  placeholder="Add a note…"
+                  className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950 resize-none"
+                />
+              </div>
+              <div className="flex justify-end">
+                <Button size="sm" variant="primary" loading={busy} disabled={!content.trim()} onClick={() => void addNote()}>Add note</Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }
 

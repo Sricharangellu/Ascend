@@ -6,11 +6,22 @@ import { Button } from "@/components/Button";
 import { Badge, statusBadge } from "@/components/Badge";
 import { Table } from "@/components/Table";
 import { Modal } from "@/components/Modal";
-import { apiGet, apiPost } from "@/api-client/client";
+import { apiGet, apiPost, apiPatch } from "@/api-client/client";
 import type { FulfillmentLocation, PickList, Register, Outlet } from "@/api-client/types";
 
+interface InventoryLocation {
+  id: string;
+  code: string;
+  name: string;
+  location_type: string;
+  outlet_id: string | null;
+  is_sellable: boolean;
+  is_receiving_location: boolean;
+  is_active: boolean;
+}
+
 export default function OperationsPage() {
-  const [tab, setTab] = useState<"locations" | "picklists" | "outlets">("locations");
+  const [tab, setTab] = useState<"locations" | "picklists" | "outlets" | "stock-locations">("locations");
   const [locations, setLocations] = useState<FulfillmentLocation[]>([]);
   const [pickLists, setPickLists] = useState<PickList[]>([]);
   const [outlets, setOutlets] = useState<Outlet[]>([]);
@@ -100,10 +111,10 @@ export default function OperationsPage() {
         {/* Tabs */}
         <div className="border-b border-gray-200">
           <nav className="flex gap-6">
-            {(["locations", "picklists", "outlets"] as const).map(t => (
+            {(["locations", "picklists", "outlets", "stock-locations"] as const).map(t => (
               <button key={t} onClick={() => setTab(t)}
                 className={`pb-3 text-sm font-medium capitalize transition-colors border-b-2 ${tab === t ? "border-brand-600 text-brand-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
-                {t === "picklists" ? "Pick Lists" : t === "outlets" ? "Outlets" : "Locations"}
+                {t === "picklists" ? "Pick Lists" : t === "outlets" ? "Outlets" : t === "stock-locations" ? "Stock Locations" : "Locations"}
               </button>
             ))}
           </nav>
@@ -127,6 +138,8 @@ export default function OperationsPage() {
             <Table columns={pickCols} rows={pickLists} loading={loading} rowKey={r => r.id} emptyMessage="No pick lists. They're auto-created when sales orders are fulfilled." />
           </div>
         )}
+
+        {tab === "stock-locations" && <StockLocationsTab />}
 
         {tab === "outlets" && (
           <div className="space-y-4">
@@ -208,5 +221,148 @@ export default function OperationsPage() {
         </div>
       </Modal>
     </EnterpriseShell>
+  );
+}
+
+// ─── Stock Locations Tab ──────────────────────────────────────────────────────
+
+const LOC_TYPE_BADGE: Record<string, "blue" | "gray" | "red" | "yellow"> = {
+  floor: "blue",
+  warehouse: "gray",
+  damage: "red",
+  receiving: "yellow",
+};
+
+function StockLocationsTab() {
+  const [items, setItems] = useState<InventoryLocation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ code: "", name: "", location_type: "floor", outlet_id: "", is_sellable: false, is_receiving_location: false });
+  const [busy, setBusy] = useState(false);
+  const [toggling, setToggling] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiGet<{ items: InventoryLocation[] }>("/api/v1/inventory/locations").catch(() => ({ items: [] as InventoryLocation[] }));
+      setItems(r.items);
+    } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const create = async () => {
+    if (!form.code.trim() || !form.name.trim()) return;
+    setBusy(true);
+    try {
+      await apiPost("/api/v1/inventory/locations", {
+        code: form.code.trim(),
+        name: form.name.trim(),
+        location_type: form.location_type,
+        outlet_id: form.outlet_id.trim() || null,
+        is_sellable: form.is_sellable,
+        is_receiving_location: form.is_receiving_location,
+      });
+      setShowForm(false);
+      setForm({ code: "", name: "", location_type: "floor", outlet_id: "", is_sellable: false, is_receiving_location: false });
+      void load();
+    } finally { setBusy(false); }
+  };
+
+  const toggleActive = async (loc: InventoryLocation) => {
+    setToggling(loc.id);
+    try {
+      await apiPatch(`/api/v1/inventory/locations/${loc.id}`, { is_active: !loc.is_active });
+      setItems(prev => prev.map(l => l.id === loc.id ? { ...l, is_active: !l.is_active } : l));
+    } finally { setToggling(null); }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-gray-900">Stock Locations ({items.length})</h2>
+        <Button variant="primary" size="sm" onClick={() => setShowForm(v => !v)}>+ New Location</Button>
+      </div>
+
+      {showForm && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+          <div className="flex flex-wrap gap-3">
+            <input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder="Code (e.g. MAIN-FLR)" className="w-36 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Name" className="flex-1 min-w-36 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+            <select value={form.location_type} onChange={e => setForm(f => ({ ...f, location_type: e.target.value }))} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
+              <option value="floor">Floor</option>
+              <option value="warehouse">Warehouse</option>
+              <option value="damage">Damage</option>
+              <option value="receiving">Receiving</option>
+            </select>
+            <input value={form.outlet_id} onChange={e => setForm(f => ({ ...f, outlet_id: e.target.value }))} placeholder="Outlet ID (optional)" className="w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+          </div>
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+              <input type="checkbox" checked={form.is_sellable} onChange={e => setForm(f => ({ ...f, is_sellable: e.target.checked }))} className="h-4 w-4 rounded border-gray-300 accent-blue-600" />
+              Sellable
+            </label>
+            <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+              <input type="checkbox" checked={form.is_receiving_location} onChange={e => setForm(f => ({ ...f, is_receiving_location: e.target.checked }))} className="h-4 w-4 rounded border-gray-300 accent-blue-600" />
+              Receiving
+            </label>
+            <div className="ml-auto flex gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setShowForm(false)}>Cancel</Button>
+              <Button size="sm" variant="primary" loading={busy} disabled={!form.code.trim() || !form.name.trim()} onClick={() => void create()}>Create</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
+              <th className="px-4 py-3">Code</th>
+              <th className="px-4 py-3">Name</th>
+              <th className="px-4 py-3">Type</th>
+              <th className="px-4 py-3">Outlet</th>
+              <th className="px-4 py-3">Sellable</th>
+              <th className="px-4 py-3">Receiving</th>
+              <th className="px-4 py-3">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {loading && <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">Loading…</td></tr>}
+            {!loading && items.length === 0 && <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">No stock locations yet. Create one above.</td></tr>}
+            {items.map(loc => (
+              <tr key={loc.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3">
+                  <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{loc.code}</span>
+                </td>
+                <td className="px-4 py-3 font-medium text-gray-900">{loc.name}</td>
+                <td className="px-4 py-3">
+                  <Badge variant={LOC_TYPE_BADGE[loc.location_type] ?? "gray"}>{loc.location_type}</Badge>
+                </td>
+                <td className="px-4 py-3 text-gray-500">{loc.outlet_id ?? "—"}</td>
+                <td className="px-4 py-3">
+                  {loc.is_sellable ? <span className="text-green-700 font-medium">Yes</span> : <span className="text-gray-400">No</span>}
+                </td>
+                <td className="px-4 py-3">
+                  {loc.is_receiving_location ? <span className="text-green-700 font-medium">Yes</span> : <span className="text-gray-400">No</span>}
+                </td>
+                <td className="px-4 py-3">
+                  <button
+                    type="button"
+                    disabled={toggling === loc.id}
+                    onClick={() => void toggleActive(loc)}
+                    aria-pressed={loc.is_active}
+                    className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${loc.is_active ? "bg-blue-600" : "bg-gray-300"} ${toggling === loc.id ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                  >
+                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${loc.is_active ? "translate-x-4" : "translate-x-0.5"}`} />
+                    <span className="sr-only">{loc.is_active ? "Active" : "Inactive"}</span>
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }

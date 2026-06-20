@@ -1613,3 +1613,99 @@ lightspeedHandlers.push(
     return HttpResponse.json({ items: exportBatches });
   }),
 );
+
+// ── Sprint 10B: Customer sub-panels + Inventory Locations ────────────────────
+
+const customerAddresses = new Map<string, any[]>();
+const customerContacts = new Map<string, any[]>();
+const customerNotes = new Map<string, any[]>();
+
+// Seed demo data for cus_demo_1
+customerAddresses.set("cus_demo_1", [
+  { id: "addr_1", address_type: "billing", address_line1: "123 Main St", city: "Houston", state: "TX", zip: "77001", country: "US", is_default: true },
+]);
+customerContacts.set("cus_demo_1", []);
+customerNotes.set("cus_demo_1", []);
+
+let invLocSeq = 2;
+const inventoryLocations: any[] = [
+  { id: "invloc_1", code: "MAIN-FLR", name: "Main Floor", location_type: "floor", outlet_id: "otl_main", is_sellable: true, is_receiving_location: false, is_active: true },
+  { id: "invloc_2", code: "BACK-WH", name: "Back Warehouse", location_type: "warehouse", outlet_id: "otl_main", is_sellable: false, is_receiving_location: true, is_active: true },
+];
+
+lightspeedHandlers.push(
+  // ── Customer addresses ────────────────────────────────────────────────────
+  http.get(`${V1}/customers/:id/addresses`, async ({ params }) => {
+    await lat();
+    const items = customerAddresses.get(String(params.id)) ?? [];
+    return HttpResponse.json({ items });
+  }),
+  http.post(`${V1}/customers/:id/addresses`, async ({ params, request }) => {
+    await lat();
+    const b = (await request.json()) as any;
+    const addr = { id: `addr_${Math.random().toString(36).slice(2, 10)}`, ...b, country: b.country ?? "US" };
+    const list = customerAddresses.get(String(params.id)) ?? [];
+    list.push(addr);
+    customerAddresses.set(String(params.id), list);
+    return HttpResponse.json(addr, { status: 201 });
+  }),
+  http.delete(`${V1}/customers/:id/addresses/:addrId`, async ({ params }) => {
+    await lat();
+    const list = (customerAddresses.get(String(params.id)) ?? []).filter((a) => a.id !== String(params.addrId));
+    customerAddresses.set(String(params.id), list);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  // ── Customer contacts ─────────────────────────────────────────────────────
+  http.get(`${V1}/customers/:id/contacts`, async ({ params }) => {
+    await lat();
+    const items = customerContacts.get(String(params.id)) ?? [];
+    return HttpResponse.json({ items });
+  }),
+  http.post(`${V1}/customers/:id/contacts`, async ({ params, request }) => {
+    await lat();
+    const b = (await request.json()) as any;
+    const contact = { id: `con_${Math.random().toString(36).slice(2, 10)}`, ...b };
+    const list = customerContacts.get(String(params.id)) ?? [];
+    list.push(contact);
+    customerContacts.set(String(params.id), list);
+    return HttpResponse.json(contact, { status: 201 });
+  }),
+
+  // ── Customer notes ────────────────────────────────────────────────────────
+  http.get(`${V1}/customers/:id/notes`, async ({ params }) => {
+    await lat();
+    const items = customerNotes.get(String(params.id)) ?? [];
+    return HttpResponse.json({ items });
+  }),
+  http.post(`${V1}/customers/:id/notes`, async ({ params, request }) => {
+    await lat();
+    const b = (await request.json()) as any;
+    const note = { id: `note_${Math.random().toString(36).slice(2, 10)}`, ...b, created_at: new Date().toISOString() };
+    const list = customerNotes.get(String(params.id)) ?? [];
+    list.push(note);
+    customerNotes.set(String(params.id), list);
+    return HttpResponse.json(note, { status: 201 });
+  }),
+
+  // ── Inventory locations (Sprint 8 physical stock locations) ───────────────
+  http.get(`${V1}/inventory/locations`, async () => {
+    await lat();
+    return HttpResponse.json({ items: [...inventoryLocations] });
+  }),
+  http.post(`${V1}/inventory/locations`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as any;
+    const loc = { id: `invloc_${++invLocSeq}`, code: b.code, name: b.name, location_type: b.location_type ?? "floor", outlet_id: b.outlet_id ?? null, is_sellable: !!b.is_sellable, is_receiving_location: !!b.is_receiving_location, is_active: true };
+    inventoryLocations.push(loc);
+    return HttpResponse.json(loc, { status: 201 });
+  }),
+  http.patch(`${V1}/inventory/locations/:id`, async ({ params, request }) => {
+    await lat();
+    const b = (await request.json()) as any;
+    const idx = inventoryLocations.findIndex((l) => l.id === String(params.id));
+    if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+    inventoryLocations[idx] = { ...inventoryLocations[idx], ...b };
+    return HttpResponse.json(inventoryLocations[idx]);
+  }),
+);
