@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { apiGet, ApiResponseError } from "@/api-client/client";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
@@ -18,6 +19,13 @@ import { ReportsSubNav } from "@/components/reports/ReportsSubNav";
 
 type Range = "today" | "7d" | "30d";
 type Tab = "category" | "customer" | "product";
+
+interface RevenueTrendItem {
+  date: string;
+  label: string;
+  revenueCents: number;
+  orderCount: number;
+}
 
 interface CategoryItem {
   category: string;
@@ -159,6 +167,7 @@ export default function SalesReportPage() {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
   const [products, setProducts] = useState<ProductItem[]>([]);
+  const [trendItems, setTrendItems] = useState<RevenueTrendItem[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -170,15 +179,17 @@ export default function SalesReportPage() {
 
     (async () => {
       try {
-        const [catData, cusData, proData] = await Promise.all([
+        const [catData, cusData, proData, trendData] = await Promise.all([
           apiGet<CategoryResponse>(`/api/v1/reports/sales-by-category?range=${range}`),
           apiGet<CustomerResponse>(`/api/v1/reports/sales-by-customer?range=${range}`),
           apiGet<ProductResponse>(`/api/v1/reports/top-products?range=${range}&limit=50`),
+          apiGet<{ items: RevenueTrendItem[] }>(`/api/v1/reports/revenue-trend?range=30d`),
         ]);
         if (!cancelled) {
           setCategories(catData.items ?? []);
           setCustomers(cusData.items ?? []);
           setProducts(proData.items ?? []);
+          setTrendItems(trendData.items ?? []);
         }
       } catch (err) {
         if (!cancelled) {
@@ -251,6 +262,59 @@ export default function SalesReportPage() {
             Export CSV
           </Button>
         </div>
+
+        {/* Revenue Trend Chart */}
+        <Card className="overflow-hidden p-0">
+          <div className="border-b border-slate-200 px-4 py-3">
+            <h2 className="text-base font-semibold text-slate-950">Revenue Trend</h2>
+            <p className="text-sm text-slate-500">Daily revenue over the last 30 days</p>
+          </div>
+          <div className="px-2 py-4">
+            <ResponsiveContainer width="100%" height={240}>
+              <AreaChart data={trendItems} margin={{ top: 4, right: 16, bottom: 0, left: 8 }}>
+                <defs>
+                  <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0.01} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="4 4" stroke="#E2E8F0" vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 11, fill: "#94A3B8" }}
+                  axisLine={false}
+                  tickLine={false}
+                  interval="preserveStartEnd"
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#94A3B8" }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v: number) => formatMoney(v)}
+                  width={70}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "white",
+                    border: "1px solid #E2E8F0",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                  }}
+                  formatter={(value: number) => [formatMoney(value), "Revenue"]}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="revenueCents"
+                  stroke="#2563eb"
+                  strokeWidth={2}
+                  fill="url(#grad)"
+                  dot={false}
+                  activeDot={{ r: 4, fill: "#2563eb" }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
 
         <Card noPadding>
           <TabBar active={tab} onChange={setTab} />

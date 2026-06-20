@@ -1708,4 +1708,18 @@ lightspeedHandlers.push(
     inventoryLocations[idx] = { ...inventoryLocations[idx], ...b };
     return HttpResponse.json(inventoryLocations[idx]);
   }),
+
+  // ── Vendor Quotes (Sprint 10C) ────────────────────────────────────────────
+  ...(() => {
+    const VQ_BASE = Date.now();
+    let vqItems = [
+      { id: "vq_1", quote_number: "VQ-00001", supplier: "Altria Group", items_count: 3, total_cents: 450000, received_at: VQ_BASE - 86400000 * 2, status: "pending" },
+      { id: "vq_2", quote_number: "VQ-00002", supplier: "RJ Reynolds", items_count: 5, total_cents: 320000, received_at: VQ_BASE - 86400000 * 5, status: "accepted" },
+    ];
+    return [
+      http.get(`${V1}/purchasing/vendor-quotes`, async () => { await lat(); return HttpResponse.json({ items: vqItems }); }),
+      http.post(`${V1}/purchasing/vendor-quotes/:id/accept`, async ({ params }) => { await lat(); vqItems = vqItems.map(q => q.id === params["id"] ? { ...q, status: "accepted" } : q); return HttpResponse.json({ ok: true }); }),
+      http.post(`${V1}/purchasing/vendor-quotes/:id/reject`, async ({ params }) => { await lat(); vqItems = vqItems.map(q => q.id === params["id"] ? { ...q, status: "rejected" } : q); return HttpResponse.json({ ok: true }); }),
+    ];
+  })(),
 );

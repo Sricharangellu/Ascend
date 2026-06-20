@@ -971,6 +971,12 @@ export const handlers = [
     ];
   })(),
 
+  // ── MFA (Sprint 10C) ─────────────────────────────────────────────────────────
+  http.get("*/api/identity/mfa/status", async () => { await latency(); return HttpResponse.json({ enabled: false, setupRequired: true }); }),
+  http.post("*/api/identity/mfa/setup", async () => { await latency(); return HttpResponse.json({ secret: "JBSWY3DPEHPK3PXP", otpauthUrl: "otpauth://totp/FinderPOS:demo@example.com?secret=JBSWY3DPEHPK3PXP&issuer=FinderPOS" }); }),
+  http.post("*/api/identity/mfa/verify", async () => { await latency(); return HttpResponse.json({ ok: true, message: "MFA enabled successfully" }); }),
+  http.post("*/api/identity/mfa/disable", async () => { await latency(); return HttpResponse.json({ ok: true }); }),
+
   // Cycle-3 modules (customers, gift cards, webhooks, inventory overview, team).
   // Maintained in a separate file to avoid cross-agent edit collisions.
   ...lightspeedHandlers,
