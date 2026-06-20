@@ -46,7 +46,8 @@ type NavKey =
   | "returns"
   | "tax-compliance"
   | "integrations"
-  | "imports-exports";
+  | "imports-exports"
+  | "workflows";
 
 // editionFlag: if set, this nav item is hidden when the corresponding feature
 // flag is false. Items with no editionFlag are always shown.
@@ -73,7 +74,8 @@ const NAV_ITEMS: Array<{
   { key: "customers", label: "Customers", href: "/customers", icon: "customers", group: "Manage", editionFlag: "groupRetailPOS" },
   { key: "discounts", label: "Discounts", href: "/discounts", icon: "discounts", group: "Manage", editionFlag: "groupRetailPOS" },
   { key: "gift-cards", label: "Gift Cards", href: "/gift-cards", icon: "gift-cards", group: "Manage", editionFlag: "groupRetailPOS" },
-  { key: "team", label: "Team", href: "/team", icon: "team", group: "Manage" },
+  { key: "team",      label: "Team",      href: "/team",      icon: "team",      group: "Manage" },
+  { key: "workflows", label: "Workflows", href: "/workflows", icon: "workflows", group: "Manage" },
   { key: "finance", label: "Finance", href: "/finance", icon: "finance", group: "Analyze", editionFlag: "groupWholesale" },
   { key: "accounting", label: "Accounting", href: "/accounting", icon: "accounting", group: "Analyze", editionFlag: "groupWholesale" },
   { key: "tax-compliance", label: "Tax Compliance", href: "/tax-compliance", icon: "tax-compliance", group: "Analyze", editionFlag: "groupWholesale" },
@@ -455,6 +457,8 @@ function NavIcon({ name }: { name: NavKey }) {
       return <FinanceIcon />;
     case "catalog":
       return <CatalogIcon />;
+    case "workflows":
+      return <WorkflowsIcon />;
     case "gift-cards":
       return <GiftCardIcon />;
     case "vendors":
@@ -721,6 +725,21 @@ function CatalogIcon() {
       <path d="M14 13h7" />
       <path d="M14 17h7" />
       <path d="M14 20h4" />
+    </svg>
+  );
+}
+
+function WorkflowsIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="5"  cy="6"  r="2" />
+      <circle cx="19" cy="6"  r="2" />
+      <circle cx="5"  cy="18" r="2" />
+      <circle cx="19" cy="18" r="2" />
+      <path d="M7 6h10" />
+      <path d="M7 18h10" />
+      <path d="M5 8v8" />
+      <path d="M19 8v8" />
     </svg>
   );
 }
