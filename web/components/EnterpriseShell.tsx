@@ -54,7 +54,8 @@ type NavKey =
   | "service-orders"
   | "inventory-locations"
   | "inventory-expiry"
-  | "invoicing";
+  | "invoicing"
+  | "inventory-serials";
 
 // editionFlag: if set, this nav item is hidden when the corresponding feature
 // flag is false. Items with no editionFlag are always shown.
@@ -76,6 +77,7 @@ const NAV_ITEMS: Array<{
   { key: "invoicing", label: "Invoicing", href: "/invoicing", icon: "invoicing", group: "Operate" },
   { key: "inventory-locations", label: "Store Map", href: "/inventory/locations", icon: "inventory-locations", group: "Manage" },
   { key: "inventory-expiry", label: "Expiry Tracking", href: "/inventory/expiry", icon: "inventory-expiry", group: "Manage" },
+  { key: "inventory-serials", label: "Serialized Inventory", href: "/inventory/serials", icon: "inventory-serials", group: "Manage" },
   { key: "payments", label: "Payments", href: "/payments", icon: "payments", group: "Operate" },
   { key: "catalog",   label: "Catalog",   href: "/catalog",   icon: "catalog",   group: "Manage" },
   { key: "inventory", label: "Inventory", href: "/inventory", icon: "inventory", group: "Manage" },
@@ -504,6 +506,8 @@ function NavIcon({ name }: { name: NavKey }) {
       return <StoreMapIcon />;
     case "inventory-expiry":
       return <ExpiryIcon />;
+    case "inventory-serials":
+      return <SerialsIcon />;
     default:
       return <ReportsIcon />;
   }
@@ -849,6 +853,19 @@ function ExpiryIcon() {
     <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="10" />
       <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+
+function SerialsIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="6" width="20" height="12" rx="2" />
+      <path d="M6 10v4" />
+      <path d="M9 10v4" />
+      <path d="M12 10v4" />
+      <path d="M15 10v4" />
+      <path d="M18 10v4" />
     </svg>
   );
 }

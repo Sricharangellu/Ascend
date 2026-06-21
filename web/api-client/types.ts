@@ -1220,3 +1220,27 @@ export interface CustomerInvoiceResponse {
   items: CustomerInvoice[];
   total: number;
 }
+
+// ─── Serialized Inventory (FE-17 / BE-24) ────────────────────────────────────
+export type SerialStatus = "in_stock" | "sold" | "returned" | "service";
+
+export interface SerialNumber {
+  id: string;
+  product_id: string;
+  product_name: string | null;
+  product_sku: string | null;
+  serial: string;
+  status: SerialStatus;
+  sold_at: number | null;
+  service_order_id: string | null;
+  received_at: number;
+  notes: string | null;
+  created_at: number;
+}
+
+export interface SerialsResponse {
+  items: SerialNumber[];
+  total: number;
+  limit: number;
+  offset: number;
+}

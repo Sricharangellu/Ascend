@@ -33,6 +33,8 @@ import { rlsModule } from "./rls/index.js";
 import { storeLocationsModule } from "./store_locations/index.js";
 import { productBatchesModule } from "./product_batches/index.js";
 import { customerInvoicesModule } from "./customer_invoices/index.js";
+import { serviceOrdersModule } from "./service_orders/index.js";
+import { serialNumbersModule } from "./serial_numbers/index.js";
 
 /**
  * Registration order = migration order. Keep dependencies earlier:
@@ -72,5 +74,7 @@ export const modules: PosModule[] = [
   storeLocationsModule,
   productBatchesModule,
   customerInvoicesModule,
+  serviceOrdersModule,
+  serialNumbersModule,
   rlsModule,  // must be last — runs after all tenant tables exist
 ];

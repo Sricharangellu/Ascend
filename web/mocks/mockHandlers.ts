@@ -3032,4 +3032,98 @@ mockHandlers.push(
       }),
     ];
   })(),
+
+  // ─── Serial Numbers (FE-17 / BE-24) ─────────────────────────────────────────
+  ...(() => {
+    type SN = {
+      id: string; product_id: string; product_name: string | null; product_sku: string | null;
+      serial: string; status: "in_stock" | "sold" | "returned" | "service";
+      sold_at: number | null; service_order_id: string | null;
+      received_at: number; notes: string | null; created_at: number;
+    };
+
+    const base = Date.now();
+    const day = 86_400_000;
+    let seq = 0;
+
+    const serials: SN[] = [
+      { id: "sn_001", product_id: "prod_001", product_name: "Apple iPad Pro 12.9\"", product_sku: "IPAD-PRO-129", serial: "DMPXQ123ABC1", status: "in_stock", sold_at: null, service_order_id: null, received_at: base - 10 * day, notes: null, created_at: base - 10 * day },
+      { id: "sn_002", product_id: "prod_001", product_name: "Apple iPad Pro 12.9\"", product_sku: "IPAD-PRO-129", serial: "DMPXQ456DEF2", status: "in_stock", sold_at: null, service_order_id: null, received_at: base - 10 * day, notes: null, created_at: base - 10 * day },
+      { id: "sn_003", product_id: "prod_002", product_name: "Sony WH-1000XM5 Headphones", product_sku: "SONY-WH1000XM5", serial: "5012345600001", status: "sold", sold_at: base - 2 * day, service_order_id: null, received_at: base - 30 * day, notes: null, created_at: base - 30 * day },
+      { id: "sn_004", product_id: "prod_002", product_name: "Sony WH-1000XM5 Headphones", product_sku: "SONY-WH1000XM5", serial: "5012345600002", status: "returned", sold_at: base - 5 * day, service_order_id: null, received_at: base - 20 * day, notes: "Customer returned — defective hinge", created_at: base - 20 * day },
+      { id: "sn_005", product_id: "prod_003", product_name: "Garmin Fenix 7X Pro Watch", product_sku: "GARMIN-FENIX7X", serial: "GRX7890123001", status: "service", sold_at: null, service_order_id: "so_1", received_at: base - 15 * day, notes: "Screen damage", created_at: base - 15 * day },
+      { id: "sn_006", product_id: "prod_003", product_name: "Garmin Fenix 7X Pro Watch", product_sku: "GARMIN-FENIX7X", serial: "GRX7890123002", status: "in_stock", sold_at: null, service_order_id: null, received_at: base - 8 * day, notes: null, created_at: base - 8 * day },
+      { id: "sn_007", product_id: "prod_004", product_name: "DJI Mini 4 Pro Drone", product_sku: "DJI-MINI4PRO", serial: "DJI20240001001", status: "sold", sold_at: base - 1 * day, service_order_id: null, received_at: base - 25 * day, notes: null, created_at: base - 25 * day },
+    ];
+
+    return [
+      http.get(`${V1}/inventory/serials`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const limit = Number(url.searchParams.get("limit") ?? 50);
+        const offset = Number(url.searchParams.get("offset") ?? 0);
+        const status = url.searchParams.get("status");
+        const product_id = url.searchParams.get("product_id");
+        const q = (url.searchParams.get("q") ?? "").toLowerCase();
+        let filtered = [...serials];
+        if (status) filtered = filtered.filter(s => s.status === status);
+        if (product_id) filtered = filtered.filter(s => s.product_id === product_id);
+        if (q) filtered = filtered.filter(s =>
+          s.serial.toLowerCase().includes(q) ||
+          (s.product_name ?? "").toLowerCase().includes(q) ||
+          (s.product_sku ?? "").toLowerCase().includes(q)
+        );
+        const total = filtered.length;
+        return HttpResponse.json({ items: filtered.slice(offset, offset + limit), total, limit, offset });
+      }),
+
+      http.post(`${V1}/inventory/serials`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as Partial<SN>;
+        if (!b.serial) return HttpResponse.json({ error: { code: "validation" } }, { status: 400 });
+        if (serials.some(s => s.serial === b.serial)) {
+          return HttpResponse.json({ error: { code: "duplicate_serial" } }, { status: 409 });
+        }
+        const now = Date.now();
+        const sn: SN = {
+          id: `sn_${++seq}`,
+          product_id: b.product_id ?? "",
+          product_name: b.product_name ?? null,
+          product_sku: b.product_sku ?? null,
+          serial: b.serial ?? "",
+          status: "in_stock",
+          sold_at: null,
+          service_order_id: null,
+          received_at: now,
+          notes: b.notes ?? null,
+          created_at: now,
+        };
+        serials.unshift(sn);
+        return HttpResponse.json(sn, { status: 201 });
+      }),
+
+      http.get(`${V1}/inventory/serials/:id`, async ({ params }) => {
+        await lat();
+        const sn = serials.find(s => s.id === String(params["id"]));
+        if (!sn) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json(sn);
+      }),
+
+      http.patch(`${V1}/inventory/serials/:id`, async ({ params, request }) => {
+        await lat();
+        const idx = serials.findIndex(s => s.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const b = (await request.json()) as Partial<SN>;
+        const prev = serials[idx]!;
+        serials[idx] = {
+          ...prev,
+          status: b.status ?? prev.status,
+          sold_at: b.status === "sold" && !prev.sold_at ? Date.now() : prev.sold_at,
+          service_order_id: b.service_order_id ?? prev.service_order_id,
+          notes: b.notes !== undefined ? b.notes : prev.notes,
+        };
+        return HttpResponse.json(serials[idx]);
+      }),
+    ];
+  })(),
 );
