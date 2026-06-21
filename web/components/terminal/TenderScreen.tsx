@@ -16,6 +16,7 @@ import { apiPost } from "@/api-client/client";
 import type { Order, Payment, CapturePaymentRequest, PaymentMethod } from "@/api-client/types";
 import { formatMoney, parseToCents, calcChange } from "@/lib/money";
 import { Button } from "@/components/Button";
+import { CardReaderScreen } from "./CardReaderScreen";
 
 interface TenderScreenProps {
   order: Order;
@@ -39,6 +40,8 @@ export function TenderScreen({
   const [cardLast4, setCardLast4] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCardReader, setShowCardReader] = useState(false);
+  const pendingCaptureRef = useRef<(() => void) | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const firstFocusRef = useRef<HTMLButtonElement>(null);
 
@@ -102,8 +105,20 @@ export function TenderScreen({
   };
 
   const handleCardSubmit = () => {
-    void capture("card", 0, totalCents, cardLast4 || "0000");
+    pendingCaptureRef.current = () => void capture("card", 0, totalCents, cardLast4 || "0000");
+    setShowCardReader(true);
   };
+
+  const handleCardReaderComplete = useCallback(() => {
+    setShowCardReader(false);
+    pendingCaptureRef.current?.();
+    pendingCaptureRef.current = null;
+  }, []);
+
+  const handleCardReaderCancel = useCallback(() => {
+    setShowCardReader(false);
+    pendingCaptureRef.current = null;
+  }, []);
 
   const handleSplitSubmit = () => {
     const cash = parseToCents(splitCash);
@@ -116,7 +131,8 @@ export function TenderScreen({
       setError("Cash amount exceeds total");
       return;
     }
-    void capture("split", cash, card, cardLast4 || "0000");
+    pendingCaptureRef.current = () => void capture("split", cash, card, cardLast4 || "0000");
+    setShowCardReader(true);
   };
 
   return (
@@ -227,6 +243,14 @@ export function TenderScreen({
             </div>
           )}
         </div>
+
+        {/* Card reader overlay — rendered above this modal */}
+        {showCardReader && (
+          <CardReaderScreen
+            onComplete={handleCardReaderComplete}
+            onCancel={handleCardReaderCancel}
+          />
+        )}
 
         {/* Action button */}
         <div className="flex-none px-6 pb-6 pt-2 border-t border-gray-100">

@@ -9,11 +9,12 @@
  * Accessibility: labelled region, keyboard controls, ≥44px targets.
  */
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { clsx } from "clsx";
 import type { CartLine, CartContextValue } from "@/lib/useCart";
 import { formatMoney } from "@/lib/money";
 import { Button } from "@/components/Button";
+import { NumpadModal } from "./NumpadModal";
 
 interface CartPanelProps {
   cart: CartContextValue;
@@ -28,6 +29,8 @@ interface CartPanelProps {
 export function CartPanel({ cart, onCharge, onClear, role, ageVerified, onAgeVerifiedChange }: CartPanelProps) {
   const { state, setQty, removeProduct, itemCount, localSubtotalCents } = cart;
   const { lines, order, syncing } = state;
+
+  const [numpadTarget, setNumpadTarget] = useState<{ productId: string; qty: number; name: string } | null>(null);
 
   const isEmpty = lines.length === 0;
 
@@ -96,6 +99,7 @@ export function CartPanel({ cart, onCharge, onClear, role, ageVerified, onAgeVer
                 line={line}
                 onQtyChange={(qty) => setQty(line.product.id, qty)}
                 onRemove={() => removeProduct(line.product.id)}
+                onNumpad={() => setNumpadTarget({ productId: line.product.id, qty: line.quantity, name: line.product.name })}
               />
             ))}
           </ul>
@@ -173,6 +177,18 @@ export function CartPanel({ cart, onCharge, onClear, role, ageVerified, onAgeVer
           {syncing ? "Calculating…" : isEmpty ? "Add items to charge" : `Charge ${formatMoney(total)}`}
         </Button>
       </div>
+
+      {numpadTarget && (
+        <NumpadModal
+          initialValue={numpadTarget.qty}
+          productName={numpadTarget.name}
+          onConfirm={(qty) => {
+            setQty(numpadTarget.productId, qty);
+            setNumpadTarget(null);
+          }}
+          onClose={() => setNumpadTarget(null)}
+        />
+      )}
     </section>
   );
 }
@@ -183,9 +199,10 @@ interface CartLineItemProps {
   line: CartLine;
   onQtyChange: (qty: number) => void;
   onRemove: () => void;
+  onNumpad: () => void;
 }
 
-function CartLineItem({ line, onQtyChange, onRemove }: CartLineItemProps) {
+function CartLineItem({ line, onQtyChange, onRemove, onNumpad }: CartLineItemProps) {
   const { product, quantity } = line;
   const lineCents = product.priceCents * quantity;
 
@@ -230,22 +247,20 @@ function CartLineItem({ line, onQtyChange, onRemove }: CartLineItemProps) {
           {quantity === 1 ? <TrashIcon /> : <MinusIcon />}
         </button>
 
-        <input
-          type="number"
-          min={1}
-          max={999}
-          value={quantity}
-          onChange={(e) => {
-            const v = parseInt(e.target.value, 10);
-            if (!isNaN(v) && v > 0) onQtyChange(v);
-          }}
-          aria-label={`${product.name} quantity`}
+        <button
+          type="button"
+          onClick={onNumpad}
+          aria-label={`${product.name} quantity: ${quantity}. Tap to edit.`}
+          title="Tap to edit quantity"
           className={clsx(
-            "w-11 border-0 bg-transparent text-center text-sm font-semibold",
-            "focus:outline-none focus:ring-0",
-            "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            "w-11 min-h-[44px] rounded border border-transparent text-center text-sm font-semibold text-gray-900",
+            "hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600",
+            "transition-colors"
           )}
-        />
+        >
+          {quantity}
+        </button>
 
         <button
           type="button"
