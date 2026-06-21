@@ -123,3 +123,9 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Shipped:** Audit log read module (src/modules/audit_log/). GET /api/v1/audit-log with filters: ?actor= (email ILIKE), ?resource_type=, ?action=, ?limit= (max 200), ?offset=. JOINs users table for actor email/role. Parses before_state/after_state JSON into field-level {from, to} diff. Adds two indexes on the existing audit_log table.
 - **Verified:** typecheck clean (npm run typecheck); pre-existing payment test failures unrelated (confirmed on clean tree).
 - **Contract changes:** New module mounted at /api/v1/audit-log. No schema changes (table pre-exists in identity migrations).
+
+## 2026-06-20 — Frontend cycle: FE-15
+
+- **Shipped:** CardReaderScreen component (web/components/terminal/CardReaderScreen.tsx) — 4-state animation (waiting→reading→processing→approved) over 3300ms with pulsing ring, rAF progress bar, step indicators, and ESC-to-cancel. Wired into TenderScreen: card and split payment paths now play the animation before POST /api/v1/payments fires. NumpadModal (web/components/terminal/NumpadModal.tsx) — 3×4 grid, keyboard support (digits, Backspace, Enter, Escape), max 4 digits, qty≥1 validation. Wired into CartPanel: quantity display replaced with a button that opens NumpadModal; confirmed via onQtyChange callback.
+- **Consumes:** No new API endpoints (pure UI).
+- **Verified:** typecheck clean (npm run typecheck exit 0); tests running (pre-existing 16-failure payment test noise expected; unrelated to this change).

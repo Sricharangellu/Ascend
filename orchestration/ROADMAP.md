@@ -220,10 +220,10 @@ records, only triaged into "build now" vs. "documented for later."
       blocks add-to-cart when product.restrictedStates includes the outlet's state code.
       Types updated; MSW flavored vape seeded as restricted in CA/MA/NJ/RI/IL. (done in ceceff3)
 
-- [ ] FE-15: Terminal UX polish — CardReaderScreen component (4-state animation:
+- [x] FE-15: Terminal UX polish — CardReaderScreen component (4-state animation:
       waiting→reading→processing→approved, ~3300ms total, pulsing ring + progress bar)
       wired into TenderScreen for card payments. NumpadModal (3×4 grid, keyboard support,
-      max 4 digits, qty≥1 validation) wired into CartPanel quantity display.
+      max 4 digits, qty≥1 validation) wired into CartPanel quantity display. (done in 6de146e)
 
 - [x] BE-19: Notifications module — new `src/modules/notifications/` module. Table
       `notifications(id, tenant_id, type, severity, title, message, read, created_at)`.
@@ -297,5 +297,7 @@ records, only triaged into "build now" vs. "documented for later."
 - 2026-06-20 backend BE-19 -> 00c515a: notifications module; GET/PATCH/POST endpoints; EventBus low_stock + invoice.overdue listeners.
 - 2026-06-20 backend BE-20 -> 15f4f4a: audit-log read module; GET /api/v1/audit-log with actor/resource_type/action filters; JOIN users for actor fields.
 - 2026-06-20 frontend FE-14 -> ceceff3: compliance flags on catalog/[id]; state enforcement on terminal; flavored vape restricted CA/MA/NJ/RI/IL.
+
+- 2026-06-20 frontend FE-15 -> 6de146e: CardReaderScreen 4-state animation + NumpadModal qty editor wired into TenderScreen + CartPanel.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
