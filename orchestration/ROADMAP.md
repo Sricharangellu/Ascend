@@ -268,11 +268,11 @@ records, only triaged into "build now" vs. "documented for later."
       Mock endpoints: `GET /api/v1/inventory/serials`, `POST /api/v1/inventory/serials`.
       Nav group: Manage. (done in 9ff2cc3)
 
-- [ ] FE-18: Workforce — Employee Scheduling (`/workforce`) — weekly schedule grid
+- [x] FE-18: Workforce — Employee Scheduling (`/workforce`) — weekly schedule grid
       (Mon–Sun × employee rows), shift blocks with color coding by role, add/edit/delete
       shifts via modal, time-off requests list. Mock endpoints:
       `GET/POST/PATCH/DELETE /api/v1/workforce/shifts`, `GET /api/v1/workforce/employees`.
-      Nav group: Manage.
+      Nav group: Manage. (done in 20b9148)
 
 ### Backend lane (Phase 2)
 
