@@ -188,3 +188,21 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **BE-25 — Workforce backend (src/modules/workforce/):** employees/shifts/time_off_requests tables. Routes: GET /workforce/employees, POST/PATCH; GET/POST/PATCH/DELETE /workforce/shifts; GET/POST /workforce/time-off, PATCH /:id for status update. Zod validation on all inputs; createShift JOINs employees for employee_name+role. Completes real backend for FE-18 schedule grid.
 - **BE-26 — Customer contacts/addresses PATCH+DELETE:** Tables already existed from Wave A. Added updateContact, deleteContact, updateAddress, deleteAddress to customers service. Added PATCH+DELETE routes at /:id/contacts/:contactId and /:id/addresses/:addressId. ContactsPanel on /customers/[id] now has per-row Edit (inline modal → PATCH) and Remove (confirm dialog → DELETE). Mock handlers updated: PATCH addresses, PATCH+DELETE contacts, richer seed data (3 contacts + 2 addresses for cus_demo_1).
 - **Verified:** npm run typecheck — 0 errors.
+
+## 2026-06-21 — Fullstack cycle: BE-27 + FE-23 (Reorder Management)
+
+- **BE-27 — Reorder management endpoints:**
+  - `InventoryService.getReorderSuggestions(tenantId)`: queries `inventory` JOINed with `catalog_products` where `reorder_pt > 0 AND stock_qty <= reorder_pt`, ordered by `preferred_vendor_name NULLS LAST, name`. Returns product_id, product_name, sku, stock_qty, reorder_pt, suggested_qty (reorder_quantity or reorder_pt fallback), preferred_vendor_id/name.
+  - `GET /inventory/reorder-suggestions` → `{ items: ReorderSuggestion[] }`
+  - `POST /inventory/reorder-suggestions/create-po` → accepts `{ lines: [{ productId, vendorId, quantity, unitCostCents }] }`, groups by vendorId, calls `PurchasingService.createOrder` per vendor. Returns `{ orders: [] }`. Requires manager role.
+  - `PurchasingService` imported in `inventory/index.ts` and passed to `registerRoutes` as third arg.
+- **FE-23 — Reorder Dashboard (`/inventory/reorder`):**
+  - 4 stat cards: SKUs to Reorder, Out of Stock, Vendors Affected, Selected.
+  - Items displayed in collapsible vendor groups with "Select group" toggle per group.
+  - Table columns: checkbox, product, SKU, on-hand, reorder point, editable order qty input, urgency badge (Out / Critical / Low).
+  - "Select All" / "Create Draft PO(s)" toolbar button. ConfirmModal shows PO breakdown per vendor before submitting.
+  - Success banner on create; error banner on failure.
+  - 8 mock seed items: 3 Core-Mark North, 3 McLane Company, 1 Eby-Brown, 1 unassigned.
+  - `inventory-reorder` NavKey + nav item (Manage group) + ReorderIcon (lines with arrow SVG).
+- **Types added:** `ReorderSuggestion`, `ReorderSuggestionsResponse` in `web/api-client/types.ts`.
+- **Verified:** npm run typecheck — 0 errors.
