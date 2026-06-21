@@ -322,10 +322,10 @@ records, only triaged into "build now" vs. "documented for later."
 
 ### Frontend lane (Phase 3)
 
-- [ ] FE-22: Customer Account Detail — enhance `/customers/[id]` with two new
+- [x] FE-22: Customer Account Detail — enhance `/customers/[id]` with two new
       tabs: Contacts (add/edit/delete contacts per account, star to set primary)
       and Addresses (add/edit/delete delivery addresses, set default). Consumes
-      BE-26 endpoints. Mock handlers for both resources.
+      BE-26 endpoints. Mock handlers for both resources. (done in 289fc23)
 
 - [x] FE-23: Reorder Dashboard (`/inventory/reorder`) — page showing all products
       at or below reorder point, grouped by vendor. Stat cards: SKUs below
