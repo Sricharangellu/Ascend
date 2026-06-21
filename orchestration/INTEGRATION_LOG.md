@@ -147,3 +147,9 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Shipped:** Cursor pagination on the three largest list endpoints. GET /api/v1/inventory replaces OFFSET with keyset cursor on (updated_at DESC, product_id DESC). GET /api/v1/billing/invoices replaces LIMIT 500 with cursor on (issued_at DESC, id DESC). GET /api/v1/sales/sales-orders replaces LIMIT 500 with cursor on (created_at DESC, id DESC). All three return { items, nextCursor, limit } — pass ?cursor=<token> for the next page. Default page size 50, max 200 (clamped). Orders endpoint was already cursor-paginated; unchanged. Cursors are base64url-encoded JSON { at, id } — opaque to callers.
 - **Contract changes:** Response shape for the three endpoints changed from { items, total, offset } / plain array to { items, nextCursor, limit }. Frontend pages that called these with hardcoded LIMIT 500 will receive at most 200 items per page; they should implement "load more" using nextCursor if needed.
 - **Verified:** typecheck clean (npm run typecheck — only pre-existing scripts/test.ts error).
+
+## 2026-06-21 — Frontend cycle: FE-16
+
+- **Shipped:** Service Orders page at `/service-orders` — full repair ticket lifecycle (draft→open→in_progress→ready→closed). List view with status filter tabs, stat cards per status, search, create modal, inline status transition buttons, and detail modal. 5 MSW handlers added to mockHandlers.ts. Types ServiceOrder/ServiceOrderStatus/ServiceOrderResponse added to types.ts. Nav icon (wrench) wired into EnterpriseShell Operate group.
+- **Consumes:** GET /api/v1/service-orders (mocked), POST /api/v1/service-orders (mocked), GET /api/v1/service-orders/:id (mocked), PATCH /api/v1/service-orders/:id (mocked).
+- **Verified:** typecheck clean (cd web && npm run typecheck — zero errors).
