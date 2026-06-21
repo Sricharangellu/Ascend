@@ -2,6 +2,7 @@ import express, { Router, type Express } from "express";
 import { createHash } from "node:crypto";
 import helmet from "helmet";
 import { openDb, type DB } from "./shared/db.js";
+import { openRedis } from "./shared/redis.js";
 import { EventBus } from "./shared/events.js";
 import { errorMiddleware } from "./shared/http.js";
 import { modules } from "./modules/index.js";
@@ -41,6 +42,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   const schema = options.schema ?? "public";
   const db = openDb({ connectionString: options.connectionString, schema });
   const events = new EventBus();
+  const redis = openRedis();
   const app = express();
   app.use(express.json());
   app.use(helmet({
@@ -84,7 +86,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   // ── Global gateway middleware (applied before all /api routes)
   app.use(requestIdMiddleware);
   app.use(metricsMiddleware);
-  app.use(rateLimitMiddleware({ capacity: 120, refillRate: 40 }));
+  app.use(rateLimitMiddleware({ capacity: 120, refillRate: 40, redis }));
 
   // ── Liveness + readiness probes (no auth — infrastructure-level)
   app.get("/healthz", (_req, res) => {
@@ -120,10 +122,10 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   // per-IP limiter (≈20/min sustained, small burst) in front of the router.
   const identityRouter = Router();
   await identityModule.register({ db, events, router: identityRouter });
-  app.use("/api/identity", rateLimitMiddleware({ capacity: 10, refillRate: 0.33 }), identityRouter);
+  app.use("/api/identity", rateLimitMiddleware({ capacity: 10, refillRate: 0.33, redis }), identityRouter);
 
   // ── Auth + per-tenant tiered rate limit applied to all /api/v1/* routes
-  app.use("/api/v1", authMiddleware, tenantResolver, tenantRateLimitMiddleware());
+  app.use("/api/v1", authMiddleware, tenantResolver, tenantRateLimitMiddleware({ redis }));
 
   // ── Feature flags (tenant-scoped, requires auth)
   app.get(

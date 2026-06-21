@@ -11,6 +11,7 @@
  *   6. errorEnvelopeMiddleware   — { error: { code, message, requestId } } envelope
  */
 export { requestIdMiddleware } from "./requestId.js";
+export type { RedisClient } from "../shared/redis.js";
 export { rateLimitMiddleware, tenantRateLimitMiddleware, RATE_TIERS } from "./rateLimit.js";
 export type { TierLimit, TenantRateLimitOptions } from "./rateLimit.js";
 export { authMiddleware, tenantResolver, requireRole } from "./auth.js";

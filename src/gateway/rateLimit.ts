@@ -1,5 +1,15 @@
 import type { Request, Response, NextFunction } from "express";
 import { HttpError } from "../shared/http.js";
+import type { RedisClient } from "../shared/redis.js";
+
+// Lua: atomic fixed-window counter.
+// Returns 1 if the request is allowed, 0 if rate-limited.
+const INCR_SCRIPT = `
+local count = redis.call('INCR', KEYS[1])
+if count == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[2]) end
+if count > tonumber(ARGV[1]) then return 0 end
+return 1
+`;
 
 /**
  * Simple in-memory token-bucket rate limiter.
@@ -18,6 +28,13 @@ export interface RateLimitOptions {
   refillRate?: number;
   /** Key extractor function. Default: IP address. */
   keyFn?: (req: Request) => string;
+  /**
+   * When provided, uses Redis for distributed state (shared across all
+   * instances). Falls back to in-memory token bucket when null/undefined.
+   */
+  redis?: RedisClient | null;
+  /** Fixed-window duration for the Redis path. Default: 60_000 ms. */
+  windowMs?: number;
 }
 
 interface Bucket {
@@ -28,6 +45,7 @@ interface Bucket {
 export function rateLimitMiddleware(options: RateLimitOptions = {}) {
   const capacity = options.capacity ?? 60;
   const refillRate = options.refillRate ?? 20; // tokens/sec
+  const windowMs = options.windowMs ?? 60_000;
   const keyFn = options.keyFn ?? ((req: Request) => {
     return (
       (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ??
@@ -35,17 +53,35 @@ export function rateLimitMiddleware(options: RateLimitOptions = {}) {
       "unknown"
     );
   });
+  const redis = options.redis ?? null;
 
+  // ── Redis path ──────────────────────────────────────────────────────────────
+  if (redis) {
+    return function rateLimit(req: Request, res: Response, next: NextFunction): void {
+      const window = Math.floor(Date.now() / windowMs);
+      const key = `rl:${keyFn(req)}:${window}`;
+      redis
+        .eval(INCR_SCRIPT, 1, key, String(capacity), String(windowMs))
+        .then((allowed) => {
+          if (!allowed) {
+            res.setHeader("Retry-After", String(Math.ceil(windowMs / 1000)));
+            next(new HttpError(429, "rate_limit_exceeded", "Too many requests — slow down."));
+          } else {
+            next();
+          }
+        })
+        .catch(() => next()); // on Redis error, allow through (fail open)
+    };
+  }
+
+  // ── In-memory path (dev / no Redis) ────────────────────────────────────────
   const buckets = new Map<string, Bucket>();
-
-  // Purge stale buckets periodically to avoid unbounded memory growth.
   const purgeIntervalMs = 60_000;
   let lastPurgeMs = Date.now();
 
   return function rateLimit(req: Request, res: Response, next: NextFunction): void {
     const now = Date.now();
 
-    // Periodic cleanup — evict buckets that have been full for >5 minutes.
     if (now - lastPurgeMs > purgeIntervalMs) {
       for (const [key, bucket] of buckets) {
         const idleSec = (now - bucket.lastRefillMs) / 1000;
@@ -63,7 +99,6 @@ export function rateLimitMiddleware(options: RateLimitOptions = {}) {
       buckets.set(key, bucket);
     }
 
-    // Refill based on elapsed time.
     const elapsedSec = (now - bucket.lastRefillMs) / 1000;
     bucket.tokens = Math.min(capacity, bucket.tokens + elapsedSec * refillRate);
     bucket.lastRefillMs = now;
@@ -103,6 +138,10 @@ export interface TenantRateLimitOptions {
   tierOf?: (tenantId: string) => string;
   /** Key when there is no authenticated tenant (defaults to client IP). */
   fallbackKey?: (req: Request) => string;
+  /** When provided, uses Redis for distributed state across instances. */
+  redis?: RedisClient | null;
+  /** Fixed-window duration for the Redis path. Default: 60_000 ms. */
+  windowMs?: number;
 }
 
 /**
@@ -113,6 +152,8 @@ export interface TenantRateLimitOptions {
 export function tenantRateLimitMiddleware(options: TenantRateLimitOptions = {}) {
   const tiers = options.tiers ?? RATE_TIERS;
   const tierOf = options.tierOf ?? (() => "standard");
+  const windowMs = options.windowMs ?? 60_000;
+  const redis = options.redis ?? null;
   const fallbackKey =
     options.fallbackKey ??
     ((req: Request) =>
@@ -121,6 +162,33 @@ export function tenantRateLimitMiddleware(options: TenantRateLimitOptions = {}) 
         req.socket.remoteAddress ??
         "unknown"));
 
+  // ── Redis path ──────────────────────────────────────────────────────────────
+  if (redis) {
+    return function tenantRateLimit(req: Request, res: Response, next: NextFunction): void {
+      const auth = res.locals["auth"] as { tenantId?: string } | undefined;
+      const tenantId = auth?.tenantId;
+      const key = `trl:${tenantId ?? fallbackKey(req)}:${Math.floor(Date.now() / windowMs)}`;
+      const tierName = tenantId ? tierOf(tenantId) : "standard";
+      const cfg = tiers[tierName] ?? tiers["standard"] ?? RATE_TIERS["standard"]!;
+
+      res.setHeader("X-RateLimit-Tier", tierName);
+      res.setHeader("X-RateLimit-Limit", String(cfg.capacity));
+
+      redis
+        .eval(INCR_SCRIPT, 1, key, String(cfg.capacity), String(windowMs))
+        .then((allowed) => {
+          if (!allowed) {
+            res.setHeader("Retry-After", String(Math.ceil(windowMs / 1000)));
+            next(new HttpError(429, "rate_limit_exceeded", "Tenant rate limit exceeded — slow down."));
+          } else {
+            next();
+          }
+        })
+        .catch(() => next()); // on Redis error, allow through (fail open)
+    };
+  }
+
+  // ── In-memory path (dev / no Redis) ────────────────────────────────────────
   const buckets = new Map<string, Bucket>();
   let lastPurgeMs = Date.now();
 
