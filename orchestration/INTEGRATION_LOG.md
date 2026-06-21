@@ -163,3 +163,13 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Shipped:** Service Orders page at `/service-orders` — full repair ticket lifecycle (draft→open→in_progress→ready→closed). List view with status filter tabs, stat cards per status, search, create modal, inline status transition buttons, and detail modal. 5 MSW handlers added to mockHandlers.ts. Types ServiceOrder/ServiceOrderStatus/ServiceOrderResponse added to types.ts. Nav icon (wrench) wired into EnterpriseShell Operate group.
 - **Consumes:** GET /api/v1/service-orders (mocked), POST /api/v1/service-orders (mocked), GET /api/v1/service-orders/:id (mocked), PATCH /api/v1/service-orders/:id (mocked).
 - **Verified:** typecheck clean (cd web && npm run typecheck — zero errors).
+
+## 2026-06-21 — Fullstack cycle: BE-23 + FE-17 + BE-24 (service orders backend + serialized inventory)
+
+- **Shipped:**
+  1. *Service Orders Backend (BE-23)* — `src/modules/service_orders/`: `service_orders` table (status, assigned_to, estimate_cents, actual_cents). CRUD routes registered at GET/POST `/service-orders`, GET/PATCH `/service-orders/:id`. Status machine: draft→open→in_progress→ready→closed enforced in service layer; transitions beyond the allowed next state return 400. EventBus publishes `service_order.status_changed` on every transition.
+  2. *Serial Numbers Backend (BE-24)* — `src/modules/serial_numbers/`: `serial_numbers` table with UNIQUE (tenant_id, serial). Endpoints: GET/POST `/inventory/serials`, GET/PATCH `/inventory/serials/:id`. List LEFT JOINs `catalog_products` for product_name/sku on read. Duplicate serial returns 409. Two indexes: (tenant_id, product_id, status) + (tenant_id, serial).
+  3. *Serialized Inventory Frontend (FE-17)* — `/inventory/serials` page: 4 stat cards (total/in_stock/sold/service), status tab filter (all/in_stock/sold/returned/service), search by serial+product+SKU, sortable table. ReceiveModal: product_id + serial + optional name/sku/notes. DetailModal: field summary + inline status transition buttons (in_stock→sold/service, returned→in_stock/service, service→in_stock/returned) with service_order_id input. 7 seed serials in mockHandlers.ts covering all 4 statuses. `inventory-serials` NavKey + nav item (Manage group) + SerialsIcon (barcode bars SVG).
+- **Consumes:** GET /api/v1/inventory/serials (mocked), POST /api/v1/inventory/serials (mocked), GET /api/v1/inventory/serials/:id (mocked), PATCH /api/v1/inventory/serials/:id (mocked).
+- **Remaining open:** FE-18 (Workforce scheduling).
+- **Verified:** npm run typecheck — 0 errors (backend + frontend in single tsc pass).
