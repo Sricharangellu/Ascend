@@ -1384,31 +1384,3 @@ export interface ReorderSuggestionsResponse {
   items: ReorderSuggestion[];
 }
 
-// ── Enhanced Reports (FE-24) ──────────────────────────────────────────────────
-export interface SalesByProductItem {
-  product_id: string;
-  product_name: string;
-  sku: string | null;
-  category: string | null;
-  units_sold: number;
-  revenue_cents: number;
-  cost_cents: number;
-  margin_cents: number;
-  margin_pct: number;
-}
-
-export interface SalesByProductResponse {
-  items: SalesByProductItem[];
-}
-
-export interface MarginByCategoryItem {
-  category: string;
-  revenue_cents: number;
-  cost_cents: number;
-  margin_cents: number;
-  margin_pct: number;
-}
-
-export interface MarginByCategoryResponse {
-  items: MarginByCategoryItem[];
-}

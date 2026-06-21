@@ -1175,6 +1175,7 @@ interface CustomerAddress {
   id: string;
   address_type: string;
   address_line1: string;
+  address_line2?: string | null;
   city: string;
   state: string;
   zip: string;
