@@ -1827,10 +1827,16 @@ const customerContacts = new Map<string, any[]>();
 const customerNotes = new Map<string, any[]>();
 
 // Seed demo data for cus_demo_1
+const _now = Date.now();
 customerAddresses.set("cus_demo_1", [
-  { id: "addr_1", address_type: "billing", address_line1: "123 Main St", city: "Houston", state: "TX", zip: "77001", country: "US", is_default: true },
+  { id: "addr_1", customer_id: "cus_demo_1", address_type: "billing",  address_line1: "123 Main St",     city: "Houston",  state: "TX", zip: "77001", country: "US", county: "Harris",  is_default: true,  created_at: _now, updated_at: _now },
+  { id: "addr_2", customer_id: "cus_demo_1", address_type: "shipping", address_line1: "456 Warehouse Rd", city: "Pasadena", state: "TX", zip: "77502", country: "US", county: "Harris",  is_default: false, created_at: _now, updated_at: _now },
 ]);
-customerContacts.set("cus_demo_1", []);
+customerContacts.set("cus_demo_1", [
+  { id: "con_1", customer_id: "cus_demo_1", contact_name: "John Smith",    title: "Owner",   email: "john@acmewholesale.com", phone: "713-555-0101", is_primary: true,  created_at: _now, updated_at: _now },
+  { id: "con_2", customer_id: "cus_demo_1", contact_name: "Maria Garcia",  title: "Buyer",   email: "maria@acmewholesale.com", phone: "713-555-0102", is_primary: false, created_at: _now, updated_at: _now },
+  { id: "con_3", customer_id: "cus_demo_1", contact_name: "David Lee",     title: "Manager", email: "david@acmewholesale.com", phone: "713-555-0103", is_primary: false, created_at: _now, updated_at: _now },
+]);
 customerNotes.set("cus_demo_1", []);
 
 let invLocSeq = 2;
@@ -1855,6 +1861,16 @@ mockHandlers.push(
     customerAddresses.set(String(params.id), list);
     return HttpResponse.json(addr, { status: 201 });
   }),
+  http.patch(`${V1}/customers/:id/addresses/:addressId`, async ({ params, request }) => {
+    await lat();
+    const list = customerAddresses.get(String(params.id)) ?? [];
+    const idx = list.findIndex((a) => a.id === String(params.addressId));
+    if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+    const b = (await request.json()) as any;
+    list[idx] = { ...list[idx], ...b, updated_at: Date.now() };
+    customerAddresses.set(String(params.id), list);
+    return HttpResponse.json(list[idx]);
+  }),
   http.delete(`${V1}/customers/:id/addresses/:addrId`, async ({ params }) => {
     await lat();
     const list = (customerAddresses.get(String(params.id)) ?? []).filter((a) => a.id !== String(params.addrId));
@@ -1871,11 +1887,27 @@ mockHandlers.push(
   http.post(`${V1}/customers/:id/contacts`, async ({ params, request }) => {
     await lat();
     const b = (await request.json()) as any;
-    const contact = { id: `con_${Math.random().toString(36).slice(2, 10)}`, ...b };
+    const contact = { id: `con_${Math.random().toString(36).slice(2, 10)}`, customer_id: String(params.id), ...b, created_at: Date.now(), updated_at: Date.now() };
     const list = customerContacts.get(String(params.id)) ?? [];
     list.push(contact);
     customerContacts.set(String(params.id), list);
     return HttpResponse.json(contact, { status: 201 });
+  }),
+  http.patch(`${V1}/customers/:id/contacts/:contactId`, async ({ params, request }) => {
+    await lat();
+    const list = customerContacts.get(String(params.id)) ?? [];
+    const idx = list.findIndex((c) => c.id === String(params.contactId));
+    if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+    const b = (await request.json()) as any;
+    list[idx] = { ...list[idx], ...b, updated_at: Date.now() };
+    customerContacts.set(String(params.id), list);
+    return HttpResponse.json(list[idx]);
+  }),
+  http.delete(`${V1}/customers/:id/contacts/:contactId`, async ({ params }) => {
+    await lat();
+    const list = (customerContacts.get(String(params.id)) ?? []).filter((c) => c.id !== String(params.contactId));
+    customerContacts.set(String(params.id), list);
+    return new HttpResponse(null, { status: 204 });
   }),
 
   // ── Customer notes ────────────────────────────────────────────────────────

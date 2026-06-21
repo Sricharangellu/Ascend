@@ -222,6 +222,26 @@ export function registerRoutes(router: Router, service: CustomersService): void 
     res.status(201).json(await service.addContact(String(req.params.id), tenantId(res), body));
   }));
 
+  router.patch("/:id/contacts/:contactId", handler(async (req, res) => {
+    const body = parseBody(addContactSchema.partial(), req.body);
+    res.json(await service.updateContact(String(req.params.contactId), tenantId(res), body));
+  }));
+
+  router.delete("/:id/contacts/:contactId", handler(async (req, res) => {
+    await service.deleteContact(String(req.params.contactId), tenantId(res));
+    res.status(204).end();
+  }));
+
+  router.patch("/:id/addresses/:addressId", handler(async (req, res) => {
+    const body = parseBody(addAddressSchema.partial(), req.body);
+    res.json(await service.updateAddress(String(req.params.addressId), tenantId(res), body));
+  }));
+
+  router.delete("/:id/addresses/:addressId", handler(async (req, res) => {
+    await service.deleteAddress(String(req.params.addressId), tenantId(res));
+    res.status(204).end();
+  }));
+
   // ── Customer ↔ Group membership ──────────────────────────────────────────────
   router.post("/:id/groups/:groupId", requireRole("manager"), handler(async (req, res) => {
     await service.addToGroup(String(req.params.id), String(req.params.groupId), tenantId(res));

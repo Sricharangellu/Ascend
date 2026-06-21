@@ -1,7 +1,7 @@
 import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
-import { HttpError } from "../../shared/http.js";
+import { HttpError, notFound } from "../../shared/http.js";
 
 export interface CursorPage<T> {
   items: T[];
@@ -743,6 +743,91 @@ export class CustomersService {
     return this.db.query<CustomerContact>(
       "SELECT * FROM customer_contacts WHERE tenant_id = @tenantId AND customer_id = @customerId ORDER BY is_primary DESC, created_at ASC",
       { tenantId, customerId },
+    );
+  }
+
+  async updateContact(
+    contactId: string,
+    tenantId: string,
+    input: { contactName?: string; title?: string | null; email?: string | null; phone?: string | null; isPrimary?: boolean },
+  ): Promise<CustomerContact> {
+    const rows = await this.db.query<CustomerContact>(
+      "SELECT * FROM customer_contacts WHERE id = @contactId AND tenant_id = @tenantId",
+      { contactId, tenantId },
+    );
+    if (!rows[0]) throw notFound("customer_contact");
+    const now = Date.now();
+    const updated: CustomerContact = {
+      ...rows[0],
+      contact_name: input.contactName ?? rows[0].contact_name,
+      title: input.title !== undefined ? input.title : rows[0].title,
+      email: input.email !== undefined ? input.email : rows[0].email,
+      phone: input.phone !== undefined ? input.phone : rows[0].phone,
+      is_primary: input.isPrimary !== undefined ? input.isPrimary : rows[0].is_primary,
+      updated_at: now,
+    };
+    await this.db.query(
+      `UPDATE customer_contacts SET contact_name=@contact_name, title=@title, email=@email,
+       phone=@phone, is_primary=@is_primary, updated_at=@updated_at WHERE id=@id`,
+      { ...updated, id: contactId } as unknown as Record<string, unknown>,
+    );
+    return updated;
+  }
+
+  async deleteContact(contactId: string, tenantId: string): Promise<void> {
+    const rows = await this.db.query<{ id: string }>(
+      "SELECT id FROM customer_contacts WHERE id = @contactId AND tenant_id = @tenantId",
+      { contactId, tenantId },
+    );
+    if (!rows[0]) throw notFound("customer_contact");
+    await this.db.query(
+      "DELETE FROM customer_contacts WHERE id = @contactId AND tenant_id = @tenantId",
+      { contactId, tenantId },
+    );
+  }
+
+  async updateAddress(
+    addressId: string,
+    tenantId: string,
+    input: { addressType?: string; addressLine1?: string | null; addressLine2?: string | null; city?: string | null; state?: string | null; zip?: string | null; country?: string; county?: string | null; isDefault?: boolean },
+  ): Promise<CustomerAddress> {
+    const rows = await this.db.query<CustomerAddress>(
+      "SELECT * FROM customer_addresses WHERE id = @addressId AND tenant_id = @tenantId",
+      { addressId, tenantId },
+    );
+    if (!rows[0]) throw notFound("customer_address");
+    const now = Date.now();
+    const updated: CustomerAddress = {
+      ...rows[0],
+      address_type: input.addressType ?? rows[0].address_type,
+      address_line1: input.addressLine1 !== undefined ? input.addressLine1 : rows[0].address_line1,
+      address_line2: input.addressLine2 !== undefined ? input.addressLine2 : rows[0].address_line2,
+      city: input.city !== undefined ? input.city : rows[0].city,
+      state: input.state !== undefined ? input.state : rows[0].state,
+      zip: input.zip !== undefined ? input.zip : rows[0].zip,
+      country: input.country ?? rows[0].country,
+      county: input.county !== undefined ? input.county : rows[0].county,
+      is_default: input.isDefault !== undefined ? input.isDefault : rows[0].is_default,
+      updated_at: now,
+    };
+    await this.db.query(
+      `UPDATE customer_addresses SET address_type=@address_type, address_line1=@address_line1,
+       address_line2=@address_line2, city=@city, state=@state, zip=@zip, country=@country,
+       county=@county, is_default=@is_default, updated_at=@updated_at WHERE id=@id`,
+      { ...updated, id: addressId } as unknown as Record<string, unknown>,
+    );
+    return updated;
+  }
+
+  async deleteAddress(addressId: string, tenantId: string): Promise<void> {
+    const rows = await this.db.query<{ id: string }>(
+      "SELECT id FROM customer_addresses WHERE id = @addressId AND tenant_id = @tenantId",
+      { addressId, tenantId },
+    );
+    if (!rows[0]) throw notFound("customer_address");
+    await this.db.query(
+      "DELETE FROM customer_addresses WHERE id = @addressId AND tenant_id = @tenantId",
+      { addressId, tenantId },
     );
   }
 

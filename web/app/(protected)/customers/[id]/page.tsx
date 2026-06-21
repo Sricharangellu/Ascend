@@ -1349,6 +1349,8 @@ function ContactsPanel({ customerId, canEdit, addToast }: { customerId: string; 
   const [loaded, setLoaded] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ contact_name: "", title: "", email: "", phone: "", is_primary: false });
+  const [editTarget, setEditTarget] = useState<CustomerContact | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CustomerContact | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
@@ -1386,90 +1388,162 @@ function ContactsPanel({ customerId, canEdit, addToast }: { customerId: string; 
     } finally { setBusy(false); }
   };
 
-  return (
-    <Card className="overflow-hidden p-0">
-      <button
-        type="button"
-        onClick={toggle}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50"
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-slate-950">Contacts</span>
-          {loaded && (
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{items.length}</span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {open && canEdit && (
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={e => { e.stopPropagation(); setShowForm(v => !v); }}
-              onKeyDown={e => { if (e.key === "Enter") { e.stopPropagation(); setShowForm(v => !v); } }}
-              className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700"
-            >
-              Add
-            </span>
-          )}
-          <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}>
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </div>
-      </button>
+  const saveEdit = async () => {
+    if (!editTarget) return;
+    setBusy(true);
+    try {
+      await apiPatch(`/api/v1/customers/${customerId}/contacts/${editTarget.id}`, {
+        contact_name: editTarget.contact_name,
+        title: editTarget.title || null,
+        email: editTarget.email || null,
+        phone: editTarget.phone || null,
+        is_primary: editTarget.is_primary,
+      });
+      setEditTarget(null);
+      load();
+      addToast({ title: "Contact updated", variant: "success" });
+    } catch (e) {
+      addToast({ title: "Failed", description: e instanceof Error ? e.message : "Unknown error", variant: "error" });
+    } finally { setBusy(false); }
+  };
 
-      {open && (
-        <div className="border-t border-slate-200">
-          {showForm && canEdit && (
-            <div className="border-b border-slate-200 bg-slate-50 px-4 py-4 space-y-3">
-              <div className="flex flex-wrap gap-3">
-                <input value={form.contact_name} onChange={e => setForm(f => ({ ...f, contact_name: e.target.value }))} placeholder="Name (required)" className="flex-1 min-w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
-                <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Title" className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
-                <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="Email" className="w-48 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
-                <input type="tel" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="Phone" className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
-              </div>
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-                  <input type="checkbox" checked={form.is_primary} onChange={e => setForm(f => ({ ...f, is_primary: e.target.checked }))} className="h-4 w-4 rounded border-slate-300 accent-blue-600" />
-                  Primary contact
-                </label>
-                <div className="ml-auto flex gap-2">
-                  <Button size="sm" variant="secondary" onClick={() => setShowForm(false)}>Cancel</Button>
-                  <Button size="sm" variant="primary" loading={busy} disabled={!form.contact_name.trim()} onClick={() => void add()}>Add</Button>
-                </div>
-              </div>
+  const remove = async (id: string) => {
+    setBusy(true);
+    try {
+      await apiDelete(`/api/v1/customers/${customerId}/contacts/${id}`);
+      setDeleteTarget(null);
+      load();
+      addToast({ title: "Contact removed", variant: "success" });
+    } catch (e) {
+      addToast({ title: "Failed", description: e instanceof Error ? e.message : "Unknown error", variant: "error" });
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Remove contact"
+        message={`Remove ${deleteTarget?.contact_name} from this account?`}
+        confirmLabel="Remove"
+        destructive
+        onConfirm={() => deleteTarget && void remove(deleteTarget.id)}
+        onCancel={() => setDeleteTarget(null)}
+      />
+      {editTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <h2 className="text-base font-semibold text-slate-900">Edit Contact</h2>
+            <div className="space-y-3">
+              <input value={editTarget.contact_name} onChange={e => setEditTarget(t => t && ({ ...t, contact_name: e.target.value }))} placeholder="Name" className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              <input value={editTarget.title ?? ""} onChange={e => setEditTarget(t => t && ({ ...t, title: e.target.value }))} placeholder="Title" className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              <input type="email" value={editTarget.email ?? ""} onChange={e => setEditTarget(t => t && ({ ...t, email: e.target.value }))} placeholder="Email" className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              <input type="tel" value={editTarget.phone ?? ""} onChange={e => setEditTarget(t => t && ({ ...t, phone: e.target.value }))} placeholder="Phone" className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input type="checkbox" checked={editTarget.is_primary} onChange={e => setEditTarget(t => t && ({ ...t, is_primary: e.target.checked }))} className="h-4 w-4 rounded border-slate-300 accent-blue-600" />
+                Primary contact
+              </label>
             </div>
-          )}
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Title</th>
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Phone</th>
-                <th className="px-4 py-3">Primary</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">Loading…</td></tr>}
-              {!loading && items.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No contacts yet.</td></tr>}
-              {items.map(contact => (
-                <tr key={contact.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 font-medium">{contact.contact_name}</td>
-                  <td className="px-4 py-3 text-slate-500">{contact.title ?? "—"}</td>
-                  <td className="px-4 py-3 text-slate-500">{contact.email ?? "—"}</td>
-                  <td className="px-4 py-3 text-slate-500">{contact.phone ?? "—"}</td>
-                  <td className="px-4 py-3">
-                    {contact.is_primary ? (
-                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">Primary</span>
-                    ) : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button size="sm" variant="secondary" onClick={() => setEditTarget(null)}>Cancel</Button>
+              <Button size="sm" variant="primary" loading={busy} onClick={() => void saveEdit()}>Save</Button>
+            </div>
+          </div>
         </div>
       )}
-    </Card>
+      <Card className="overflow-hidden p-0">
+        <button
+          type="button"
+          onClick={toggle}
+          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-slate-950">Contacts</span>
+            {loaded && (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{items.length}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {open && canEdit && (
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={e => { e.stopPropagation(); setShowForm(v => !v); }}
+                onKeyDown={e => { if (e.key === "Enter") { e.stopPropagation(); setShowForm(v => !v); } }}
+                className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700"
+              >
+                Add
+              </span>
+            )}
+            <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
+        </button>
+
+        {open && (
+          <div className="border-t border-slate-200">
+            {showForm && canEdit && (
+              <div className="border-b border-slate-200 bg-slate-50 px-4 py-4 space-y-3">
+                <div className="flex flex-wrap gap-3">
+                  <input value={form.contact_name} onChange={e => setForm(f => ({ ...f, contact_name: e.target.value }))} placeholder="Name (required)" className="flex-1 min-w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+                  <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Title" className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+                  <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="Email" className="w-48 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+                  <input type="tel" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="Phone" className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+                </div>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                    <input type="checkbox" checked={form.is_primary} onChange={e => setForm(f => ({ ...f, is_primary: e.target.checked }))} className="h-4 w-4 rounded border-slate-300 accent-blue-600" />
+                    Primary contact
+                  </label>
+                  <div className="ml-auto flex gap-2">
+                    <Button size="sm" variant="secondary" onClick={() => setShowForm(false)}>Cancel</Button>
+                    <Button size="sm" variant="primary" loading={busy} disabled={!form.contact_name.trim()} onClick={() => void add()}>Add</Button>
+                  </div>
+                </div>
+              </div>
+            )}
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  <th className="px-4 py-3">Name</th>
+                  <th className="px-4 py-3">Title</th>
+                  <th className="px-4 py-3">Email</th>
+                  <th className="px-4 py-3">Phone</th>
+                  <th className="px-4 py-3">Primary</th>
+                  {canEdit && <th className="px-4 py-3" />}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {loading && <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">Loading…</td></tr>}
+                {!loading && items.length === 0 && <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">No contacts yet.</td></tr>}
+                {items.map(contact => (
+                  <tr key={contact.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium">{contact.contact_name}</td>
+                    <td className="px-4 py-3 text-slate-500">{contact.title ?? "—"}</td>
+                    <td className="px-4 py-3 text-slate-500">{contact.email ?? "—"}</td>
+                    <td className="px-4 py-3 text-slate-500">{contact.phone ?? "—"}</td>
+                    <td className="px-4 py-3">
+                      {contact.is_primary ? (
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">Primary</span>
+                      ) : "—"}
+                    </td>
+                    {canEdit && (
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2 justify-end">
+                          <button onClick={() => setEditTarget({ ...contact })} className="text-xs text-slate-500 hover:text-slate-800 underline">Edit</button>
+                          <button onClick={() => setDeleteTarget(contact)} className="text-xs text-red-500 hover:text-red-700 underline">Remove</button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </>
   );
 }
 

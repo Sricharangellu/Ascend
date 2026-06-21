@@ -1286,3 +1286,32 @@ export interface TimeOffRequest {
   status: TimeOffStatus;
   created_at: number;
 }
+
+// ─── Customer Contacts + Addresses (FE-22 / BE-26) ───────────────────────────
+export interface CustomerContact {
+  id: string;
+  customer_id: string;
+  contact_name: string;
+  title: string | null;
+  email: string | null;
+  phone: string | null;
+  is_primary: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface CustomerAddress {
+  id: string;
+  customer_id: string;
+  address_type: "billing" | "shipping" | string;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  country: string;
+  county: string | null;
+  is_default: boolean;
+  created_at: number;
+  updated_at: number;
+}
