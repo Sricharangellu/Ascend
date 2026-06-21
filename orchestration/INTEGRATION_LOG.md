@@ -99,3 +99,9 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Shipped:** Bulk catalog operations. `POST /api/v1/catalog/bulk-update` (manager-gated) applies one field update to up to 500 product ids and returns the updated rows. `GET /api/v1/catalog/export` returns the full tenant catalog as `text/csv` (new `src/shared/csv.ts` helper, no external dependency). `POST /api/v1/catalog/import-csv` (owner/manager) parses CSV (`sku,name,priceCents|price_cents,category,barcode` columns) and upserts via the existing `bulkImport`. `POST /api/v1/catalog/bulk-barcodes` (manager-gated) generates EAN-13 barcodes (with check digit, collision-checked against `product_barcodes`) for any of the given ids that don't already have one.
 - **Verified:** typecheck clean; `npm test` 125/125 pass (120 pre-existing + 5 new: bulk-update apply + 403 gating, CSV export/import round-trip including a comma-quoted field, import-csv validation rejection, bulk-barcodes generate-only-if-missing).
 - **Contract changes:** New endpoints `POST /api/v1/catalog/bulk-update`, `GET /export`, `POST /import-csv`, `POST /bulk-barcodes`, all under `/api/v1/catalog`. `contracts/openapi.yaml` / `web/api-client/types.ts` still not updated — this is now three backend cycles (BE-6/7/8) whose contracts the frontend hasn't picked up; worth a dedicated contract-sync pass before FE-7/8/9.
+
+## 2026-06-20 — Frontend cycle: FE-6
+
+- **Shipped:** Mock audit of lightspeedHandlers.ts vs live backend. One path mismatch fixed: /api/v1/imports/products → /api/v1/catalog/import-csv (same body shape, live endpoint exists). Three new Backend-lane items queued (BE-19 notifications, BE-20 audit-log read, BE-21 loyalty programme).
+- **Consumes:** POST /api/v1/catalog/import-csv (live, catalog module)
+- **Verified:** typecheck clean (backend npm run typecheck, frontend npm run typecheck); npm test 304/304 pass
