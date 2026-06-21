@@ -4,7 +4,8 @@ import { ensurePg } from "./pg-harness.js";
 
 const { url, stop } = await ensurePg();
 
-const testFiles = await glob("src/**/*.test.ts");
+const testFiles: string[] = [];
+for await (const f of glob("src/**/*.test.ts")) testFiles.push(f);
 
 const child = spawn(
   process.execPath,

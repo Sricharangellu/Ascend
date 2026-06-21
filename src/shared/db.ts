@@ -23,6 +23,14 @@ export interface DB {
   one<T = any>(sql: string, params?: Params): Promise<T | undefined>;
   exec(sql: string): Promise<void>;
   tx<T>(fn: (db: DB) => Promise<T>): Promise<T>;
+  /**
+   * Returns a DB view where every query runs inside an explicit transaction
+   * with `set_config('app.tenant_id', tenantId, true)` so Postgres RLS
+   * policies can use `current_setting('app.tenant_id', true)` to enforce
+   * tenant isolation at the database layer. Safe with connection pools:
+   * `set_config(..., true)` is transaction-local and resets at COMMIT/ROLLBACK.
+   */
+  withTenant(tenantId: string): DB;
   close(): Promise<void>;
 }
 
@@ -88,6 +96,40 @@ function makeDb(q: Queryable, opts: { isTx: boolean; pool?: pg.Pool }): DB {
       } finally {
         client.release();
       }
+    },
+    withTenant(tenantId: string): DB {
+      const parent = db;
+      const scoped: DB = {
+        async query<T = any>(sql: string, params?: Params): Promise<T[]> {
+          return parent.tx(async (tdb) => {
+            await tdb.query(`SELECT set_config('app.tenant_id', ?, true)`, [tenantId]);
+            return tdb.query<T>(sql, params);
+          });
+        },
+        async one<T = any>(sql: string, params?: Params): Promise<T | undefined> {
+          const rows = await scoped.query<T>(sql, params);
+          return rows[0];
+        },
+        async exec(sql: string): Promise<void> {
+          await parent.tx(async (tdb) => {
+            await tdb.query(`SELECT set_config('app.tenant_id', ?, true)`, [tenantId]);
+            await tdb.exec(sql);
+          });
+        },
+        async tx<T>(fn: (tdb: DB) => Promise<T>): Promise<T> {
+          return parent.tx(async (tdb) => {
+            await tdb.query(`SELECT set_config('app.tenant_id', ?, true)`, [tenantId]);
+            return fn(tdb);
+          });
+        },
+        withTenant(newTenantId: string): DB {
+          return parent.withTenant(newTenantId);
+        },
+        async close(): Promise<void> {
+          // Scoped view — does not own the pool.
+        },
+      };
+      return scoped;
     },
     async close(): Promise<void> {
       if (!opts.isTx && opts.pool) await opts.pool.end();
