@@ -277,14 +277,13 @@ test("lowStock filter excludes untracked products (reorder point 0)", async () =
   assert.ok(!json.items.some((i: any) => i.product_id === "prod_untracked"));
 });
 
-test("list returns Page<T> shape", async () => {
+test("list returns cursor-pagination shape", async () => {
   const app = await freshApp();
   await call(app, "POST", "/api/inventory/prod_p/receive", { quantity: 1 });
   const { json } = await call(app, "GET", "/api/inventory/");
   assert.ok(Array.isArray(json.items));
-  assert.equal(typeof json.total, "number");
   assert.equal(typeof json.limit, "number");
-  assert.equal(typeof json.offset, "number");
+  assert.ok(json.nextCursor === null || typeof json.nextCursor === "string");
 });
 
 test("movements history records receive and adjust", async () => {
