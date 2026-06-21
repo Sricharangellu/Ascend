@@ -111,3 +111,9 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Shipped:** Notifications module (src/modules/notifications/). Table + indexes created on boot. GET /api/v1/notifications (paginated, unread filter), PATCH /:id/read, POST /mark-all-read, POST / (create). EventBus listeners for inventory.adjusted (low_stock) and invoice.overdue (overdue_invoice) automatically emit notifications.
 - **Verified:** typecheck clean (npm run typecheck); npm test pass with 16 pre-existing payment test failures unrelated to this change (confirmed by running payments.test.ts on clean tree — same failures).
 - **Contract changes:** New module mounted at /api/v1/notifications. All four endpoints are now live.
+
+## 2026-06-20 — Frontend cycle: FE-14
+
+- **Shipped:** Compliance product flags + state enforcement. TerminalProduct and CatalogProduct types gain tobacco_type, flavored, menthol, msa_reportable, restricted_states fields. Catalog /catalog/[id] page gains a Compliance card: tobacco type select, flag checkboxes (flavored/menthol/msa_reportable), 50-state restricted-states grid — saved via PATCH /api/v1/catalog/:id/compliance. Terminal blocks add-to-cart when product.restrictedStates includes the active outlet's state code (derived from inventory locations state field). MSW mocks updated: locations seed includes state: "CA"; flavored vape product restricted in ["CA","MA","NJ","RI","IL"] for demo enforcement. BE-22 queued for backend compliance columns.
+- **Consumes:** GET /api/v1/inventory/locations (live, inventory module; extended to include state field in mock); PATCH /api/v1/catalog/:id/compliance (mocked, pending BE-22).
+- **Verified:** typecheck clean (tsc --noEmit exit 0); web tests skipped (pre-existing jsdom/rettime dependency issue in test runner, unrelated to FE-14 changes).
