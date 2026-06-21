@@ -409,6 +409,58 @@ export interface TopProductsResponse {
   items: TopProduct[];
 }
 
+export interface SalesByProductItem {
+  productId: string;
+  sku: string;
+  name: string;
+  category: string;
+  units: number;
+  revenueCents: number;
+  costCents: number;
+  marginPct: number;
+}
+
+export interface SalesByProductResponse {
+  items: SalesByProductItem[];
+}
+
+export interface MarginByCategoryItem {
+  category: string;
+  revenueCents: number;
+  costCents: number;
+  marginPct: number;
+  units: number;
+}
+
+export interface MarginByCategoryResponse {
+  items: MarginByCategoryItem[];
+}
+
+export interface InventoryValuationRow {
+  productId: string;
+  name: string;
+  stockQty: number;
+  costCents: number;
+  retailCents: number;
+  costValueCents: number;
+  retailValueCents: number;
+}
+
+export interface InventoryValuationResponse {
+  rows: InventoryValuationRow[];
+  totalCostCents: number;
+  totalRetailCents: number;
+}
+
+export interface LowStockItem {
+  id: string;
+  sku: string;
+  name: string;
+  stock_qty: number;
+  reorder_pt: number;
+  category: string;
+}
+
 export interface Register {
   id: string;
   name: string;
@@ -1330,4 +1382,33 @@ export interface ReorderSuggestion {
 
 export interface ReorderSuggestionsResponse {
   items: ReorderSuggestion[];
+}
+
+// ── Enhanced Reports (FE-24) ──────────────────────────────────────────────────
+export interface SalesByProductItem {
+  product_id: string;
+  product_name: string;
+  sku: string | null;
+  category: string | null;
+  units_sold: number;
+  revenue_cents: number;
+  cost_cents: number;
+  margin_cents: number;
+  margin_pct: number;
+}
+
+export interface SalesByProductResponse {
+  items: SalesByProductItem[];
+}
+
+export interface MarginByCategoryItem {
+  category: string;
+  revenue_cents: number;
+  cost_cents: number;
+  margin_cents: number;
+  margin_pct: number;
+}
+
+export interface MarginByCategoryResponse {
+  items: MarginByCategoryItem[];
 }

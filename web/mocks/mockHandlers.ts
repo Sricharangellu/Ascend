@@ -294,10 +294,51 @@ export const mockHandlers = [
   http.get(`${V1}/reports/inventory-valuation`, async () => {
     await lat();
     const rows = [
-      { productId: "prod_demo_a", name: "Apple", stockQty: 95, costCents: 600, retailCents: 1000, costValueCents: 57000, retailValueCents: 95000 },
-      { productId: "prod_demo_b", name: "Chips", stockQty: 90, costCents: 300, retailCents: 500, costValueCents: 27000, retailValueCents: 45000 },
+      { productId: "prod_demo_a", name: "Organic Dark Roast Beans", stockQty: 95, costCents: 600, retailCents: 1000, costValueCents: 57000, retailValueCents: 95000 },
+      { productId: "prod_demo_b", name: "Wildflower Honey", stockQty: 90, costCents: 300, retailCents: 500, costValueCents: 27000, retailValueCents: 45000 },
+      { productId: "prod_demo_c", name: "Finder Logo T-Shirt", stockQty: 42, costCents: 900, retailCents: 2200, costValueCents: 37800, retailValueCents: 92400 },
+      { productId: "prod_demo_d", name: "Ceramic Coffee Mug", stockQty: 30, costCents: 450, retailCents: 1200, costValueCents: 13500, retailValueCents: 36000 },
+      { productId: "prod_demo_e", name: "Whole Bean Coffee 1lb", stockQty: 68, costCents: 700, retailCents: 1499, costValueCents: 47600, retailValueCents: 101932 },
     ];
-    return HttpResponse.json({ rows, totalCostCents: 84000, totalRetailCents: 140000 });
+    const totalCostCents = rows.reduce((s, r) => s + r.costValueCents, 0);
+    const totalRetailCents = rows.reduce((s, r) => s + r.retailValueCents, 0);
+    return HttpResponse.json({ rows, totalCostCents, totalRetailCents });
+  }),
+
+  http.get(`${V1}/reports/sales-by-product`, async () => {
+    await lat();
+    return HttpResponse.json({ items: [
+      { productId: "ps01", sku: "BEV-LAT-001", name: "Latte", category: "Beverages", units: 340, revenueCents: 169660, costCents: 101796, marginPct: 40 },
+      { productId: "ps02", sku: "BEV-CB-001",  name: "Cold Brew", category: "Beverages", units: 280, revenueCents: 153720, costCents: 84546, marginPct: 45 },
+      { productId: "ps03", sku: "BEV-CAP-001", name: "Cappuccino", category: "Beverages", units: 220, revenueCents: 103180, costCents: 61908, marginPct: 40 },
+      { productId: "ps04", sku: "BEV-ESP-001", name: "Espresso", category: "Beverages", units: 195, revenueCents: 77025, costCents: 38513, marginPct: 50 },
+      { productId: "ps05", sku: "BEV-MAT-001", name: "Matcha Latte", category: "Beverages", units: 180, revenueCents: 95040, costCents: 57024, marginPct: 40 },
+      { productId: "ps06", sku: "FOO-CRO-001", name: "Butter Croissant", category: "Food", units: 210, revenueCents: 68250, costCents: 41838, marginPct: 39 },
+      { productId: "ps07", sku: "FOO-MUF-001", name: "Blueberry Muffin", category: "Food", units: 165, revenueCents: 57750, costCents: 34650, marginPct: 40 },
+      { productId: "ps08", sku: "FOO-AVO-001", name: "Avocado Toast", category: "Food", units: 148, revenueCents: 110520, costCents: 66312, marginPct: 40 },
+      { productId: "ps09", sku: "FOO-SAN-001", name: "Turkey Sandwich", category: "Food", units: 132, revenueCents: 91080, costCents: 54648, marginPct: 40 },
+      { productId: "ps10", sku: "FOO-SAL-001", name: "Caesar Salad", category: "Food", units: 120, revenueCents: 95400, costCents: 52470, marginPct: 45 },
+      { productId: "ps11", sku: "RET-MUG-001", name: "Finder Mug", category: "Retail", units: 95, revenueCents: 113525, costCents: 45410, marginPct: 60 },
+      { productId: "ps12", sku: "RET-TSH-001", name: "Finder T-Shirt", category: "Retail", units: 88, revenueCents: 193600, costCents: 83248, marginPct: 57 },
+      { productId: "ps13", sku: "RET-BAG-001", name: "Tote Bag", category: "Retail", units: 76, revenueCents: 83600, costCents: 29260, marginPct: 65 },
+      { productId: "ps14", sku: "GRO-COF-001", name: "Whole Bean Coffee 1lb", category: "Groceries", units: 68, revenueCents: 101932, costCents: 47163, marginPct: 54 },
+      { productId: "ps15", sku: "GRO-TEA-001", name: "Loose Leaf Tea", category: "Groceries", units: 54, revenueCents: 64260, costCents: 30845, marginPct: 52 },
+      { productId: "ps16", sku: "BEV-HOT-001", name: "Hot Chocolate", category: "Beverages", units: 98, revenueCents: 45668, costCents: 27401, marginPct: 40 },
+      { productId: "ps17", sku: "BEV-OAT-001", name: "Oat Milk Latte", category: "Beverages", units: 85, revenueCents: 46325, costCents: 27795, marginPct: 40 },
+      { productId: "ps18", sku: "FOO-GRN-001", name: "Granola Bar", category: "Food", units: 144, revenueCents: 33120, costCents: 18216, marginPct: 45 },
+      { productId: "ps19", sku: "GRO-JAM-001", name: "Artisan Jam", category: "Groceries", units: 42, revenueCents: 50400, costCents: 23688, marginPct: 53 },
+      { productId: "ps20", sku: "BEV-SMO-001", name: "Smoothie", category: "Beverages", units: 66, revenueCents: 51546, costCents: 29432, marginPct: 43 },
+    ]});
+  }),
+
+  http.get(`${V1}/reports/margin-by-category`, async () => {
+    await lat();
+    return HttpResponse.json({ items: [
+      { category: "Retail",     revenueCents: 390725, costCents: 157918, marginPct: 60, units: 259 },
+      { category: "Groceries",  revenueCents: 216592, costCents: 101696, marginPct: 53, units: 164 },
+      { category: "Beverages",  revenueCents: 742164, costCents: 428415, marginPct: 42, units: 1264 },
+      { category: "Food",       revenueCents: 456120, costCents: 268134, marginPct: 41, units: 919 },
+    ]});
   }),
 
   // ── Outlets + registers (store/register selector) ─────────────────────────
@@ -3337,6 +3378,56 @@ mockHandlers.push(
           created_at: Date.now(),
         }));
         return HttpResponse.json({ orders }, { status: 201 });
+      }),
+    ];
+  })(),
+
+  // ── Enhanced Reports (FE-24) ──────────────────────────────────────────────
+  ...(() => {
+    interface SBP { product_id: string; product_name: string; sku: string | null; category: string | null; units_sold: number; revenue_cents: number; cost_cents: number; margin_cents: number; margin_pct: number; }
+    interface MBC { category: string; revenue_cents: number; cost_cents: number; margin_cents: number; margin_pct: number; }
+
+    const salesByProduct: SBP[] = [
+      { product_id: "p01", product_name: "Marlboro Red King",       sku: "MRL-RED-K",  category: "Tobacco",    units_sold: 312, revenue_cents: 1934880, cost_cents: 1393114, margin_cents: 541766, margin_pct: 28.0 },
+      { product_id: "p02", product_name: "Newport Menthol 100s",    sku: "NWP-M100",   category: "Tobacco",    units_sold: 248, revenue_cents: 1537360, cost_cents: 1106900, margin_cents: 430460, margin_pct: 28.0 },
+      { product_id: "p03", product_name: "Monster Energy Original", sku: "MON-OG",     category: "Beverages",  units_sold: 540, revenue_cents:  972000, cost_cents:  583200, margin_cents: 388800, margin_pct: 40.0 },
+      { product_id: "p04", product_name: "Red Bull 8.4oz",          sku: "RDB-84",     category: "Beverages",  units_sold: 480, revenue_cents:  806400, cost_cents:  483840, margin_cents: 322560, margin_pct: 40.0 },
+      { product_id: "p05", product_name: "Swisher Sweets Original", sku: "SWI-OG",     category: "Tobacco",    units_sold: 195, revenue_cents:  624000, cost_cents:  436800, margin_cents: 187200, margin_pct: 30.0 },
+      { product_id: "p06", product_name: "Backwoods Honey Berry",   sku: "BKW-HB",     category: "Tobacco",    units_sold: 180, revenue_cents:  576000, cost_cents:  403200, margin_cents: 172800, margin_pct: 30.0 },
+      { product_id: "p07", product_name: "5-Hour Energy Berry",     sku: "5HR-BRY",    category: "Beverages",  units_sold: 360, revenue_cents:  540000, cost_cents:  270000, margin_cents: 270000, margin_pct: 50.0 },
+      { product_id: "p08", product_name: "Camel Blue Box",          sku: "CAM-BLU",    category: "Tobacco",    units_sold: 144, revenue_cents:  892800, cost_cents:  642816, margin_cents: 249984, margin_pct: 28.0 },
+      { product_id: "p09", product_name: "Lottery Tickets (avg)",   sku: "LOT-AVG",    category: "Lottery",    units_sold: 820, revenue_cents:  820000, cost_cents:  779000, margin_cents:  41000, margin_pct:  5.0 },
+      { product_id: "p10", product_name: "Doritos Nacho Cheese",    sku: "DOR-NCH",    category: "Snacks",     units_sold: 295, revenue_cents:  295000, cost_cents:  177000, margin_cents: 118000, margin_pct: 40.0 },
+      { product_id: "p11", product_name: "Lay's Classic",           sku: "LAY-CLS",    category: "Snacks",     units_sold: 270, revenue_cents:  270000, cost_cents:  162000, margin_cents: 108000, margin_pct: 40.0 },
+      { product_id: "p12", product_name: "Gatorade Blue 32oz",      sku: "GAT-BLU-32", category: "Beverages",  units_sold: 210, revenue_cents:  378000, cost_cents:  226800, margin_cents: 151200, margin_pct: 40.0 },
+      { product_id: "p13", product_name: "Coca-Cola 20oz",          sku: "COK-20",     category: "Beverages",  units_sold: 390, revenue_cents:  507000, cost_cents:  304200, margin_cents: 202800, margin_pct: 40.0 },
+      { product_id: "p14", product_name: "White Owl Cigarillos",    sku: "WOW-CIG",    category: "Tobacco",    units_sold: 132, revenue_cents:  422400, cost_cents:  295680, margin_cents: 126720, margin_pct: 30.0 },
+      { product_id: "p15", product_name: "Trolli Sour Worms",       sku: "TRL-SW",     category: "Candy",      units_sold: 185, revenue_cents:  185000, cost_cents:  103600, margin_cents:  81400, margin_pct: 44.0 },
+      { product_id: "p16", product_name: "Reese's Peanut Butter",   sku: "RES-PB",     category: "Candy",      units_sold: 200, revenue_cents:  200000, cost_cents:  110000, margin_cents:  90000, margin_pct: 45.0 },
+      { product_id: "p17", product_name: "Pepsi 20oz",              sku: "PEP-20",     category: "Beverages",  units_sold: 330, revenue_cents:  429000, cost_cents:  257400, margin_cents: 171600, margin_pct: 40.0 },
+      { product_id: "p18", product_name: "Kind Bar Almond",         sku: "KND-ALM",    category: "Snacks",     units_sold: 145, revenue_cents:  261000, cost_cents:  156600, margin_cents: 104400, margin_pct: 40.0 },
+      { product_id: "p19", product_name: "Juul Pod Mint",           sku: "JUL-MNT",    category: "Vapor",      units_sold:  90, revenue_cents:  360000, cost_cents:  252000, margin_cents: 108000, margin_pct: 30.0 },
+      { product_id: "p20", product_name: "Vuse Alto Pod",           sku: "VUS-ALT",    category: "Vapor",      units_sold:  78, revenue_cents:  312000, cost_cents:  218400, margin_cents:  93600, margin_pct: 30.0 },
+    ];
+
+    const marginByCategory: MBC[] = [
+      { category: "Tobacco",   revenue_cents: 5387440, cost_cents: 3878510, margin_cents: 1508930, margin_pct: 28.0 },
+      { category: "Beverages", revenue_cents: 3632400, cost_cents: 2125440, margin_cents: 1506960, margin_pct: 41.5 },
+      { category: "Lottery",   revenue_cents:  820000, cost_cents:  779000, margin_cents:   41000, margin_pct:  5.0 },
+      { category: "Snacks",    revenue_cents:  826000, cost_cents:  495600, margin_cents:  330400, margin_pct: 40.0 },
+      { category: "Candy",     revenue_cents:  385000, cost_cents:  213600, margin_cents:  171400, margin_pct: 44.5 },
+      { category: "Vapor",     revenue_cents:  672000, cost_cents:  470400, margin_cents:  201600, margin_pct: 30.0 },
+    ];
+
+    return [
+      http.get(`${V1}/reports/sales-by-product`, async () => {
+        await lat();
+        return HttpResponse.json({ items: salesByProduct });
+      }),
+
+      http.get(`${V1}/reports/margin-by-category`, async () => {
+        await lat();
+        return HttpResponse.json({ items: marginByCategory });
       }),
     ];
   })(),
