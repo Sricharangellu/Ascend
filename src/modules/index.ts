@@ -30,6 +30,9 @@ import { notificationsModule } from "./notifications/index.js";
 import { auditLogModule } from "./audit_log/index.js";
 import { loyaltyModule } from "./loyalty/index.js";
 import { rlsModule } from "./rls/index.js";
+import { storeLocationsModule } from "./store_locations/index.js";
+import { productBatchesModule } from "./product_batches/index.js";
+import { customerInvoicesModule } from "./customer_invoices/index.js";
 
 /**
  * Registration order = migration order. Keep dependencies earlier:
@@ -66,5 +69,8 @@ export const modules: PosModule[] = [
   notificationsModule,
   auditLogModule,
   loyaltyModule,
+  storeLocationsModule,
+  productBatchesModule,
+  customerInvoicesModule,
   rlsModule,  // must be last — runs after all tenant tables exist
 ];

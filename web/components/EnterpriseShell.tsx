@@ -51,7 +51,10 @@ type NavKey =
   | "loyalty"
   | "notifications"
   | "audit-log"
-  | "service-orders";
+  | "service-orders"
+  | "inventory-locations"
+  | "inventory-expiry"
+  | "invoicing";
 
 // editionFlag: if set, this nav item is hidden when the corresponding feature
 // flag is false. Items with no editionFlag are always shown.
@@ -70,6 +73,9 @@ const NAV_ITEMS: Array<{
   { key: "quotes", label: "Quotations", href: "/quotes", icon: "quotes", group: "Operate" },
   { key: "returns", label: "Returns", href: "/returns", icon: "returns", group: "Operate", editionFlag: "groupRetailPOS" },
   { key: "service-orders", label: "Service Orders", href: "/service-orders", icon: "service-orders", group: "Operate" },
+  { key: "invoicing", label: "Invoicing", href: "/invoicing", icon: "invoicing", group: "Operate" },
+  { key: "inventory-locations", label: "Store Map", href: "/inventory/locations", icon: "inventory-locations", group: "Manage" },
+  { key: "inventory-expiry", label: "Expiry Tracking", href: "/inventory/expiry", icon: "inventory-expiry", group: "Manage" },
   { key: "payments", label: "Payments", href: "/payments", icon: "payments", group: "Operate" },
   { key: "catalog",   label: "Catalog",   href: "/catalog",   icon: "catalog",   group: "Manage" },
   { key: "inventory", label: "Inventory", href: "/inventory", icon: "inventory", group: "Manage" },
@@ -492,6 +498,12 @@ function NavIcon({ name }: { name: NavKey }) {
       return <AuditLogIcon />;
     case "service-orders":
       return <ServiceOrdersIcon />;
+    case "invoicing":
+      return <InvoicingIcon />;
+    case "inventory-locations":
+      return <StoreMapIcon />;
+    case "inventory-expiry":
+      return <ExpiryIcon />;
     default:
       return <ReportsIcon />;
   }
@@ -808,6 +820,35 @@ function ServiceOrdersIcon() {
   return (
     <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+    </svg>
+  );
+}
+
+function InvoicingIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+      <line x1="8" y1="21" x2="16" y2="21" />
+      <line x1="12" y1="17" x2="12" y2="21" />
+    </svg>
+  );
+}
+
+function StoreMapIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" />
+      <line x1="9" y1="3" x2="9" y2="18" />
+      <line x1="15" y1="6" x2="15" y2="21" />
+    </svg>
+  );
+}
+
+function ExpiryIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
     </svg>
   );
 }

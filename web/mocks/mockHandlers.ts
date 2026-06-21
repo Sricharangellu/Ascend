@@ -2651,6 +2651,282 @@ mockHandlers.push(
     return HttpResponse.json({ batch_id: `batch_${Date.now()}`, total: 12, status: "queued" }, { status: 201 });
   }),
 
+  // ── Store Locations ───────────────────────────────────────────────────────
+  ...(() => {
+    let seq = 0;
+    const BASE = Date.now();
+    interface SL { id: string; tenant_id: string; outlet_id: string | null; aisle: string; shelf: string; bin: string; label: string; description: string | null; created_at: number; updated_at: number; }
+    interface PL { id: string; product_id: string; location_id: string; qty_at_location: number; notes: string | null; aisle: string; shelf: string; bin: string; label: string; product_name: string; product_sku: string; created_at: number; updated_at: number; }
+
+    let locations: SL[] = [
+      { id: "loc_A1A", tenant_id: "t1", outlet_id: null, aisle: "A", shelf: "1", bin: "A", label: "A-1-A", description: "Beverages — water & soda", created_at: BASE - 864e5, updated_at: BASE - 864e5 },
+      { id: "loc_A1B", tenant_id: "t1", outlet_id: null, aisle: "A", shelf: "1", bin: "B", label: "A-1-B", description: "Beverages — energy drinks", created_at: BASE - 864e5, updated_at: BASE - 864e5 },
+      { id: "loc_A2A", tenant_id: "t1", outlet_id: null, aisle: "A", shelf: "2", bin: "A", label: "A-2-A", description: "Snacks — chips", created_at: BASE - 864e5, updated_at: BASE - 864e5 },
+      { id: "loc_B1A", tenant_id: "t1", outlet_id: null, aisle: "B", shelf: "1", bin: "A", label: "B-1-A", description: "Tobacco — cigarettes", created_at: BASE - 864e5, updated_at: BASE - 864e5 },
+      { id: "loc_B1B", tenant_id: "t1", outlet_id: null, aisle: "B", shelf: "1", bin: "B", label: "B-1-B", description: "Tobacco — cigars", created_at: BASE - 864e5, updated_at: BASE - 864e5 },
+      { id: "loc_B2A", tenant_id: "t1", outlet_id: null, aisle: "B", shelf: "2", bin: "A", label: "B-2-A", description: "Vape — disposables", created_at: BASE - 864e5, updated_at: BASE - 864e5 },
+      { id: "loc_C1A", tenant_id: "t1", outlet_id: null, aisle: "C", shelf: "1", bin: "A", label: "C-1-A", description: "Candy & gum", created_at: BASE - 864e5, updated_at: BASE - 864e5 },
+      { id: "loc_FRZE1", tenant_id: "t1", outlet_id: null, aisle: "Freezer", shelf: "1", bin: "", label: "FREEZER-1", description: "Frozen foods & ice cream", created_at: BASE - 864e5, updated_at: BASE - 864e5 },
+    ];
+
+    let productLocs: PL[] = [
+      { id: "pl_1", product_id: "prod_1", location_id: "loc_A1A", qty_at_location: 48, notes: null, aisle: "A", shelf: "1", bin: "A", label: "A-1-A", product_name: "Niagara Water 24pk", product_sku: "005008", created_at: BASE, updated_at: BASE },
+      { id: "pl_2", product_id: "prod_2", location_id: "loc_A1B", qty_at_location: 24, notes: null, aisle: "A", shelf: "1", bin: "B", label: "A-1-B", product_name: "Monster Energy 16oz", product_sku: "005020", created_at: BASE, updated_at: BASE },
+      { id: "pl_3", product_id: "prod_3", location_id: "loc_B1A", qty_at_location: 120, notes: "Marlboro Red", aisle: "B", shelf: "1", bin: "A", label: "B-1-A", product_name: "Marlboro Red King", product_sku: "005050", created_at: BASE, updated_at: BASE },
+      { id: "pl_4", product_id: "prod_4", location_id: "loc_B2A", qty_at_location: 60, notes: null, aisle: "B", shelf: "2", bin: "A", label: "B-2-A", product_name: "Elf Bar BC5000 Mango", product_sku: "005100", created_at: BASE, updated_at: BASE },
+    ];
+
+    const buildMap = (locs: SL[], pls: PL[]) => {
+      const plByLoc = new Map<string, PL[]>();
+      for (const pl of pls) { const a = plByLoc.get(pl.location_id) ?? []; a.push(pl); plByLoc.set(pl.location_id, a); }
+      const aisleMap = new Map<string, Map<string, SL[]>>();
+      for (const loc of locs) {
+        if (!aisleMap.has(loc.aisle)) aisleMap.set(loc.aisle, new Map());
+        const sm = aisleMap.get(loc.aisle)!;
+        const sk = loc.shelf || "(none)"; const bins = sm.get(sk) ?? []; bins.push(loc); sm.set(sk, bins);
+      }
+      const aisles = [];
+      for (const [aisle, sm] of aisleMap) {
+        const shelves = [];
+        for (const [shelf, ls] of sm) shelves.push({ name: shelf, bins: ls.map(l => ({ location: l, products: plByLoc.get(l.id) ?? [] })) });
+        aisles.push({ name: aisle, shelves });
+      }
+      return { aisles };
+    };
+
+    return [
+      http.get(`${V1}/store-locations`, async () => { await lat(); return HttpResponse.json({ items: locations }); }),
+      http.get(`${V1}/store-locations/map`, async () => { await lat(); return HttpResponse.json(buildMap(locations, productLocs)); }),
+      http.post(`${V1}/store-locations`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as Partial<SL>;
+        const shelf = b.shelf ?? ""; const bin = b.bin ?? "";
+        let label = (b.aisle ?? "").toUpperCase(); if (shelf) label += `-${shelf}`; if (bin) label += `-${bin}`;
+        const now = Date.now();
+        const loc: SL = { id: `loc_${++seq}`, tenant_id: "t1", outlet_id: b.outlet_id ?? null, aisle: b.aisle ?? "", shelf, bin, label, description: b.description ?? null, created_at: now, updated_at: now };
+        locations.push(loc);
+        return HttpResponse.json(loc, { status: 201 });
+      }),
+      http.patch(`${V1}/store-locations/:id`, async ({ params, request }) => {
+        await lat();
+        const idx = locations.findIndex(l => l.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const b = (await request.json()) as Partial<SL>;
+        locations[idx] = { ...locations[idx], ...b, updated_at: Date.now() };
+        return HttpResponse.json(locations[idx]);
+      }),
+      http.delete(`${V1}/store-locations/:id`, async ({ params }) => {
+        await lat();
+        locations = locations.filter(l => l.id !== String(params["id"]));
+        productLocs = productLocs.filter(pl => pl.location_id !== String(params["id"]));
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.get(`${V1}/product-locations`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const locationId = url.searchParams.get("location_id");
+        const productId = url.searchParams.get("product_id");
+        let filtered = productLocs;
+        if (locationId) filtered = filtered.filter(pl => pl.location_id === locationId);
+        if (productId) filtered = filtered.filter(pl => pl.product_id === productId);
+        return HttpResponse.json({ items: filtered });
+      }),
+      http.post(`${V1}/product-locations`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as { product_id: string; location_id: string; qty_at_location?: number; notes?: string | null };
+        const loc = locations.find(l => l.id === b.location_id);
+        const now = Date.now();
+        const existing = productLocs.findIndex(pl => pl.product_id === b.product_id && pl.location_id === b.location_id);
+        if (existing !== -1) {
+          productLocs[existing] = { ...productLocs[existing], qty_at_location: b.qty_at_location ?? productLocs[existing].qty_at_location, notes: b.notes ?? productLocs[existing].notes, updated_at: now };
+          return HttpResponse.json(productLocs[existing], { status: 201 });
+        }
+        const pl: PL = { id: `pl_${++seq}`, product_id: b.product_id, location_id: b.location_id, qty_at_location: b.qty_at_location ?? 0, notes: b.notes ?? null, aisle: loc?.aisle ?? "", shelf: loc?.shelf ?? "", bin: loc?.bin ?? "", label: loc?.label ?? "", product_name: "Product", product_sku: b.product_id, created_at: now, updated_at: now };
+        productLocs.push(pl);
+        return HttpResponse.json(pl, { status: 201 });
+      }),
+      http.post(`${V1}/product-locations/bulk`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as { assignments: Array<{ product_id: string; location_id: string }> };
+        return HttpResponse.json({ assigned: b.assignments.length });
+      }),
+      http.delete(`${V1}/product-locations`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const pid = url.searchParams.get("product_id"); const lid = url.searchParams.get("location_id");
+        productLocs = productLocs.filter(pl => !(pl.product_id === pid && pl.location_id === lid));
+        return new HttpResponse(null, { status: 204 });
+      }),
+    ];
+  })(),
+
+  // ── Product Batches / Expiry ──────────────────────────────────────────────
+  ...(() => {
+    let seq = 0;
+    const BASE = Date.now();
+    const DAY = 86400000;
+    interface PB { id: string; product_id: string; batch_number: string; expiry_date: number | null; qty: number; cost_cents: number; received_at: number; supplier_name: string | null; notes: string | null; product_name: string; product_sku: string; category: string; expiry_status: string | undefined; days_until_expiry: number | null; created_at: number; updated_at: number; }
+
+    const calcStatus = (expiry: number | null) => {
+      if (!expiry) return undefined;
+      const d = Math.floor((expiry - Date.now()) / DAY);
+      if (d < 0) return "expired"; if (d <= 7) return "critical"; if (d <= 30) return "warning"; return "ok";
+    };
+    const calcDays = (expiry: number | null) => expiry == null ? null : Math.floor((expiry - Date.now()) / DAY);
+
+    let batches: PB[] = [
+      { id: "batch_1", product_id: "prod_5", batch_number: "LOT-2024-001", expiry_date: BASE - 2 * DAY, qty: 12, cost_cents: 180, received_at: BASE - 60 * DAY, supplier_name: "Core-Mark", notes: null, product_name: "Nature Valley Bars 12pk", product_sku: "005200", category: "Snacks", expiry_status: "expired", days_until_expiry: -2, created_at: BASE - 60 * DAY, updated_at: BASE - 60 * DAY },
+      { id: "batch_2", product_id: "prod_6", batch_number: "LOT-2024-002", expiry_date: BASE + 4 * DAY, qty: 36, cost_cents: 240, received_at: BASE - 30 * DAY, supplier_name: "KeHE", notes: "Check dates", product_name: "Chobani Greek Yogurt", product_sku: "005210", category: "Dairy", expiry_status: "critical", days_until_expiry: 4, created_at: BASE - 30 * DAY, updated_at: BASE - 30 * DAY },
+      { id: "batch_3", product_id: "prod_7", batch_number: "LOT-2024-003", expiry_date: BASE + 18 * DAY, qty: 24, cost_cents: 320, received_at: BASE - 10 * DAY, supplier_name: "Core-Mark", notes: null, product_name: "Red Bull 8.4oz 4pk", product_sku: "005220", category: "Beverages", expiry_status: "warning", days_until_expiry: 18, created_at: BASE - 10 * DAY, updated_at: BASE - 10 * DAY },
+      { id: "batch_4", product_id: "prod_8", batch_number: "LOT-2024-004", expiry_date: BASE + 6 * DAY, qty: 8, cost_cents: 150, received_at: BASE - 45 * DAY, supplier_name: "McLane", notes: "Near expired — discount", product_name: "Lays Classic Chips 1oz", product_sku: "005230", category: "Snacks", expiry_status: "critical", days_until_expiry: 6, created_at: BASE - 45 * DAY, updated_at: BASE - 45 * DAY },
+      { id: "batch_5", product_id: "prod_9", batch_number: "LOT-2025-001", expiry_date: BASE + 120 * DAY, qty: 48, cost_cents: 95, received_at: BASE - 5 * DAY, supplier_name: "Core-Mark", notes: null, product_name: "Marlboro Red King 1ct", product_sku: "005050", category: "Tobacco", expiry_status: "ok", days_until_expiry: 120, created_at: BASE - 5 * DAY, updated_at: BASE - 5 * DAY },
+      { id: "batch_6", product_id: "prod_10", batch_number: "LOT-2024-005", expiry_date: BASE - 10 * DAY, qty: 6, cost_cents: 200, received_at: BASE - 90 * DAY, supplier_name: "KeHE", notes: null, product_name: "Silk Almond Milk 64oz", product_sku: "005240", category: "Dairy", expiry_status: "expired", days_until_expiry: -10, created_at: BASE - 90 * DAY, updated_at: BASE - 90 * DAY },
+      { id: "batch_7", product_id: "prod_11", batch_number: "LOT-2025-002", expiry_date: BASE + 25 * DAY, qty: 60, cost_cents: 110, received_at: BASE - 2 * DAY, supplier_name: "McLane", notes: null, product_name: "Snickers Bar 1.86oz", product_sku: "005250", category: "Candy", expiry_status: "warning", days_until_expiry: 25, created_at: BASE - 2 * DAY, updated_at: BASE - 2 * DAY },
+    ];
+
+    return [
+      http.get(`${V1}/product-batches/summary`, async () => {
+        await lat();
+        const now = Date.now();
+        const activeQty = batches.filter(b => b.qty > 0);
+        return HttpResponse.json({
+          expired: activeQty.filter(b => b.expiry_date != null && b.expiry_date < now).length,
+          critical: activeQty.filter(b => b.expiry_date != null && b.expiry_date >= now && b.expiry_date < now + 7 * DAY).length,
+          warning: activeQty.filter(b => b.expiry_date != null && b.expiry_date >= now + 7 * DAY && b.expiry_date < now + 30 * DAY).length,
+          ok: activeQty.filter(b => b.expiry_date == null || b.expiry_date >= now + 30 * DAY).length,
+          expired_qty: activeQty.filter(b => b.expiry_date != null && b.expiry_date < now).reduce((s, b) => s + b.qty, 0),
+          critical_qty: activeQty.filter(b => b.expiry_date != null && b.expiry_date >= now && b.expiry_date < now + 7 * DAY).reduce((s, b) => s + b.qty, 0),
+          warning_qty: activeQty.filter(b => b.expiry_date != null && b.expiry_date >= now + 7 * DAY && b.expiry_date < now + 30 * DAY).reduce((s, b) => s + b.qty, 0),
+        });
+      }),
+      http.get(`${V1}/product-batches`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const status = url.searchParams.get("status");
+        const productId = url.searchParams.get("product_id");
+        const now = Date.now();
+        let filtered = batches.filter(b => b.qty > 0);
+        if (productId) filtered = filtered.filter(b => b.product_id === productId);
+        if (status === "expired") filtered = filtered.filter(b => b.expiry_date != null && b.expiry_date < now);
+        else if (status === "critical") filtered = filtered.filter(b => b.expiry_date != null && b.expiry_date >= now && b.expiry_date < now + 7 * DAY);
+        else if (status === "warning") filtered = filtered.filter(b => b.expiry_date != null && b.expiry_date >= now + 7 * DAY && b.expiry_date < now + 30 * DAY);
+        else if (status === "ok") filtered = filtered.filter(b => b.expiry_date == null || b.expiry_date >= now + 30 * DAY);
+        return HttpResponse.json({ items: filtered.map(b => ({ ...b, expiry_status: calcStatus(b.expiry_date), days_until_expiry: calcDays(b.expiry_date) })) });
+      }),
+      http.post(`${V1}/product-batches`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as Partial<PB>;
+        const now = Date.now();
+        const batch: PB = { id: `batch_${++seq}`, product_id: b.product_id ?? "", batch_number: b.batch_number ?? "", expiry_date: b.expiry_date ?? null, qty: b.qty ?? 0, cost_cents: b.cost_cents ?? 0, received_at: b.received_at ?? now, supplier_name: b.supplier_name ?? null, notes: b.notes ?? null, product_name: "Product", product_sku: b.product_id ?? "", category: "", expiry_status: calcStatus(b.expiry_date ?? null), days_until_expiry: calcDays(b.expiry_date ?? null), created_at: now, updated_at: now };
+        batches.push(batch);
+        return HttpResponse.json(batch, { status: 201 });
+      }),
+      http.patch(`${V1}/product-batches/:id`, async ({ params, request }) => {
+        await lat();
+        const idx = batches.findIndex(b => b.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const b = (await request.json()) as Partial<PB>;
+        batches[idx] = { ...batches[idx], ...b, expiry_status: calcStatus(b.expiry_date ?? batches[idx].expiry_date), days_until_expiry: calcDays(b.expiry_date ?? batches[idx].expiry_date), updated_at: Date.now() };
+        return HttpResponse.json(batches[idx]);
+      }),
+      http.delete(`${V1}/product-batches/:id`, async ({ params }) => {
+        await lat();
+        batches = batches.filter(b => b.id !== String(params["id"]));
+        return new HttpResponse(null, { status: 204 });
+      }),
+    ];
+  })(),
+
+  // ── Customer Invoices ─────────────────────────────────────────────────────
+  ...(() => {
+    let seq = 1000;
+    const BASE = Date.now();
+    const DAY = 86400000;
+    type IStatus = "draft" | "sent" | "partial" | "paid" | "overdue" | "void";
+    interface CIL { id: string; invoice_id: string; product_id: string | null; upc: string | null; sku: string | null; name: string; quantity: number; unit_price_cents: number; discount_cents: number; tax_rate_pct: number; line_total_cents: number; sort_order: number; }
+    interface CI { id: string; invoice_number: string; customer_id: string | null; customer_name: string; customer_email: string | null; customer_phone: string | null; billing_address: string | null; status: IStatus; subtotal_cents: number; tax_cents: number; discount_cents: number; total_cents: number; paid_cents: number; due_date: number | null; paid_at: number | null; notes: string | null; created_at: number; updated_at: number; lines?: CIL[]; }
+
+    const makeLines = (inv_id: string, lines: Omit<CIL, "id" | "invoice_id">[]): CIL[] =>
+      lines.map((l, i) => ({ ...l, id: `cil_${inv_id}_${i}`, invoice_id: inv_id }));
+
+    let invoices: CI[] = [
+      { id: "cinv_1", invoice_number: "INV-01001", customer_id: "cust_1", customer_name: "Alice Johnson", customer_email: "alice@example.com", customer_phone: "555-0101", billing_address: "123 Main St, Austin TX 78701", status: "paid", subtotal_cents: 4599, tax_cents: 380, discount_cents: 0, total_cents: 4979, paid_cents: 4979, due_date: BASE + 30 * DAY, paid_at: BASE - 5 * DAY, notes: null, created_at: BASE - 10 * DAY, updated_at: BASE - 5 * DAY },
+      { id: "cinv_2", invoice_number: "INV-01002", customer_id: "cust_2", customer_name: "Bob Martinez", customer_email: "bob@example.com", customer_phone: "555-0102", billing_address: "456 Oak Ave, Dallas TX 75201", status: "sent", subtotal_cents: 12750, tax_cents: 1052, discount_cents: 500, total_cents: 13302, paid_cents: 0, due_date: BASE + 15 * DAY, paid_at: null, notes: "Net 15 terms", created_at: BASE - 3 * DAY, updated_at: BASE - 3 * DAY },
+      { id: "cinv_3", invoice_number: "INV-01003", customer_id: null, customer_name: "Walk-in Customer", customer_email: null, customer_phone: null, billing_address: null, status: "draft", subtotal_cents: 2340, tax_cents: 193, discount_cents: 0, total_cents: 2533, paid_cents: 0, due_date: null, paid_at: null, notes: null, created_at: BASE - 1 * DAY, updated_at: BASE - 1 * DAY },
+      { id: "cinv_4", invoice_number: "INV-01004", customer_id: "cust_3", customer_name: "Carol White", customer_email: "carol@example.com", customer_phone: "555-0103", billing_address: "789 Pine Rd, Houston TX 77001", status: "overdue", subtotal_cents: 8900, tax_cents: 735, discount_cents: 0, total_cents: 9635, paid_cents: 5000, due_date: BASE - 5 * DAY, paid_at: null, notes: "Partial payment received", created_at: BASE - 45 * DAY, updated_at: BASE - 5 * DAY },
+    ];
+    const linesByInv: Record<string, CIL[]> = {
+      cinv_1: makeLines("cinv_1", [{ product_id: "prod_1", upc: "123123123", sku: "005008", name: "Niagara Water 24pk", quantity: 3, unit_price_cents: 325, discount_cents: 0, tax_rate_pct: 8.25, line_total_cents: 1056, sort_order: 0 }, { product_id: "prod_3", upc: "456456456", sku: "005050", name: "Marlboro Red King", quantity: 12, unit_price_cents: 299, discount_cents: 0, tax_rate_pct: 8.25, line_total_cents: 3923, sort_order: 1 }]),
+      cinv_2: makeLines("cinv_2", [{ product_id: "prod_4", upc: "789789789", sku: "005100", name: "Elf Bar BC5000 Mango", quantity: 10, unit_price_cents: 1275, discount_cents: 500, tax_rate_pct: 8.25, line_total_cents: 13302, sort_order: 0 }]),
+      cinv_3: makeLines("cinv_3", [{ product_id: "prod_2", upc: "111222333", sku: "005020", name: "Monster Energy 16oz", quantity: 6, unit_price_cents: 390, discount_cents: 0, tax_rate_pct: 8.25, line_total_cents: 2533, sort_order: 0 }]),
+      cinv_4: makeLines("cinv_4", [{ product_id: null, upc: null, sku: null, name: "Custom Repair Service", quantity: 1, unit_price_cents: 8900, discount_cents: 0, tax_rate_pct: 8.25, line_total_cents: 9635, sort_order: 0 }]),
+    };
+
+    const upcCatalog: Record<string, { product_id: string; name: string; price_cents: number; sku: string }> = {
+      "123123123": { product_id: "prod_1", name: "Niagara Water 24pk", price_cents: 325, sku: "005008" },
+      "456456456": { product_id: "prod_3", name: "Marlboro Red King", price_cents: 299, sku: "005050" },
+      "789789789": { product_id: "prod_4", name: "Elf Bar BC5000 Mango", price_cents: 1275, sku: "005100" },
+      "111222333": { product_id: "prod_2", name: "Monster Energy 16oz", price_cents: 390, sku: "005020" },
+      "005008": { product_id: "prod_1", name: "Niagara Water 24pk", price_cents: 325, sku: "005008" },
+      "005050": { product_id: "prod_3", name: "Marlboro Red King", price_cents: 299, sku: "005050" },
+      "005100": { product_id: "prod_4", name: "Elf Bar BC5000 Mango", price_cents: 1275, sku: "005100" },
+    };
+
+    return [
+      http.get(`${V1}/customer-invoices/lookup-upc`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const upc = url.searchParams.get("upc") ?? "";
+        const item = upcCatalog[upc];
+        if (!item) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json(item);
+      }),
+      http.get(`${V1}/customer-invoices`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const status = url.searchParams.get("status");
+        const customerId = url.searchParams.get("customer_id");
+        const limit = Number(url.searchParams.get("limit") ?? 50);
+        const offset = Number(url.searchParams.get("offset") ?? 0);
+        let filtered = invoices;
+        if (status) filtered = filtered.filter(i => i.status === status);
+        if (customerId) filtered = filtered.filter(i => i.customer_id === customerId);
+        const total = filtered.length;
+        return HttpResponse.json({ items: filtered.slice(offset, offset + limit), total });
+      }),
+      http.get(`${V1}/customer-invoices/:id`, async ({ params }) => {
+        await lat();
+        const inv = invoices.find(i => i.id === String(params["id"]));
+        if (!inv) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json({ ...inv, lines: linesByInv[inv.id] ?? [] });
+      }),
+      http.post(`${V1}/customer-invoices`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as Partial<CI & { lines: CIL[] }>;
+        const now = Date.now();
+        const lines = (b.lines ?? []) as CIL[];
+        const subtotal = lines.reduce((s, l) => s + l.quantity * l.unit_price_cents, 0);
+        const discount = lines.reduce((s, l) => s + (l.discount_cents ?? 0), 0);
+        const tax = Math.round((subtotal - discount) * 0.0825);
+        const total = subtotal - discount + tax;
+        const id = `cinv_${++seq}`;
+        const inv: CI = { id, invoice_number: `INV-0${seq}`, customer_id: b.customer_id ?? null, customer_name: b.customer_name ?? "Walk-in Customer", customer_email: b.customer_email ?? null, customer_phone: b.customer_phone ?? null, billing_address: b.billing_address ?? null, status: "draft", subtotal_cents: subtotal, tax_cents: tax, discount_cents: discount, total_cents: total, paid_cents: 0, due_date: b.due_date ?? null, paid_at: null, notes: b.notes ?? null, created_at: now, updated_at: now };
+        invoices.unshift(inv);
+        linesByInv[id] = makeLines(id, lines.map((l, i) => ({ ...l, sort_order: i, line_total_cents: l.quantity * l.unit_price_cents - (l.discount_cents ?? 0) + Math.round((l.quantity * l.unit_price_cents - (l.discount_cents ?? 0)) * 0.0825) })));
+        return HttpResponse.json({ ...inv, lines: linesByInv[id] }, { status: 201 });
+      }),
+      http.patch(`${V1}/customer-invoices/:id/status`, async ({ params, request }) => {
+        await lat();
+        const idx = invoices.findIndex(i => i.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const b = (await request.json()) as { status: IStatus; paid_cents?: number };
+        const now = Date.now();
+        invoices[idx] = { ...invoices[idx], status: b.status, paid_cents: b.paid_cents ?? invoices[idx].paid_cents, paid_at: b.status === "paid" ? now : invoices[idx].paid_at, updated_at: now };
+        return HttpResponse.json({ ...invoices[idx], lines: linesByInv[String(params["id"])] ?? [] });
+      }),
+    ];
+  })(),
+
   // ── Service Orders ────────────────────────────────────────────────────────
   ...(() => {
     let seq = 0;

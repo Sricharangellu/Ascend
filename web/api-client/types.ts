@@ -1091,3 +1091,132 @@ export interface ServiceOrderResponse {
   limit: number;
   offset: number;
 }
+
+// ── Store Locations ───────────────────────────────────────────────────────────
+
+export interface StoreLocation {
+  id: string;
+  tenant_id: string;
+  outlet_id: string | null;
+  aisle: string;
+  shelf: string;
+  bin: string;
+  label: string;
+  description: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ProductLocation {
+  id: string;
+  product_id: string;
+  location_id: string;
+  qty_at_location: number;
+  notes: string | null;
+  aisle: string;
+  shelf: string;
+  bin: string;
+  label: string;
+  product_name: string;
+  product_sku: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface StoreMapBin {
+  location: StoreLocation;
+  products: ProductLocation[];
+}
+
+export interface StoreMapShelf {
+  name: string;
+  bins: StoreMapBin[];
+}
+
+export interface StoreMapAisle {
+  name: string;
+  shelves: StoreMapShelf[];
+}
+
+export interface StoreMap {
+  aisles: StoreMapAisle[];
+}
+
+// ── Product Batches / Expiry ──────────────────────────────────────────────────
+
+export type ExpiryStatus = "expired" | "critical" | "warning" | "ok";
+
+export interface ProductBatch {
+  id: string;
+  product_id: string;
+  batch_number: string;
+  expiry_date: number | null;
+  qty: number;
+  cost_cents: number;
+  received_at: number;
+  supplier_name: string | null;
+  notes: string | null;
+  product_name: string;
+  product_sku: string;
+  category: string;
+  expiry_status: ExpiryStatus | undefined;
+  days_until_expiry: number | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ExpirySummary {
+  expired: number;
+  critical: number;
+  warning: number;
+  ok: number;
+  expired_qty: number;
+  critical_qty: number;
+  warning_qty: number;
+}
+
+// ── Customer Invoices ─────────────────────────────────────────────────────────
+
+export type InvoiceStatus = "draft" | "sent" | "partial" | "paid" | "overdue" | "void";
+
+export interface CustomerInvoiceLine {
+  id: string;
+  invoice_id: string;
+  product_id: string | null;
+  upc: string | null;
+  sku: string | null;
+  name: string;
+  quantity: number;
+  unit_price_cents: number;
+  discount_cents: number;
+  tax_rate_pct: number;
+  line_total_cents: number;
+  sort_order: number;
+}
+
+export interface CustomerInvoice {
+  id: string;
+  invoice_number: string;
+  customer_id: string | null;
+  customer_name: string;
+  customer_email: string | null;
+  customer_phone: string | null;
+  billing_address: string | null;
+  status: InvoiceStatus;
+  subtotal_cents: number;
+  tax_cents: number;
+  discount_cents: number;
+  total_cents: number;
+  paid_cents: number;
+  due_date: number | null;
+  paid_at: number | null;
+  notes: string | null;
+  created_at: number;
+  updated_at: number;
+  lines?: CustomerInvoiceLine[];
+}
+
+export interface CustomerInvoiceResponse {
+  items: CustomerInvoice[];
+  total: number;
+}
