@@ -148,6 +148,16 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Contract changes:** Response shape for the three endpoints changed from { items, total, offset } / plain array to { items, nextCursor, limit }. Frontend pages that called these with hardcoded LIMIT 500 will receive at most 200 items per page; they should implement "load more" using nextCursor if needed.
 - **Verified:** typecheck clean (npm run typecheck — only pre-existing scripts/test.ts error).
 
+## 2026-06-21 — Fullstack cycle: PRODUCT-DATA (store locations + expiry + invoicing)
+
+- **Shipped:**
+  1. *Store Locations* — `store_locations` + `product_locations` tables. CRUD + map endpoint + bulk assign. `/inventory/locations` page: collapsible aisle/shelf/bin map (color-coded by aisle), product list view with search, bulk assign modal (multi-row SKU→location grid).
+  2. *Product Expiry / Batch Tracking* — `product_batches` table (batch_number, expiry_date, qty, cost_cents, supplier). `/product-batches/summary` returns expired/critical/warning/ok counts+qty. `/inventory/expiry` page: alert banner for urgent items, 4 colored status cards, table with color-coded progress bars and "days left" column. Add Batch modal.
+  3. *Customer Invoicing* — `customer_invoices` + `customer_invoice_lines` tables, auto-sequence INV-nnnnn. `/customer-invoices/lookup-upc` for barcode→product resolution. Full lifecycle draft→sent→partial→paid→overdue→void. `/invoicing` page: stats row, status filter tabs, UPC-scan line builder (scan → auto-fill name/price), totals panel, invoice detail modal with status advancement.
+- **Consumes:** GET/POST /store-locations, GET /store-locations/map, POST/GET /product-locations, POST /product-locations/bulk, GET /product-batches/summary, GET/POST/PATCH /product-batches, GET/POST /customer-invoices, GET /customer-invoices/lookup-upc, PATCH /customer-invoices/:id/status — all mocked.
+- **Data model:** Derived from product-export.xlsx (Product Location col, Expiration date col, UPC/SKU/price fields) and Invoice Template.xls (upc/quantity/price/name schema).
+- **Verified:** backend typecheck clean (npm run typecheck); frontend typecheck clean (cd web && npm run typecheck — zero errors).
+
 ## 2026-06-21 — Frontend cycle: FE-16
 
 - **Shipped:** Service Orders page at `/service-orders` — full repair ticket lifecycle (draft→open→in_progress→ready→closed). List view with status filter tabs, stat cards per status, search, create modal, inline status transition buttons, and detail modal. 5 MSW handlers added to mockHandlers.ts. Types ServiceOrder/ServiceOrderStatus/ServiceOrderResponse added to types.ts. Nav icon (wrench) wired into EnterpriseShell Operate group.
