@@ -342,7 +342,7 @@ records, only triaged into "build now" vs. "documented for later."
       `/reports/summary`, `/reports/top-products`, `/reports/inventory-valuation`,
       plus new mock for `/reports/sales-by-product`. (done in 28e1164)
 
-- [ ] FE-25: Receipt Templates (`/settings/receipts`) — per-outlet receipt
+- [x] FE-25: Receipt Templates (`/settings/receipts`) — per-outlet receipt
       customization. Fields: header text, footer text, show_logo (toggle),
       show_barcode (toggle), show_tax_breakdown (toggle), contact_info,
       return_policy (textarea). Live preview panel (thermal receipt mockup).
@@ -406,5 +406,9 @@ records, only triaged into "build now" vs. "documented for later."
 - 2026-06-20 backend DB-2 -> c5fe02c: ioredis client + atomic Lua INCR/PEXPIRE in both rate limiters; REDIS_URL absent = in-memory fallback; Redis error = fail open.
 - 2026-06-21 frontend FE-16 -> 06e8e22: Service Orders page — repair ticket list, stat cards, create modal, status transitions, detail modal; 5 MSW handlers.
 - 2026-06-21 fullstack PRODUCT-DATA -> b6dc1f8: store locations (aisle/shelf/bin map + bulk assign), product expiry/batch tracking, customer invoicing (UPC scan builder, INV-sequence, lifecycle); 3 new backend modules, 3 new frontend pages, 4 nav entries.
+
+- 2026-06-21 human/assistant fix(ci): VERCEL_SCOPE optional via shell param expansion -> 9c726f0
+- 2026-06-21 frontend FE-24 -> d1cf2a0: enhanced reports — date-range picker (7d/30d/90d/custom), sales-by-product top-20 sortable table, margin-by-category bar chart, inventory valuation with potential-margin stat, low-stock SKUs; CSV export per section; 2 new mock endpoints + types.
+- 2026-06-21 frontend FE-25 -> 8a4cc57: receipt templates section in Settings — per-outlet form (header/footer/contact/return policy + 3 toggles), live thermal receipt preview panel, GET/POST/PATCH mock handlers.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
