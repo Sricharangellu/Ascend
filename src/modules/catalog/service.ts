@@ -95,6 +95,12 @@ export interface Product {
   // Variant / master
   parent_product_id: string | null;
   variant_label: string | null;
+  // BE-22: regulated product compliance
+  tobacco_type: string | null;
+  flavored: number;        // 1|0
+  menthol: number;         // 1|0
+  msa_reportable: number;  // 1|0
+  restricted_states: string | null;  // JSON array e.g. '["CA","MA"]'
   // Operational flags (1|0)
   age_restricted: number;
   returnable: number;
@@ -312,6 +318,12 @@ export class CatalogService {
       // Variant
       parent_product_id: input.parent_product_id ?? null,
       variant_label: input.variant_label ?? null,
+      // BE-22: regulated compliance
+      tobacco_type: null,
+      flavored: 0,
+      menthol: 0,
+      msa_reportable: 0,
+      restricted_states: null,
       // Flags
       age_restricted: input.age_restricted ? 1 : 0,
       returnable: input.returnable !== false ? 1 : 0,
@@ -339,7 +351,8 @@ export class CatalogService {
             preferred_vendor_id, preferred_vendor_name, primary_vendor, vendor_upc, drop_shipment, reorder_quantity,
             min_qty_to_sell, max_qty_to_sell, qty_increment,
             parent_product_id, variant_label,
-            age_restricted, returnable, service_product, customer_specific, exclude_from_po, composite_product, track_inventory, track_inventory_by_imei, ecommerce)
+            age_restricted, returnable, service_product, customer_specific, exclude_from_po, composite_product, track_inventory, track_inventory_by_imei, ecommerce,
+            tobacco_type, flavored, menthol, msa_reportable, restricted_states)
          VALUES
            (@id, @tenant_id, @sku, @name, @price_cents, @category, @tax_class, @barcode, @status, @created_at, @updated_at,
             @description, @short_description, @full_description, @alternative_name, @model_name, @manufacturer, @brand, @tags, @url_alias,
@@ -351,7 +364,8 @@ export class CatalogService {
             @preferred_vendor_id, @preferred_vendor_name, @primary_vendor, @vendor_upc, @drop_shipment, @reorder_quantity,
             @min_qty_to_sell, @max_qty_to_sell, @qty_increment,
             @parent_product_id, @variant_label,
-            @age_restricted, @returnable, @service_product, @customer_specific, @exclude_from_po, @composite_product, @track_inventory, @track_inventory_by_imei, @ecommerce)`,
+            @age_restricted, @returnable, @service_product, @customer_specific, @exclude_from_po, @composite_product, @track_inventory, @track_inventory_by_imei, @ecommerce,
+            @tobacco_type, @flavored, @menthol, @msa_reportable, @restricted_states)`,
         product as unknown as Record<string, unknown>,
       );
     } catch (err) {
@@ -641,6 +655,55 @@ export class CatalogService {
   /** Soft delete: archive the product. */
   async archive(id: string, tenantId: string): Promise<Product> {
     return this.update(id, { status: "archived" }, tenantId);
+  }
+
+  /** BE-22: update regulated-product compliance fields (manager-gated at route level). */
+  async updateCompliance(
+    id: string,
+    input: {
+      tobacco_type?: string | null;
+      flavored?: boolean;
+      menthol?: boolean;
+      msa_reportable?: boolean;
+      restricted_states?: string[];
+    },
+    tenantId: string,
+  ): Promise<Product> {
+    const current = await this.getOrThrow(id, tenantId);
+    const now = Date.now();
+
+    const tobacco_type = input.tobacco_type !== undefined ? (input.tobacco_type ?? null) : current.tobacco_type;
+    const flavored = input.flavored !== undefined ? (input.flavored ? 1 : 0) : current.flavored;
+    const menthol = input.menthol !== undefined ? (input.menthol ? 1 : 0) : current.menthol;
+    const msa_reportable = input.msa_reportable !== undefined ? (input.msa_reportable ? 1 : 0) : current.msa_reportable;
+    const restricted_states =
+      input.restricted_states !== undefined
+        ? JSON.stringify(input.restricted_states)
+        : current.restricted_states;
+
+    await this.db.query(
+      `UPDATE products
+       SET tobacco_type = @tobacco_type,
+           flavored = @flavored,
+           menthol = @menthol,
+           msa_reportable = @msa_reportable,
+           restricted_states = @restricted_states,
+           updated_at = @now
+       WHERE id = @id AND tenant_id = @tenantId`,
+      { id, tenantId, tobacco_type, flavored, menthol, msa_reportable, restricted_states, now },
+    );
+
+    await this.events.publish("product.updated", { id, tobacco_type, flavored, menthol, msa_reportable, restricted_states }, id);
+
+    return {
+      ...current,
+      tobacco_type,
+      flavored,
+      menthol,
+      msa_reportable,
+      restricted_states,
+      updated_at: now,
+    };
   }
 
   async count(tenantId: string): Promise<number> {

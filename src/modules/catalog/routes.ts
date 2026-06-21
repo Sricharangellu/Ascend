@@ -460,6 +460,25 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     }),
   );
 
+  // BE-22: compliance fields — manager-gated
+  const complianceSchema = z.object({
+    tobacco_type: z.string().nullable().optional(),
+    flavored: z.boolean().optional(),
+    menthol: z.boolean().optional(),
+    msa_reportable: z.boolean().optional(),
+    restricted_states: z.array(z.string().length(2)).optional(),
+  });
+
+  router.patch(
+    "/:id/compliance",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const body = parseBody(complianceSchema, req.body);
+      const product = await service.updateCompliance(String(req.params.id), body, tenantId(res));
+      res.json(product);
+    }),
+  );
+
   // ── Product Images ─────────────────────────────────────────────────────────
   const addImageSchema = z.object({
     imageUrl: z.string().url(),

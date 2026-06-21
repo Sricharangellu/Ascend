@@ -103,6 +103,16 @@ const ALTER_PRODUCTS_AGE = `
 ALTER TABLE products ADD COLUMN IF NOT EXISTS age_restricted INTEGER NOT NULL DEFAULT 0;
 `;
 
+// BE-22: compliance columns for regulated tobacco/vape/CBD retail.
+// restricted_states is a JSON array of 2-letter state codes (e.g. '["CA","MA"]').
+const ALTER_PRODUCTS_COMPLIANCE = `
+ALTER TABLE products ADD COLUMN IF NOT EXISTS tobacco_type TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS flavored INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS menthol INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS msa_reportable INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS restricted_states TEXT;
+`;
+
 // Expiry date: denormalized cache of the soonest active lot expiry from inventory_lots.
 // Written by InventoryService.syncProductExpiry() on every lot create/depletion.
 // NULL = no lot tracking (non-perishable) or all lots fully depleted.
@@ -174,6 +184,7 @@ export const catalogModule: PosModule = {
     CREATE_PRODUCT_CATEGORIES,
     ALTER_PRODUCTS_VARIANTS,
     ALTER_PRODUCTS_AGE,
+    ALTER_PRODUCTS_COMPLIANCE,
     ALTER_PRODUCTS_EXPIRY,
     ALTER_PRODUCTS_XLSX_FIELDS,
     ALTER_PRODUCTS_TIERED_PRICING,
