@@ -181,3 +181,10 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Types added:** Employee, Shift, ShiftsResponse, TimeOffRequest, ShiftRole, TimeOffStatus.
 - **Phase 2 complete:** All FE-16–FE-18 (frontend) and BE-23–BE-24 (backend) roadmap items are now checked off.
 - **Verified:** npm run typecheck — 0 errors.
+
+## 2026-06-21 — Fullstack cycle: Phase 3 kickoff — BE-25 + BE-26
+
+- **Phase 3 roadmap:** 5 new items added (BE-25..27, FE-22..25) — Workforce backend, Customer accounts depth, Reorder dashboard, Enhanced reports, Receipt templates.
+- **BE-25 — Workforce backend (src/modules/workforce/):** employees/shifts/time_off_requests tables. Routes: GET /workforce/employees, POST/PATCH; GET/POST/PATCH/DELETE /workforce/shifts; GET/POST /workforce/time-off, PATCH /:id for status update. Zod validation on all inputs; createShift JOINs employees for employee_name+role. Completes real backend for FE-18 schedule grid.
+- **BE-26 — Customer contacts/addresses PATCH+DELETE:** Tables already existed from Wave A. Added updateContact, deleteContact, updateAddress, deleteAddress to customers service. Added PATCH+DELETE routes at /:id/contacts/:contactId and /:id/addresses/:addressId. ContactsPanel on /customers/[id] now has per-row Edit (inline modal → PATCH) and Remove (confirm dialog → DELETE). Mock handlers updated: PATCH addresses, PATCH+DELETE contacts, richer seed data (3 contacts + 2 addresses for cus_demo_1).
+- **Verified:** npm run typecheck — 0 errors.
