@@ -61,7 +61,7 @@ interface CustomerFinancials {
   storeCredit?: number;
 }
 
-type DetailTab = "general" | "transactions" | "financials" | "store-credit";
+type DetailTab = "general" | "transactions" | "financials" | "store-credit" | "contacts" | "addresses";
 
 interface CustomerLoyalty {
   customerId: string;
@@ -413,6 +413,8 @@ export default function CustomerDetailPage() {
     { key: "transactions", label: "Transactions" },
     { key: "financials", label: "Financials" },
     { key: "store-credit", label: "Store Credit" },
+    { key: "contacts", label: "Contacts" },
+    { key: "addresses", label: "Addresses" },
   ];
 
   return (
@@ -519,14 +521,20 @@ export default function CustomerDetailPage() {
         {activeTab === "store-credit" && (
           <StoreCreditTab customer={customer} financials={financials} canEdit={canEdit} />
         )}
+        {activeTab === "contacts" && (
+          <ContactsTab customerId={customerId} canEdit={canEdit} addToast={addToast} />
+        )}
+        {activeTab === "addresses" && (
+          <AddressesTab customerId={customerId} canEdit={canEdit} addToast={addToast} />
+        )}
 
-        {/* Loyalty card */}
-        <LoyaltyCard loyalty={loyalty} loading={loyaltyLoading} />
-
-        {/* Sub-panels: Addresses, Contacts, Notes */}
-        <AddressesPanel customerId={customerId} canEdit={canEdit} addToast={addToast} />
-        <ContactsPanel customerId={customerId} canEdit={canEdit} addToast={addToast} />
-        <NotesPanel customerId={customerId} canEdit={canEdit} addToast={addToast} />
+        {/* Loyalty card + Notes always visible below tabs */}
+        {activeTab !== "contacts" && activeTab !== "addresses" && (
+          <>
+            <LoyaltyCard loyalty={loyalty} loading={loyaltyLoading} />
+            <NotesPanel customerId={customerId} canEdit={canEdit} addToast={addToast} />
+          </>
+        )}
       </div>
 
       {showMerge && (
@@ -1175,39 +1183,66 @@ interface CustomerAddress {
 }
 
 function AddressesPanel({ customerId, canEdit, addToast }: { customerId: string; canEdit: boolean; addToast: ReturnType<typeof useToast>["addToast"] }) {
-  const [open, setOpen] = useState(false);
+  return <AddressesTab customerId={customerId} canEdit={canEdit} addToast={addToast} />;
+}
+
+type AddrForm = { address_type: string; address_line1: string; address_line2: string; city: string; state: string; zip: string; country: string; is_default: boolean };
+const BLANK_ADDR: AddrForm = { address_type: "billing", address_line1: "", address_line2: "", city: "", state: "", zip: "", country: "US", is_default: false };
+
+function AddressesTab({ customerId, canEdit, addToast }: { customerId: string; canEdit: boolean; addToast: ReturnType<typeof useToast>["addToast"] }) {
   const [items, setItems] = useState<CustomerAddress[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ address_type: "billing", address_line1: "", city: "", state: "", zip: "", is_default: false });
-  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState<AddrForm>(BLANK_ADDR);
+  const [editTarget, setEditTarget] = useState<CustomerAddress | null>(null);
+  const [editForm, setEditForm] = useState<AddrForm>(BLANK_ADDR);
   const [deleteTarget, setDeleteTarget] = useState<CustomerAddress | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
     apiGet<{ items: CustomerAddress[] }>(`/api/v1/customers/${customerId}/addresses`)
       .then(r => setItems(r.items ?? []))
       .catch(() => setItems([]))
-      .finally(() => { setLoading(false); setLoaded(true); });
+      .finally(() => setLoading(false));
   }, [customerId]);
 
-  const toggle = () => {
-    setOpen(v => {
-      if (!v && !loaded) load();
-      return !v;
-    });
-  };
+  useEffect(() => { load(); }, [load]);
 
   const add = async () => {
     if (!form.address_line1.trim() || !form.city.trim()) return;
     setBusy(true);
     try {
-      await apiPost(`/api/v1/customers/${customerId}/addresses`, form);
-      setShowForm(false);
-      setForm({ address_type: "billing", address_line1: "", city: "", state: "", zip: "", is_default: false });
-      load();
+      await apiPost(`/api/v1/customers/${customerId}/addresses`, {
+        addressType: form.address_type, addressLine1: form.address_line1.trim(),
+        addressLine2: form.address_line2.trim() || null, city: form.city.trim(),
+        state: form.state.trim() || null, zip: form.zip.trim() || null,
+        country: form.country || "US", isDefault: form.is_default,
+      });
+      setShowForm(false); setForm(BLANK_ADDR); load();
       addToast({ title: "Address added", variant: "success" });
+    } catch (e) {
+      addToast({ title: "Failed", description: e instanceof Error ? e.message : "Unknown error", variant: "error" });
+    } finally { setBusy(false); }
+  };
+
+  const startEdit = (addr: CustomerAddress) => {
+    setEditTarget(addr);
+    setEditForm({ address_type: addr.address_type, address_line1: addr.address_line1 ?? "", address_line2: addr.address_line2 ?? "", city: addr.city ?? "", state: addr.state ?? "", zip: addr.zip ?? "", country: addr.country ?? "US", is_default: addr.is_default });
+  };
+
+  const saveEdit = async () => {
+    if (!editTarget) return;
+    setBusy(true);
+    try {
+      await apiPatch(`/api/v1/customers/${customerId}/addresses/${editTarget.id}`, {
+        addressType: editForm.address_type, addressLine1: editForm.address_line1.trim() || null,
+        addressLine2: editForm.address_line2.trim() || null, city: editForm.city.trim() || null,
+        state: editForm.state.trim() || null, zip: editForm.zip.trim() || null,
+        country: editForm.country || null, isDefault: editForm.is_default,
+      });
+      setEditTarget(null); load();
+      addToast({ title: "Address updated", variant: "success" });
     } catch (e) {
       addToast({ title: "Failed", description: e instanceof Error ? e.message : "Unknown error", variant: "error" });
     } finally { setBusy(false); }
@@ -1217,8 +1252,7 @@ function AddressesPanel({ customerId, canEdit, addToast }: { customerId: string;
     setBusy(true);
     try {
       await apiDelete(`/api/v1/customers/${customerId}/addresses/${id}`);
-      setDeleteTarget(null);
-      load();
+      setDeleteTarget(null); load();
       addToast({ title: "Address removed", variant: "success" });
     } catch (e) {
       addToast({ title: "Failed", description: e instanceof Error ? e.message : "Unknown error", variant: "error" });
@@ -1227,111 +1261,123 @@ function AddressesPanel({ customerId, canEdit, addToast }: { customerId: string;
 
   return (
     <>
-      <ConfirmDialog
-        open={!!deleteTarget}
-        title="Remove address"
-        message={`Remove this ${deleteTarget?.address_type} address?`}
-        confirmLabel="Remove"
-        destructive
+      <ConfirmDialog open={!!deleteTarget} title="Remove address"
+        message={`Remove this ${deleteTarget?.address_type ?? ""} address?`}
+        confirmLabel="Remove" destructive
         onConfirm={() => deleteTarget && void remove(deleteTarget.id)}
-        onCancel={() => setDeleteTarget(null)}
-      />
+        onCancel={() => setDeleteTarget(null)} />
+
+      {editTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEditTarget(null)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <h2 className="text-base font-semibold text-slate-900">Edit Address</h2>
+            <div className="space-y-3">
+              <div className="flex gap-3">
+                <select value={editForm.address_type} onChange={e => setEditForm(f => ({ ...f, address_type: e.target.value }))} className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950">
+                  <option value="billing">Billing</option>
+                  <option value="shipping">Shipping</option>
+                </select>
+                <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                  <input type="checkbox" checked={editForm.is_default} onChange={e => setEditForm(f => ({ ...f, is_default: e.target.checked }))} className="h-4 w-4 rounded border-slate-300 accent-blue-600" />
+                  Default
+                </label>
+              </div>
+              <input value={editForm.address_line1} onChange={e => setEditForm(f => ({ ...f, address_line1: e.target.value }))} placeholder="Address line 1" className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              <input value={editForm.address_line2} onChange={e => setEditForm(f => ({ ...f, address_line2: e.target.value }))} placeholder="Address line 2" className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              <div className="flex gap-3">
+                <input value={editForm.city} onChange={e => setEditForm(f => ({ ...f, city: e.target.value }))} placeholder="City" className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+                <input value={editForm.state} onChange={e => setEditForm(f => ({ ...f, state: e.target.value }))} placeholder="State" className="w-20 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+                <input value={editForm.zip} onChange={e => setEditForm(f => ({ ...f, zip: e.target.value }))} placeholder="ZIP" className="w-24 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button size="sm" variant="secondary" onClick={() => setEditTarget(null)}>Cancel</Button>
+              <Button size="sm" variant="primary" loading={busy} onClick={() => void saveEdit()}>Save</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Card className="overflow-hidden p-0">
-        <button
-          type="button"
-          onClick={toggle}
-          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50"
-        >
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-slate-950">Addresses</span>
-            {loaded && (
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{items.length}</span>
-            )}
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{items.length}</span>
           </div>
-          <div className="flex items-center gap-2">
-            {open && canEdit && (
-              <span
-                role="button"
-                tabIndex={0}
-                onClick={e => { e.stopPropagation(); setShowForm(v => !v); }}
-                onKeyDown={e => { if (e.key === "Enter") { e.stopPropagation(); setShowForm(v => !v); } }}
-                className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700"
-              >
-                Add
-              </span>
-            )}
-            <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}>
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </div>
-        </button>
+          {canEdit && (
+            <Button size="sm" variant="secondary" onClick={() => setShowForm(v => !v)}>
+              {showForm ? "Cancel" : "+ Add address"}
+            </Button>
+          )}
+        </div>
 
-        {open && (
-          <div className="border-t border-slate-200">
-            {showForm && canEdit && (
-              <div className="border-b border-slate-200 bg-slate-50 px-4 py-4 space-y-3">
-                <div className="flex flex-wrap gap-3">
-                  <select value={form.address_type} onChange={e => setForm(f => ({ ...f, address_type: e.target.value }))} className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950">
-                    <option value="billing">Billing</option>
-                    <option value="shipping">Shipping</option>
-                  </select>
-                  <input value={form.address_line1} onChange={e => setForm(f => ({ ...f, address_line1: e.target.value }))} placeholder="Address line 1" className="flex-1 min-w-48 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
-                  <input value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} placeholder="City" className="w-32 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
-                  <input value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value }))} placeholder="State" className="w-20 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
-                  <input value={form.zip} onChange={e => setForm(f => ({ ...f, zip: e.target.value }))} placeholder="ZIP" className="w-24 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
-                </div>
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-                    <input type="checkbox" checked={form.is_default} onChange={e => setForm(f => ({ ...f, is_default: e.target.checked }))} className="h-4 w-4 rounded border-slate-300 accent-blue-600" />
-                    Set as default
-                  </label>
-                  <div className="ml-auto flex gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => setShowForm(false)}>Cancel</Button>
-                    <Button size="sm" variant="primary" loading={busy} disabled={!form.address_line1.trim() || !form.city.trim()} onClick={() => void add()}>Add</Button>
-                  </div>
-                </div>
+        {showForm && canEdit && (
+          <div className="border-b border-slate-200 bg-slate-50 px-4 py-4 space-y-3">
+            <div className="flex flex-wrap gap-3">
+              <select value={form.address_type} onChange={e => setForm(f => ({ ...f, address_type: e.target.value }))} className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950">
+                <option value="billing">Billing</option>
+                <option value="shipping">Shipping</option>
+              </select>
+              <input value={form.address_line1} onChange={e => setForm(f => ({ ...f, address_line1: e.target.value }))} placeholder="Address line 1 (required)" className="flex-1 min-w-48 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              <input value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} placeholder="City (required)" className="w-32 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              <input value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value }))} placeholder="State" className="w-20 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              <input value={form.zip} onChange={e => setForm(f => ({ ...f, zip: e.target.value }))} placeholder="ZIP" className="w-24 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+            </div>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input type="checkbox" checked={form.is_default} onChange={e => setForm(f => ({ ...f, is_default: e.target.checked }))} className="h-4 w-4 rounded border-slate-300 accent-blue-600" />
+                Set as default
+              </label>
+              <div className="ml-auto flex gap-2">
+                <Button size="sm" variant="secondary" onClick={() => { setShowForm(false); setForm(BLANK_ADDR); }}>Cancel</Button>
+                <Button size="sm" variant="primary" loading={busy} disabled={!form.address_line1.trim() || !form.city.trim()} onClick={() => void add()}>Add</Button>
               </div>
-            )}
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Address</th>
-                  <th className="px-4 py-3">City / State / ZIP</th>
-                  <th className="px-4 py-3">Default</th>
-                  {canEdit && <th className="px-4 py-3" />}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {loading && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">Loading…</td></tr>}
-                {!loading && items.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No addresses yet.</td></tr>}
-                {items.map(addr => (
-                  <tr key={addr.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 capitalize text-slate-700">{addr.address_type}</td>
-                    <td className="px-4 py-3">{addr.address_line1}</td>
-                    <td className="px-4 py-3 text-slate-500">{addr.city}, {addr.state} {addr.zip}</td>
-                    <td className="px-4 py-3">
-                      {addr.is_default ? (
-                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">Default</span>
-                      ) : "—"}
-                    </td>
-                    {canEdit && (
-                      <td className="px-4 py-3 text-right">
-                        <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(addr)}>Remove</Button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            </div>
           </div>
         )}
+
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <th className="px-4 py-3">Type</th>
+              <th className="px-4 py-3">Address</th>
+              <th className="px-4 py-3">City / State / ZIP</th>
+              <th className="px-4 py-3">Default</th>
+              {canEdit && <th className="px-4 py-3" />}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {loading && <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">Loading…</td></tr>}
+            {!loading && items.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">No addresses yet.</td></tr>}
+            {items.map(addr => (
+              <tr key={addr.id} className="hover:bg-slate-50">
+                <td className="px-4 py-3 capitalize text-slate-700">{addr.address_type}</td>
+                <td className="px-4 py-3">
+                  <p>{addr.address_line1}</p>
+                  {addr.address_line2 && <p className="text-xs text-slate-500">{addr.address_line2}</p>}
+                </td>
+                <td className="px-4 py-3 text-slate-500">{[addr.city, addr.state, addr.zip].filter(Boolean).join(", ")}</td>
+                <td className="px-4 py-3">
+                  {addr.is_default ? <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">Default</span> : "—"}
+                </td>
+                {canEdit && (
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex justify-end gap-2">
+                      <button onClick={() => startEdit(addr)} className="text-xs text-slate-500 hover:text-slate-800 underline">Edit</button>
+                      <button onClick={() => setDeleteTarget(addr)} className="text-xs text-red-500 hover:text-red-700 underline">Remove</button>
+                    </div>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </Card>
     </>
   );
 }
 
-// ─── Contacts Sub-panel ───────────────────────────────────────────────────────
+// ─── Contacts Tab ─────────────────────────────────────────────────────────────
 
 interface CustomerContact {
   id: string;
@@ -1343,10 +1389,12 @@ interface CustomerContact {
 }
 
 function ContactsPanel({ customerId, canEdit, addToast }: { customerId: string; canEdit: boolean; addToast: ReturnType<typeof useToast>["addToast"] }) {
-  const [open, setOpen] = useState(false);
+  return <ContactsTab customerId={customerId} canEdit={canEdit} addToast={addToast} />;
+}
+
+function ContactsTab({ customerId, canEdit, addToast }: { customerId: string; canEdit: boolean; addToast: ReturnType<typeof useToast>["addToast"] }) {
   const [items, setItems] = useState<CustomerContact[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ contact_name: "", title: "", email: "", phone: "", is_primary: false });
   const [editTarget, setEditTarget] = useState<CustomerContact | null>(null);
@@ -1358,26 +1406,21 @@ function ContactsPanel({ customerId, canEdit, addToast }: { customerId: string; 
     apiGet<{ items: CustomerContact[] }>(`/api/v1/customers/${customerId}/contacts`)
       .then(r => setItems(r.items ?? []))
       .catch(() => setItems([]))
-      .finally(() => { setLoading(false); setLoaded(true); });
+      .finally(() => setLoading(false));
   }, [customerId]);
 
-  const toggle = () => {
-    setOpen(v => {
-      if (!v && !loaded) load();
-      return !v;
-    });
-  };
+  useEffect(() => { load(); }, [load]);
 
   const add = async () => {
     if (!form.contact_name.trim()) return;
     setBusy(true);
     try {
       await apiPost(`/api/v1/customers/${customerId}/contacts`, {
-        contact_name: form.contact_name.trim(),
+        contactName: form.contact_name.trim(),
         title: form.title.trim() || undefined,
         email: form.email.trim() || undefined,
         phone: form.phone.trim() || undefined,
-        is_primary: form.is_primary,
+        isPrimary: form.is_primary,
       });
       setShowForm(false);
       setForm({ contact_name: "", title: "", email: "", phone: "", is_primary: false });
@@ -1393,11 +1436,11 @@ function ContactsPanel({ customerId, canEdit, addToast }: { customerId: string; 
     setBusy(true);
     try {
       await apiPatch(`/api/v1/customers/${customerId}/contacts/${editTarget.id}`, {
-        contact_name: editTarget.contact_name,
+        contactName: editTarget.contact_name,
         title: editTarget.title || null,
         email: editTarget.email || null,
         phone: editTarget.phone || null,
-        is_primary: editTarget.is_primary,
+        isPrimary: editTarget.is_primary,
       });
       setEditTarget(null);
       load();
@@ -1421,18 +1464,15 @@ function ContactsPanel({ customerId, canEdit, addToast }: { customerId: string; 
 
   return (
     <>
-      <ConfirmDialog
-        open={!!deleteTarget}
-        title="Remove contact"
-        message={`Remove ${deleteTarget?.contact_name} from this account?`}
-        confirmLabel="Remove"
-        destructive
+      <ConfirmDialog open={!!deleteTarget} title="Remove contact"
+        message={`Remove ${deleteTarget?.contact_name ?? "this contact"} from this account?`}
+        confirmLabel="Remove" destructive
         onConfirm={() => deleteTarget && void remove(deleteTarget.id)}
-        onCancel={() => setDeleteTarget(null)}
-      />
+        onCancel={() => setDeleteTarget(null)} />
+
       {editTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEditTarget(null)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4" onClick={e => e.stopPropagation()}>
             <h2 className="text-base font-semibold text-slate-900">Edit Contact</h2>
             <div className="space-y-3">
               <input value={editTarget.contact_name} onChange={e => setEditTarget(t => t && ({ ...t, contact_name: e.target.value }))} placeholder="Name" className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
@@ -1451,97 +1491,78 @@ function ContactsPanel({ customerId, canEdit, addToast }: { customerId: string; 
           </div>
         </div>
       )}
+
       <Card className="overflow-hidden p-0">
-        <button
-          type="button"
-          onClick={toggle}
-          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50"
-        >
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-slate-950">Contacts</span>
-            {loaded && (
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{items.length}</span>
-            )}
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{items.length}</span>
           </div>
-          <div className="flex items-center gap-2">
-            {open && canEdit && (
-              <span
-                role="button"
-                tabIndex={0}
-                onClick={e => { e.stopPropagation(); setShowForm(v => !v); }}
-                onKeyDown={e => { if (e.key === "Enter") { e.stopPropagation(); setShowForm(v => !v); } }}
-                className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700"
-              >
-                Add
-              </span>
-            )}
-            <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}>
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </div>
-        </button>
+          {canEdit && (
+            <Button size="sm" variant="secondary" onClick={() => setShowForm(v => !v)}>
+              {showForm ? "Cancel" : "+ Add contact"}
+            </Button>
+          )}
+        </div>
 
-        {open && (
-          <div className="border-t border-slate-200">
-            {showForm && canEdit && (
-              <div className="border-b border-slate-200 bg-slate-50 px-4 py-4 space-y-3">
-                <div className="flex flex-wrap gap-3">
-                  <input value={form.contact_name} onChange={e => setForm(f => ({ ...f, contact_name: e.target.value }))} placeholder="Name (required)" className="flex-1 min-w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
-                  <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Title" className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
-                  <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="Email" className="w-48 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
-                  <input type="tel" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="Phone" className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
-                </div>
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-                    <input type="checkbox" checked={form.is_primary} onChange={e => setForm(f => ({ ...f, is_primary: e.target.checked }))} className="h-4 w-4 rounded border-slate-300 accent-blue-600" />
-                    Primary contact
-                  </label>
-                  <div className="ml-auto flex gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => setShowForm(false)}>Cancel</Button>
-                    <Button size="sm" variant="primary" loading={busy} disabled={!form.contact_name.trim()} onClick={() => void add()}>Add</Button>
-                  </div>
-                </div>
+        {showForm && canEdit && (
+          <div className="border-b border-slate-200 bg-slate-50 px-4 py-4 space-y-3">
+            <div className="flex flex-wrap gap-3">
+              <input value={form.contact_name} onChange={e => setForm(f => ({ ...f, contact_name: e.target.value }))} placeholder="Name (required)" className="flex-1 min-w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Title" className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="Email" className="w-48 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              <input type="tel" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="Phone" className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+            </div>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input type="checkbox" checked={form.is_primary} onChange={e => setForm(f => ({ ...f, is_primary: e.target.checked }))} className="h-4 w-4 rounded border-slate-300 accent-blue-600" />
+                Primary contact
+              </label>
+              <div className="ml-auto flex gap-2">
+                <Button size="sm" variant="secondary" onClick={() => { setShowForm(false); setForm({ contact_name: "", title: "", email: "", phone: "", is_primary: false }); }}>Cancel</Button>
+                <Button size="sm" variant="primary" loading={busy} disabled={!form.contact_name.trim()} onClick={() => void add()}>Add</Button>
               </div>
-            )}
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Title</th>
-                  <th className="px-4 py-3">Email</th>
-                  <th className="px-4 py-3">Phone</th>
-                  <th className="px-4 py-3">Primary</th>
-                  {canEdit && <th className="px-4 py-3" />}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {loading && <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">Loading…</td></tr>}
-                {!loading && items.length === 0 && <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">No contacts yet.</td></tr>}
-                {items.map(contact => (
-                  <tr key={contact.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium">{contact.contact_name}</td>
-                    <td className="px-4 py-3 text-slate-500">{contact.title ?? "—"}</td>
-                    <td className="px-4 py-3 text-slate-500">{contact.email ?? "—"}</td>
-                    <td className="px-4 py-3 text-slate-500">{contact.phone ?? "—"}</td>
-                    <td className="px-4 py-3">
-                      {contact.is_primary ? (
-                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">Primary</span>
-                      ) : "—"}
-                    </td>
-                    {canEdit && (
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2 justify-end">
-                          <button onClick={() => setEditTarget({ ...contact })} className="text-xs text-slate-500 hover:text-slate-800 underline">Edit</button>
-                          <button onClick={() => setDeleteTarget(contact)} className="text-xs text-red-500 hover:text-red-700 underline">Remove</button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            </div>
           </div>
         )}
+
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <th className="px-4 py-3">Name</th>
+              <th className="px-4 py-3">Title</th>
+              <th className="px-4 py-3">Email</th>
+              <th className="px-4 py-3">Phone</th>
+              <th className="px-4 py-3">Primary</th>
+              {canEdit && <th className="px-4 py-3" />}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {loading && <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">Loading…</td></tr>}
+            {!loading && items.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">No contacts yet.</td></tr>}
+            {items.map(contact => (
+              <tr key={contact.id} className="hover:bg-slate-50">
+                <td className="px-4 py-3 font-medium text-slate-900">{contact.contact_name}</td>
+                <td className="px-4 py-3 text-slate-500">{contact.title ?? "—"}</td>
+                <td className="px-4 py-3 text-slate-500">{contact.email ?? "—"}</td>
+                <td className="px-4 py-3 text-slate-500">{contact.phone ?? "—"}</td>
+                <td className="px-4 py-3">
+                  {contact.is_primary
+                    ? <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">Primary</span>
+                    : <button onClick={() => { /* promote to primary */ void saveEdit(); }} className="text-xs text-slate-400">—</button>}
+                </td>
+                {canEdit && (
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2 justify-end">
+                      <button onClick={() => setEditTarget({ ...contact })} className="text-xs text-slate-500 hover:text-slate-800 underline">Edit</button>
+                      <button onClick={() => setDeleteTarget(contact)} className="text-xs text-red-500 hover:text-red-700 underline">Remove</button>
+                    </div>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </Card>
     </>
   );
