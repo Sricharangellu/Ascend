@@ -334,13 +334,13 @@ records, only triaged into "build now" vs. "documented for later."
       action calling BE-27. Mock endpoint: `GET /inventory/reorder-suggestions`.
       Nav group: Manage. (done in 3ee1aa2)
 
-- [ ] FE-24: Enhanced Reports (`/reports`) — replace static stub with a real
+- [x] FE-24: Enhanced Reports (`/reports`) — replace static stub with a real
       analytics page. Date-range picker (last 7d/30d/90d/custom). Report cards:
       Sales by Product (top 20, sortable), Margin by Category (bar chart),
       Inventory Valuation (total cost value by category), Low Stock SKUs.
       CSV export button per report. Consumes existing
       `/reports/summary`, `/reports/top-products`, `/reports/inventory-valuation`,
-      plus new mock for `/reports/sales-by-product`.
+      plus new mock for `/reports/sales-by-product`. (done in 28e1164)
 
 - [ ] FE-25: Receipt Templates (`/settings/receipts`) — per-outlet receipt
       customization. Fields: header text, footer text, show_logo (toggle),
