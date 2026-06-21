@@ -345,5 +345,6 @@ records, only triaged into "build now" vs. "documented for later."
 - 2026-06-20 backend DB-1 -> 15a1228: RLS migration (DO block enables tenant_isolation policy on all tenant_id tables); DB.withTenant(tenantId) helper wraps queries in mini-tx with set_config for safe pool use.
 - 2026-06-20 backend DB-2 -> c5fe02c: ioredis client + atomic Lua INCR/PEXPIRE in both rate limiters; REDIS_URL absent = in-memory fallback; Redis error = fail open.
 - 2026-06-21 frontend FE-16 -> 06e8e22: Service Orders page — repair ticket list, stat cards, create modal, status transitions, detail modal; 5 MSW handlers.
+- 2026-06-21 fullstack PRODUCT-DATA -> b6dc1f8: store locations (aisle/shelf/bin map + bulk assign), product expiry/batch tracking, customer invoicing (UPC scan builder, INV-sequence, lifecycle); 3 new backend modules, 3 new frontend pages, 4 nav entries.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
