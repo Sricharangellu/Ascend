@@ -348,6 +348,75 @@ export const lightspeedHandlers = [
     });
   }),
 
+  // ── Inventory: locations ──────────────────────────────────────────────────
+  http.get(`${V1}/inventory/locations`, async () => {
+    await lat();
+    return HttpResponse.json({
+      items: [
+        { id: "loc_main",   name: "Main Store" },
+        { id: "loc_wh",     name: "Warehouse" },
+        { id: "loc_dt",     name: "Downtown" },
+      ],
+    });
+  }),
+
+  // ── Inventory: stock deduction (post-payment) ─────────────────────────────
+  http.post(`${V1}/inventory/deduct`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as {
+      location_id: string;
+      lines: Array<{ product_id: string; qty: number }>;
+      order_id: string | null;
+    };
+    return HttpResponse.json({
+      deducted: (b.lines ?? []).reduce((s: number, l: { qty: number }) => s + l.qty, 0),
+      location_id: b.location_id,
+      order_id: b.order_id,
+    });
+  }),
+
+  // ── Inventory: adjustments ────────────────────────────────────────────────
+  http.post(`${V1}/inventory/adjustments`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as {
+      product_id: string;
+      location_id: string;
+      delta: number;
+      reason: string;
+      note: string | null;
+    };
+    return HttpResponse.json(
+      {
+        id: `adj_${Math.random().toString(36).slice(2, 12)}`,
+        product_id: b.product_id,
+        location_id: b.location_id,
+        delta: b.delta,
+        reason: b.reason,
+        applied_at: Date.now(),
+      },
+      { status: 201 },
+    );
+  }),
+
+  // ── Inventory: movement ledger ────────────────────────────────────────────
+  http.get(`${V1}/inventory/movements`, async ({ request }) => {
+    await lat();
+    const productId = new URL(request.url).searchParams.get("product_id") ?? "prod";
+    const D = 86_400_000;
+    const now = Date.now();
+    const items = [
+      { id: `mv_1`, type: "sale",       delta: -2,  location: "Main Store",  actor: "POS Terminal",       note: "Order #ORD-0042",    created_at: now - 2 * 3600_000 },
+      { id: `mv_2`, type: "adjustment", delta: +5,  location: "Main Store",  actor: "admin@example.com",  note: "Cycle count",        created_at: now - 8 * 3600_000 },
+      { id: `mv_3`, type: "receive",    delta: +50, location: "Warehouse",   actor: "system",             note: "PO-0019",            created_at: now - D },
+      { id: `mv_4`, type: "transfer",   delta: -10, location: "Warehouse",   actor: "system",             note: "Transfer to Main",   created_at: now - D - 3600_000 },
+      { id: `mv_5`, type: "sale",       delta: -1,  location: "Main Store",  actor: "POS Terminal",       note: "Order #ORD-0039",    created_at: now - 2 * D },
+      { id: `mv_6`, type: "return",     delta: +1,  location: "Main Store",  actor: "cashier@finder-pos.dev", note: "Customer return", created_at: now - 2 * D - 3600_000 },
+      { id: `mv_7`, type: "adjustment", delta: -3,  location: "Main Store",  actor: "manager@finder-pos.dev", note: "Damage",         created_at: now - 3 * D },
+      { id: `mv_8`, type: "receive",    delta: +20, location: "Main Store",  actor: "system",             note: "PO-0017",            created_at: now - 5 * D },
+    ].map((m, i) => ({ ...m, id: `mv_${productId}_${i + 1}` }));
+    return HttpResponse.json({ items });
+  }),
+
   // ── Customers + loyalty ───────────────────────────────────────────────────
   http.get(`${V1}/customers`, async () => {
     await lat();
