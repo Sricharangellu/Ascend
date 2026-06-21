@@ -52,7 +52,7 @@ function readQuery(req: Request) {
   return {
     lowStock: req.query.lowStock === "true",
     limit: parseInt0(req.query.limit),
-    offset: parseInt0(req.query.offset),
+    cursor: typeof req.query.cursor === "string" ? req.query.cursor : undefined,
   };
 }
 

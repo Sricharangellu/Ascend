@@ -311,13 +311,37 @@ export class SalesService {
     return { ...so, lines };
   }
 
-  async listSalesOrders(tenantId: string, filter: { status?: SOStatus; salesRepId?: string; pickerId?: string } = {}): Promise<SalesOrder[]> {
+  async listSalesOrders(
+    tenantId: string,
+    filter: { status?: SOStatus; salesRepId?: string; pickerId?: string; cursor?: string; limit?: number } = {},
+  ): Promise<{ items: SalesOrder[]; nextCursor: string | null; limit: number }> {
+    const limit = Math.min(filter.limit ?? 50, 200);
     const where: string[] = ["tenant_id = @t"];
     const params: Record<string, unknown> = { t: tenantId };
+
     if (filter.status) { where.push("status = @s"); params.s = filter.status; }
     if (filter.salesRepId) { where.push("sales_rep_id = @r"); params.r = filter.salesRepId; }
     if (filter.pickerId) { where.push("picker_id = @p"); params.p = filter.pickerId; }
-    return this.db.query<SalesOrder>(`SELECT * FROM sales_orders WHERE ${where.join(" AND ")} ORDER BY created_at DESC LIMIT 500`, params);
+
+    if (filter.cursor) {
+      const cur = JSON.parse(Buffer.from(filter.cursor, "base64url").toString()) as { at: number; id: string };
+      where.push("(created_at < @curAt OR (created_at = @curAt AND id < @curId))");
+      params.curAt = cur.at;
+      params.curId = cur.id;
+    }
+
+    const items = await this.db.query<SalesOrder>(
+      `SELECT * FROM sales_orders WHERE ${where.join(" AND ")} ORDER BY created_at DESC, id DESC LIMIT @limit`,
+      { ...params, limit },
+    );
+
+    const last = items.at(-1);
+    const nextCursor =
+      items.length === limit && last
+        ? Buffer.from(JSON.stringify({ at: last.created_at, id: last.id })).toString("base64url")
+        : null;
+
+    return { items, nextCursor, limit };
   }
 
   async getSalesOrder(id: string, tenantId: string): Promise<SalesOrder & { lines: SalesLine[] }> {

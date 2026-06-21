@@ -182,9 +182,35 @@ export class BillingService {
     return inv;
   }
 
-  async listInvoices(tenantId: string, status?: string): Promise<Invoice[]> {
-    if (status) return this.db.query<Invoice>("SELECT * FROM invoices WHERE tenant_id = @t AND status = @s ORDER BY issued_at DESC LIMIT 500", { t: tenantId, s: status });
-    return this.db.query<Invoice>("SELECT * FROM invoices WHERE tenant_id = @t ORDER BY issued_at DESC LIMIT 500", { t: tenantId });
+  async listInvoices(
+    tenantId: string,
+    opts: { status?: string; cursor?: string; limit?: number } = {},
+  ): Promise<{ items: Invoice[]; nextCursor: string | null; limit: number }> {
+    const limit = Math.min(opts.limit ?? 50, 200);
+    const where: string[] = ["tenant_id = @t"];
+    const params: Record<string, unknown> = { t: tenantId };
+
+    if (opts.status) { where.push("status = @s"); params.s = opts.status; }
+
+    if (opts.cursor) {
+      const cur = JSON.parse(Buffer.from(opts.cursor, "base64url").toString()) as { at: number; id: string };
+      where.push("(issued_at < @curAt OR (issued_at = @curAt AND id < @curId))");
+      params.curAt = cur.at;
+      params.curId = cur.id;
+    }
+
+    const items = await this.db.query<Invoice>(
+      `SELECT * FROM invoices WHERE ${where.join(" AND ")} ORDER BY issued_at DESC, id DESC LIMIT @limit`,
+      { ...params, limit },
+    );
+
+    const last = items.at(-1);
+    const nextCursor =
+      items.length === limit && last
+        ? Buffer.from(JSON.stringify({ at: last.issued_at, id: last.id })).toString("base64url")
+        : null;
+
+    return { items, nextCursor, limit };
   }
 
   async payInvoice(id: string, amountCents: number, method: string, tenantId: string): Promise<Invoice> {

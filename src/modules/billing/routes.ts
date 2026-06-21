@@ -49,7 +49,9 @@ export function registerRoutes(router: Router, service: BillingService): void {
   }));
   router.get("/invoices", handler(async (req, res) => {
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
-    res.json({ items: await service.listInvoices(tenantId(res), status) });
+    const cursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
+    const limit = typeof req.query.limit === "string" ? parseInt(req.query.limit, 10) || undefined : undefined;
+    res.json(await service.listInvoices(tenantId(res), { status, cursor, limit }));
   }));
   router.post("/invoices/:id/pay", handler(async (req, res) => {
     const b = parseBody(paySchema, req.body);

@@ -69,13 +69,13 @@ export function registerRoutes(router: Router, service: SalesService): void {
     res.status(201).json(await service.createSalesOrder(parseBody(soSchema, req.body), tenantId(res)));
   }));
   router.get("/sales-orders", handler(async (req, res) => {
-    res.json({
-      items: await service.listSalesOrders(tenantId(res), {
-        status: typeof req.query.status === "string" ? (req.query.status as SOStatus) : undefined,
-        salesRepId: typeof req.query.salesRepId === "string" ? req.query.salesRepId : undefined,
-        pickerId: typeof req.query.pickerId === "string" ? req.query.pickerId : undefined,
-      }),
-    });
+    res.json(await service.listSalesOrders(tenantId(res), {
+      status: typeof req.query.status === "string" ? (req.query.status as SOStatus) : undefined,
+      salesRepId: typeof req.query.salesRepId === "string" ? req.query.salesRepId : undefined,
+      pickerId: typeof req.query.pickerId === "string" ? req.query.pickerId : undefined,
+      cursor: typeof req.query.cursor === "string" ? req.query.cursor : undefined,
+      limit: typeof req.query.limit === "string" ? parseInt(req.query.limit, 10) || undefined : undefined,
+    }));
   }));
   router.get("/sales-orders/:id", handler(async (req, res) => {
     res.json(await service.getSalesOrder(String(req.params.id), tenantId(res)));
@@ -108,10 +108,10 @@ export function registerRoutes(router: Router, service: SalesService): void {
   // GET /orders — alias for sales-orders with optional ?type filter (used by ecommerce page).
   router.get("/orders", handler(async (req, res) => {
     const type = typeof req.query.type === "string" ? req.query.type : undefined;
-    const orders = await service.listSalesOrders(tenantId(res));
+    const page = await service.listSalesOrders(tenantId(res));
     const items = type === "ecommerce"
-      ? orders.filter((o) => o.store_id === "ecommerce")
-      : orders;
-    res.json({ items });
+      ? page.items.filter((o) => o.store_id === "ecommerce")
+      : page.items;
+    res.json({ items, nextCursor: page.nextCursor, limit: page.limit });
   }));
 }

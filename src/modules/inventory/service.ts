@@ -2,7 +2,6 @@ import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import { HttpError } from "../../shared/http.js";
-import type { Page } from "../../shared/types.js";
 
 export type MovementReason = "receiving" | "sale" | "adjustment" | "return" | "cycle_count";
 
@@ -58,6 +57,7 @@ export interface ListInventoryQuery {
   lowStock?: boolean;
   limit?: number;
   offset?: number;
+  cursor?: string;
 }
 
 /** Inventory level row in the shape the frontend requested. */
@@ -492,32 +492,37 @@ export class InventoryService {
     return result.row;
   }
 
-  async list(query: ListInventoryQuery = {}, tenantId: string): Promise<Page<InventoryRow>> {
+  async list(query: ListInventoryQuery = {}, tenantId: string): Promise<{ items: InventoryRow[]; nextCursor: string | null; limit: number }> {
     const limit = clampLimit(query.limit);
-    const offset = query.offset && query.offset > 0 ? Math.floor(query.offset) : 0;
-
     const where: string[] = ["tenant_id = @tenantId"];
     const params: Record<string, unknown> = { tenantId };
+
     // Low-stock means at/below a SET reorder point. A reorder point of 0 means
     // "untracked" (consistent with overview() and levels()), so those products
     // are excluded rather than flagging every zero-stock untracked item as low.
     if (query.lowStock) where.push("reorder_pt > 0 AND stock_qty <= reorder_pt");
-    const whereSql = `WHERE ${where.join(" AND ")}`;
 
-    const totalRow = await this.db.one<{ n: number }>(
-      `SELECT COUNT(*) AS n FROM inventory ${whereSql}`,
-      params,
-    );
-    const total = totalRow?.n ?? 0;
+    if (query.cursor) {
+      const cur = JSON.parse(Buffer.from(query.cursor, "base64url").toString()) as { at: number; id: string };
+      where.push("(updated_at < @curAt OR (updated_at = @curAt AND product_id < @curId))");
+      params.curAt = cur.at;
+      params.curId = cur.id;
+    }
 
     const items = await this.db.query<InventoryRow>(
-      `SELECT * FROM inventory ${whereSql}
+      `SELECT * FROM inventory WHERE ${where.join(" AND ")}
        ORDER BY updated_at DESC, product_id DESC
-       LIMIT @limit OFFSET @offset`,
-      { ...params, limit, offset },
+       LIMIT @limit`,
+      { ...params, limit },
     );
 
-    return { items, total, limit, offset };
+    const last = items.at(-1);
+    const nextCursor =
+      items.length === limit && last
+        ? Buffer.from(JSON.stringify({ at: last.updated_at, id: last.product_id })).toString("base64url")
+        : null;
+
+    return { items, nextCursor, limit };
   }
 
   async movements(productId: string, tenantId: string): Promise<MovementRow[]> {
