@@ -50,31 +50,27 @@ FinderPOS is a full-stack enterprise POS platform targeting retail, wholesale, a
 
 ### Right now (next 1–3 tasks)
 
-- **Bulk product import wizard** — The imports page tracks CSV batches but has no upload UI. Add a step-by-step wizard: upload CSV → map columns → preview rows → import with progress. Merchants need this to load their catalog before going live — it's a launch blocker.
+- **Per-outlet inventory deduction** — Terminal checkout currently has no outlet selector and doesn't deduct stock. Add an outlet/register picker to the terminal header and fire `POST /api/v1/inventory/deduct` after every successful payment, passing the outlet's location ID and cart lines.
 
-- **Price label printing** — Add a "Print Labels" action in the catalog that generates a printable page of 2"×1" shelf labels (product name, barcode, price). Stores need shelf labels when stocking shelves. Builds on the thermal receipt CSS-print approach.
+- **Quick stock adjustment** — Inventory page has no way to manually correct stock levels. Add an "Adjust" action per row that opens a modal: reason (cycle count / damage / theft / received / other), delta quantity (+/-), optional note. Fires `POST /api/v1/inventory/adjustments`.
 
-- **Customer merge / deduplication** — The CRM has no way to merge duplicate customer records. Add a "Merge" action on the customer detail page that lets staff search for a duplicate and merge the two records (loyalty points, order history combined).
+- **Stock movement ledger** — Inventory detail has no history. Add a Movements tab showing a chronological log of stock in/out events (adjustments, sales deductions, PO receives) with actor, timestamp, and running balance.
 
 ### Coming up (next wave of work)
 
-- **Deploy Sprints 11–15 to Vercel** — Push everything live after Sprint 15 is done. Run `bash deploy.sh` from `web/`.
+- **Deploy to Vercel** — Run `bash deploy.sh` from repo root when ready.
 
-- **Vendor quotations backend** — The vendor quotes tab in Purchasing is mock-only. Build real backend endpoints (`POST /purchasing/vendor-quotes`, `PATCH /purchasing/vendor-quotes/:id/accept`, etc.).
+- **Stripe Terminal simulation** — Mock card reader in the terminal: after Charge, show a "Tap / Swipe / Insert card" animation screen with simulated 2s processing before completing payment.
 
-- **MFA backup codes** — Users who lose their authenticator are locked out. Add backup-codes endpoint and recovery flow in Settings → Security.
-
-- **Per-outlet inventory deduction** — The terminal deducts from the flat `inventory` table. Wire checkout to deduct from `inventory_stock` for the correct location.
+- **Reorder auto-draft POs** — The Insights page has "Create Draft POs" button but it likely does nothing. Wire it to `POST /api/v1/purchasing/orders/auto-draft` which creates draft POs for all items below reorder point.
 
 ### Future ideas
 
 - **Redis rate limiting** — Replace in-memory token bucket with Redis-backed rate limiter for multi-instance deployments.
 - **Customer portal** — Separate Next.js app where B2B customers log in, view invoices, reorder.
-- **Stripe Terminal integration** — Wire real card reader (BBPOS WisePOS E).
+- **Stripe Terminal (real)** — Wire actual card reader (BBPOS WisePOS E) via Stripe Terminal SDK.
 - **Multi-company** — Per-tenant schemas instead of shared schema with `tenant_id`.
 - **Data warehouse ETL** — Nightly aggregation for fast dashboard queries.
-- **Price label printing** — Generate printable shelf label PDFs from catalog (Avery format).
-- **Customer merge/deduplication** — Merge duplicate customer records from the CRM.
 
 ---
 
@@ -88,7 +84,7 @@ FinderPOS is a full-stack enterprise POS platform targeting retail, wholesale, a
 
 ## What to build next
 
-The bulk product import wizard is the highest-priority remaining feature — merchants cannot populate their catalog without it, so it's a go-live blocker. Price label printing is a fast win that builds on the existing thermal-receipt CSS-print approach. Customer merge/dedup rounds out the CRM for stores with legacy data migrations. All three are self-contained with no blockers.
+Per-outlet inventory deduction closes the biggest operational gap — without it, the terminal records sales but never reduces stock, so inventory is always wrong after the first sale. Pairing it with quick stock adjustment and a movement ledger gives cashiers and managers a complete stock-accuracy workflow: deduct on sale, adjust for shrink, audit the trail.
 
 ---
 

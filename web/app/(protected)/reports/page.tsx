@@ -7,11 +7,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { apiGet, ApiResponseError } from "@/api-client/client";
+import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import type { SalesSummary, TopProduct, TopProductsResponse } from "@/api-client/types";
 import { getUser } from "@/lib/auth";
+import { formatMoney } from "@/lib/money";
 import { ReportsDashboard } from "@/components/reports/ReportsDashboard";
 import { ReportsSubNav } from "@/components/reports/ReportsSubNav";
+import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 
@@ -22,8 +24,44 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<"today" | "7d" | "30d">("today");
 
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [schedEmail, setSchedEmail] = useState("");
+  const [schedFreq, setSchedFreq] = useState<"daily" | "weekly" | "monthly">("weekly");
+  const [scheduling, setScheduling] = useState(false);
+  const [schedMsg, setSchedMsg] = useState<string | null>(null);
+
   const role = getUser()?.role ?? "cashier";
   const allowed = role === "owner" || role === "manager";
+
+  const exportCsv = () => {
+    if (!summary) return;
+    const rows = [
+      ["Metric", "Value"],
+      ["Gross Revenue", String(summary.revenue?.grossCents ?? 0)],
+      ["Net Revenue", String(summary.revenue?.netCents ?? 0)],
+      ["Tax", String(summary.revenue?.taxCents ?? 0)],
+      ["Total Orders", String(summary.orders?.total ?? 0)],
+      ["Completed Orders", String(summary.orders?.completed ?? 0)],
+    ];
+    const csv = rows.map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `report-${range}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const scheduleReport = async () => {
+    if (!schedEmail.trim()) return;
+    setScheduling(true); setSchedMsg(null);
+    try {
+      await apiPost("/api/v1/insights/scheduled-reports", { email: schedEmail.trim(), frequency: schedFreq, range });
+      setSchedMsg(`Scheduled ${schedFreq} report to ${schedEmail.trim()}`);
+      setSchedEmail("");
+    } catch { setSchedMsg("Could not schedule report."); }
+    finally { setScheduling(false); }
+  };
 
   useEffect(() => {
     if (!allowed) {
@@ -114,12 +152,12 @@ export default function ReportsPage() {
               ))}
             </div>
             <div className="flex gap-2">
-              <button className="min-h-[40px] rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50" type="button">
+              <Button variant="secondary" size="sm" disabled={!summary} onClick={exportCsv}>
                 Export CSV
-              </button>
-              <button className="min-h-[40px] rounded-md bg-slate-950 px-3 text-sm font-medium text-white hover:bg-slate-800" type="button">
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => { setShowSchedule(v => !v); setSchedMsg(null); }}>
                 Schedule report
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -143,6 +181,39 @@ export default function ReportsPage() {
         ) : summary ? (
           <ReportsDashboard summary={summary} topProducts={topProducts} />
         ) : null}
+
+        {/* Schedule report inline panel */}
+        {allowed && showSchedule && (
+          <Card>
+            <h2 className="text-sm font-semibold text-slate-900 mb-3">Schedule recurring report</h2>
+            {schedMsg && <p className="text-sm text-green-700 bg-green-50 rounded px-3 py-2 mb-3">{schedMsg}</p>}
+            <div className="flex flex-wrap gap-3 items-end">
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={schedEmail}
+                  onChange={e => setSchedEmail(e.target.value)}
+                  placeholder="owner@company.com"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none w-56"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Frequency</label>
+                <select value={schedFreq} onChange={e => setSchedFreq(e.target.value as "daily" | "weekly" | "monthly")}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+              <Button size="sm" variant="primary" loading={scheduling} disabled={!schedEmail.trim()} onClick={() => void scheduleReport()}>
+                Schedule
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => setShowSchedule(false)}>Cancel</Button>
+            </div>
+          </Card>
+        )}
       </div>
     </EnterpriseShell>
   );
