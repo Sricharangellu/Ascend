@@ -235,13 +235,13 @@ records, only triaged into "build now" vs. "documented for later."
       Add `GET /api/v1/audit-log` to the identity router (no new module needed):
       filter by `?actor=`, `?resourceType=`, `?action=`, `?limit=`, `?offset=`.
       Returns `{ items: AuditEvent[], total }`. See FE-6 audit: /audit-log page uses this. (done in 15f4f4a)
-- [ ] BE-21: Loyalty programme — `GET/POST/PATCH/DELETE /api/v1/loyalty/tiers` (tier
+- [x] BE-21: Loyalty programme — `GET/POST/PATCH/DELETE /api/v1/loyalty/tiers` (tier
       objects with UUID `id`, `name`, `level`, `points_required`, `discount_pct`,
       `description`); `GET /api/v1/loyalty/members` + `POST /api/v1/loyalty/members/:id/adjust`
       (points delta); `GET/POST/PATCH/DELETE /api/v1/loyalty/rewards` (reward catalogue:
       `name`, `points_cost`, `reward_type`, `status`). New `loyalty` module. Note: the
       simpler `loyalty_tier_rules` table used by /settings already lives in the customers
-      module — this is a richer separate programme management feature.
+      module — this is a richer separate programme management feature. (done in 2b681b7)
 
 - [ ] BE-22: Compliance columns on products table — add `tobacco_type TEXT`,
       `flavored INTEGER DEFAULT 0`, `menthol INTEGER DEFAULT 0`,
@@ -299,5 +299,6 @@ records, only triaged into "build now" vs. "documented for later."
 - 2026-06-20 frontend FE-14 -> ceceff3: compliance flags on catalog/[id]; state enforcement on terminal; flavored vape restricted CA/MA/NJ/RI/IL.
 
 - 2026-06-20 frontend FE-15 -> 6de146e: CardReaderScreen 4-state animation + NumpadModal qty editor wired into TenderScreen + CartPanel.
+- 2026-06-20 backend BE-21 -> 2b681b7: loyalty module; tiers/members/rewards CRUD; auto-tier-upgrade on points adjust; SSE loyalty.tier_upgraded.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
