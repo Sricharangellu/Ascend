@@ -393,7 +393,7 @@ export default function CustomerDetailPage() {
         <div className="p-6">
           <Link
             href="/customers"
-            className="inline-flex items-center gap-1 text-sm text-slate-950 hover:underline mb-4 block"
+            className="inline-flex items-center gap-1 text-sm text-slate-950 hover:underline mb-4"
           >
             <BackIcon /> Back to Customers
           </Link>

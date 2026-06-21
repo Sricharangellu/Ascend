@@ -93,6 +93,11 @@ export interface TerminalProduct {
   barcode?: string;
   status: "active" | "draft" | "archived";
   ageRestricted?: boolean;
+  restrictedStates?: string[];
+  tobaccoType?: string | null;
+  flavored?: boolean;
+  menthol?: boolean;
+  msaReportable?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -506,6 +511,11 @@ export interface CatalogProduct {
   qty_increment?: number;
   parent_product_id?: string;
   variant_label?: string;
+  tobacco_type?: string | null;
+  flavored?: number;
+  menthol?: number;
+  msa_reportable?: number;
+  restricted_states?: string[];
   createdAt: number;
   updatedAt: number;
 }

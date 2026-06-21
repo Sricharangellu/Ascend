@@ -685,6 +685,13 @@ export const lightspeedHandlers = [
       category: string, taxClass: "standard" | "exempt", barcode: string,
       status: "active" | "draft" | "archived", ageRestricted: boolean,
       costCents: number, createdDaysAgo: number,
+      compliance?: {
+        tobacco_type?: string | null;
+        flavored?: boolean;
+        menthol?: boolean;
+        msa_reportable?: boolean;
+        restricted_states?: string[];
+      },
     ) => ({
       id, sku, name, priceCents, category, taxClass, barcode, status, ageRestricted,
       createdAt: now - createdDaysAgo * 86_400_000, updatedAt: now - Math.floor(createdDaysAgo / 3) * 86_400_000,
@@ -692,6 +699,15 @@ export const lightspeedHandlers = [
       price_cents: priceCents, tax_class: taxClass, age_restricted: ageRestricted ? 1 : 0,
       raw_cost_price_cents: costCents, description: null, brand: null,
       image_url: null, msrp_cents: null, parent_product_id: null, variant_label: null,
+      // Compliance fields (dual snake_case + camelCase for compatibility)
+      tobacco_type: compliance?.tobacco_type ?? null,
+      flavored: compliance?.flavored ? 1 : 0,
+      menthol: compliance?.menthol ? 1 : 0,
+      msa_reportable: compliance?.msa_reportable ? 1 : 0,
+      restricted_states: compliance?.restricted_states ?? [],
+      tobaccoType: compliance?.tobacco_type ?? null,
+      msaReportable: !!compliance?.msa_reportable,
+      restrictedStates: compliance?.restricted_states ?? [],
     });
 
     let products = [
@@ -699,8 +715,11 @@ export const lightspeedHandlers = [
       mkProduct("prod_2","BEV-002","Orange Juice 1L",349,"Beverages","standard","012345678902","active",false,140,88),
       mkProduct("prod_3","SNK-001","Potato Chips 150g",299,"Snacks","standard","012345678903","active",false,110,60),
       mkProduct("prod_4","SNK-002","Mixed Nuts 200g",599,"Snacks","standard","012345678904","active",false,250,45),
-      mkProduct("prod_5","TOB-001","Classic Cigarettes 20pk",1299,"Tobacco","exempt","012345678905","active",true,850,100),
+      mkProduct("prod_5","TOB-001","Classic Cigarettes 20pk",1299,"Tobacco","exempt","012345678905","active",true,850,100,
+        { tobacco_type: "cigarette", msa_reportable: true }),
       mkProduct("prod_6","BEV-003","Energy Drink 250ml",249,"Beverages","standard","012345678906","draft",false,100,5),
+      mkProduct("prod_7","TOB-FLV","Mango Blast Vape 50mg",1499,"Tobacco","exempt","012345678907","active",true,600,45,
+        { tobacco_type: "ecigarette", flavored: true, msa_reportable: true, restricted_states: ["CA","MA","NJ","RI","IL"] }),
     ];
 
     function applyFilters(
@@ -852,6 +871,16 @@ export const lightspeedHandlers = [
         categories = categories.filter((c) => c.id !== String(params["id"]));
         if (categories.length === before) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
         return new HttpResponse(null, { status: 204 });
+      }),
+
+      // ── Compliance flags ──────────────────────────────────────────────────
+      http.patch(`${V1}/catalog/:id/compliance`, async ({ params, request }) => {
+        await lat();
+        const b = (await request.json()) as Record<string, unknown>;
+        const idx = products.findIndex((p) => p.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        products[idx] = { ...products[idx], ...b, updatedAt: Date.now() };
+        return HttpResponse.json(products[idx]);
       }),
     ];
   })(),
@@ -1806,8 +1835,8 @@ customerNotes.set("cus_demo_1", []);
 
 let invLocSeq = 2;
 const inventoryLocations: any[] = [
-  { id: "invloc_1", code: "MAIN-FLR", name: "Main Floor", location_type: "floor", outlet_id: "otl_main", is_sellable: true, is_receiving_location: false, is_active: true },
-  { id: "invloc_2", code: "BACK-WH", name: "Back Warehouse", location_type: "warehouse", outlet_id: "otl_main", is_sellable: false, is_receiving_location: true, is_active: true },
+  { id: "invloc_1", code: "MAIN-FLR", name: "Main Floor (CA)", location_type: "floor", outlet_id: "otl_main", state: "CA", is_sellable: true, is_receiving_location: false, is_active: true },
+  { id: "invloc_2", code: "BACK-WH", name: "Back Warehouse", location_type: "warehouse", outlet_id: "otl_main", state: "CA", is_sellable: false, is_receiving_location: true, is_active: true },
 ];
 
 lightspeedHandlers.push(

@@ -195,6 +195,22 @@ const MOCK_PRODUCTS: TerminalProduct[] = [
     createdAt: 1700000000000,
     updatedAt: 1700000000000,
   },
+  {
+    id: "prod_014",
+    sku: "VAPE-MNG-50",
+    name: "Mango Blast Vape 50mg",
+    priceCents: 1499,
+    category: "Tobacco",
+    taxClass: "exempt" as const,
+    status: "active",
+    ageRestricted: true,
+    tobaccoType: "ecigarette",
+    flavored: true,
+    msaReportable: true,
+    restrictedStates: ["CA", "MA", "NJ", "RI", "IL"],
+    createdAt: 1700000000000,
+    updatedAt: 1700000000000,
+  },
 ];
 
 // ─── Mock order store (in-memory for dev session) ─────────────────────────────
