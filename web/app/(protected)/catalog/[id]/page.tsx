@@ -185,7 +185,7 @@ export default function ProductDetailPage() {
 
   if (loading) {
     return (
-      <EnterpriseShell active="catalog" title="Product" contentClassName="overflow-y-auto">
+      <EnterpriseShell active="catalog" title="Product" subtitle="Loading…" contentClassName="overflow-y-auto">
         <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 space-y-4">
           {[1, 2, 3].map(i => <div key={i} className="h-24 rounded-xl bg-gray-100 animate-pulse" />)}
         </div>
@@ -195,7 +195,7 @@ export default function ProductDetailPage() {
 
   if (error || !product) {
     return (
-      <EnterpriseShell active="catalog" title="Product" contentClassName="overflow-y-auto">
+      <EnterpriseShell active="catalog" title="Product" subtitle="Not found" contentClassName="overflow-y-auto">
         <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6">
           <p role="alert" className="text-sm text-red-700 bg-red-50 rounded-lg px-4 py-3">{error ?? "Product not found."}</p>
           <Button variant="secondary" size="sm" onClick={() => router.back()} className="mt-4">← Back</Button>

@@ -140,7 +140,7 @@ function PLChart({ pnl, rangeLabel }: { pnl: PLResponse; rangeLabel: string }) {
               tickFormatter={(v: number) => formatMoney(v)}
             />
             <Tooltip
-              formatter={(v: number) => [formatMoney(v), "Amount"]}
+              formatter={(v: unknown) => [formatMoney(typeof v === "number" ? v : 0), "Amount"]}
               contentStyle={{
                 backgroundColor: "white",
                 border: "1px solid #E2E8F0",

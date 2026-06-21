@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
@@ -178,10 +178,10 @@ function ImportWizard({ onImportDone }: { onImportDone: () => void }) {
     if (file) loadFile(file);
   };
 
-  const handleDrop = (e: DragEvent & { dataTransfer: DataTransfer; preventDefault: () => void }) => {
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragging(false);
-    const file = (e.dataTransfer as DataTransfer).files?.[0];
+    const file = e.dataTransfer.files?.[0];
     if (file && file.name.endsWith(".csv")) loadFile(file);
   };
 

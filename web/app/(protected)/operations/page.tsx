@@ -20,12 +20,6 @@ interface StockItem {
   quantity_available: number;
 }
 
-interface LocationStockResponse {
-  locationId: string;
-  locationName: string;
-  items: StockItem[];
-}
-
 interface InventoryLocation {
   id: string;
   code: string;
@@ -279,28 +273,6 @@ function StockLocationsTab() {
   const [viewStockLoc, setViewStockLoc] = useState<InventoryLocation | null>(null);
   const [stockItems, setStockItems] = useState<LocationStock[]>([]);
   const [stockLoading, setStockLoading] = useState(false);
-
-  // Stock-by-location modal state
-  const [stockModalLoc, setStockModalLoc] = useState<InventoryLocation | null>(null);
-  const [stockData, setStockData] = useState<LocationStockResponse | null>(null);
-  const [stockLoading, setStockLoading] = useState(false);
-
-  const openStockModal = useCallback(async (loc: InventoryLocation) => {
-    setStockModalLoc(loc);
-    setStockData(null);
-    setStockLoading(true);
-    try {
-      const data = await apiGet<LocationStockResponse>(`/api/v1/inventory/locations/${loc.id}/stock`);
-      setStockData(data);
-    } finally {
-      setStockLoading(false);
-    }
-  }, []);
-
-  const closeStockModal = useCallback(() => {
-    setStockModalLoc(null);
-    setStockData(null);
-  }, []);
 
   // Transfer modal state
   const [transferLoc, setTransferLoc] = useState<InventoryLocation | null>(null);
