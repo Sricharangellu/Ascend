@@ -250,6 +250,45 @@ records, only triaged into "build now" vs. "documented for later."
       (manager-gated) that updates those columns. Note: FE-14 already built the UI
       against a mock of this endpoint. (done in 41cd91e)
 
+## Phase 2 — General Retail (Apparel, Electronics, Bike, Pet, Sporting Goods)
+
+### Frontend lane (Phase 2)
+
+- [x] FE-16: Service Orders page (`/service-orders`) — repair ticket management for
+      bike shops, electronics repair, and other service-oriented retail. UI: list of
+      tickets with status (draft/open/in_progress/ready/closed), create modal (customer,
+      device/item description, estimated cost, assigned tech), status transitions, and
+      ticket detail modal. Mock endpoints: `GET/POST /api/v1/service-orders`,
+      `PATCH /api/v1/service-orders/:id`. Types: `ServiceOrder`, `ServiceOrderStatus`.
+      Nav group: Operate.
+
+- [ ] FE-17: Serialized Inventory page (`/inventory/serials`) — track individual units
+      by serial number for electronics and jewelry. List view of serial numbers with
+      status (in_stock/sold/returned/service), search by serial, and link to product.
+      Mock endpoints: `GET /api/v1/inventory/serials`, `POST /api/v1/inventory/serials`.
+      Nav group: Operate.
+
+- [ ] FE-18: Workforce — Employee Scheduling (`/workforce`) — weekly schedule grid
+      (Mon–Sun × employee rows), shift blocks with color coding by role, add/edit/delete
+      shifts via modal, time-off requests list. Mock endpoints:
+      `GET/POST/PATCH/DELETE /api/v1/workforce/shifts`, `GET /api/v1/workforce/employees`.
+      Nav group: Manage.
+
+### Backend lane (Phase 2)
+
+- [ ] BE-23: Service Orders module (`src/modules/service-orders/`) — table:
+      `service_orders (id, tenant_id, customer_id, title, description, status,
+      assigned_to, estimate_cents, actual_cents, created_at, updated_at)`.
+      CRUD endpoints: `GET/POST /api/v1/service-orders`,
+      `GET/PATCH /api/v1/service-orders/:id`. Status transitions:
+      draft→open→in_progress→ready→closed. EventBus: `service_order.status_changed`.
+
+- [ ] BE-24: Serialized Inventory module — table: `serial_numbers (id, tenant_id,
+      product_id, serial, status, sold_at, service_order_id, created_at)`.
+      Endpoints: `GET /api/v1/inventory/serials` (filterable by product/status),
+      `POST /api/v1/inventory/serials` (receive), `PATCH /api/v1/inventory/serials/:id`
+      (status update). Index on `(tenant_id, product_id)` and `(tenant_id, serial)`.
+
 ## Cross-cutting (claim into your lane when picked up)
 
 - [x] DB-1: Enable Postgres row-level security on tenant tables as
@@ -305,5 +344,6 @@ records, only triaged into "build now" vs. "documented for later."
 
 - 2026-06-20 backend DB-1 -> 15a1228: RLS migration (DO block enables tenant_isolation policy on all tenant_id tables); DB.withTenant(tenantId) helper wraps queries in mini-tx with set_config for safe pool use.
 - 2026-06-20 backend DB-2 -> c5fe02c: ioredis client + atomic Lua INCR/PEXPIRE in both rate limiters; REDIS_URL absent = in-memory fallback; Redis error = fail open.
+- 2026-06-21 frontend FE-16 -> 06e8e22: Service Orders page — repair ticket list, stat cards, create modal, status transitions, detail modal; 5 MSW handlers.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
