@@ -490,16 +490,48 @@ export const lightspeedHandlers = [
   }),
 
   // ── Team (Settings → Users) ───────────────────────────────────────────────
-  http.get(`${V1}/team`, async () => {
-    await lat();
-    return HttpResponse.json({
-      items: [
-        { id: "usr_demo_owner",   email: "owner@finder-pos.dev",   role: "owner",   custom_role_id: null, created_at: Date.now() - 90 * 86_400_000 },
-        { id: "usr_demo_manager", email: "manager@finder-pos.dev", role: "manager", custom_role_id: null, created_at: Date.now() - 60 * 86_400_000 },
-        { id: "usr_demo_cashier", email: "cashier@finder-pos.dev", role: "cashier", custom_role_id: "crl_demo_1", created_at: Date.now() - 30 * 86_400_000 },
-      ],
-    });
-  }),
+  // ── Team ─────────────────────────────────────────────────────────────────
+  ...(() => {
+    let teamSeq = 10;
+    let teamMembers = [
+      { id: "usr_demo_owner",   email: "owner@finder-pos.dev",   role: "owner",   custom_role_id: null,       created_at: Date.now() - 90 * 86_400_000 },
+      { id: "usr_demo_manager", email: "manager@finder-pos.dev", role: "manager", custom_role_id: null,       created_at: Date.now() - 60 * 86_400_000 },
+      { id: "usr_demo_cashier", email: "cashier@finder-pos.dev", role: "cashier", custom_role_id: "crl_demo_1", created_at: Date.now() - 30 * 86_400_000 },
+    ];
+    return [
+      http.get(`${V1}/team`, async () => {
+        await lat();
+        return HttpResponse.json({ items: teamMembers });
+      }),
+      http.post(`${V1}/team/invite`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as { email: string; role: string };
+        if (!b.email) return HttpResponse.json({ error: { code: "validation", message: "email required" } }, { status: 400 });
+        const existing = teamMembers.find(m => m.email === b.email);
+        if (existing) return HttpResponse.json({ error: { code: "conflict", message: "Member already exists." } }, { status: 409 });
+        const member = { id: `usr_${++teamSeq}`, email: b.email, role: b.role ?? "cashier", custom_role_id: null, created_at: Date.now() };
+        teamMembers.push(member);
+        return HttpResponse.json(member, { status: 201 });
+      }),
+      http.patch(`${V1}/team/:id`, async ({ params, request }) => {
+        await lat();
+        const id = String(params["id"]);
+        const b = (await request.json()) as { role?: string; custom_role_id?: string | null };
+        const idx = teamMembers.findIndex(m => m.id === id);
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        teamMembers[idx] = { ...teamMembers[idx], ...b };
+        return HttpResponse.json(teamMembers[idx]);
+      }),
+      http.delete(`${V1}/team/:id`, async ({ params }) => {
+        await lat();
+        const id = String(params["id"]);
+        const idx = teamMembers.findIndex(m => m.id === id);
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        teamMembers.splice(idx, 1);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    ];
+  })(),
 
   // ── Custom Roles ─────────────────────────────────────────────────────────
   ...(() => {
