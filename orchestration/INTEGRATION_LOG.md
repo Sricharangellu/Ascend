@@ -206,3 +206,15 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
   - `inventory-reorder` NavKey + nav item (Manage group) + ReorderIcon (lines with arrow SVG).
 - **Types added:** `ReorderSuggestion`, `ReorderSuggestionsResponse` in `web/api-client/types.ts`.
 - **Verified:** npm run typecheck — 0 errors.
+
+## 2026-06-21 — Frontend cycle: FE-22 (Customer Account Detail — Contacts + Addresses Tabs)
+
+- **FE-22 — Contacts and Addresses as proper tabs on `/customers/[id]`:**
+  - `DetailTab` union extended with `"contacts" | "addresses"`.
+  - `tabs` array gets two new entries; both rendered as first-class tab panels that mount-load immediately via `useEffect` (no lazy accordion open/close).
+  - **ContactsTab**: full add inline form (Name/Title/Email/Phone + Primary checkbox), edit modal (PATCH `/contacts/:id`), delete confirm dialog (DELETE `/contacts/:id`). Flat table always visible when tab is active.
+  - **AddressesTab**: add inline form (Type/Line1/City/State/ZIP + Default checkbox), new inline edit modal (PATCH `/addresses/:id`) added — existing panel only had delete. Supports address_line2. Edit and Remove buttons per row.
+  - `ContactsPanel` and `AddressesPanel` retained as thin shims delegating to the new tabs (no callers break).
+  - LoyaltyCard and NotesPanel remain visible on all non-contacts/addresses tabs.
+- **Consumes:** GET/POST/PATCH/DELETE `/api/v1/customers/:id/contacts` and `/addresses` — all mocked.
+- **Verified:** npm run typecheck — 0 errors.
