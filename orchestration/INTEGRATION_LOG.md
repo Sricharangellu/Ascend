@@ -218,3 +218,17 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
   - LoyaltyCard and NotesPanel remain visible on all non-contacts/addresses tabs.
 - **Consumes:** GET/POST/PATCH/DELETE `/api/v1/customers/:id/contacts` and `/addresses` — all mocked.
 - **Verified:** npm run typecheck — 0 errors.
+
+## 2026-06-21 — Frontend cycle: FE-24 (Enhanced Reports)
+
+- **FE-24 — `/reports` rebuilt as 5-tab analytics page:**
+  - **Overview**: existing ReportsDashboard KPI cards + top products (preserved).
+  - **Sales by Product**: sortable table (click headers to sort by units/revenue/margin$/margin%). 20 seed products. Color-coded margin badges (green ≥40%, yellow ≥25%, red <25%). CSV export.
+  - **Margin by Category**: SVG horizontal bar chart (revenue background, margin overlay in blue) + detail table sorted by margin. 6 categories (Tobacco/Beverages/Lottery/Snacks/Candy/Vapor). CSV export.
+  - **Inventory Valuation**: 4 stat cards (total cost/retail/potential margin/SKUs tracked) + detail table. Consumes existing `/reports/inventory-valuation` mock. CSV export.
+  - **Low Stock**: flat table from `/inventory/levels?lowStock=true`; out-of-stock (red) vs low-stock (yellow) badges. CSV export.
+  - Range picker extended to 7d/30d/90d; each tab re-fetches on range change via `useCallback`.
+  - Schedule recurring report panel preserved.
+- **New mock handlers**: `GET /reports/sales-by-product` (20 items with realistic c-store product mix), `GET /reports/margin-by-category` (6 categories).
+- **Types added**: `SalesByProductItem`, `SalesByProductResponse`, `MarginByCategoryItem`, `MarginByCategoryResponse`.
+- **Verified:** npm run typecheck — 0 errors.
