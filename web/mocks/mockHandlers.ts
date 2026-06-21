@@ -79,6 +79,19 @@ function seed() {
 }
 seed();
 
+// ── Receipt templates store (FE-25) ──────────────────────────────────────────
+const receiptTemplatesStore = new Map<string, any>();
+const receiptDefaultTemplate = (outletId: string) => ({
+  outletId,
+  headerText: "Thank you for visiting!",
+  footerText: "See you again soon.",
+  showLogo: true,
+  showBarcode: true,
+  showTaxBreakdown: true,
+  contactInfo: "",
+  returnPolicy: "Returns accepted within 30 days with receipt.",
+});
+
 export const mockHandlers = [
   // ── Inventory overview ────────────────────────────────────────────────────
   http.get(`${V1}/inventory/overview`, async () => {
@@ -1428,6 +1441,27 @@ mockHandlers.push(
   http.get(`${V1}/settings/tax-rates`, async () => { await lat(); return HttpResponse.json({ items: taxRates }); }),
   http.post(`${V1}/settings/tax-rates`, async ({ request }) => { await lat(); const b = (await request.json()) as any; const r = { id: `tax_${++txSeq}`, tenant_id: "tnt_demo", name: b.name, rate_bps: b.rateBps, apply_to_category: b.applyToCategory ?? null, state: b.state ?? null, active: 1 }; taxRates.push(r); return HttpResponse.json(r, { status: 201 }); }),
   http.post(`${V1}/settings/edition`, async ({ request }) => { await lat(); const b = (await request.json()) as { edition: string }; return HttpResponse.json({ ok: true, edition: b.edition }); }),
+
+  // ── Receipt templates (FE-25) ─────────────────────────────────────────────
+  http.get(`${V1}/settings/receipts/:outletId`, async ({ params }) => {
+    await lat();
+    const id = String(params.outletId);
+    return HttpResponse.json(receiptTemplatesStore.get(id) ?? receiptDefaultTemplate(id));
+  }),
+  http.post(`${V1}/settings/receipts/:outletId`, async ({ params, request }) => {
+    await lat();
+    const id = String(params.outletId);
+    const b = (await request.json()) as any;
+    receiptTemplatesStore.set(id, { ...receiptDefaultTemplate(id), ...b, outletId: id });
+    return HttpResponse.json(receiptTemplatesStore.get(id));
+  }),
+  http.patch(`${V1}/settings/receipts/:outletId`, async ({ params, request }) => {
+    await lat();
+    const id = String(params.outletId);
+    const b = (await request.json()) as any;
+    receiptTemplatesStore.set(id, { ...(receiptTemplatesStore.get(id) ?? receiptDefaultTemplate(id)), ...b, outletId: id });
+    return HttpResponse.json(receiptTemplatesStore.get(id));
+  }),
   http.get(`${V1}/search`, async ({ request }) => {
     await lat();
     const q = (new URL(request.url).searchParams.get("q") ?? "").toLowerCase();
