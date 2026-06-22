@@ -448,19 +448,16 @@ on go-live readiness needs.
       sent automatically). logout() clears both cookies via clearAuthCookies().
       See `orchestration/SYSTEM_DESIGN.md §Auth`. (done in f7da017)
 
-- [ ] BE-32: Early payment discount on bills — add `discount_pct` and
-      `discount_date` to `bills`; when `PATCH /billing/bills/:id/pay` is called
-      before `discount_date`, apply the discount and record
-      `discount_applied_cents`. Surface in `GET /billing/bills`. (BE-30 renamed
-      to BE-32 to keep Phase 4 numbering clean; same spec as the Phase 4 item.)
-      See `gaps/PURCHASING_GAPS.md`.
+- [x] BE-32: Early payment discount on bills — duplicate of BE-30, which already
+      implements discount_pct + discount_date + discount_applied_cents on bills
+      with automatic application on payBill(). (done via BE-30 in af7d7a7)
 
-- [ ] BE-33: Webhook delivery system — persist `webhook_subscriptions` per
+- [x] BE-33: Webhook delivery system — persist `webhook_subscriptions` per
       tenant (event type, target URL, signing secret); on EventBus publish,
       enqueue a delivery job (BullMQ or pg-cron), POST to the URL with
       HMAC-SHA256 signature, retry on failure (exponential backoff × 5),
       log results in `webhook_deliveries`. Owner-only management endpoints.
-      See `orchestration/SYSTEM_DESIGN.md §Webhooks`.
+      See `orchestration/SYSTEM_DESIGN.md §Webhooks`. (done in c1b8816)
 
 - [ ] BE-34: Background job queue — introduce BullMQ (Redis-backed) for
       async work: dunning sweep, Core-Mark ETL sync, report pre-cache,
@@ -535,5 +532,7 @@ on go-live readiness needs.
 - 2026-06-21 human/assistant SEC-1 -> 5af7a24: full security audit; 6 fixes (customer privilege escalation, receipts/quotation guards, metrics token, logout body injection, CSP headers). Phase 5 system design items added to roadmap; SYSTEM_DESIGN.md created.
 - 2026-06-21 backend BE-30 -> af7d7a7: early payment discount on bills — discount_pct/discount_date/discount_applied_cents columns; payBill applies discount on first payment before deadline; effectiveTotal guards overpayment; mocks seeded.
 - 2026-06-22 fullstack BE-31 -> f7da017: httpOnly cookie auth — finder_refresh (httpOnly) + finder_session_hint (non-httpOnly) set on login/refresh; middleware enforces auth; silentRefresh uses hint cookie; logout clears cookies.
+
+- 2026-06-22 human/assistant BE-33 -> c1b8816: webhook delivery — exponential backoff retries (×5), owner guards, toggle endpoint, attempt_count + last_response_body delivery log.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
