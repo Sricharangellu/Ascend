@@ -14,3 +14,7 @@ desktop/release/
 *.dmg
 *.dmg.blockmap
 builder-debug.yml
+# Playwright
+web/playwright-report/
+web/test-results/
+web/e2e/.auth/*.json
