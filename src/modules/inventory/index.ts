@@ -176,6 +176,26 @@ DO $$ BEGIN
   END IF;
 END $$;
 `,
+    // PROD-8 + PROD-9: FK constraints and updated_at triggers for inventory tables.
+    `
+DO $$
+DECLARE tbl TEXT;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'set_updated_at') THEN RETURN; END IF;
+  FOREACH tbl IN ARRAY ARRAY['inventory_locations']
+  LOOP
+    BEGIN
+      EXECUTE format(
+        'CREATE TRIGGER %I_updated_at BEFORE UPDATE ON %I
+         FOR EACH ROW EXECUTE FUNCTION set_updated_at()',
+        tbl, tbl
+      );
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+  END LOOP;
+END;
+$$;
+`,
   ],
   register({ db, events, router }) {
     const service = new InventoryService(db, events);

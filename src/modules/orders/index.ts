@@ -54,9 +54,44 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'USD'
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS exchange_rate NUMERIC(10,6) NOT NULL DEFAULT 1.0;
 `;
 
+// PROD-8: FK constraints — order_lines must reference a real order row.
+// Deferred initially (DEFERRABLE INITIALLY DEFERRED) so batch inserts within
+// the same transaction don't require a specific INSERT order.
+const ADD_ORDER_LINE_FK = `
+DO $$
+BEGIN
+  ALTER TABLE order_lines
+    ADD CONSTRAINT fk_order_lines_order
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END;
+$$;
+`;
+
+// PROD-9: updated_at auto-stamp triggers for orders tables.
+const ADD_ORDERS_UPDATED_AT_TRIGGERS = `
+DO $$
+DECLARE tbl TEXT;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'set_updated_at') THEN RETURN; END IF;
+  FOREACH tbl IN ARRAY ARRAY['orders']
+  LOOP
+    BEGIN
+      EXECUTE format(
+        'CREATE TRIGGER %I_updated_at BEFORE UPDATE ON %I
+         FOR EACH ROW EXECUTE FUNCTION set_updated_at()',
+        tbl, tbl
+      );
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+  END LOOP;
+END;
+$$;
+`;
+
 export const ordersModule: PosModule = {
   name: "orders",
-  migrations: [dropLegacyNoTenant("order_lines"), dropLegacyNoTenant("orders"), CREATE_ORDERS_TABLE, CREATE_ORDER_LINES_TABLE, ALTER_ORDERS_STORE_ID, ALTER_ORDERS_CURRENCY],
+  migrations: [dropLegacyNoTenant("order_lines"), dropLegacyNoTenant("orders"), CREATE_ORDERS_TABLE, CREATE_ORDER_LINES_TABLE, ALTER_ORDERS_STORE_ID, ALTER_ORDERS_CURRENCY, ADD_ORDER_LINE_FK, ADD_ORDERS_UPDATED_AT_TRIGGERS],
   register(ctx: ModuleContext): void {
     const service = new OrdersService(ctx.db, ctx.events);
     registerRoutes(ctx.router, service);

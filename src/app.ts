@@ -201,6 +201,13 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
 
   // ── Global gateway middleware (applied before all /api routes)
   app.use(requestIdMiddleware);
+  // PROD-10: scope a per-request DB view that sets app.request_id on every
+  // transaction so Postgres logs can correlate slow queries to HTTP requests.
+  app.use((req, res, next) => {
+    const requestId = (res.locals["requestId"] as string | undefined) ?? "";
+    if (requestId) res.locals["db"] = db.withRequestId(requestId);
+    next();
+  });
   app.use(metricsMiddleware);
   app.use(rateLimitMiddleware({ capacity: 120, refillRate: 40, redis }));
 

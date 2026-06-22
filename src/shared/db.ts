@@ -40,6 +40,12 @@ export interface DB {
    * `set_config(..., true)` is transaction-local and resets at COMMIT/ROLLBACK.
    */
   withTenant(tenantId: string): DB;
+  /**
+   * Returns a DB view that sets `app.request_id` on every transaction so
+   * Postgres logs and pg_stat_activity can correlate slow queries to HTTP
+   * requests. Composable with withTenant: db.withTenant(t).withRequestId(r).
+   */
+  withRequestId(requestId: string): DB;
   close(): Promise<void>;
   /**
    * Returns live connection pool statistics. Null when called on a
@@ -144,12 +150,47 @@ function makeDb(q: Queryable, opts: { isTx: boolean; pool?: pg.Pool }): DB {
         withTenant(newTenantId: string): DB {
           return parent.withTenant(newTenantId);
         },
+        withRequestId(requestId: string): DB {
+          return parent.withRequestId(requestId);
+        },
         async close(): Promise<void> {
           // Scoped view — does not own the pool.
         },
         poolStats(): PoolStats | null {
           return parent.poolStats();
         },
+      };
+      return scoped;
+    },
+    withRequestId(requestId: string): DB {
+      const parent = db;
+      const scoped: DB = {
+        async query<T = any>(sql: string, params?: Params): Promise<T[]> {
+          return parent.tx(async (tdb) => {
+            await tdb.query(`SELECT set_config('app.request_id', ?, true)`, [requestId]);
+            return tdb.query<T>(sql, params);
+          });
+        },
+        async one<T = any>(sql: string, params?: Params): Promise<T | undefined> {
+          const rows = await scoped.query<T>(sql, params);
+          return rows[0];
+        },
+        async exec(sql: string): Promise<void> {
+          await parent.tx(async (tdb) => {
+            await tdb.query(`SELECT set_config('app.request_id', ?, true)`, [requestId]);
+            await tdb.exec(sql);
+          });
+        },
+        async tx<T>(fn: (tdb: DB) => Promise<T>): Promise<T> {
+          return parent.tx(async (tdb) => {
+            await tdb.query(`SELECT set_config('app.request_id', ?, true)`, [requestId]);
+            return fn(tdb);
+          });
+        },
+        withTenant(tenantId: string): DB { return parent.withTenant(tenantId).withRequestId(requestId); },
+        withRequestId(newId: string): DB { return parent.withRequestId(newId); },
+        async close(): Promise<void> {},
+        poolStats(): PoolStats | null { return parent.poolStats(); },
       };
       return scoped;
     },

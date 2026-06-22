@@ -211,11 +211,44 @@ CREATE TABLE IF NOT EXISTS supplier_balances (
 );
 `;
 
+// PROD-8: FK — purchase_order_lines must reference a real purchase_order row.
+const ADD_PO_LINE_FK = `
+DO $$
+BEGIN
+  ALTER TABLE purchase_order_lines
+    ADD CONSTRAINT fk_po_lines_po
+    FOREIGN KEY (po_id) REFERENCES purchase_orders(id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END;
+$$;
+`;
+
+// PROD-9: updated_at auto-stamp on purchasing tables.
+const ADD_PURCHASING_UPDATED_AT_TRIGGERS = `
+DO $$
+DECLARE tbl TEXT;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'set_updated_at') THEN RETURN; END IF;
+  FOREACH tbl IN ARRAY ARRAY['suppliers','purchase_orders']
+  LOOP
+    BEGIN
+      EXECUTE format(
+        'CREATE TRIGGER %I_updated_at BEFORE UPDATE ON %I
+         FOR EACH ROW EXECUTE FUNCTION set_updated_at()',
+        tbl, tbl
+      );
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+  END LOOP;
+END;
+$$;
+`;
+
 /** Purchasing — suppliers, purchase orders, receiving. Receiving emits
  *  `purchase_order.received`; inventory listens and increments stock. */
 export const purchasingModule: PosModule = {
   name: "purchasing",
-  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES],
+  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES, ADD_PO_LINE_FK, ADD_PURCHASING_UPDATED_AT_TRIGGERS],
   async register({ db, events, router }) {
     const service = new PurchasingService(db, events);
     registerRoutes(router, service);

@@ -22,9 +22,21 @@ CREATE TABLE IF NOT EXISTS payments (
 CREATE INDEX IF NOT EXISTS payments_tenant_order_idx ON payments (tenant_id, order_id);
 `;
 
+// PROD-8: FK — payments must reference a real order.
+const ADD_PAYMENT_FK = `
+DO $$
+BEGIN
+  ALTER TABLE payments
+    ADD CONSTRAINT fk_payments_order
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END;
+$$;
+`;
+
 export const paymentsModule: PosModule = {
   name: "payments",
-  migrations: [dropLegacyNoTenant("payments"), MIGRATION],
+  migrations: [dropLegacyNoTenant("payments"), MIGRATION, ADD_PAYMENT_FK],
   register(ctx: ModuleContext): void {
     const service = new PaymentsService(ctx.db, ctx.events);
     registerRoutes(ctx.router, service);

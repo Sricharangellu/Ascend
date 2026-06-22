@@ -7,6 +7,40 @@ on:
     branches: [master]
 
 jobs:
+  guard:
+    name: Production guard — lint anti-patterns
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # PROD guardrails: fail CI if any of these known-bad patterns appear.
+      # These are the classes of error that reached production in the 2026-06-22 audit.
+      - name: No unguarded mutation routes (router.patch/delete without requireRole)
+        run: |
+          # Find route files with patch/delete that lack requireRole on the same line or immediately preceding.
+          # This grep exits 0 (pass) if NO violations found, 1 if violations found.
+          ! grep -rn --include="*routes.ts" -A1 "router\.\(patch\|delete\|put\)" src/ \
+            | grep -B1 "handler(" \
+            | grep -v "requireRole\|//\s*no auth" \
+            | grep "router\.\(patch\|delete\|put\)" \
+            | grep -v "test\|spec" \
+            || echo "All mutation routes have role guards ✓"
+      - name: No console.log/error in production source (modules + gateway)
+        run: |
+          count=$(grep -rn --include="*.ts" "console\.\(log\|error\|warn\)" src/modules/ src/gateway/ \
+            | grep -v "\.test\.ts" | wc -l | tr -d ' ')
+          echo "Remaining console.* calls in modules/gateway: $count"
+          if [ "$count" -gt "0" ]; then
+            grep -rn --include="*.ts" "console\.\(log\|error\|warn\)" src/modules/ src/gateway/ | grep -v "\.test\.ts"
+            exit 1
+          fi
+      - name: No raw sql string interpolation (SQL injection risk)
+        run: |
+          # Catch template literals used directly in query() calls — should use parameterized @key syntax.
+          ! grep -rn --include="*.ts" "\.query\(\`.*\${" src/modules/ src/gateway/ \
+            | grep -v "\.test\.ts\|set_config\|schema" \
+            || (echo "❌ Raw string interpolation in SQL query — use @param syntax instead" && exit 1)
+          echo "No raw SQL interpolation found ✓"
+
   backend:
     name: Backend — typecheck + test
     runs-on: ubuntu-latest
@@ -35,6 +69,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      # PROD-17: run tests. Coverage threshold enforcement deferred until
+      # baseline is measured (PROD-18 adds tests for the 9 uncovered modules).
+      # Add --coverage flag once baseline is set to track regressions.
       - run: npm test
 
   frontend:
@@ -71,11 +108,11 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci
-      - run: |
-          npx vercel --prod --yes --token "$VERCEL_TOKEN" ${VERCEL_SCOPE:+--scope "$VERCEL_SCOPE"}
+      # Scope is resolved automatically from .vercel/project.json (created by
+      # `vercel link` during repo setup). No --scope flag needed at runtime.
+      - run: npx vercel --prod --yes --token "$VERCEL_TOKEN"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_SCOPE: ${{ secrets.VERCEL_SCOPE }}
 
   smoke-test:
     name: Post-deploy smoke test

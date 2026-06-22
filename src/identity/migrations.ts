@@ -269,13 +269,15 @@ DECLARE tbl TEXT;
 BEGIN
   FOREACH tbl IN ARRAY ARRAY['users','tenants','custom_roles','devices','user_mfa','api_keys']
   LOOP
-    EXECUTE format(
-      'CREATE TRIGGER %I_updated_at BEFORE UPDATE ON %I
-       FOR EACH ROW EXECUTE FUNCTION set_updated_at()',
-      tbl, tbl
-    );
+    BEGIN
+      EXECUTE format(
+        'CREATE TRIGGER %I_updated_at BEFORE UPDATE ON %I
+         FOR EACH ROW EXECUTE FUNCTION set_updated_at()',
+        tbl, tbl
+      );
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
   END LOOP;
-EXCEPTION WHEN duplicate_object THEN NULL; -- idempotent
 END;
 $$;
 `;
