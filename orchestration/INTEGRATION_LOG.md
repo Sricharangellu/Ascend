@@ -235,7 +235,20 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 
 ---
 
-## Phase 4 kickoff — 2026-06-21 (FE-26)
+## Phase 4 — FE-27 + FE-28 (2026-06-21)
+
+### FE-27: Purchasing order detail (pre-existing — confirmed)
+- Page `web/app/(protected)/purchasing/[id]/page.tsx` (348 lines) already implemented: header card with supplier/status/total/dates, line items table (ordered/received/remaining/unit cost/line cost/lot/expiry), Receive Stock modal with per-line qty inputs capped at remaining.
+- Mock handler `GET /purchasing/orders/:id` already present at line 1486 of mockHandlers.ts.
+- No new code required — marked done on roadmap.
+
+### FE-28: AR Dunning dashboard (cf32d47)
+- **Invoice type**: added `dunning_level?: 0 | 1 | 2 | 3 | null` to `Invoice` interface.
+- **Seed data**: `BASE_INVOICES` extended with 3 overdue invoices (inv_3=30d, inv_4=60d, inv_5=90d+) with pre-assigned dunning levels.
+- **Mock handler**: `POST /reports/ar-aging/sweep` reads all non-paid/non-void invoices, computes days overdue, sets dunning_level in invoicesStore, returns `{ updated: N }`.
+- **Accounting page**: `dunning_level` state vars (`sweepBusy`, `sweepResult`); `runDunningSweep()` calls sweep then reloads; AR table gains an "Overdue" column with colored badges (yellow=30d, orange=60d, red=90d+); "Run Dunning Sweep" button visible to managers with inline result count.
+- **Bug fix**: `TableSkeleton` import missing in loyalty/page.tsx — added import.
+- **Verified:** npm run typecheck — 0 errors.
 
 ### FE-26: Cycle Count UI (84df7e8)
 - **Roadmap**: Phase 4 section added covering FE-26/27/28 + BE-29/30 derived from all gaps/*.md files.
