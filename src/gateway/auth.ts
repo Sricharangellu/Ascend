@@ -1,8 +1,10 @@
-import type { Request, Response, NextFunction } from "express";
+import { createHash } from "node:crypto";
+import type { Request, Response, NextFunction, RequestHandler } from "express";
 import jwt from "jsonwebtoken";
 import { HttpError } from "../shared/http.js";
 import type { Role } from "../identity/types.js";
 import { hasRole } from "../identity/types.js";
+import type { DB } from "../shared/db.js";
 
 export interface AuthPayload {
   tenantId: string;
@@ -14,6 +16,11 @@ export interface AuthPayload {
   customRoleId?: string;
   /** Fine-grained permission strings granted by custom role (e.g. "orders:read"). */
   permissions: string[];
+  /**
+   * API key scopes. Empty array means no scope restrictions (regular JWT session).
+   * Non-empty means the caller is an API key — use requireScope() to gate mutations.
+   */
+  scopes: string[];
 }
 
 // Augment Express Request so downstream handlers can read the auth context.
@@ -98,6 +105,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
       storeIds: Array.isArray(payload["storeIds"]) ? (payload["storeIds"] as string[]).map(String) : [],
       customRoleId: payload["customRoleId"] ? String(payload["customRoleId"]) : undefined,
       permissions: Array.isArray(payload["permissions"]) ? (payload["permissions"] as string[]).map(String) : [],
+      scopes: [], // JWT sessions are unrestricted; scopes only apply to API key tokens
     };
     if (!auth.tenantId || !auth.userId) {
       next(new HttpError(401, "unauthenticated", "Token is missing required claims."));
@@ -112,6 +120,108 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
       next(new HttpError(401, "unauthenticated", "Invalid access token."));
     }
   }
+}
+
+/**
+ * Enhanced auth middleware factory that handles both JWT sessions and API keys.
+ * Use this in production (app.ts). The plain authMiddleware() above is kept
+ * for tests that call it directly without a DB reference.
+ *
+ * API keys are identified by the "fpk_" prefix. Their scopes are read from
+ * the api_keys table and stored in res.locals.auth.scopes. Use requireScope()
+ * to gate routes that must not be called by read-only API keys.
+ */
+export function makeAuthMiddleware(db: DB): RequestHandler {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const header = req.headers.authorization;
+    if (!header || !header.startsWith("Bearer ")) {
+      next(new HttpError(401, "unauthenticated", "Missing or malformed Authorization header."));
+      return;
+    }
+    const token = header.slice(7);
+
+    // ── API key path ──────────────────────────────────────────────────────────
+    if (token.startsWith("fpk_")) {
+      const prefix = token.slice(0, 12);
+      const hash = createHash("sha256").update(token).digest("hex");
+      const now = Date.now();
+
+      const row = await db.one<{
+        id: string; tenant_id: string; key_hash: string;
+        scopes: string; expires_at: number | null; created_by: string | null;
+      }>(
+        "SELECT id, tenant_id, key_hash, scopes, expires_at, created_by FROM api_keys WHERE key_prefix = @prefix AND revoked_at IS NULL",
+        { prefix },
+      );
+
+      if (!row || row.key_hash !== hash) {
+        next(new HttpError(401, "unauthenticated", "Invalid API key."));
+        return;
+      }
+      if (row.expires_at !== null && now > row.expires_at) {
+        next(new HttpError(401, "token_expired", "API key has expired."));
+        return;
+      }
+
+      let scopes: string[] = ["read"];
+      try { scopes = JSON.parse(row.scopes) as string[]; } catch { /* use default */ }
+
+      const role: Role = scopes.includes("admin") ? "manager" : "cashier";
+      const auth: AuthPayload = {
+        tenantId: row.tenant_id,
+        userId: row.created_by ?? row.id,
+        role,
+        storeIds: [],
+        permissions: [],
+        scopes,
+      };
+      res.locals["auth"] = auth;
+
+      // Record last usage fire-and-forget — non-fatal if it fails.
+      void db.query("UPDATE api_keys SET last_used_at = @now WHERE id = @id", { now, id: row.id }).catch(() => {});
+      next();
+      return;
+    }
+
+    // ── JWT path (same logic as authMiddleware) ───────────────────────────────
+    const secret = process.env.JWT_SECRET;
+    if (!secret) { next(new HttpError(500, "misconfigured", "JWT_SECRET environment variable is not set.")); return; }
+    try {
+      const payload = jwt.verify(token, secret) as jwt.JwtPayload;
+      const auth: AuthPayload = {
+        tenantId: String(payload["tenantId"] ?? ""),
+        userId: String(payload["sub"] ?? ""),
+        role: (payload["role"] as Role) ?? "cashier",
+        storeIds: Array.isArray(payload["storeIds"]) ? (payload["storeIds"] as string[]).map(String) : [],
+        customRoleId: payload["customRoleId"] ? String(payload["customRoleId"]) : undefined,
+        permissions: Array.isArray(payload["permissions"]) ? (payload["permissions"] as string[]).map(String) : [],
+        scopes: [],
+      };
+      if (!auth.tenantId || !auth.userId) { next(new HttpError(401, "unauthenticated", "Token is missing required claims.")); return; }
+      res.locals["auth"] = auth;
+      next();
+    } catch (err) {
+      next(err instanceof jwt.TokenExpiredError
+        ? new HttpError(401, "token_expired", "Access token has expired.")
+        : new HttpError(401, "unauthenticated", "Invalid access token."));
+    }
+  };
+}
+
+/**
+ * Scope guard for API key callers. JWT sessions (scopes: []) are always allowed.
+ * An API key must explicitly include the required scope; otherwise 403.
+ *
+ * Usage: router.post("/", requireScope("write"), handler(...))
+ */
+export function requireScope(scope: string) {
+  return (_req: Request, res: Response, next: NextFunction): void => {
+    const auth = res.locals["auth"] as AuthPayload | undefined;
+    if (!auth) { next(new HttpError(401, "unauthenticated", "Not authenticated.")); return; }
+    // Empty scopes = JWT session = unrestricted.
+    if (auth.scopes.length === 0 || auth.scopes.includes(scope)) { next(); return; }
+    next(new HttpError(403, "forbidden", `API key requires '${scope}' scope for this operation.`));
+  };
 }
 
 /**

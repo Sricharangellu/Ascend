@@ -12,7 +12,7 @@ import {
   requestIdMiddleware,
   rateLimitMiddleware,
   tenantRateLimitMiddleware,
-  authMiddleware,
+  makeAuthMiddleware,
   tenantResolver,
   errorEnvelopeMiddleware,
   metricsMiddleware,
@@ -252,8 +252,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   );
   app.use("/api/identity", rateLimitMiddleware({ capacity: 10, refillRate: 0.33, redis }), identityRouter);
 
-  // ── Auth + per-tenant tiered rate limit applied to all /api/v1/* routes
-  app.use("/api/v1", authMiddleware, tenantResolver, tenantRateLimitMiddleware({ redis }));
+  // ── Auth + per-tenant tiered rate limit applied to all /api/v1/* routes.
+  // makeAuthMiddleware handles both JWT sessions and API key tokens (fpk_ prefix).
+  app.use("/api/v1", makeAuthMiddleware(db), tenantResolver, tenantRateLimitMiddleware({ redis }));
 
   // ── Feature flags (tenant-scoped, requires auth)
   app.get(
