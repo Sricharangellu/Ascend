@@ -23,8 +23,11 @@ const BASE_BILLS: Record<string, any> = {
   bil_2: { id: "bil_2", tenant_id: "tnt_demo", supplier_id: "sup_tea", po_id: "po_2", bill_number: "BILL-00002", status: "partial", total_cents: 11250, paid_cents: 5000, due_date: Date.now() + 20 * 86400000, issued_at: Date.now() - 86400000 },
 };
 const BASE_INVOICES: Record<string, any> = {
-  inv_1: { id: "inv_1", tenant_id: "tnt_demo", customer_id: "cus_demo_1", order_id: "ord_a", invoice_number: "INV-00001", status: "paid", total_cents: 8600, paid_cents: 8600, due_date: Date.now() + 15 * 86400000, issued_at: Date.now() - 5 * 86400000 },
-  inv_2: { id: "inv_2", tenant_id: "tnt_demo", customer_id: "cus_demo_2", order_id: null, invoice_number: "INV-00002", status: "open", total_cents: 4200, paid_cents: 0, due_date: Date.now() + 30 * 86400000, issued_at: Date.now() },
+  inv_1: { id: "inv_1", tenant_id: "tnt_demo", customer_id: "cus_demo_1", order_id: "ord_a", invoice_number: "INV-00001", status: "paid",    total_cents: 8600,  paid_cents: 8600, due_date: Date.now() + 15 * 86400000, issued_at: Date.now() - 5  * 86400000, dunning_level: null },
+  inv_2: { id: "inv_2", tenant_id: "tnt_demo", customer_id: "cus_demo_2", order_id: null,    invoice_number: "INV-00002", status: "open",    total_cents: 4200,  paid_cents: 0,    due_date: Date.now() + 30 * 86400000, issued_at: Date.now(),              dunning_level: null },
+  inv_3: { id: "inv_3", tenant_id: "tnt_demo", customer_id: "cus_demo_3", order_id: null,    invoice_number: "INV-00003", status: "partial",  total_cents: 12000, paid_cents: 3000, due_date: Date.now() - 35 * 86400000, issued_at: Date.now() - 65 * 86400000, dunning_level: 1 },
+  inv_4: { id: "inv_4", tenant_id: "tnt_demo", customer_id: "cus_demo_4", order_id: null,    invoice_number: "INV-00004", status: "open",    total_cents: 7500,  paid_cents: 0,    due_date: Date.now() - 65 * 86400000, issued_at: Date.now() - 95 * 86400000, dunning_level: 2 },
+  inv_5: { id: "inv_5", tenant_id: "tnt_demo", customer_id: "cus_demo_5", order_id: null,    invoice_number: "INV-00005", status: "open",    total_cents: 18900, paid_cents: 0,    due_date: Date.now() - 95 * 86400000, issued_at: Date.now() - 125 * 86400000, dunning_level: 3 },
 };
 let webhooks: any[] = [];
 // Fulfillment / WMS dev stores
@@ -270,6 +273,25 @@ export const mockHandlers = [
       ],
     });
   }),
+  // Dunning sweep (BE-14 / FE-28) — flags overdue invoices with dunning_level
+  http.post(`${V1}/reports/ar-aging/sweep`, async () => {
+    await lat();
+    const now = Date.now();
+    let updated = 0;
+    for (const id of Object.keys(BASE_INVOICES)) {
+      const inv = invoicesStore.get(id) ?? BASE_INVOICES[id];
+      if (inv.status === "paid" || inv.status === "void" || !inv.due_date) continue;
+      const daysOverdue = Math.floor((now - inv.due_date) / 86400_000);
+      if (daysOverdue <= 0) continue;
+      const level: 1 | 2 | 3 = daysOverdue > 90 ? 3 : daysOverdue > 60 ? 2 : 1;
+      if (inv.dunning_level !== level) {
+        invoicesStore.set(id, { ...inv, dunning_level: level });
+        updated++;
+      }
+    }
+    return HttpResponse.json({ updated });
+  }),
+
   http.get(`${V1}/reports/ap-aging`, async () => {
     await lat();
     return HttpResponse.json({

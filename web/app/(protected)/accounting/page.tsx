@@ -26,6 +26,16 @@ const BILLING_STYLE: Record<BillingStatus, string> = {
   paid: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   void: "bg-slate-100 text-slate-500 ring-slate-200",
 };
+const DUNNING_STYLE: Record<number, string> = {
+  1: "bg-yellow-50 text-yellow-700 ring-yellow-200",
+  2: "bg-orange-50 text-orange-700 ring-orange-200",
+  3: "bg-red-50 text-red-700 ring-red-200",
+};
+const DUNNING_LABEL: Record<number, string> = {
+  1: "30d",
+  2: "60d",
+  3: "90d+",
+};
 
 function formatDate(ms: number | null) {
   if (ms === null) return "-";
@@ -41,6 +51,8 @@ export default function AccountingPage() {
   const [arAging, setArAging] = useState<AgingReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sweepBusy, setSweepBusy] = useState(false);
+  const [sweepResult, setSweepResult] = useState<number | null>(null);
   const canPay = hasRole("manager");
 
   const load = useCallback(async () => {
@@ -72,6 +84,20 @@ export default function AccountingPage() {
     try { await apiPost("/api/v1/accounting/accounts/seed", {}); await load(); }
     catch (e) { setError(e instanceof Error ? e.message : "Seed failed"); }
     finally { setBusy(false); }
+  };
+
+  const runDunningSweep = async () => {
+    setSweepBusy(true);
+    setSweepResult(null);
+    try {
+      const res = await apiPost<{ updated: number }>("/api/v1/reports/ar-aging/sweep", {});
+      setSweepResult(res.updated);
+      await load();
+    } catch (e) {
+      setError(e instanceof ApiResponseError ? e.message : "Dunning sweep failed");
+    } finally {
+      setSweepBusy(false);
+    }
   };
 
   const decide = async (id: string, action: "approve" | "reject") => {
@@ -176,22 +202,53 @@ export default function AccountingPage() {
 
         <Card title="Accounts Receivable" description="Customer invoices and aging by days outstanding.">
           {arAging && <AgingSummary report={arAging} />}
+
+          {canPay && (
+            <div className="mt-3 flex items-center gap-3">
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={sweepBusy}
+                onClick={() => void runDunningSweep()}
+              >
+                {sweepBusy ? "Running sweep…" : "Run Dunning Sweep"}
+              </Button>
+              {sweepResult !== null && (
+                <span className="text-xs text-slate-500">
+                  {sweepResult === 0
+                    ? "All invoices already up-to-date."
+                    : `${sweepResult} invoice${sweepResult !== 1 ? "s" : ""} flagged.`}
+                </span>
+              )}
+            </div>
+          )}
+
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                   <th className="px-4 py-3">Invoice #</th><th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Overdue</th>
                   <th className="px-4 py-3">Due</th>
                   <th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Paid</th>
                   <th className="px-4 py-3 text-right">Due amount</th><th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {invoices.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No invoices</td></tr>}
+                {invoices.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">No invoices</td></tr>}
                 {invoices.map((inv) => (
                   <tr key={inv.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                     <td className="px-4 py-3 font-medium text-slate-950">{inv.invoice_number}</td>
                     <td className="px-4 py-3"><span className={`rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${BILLING_STYLE[inv.status]}`}>{inv.status}</span></td>
+                    <td className="px-4 py-3">
+                      {inv.dunning_level ? (
+                        <span className={`rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${DUNNING_STYLE[inv.dunning_level]}`}>
+                          {DUNNING_LABEL[inv.dunning_level]}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-slate-500">{formatDate(inv.due_date)}</td>
                     <td className="px-4 py-3 text-right">{formatMoney(inv.total_cents)}</td>
                     <td className="px-4 py-3 text-right">{formatMoney(inv.paid_cents)}</td>

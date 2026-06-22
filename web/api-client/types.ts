@@ -526,6 +526,7 @@ export interface Invoice {
   paid_cents: number;
   due_date: number | null;
   issued_at: number;
+  dunning_level?: 0 | 1 | 2 | 3 | null;
 }
 
 export interface InvoicesResponse {

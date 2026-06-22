@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type {
@@ -202,9 +203,11 @@ function TiersTab() {
         {error && <p role="alert" className="border-b border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
 
         {loading ? (
-          <p className="px-4 py-8 text-center text-sm text-slate-400">Loading…</p>
+          <TableSkeleton headers={["Tier", "Threshold", "Discount", "Members"]} rows={4} />
         ) : tiers.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-slate-400">No tiers configured yet.</p>
+          <div className="py-14 text-center">
+            <p className="text-sm font-medium text-[var(--color-text-primary)]">No tiers configured yet.</p>
+          </div>
         ) : (
           <div className="divide-y divide-slate-100">
             {tiers.map(tier => (
@@ -383,6 +386,13 @@ function MembersTab({ tiers }: { tiers: LoyaltyTier[] }) {
 
         {error && <p role="alert" className="border-b border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
 
+        {loading ? (
+          <TableSkeleton headers={["Customer", "Tier", "Balance", "Lifetime", "Joined", ""]} rows={8} />
+        ) : members.length === 0 ? (
+          <div className="py-14 text-center">
+            <p className="text-sm font-medium text-[var(--color-text-primary)]">No members found.</p>
+          </div>
+        ) : (
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -395,11 +405,7 @@ function MembersTab({ tiers }: { tiers: LoyaltyTier[] }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {loading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">Loading…</td></tr>
-            ) : members.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">No members found.</td></tr>
-            ) : members.map(m => (
+            {members.map(m => (
               <tr key={m.id} className="hover:bg-slate-50 transition-colors">
                 <td className="px-4 py-3">
                   <p className="font-medium text-slate-950">{m.customer_name}</p>
@@ -425,6 +431,7 @@ function MembersTab({ tiers }: { tiers: LoyaltyTier[] }) {
             ))}
           </tbody>
         </table>
+        )}
       </Card>
 
       {adjustMember && (
@@ -598,6 +605,13 @@ function RewardsTab() {
 
         {error && <p role="alert" className="border-b border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
 
+        {loading ? (
+          <TableSkeleton headers={["Reward", "Points cost", "Value", "Redeemed", "Status", ""]} rows={6} />
+        ) : rewards.length === 0 ? (
+          <div className="py-14 text-center">
+            <p className="text-sm font-medium text-[var(--color-text-primary)]">No rewards found.</p>
+          </div>
+        ) : (
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -610,11 +624,7 @@ function RewardsTab() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {loading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">Loading…</td></tr>
-            ) : rewards.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">No rewards found.</td></tr>
-            ) : rewards.map(r => (
+            {rewards.map(r => (
               <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                 <td className="px-4 py-3">
                   <p className="font-medium text-slate-950">{r.name}</p>
@@ -654,6 +664,7 @@ function RewardsTab() {
             ))}
           </tbody>
         </table>
+        )}
       </Card>
 
       {editReward !== undefined && (
