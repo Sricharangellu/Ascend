@@ -14,6 +14,9 @@ const billSchema = z.object({
   poId: z.string().min(1).optional(),
   totalCents: z.number().int().positive().optional(),
   dueDate: z.number().int().positive().optional(),
+  // BE-30: early payment discount terms.
+  discountPct: z.number().min(0).max(100).optional(),
+  discountDate: z.number().int().positive().optional(),
 });
 const invoiceSchema = z.object({
   customerId: z.string().min(1),

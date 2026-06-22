@@ -19,8 +19,12 @@ const giftcards = new Map<string, any>();
 const billsStore = new Map<string, any>();
 const invoicesStore = new Map<string, any>();
 const BASE_BILLS: Record<string, any> = {
-  bil_1: { id: "bil_1", tenant_id: "tnt_demo", supplier_id: "sup_acme", po_id: "po_1", bill_number: "BILL-00001", status: "open", total_cents: 24000, paid_cents: 0, due_date: Date.now() + 30 * 86400000, issued_at: Date.now() - 2 * 86400000 },
-  bil_2: { id: "bil_2", tenant_id: "tnt_demo", supplier_id: "sup_tea", po_id: "po_2", bill_number: "BILL-00002", status: "partial", total_cents: 11250, paid_cents: 5000, due_date: Date.now() + 20 * 86400000, issued_at: Date.now() - 86400000 },
+  // bil_1: 2% early-pay discount valid for 10 days — still active.
+  bil_1: { id: "bil_1", tenant_id: "tnt_demo", supplier_id: "sup_acme", po_id: "po_1", bill_number: "BILL-00001", status: "open",    total_cents: 24000, paid_cents: 0,    due_date: Date.now() + 30 * 86400000, issued_at: Date.now() - 2 * 86400000, discount_pct: 2.00,  discount_date: Date.now() + 10 * 86400000, discount_applied_cents: 0 },
+  // bil_2: 1% discount window already expired — no discount on payment.
+  bil_2: { id: "bil_2", tenant_id: "tnt_demo", supplier_id: "sup_tea",  po_id: "po_2", bill_number: "BILL-00002", status: "partial", total_cents: 11250, paid_cents: 5000, due_date: Date.now() + 20 * 86400000, issued_at: Date.now() - 86400000,    discount_pct: 1.00,  discount_date: Date.now() - 5  * 86400000, discount_applied_cents: 0 },
+  // bil_3: no discount terms.
+  bil_3: { id: "bil_3", tenant_id: "tnt_demo", supplier_id: "sup_acme", po_id: null,   bill_number: "BILL-00003", status: "open",    total_cents: 6500,  paid_cents: 0,    due_date: Date.now() + 45 * 86400000, issued_at: Date.now() - 3 * 86400000, discount_pct: null,  discount_date: null,                       discount_applied_cents: 0 },
 };
 const BASE_INVOICES: Record<string, any> = {
   inv_1: { id: "inv_1", tenant_id: "tnt_demo", customer_id: "cus_demo_1", order_id: "ord_a", invoice_number: "INV-00001", status: "paid",    total_cents: 8600,  paid_cents: 8600, due_date: Date.now() + 15 * 86400000, issued_at: Date.now() - 5  * 86400000, dunning_level: null },
@@ -224,12 +228,20 @@ export const mockHandlers = [
     const base = billsStore.get(params.id as string) ?? BASE_BILLS[params.id as string];
     if (!base) return HttpResponse.json({ error: { code: "not_found", message: "bill not found", requestId: rid() } }, { status: 404 });
     if (base.status === "void") return HttpResponse.json({ error: { code: "conflict", message: "cannot pay a void bill", requestId: rid() } }, { status: 409 });
-    const remaining = base.total_cents - base.paid_cents;
-    if (body.amountCents > remaining) {
-      return HttpResponse.json({ error: { code: "bad_request", message: "payment exceeds amount due", requestId: rid() } }, { status: 400 });
+
+    // Apply early payment discount on first payment before deadline (mirrors backend payBill logic).
+    let discountApplied: number = base.discount_applied_cents ?? 0;
+    const now = Date.now();
+    if (discountApplied === 0 && base.discount_pct != null && base.discount_pct > 0 && base.discount_date != null && now <= base.discount_date) {
+      discountApplied = Math.floor(base.total_cents * base.discount_pct / 100);
+    }
+
+    const effectiveTotal = base.total_cents - discountApplied;
+    if (body.amountCents > effectiveTotal - base.paid_cents) {
+      return HttpResponse.json({ error: { code: "bad_request", message: "payment exceeds discounted amount due", requestId: rid() } }, { status: 400 });
     }
     const paid_cents = base.paid_cents + body.amountCents;
-    const updated = { ...base, paid_cents, status: paid_cents >= base.total_cents ? "paid" : "partial" };
+    const updated = { ...base, paid_cents, discount_applied_cents: discountApplied, status: paid_cents >= effectiveTotal ? "paid" : "partial" };
     billsStore.set(updated.id, updated);
     return HttpResponse.json(updated);
   }),

@@ -60,11 +60,18 @@ const ALTER_INVOICES_DUNNING = `
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS dunning_level INTEGER NOT NULL DEFAULT 0;
 `;
 
+// BE-30: early payment discount on bills.
+const ALTER_BILLS_DISCOUNT = `
+ALTER TABLE bills ADD COLUMN IF NOT EXISTS discount_pct     NUMERIC(5,2);
+ALTER TABLE bills ADD COLUMN IF NOT EXISTS discount_date    BIGINT;
+ALTER TABLE bills ADD COLUMN IF NOT EXISTS discount_applied_cents BIGINT NOT NULL DEFAULT 0;
+`;
+
 /** Billing — supplier bills (AP) + customer invoices (AR). A received PO
  *  auto-drafts a bill (via the purchase_order.received event). */
 export const billingModule: PosModule = {
   name: "billing",
-  migrations: [CREATE_BILLS, CREATE_INVOICES, CREATE_PAYMENTS, INDEXES, ALTER_BILLS_VARIANCE, ALTER_INVOICES_DUNNING],
+  migrations: [CREATE_BILLS, CREATE_INVOICES, CREATE_PAYMENTS, INDEXES, ALTER_BILLS_VARIANCE, ALTER_INVOICES_DUNNING, ALTER_BILLS_DISCOUNT],
   async register({ db, events, router }) {
     const service = new BillingService(db, events);
     events.on("purchase_order.received", async (event) => {

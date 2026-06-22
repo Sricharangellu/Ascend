@@ -21,6 +21,10 @@ export interface Bill {
   due_date: number | null;
   issued_at: number;
   variance_cents: number | null; // BE-12: signed delta when bill ≠ received total
+  // BE-30: early payment discount — applied on first payment before discount_date.
+  discount_pct: number | null;          // e.g. 2.00 for 2%
+  discount_date: number | null;         // epoch ms deadline
+  discount_applied_cents: number;       // 0 until the discount is taken
 }
 
 export interface Invoice {
@@ -59,7 +63,7 @@ export class BillingService {
 
   // ── Bills (AP) ──────────────────────────────────────────────────────────────
   async createBill(
-    input: { supplierId?: string; poId?: string; totalCents?: number; dueDate?: number },
+    input: { supplierId?: string; poId?: string; totalCents?: number; dueDate?: number; discountPct?: number; discountDate?: number },
     tenantId: string,
   ): Promise<Bill> {
     let supplierId = input.supplierId;
@@ -81,10 +85,13 @@ export class BillingService {
       bill_number: await this.nextNumber("bills", "BILL", tenantId), status: "open",
       total_cents: total, paid_cents: 0, due_date: input.dueDate ?? now + 30 * DAY, issued_at: now,
       variance_cents: null,
+      discount_pct: input.discountPct ?? null,
+      discount_date: input.discountDate ?? null,
+      discount_applied_cents: 0,
     };
     await this.db.query(
-      `INSERT INTO bills (id, tenant_id, supplier_id, po_id, bill_number, status, total_cents, paid_cents, due_date, issued_at)
-       VALUES (@id,@tenant_id,@supplier_id,@po_id,@bill_number,@status,@total_cents,@paid_cents,@due_date,@issued_at)`,
+      `INSERT INTO bills (id, tenant_id, supplier_id, po_id, bill_number, status, total_cents, paid_cents, due_date, issued_at, discount_pct, discount_date, discount_applied_cents)
+       VALUES (@id,@tenant_id,@supplier_id,@po_id,@bill_number,@status,@total_cents,@paid_cents,@due_date,@issued_at,@discount_pct,@discount_date,@discount_applied_cents)`,
       bill as unknown as Record<string, unknown>,
     );
     return bill;
@@ -108,19 +115,37 @@ export class BillingService {
 
   async payBill(id: string, amountCents: number, method: string, tenantId: string): Promise<Bill> {
     if (amountCents <= 0) throw new HttpError(400, "bad_request", "amountCents must be positive");
-    return this.db.tx(async (tdb) => {
+    return this.db.withTenant(tenantId).tx(async (tdb) => {
       const bill = await tdb.one<Bill>("SELECT * FROM bills WHERE id = @id AND tenant_id = @t FOR UPDATE", { id, t: tenantId });
       if (!bill) throw new HttpError(404, "not_found", `bill '${id}' not found`);
       if (bill.status === "void") throw new HttpError(409, "void", "bill is void");
+
+      const now = Date.now();
+      let discountApplied = Number(bill.discount_applied_cents ?? 0);
+
+      // Apply early payment discount on the first payment before the deadline.
+      if (
+        discountApplied === 0 &&
+        bill.discount_pct != null && Number(bill.discount_pct) > 0 &&
+        bill.discount_date != null && now <= Number(bill.discount_date)
+      ) {
+        discountApplied = Math.floor(Number(bill.total_cents) * Number(bill.discount_pct) / 100);
+      }
+
+      const effectiveTotal = Number(bill.total_cents) - discountApplied;
       const paid = Number(bill.paid_cents) + amountCents;
-      if (paid > Number(bill.total_cents)) throw new HttpError(400, "overpayment", "payment exceeds amount due");
-      const status = this.nextStatus(Number(bill.total_cents), paid);
-      await tdb.query("UPDATE bills SET paid_cents = @paid, status = @status WHERE id = @id AND tenant_id = @t", { paid, status, id, t: tenantId });
+      if (paid > effectiveTotal) throw new HttpError(400, "overpayment", "payment exceeds discounted amount due");
+
+      const status = this.nextStatus(effectiveTotal, paid);
+      await tdb.query(
+        "UPDATE bills SET paid_cents = @paid, status = @status, discount_applied_cents = @disc WHERE id = @id AND tenant_id = @t",
+        { paid, status, disc: discountApplied, id, t: tenantId },
+      );
       await tdb.query(
         "INSERT INTO billing_payments (id, tenant_id, doc_type, doc_id, amount_cents, method, created_at) VALUES (@id,@t,'bill',@doc,@amt,@m,@now)",
-        { id: `blp_${uuidv7()}`, t: tenantId, doc: id, amt: amountCents, m: method, now: Date.now() },
+        { id: `blp_${uuidv7()}`, t: tenantId, doc: id, amt: amountCents, m: method, now },
       );
-      return { ...bill, paid_cents: paid, status };
+      return { ...bill, paid_cents: paid, status, discount_applied_cents: discountApplied };
     });
   }
 
@@ -215,7 +240,7 @@ export class BillingService {
 
   async payInvoice(id: string, amountCents: number, method: string, tenantId: string): Promise<Invoice> {
     if (amountCents <= 0) throw new HttpError(400, "bad_request", "amountCents must be positive");
-    return this.db.tx(async (tdb) => {
+    return this.db.withTenant(tenantId).tx(async (tdb) => {
       const inv = await tdb.one<Invoice>("SELECT * FROM invoices WHERE id = @id AND tenant_id = @t FOR UPDATE", { id, t: tenantId });
       if (!inv) throw new HttpError(404, "not_found", `invoice '${id}' not found`);
       if (inv.status === "void") throw new HttpError(409, "void", "invoice is void");

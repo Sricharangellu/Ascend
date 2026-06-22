@@ -209,8 +209,26 @@ export interface CapturePaymentRequest {
   cashCents?: number;
   /** integer cents charged to card */
   cardCents?: number;
-  /** EMV/card last 4 digits */
-  cardLast4?: string;
+  /**
+   * Stripe PaymentIntent ID — required for card / split when Stripe is
+   * configured. The intent must already be in "succeeded" state (processed
+   * by the Terminal reader). The backend retrieves real last4 and auth code
+   * from Stripe instead of simulating them.
+   */
+  stripePaymentIntentId?: string;
+}
+
+// ─── Stripe Terminal ──────────────────────────────────────────────────────────
+export interface TerminalStartResponse {
+  intentId: string;
+  status: string;
+  readerId: string;
+}
+
+export interface TerminalStatusResponse {
+  status: string;
+  last4: string | null;
+  authCode: string | null;
 }
 
 // ─── Refund / void (Wave 1) ───────────────────────────────────────────────────
@@ -510,6 +528,10 @@ export interface Bill {
   paid_cents: number;
   due_date: number | null;
   issued_at: number;
+  // BE-30: early payment discount
+  discount_pct: number | null;
+  discount_date: number | null;
+  discount_applied_cents: number;
 }
 
 export interface BillsResponse {
