@@ -7,5 +7,10 @@ dist/
 .DS_Store
 web/node_modules/
 web/.next/
+web/tsconfig.tsbuildinfo
 .vercel
 .claude/worktrees/
+desktop/release/
+*.dmg
+*.dmg.blockmap
+builder-debug.yml
