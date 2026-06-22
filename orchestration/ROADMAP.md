@@ -120,10 +120,10 @@ records, only triaged into "build now" vs. "documented for later."
       idempotency key deduplication. Extends the shell Service Worker
       (`web/public/sw.js`) already in place. See SYSTEM_DESIGN.md §7.
       (done in 74241ec)
-- [ ] INF-9: E2E test suite (Playwright) — cover the golden paths: login →
+- [x] INF-9: E2E test suite (Playwright) — cover the golden paths: login →
       checkout, inventory receive, invoice pay. Run in CI against a real
       backend + Postgres (reuse the CI job's postgres service container).
-      Estimated effort: 2–3 days.
+      (done in 99a5ed7)
 - [x] INF-10: API key scope enforcement — `makeAuthMiddleware(db)` factory
       handles both JWT sessions (scopes:[]=unrestricted) and API key tokens
       (fpk_ prefix: DB lookup, SHA-256 verify, scope population). Added
@@ -802,6 +802,7 @@ current codebase. Ordered by value/dependency within each lane.
 - 2026-06-22 human/assistant BE-33 -> c1b8816: webhook delivery — exponential backoff retries (×5), owner guards, toggle endpoint, attempt_count + last_response_body delivery log.
 - 2026-06-22 human/assistant INF-7 -> ed732b4: .env.example pool sizing docs + redis.ts structured logging.
 
+- 2026-06-22 human/assistant INF-9 -> 99a5ed7: Playwright E2E — login, checkout, inventory-receive, invoice-pay; e2e CI job.
 - 2026-06-22 human/assistant INF-8 -> 74241ec: offline checkout outbox — IndexedDB write-ahead queue, Background Sync, TenderScreen fallback, OfflineBanner with sync status.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
