@@ -110,11 +110,11 @@ records, only triaged into "build now" vs. "documented for later."
       re-enqueues itself 24 h later). Bootstrap seeds one job per tenant on
       startup via enqueueOnce (idempotent). BullMQ deferred — Postgres queue
       is sufficient for current scale. (done in a957060)
-- [ ] INF-7: Connection pool sizing — add `PG_POOL_MAX` env var guidance to
+- [x] INF-7: Connection pool sizing — add `PG_POOL_MAX` env var guidance to
       `.env.example`; document that Neon / Railway users should point
       `DATABASE_URL` at the pool proxy endpoint (not the direct DB). Add a
       `/readyz` pool-saturation check that returns 503 when all connections
-      are in use. Estimated effort: 0.5 day.
+      are in use. (done in ed732b4; /readyz + poolStats() already done in a957060)
 - [ ] INF-8: Offline terminal — IndexedDB write-ahead queue for checkout
       commands when the network is unavailable; replay on reconnect with
       idempotency key deduplication. Extends the shell Service Worker
@@ -597,5 +597,6 @@ on go-live readiness needs.
 - 2026-06-22 fullstack BE-31 -> f7da017: httpOnly cookie auth — finder_refresh (httpOnly) + finder_session_hint (non-httpOnly) set on login/refresh; middleware enforces auth; silentRefresh uses hint cookie; logout clears cookies.
 
 - 2026-06-22 human/assistant BE-33 -> c1b8816: webhook delivery — exponential backoff retries (×5), owner guards, toggle endpoint, attempt_count + last_response_body delivery log.
+- 2026-06-22 human/assistant INF-7 -> ed732b4: .env.example pool sizing docs + redis.ts structured logging.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
