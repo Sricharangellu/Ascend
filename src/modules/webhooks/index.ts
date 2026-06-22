@@ -27,6 +27,11 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
 );
 `;
 
+const ADD_DELIVERY_RETRY_COLUMNS = `
+ALTER TABLE webhook_deliveries ADD COLUMN IF NOT EXISTS attempt_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE webhook_deliveries ADD COLUMN IF NOT EXISTS last_response_body TEXT;
+`;
+
 const CREATE_WEBHOOK_INDEXES = `
 CREATE INDEX IF NOT EXISTS webhook_subs_tenant_idx ON webhook_subscriptions (tenant_id, active);
 CREATE INDEX IF NOT EXISTS webhook_deliveries_tenant_idx ON webhook_deliveries (tenant_id, created_at DESC);
@@ -39,7 +44,7 @@ CREATE INDEX IF NOT EXISTS webhook_deliveries_tenant_idx ON webhook_deliveries (
  */
 export const webhooksModule: PosModule = {
   name: "webhooks",
-  migrations: [CREATE_SUBSCRIPTIONS_TABLE, CREATE_DELIVERIES_TABLE, CREATE_WEBHOOK_INDEXES],
+  migrations: [CREATE_SUBSCRIPTIONS_TABLE, CREATE_DELIVERIES_TABLE, CREATE_WEBHOOK_INDEXES, ADD_DELIVERY_RETRY_COLUMNS],
   async register({ db, events, router }) {
     const service = new WebhooksService(db);
     // Best-effort fan-out on every event; never await (would block publishers).
