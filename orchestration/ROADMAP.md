@@ -549,6 +549,130 @@ on go-live readiness needs.
 
 ---
 
+## Phase 6 — Implementation Prompt Parity (FinderPOS_Implementation_Prompt.docx)
+
+Gap analysis completed 2026-06-22 against `orchestration/FinderPOS_Implementation_Prompt.docx`.
+Items below are features specified in that document that are absent or incomplete in the
+current codebase. Ordered by value/dependency within each lane.
+
+> Source doc: 9 modules (Dashboard, Sell/Register, Reporting, Catalog, Inventory,
+> Customers, Finance, Setup, Ecommerce), 14 mandatory business rules, full API
+> contract, and URL state management spec.
+
+### Backend lane (Phase 6)
+
+- [ ] BE-35: Store Credit payment mode — add `store_credit` as a valid
+      `PaymentMethod` in the payments service; deduct from `customers.store_credit_cents`
+      atomically inside `capture()`; add `POST /api/v1/customers/:id/store-credit`
+      (delta endpoint: positive = add credit, negative = deduct; manager-gated for
+      adds; enforce balance ≥ 0). Emit `store_credit.debited` event on checkout.
+      Guards: store credit payment cannot exceed customer balance (rule #10).
+      See §9 (Customer record > Store Credit tab) and §14 rule #10.
+
+- [ ] BE-36: Register Closures report endpoint — `GET /api/v1/reports/register-closures`
+      (list: outlet, register, opened_by, opened_at, closed_at, opening_cash,
+      closing_cash, expected_cash, discrepancy, payment breakdown by mode);
+      `GET /api/v1/reports/register-closures/:sessionId` (detail: header +
+      payment breakdown table + transaction log of invoices in session +
+      cash drawer movements in session). Reads from `register_sessions` +
+      `cash_drawer_movements` + `payments` tables.
+      See §6.2 Register Closures and §6.3 Register Closure Detail View.
+
+- [ ] BE-37: Cash Movement report endpoint — `GET /api/v1/reports/cash-movement`
+      (filter by `?registerId=&sessionId=&from=&to=`); reads `cash_drawer_movements`
+      table; returns rows with direction (cash_in/cash_out), amount, reason,
+      user, timestamp. Aggregates: total_in, total_out, net.
+      See §6.2 Cash Movement and §15 POS Transaction → Report Feed Map.
+
+- [ ] BE-38: Purchase/AP report endpoint — `GET /api/v1/reports/purchases`
+      (filter by `?vendorId=&productId=&categoryId=&from=&to=`); joins
+      `purchase_orders` + `purchase_order_lines` + `suppliers` + `products`;
+      returns qty ordered, cost, units received, due amount per vendor/product/
+      category pivot. See §6.2 Reporting sub-pages (Purchase Report).
+
+- [ ] BE-39: Customer-specific product price overrides — new table
+      `customer_product_prices (id, tenant_id, customer_id, product_id, price_cents,
+      created_at, updated_at)`. Endpoints: `GET/POST/DELETE
+      /api/v1/customers/:id/product-prices`. Price resolution in orders/sales
+      must check this table FIRST (highest priority, before tier pricing).
+      See §5.2 Product Data Resolution at POS (rule 1).
+
+- [ ] BE-40: Employee time clock — new table `time_entries (id, tenant_id,
+      employee_id, clock_in BIGINT, clock_out BIGINT, break_minutes INTEGER,
+      created_at)`. Endpoints: `POST /api/v1/workforce/clock-in`, `POST
+      /api/v1/workforce/clock-out` (sets clock_out, calculates break if
+      re-clocked within shift). Report endpoint: `GET /api/v1/reports/time-cards`
+      (filter by user/date; returns total_hours per employee + detail rows).
+      See §6.2 User/Time Cards sub-page.
+
+### Frontend lane (Phase 6)
+
+- [ ] FE-41: Dashboard KPI alignment + outlet filter — replace current 8 KPI
+      tiles with the 8 spec KPIs: Revenue, Sale Count, Gross Profit (revenue −
+      cost), Customer Count (DISTINCT customer_id), Avg Sale Value, Avg Items/Sale,
+      Discounted Amount, Discounted %. Each tile: current value, delta vs. prior
+      period (absolute + % + directional arrow), sparkline (last 8 data points),
+      "View report" deep-link. Add outlet dropdown filter bar (All Outlets +
+      individual from `/api/v1/outlets`) that scopes all tile queries.
+      See §4.1 KPI Tile Grid and §4.3 Dashboard Filter Bar.
+
+- [ ] FE-42: Register Closures report page (`/reports/register-closures`) —
+      list view: outlet, register, opened/closed times, opening float, closing
+      float, discrepancy. Click row → detail view: header, payment breakdown
+      table (cash/card/gift card/etc.), transaction log (invoice rows linking
+      to `/sell/sale/:id`), cash movement events in session.
+      Consumes BE-36. See §6.2 and §6.3.
+
+- [ ] FE-43: Cash Movement report page (`/reports/cash-movement`) — table of
+      cash in/out/petty cash events with register, user, reason, amount;
+      aggregate totals at top. Filter by register and date range.
+      Consumes BE-37. See §6.2 Cash Movement.
+
+- [ ] FE-44: Purchase/AP report page (`/reports/purchases`) — vendor × product
+      pivot with qty ordered, cost, received, due amount; "Export CSV" action.
+      Consumes BE-38. See §6.2 Purchase Report.
+
+- [ ] FE-45: Store Credit UI — (a) Customer detail: add "Store Credit" tab
+      showing balance, add/deduct form (manager: add; cashier: deduct only),
+      transaction history. (b) TenderScreen: add "Store Credit" payment option
+      that shows balance, enforces balance ≥ payment amount. Consumes BE-35.
+      See §5.4 Checkout payment modes and §9.2 Customer > Store Credit tab.
+
+- [ ] FE-46: Lot code selection at POS — when a product with lot-tracked
+      inventory is added to the cart, show a lot-picker dialog
+      (`GET /api/v1/inventory/:productId/lots`) displaying lot code, expiry date,
+      and available qty. Pre-select the earliest-expiry lot (FEFO). Attach
+      `lotCode` to the cart line item sent to `POST /api/v1/orders`.
+      See §5.3 Inventory Checks at Scan/Add (lot-tracked items).
+
+- [ ] FE-47: Price Book page (`/catalog/price-book`) — grid of outlet-specific
+      price overrides: product × outlet matrix. Inline-editable cells. Bulk
+      import via CSV. Uses `POST/PATCH /api/v1/catalog/:id` (existing) with
+      outlet-scoped price columns; or a new `product_outlet_prices` table if
+      outlet-specific pricing is not yet in the schema.
+      See §7.1 Catalog sub-pages > Price Book.
+
+- [ ] FE-48: URL state management for report filters — all `/reports/*` pages
+      encode their active filters as `?definition=<base64(JSON)>` so views
+      are bookmarkable and deep-linkable. JSON shape: `{ metric, dimension,
+      constraints[], granularity, periodType, periodCount, startDate, endDate,
+      comparison, order, reportView, optionalAggregates }`.
+      Dashboard Day/Week/Month toggle writes `granularity` to the URL and to
+      global context (read as default when navigating to any report).
+      See §6.1 Shared Report Filter Architecture and §16 URL State Management.
+
+- [ ] FE-49: Time Cards report page (`/reports/time-cards`) — employee list
+      with total hours per period; expandable to clock-in/out log per employee.
+      Consumes BE-40. See §6.2 User/Time Cards.
+
+- [ ] FE-50: Customer-specific price UI — add "Product Prices" tab on
+      `/customers/[id]` listing per-product price overrides with add/edit/delete.
+      At POS, when a customer is selected, show a "custom price" badge on
+      products with overrides and apply the override in the cart.
+      Consumes BE-39. See §9.2 Customer > Product Price tab and §5.2 rule 1.
+
+---
+
 ## Run log (most recent first)
 
 - 2026-06-14 human/assistant PROD-1 -> 216fc4c: merged backend-cycle3 into
