@@ -1,23 +1,25 @@
 name: CI
 
+# ─── Trigger rules ─────────────────────────────────────────────────────────────
+# master  → full CI + deploy to PRODUCTION  (finder-pos-frontend.vercel.app)
+# staging → full CI + deploy to STAGING     (Vercel preview URL, isolated DB)
+# PRs     → full CI, no deploy
+# feature → no CI (local dev + pre-push hook)
 on:
   push:
-    branches: [master]
+    branches: [master, staging]
   pull_request:
-    branches: [master]
+    branches: [master, staging]
 
+# ─── Shared test jobs (run on every trigger) ──────────────────────────────────
 jobs:
   guard:
     name: Production guard — lint anti-patterns
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # PROD guardrails: fail CI if any of these known-bad patterns appear.
-      # These are the classes of error that reached production in the 2026-06-22 audit.
       - name: No unguarded mutation routes (router.patch/delete without requireRole)
         run: |
-          # Find route files with patch/delete that lack requireRole on the same line or immediately preceding.
-          # This grep exits 0 (pass) if NO violations found, 1 if violations found.
           ! grep -rn --include="*routes.ts" -A1 "router\.\(patch\|delete\|put\)" src/ \
             | grep -B1 "handler(" \
             | grep -v "requireRole\|//\s*no auth" \
@@ -33,12 +35,11 @@ jobs:
             grep -rn --include="*.ts" "console\.\(log\|error\|warn\)" src/modules/ src/gateway/ | grep -v "\.test\.ts"
             exit 1
           fi
-      - name: No raw sql string interpolation (SQL injection risk)
+      - name: No raw SQL string interpolation (SQL injection risk)
         run: |
-          # Catch template literals used directly in query() calls — should use parameterized @key syntax.
           ! grep -rn --include="*.ts" "\.query\(\`.*\${" src/modules/ src/gateway/ \
             | grep -v "\.test\.ts\|set_config\|schema" \
-            || (echo "❌ Raw string interpolation in SQL query — use @param syntax instead" && exit 1)
+            || (echo "❌ Raw string interpolation in SQL — use @param syntax" && exit 1)
           echo "No raw SQL interpolation found ✓"
 
   backend:
@@ -69,9 +70,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      # PROD-17: run tests. Coverage threshold enforcement deferred until
-      # baseline is measured (PROD-18 adds tests for the 9 uncovered modules).
-      # Add --coverage flag once baseline is set to track regressions.
       - run: npm test
 
   frontend:
@@ -92,14 +90,21 @@ jobs:
       - run: npm run lint
       - run: npm run build
 
-  deploy-frontend:
-    name: Deploy frontend → Vercel
-    needs: [backend, frontend]
+  # ─── Staging deploy (push to staging branch only) ──────────────────────────
+  # Deploys to a Vercel PREVIEW URL (no --prod flag).
+  # Uses STAGING_DATABASE_URL and STAGING_JWT_SECRET secrets (isolated DB).
+  # Preview URL is unique per deployment — check Vercel dashboard for the URL.
+  deploy-staging:
+    name: Deploy → Staging (Vercel preview)
+    needs: [guard, backend, frontend]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/staging' && github.event_name == 'push'
     defaults:
       run:
         working-directory: web
+    environment:
+      name: staging
+      url: ${{ steps.deploy.outputs.url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -108,15 +113,53 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci
-      # Scope is resolved automatically from .vercel/project.json (created by
-      # `vercel link` during repo setup). No --scope flag needed at runtime.
+      # Deploy as Vercel preview (no --prod flag) → unique preview URL.
+      # Set STAGING env vars in Vercel dashboard under the staging environment.
+      - name: Deploy to Vercel staging
+        id: deploy
+        run: |
+          url=$(npx vercel --yes --token "$VERCEL_TOKEN" 2>&1 | tail -1)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Staging URL: $url"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Staging smoke test
+        run: |
+          sleep 10
+          BACKEND_URL="${{ secrets.STAGING_BACKEND_URL }}"
+          curl -f --retry 3 --retry-delay 5 "${BACKEND_URL}/healthz" \
+            || echo "⚠️  Staging backend not reachable — check STAGING_BACKEND_URL secret"
+
+  # ─── Production deploy (push to master branch only) ────────────────────────
+  # Deploys to the PRODUCTION Vercel URL with --prod flag.
+  # Only runs after all test jobs pass AND only on master.
+  deploy-production:
+    name: Deploy → Production (Vercel --prod)
+    needs: [guard, backend, frontend]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    defaults:
+      run:
+        working-directory: web
+    environment:
+      name: production
+      url: https://finder-pos-frontend.vercel.app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
       - run: npx vercel --prod --yes --token "$VERCEL_TOKEN"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
+  # ─── Production smoke test ─────────────────────────────────────────────────
   smoke-test:
-    name: Post-deploy smoke test
-    needs: [deploy-frontend]
+    name: Post-deploy smoke test (production)
+    needs: [deploy-production]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     steps:
