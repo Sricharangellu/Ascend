@@ -2,86 +2,132 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design System Tokens ────────────────────────────────────────────────── */
+:root {
+  --color-primary:        #0137FC;
+  --color-sidebar-bg:     #030B25;
+  --color-sidebar-active: #0137FC;
+  --color-header-bg:      #F7F7F7;
+  --color-header-border:  rgb(229, 220, 220);
+  --color-page-bg:        #F9F9F9;
+  --color-table-header:   #FAFAFA;
+  --color-table-border:   #F0F0F0;
+  --color-text-primary:   rgba(0, 0, 0, 0.88);
+  --color-text-secondary: rgba(0, 0, 0, 0.45);
+  --color-link:           #0137FC;
+  --color-billed:         #1890FF;
+  --color-not-billed:     #FA8C16;
+  --color-danger:         #FF4D4F;
+  --color-success:        #52C41A;
+}
+
 /* ── Print receipt ────────────────────────────────────────────────────────── */
 @media print {
-  /* Hide everything except the receipt modal content */
   body > * { display: none !important; }
-  [role="dialog"] { display: block !important; position: static !important; width: 80mm !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; }
+  [role="dialog"] {
+    display: block !important;
+    position: static !important;
+    width: 80mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
   [role="dialog"] > .fixed,
   [role="dialog"] [aria-hidden="true"],
   [role="dialog"] [aria-label="Close tender screen"] { display: none !important; }
-  /* Strip backgrounds, show borders cleanly */
   * { background: white !important; color: black !important; box-shadow: none !important; }
-  /* Ensure the receipt content fills the page */
   @page { size: 80mm auto; margin: 4mm; }
 }
 
-/* ─────────────────────────────────────────────────────
-   Base resets and WCAG-friendly defaults
-───────────────────────────────────────────────────── */
+/* ── Base resets ─────────────────────────────────────────────────────────── */
 @layer base {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     box-sizing: border-box;
   }
 
   html {
-    /* Prevent layout shift from scrollbar gutter */
     scrollbar-gutter: stable;
     -webkit-text-size-adjust: 100%;
   }
 
   body {
-    @apply bg-slate-100 text-slate-900 font-sans antialiased;
+    background-color: var(--color-page-bg);
+    color: var(--color-text-primary);
+    font-family: -apple-system, "system-ui", "Segoe UI", Roboto, Oxygen, Ubuntu,
+      "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-size: 14px;
   }
 
-  /* Remove default button styles — components re-apply them explicitly */
   button {
     cursor: pointer;
   }
 
-  /* Visible focus ring for keyboard users (not hidden by default) */
   :focus-visible {
-    outline: 3px solid theme("colors.brand.600");
+    outline: 2px solid var(--color-primary);
     outline-offset: 2px;
   }
 
-  /* Accessible skip-to-content link */
+  /* Links */
+  a {
+    color: var(--color-link);
+  }
+
   .skip-link {
     @apply sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2
-           focus:z-50 focus:px-4 focus:py-2 focus:bg-brand-600 focus:text-white
-           focus:rounded focus:shadow-lg;
+           focus:z-50 focus:px-4 focus:py-2 focus:text-white focus:rounded focus:shadow-lg;
+    background-color: var(--color-primary);
   }
 }
 
-/* ─────────────────────────────────────────────────────
-   Utility classes for touch targets (WCAG 2.5.5)
-───────────────────────────────────────────────────── */
+/* ── Utility classes ─────────────────────────────────────────────────────── */
 @layer utilities {
   .touch-target {
     min-height: 44px;
     min-width: 44px;
   }
+
+  /* ERP table styles */
+  .erp-table thead {
+    background-color: var(--color-table-header);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .erp-table th {
+    padding: 12px 8px;
+    border-bottom: 1px solid var(--color-table-border);
+    color: var(--color-text-primary);
+  }
+
+  .erp-table td {
+    padding: 8px 8px;
+    border-bottom: 1px solid var(--color-table-border);
+    font-size: 13px;
+    color: var(--color-text-primary);
+  }
+
+  /* ERP link style */
+  .erp-link {
+    color: var(--color-link);
+    cursor: pointer;
+  }
+
+  .erp-link:hover {
+    text-decoration: underline;
+  }
 }
 
-/* ─────────────────────────────────────────────────────
-   Smooth transitions for modals/toasts
-───────────────────────────────────────────────────── */
+/* ── Animations ──────────────────────────────────────────────────────────── */
 @layer components {
   .animate-slide-in-right {
     animation: slideInRight 0.2s ease-out forwards;
   }
 
   @keyframes slideInRight {
-    from {
-      opacity: 0;
-      transform: translateX(100%);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
+    from { opacity: 0; transform: translateX(100%); }
+    to   { opacity: 1; transform: translateX(0); }
   }
 
   .animate-fade-in {
@@ -89,11 +135,7 @@
   }
 
   @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
 }

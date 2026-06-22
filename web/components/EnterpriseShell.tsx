@@ -11,7 +11,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { clsx } from "clsx";
-import { Button } from "@/components/Button";
 import { CommandPalette } from "@/components/CommandPalette";
 import { NotificationBell } from "@/components/NotificationBell";
 import { apiGet } from "@/api-client/client";
@@ -153,15 +152,27 @@ export function EnterpriseShell({
   }, [handleGlobalKey]);
 
   return (
-    <div className="flex min-h-screen bg-slate-100 text-slate-900">
+    <div className="flex min-h-screen" style={{ backgroundColor: "var(--color-page-bg)" }}>
       <EnterpriseRail active={active} pathname={pathname} flags={flags} />
 
       <div className="flex min-w-0 flex-1 flex-col pb-16 md:pb-0">
         {banner}
 
-        <header className="z-10 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
-          <div className="border-b border-slate-100 px-3 py-2 sm:px-5">
-            <div className="flex gap-1 overflow-x-auto" aria-label="Application areas">
+        {/* ── Top header (SalesGent spec: #F7F7F7 bg, 77px total) ──────── */}
+        <header
+          className="z-10 sticky top-0"
+          style={{
+            backgroundColor: "var(--color-header-bg)",
+            borderBottom: "1px solid var(--color-header-border)",
+          }}
+        >
+          {/* Row 1 — app switcher + search + store + utilities */}
+          <div
+            className="flex items-center justify-between gap-3 px-4 py-2"
+            style={{ borderBottom: "1px solid var(--color-header-border)" }}
+          >
+            {/* Left: app switcher */}
+            <div className="flex items-center gap-1 overflow-x-auto" aria-label="Application areas">
               {APP_SWITCHER.map((app) => {
                 const selected = app.activeKeys.includes(active);
                 return (
@@ -170,67 +181,81 @@ export function EnterpriseShell({
                     href={app.href}
                     aria-current={selected ? "page" : undefined}
                     className={clsx(
-                      "whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
+                      "whitespace-nowrap rounded px-3 py-1.5 text-[13px] font-medium transition-colors",
                       selected
-                        ? "bg-slate-950 text-white"
-                        : "text-slate-500 hover:bg-slate-100 hover:text-slate-950"
+                        ? "text-white"
+                        : "text-[rgba(0,0,0,0.65)] hover:bg-black/5 hover:text-[rgba(0,0,0,0.88)]"
                     )}
+                    style={selected ? { backgroundColor: "var(--color-primary)" } : undefined}
                   >
                     {app.label}
                   </Link>
                 );
               })}
             </div>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-5">
-            <div className="flex min-w-0 items-center gap-3">
-              <div
-                aria-hidden="true"
-                className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-950 text-sm font-bold text-white md:hidden"
-              >
-                F
-              </div>
-              <div className="min-w-0">
-                <span className="block truncate text-base font-semibold text-slate-950 sm:text-lg">
-                  {title}
-                </span>
-                <span className="block truncate text-xs font-medium text-slate-500">
-                  {subtitle}
-                </span>
-                <nav className="mt-1 hidden text-[11px] font-medium text-slate-400 sm:block" aria-label="Breadcrumb">
-                  Finder / {activeLabel(active)} / {title}
-                </nav>
-              </div>
-            </div>
 
-            <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-              {/* ⌘K search trigger */}
-              <button
-                type="button"
-                onClick={() => setPaletteOpen(true)}
-                className="hidden min-h-[40px] items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 transition-colors hover:border-slate-300 hover:bg-white sm:flex"
-                aria-label="Open search (⌘K)"
-              >
-                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-                <span className="text-slate-400">Search</span>
-                <kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] text-slate-400">⌘K</kbd>
-              </button>
+            {/* Center: search bar */}
+            <button
+              type="button"
+              onClick={() => setPaletteOpen(true)}
+              className="hidden flex-1 max-w-sm items-center gap-2 rounded border border-[#D9D9D9] bg-white px-3 h-8 text-[13px] text-[rgba(0,0,0,0.45)] transition-colors hover:border-brand-600 sm:flex"
+              aria-label="Open search (⌘K)"
+            >
+              <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <span className="flex-1 text-left">Search in All</span>
+              <kbd className="rounded border border-[#D9D9D9] bg-[#F7F7F7] px-1.5 py-0.5 text-[11px] text-[rgba(0,0,0,0.45)]">⌘K</kbd>
+            </button>
+
+            {/* Right: store + notifications + user */}
+            <div className="flex items-center gap-2">
               <StoreSwitcher />
               <NotificationBell />
               <DeviceStatus isOffline={isOffline} />
-              {user && <UserContext name={user.name} role={user.role} />}
-              <Button variant="ghost" size="sm" onClick={() => void logout()}>
-                Sign out
-              </Button>
+              {user && <UserContext name={user.name} role={user.role} onLogout={() => void logout()} />}
             </div>
+          </div>
+
+          {/* Row 2 — breadcrumb + page title */}
+          <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+            <div className="flex min-w-0 items-center gap-2">
+              {/* Mobile logo */}
+              <div
+                aria-hidden="true"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-xs font-bold text-white md:hidden"
+                style={{ backgroundColor: "var(--color-primary)" }}
+              >
+                F
+              </div>
+              {/* Breadcrumb: 🏠 > Parent > Current */}
+              <nav className="flex items-center gap-1 text-[13px]" aria-label="Breadcrumb">
+                <Link href="/dashboard" className="text-[rgba(0,0,0,0.45)] hover:text-brand-600 transition-colors" aria-label="Home">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                  </svg>
+                </Link>
+                <ChevronRight />
+                <Link
+                  href={NAV_ITEMS.find((i) => i.key === active)?.href ?? "/"}
+                  className="transition-colors hover:text-brand-600"
+                  style={{ color: "var(--color-link)" }}
+                >
+                  {activeLabel(active)}
+                </Link>
+                <ChevronRight />
+                <span className="font-medium text-[rgba(0,0,0,0.88)] truncate max-w-[200px]">{title}</span>
+              </nav>
+            </div>
+            <span className="hidden text-[12px] text-[rgba(0,0,0,0.45)] sm:block">{subtitle}</span>
           </div>
         </header>
 
         <main
           id="terminal-content"
-          className={clsx("flex-1 overflow-hidden bg-slate-100", contentClassName)}
+          className={clsx("flex-1 overflow-hidden", contentClassName)}
+          style={{ backgroundColor: "var(--color-page-bg)" }}
           aria-label={title}
         >
           {children}
@@ -258,24 +283,32 @@ function EnterpriseRail({
   );
 
   return (
-    <aside className="hidden w-20 shrink-0 flex-col border-r border-slate-200 bg-white text-slate-900 md:flex xl:w-64">
-      <div className="flex h-[65px] items-center gap-3 border-b border-slate-200 px-4">
+    <aside
+      className="hidden w-20 shrink-0 flex-col md:flex xl:w-64"
+      style={{ backgroundColor: "var(--color-sidebar-bg)", borderRight: "1px solid rgba(255,255,255,0.08)" }}
+    >
+      {/* Logo area */}
+      <div
+        className="flex h-[65px] items-center gap-3 px-4"
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+      >
         <div
           aria-hidden="true"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-slate-950 text-base font-bold text-white"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-base font-bold text-white"
+          style={{ backgroundColor: "var(--color-sidebar-active)" }}
         >
           F
         </div>
         <div className="hidden min-w-0 xl:block">
-          <p className="truncate text-sm font-semibold text-slate-950">Finder POS</p>
-          <p className="truncate text-xs text-slate-500">Enterprise retail suite</p>
+          <p className="truncate text-sm font-semibold text-white">Finder POS</p>
+          <p className="truncate text-xs text-white/50">Enterprise retail suite</p>
         </div>
       </div>
 
       <nav aria-label="Primary" className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 py-4">
         {(["Operate", "Manage", "Analyze", "Platform"] as const).map((group) => (
-          <div key={group} className="space-y-1">
-            <p className="hidden px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 xl:block">
+          <div key={group} className="space-y-0.5">
+            <p className="hidden px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/30 xl:block">
               {group}
             </p>
             {visibleItems.filter((item) => item.group === group).map((item) => {
@@ -286,11 +319,12 @@ function EnterpriseRail({
                   href={item.href}
                   aria-current={selected ? "page" : undefined}
                   className={clsx(
-                    "flex min-h-[42px] items-center justify-center gap-3 rounded-md border px-3 text-sm font-medium transition-colors xl:justify-start",
+                    "flex min-h-[40px] items-center justify-center gap-3 rounded-md px-3 text-[13px] font-medium transition-colors xl:justify-start",
                     selected
-                      ? "border-slate-300 bg-slate-950 text-white shadow-sm"
-                      : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-950"
+                      ? "text-white"
+                      : "text-white/60 hover:bg-white/10 hover:text-white"
                   )}
+                  style={selected ? { backgroundColor: "var(--color-sidebar-active)" } : undefined}
                 >
                   <NavIcon name={item.icon} />
                   <span className="hidden xl:inline">{item.label}</span>
@@ -301,11 +335,12 @@ function EnterpriseRail({
         ))}
       </nav>
 
-      <div className="border-t border-slate-200 p-3">
-        <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-          <p className="text-xs font-semibold text-slate-600 xl:block">Register health</p>
-          <div className="mt-2 flex items-center gap-2 text-xs text-success-700">
-            <span className="h-2 w-2 rounded-full bg-success-500" aria-hidden="true" />
+      {/* Footer — register health indicator */}
+      <div className="p-3" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+        <div className="rounded-md p-3" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>
+          <p className="hidden text-[11px] font-semibold text-white/50 xl:block">Register health</p>
+          <div className="mt-1 flex items-center gap-2 text-[11px] text-emerald-400">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
             <span className="hidden xl:inline">Ready for sales</span>
           </div>
         </div>
@@ -321,16 +356,17 @@ function MobileNav({ active, flags }: { active: NavKey; flags: Record<string, bo
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-40 flex overflow-x-auto border-t border-slate-200 bg-white shadow-[0_-8px_24px_rgba(15,23,42,0.08)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 flex overflow-x-auto border-t border-white/10 md:hidden"
+      style={{ backgroundColor: "var(--color-sidebar-bg)", boxShadow: "0 -4px 16px rgba(0,0,0,0.3)" }}
     >
-      {visibleItems.map((item) => (
+      {visibleItems.slice(0, 6).map((item) => (
         <Link
           key={item.key}
           href={item.href}
           aria-current={active === item.key ? "page" : undefined}
           className={clsx(
-            "flex min-h-[56px] min-w-[72px] flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium",
-            active === item.key ? "text-slate-950" : "text-slate-500"
+            "flex min-h-[56px] min-w-[72px] flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors",
+            active === item.key ? "text-white" : "text-white/50 hover:text-white"
           )}
         >
           <NavIcon name={item.icon} />
@@ -383,13 +419,13 @@ function StoreSwitcher() {
 
   return (
     <label
-      className="hidden items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm md:flex"
+      className="hidden items-center gap-2 rounded border border-[#D9D9D9] bg-white px-3 h-8 text-[13px] md:flex"
       aria-busy={loading}
     >
       <StoreIcon />
       <span className="sr-only">Current store</span>
       <select
-        className="bg-transparent text-sm font-medium text-slate-800 outline-none"
+        className="bg-transparent text-[13px] font-medium text-[rgba(0,0,0,0.88)] outline-none"
         value={selected}
         onChange={(event) => setSelected(event.target.value)}
         aria-label="Current store and register"
@@ -410,31 +446,40 @@ function DeviceStatus({ isOffline }: { isOffline: boolean }) {
       role="status"
       aria-live="polite"
       className={clsx(
-        "inline-flex min-h-[40px] items-center gap-2 rounded-md border px-3 text-sm font-medium",
+        "inline-flex h-8 items-center gap-2 rounded border px-3 text-[13px] font-medium",
         isOffline
-          ? "border-warning-200 bg-warning-50 text-warning-700"
-          : "border-success-200 bg-success-50 text-success-700"
+          ? "border-orange-200 bg-orange-50 text-orange-700"
+          : "border-emerald-200 bg-emerald-50 text-emerald-700"
       )}
     >
       {isOffline ? <OfflineIcon /> : <OnlineIcon />}
-      <span>{isOffline ? "Offline queue" : "Online"}</span>
+      <span className="hidden sm:inline">{isOffline ? "Offline" : "Online"}</span>
     </div>
   );
 }
 
-function UserContext({ name, role }: { name: string; role: string }) {
+function UserContext({
+  name,
+  role,
+  onLogout,
+}: {
+  name: string;
+  role: string;
+  onLogout?: () => void;
+}) {
   return (
     <button
       type="button"
-      title="User switching coming soon"
-      className="hidden min-h-[40px] items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-left transition-colors hover:bg-slate-50 sm:flex"
+      onClick={onLogout}
+      title={onLogout ? "Sign out" : "User switching coming soon"}
+      className="hidden h-8 items-center gap-2 rounded border border-[#D9D9D9] bg-white px-3 text-left transition-colors hover:border-brand-600 hover:bg-gray-50 sm:flex"
     >
       <UserIcon />
       <span className="min-w-0">
-        <span className="block max-w-[9rem] truncate text-sm font-medium text-slate-900">
+        <span className="block max-w-[9rem] truncate text-[13px] font-medium text-[rgba(0,0,0,0.88)]">
           {name}
         </span>
-        <span className="block text-xs capitalize text-slate-500">{role}</span>
+        <span className="block text-[11px] capitalize text-[rgba(0,0,0,0.45)]">{role}</span>
       </span>
     </button>
   );
@@ -523,6 +568,14 @@ function NavIcon({ name }: { name: NavKey }) {
 
 function activeLabel(active: NavKey) {
   return NAV_ITEMS.find((item) => item.key === active)?.label ?? "Workspace";
+}
+
+function ChevronRight() {
+  return (
+    <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[rgba(0,0,0,0.25)]">
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
 }
 
 function GiftCardIcon() {
