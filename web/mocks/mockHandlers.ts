@@ -2708,5 +2708,128 @@ mockHandlers.push(
       }),
     ];
   })(),
+
+  // ── Cycle Count Sessions (BE-10 / FE-26) ─────────────────────────────────
+  ...(() => {
+    interface CCLine {
+      id: string; session_id: string; product_id: string;
+      product_name: string; sku: string | null;
+      expected_qty: number; counted_qty: number | null;
+      variance: number | null; recorded_at: number | null;
+    }
+    interface CCSession {
+      id: string; status: "open" | "closed"; opened_by: string;
+      opened_at: number; closed_at: number | null; note: string | null;
+    }
+    const BASE_TS = Date.now();
+    let ccSeq = 0;
+    let clSeq = 0;
+
+    const SEED_PRODUCTS = [
+      { id: "prod_001", name: "Marlboro Red King",      sku: "MRL-RED-K", qty: 3  },
+      { id: "prod_002", name: "Newport Menthol 100s",   sku: "NWP-M100",  qty: 1  },
+      { id: "prod_003", name: "Camel Blue Box",         sku: "CAM-BLU",   qty: 0  },
+      { id: "prod_004", name: "Swisher Sweets Original",sku: "SWI-OG",    qty: 4  },
+      { id: "prod_005", name: "White Owl Cigarillos",   sku: "WOW-CIG",   qty: 2  },
+      { id: "prod_006", name: "Backwoods Honey Berry",  sku: "BKW-HB",    qty: 0  },
+      { id: "prod_007", name: "5-Hour Energy Berry",    sku: "5HR-BRY",   qty: 5  },
+      { id: "prod_008", name: "Monster Energy Original",sku: "MON-OG",    qty: 3  },
+    ];
+
+    const closedLines: CCLine[] = SEED_PRODUCTS.map((p, i) => ({
+      id: `ccl_demo_${i}`,
+      session_id: "cc_demo_closed",
+      product_id: p.id,
+      product_name: p.name,
+      sku: p.sku,
+      expected_qty: p.qty,
+      counted_qty: p.qty + (i % 3 === 0 ? -1 : i % 3 === 1 ? 0 : 1),
+      variance: i % 3 === 0 ? -1 : i % 3 === 1 ? 0 : 1,
+      recorded_at: BASE_TS - 7 * 86400_000 + 1800_000,
+    }));
+
+    const sessions: CCSession[] = [
+      {
+        id: "cc_demo_closed",
+        status: "closed",
+        opened_by: "admin@example.com",
+        opened_at: BASE_TS - 7 * 86400_000,
+        closed_at: BASE_TS - 7 * 86400_000 + 3600_000,
+        note: "Weekly count — main stockroom",
+      },
+    ];
+    const linesMap = new Map<string, CCLine[]>([["cc_demo_closed", closedLines]]);
+
+    return [
+      http.get(`${V1}/inventory/counts`, async () => {
+        await lat();
+        return HttpResponse.json({ items: [...sessions].reverse() });
+      }),
+
+      // sub-path BEFORE /:id
+      http.post(`${V1}/inventory/counts`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as { note?: string };
+        const id = `cc_${++ccSeq}_${Date.now()}`;
+        const session: CCSession = {
+          id, status: "open", opened_by: "admin@example.com",
+          opened_at: Date.now(), closed_at: null, note: body.note ?? null,
+        };
+        const newLines: CCLine[] = SEED_PRODUCTS.map(p => ({
+          id: `ccl_${++clSeq}`,
+          session_id: id,
+          product_id: p.id,
+          product_name: p.name,
+          sku: p.sku,
+          expected_qty: p.qty,
+          counted_qty: null,
+          variance: null,
+          recorded_at: null,
+        }));
+        sessions.push(session);
+        linesMap.set(id, newLines);
+        return HttpResponse.json(session, { status: 201 });
+      }),
+
+      http.get(`${V1}/inventory/counts/:id/lines`, async ({ params }) => {
+        await lat();
+        const id = String(params["id"]);
+        return HttpResponse.json({ items: linesMap.get(id) ?? [] });
+      }),
+
+      http.post(`${V1}/inventory/counts/:id/lines`, async ({ params, request }) => {
+        await lat();
+        const id = String(params["id"]);
+        const body = (await request.json()) as { productId: string; countedQty: number };
+        const sessionLines = linesMap.get(id);
+        if (!sessionLines) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const idx = sessionLines.findIndex(l => l.product_id === body.productId);
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const line = sessionLines[idx]!;
+        sessionLines[idx] = {
+          ...line,
+          counted_qty: body.countedQty,
+          variance: body.countedQty - line.expected_qty,
+          recorded_at: Date.now(),
+        };
+        return HttpResponse.json(sessionLines[idx], { status: 201 });
+      }),
+
+      http.post(`${V1}/inventory/counts/:id/close`, async ({ params }) => {
+        await lat();
+        const id = String(params["id"]);
+        const idx = sessions.findIndex(s => s.id === id);
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const s = sessions[idx]!;
+        if (s.status === "closed") {
+          return HttpResponse.json({ error: { code: "already_closed" } }, { status: 409 });
+        }
+        const sessionLines = linesMap.get(id) ?? [];
+        const adjustments = sessionLines.filter(l => l.variance !== null && l.variance !== 0).length;
+        sessions[idx] = { ...s, status: "closed", closed_at: Date.now() };
+        return HttpResponse.json({ session: sessions[idx], adjustments });
+      }),
+    ];
+  })(),
 );
 

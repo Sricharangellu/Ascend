@@ -1384,3 +1384,35 @@ export interface ReorderSuggestionsResponse {
   items: ReorderSuggestion[];
 }
 
+// ── Cycle Count Sessions (BE-10 / FE-26) ─────────────────────────────────────
+export type CycleCountStatus = "open" | "closed";
+
+export interface CycleCountSession {
+  id: string;
+  status: CycleCountStatus;
+  opened_by: string;
+  opened_at: number;
+  closed_at: number | null;
+  note: string | null;
+}
+
+export interface CycleCountSessionsResponse {
+  items: CycleCountSession[];
+}
+
+export interface CycleCountLine {
+  id: string;
+  session_id: string;
+  product_id: string;
+  product_name?: string;
+  sku?: string | null;
+  expected_qty: number;
+  counted_qty: number | null;
+  variance: number | null;
+  recorded_at: number | null;
+}
+
+export interface CycleCountLinesResponse {
+  items: CycleCountLine[];
+}
+
