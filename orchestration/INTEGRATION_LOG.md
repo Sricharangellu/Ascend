@@ -250,6 +250,19 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Bug fix**: `TableSkeleton` import missing in loyalty/page.tsx — added import.
 - **Verified:** npm run typecheck — 0 errors.
 
+---
+
+## Phase 4 — BE-29 (2026-06-21)
+
+### BE-29: Sales rep management (5e4e09f)
+- **Migration**: `sales_reps (id, tenant_id, name, email, commission_pct NUMERIC(5,2), active INTEGER 0/1, created_at)` + index on `(tenant_id, active)`. Added to `salesModule.migrations[]`.
+- **Service** (`SalesService`): `SalesRepRow` raw DB type (active as integer) + `rowToRep()` coercer; methods: `listReps(tenantId, activeOnly?)`, `createRep(input, tenantId)`, `updateRep(id, input, tenantId)`, `getRepPerformance(id, tenantId, from, to)`.
+- **Performance query**: SUM(total_cents)/COUNT(*) from `sales_orders WHERE sales_rep_id = @id AND status != 'cancelled' AND created_at BETWEEN @from AND @to`.
+- **Routes** (added to sales router): `GET /reps`, `POST /reps` (manager), `GET /reps/:id/performance` (sub-path before `/:id`), `PATCH /reps/:id` (manager).
+- **Types**: `SalesRep`, `SalesRepsResponse`, `SalesRepPerformance` added to `web/api-client/types.ts`.
+- **Mock handlers (IIFE)**: 4 seed reps (Jordan Walsh 5%, Maya Patel 6.5%, Chris Nguyen 4.5% inactive, Dana Okonkwo 5%); GET list (filter ?active=true), POST create, GET :id/performance (seeded revenue/order counts), PATCH update.
+- **Verified:** npm run typecheck — 0 errors (both backend + frontend).
+
 ### FE-26: Cycle Count UI (84df7e8)
 - **Roadmap**: Phase 4 section added covering FE-26/27/28 + BE-29/30 derived from all gaps/*.md files.
 - **Page**: `web/app/(protected)/inventory/counts/page.tsx` — sessions list (stat cards, click-to-expand) + session detail panel.
