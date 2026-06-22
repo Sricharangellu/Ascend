@@ -98,16 +98,18 @@ records, only triaged into "build now" vs. "documented for later."
       so the raw buffer is available; verify using
       `stripe.webhooks.constructEvent()` + `STRIPE_WEBHOOK_SECRET` env var;
       publish verified events to the internal EventBus. (done in this commit)
-- [ ] INF-5: Durable EventBus — replace in-process `EventBus` with a
-      Postgres-backed LISTEN/NOTIFY or Redis-Streams broker so events survive
-      across multiple instances. All existing `.on()` / `.publish()` call sites
-      must remain compatible. See `orchestration/SYSTEM_DESIGN.md` §6.
-      Estimated effort: 2–3 days.
-- [ ] INF-6: Background job queue (BullMQ) — add `bullmq` + Redis; move the
-      AR dunning sweep, webhook delivery retries, and report pre-computation
-      out of synchronous request handlers into durable workers. Depends on
-      INF-5 (shared Redis) but can start in parallel. See SYSTEM_DESIGN.md §9.
-      Estimated effort: 1–2 days.
+- [x] INF-5: Durable EventBus — EventBus gained a Redis Pub/Sub bridge via
+      `useRedis(redis)`. `publish()` dispatches locally then broadcasts to
+      `"finder:events"` channel; all other instances receive and re-dispatch.
+      Self-messages suppressed by instance ID. Falls back to local-only when
+      REDIS_URL is unset. buildApp() wires the bridge and returns cleanup().
+      openRedis() now returns `Redis | null` (full ioredis type). (done in a957060)
+- [x] INF-6: Background job queue — Postgres-backed QueueConsumer/Producer was
+      already in place with FOR UPDATE SKIP LOCKED. Added: `AR_DUNNING` queue
+      name + arDunningJob handler (runs BillingService.runDunning per tenant,
+      re-enqueues itself 24 h later). Bootstrap seeds one job per tenant on
+      startup via enqueueOnce (idempotent). BullMQ deferred — Postgres queue
+      is sufficient for current scale. (done in a957060)
 - [ ] INF-7: Connection pool sizing — add `PG_POOL_MAX` env var guidance to
       `.env.example`; document that Neon / Railway users should point
       `DATABASE_URL` at the pool proxy endpoint (not the direct DB). Add a
@@ -122,11 +124,12 @@ records, only triaged into "build now" vs. "documented for later."
       checkout, inventory receive, invoice pay. Run in CI against a real
       backend + Postgres (reuse the CI job's postgres service container).
       Estimated effort: 2–3 days.
-- [ ] INF-10: API key scope enforcement — add a `requireScope(scope)` Express
-      middleware that reads parsed API-key scopes from `res.locals.auth.scopes`
-      and rejects 403 when the scope is absent. Apply `requireScope("write")`
-      on all mutation routes and `requireScope("admin")` on management routes.
-      Estimated effort: 0.5 day.
+- [x] INF-10: API key scope enforcement — `makeAuthMiddleware(db)` factory
+      handles both JWT sessions (scopes:[]=unrestricted) and API key tokens
+      (fpk_ prefix: DB lookup, SHA-256 verify, scope population). Added
+      `requireScope(scope)` middleware factory. app.ts now uses
+      makeAuthMiddleware(db) on /api/v1/*. Plain authMiddleware() kept for
+      test compatibility. Exported from gateway/index.ts. (done in d74a87f)
 - [ ] INF-11: Replace remaining `console.*` — audit all `src/modules/**` for
       `console.log`/`console.error`; replace with `moduleLogger(name)` child
       loggers. Estimated effort: 1 day.
