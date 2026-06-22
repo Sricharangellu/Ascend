@@ -3,7 +3,7 @@ import { logger } from "./shared/logger.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
-const { express: app, db } = await buildApp({ connectionString: process.env.DATABASE_URL });
+const { express: app, db, cleanup } = await buildApp({ connectionString: process.env.DATABASE_URL });
 
 const server = app.listen(PORT, () => {
   logger.info({ port: PORT }, "Finder POS started");
@@ -15,9 +15,10 @@ function shutdown(signal: string): void {
   logger.info({ signal }, "shutdown signal received — draining");
   server.close(async () => {
     try {
-      await db.close();
+      await cleanup();   // disconnect Redis event-bus subscriber
+      await db.close();  // release Postgres pool
     } catch {
-      // pool already closed — ignore
+      // ignore cleanup errors — we're exiting anyway
     }
     logger.info("graceful shutdown complete");
     process.exit(0);

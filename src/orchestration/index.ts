@@ -117,11 +117,13 @@ import { registerPurchasingSaga } from "./sagas/purchasing.saga.js";
 import { registerRefundSaga } from "./sagas/refund.saga.js";
 import { registerEcommerceSyncSaga } from "./sagas/ecommerce-sync.saga.js";
 import { QueueConsumer } from "./queues/queue-consumer.js";
+import { QueueProducer } from "./queues/queue-producer.js";
 import { QueueNames } from "./queues/queue-names.js";
 import { expireReservationsJob } from "./jobs/expire-reservations.job.js";
 import { reconcilePaymentsJob } from "./jobs/reconcile-payments.job.js";
 import { closeRegisterJob } from "./jobs/close-register.job.js";
 import { syncEcommerceJob } from "./jobs/sync-ecommerce.job.js";
+import { arDunningJob } from "./jobs/ar-dunning.job.js";
 
 export interface OrchestrationBootstrap {
   runner: WorkflowRunner;
@@ -177,6 +179,8 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
 
   // ── 6. Job Consumer ────────────────────────────────────────────────────────
   const jobConsumer = new QueueConsumer(db);
+  const jobProducer = new QueueProducer(db);
+  const DAY_MS = 24 * 60 * 60 * 1000;
 
   jobConsumer.register(QueueNames.EXPIRE_RESERVATIONS, async (job) => {
     await expireReservationsJob(job, db, events);
@@ -190,6 +194,41 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
   jobConsumer.register(QueueNames.ECOMMERCE_SYNC, async (job) => {
     await syncEcommerceJob(job, db, events);
   });
+
+  // INF-6: AR dunning — runs once per tenant per day. The handler re-enqueues
+  // itself 24 h in the future so the sweep perpetuates without a cron daemon.
+  jobConsumer.register(QueueNames.AR_DUNNING, async (job) => {
+    const payload = JSON.parse(job.payload) as { tenantId?: string };
+    const tenantId = payload.tenantId ?? job.tenant_id;
+    await arDunningJob(job, db, events);
+    // Re-schedule for tomorrow — idempotent (skips if one is already pending).
+    await jobProducer.enqueueOnce({
+      type: QueueNames.AR_DUNNING,
+      tenantId,
+      payload: { tenantId },
+      runAt: Date.now() + DAY_MS,
+      maxAttempts: 3,
+    });
+  });
+
+  // Seed dunning jobs for every active tenant on startup (once per tenant;
+  // enqueueOnce is a no-op if a pending job already exists).
+  void (async () => {
+    try {
+      const tenants = await db.query<{ id: string }>("SELECT id FROM tenants");
+      for (const t of tenants) {
+        await jobProducer.enqueueOnce({
+          type: QueueNames.AR_DUNNING,
+          tenantId: t.id,
+          payload: { tenantId: t.id },
+          runAt: Date.now(), // run immediately on first boot
+          maxAttempts: 3,
+        });
+      }
+    } catch {
+      // Non-fatal — dunning jobs will be seeded on next startup or manual trigger.
+    }
+  })();
 
   // Start polling background jobs.
   jobConsumer.start(10_000); // poll every 10 seconds

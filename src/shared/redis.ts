@@ -1,5 +1,7 @@
 import { Redis } from "ioredis";
 
+export type { Redis };
+
 /**
  * Minimal interface that our rate-limit store needs from a Redis client.
  * Keeps the gateway layer decoupled from the full ioredis API.
@@ -13,8 +15,11 @@ export interface RedisClient {
  * Open a Redis connection from REDIS_URL (or the supplied url).
  * Returns null when no URL is configured so callers can fall back to
  * in-memory implementations — keeps dev/test zero-config.
+ *
+ * Returns the full ioredis Redis type (superset of RedisClient) so callers
+ * that need Pub/Sub (EventBus bridge) can use publish() and duplicate().
  */
-export function openRedis(url?: string): RedisClient | null {
+export function openRedis(url?: string): Redis | null {
   const redisUrl = url ?? process.env.REDIS_URL;
   if (!redisUrl) return null;
 
@@ -26,7 +31,7 @@ export function openRedis(url?: string): RedisClient | null {
   });
 
   client.on("error", (err) => {
-    // Log but don't crash — rate limiting degrades gracefully.
+    // Non-fatal — rate limiting and event fan-out degrade gracefully without Redis.
     console.error("[redis] connection error:", (err as Error).message);
   });
 

@@ -27,6 +27,8 @@ export interface App {
   express: Express;
   db: DB;
   events: EventBus;
+  /** Call on graceful shutdown to disconnect the Redis event-bus subscriber. */
+  cleanup: () => Promise<void>;
 }
 
 export interface BuildAppOptions {
@@ -71,6 +73,16 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   const events = new EventBus();
   const redis = openRedis();
   const app = express();
+
+  // Wire Redis Pub/Sub fan-out so events cross instance boundaries.
+  // When REDIS_URL is set, every publish() also broadcasts to "finder:events"
+  // channel; other instances receive and re-dispatch to their local subscribers.
+  // Without Redis (dev/test), the bus stays in-process — no config needed.
+  let cleanupEventBridge: () => Promise<void> = async () => {};
+  if (redis) {
+    cleanupEventBridge = await events.useRedis(redis);
+    logger.info("event bus Redis fan-out enabled");
+  }
 
   // ── Stripe webhook — must be registered with raw body parser BEFORE express.json()
   // so we can verify the Stripe-Signature header against the raw payload bytes.
@@ -333,5 +345,5 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   app.use(errorMiddleware);
   app.use(errorEnvelopeMiddleware);
 
-  return { express: app, db, events };
+  return { express: app, db, events, cleanup: cleanupEventBridge };
 }

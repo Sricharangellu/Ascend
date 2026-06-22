@@ -12,6 +12,10 @@ export const QueueNames = {
   INVENTORY_TRANSFER: "inventory_transfer",
   STOCK_ADJUSTMENT: "stock_adjustment",
   RETURNS_PROCESSING: "returns_processing",
+  /** INF-6: AR dunning sweep — runs per-tenant on a 24 h schedule. */
+  AR_DUNNING: "ar_dunning",
+  /** INF-6: Durable webhook delivery retry — survives process restart. */
+  WEBHOOK_DELIVERY: "webhook_delivery",
 } as const;
 
 export type QueueName = typeof QueueNames[keyof typeof QueueNames];
