@@ -232,3 +232,18 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **New mock handlers**: `GET /reports/sales-by-product` (20 items with realistic c-store product mix), `GET /reports/margin-by-category` (6 categories).
 - **Types added**: `SalesByProductItem`, `SalesByProductResponse`, `MarginByCategoryItem`, `MarginByCategoryResponse`.
 - **Verified:** npm run typecheck — 0 errors.
+
+---
+
+## Phase 4 kickoff — 2026-06-21 (FE-26)
+
+### FE-26: Cycle Count UI (84df7e8)
+- **Roadmap**: Phase 4 section added covering FE-26/27/28 + BE-29/30 derived from all gaps/*.md files.
+- **Page**: `web/app/(protected)/inventory/counts/page.tsx` — sessions list (stat cards, click-to-expand) + session detail panel.
+- **Sessions list**: three stat cards (open/closed/total), table of sessions ordered newest-first. "New Session" modal with optional note field.
+- **Session detail**: breadcrumb back-nav, four stat cards (total/counted/remaining/variances), count line table with inline qty inputs (blur/Enter to save, disabled while saving). Closed sessions render read-only.
+- **Close Session**: modal shows uncounted-SKU warning and adjustment count preview before posting `POST /counts/:id/close` (manager-gated).
+- **Mock handlers (IIFE)**: GET/POST `/inventory/counts`, GET/POST `/inventory/counts/:id/lines`, POST `/inventory/counts/:id/close`. Sub-paths registered before `/:id`. Seeded with one closed demo session (8 lines, realistic variance pattern).
+- **Types added**: `CycleCountStatus`, `CycleCountSession`, `CycleCountSessionsResponse`, `CycleCountLine`, `CycleCountLinesResponse`.
+- **Nav**: `"inventory-counts"` key added to NavKey union + NAV_ITEMS (group: Manage) + `CycleCountIcon` (clipboard-check SVG).
+- **Verified:** npm run typecheck — 0 errors.
