@@ -8,14 +8,14 @@ import { HttpError } from "../../shared/http.js";
 
 const captureSchema = z.object({
   orderId: z.string().min(1),
-  method: z.enum(["cash", "card", "split"]),
+  method: z.enum(["cash", "card", "split", "store_credit"]),
   cashCents: z.number().int().nonnegative().optional(),
   cardCents: z.number().int().nonnegative().optional(),
   tenderedCents: z.number().int().nonnegative().optional(),
   idempotencyKey: z.string().min(1).optional(),
-  // Required for card/split when Stripe is configured; the intent was already
-  // processed by the Terminal reader and just needs to be recorded.
   stripePaymentIntentId: z.string().min(1).optional(),
+  // Required for store_credit payments.
+  customerId: z.string().min(1).optional(),
 });
 
 function tenantId(res: Response): string {

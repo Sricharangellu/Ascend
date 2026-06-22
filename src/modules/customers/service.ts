@@ -899,4 +899,65 @@ export class CustomersService {
       { tenantId, customerId },
     );
   }
+
+  // ── Store Credit ───────────────────────────────────────────────────────────
+
+  /** Return the current store credit balance for a customer. */
+  async getStoreCredit(customerId: string, tenantId: string): Promise<{ balanceCents: number }> {
+    const row = await this.db.one<{ store_credit_cents: number }>(
+      "SELECT store_credit_cents FROM customers WHERE id = @id AND tenant_id = @t",
+      { id: customerId, t: tenantId },
+    );
+    if (!row) throw new HttpError(404, "not_found", `customer '${customerId}' not found`);
+    return { balanceCents: Number(row.store_credit_cents) };
+  }
+
+  /**
+   * Apply a signed delta to a customer's store credit balance.
+   * Positive delta = add credit (manager-gated at the route level).
+   * Negative delta = deduct (checkout path).
+   * Enforces balance ≥ 0 (rule #10 from Implementation Prompt).
+   */
+  async adjustStoreCredit(
+    customerId: string,
+    deltaCents: number,
+    reason: string,
+    tenantId: string,
+  ): Promise<{ balanceCents: number }> {
+    if (!Number.isInteger(deltaCents) || deltaCents === 0) {
+      throw new HttpError(400, "bad_request", "deltaCents must be a non-zero integer");
+    }
+
+    return this.db.withTenant(tenantId).tx(async (tdb) => {
+      const row = await tdb.one<{ store_credit_cents: number }>(
+        "SELECT store_credit_cents FROM customers WHERE id = @id AND tenant_id = @t FOR UPDATE",
+        { id: customerId, t: tenantId },
+      );
+      if (!row) throw new HttpError(404, "not_found", `customer '${customerId}' not found`);
+
+      const current = Number(row.store_credit_cents);
+      const next = current + deltaCents;
+
+      if (next < 0) {
+        throw new HttpError(
+          400,
+          "insufficient_store_credit",
+          `Store credit balance ${current} is less than the requested deduction of ${Math.abs(deltaCents)}.`,
+        );
+      }
+
+      await tdb.query(
+        "UPDATE customers SET store_credit_cents = @next WHERE id = @id AND tenant_id = @t",
+        { next, id: customerId, t: tenantId },
+      );
+
+      void this.events.publish(
+        deltaCents > 0 ? "store_credit.added" : "store_credit.debited",
+        { customerId, tenantId, deltaCents, balanceCents: next, reason },
+        customerId,
+      );
+
+      return { balanceCents: next };
+    });
+  }
 }

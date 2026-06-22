@@ -20,6 +20,7 @@ const METHOD_BADGE: Record<PaymentMethod, "green" | "blue" | "purple"> = {
   cash: "green",
   card: "blue",
   split: "purple",
+  store_credit: "green",
 };
 
 const STATUS_BADGE: Record<string, "green" | "red" | "gray"> = {

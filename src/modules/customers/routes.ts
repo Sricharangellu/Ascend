@@ -268,4 +268,35 @@ export function registerRoutes(router: Router, service: CustomersService): void 
     const auth = res.locals["auth"] as { userId?: string } | undefined;
     res.status(201).json(await service.addNote(String(req.params.id), tenantId(res), body.note, body.noteType, auth?.userId ?? null));
   }));
+
+  // ── Store Credit ────────────────────────────────────────────────────────────
+  const storeCreditSchema = z.object({
+    deltaCents: z.number().int().refine((n) => n !== 0, "deltaCents must be non-zero"),
+    reason: z.string().min(1).max(200),
+  });
+
+  // GET  /:id/store-credit — current balance (any authenticated user)
+  router.get("/:id/store-credit", handler(async (req, res) => {
+    res.json(await service.getStoreCredit(String(req.params.id), tenantId(res)));
+  }));
+
+  // POST /:id/store-credit — apply a delta
+  //   positive delta (add credit) → manager only
+  //   negative delta (deduct at checkout) → cashier allowed
+  router.post("/:id/store-credit", handler(async (req, res) => {
+    const body = parseBody(storeCreditSchema, req.body);
+    const auth = res.locals["auth"] as AuthPayload;
+    // Adding credit requires manager or above; deducting is allowed for cashiers.
+    if (body.deltaCents > 0 && auth.role === "cashier") {
+      res.status(403).json({ error: { code: "forbidden", message: "Only managers can add store credit." } });
+      return;
+    }
+    const result = await service.adjustStoreCredit(
+      String(req.params.id),
+      body.deltaCents,
+      body.reason,
+      tenantId(res),
+    );
+    res.json(result);
+  }));
 }

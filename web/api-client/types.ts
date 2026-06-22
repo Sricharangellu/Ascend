@@ -155,7 +155,7 @@ export interface Order {
 }
 
 // ─── Payments (Wave 1, pre-typed for MSW mocks) ───────────────────────────────
-export type PaymentMethod = "cash" | "card" | "split";
+export type PaymentMethod = "cash" | "card" | "split" | "store_credit";
 export type PaymentStatus = "captured" | "declined";
 
 export interface Payment {
@@ -216,6 +216,17 @@ export interface CapturePaymentRequest {
    * from Stripe instead of simulating them.
    */
   stripePaymentIntentId?: string;
+  /** Required for store_credit payments — the customer whose balance is deducted. */
+  customerId?: string;
+}
+
+export interface StoreCreditBalance {
+  balanceCents: number;
+}
+
+export interface StoreCreditAdjustRequest {
+  deltaCents: number;
+  reason: string;
 }
 
 // ─── Stripe Terminal ──────────────────────────────────────────────────────────

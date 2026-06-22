@@ -9,8 +9,8 @@ import { moduleLogger } from "../../shared/logger.js";
 
 const log = moduleLogger("payments");
 
-export type PaymentMethod = "cash" | "card" | "split";
-export type PaymentStatus = "captured" | "declined";
+export type PaymentMethod = "cash" | "card" | "split" | "store_credit";
+export type PaymentStatus = "captured" | "declined" | "queued_offline";
 
 export interface PaymentRecord {
   id: string;
@@ -41,6 +41,8 @@ export interface CapturePaymentInput {
    * The backend retrieves this intent to get real last4 and authorization code.
    */
   stripePaymentIntentId?: string;
+  /** Required for store_credit payments — the customer whose balance to deduct. */
+  customerId?: string;
 }
 
 interface OrderRow {
@@ -232,6 +234,30 @@ export class PaymentsService {
           cardLast4 = cardResult.last4;
           authCode = cardResult.authCode;
         }
+        break;
+      }
+
+      case "store_credit": {
+        if (!input.customerId) throw badRequest("customerId is required for store_credit payments");
+        // Deduct atomically from the customer's balance; throws if insufficient.
+        const sc = await this.db.one<{ store_credit_cents: number }>(
+          "SELECT store_credit_cents FROM customers WHERE id = @id AND tenant_id = @t FOR UPDATE",
+          { id: input.customerId, t: tenantId },
+        );
+        if (!sc) throw notFound(`customer '${input.customerId}' not found`);
+        const balance = Number(sc.store_credit_cents);
+        if (balance < owed) {
+          throw new HttpError(
+            400,
+            "insufficient_store_credit",
+            `Store credit balance ${balance} is less than order total ${owed}.`,
+          );
+        }
+        await this.db.query(
+          "UPDATE customers SET store_credit_cents = store_credit_cents - @delta WHERE id = @id AND tenant_id = @t",
+          { delta: owed, id: input.customerId, t: tenantId },
+        );
+        cashCents = owed; // treat store credit as "cash" for accounting columns
         break;
       }
 
