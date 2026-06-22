@@ -1,6 +1,9 @@
 import type { EventBus } from "../../shared/events.js";
 import type { WorkflowRunner } from "../workflow-runner.js";
 import { EventTypes } from "../events/event-types.js";
+import { moduleLogger } from "../../shared/logger.js";
+
+const log = moduleLogger("checkout-saga");
 
 /**
  * Checkout Saga
@@ -46,7 +49,7 @@ export function registerCheckoutSaga(runner: WorkflowRunner, events: EventBus): 
 
     // Start a reversal pass if checkout had already posted accounting.
     await runner.start("checkout", { ...payload, orderId, _action: "compensate" }, tenantId).catch(
-      (err) => console.error(`[checkout-saga] void compensation failed: ${err instanceof Error ? err.message : err}`),
+      (err) => log.error({ err, orderId }, "void compensation failed"),
     );
   });
 }

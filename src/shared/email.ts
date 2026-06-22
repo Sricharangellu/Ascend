@@ -50,6 +50,7 @@ export async function sendEmail(msg: EmailMessage): Promise<SendResult> {
   }
 
   // Dev fallback: log and return preview
-  console.log(`[email] To: ${msg.to} | Subject: ${msg.subject}\n${msg.text}`);
+  const { moduleLogger } = await import("./logger.js");
+  moduleLogger("email").info({ to: msg.to, subject: msg.subject }, "email (dev preview — not sent)");
   return { sent: false, preview: msg.html };
 }

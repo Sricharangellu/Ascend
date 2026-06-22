@@ -3,6 +3,9 @@ import type { EventBus } from "../shared/events.js";
 import type { DomainEvent } from "../shared/types.js";
 import type { WorkflowDefinition, WorkflowContext } from "./types.js";
 import { WorkflowStateStore } from "./state/workflow-state.store.js";
+import { moduleLogger } from "../shared/logger.js";
+
+const log = moduleLogger("workflow-runner");
 import { CompensationRunner } from "./compensations/compensation-runner.js";
 import { OrchestrationLogger } from "./telemetry/orchestration-logger.js";
 import { EventTypes } from "./events/event-types.js";
@@ -39,7 +42,7 @@ export class WorkflowRunner {
     for (const trigger of def.triggers) {
       this.events.on(trigger, async (event: DomainEvent) => {
         await this.execute(def, event).catch((err) =>
-          console.error(`[workflow-runner] ${def.type} failed on ${trigger}:`, err instanceof Error ? err.message : err),
+          log.error({ err, workflow: def.type, trigger }, "workflow execution failed"),
         );
       });
     }

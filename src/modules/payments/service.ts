@@ -5,6 +5,9 @@ import type { EventBus } from "../../shared/events.js";
 import { Money, type Cents } from "../../shared/money.js";
 import { notFound, badRequest, conflict, HttpError } from "../../shared/http.js";
 import { getStripe, isStripeConfigured, resolveChargeDetails } from "./stripe.js";
+import { moduleLogger } from "../../shared/logger.js";
+
+const log = moduleLogger("payments");
 
 export type PaymentMethod = "cash" | "card" | "split";
 export type PaymentStatus = "captured" | "declined";
@@ -90,11 +93,7 @@ async function resolveCardFromStripe(
     );
   }
 
-  // Development simulation — explicit warning so it's never silent.
-  console.warn(
-    "[payments] STRIPE_SECRET_KEY not set — using card simulation (dev only). " +
-      "Set STRIPE_SECRET_KEY before deploying.",
-  );
+  log.warn("STRIPE_SECRET_KEY not set — using card simulation (dev only)");
   const { last4, authCode } = simulateCardRead();
   return { cardCents: amountCents, last4, authCode };
 }

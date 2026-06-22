@@ -1,6 +1,9 @@
 import type { Request, Response, NextFunction } from "express";
 import { IdempotencyStore } from "./idempotency-store.js";
 import type { DB } from "../../shared/db.js";
+import { moduleLogger } from "../../shared/logger.js";
+
+const log = moduleLogger("idempotency");
 
 /**
  * Express middleware that enforces idempotency on POST/PATCH routes.
@@ -37,7 +40,7 @@ export function idempotencyMiddleware(db: DB) {
         // Record the result asynchronously — don't block the response.
         store
           .record(tenantId, key, null, { status: res.statusCode, body })
-          .catch((err) => console.error("[idempotency] record failed:", err instanceof Error ? err.message : err));
+          .catch((err) => log.error({ err }, "idempotency record failed"));
         return originalJson(body);
       };
 

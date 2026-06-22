@@ -2,6 +2,9 @@ import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import type { JobRow } from "../types.js";
 import { EventTypes } from "../events/event-types.js";
+import { moduleLogger } from "../../shared/logger.js";
+
+const log = moduleLogger("sync-ecommerce");
 
 /**
  * Sync Ecommerce Job
@@ -29,6 +32,6 @@ export async function syncEcommerceJob(job: JobRow, db: DB, events: EventBus): P
       syncType: "incremental",
       since,
     });
-    console.info(`[sync-ecommerce] triggered sync for ${integration.platform} tenant=${tenantId}`);
+    log.info({ platform: integration.platform, tenantId }, "ecommerce sync triggered");
   }
 }

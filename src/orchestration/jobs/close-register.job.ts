@@ -1,6 +1,9 @@
 import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import type { JobRow } from "../types.js";
+import { moduleLogger } from "../../shared/logger.js";
+
+const log = moduleLogger("close-register");
 
 /**
  * Close Register Job
@@ -22,7 +25,7 @@ export async function closeRegisterJob(job: JobRow, db: DB, events: EventBus): P
     { outletId: payload.outletId, tenantId },
   );
   if (!session) {
-    console.warn(`[close-register] no open session for outlet '${payload.outletId}'`);
+    log.warn({ outletId: payload.outletId }, "no open session found — skipping");
     return;
   }
 
@@ -34,5 +37,5 @@ export async function closeRegisterJob(job: JobRow, db: DB, events: EventBus): P
     cashCents: payload.expectedCashCents ?? 0,
   });
 
-  console.info(`[close-register] closing session ${session.id} for outlet ${payload.outletId}`);
+  log.info({ sessionId: session.id, outletId: payload.outletId }, "closing register session");
 }

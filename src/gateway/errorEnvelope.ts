@@ -1,5 +1,8 @@
 import type { Request, Response, NextFunction } from "express";
 import { HttpError } from "../shared/http.js";
+import { moduleLogger } from "../shared/logger.js";
+
+const log = moduleLogger("error-envelope");
 
 /**
  * Error-envelope middleware. Must be mounted LAST in the Express chain.
@@ -28,16 +31,13 @@ export function errorEnvelopeMiddleware(
 
   // Unexpected error — log it (never expose internals).
   const message = err instanceof Error ? err.message : String(err);
-  console.error(
-    JSON.stringify({
-      level: "error",
-      requestId,
-      path: req.path,
-      method: req.method,
-      message,
-      stack: err instanceof Error ? err.stack : undefined,
-    }),
-  );
+  log.error({
+    requestId,
+    path: req.path,
+    method: req.method,
+    message,
+    stack: err instanceof Error ? err.stack : undefined,
+  }, "unhandled error");
 
   res.status(500).json({
     error: {

@@ -3,6 +3,9 @@ import type { EventBus } from "../../shared/events.js";
 import type { WorkflowContext, StepDefinition } from "../types.js";
 import type { WorkflowStateStore } from "../state/workflow-state.store.js";
 import type { OrchestrationLogger } from "../telemetry/orchestration-logger.js";
+import { moduleLogger } from "../../shared/logger.js";
+
+const log = moduleLogger("compensation");
 
 /**
  * Runs compensation (rollback) steps in reverse order for failed workflows.
@@ -37,7 +40,7 @@ export class CompensationRunner {
         await this.logger.logStep(workflowId, step.name, "compensated");
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[compensation] step '${step.name}' failed: ${msg}`);
+        log.error({ workflowId, step: step.name, error: msg }, "compensation step failed");
         await this.logger.log(workflowId, "compensation.step_failed", { step: step.name, error: msg });
         // Continue with remaining compensations — partial rollback is better than none.
       }

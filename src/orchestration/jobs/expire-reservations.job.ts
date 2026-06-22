@@ -1,6 +1,9 @@
 import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import type { JobRow } from "../types.js";
+import { moduleLogger } from "../../shared/logger.js";
+
+const log = moduleLogger("expire-reservations");
 
 const RESERVATION_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -33,6 +36,6 @@ export async function expireReservationsJob(job: JobRow, db: DB, events: EventBu
   }
 
   if (stale.length > 0) {
-    console.info(`[expire-reservations] expired ${stale.length} stale reservation(s)`);
+    log.info({ count: stale.length }, "expired stale reservations");
   }
 }

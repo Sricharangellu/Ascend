@@ -18,6 +18,15 @@ export type Params = unknown[] | Record<string, unknown> | undefined;
  * or `@name` (named) placeholders and compiled to Postgres `$n` here, so the
  * service-layer SQL stays portable.
  */
+export interface PoolStats {
+  /** Total connections currently open (idle + active). */
+  total: number;
+  /** Connections available for immediate use. */
+  idle: number;
+  /** Requests queued waiting for a free connection. */
+  waiting: number;
+}
+
 export interface DB {
   query<T = any>(sql: string, params?: Params): Promise<T[]>;
   one<T = any>(sql: string, params?: Params): Promise<T | undefined>;
@@ -32,6 +41,12 @@ export interface DB {
    */
   withTenant(tenantId: string): DB;
   close(): Promise<void>;
+  /**
+   * Returns live connection pool statistics. Null when called on a
+   * transaction-scoped DB (which shares the parent pool's connection).
+   * Use in health checks to detect pool exhaustion.
+   */
+  poolStats(): PoolStats | null;
 }
 
 interface Queryable {
@@ -128,11 +143,22 @@ function makeDb(q: Queryable, opts: { isTx: boolean; pool?: pg.Pool }): DB {
         async close(): Promise<void> {
           // Scoped view — does not own the pool.
         },
+        poolStats(): PoolStats | null {
+          return parent.poolStats();
+        },
       };
       return scoped;
     },
     async close(): Promise<void> {
       if (!opts.isTx && opts.pool) await opts.pool.end();
+    },
+    poolStats(): PoolStats | null {
+      if (!opts.pool || opts.isTx) return null;
+      return {
+        total: opts.pool.totalCount,
+        idle: opts.pool.idleCount,
+        waiting: opts.pool.waitingCount,
+      };
     },
   };
   return db;

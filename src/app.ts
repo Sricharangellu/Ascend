@@ -231,9 +231,23 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
 
   app.get("/readyz", handler(async (_req, res) => {
     await db.one("SELECT 1");
+    const pool = db.poolStats();
+    const poolMax = Number(process.env["PG_POOL_MAX"] ?? 10);
+    // Return 503 when all connections are in use — load balancer will stop routing.
+    if (pool && pool.waiting > 0) {
+      res.status(503).json({
+        status: "degraded",
+        reason: "connection pool exhausted",
+        pool,
+        ts: Date.now(),
+      });
+      return;
+    }
     res.json({
       status: "ok",
       db: "connected",
+      pool: pool ?? undefined,
+      poolMax,
       modules: ["identity", ...modules.map((m) => m.name)],
       ts: Date.now(),
     });

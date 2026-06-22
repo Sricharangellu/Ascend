@@ -1,5 +1,8 @@
 import type { CommandBus } from "./command-bus.js";
 import type { CommandType } from "./command-types.js";
+import { moduleLogger } from "../../shared/logger.js";
+
+const log = moduleLogger("command-registry");
 
 interface CommandEntry {
   type: string;
@@ -56,7 +59,7 @@ export class CommandRegistry {
     const missing = this.unregistered();
     if (missing.length > 0) {
       const names = missing.map((m) => m.type).join(", ");
-      console.warn(`[command-registry] ${missing.length} commands not yet registered: ${names}`);
+      log.warn({ missing: names, count: missing.length }, "commands not yet registered");
     }
   }
 }

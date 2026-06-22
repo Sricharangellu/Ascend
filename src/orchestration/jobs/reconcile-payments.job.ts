@@ -3,6 +3,9 @@ import type { EventBus } from "../../shared/events.js";
 import type { JobRow } from "../types.js";
 import { EventTypes } from "../events/event-types.js";
 import { v7 as uuidv7 } from "uuid";
+import { moduleLogger } from "../../shared/logger.js";
+
+const log = moduleLogger("reconcile-payments");
 
 /**
  * Reconcile Payments Job
@@ -28,5 +31,5 @@ export async function reconcilePaymentsJob(job: JobRow, _db: DB, events: EventBu
     toAt,
   });
 
-  console.info(`[reconcile-payments] started batch ${batchId} for tenant ${tenantId}`);
+  log.info({ batchId, tenantId }, "payment reconciliation batch started");
 }

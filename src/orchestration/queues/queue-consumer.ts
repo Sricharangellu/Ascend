@@ -1,5 +1,8 @@
 import type { DB } from "../../shared/db.js";
 import type { JobRow } from "../types.js";
+import { moduleLogger } from "../../shared/logger.js";
+
+const log = moduleLogger("job-queue");
 
 type JobHandler = (job: JobRow) => Promise<void>;
 
@@ -63,9 +66,7 @@ export class QueueConsumer {
   start(intervalMs = 10_000): void {
     if (this.pollTimer) return;
     this.pollTimer = setInterval(() => {
-      this.poll().catch((err) =>
-        console.error("[job-queue] poll error", err instanceof Error ? err.message : err),
-      );
+      this.poll().catch((err) => log.error({ err }, "poll error"));
     }, intervalMs);
     // Don't block process exit.
     if (this.pollTimer.unref) this.pollTimer.unref();

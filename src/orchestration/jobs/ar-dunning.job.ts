@@ -2,6 +2,9 @@ import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import type { JobRow } from "../types.js";
 import { BillingService } from "../../modules/billing/service.js";
+import { moduleLogger } from "../../shared/logger.js";
+
+const log = moduleLogger("ar-dunning");
 
 /**
  * AR Dunning Job
@@ -27,6 +30,6 @@ export async function arDunningJob(job: JobRow, db: DB, events: EventBus): Promi
       .filter(([, n]) => n > 0)
       .map(([lvl, n]) => `level${lvl}=${n}`)
       .join(", ");
-    console.info(`[ar-dunning] tenant=${tenantId} processed=${result.processed} (${levels})`);
+    log.info({ tenantId, processed: result.processed, levels }, "dunning sweep complete");
   }
 }
