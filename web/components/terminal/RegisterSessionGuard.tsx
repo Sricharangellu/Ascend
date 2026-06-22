@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { apiGet, apiPost } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import { Button } from "@/components/Button";
+import { useFinderContext } from "@/lib/useFinderContext";
 
 interface Session {
   id: string;
@@ -20,6 +21,7 @@ interface RegisterSessionGuardProps {
 }
 
 export function RegisterSessionGuard({ registerId, children }: RegisterSessionGuardProps) {
+  const { setActiveSessionId } = useFinderContext();
   const [session, setSession] = useState<Session | null | "loading">("loading");
   const [openFloat, setOpenFloat] = useState("");
   const [closeFloat, setCloseFloat] = useState("");
@@ -33,11 +35,14 @@ export function RegisterSessionGuard({ registerId, children }: RegisterSessionGu
     try {
       const res = await apiGet<{ items: Session[] }>(`/api/v1/outlets/registers/${registerId}/sessions?limit=1`);
       const latest = res.items[0];
-      setSession(latest?.status === "open" ? latest : null);
+      const active = latest?.status === "open" ? latest : null;
+      setSession(active);
+      setActiveSessionId(active?.id ?? null);
     } catch {
       setSession(null);
+      setActiveSessionId(null);
     }
-  }, [registerId]);
+  }, [registerId, setActiveSessionId]);
 
   const loadExpected = useCallback(async () => {
     try {
@@ -64,6 +69,7 @@ export function RegisterSessionGuard({ registerId, children }: RegisterSessionGu
       const floatCents = Math.round(parseFloat(openFloat || "0") * 100);
       const s = await apiPost<Session>(`/api/v1/outlets/registers/${registerId}/open`, { openingFloatCents: floatCents });
       setSession(s);
+      setActiveSessionId(s.id);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to open register");
     } finally { setWorking(false); }
@@ -77,6 +83,7 @@ export function RegisterSessionGuard({ registerId, children }: RegisterSessionGu
       const closingCents = Math.round(parseFloat(closeFloat || "0") * 100);
       await apiPost(`/api/v1/outlets/registers/${registerId}/close`, { countedCashCents: countedCents, closingFloatCents: closingCents });
       setSession(null); setShowClose(false);
+      setActiveSessionId(null);
       setExpectedData(null);
       setCloseCounted("");
       setCloseFloat("");
@@ -198,4 +205,3 @@ export function RegisterSessionGuard({ registerId, children }: RegisterSessionGu
     </div>
   );
 }
-

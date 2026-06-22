@@ -35,11 +35,13 @@ import { RegisterSessionGuard } from "@/components/terminal/RegisterSessionGuard
 import { ShortcutsOverlay } from "@/components/terminal/ShortcutsOverlay";
 import { useFlag } from "@/flags/useFlag";
 import { ScanToast } from "@/components/ScanToast";
+import { useFinderContext } from "@/lib/useFinderContext";
 
 // ─── Terminal inner (has access to cart context) ──────────────────────────────
 
 function TerminalInner() {
   const { user } = useAuth();
+  const { registerId, outletId } = useFinderContext();
   const { isOffline } = useOffline();
   const cart = useCart();
   const { addToast } = useToast();
@@ -270,12 +272,12 @@ function TerminalInner() {
   return (
     <EnterpriseShell
       active="register"
-      title="Register"
-      subtitle="Demo Store · Front Counter · Register 01"
+      title="Sell"
+      subtitle={`${outletId} · ${registerId}`}
       banner={<OfflineQueueBanner />}
       contentClassName="flex flex-1 flex-col overflow-hidden lg:flex-row"
     >
-      <RegisterSessionGuard registerId="reg_01">
+      <RegisterSessionGuard registerId={registerId}>
         <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
           <CheckoutStatusStrip
             cashier={user?.name ?? "Cashier"}

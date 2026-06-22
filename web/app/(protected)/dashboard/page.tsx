@@ -17,6 +17,7 @@ import { apiGet } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import { LineChart } from "@/components/charts/LineChart";
 import { BarChart } from "@/components/charts/BarChart";
+import { useFinderContext, type FinderDateRange } from "@/lib/useFinderContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -235,6 +236,23 @@ function rangeLabel(range: Range): string {
   return "Last 30 days";
 }
 
+function dateRangeForPreset(preset: FinderDateRange["preset"]): FinderDateRange {
+  const now = new Date();
+  const start = new Date(now);
+  const end = new Date(now);
+  if (preset === "current_week") {
+    const day = start.getDay();
+    start.setDate(start.getDate() - (day === 0 ? 6 : day - 1));
+    end.setTime(start.getTime());
+    end.setDate(start.getDate() + 6);
+  } else if (preset === "current_month") {
+    start.setDate(1);
+    end.setMonth(start.getMonth() + 1, 0);
+  }
+  const iso = (value: Date) => value.toISOString().slice(0, 10);
+  return { startDate: iso(start), endDate: iso(end), preset };
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 interface LowStockItem {
@@ -247,7 +265,18 @@ interface DashNotification {
 }
 
 export default function DashboardPage() {
-  const [range, setRange] = useState<Range>("7d");
+  const {
+    storeId,
+    outletId,
+    dateRange,
+    granularity,
+    setDateRange,
+    setGranularity,
+  } = useFinderContext();
+  const range: Range = dateRange.preset === "today"
+    ? "today"
+    : dateRange.preset === "current_month" ? "30d" : "7d";
+  const scope = new URLSearchParams({ store_id: storeId, outlet_id: outletId }).toString();
   const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
   const [recentNotifs, setRecentNotifs] = useState<DashNotification[]>([]);
 
@@ -261,43 +290,43 @@ export default function DashboardPage() {
   }, []);
 
   const fetchSummary = useCallback(
-    () => apiGet<SummaryResponse>(`/api/v1/reports/summary?range=${range}`),
-    [range],
+    () => apiGet<SummaryResponse>(`/api/v1/reports/summary?range=${range}&${scope}`),
+    [range, scope],
   );
   const fetchTopProducts = useCallback(
-    () => apiGet<TopProductsResponse>(`/api/v1/reports/top-products?range=${range}&limit=5`),
-    [range],
+    () => apiGet<TopProductsResponse>(`/api/v1/reports/top-products?range=${range}&limit=5&${scope}`),
+    [range, scope],
   );
   const fetchTopCustomers = useCallback(
-    () => apiGet<TopCustomersResponse>(`/api/v1/reports/sales-by-customer?range=${range}`),
-    [range],
+    () => apiGet<TopCustomersResponse>(`/api/v1/reports/sales-by-customer?range=${range}&${scope}`),
+    [range, scope],
   );
   const trendRange = range === "today" ? "7d" : range;
   const fetchTrend = useCallback(
-    () => apiGet<TrendResponse>(`/api/v1/reports/revenue-trend?range=${trendRange}`),
-    [trendRange],
+    () => apiGet<TrendResponse>(`/api/v1/reports/revenue-trend?range=${trendRange}&${scope}`),
+    [scope, trendRange],
   );
   const fetchHourly = useCallback(
-    () => apiGet<HourlyResponse>(`/api/v1/reports/hourly?range=${range}`),
-    [range],
+    () => apiGet<HourlyResponse>(`/api/v1/reports/hourly?range=${range}&${scope}`),
+    [range, scope],
   );
   const fetchCategory = useCallback(
-    () => apiGet<CategoryResponse>(`/api/v1/reports/sales-by-category?range=${range}`),
-    [range],
+    () => apiGet<CategoryResponse>(`/api/v1/reports/sales-by-category?range=${range}&${scope}`),
+    [range, scope],
   );
 
   const { data: summary, loading: loadingSummary, error: errorSummary } =
-    useQuery(`dashboard:summary:${range}`, fetchSummary, { staleMs: 60_000 });
+    useQuery(`dashboard:summary:${range}:${scope}`, fetchSummary, { staleMs: 60_000 });
   const { data: topProductsData, loading: loadingProducts } =
-    useQuery(`dashboard:top-products:${range}`, fetchTopProducts, { staleMs: 60_000 });
+    useQuery(`dashboard:top-products:${range}:${scope}`, fetchTopProducts, { staleMs: 60_000 });
   const { data: topCustomersData, loading: loadingCustomers } =
-    useQuery(`dashboard:top-customers:${range}`, fetchTopCustomers, { staleMs: 60_000 });
+    useQuery(`dashboard:top-customers:${range}:${scope}`, fetchTopCustomers, { staleMs: 60_000 });
   const { data: trendData, loading: loadingTrend } =
-    useQuery(`dashboard:trend:${trendRange}`, fetchTrend, { staleMs: 60_000 });
+    useQuery(`dashboard:trend:${trendRange}:${scope}`, fetchTrend, { staleMs: 60_000 });
   const { data: hourlyData, loading: loadingHourly } =
-    useQuery(`dashboard:hourly:${range}`, fetchHourly, { staleMs: 60_000 });
+    useQuery(`dashboard:hourly:${range}:${scope}`, fetchHourly, { staleMs: 60_000 });
   const { data: categoryData, loading: loadingCategory } =
-    useQuery(`dashboard:category:${range}`, fetchCategory, { staleMs: 60_000 });
+    useQuery(`dashboard:category:${range}:${scope}`, fetchCategory, { staleMs: 60_000 });
 
   const topProducts = topProductsData?.items ?? [];
   const topCustomers = topCustomersData?.items ?? [];
@@ -338,26 +367,23 @@ export default function DashboardPage() {
               Revenue, orders, inventory movement, and tender mix.
             </p>
           </div>
-          <div
-            role="group"
-            aria-label="Date range"
-            className="inline-flex rounded-md border border-slate-200 bg-white p-1 shadow-sm"
-          >
-            {(["today", "7d", "30d"] as const).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRange(r)}
-                aria-pressed={range === r}
-                className={`min-h-[36px] rounded px-4 text-sm font-medium transition-colors ${
-                  range === r
-                    ? "bg-slate-950 text-white shadow-sm"
-                    : "text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                {rangeLabel(r)}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <div role="group" aria-label="Report granularity" className="inline-flex rounded-md border border-slate-200 bg-white p-1 shadow-sm">
+              {(["day", "week", "month"] as const).map((value) => (
+                <button key={value} type="button" onClick={() => setGranularity(value)} aria-pressed={granularity === value}
+                  className={`min-h-[36px] rounded px-3 text-sm font-medium capitalize transition-colors ${granularity === value ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100"}`}>
+                  {value}
+                </button>
+              ))}
+            </div>
+            <label className="sr-only" htmlFor="dashboard-date-preset">Date range</label>
+            <select id="dashboard-date-preset" value={dateRange.preset === "custom" ? "current_week" : dateRange.preset}
+              onChange={(event) => setDateRange(dateRangeForPreset(event.target.value as FinderDateRange["preset"]))}
+              className="h-[46px] rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm outline-none focus:border-brand-600">
+              <option value="today">Today</option>
+              <option value="current_week">This Week</option>
+              <option value="current_month">This Month</option>
+            </select>
           </div>
         </div>
 

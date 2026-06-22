@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { AccountModeProvider } from "@/lib/useAccountMode";
+import { FinderContextProvider } from "@/lib/useFinderContext";
 
 export default function ProtectedLayout({
   children,
@@ -49,8 +50,10 @@ export default function ProtectedLayout({
 
   return (
     <AccountModeProvider>
-      <OfflineBanner />
-      {children}
+      <FinderContextProvider>
+        <OfflineBanner />
+        {children}
+      </FinderContextProvider>
     </AccountModeProvider>
   );
 }
