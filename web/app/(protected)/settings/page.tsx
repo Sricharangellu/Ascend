@@ -6,7 +6,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { getUser } from "@/lib/auth";
-import { apiGet, apiPut, apiPost, apiDelete } from "@/api-client/client";
+import { apiGet, apiPut, apiPost, apiDelete, safeLoad } from "@/api-client/client";
 import { useToast } from "@/components/Toast";
 import { formatMoney } from "@/lib/money";
 import { Badge } from "@/components/Badge";
@@ -189,7 +189,7 @@ function ShippingSection({ canManage, addToast }: { canManage: boolean; addToast
   const [deleteTarget, setDeleteTarget] = useState<ShippingMethod | null>(null);
 
   const load = useCallback(() => {
-    apiGet<{ items: ShippingMethod[] }>("/api/v1/settings/shipping-methods").then((r) => setItems(r.items ?? []));
+    safeLoad(apiGet<{ items: ShippingMethod[] }>("/api/v1/settings/shipping-methods").then((r) => setItems(r.items ?? [])));
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -283,7 +283,7 @@ function TermsSection({ canManage, addToast }: { canManage: boolean; addToast: R
   const [form, setForm] = useState<{ name: string; daysDue: string; description: string } | null>(null);
 
   const load = useCallback(() => {
-    apiGet<{ items: PaymentTerm[] }>("/api/v1/settings/payment-terms").then((r) => setItems(r.items ?? []));
+    safeLoad(apiGet<{ items: PaymentTerm[] }>("/api/v1/settings/payment-terms").then((r) => setItems(r.items ?? [])));
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -348,7 +348,7 @@ function ModesSection({ canManage, addToast }: { canManage: boolean; addToast: R
   const [adding, setAdding] = useState(false);
 
   const load = useCallback(() => {
-    apiGet<{ items: PaymentMode[] }>("/api/v1/settings/payment-modes").then((r) => setItems(r.items ?? []));
+    safeLoad(apiGet<{ items: PaymentMode[] }>("/api/v1/settings/payment-modes").then((r) => setItems(r.items ?? [])));
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -397,7 +397,7 @@ function TaxSection({ canManage, addToast }: { canManage: boolean; addToast: Ret
   const [form, setForm] = useState<{ name: string; ratePct: string; category: string; state: string } | null>(null);
 
   const load = useCallback(() => {
-    apiGet<{ items: TaxRate[] }>("/api/v1/settings/tax-rates").then((r) => setItems(r.items ?? []));
+    safeLoad(apiGet<{ items: TaxRate[] }>("/api/v1/settings/tax-rates").then((r) => setItems(r.items ?? [])));
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -468,7 +468,7 @@ function FlagsSection({ canManage, addToast }: { canManage: boolean; addToast: R
   const [dirty, setDirty] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    apiGet<Record<string, boolean>>("/api/v1/settings/feature-flags").then((f) => setFlags(f));
+    safeLoad(apiGet<Record<string, boolean>>("/api/v1/settings/feature-flags").then((f) => setFlags(f)));
   }, []);
 
   const merged = useMemo(() => ({ ...flags, ...dirty }), [flags, dirty]);

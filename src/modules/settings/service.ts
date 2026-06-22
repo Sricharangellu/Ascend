@@ -60,7 +60,7 @@ export class SettingsService {
 
   // ── Shipping methods ──────────────────────────────────────────────────────
   async listShipping(tenantId: string) {
-    return this.db.query<ShippingMethod>("SELECT * FROM shipping_methods WHERE tenant_id = @t ORDER BY sequence ASC, name ASC", { t: tenantId });
+    return this.db.query<ShippingMethod>("SELECT * FROM shipping_methods WHERE tenant_id = @t ORDER BY sequence ASC, name ASC LIMIT 200", { t: tenantId });
   }
   async createShipping(b: { name: string; amountCents: number; freeLimitCents?: number; ecommerce?: boolean; sequence?: number; creditAccountId?: string; debitAccountId?: string }, tenantId: string) {
     const row: ShippingMethod = { id: `shm_${uuidv7()}`, tenant_id: tenantId, name: b.name, amount_cents: b.amountCents, free_limit_cents: b.freeLimitCents ?? null, ecommerce: b.ecommerce ? 1 : 0, sequence: b.sequence ?? 0, credit_account_id: b.creditAccountId ?? null, debit_account_id: b.debitAccountId ?? null, active: 1 };
@@ -79,7 +79,7 @@ export class SettingsService {
   }
 
   // ── Payment terms ─────────────────────────────────────────────────────────
-  async listTerms(tenantId: string) { return this.db.query<PaymentTerm>("SELECT * FROM payment_terms WHERE tenant_id = @t ORDER BY days_due ASC", { t: tenantId }); }
+  async listTerms(tenantId: string) { return this.db.query<PaymentTerm>("SELECT * FROM payment_terms WHERE tenant_id = @t ORDER BY days_due ASC LIMIT 200", { t: tenantId }); }
   async createTerm(b: { name: string; daysDue: number; description?: string }, tenantId: string) {
     const row: PaymentTerm = { id: `pt_${uuidv7()}`, tenant_id: tenantId, name: b.name, days_due: b.daysDue, description: b.description ?? null, active: 1 };
     await this.db.query("INSERT INTO payment_terms (id, tenant_id, name, days_due, description, active) VALUES (@id,@tenant_id,@name,@days_due,@description,@active)", row as unknown as Record<string, unknown>);
@@ -87,7 +87,7 @@ export class SettingsService {
   }
 
   // ── Payment modes ─────────────────────────────────────────────────────────
-  async listModes(tenantId: string) { return this.db.query<PaymentMode>("SELECT * FROM payment_modes WHERE tenant_id = @t ORDER BY name ASC", { t: tenantId }); }
+  async listModes(tenantId: string) { return this.db.query<PaymentMode>("SELECT * FROM payment_modes WHERE tenant_id = @t ORDER BY name ASC LIMIT 200", { t: tenantId }); }
   async createMode(b: { name: string }, tenantId: string) {
     const row: PaymentMode = { id: `pm_${uuidv7()}`, tenant_id: tenantId, name: b.name, active: 1 };
     await this.db.query("INSERT INTO payment_modes (id, tenant_id, name, active) VALUES (@id,@tenant_id,@name,@active)", row as unknown as Record<string, unknown>);
@@ -95,7 +95,7 @@ export class SettingsService {
   }
 
   // ── Tax rates ─────────────────────────────────────────────────────────────
-  async listTaxRates(tenantId: string) { return this.db.query<TaxRate>("SELECT * FROM tax_rates WHERE tenant_id = @t ORDER BY name ASC", { t: tenantId }); }
+  async listTaxRates(tenantId: string) { return this.db.query<TaxRate>("SELECT * FROM tax_rates WHERE tenant_id = @t ORDER BY name ASC LIMIT 200", { t: tenantId }); }
   async createTaxRate(b: { name: string; rateBps: number; applyToCategory?: string; state?: string }, tenantId: string) {
     const row: TaxRate = { id: `tax_${uuidv7()}`, tenant_id: tenantId, name: b.name, rate_bps: b.rateBps, apply_to_category: b.applyToCategory ?? null, state: b.state ?? null, active: 1 };
     await this.db.query("INSERT INTO tax_rates (id, tenant_id, name, rate_bps, apply_to_category, state, active) VALUES (@id,@tenant_id,@name,@rate_bps,@apply_to_category,@state,@active)", row as unknown as Record<string, unknown>);

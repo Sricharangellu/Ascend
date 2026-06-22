@@ -269,7 +269,7 @@ export class PurchasingService {
   }
 
   async listSuppliers(tenantId: string): Promise<Supplier[]> {
-    return this.db.query<Supplier>("SELECT * FROM suppliers WHERE tenant_id = @tenantId ORDER BY name ASC", { tenantId });
+    return this.db.query<Supplier>("SELECT * FROM suppliers WHERE tenant_id = @tenantId ORDER BY name ASC LIMIT 500", { tenantId });
   }
 
   /** Vendor directory with spend + open-credit balances (the vendor list). */
@@ -634,7 +634,7 @@ export class PurchasingService {
 
   // ── Supplier addresses ───────────────────────────────────────────────────────
   async listSupplierAddresses(supplierId: string, tenantId: string) {
-    return this.db.query("SELECT * FROM supplier_addresses WHERE supplier_id = @sid AND tenant_id = @t ORDER BY is_default DESC, created_at ASC", { sid: supplierId, t: tenantId });
+    return this.db.query("SELECT * FROM supplier_addresses WHERE supplier_id = @sid AND tenant_id = @t ORDER BY is_default DESC, created_at ASC LIMIT 100", { sid: supplierId, t: tenantId });
   }
 
   async addSupplierAddress(supplierId: string, tenantId: string, input: { addressType?: string; addressLine1?: string | null; addressLine2?: string | null; city?: string | null; state?: string | null; zip?: string | null; country?: string; county?: string | null; isDefault?: boolean }) {
@@ -650,7 +650,7 @@ export class PurchasingService {
 
   // ── Supplier contacts ────────────────────────────────────────────────────────
   async listSupplierContacts(supplierId: string, tenantId: string) {
-    return this.db.query("SELECT * FROM supplier_contacts WHERE supplier_id = @sid AND tenant_id = @t ORDER BY is_primary DESC, created_at ASC", { sid: supplierId, t: tenantId });
+    return this.db.query("SELECT * FROM supplier_contacts WHERE supplier_id = @sid AND tenant_id = @t ORDER BY is_primary DESC, created_at ASC LIMIT 100", { sid: supplierId, t: tenantId });
   }
 
   async addSupplierContact(supplierId: string, tenantId: string, input: { contactName: string; title?: string | null; email?: string | null; phone?: string | null; isPrimary?: boolean }) {

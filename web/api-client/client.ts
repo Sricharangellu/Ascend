@@ -161,3 +161,30 @@ export const apiPatch = <T>(
 
 export const apiDelete = <T>(path: string, opts?: FetchOptions) =>
   apiFetch<T>("DELETE", path, opts);
+
+/**
+ * PROD-16: safeLoad — wraps a data-fetch promise so rejected promises are
+ * caught and reported rather than becoming unhandled rejections.
+ *
+ * Usage:
+ *   safeLoad(apiGet<Items>("/api/v1/things").then((r) => setItems(r.items)));
+ *
+ * The global unhandledrejection handler (ErrorMonitor in layout.tsx) is the
+ * primary safety net. safeLoad is belt-and-suspenders for pages that want
+ * explicit error handling without boilerplate try/catch.
+ *
+ * @param promise - Any promise, typically an api call chain ending with .then()
+ * @param onError - Optional callback; receives the error for local UI state
+ */
+export function safeLoad<T>(
+  promise: Promise<T>,
+  onError?: (err: unknown) => void,
+): void {
+  promise.catch((err) => {
+    if (onError) {
+      onError(err);
+    } else if (process.env.NODE_ENV !== "production") {
+      console.error("[safeLoad]", err);
+    }
+  });
+}

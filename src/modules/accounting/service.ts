@@ -99,8 +99,8 @@ export class AccountingService {
   }
 
   async listAccounts(tenantId: string, type?: AccountType): Promise<Account[]> {
-    if (type) return this.db.query<Account>("SELECT * FROM accounts WHERE tenant_id = @t AND type = @ty ORDER BY code ASC", { t: tenantId, ty: type });
-    return this.db.query<Account>("SELECT * FROM accounts WHERE tenant_id = @t ORDER BY code ASC", { t: tenantId });
+    if (type) return this.db.query<Account>("SELECT * FROM accounts WHERE tenant_id = @t AND type = @ty ORDER BY code ASC LIMIT 500", { t: tenantId, ty: type });
+    return this.db.query<Account>("SELECT * FROM accounts WHERE tenant_id = @t ORDER BY code ASC LIMIT 500", { t: tenantId });
   }
 
   /** Accounts as a parent/child tree (roots = accounts with no parent). */

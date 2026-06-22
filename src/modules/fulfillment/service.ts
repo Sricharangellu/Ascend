@@ -58,7 +58,7 @@ export class FulfillmentService {
   }
 
   async listLocations(tenantId: string): Promise<Location[]> {
-    return this.db.query<Location>("SELECT * FROM locations WHERE tenant_id = @t ORDER BY code ASC", { t: tenantId });
+    return this.db.query<Location>("SELECT * FROM locations WHERE tenant_id = @t ORDER BY code ASC LIMIT 500", { t: tenantId });
   }
 
   /** Assign a product's primary pick location. */
