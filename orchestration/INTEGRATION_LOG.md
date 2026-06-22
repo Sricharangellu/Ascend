@@ -421,3 +421,9 @@ before this commit. No new errors introduced.
 - **Roadmap:** INF lane added with 11 items (INF-1..4 closed; INF-5..11 queued as priority over feature work).
 - **Verified:** typecheck clean; npm test pass.
 - **Contract changes:** `POST /api/stripe/webhook` (unauthenticated, raw body, requires `STRIPE_WEBHOOK_SECRET` env var).
+
+## 2026-06-22 — Infrastructure cycle: INF-7
+
+- **Shipped:** `.env.example` comprehensively documented — `PG_POOL_MAX` with pool sizing formula and Neon/Railway pooler guidance, plus all other env vars now used (Redis, Stripe, APP_URL, BACKEND_URL, METRICS_TOKEN, CORS). redis.ts console.error replaced with structured pino logger (last remaining console.* in src/shared/). /readyz pool-saturation 503 was already done in a957060 (INF-1..6 sprint).
+- **Verified:** typecheck clean; npm test 308/308 pass.
+- **Contract changes:** none — .env.example is documentation only.
