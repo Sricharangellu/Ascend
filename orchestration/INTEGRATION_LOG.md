@@ -402,6 +402,15 @@ before this commit. No new errors introduced.
 - **Verified:** typecheck clean; npm test 308/308 pass.
 - **Contract changes:** PATCH /api/v1/webhooks/:id (toggle active); webhook_deliveries now returns attempt_count and last_response_body fields.
 
+## 2026-06-22 — Infrastructure sprint: INF-5, INF-6, INF-10
+
+- **Shipped:**
+  - INF-5: EventBus Redis Pub/Sub fan-out (`useRedis(redis)` on EventBus; `openRedis()` now returns full `Redis | null`; `buildApp()` returns `cleanup()` called on SIGTERM).
+  - INF-6: AR Dunning scheduled job — `arDunningJob` runs `BillingService.runDunning()` per tenant, self-re-enqueues 24 h later; seeded per-tenant at startup via `enqueueOnce`. `AR_DUNNING` and `WEBHOOK_DELIVERY` added to QueueNames.
+  - INF-10: `makeAuthMiddleware(db)` handles both JWT and API key (`fpk_` prefix) auth; `requireScope(scope)` middleware factory added; `AuthPayload` gains `scopes: string[]`.
+- **Verified:** typecheck clean; npm test pass.
+- **Contract changes:** `AuthPayload` now includes `scopes: string[]`; `makeAuthMiddleware` and `requireScope` exported from gateway.
+
 ## 2026-06-22 — Infrastructure sprint: INF-1..4
 
 - **Shipped:** Four enterprise blockers addressed in one commit (3fabb55):
