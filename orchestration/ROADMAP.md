@@ -349,6 +349,56 @@ records, only triaged into "build now" vs. "documented for later."
       Mock endpoints: `GET/POST/PATCH /settings/receipts/:outletId`.
       Nav: sub-item under Settings.
 
+## Phase 4 — Operational Completeness (Cycle Counts, Register Sessions, Backend Wire-up)
+
+Phase 4 closes the remaining frontend gaps where a backend already exists but
+no page was built, and adds the last two high-value operational features
+identified in the gaps analysis that survived the "defer" filter.
+
+### Frontend lane (Phase 4)
+
+- [x] FE-26: Cycle Count UI (`/inventory/counts`) — sessions list showing
+      open/closed count sessions with stat cards (open sessions, total SKUs
+      to count, variance items). "New Session" button (manager) opens a modal
+      with optional note; creates a session seeded with all current stock levels.
+      Session detail panel: per-SKU count table (product, SKU, expected qty,
+      count input, variance badge). "Close Session" button (manager) posts
+      variances as adjustments. Consumes BE-10 endpoints:
+      `GET/POST /inventory/counts`, `GET/POST /inventory/counts/:id/lines`,
+      `POST /inventory/counts/:id/close`. Mock handlers + types.
+      Nav key: `"inventory-counts"`, group: Manage. (done in 84df7e8)
+
+- [ ] FE-27: Purchasing order detail page (`/purchasing/[id]`) — full PO detail
+      view: header (vendor, status, PO number, created date), line items table
+      (product, qty ordered, qty received, unit cost, line total), receive
+      flow with per-line qty inputs (partial receiving per BE-11). Status
+      chips: open / partially_received / received / cancelled. Link from
+      `/purchasing` list rows. Mock handler for `GET /purchasing/orders/:id`.
+
+- [ ] FE-28: AR Dunning dashboard — surface `invoices.dunning_level` in the
+      Accounting page's invoices list (colored badge: 30d/60d/90d overdue).
+      Add a "Run Dunning Sweep" button (`POST /api/v1/reports/ar-aging/sweep`,
+      manager) that flags overdue invoices and shows a count of records updated.
+      Consumes BE-14.
+
+### Backend lane (Phase 4)
+
+- [ ] BE-29: Sales rep management — `sales_reps(id, tenant_id, name, email,
+      commission_pct, active, created_at)` table + CRUD endpoints
+      `GET/POST /api/v1/sales/reps`, `PATCH /api/v1/sales/reps/:id`. The
+      existing `sales-by-rep` report currently references `sales_rep_id` in
+      quotations/sales-orders but there is no way to create or manage reps.
+      Also add `GET /api/v1/sales/reps/:id/performance` (total revenue, orders,
+      avg deal size over a date range).
+
+- [ ] BE-30: Purchasing — early payment discount on bills: add `discount_pct`
+      and `discount_date` to `bills`; when `PATCH /billing/bills/:id/pay` is
+      called before `discount_date`, apply the discount and record
+      `discount_applied_cents`. Surface in `GET /billing/bills`. See
+      `gaps/PURCHASING_GAPS.md`.
+
+---
+
 ## Cross-cutting (claim into your lane when picked up)
 
 - [x] DB-1: Enable Postgres row-level security on tenant tables as
