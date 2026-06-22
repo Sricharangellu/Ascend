@@ -2708,55 +2708,5 @@ mockHandlers.push(
       }),
     ];
   })(),
-
-  // ── Enhanced Reports (FE-24) ──────────────────────────────────────────────
-  ...(() => {
-    interface SBP { productId: string; name: string; sku: string; category: string; units: number; revenueCents: number; costCents: number; marginPct: number; }
-    interface MBC { category: string; units: number; revenueCents: number; costCents: number; marginPct: number; }
-
-    const salesByProduct: SBP[] = [
-      { productId: "p01", name: "Marlboro Red King",       sku: "MRL-RED-K",  category: "Tobacco",   units: 312, revenueCents: 1934880, costCents: 1393114, marginPct: 28 },
-      { productId: "p02", name: "Newport Menthol 100s",    sku: "NWP-M100",   category: "Tobacco",   units: 248, revenueCents: 1537360, costCents: 1106900, marginPct: 28 },
-      { productId: "p03", name: "Monster Energy Original", sku: "MON-OG",     category: "Beverages", units: 540, revenueCents:  972000, costCents:  583200, marginPct: 40 },
-      { productId: "p04", name: "Red Bull 8.4oz",          sku: "RDB-84",     category: "Beverages", units: 480, revenueCents:  806400, costCents:  483840, marginPct: 40 },
-      { productId: "p05", name: "Swisher Sweets Original", sku: "SWI-OG",     category: "Tobacco",   units: 195, revenueCents:  624000, costCents:  436800, marginPct: 30 },
-      { productId: "p06", name: "Backwoods Honey Berry",   sku: "BKW-HB",     category: "Tobacco",   units: 180, revenueCents:  576000, costCents:  403200, marginPct: 30 },
-      { productId: "p07", name: "5-Hour Energy Berry",     sku: "5HR-BRY",    category: "Beverages", units: 360, revenueCents:  540000, costCents:  270000, marginPct: 50 },
-      { productId: "p08", name: "Camel Blue Box",          sku: "CAM-BLU",    category: "Tobacco",   units: 144, revenueCents:  892800, costCents:  642816, marginPct: 28 },
-      { productId: "p09", name: "Lottery Tickets (avg)",   sku: "LOT-AVG",    category: "Lottery",   units: 820, revenueCents:  820000, costCents:  779000, marginPct:  5 },
-      { productId: "p10", name: "Doritos Nacho Cheese",    sku: "DOR-NCH",    category: "Snacks",    units: 295, revenueCents:  295000, costCents:  177000, marginPct: 40 },
-      { productId: "p11", name: "Lay's Classic",           sku: "LAY-CLS",    category: "Snacks",    units: 270, revenueCents:  270000, costCents:  162000, marginPct: 40 },
-      { productId: "p12", name: "Gatorade Blue 32oz",      sku: "GAT-BLU-32", category: "Beverages", units: 210, revenueCents:  378000, costCents:  226800, marginPct: 40 },
-      { productId: "p13", name: "Coca-Cola 20oz",          sku: "COK-20",     category: "Beverages", units: 390, revenueCents:  507000, costCents:  304200, marginPct: 40 },
-      { productId: "p14", name: "White Owl Cigarillos",    sku: "WOW-CIG",    category: "Tobacco",   units: 132, revenueCents:  422400, costCents:  295680, marginPct: 30 },
-      { productId: "p15", name: "Trolli Sour Worms",       sku: "TRL-SW",     category: "Candy",     units: 185, revenueCents:  185000, costCents:  103600, marginPct: 44 },
-      { productId: "p16", name: "Reese's Peanut Butter",   sku: "RES-PB",     category: "Candy",     units: 200, revenueCents:  200000, costCents:  110000, marginPct: 45 },
-      { productId: "p17", name: "Pepsi 20oz",              sku: "PEP-20",     category: "Beverages", units: 330, revenueCents:  429000, costCents:  257400, marginPct: 40 },
-      { productId: "p18", name: "Kind Bar Almond",         sku: "KND-ALM",    category: "Snacks",    units: 145, revenueCents:  261000, costCents:  156600, marginPct: 40 },
-      { productId: "p19", name: "Juul Pod Mint",           sku: "JUL-MNT",    category: "Vapor",     units:  90, revenueCents:  360000, costCents:  252000, marginPct: 30 },
-      { productId: "p20", name: "Vuse Alto Pod",           sku: "VUS-ALT",    category: "Vapor",     units:  78, revenueCents:  312000, costCents:  218400, marginPct: 30 },
-    ];
-
-    const marginByCategory: MBC[] = [
-      { category: "Tobacco",   units: 1011, revenueCents: 5387440, costCents: 3878510, marginPct: 28 },
-      { category: "Beverages", units: 2310, revenueCents: 3632400, costCents: 2125440, marginPct: 42 },
-      { category: "Lottery",   units:  820, revenueCents:  820000, costCents:  779000, marginPct:  5 },
-      { category: "Snacks",    units:  710, revenueCents:  826000, costCents:  495600, marginPct: 40 },
-      { category: "Candy",     units:  385, revenueCents:  385000, costCents:  213600, marginPct: 45 },
-      { category: "Vapor",     units:  168, revenueCents:  672000, costCents:  470400, marginPct: 30 },
-    ];
-
-    return [
-      http.get(`${V1}/reports/sales-by-product`, async () => {
-        await lat();
-        return HttpResponse.json({ items: salesByProduct });
-      }),
-
-      http.get(`${V1}/reports/margin-by-category`, async () => {
-        await lat();
-        return HttpResponse.json({ items: marginByCategory });
-      }),
-    ];
-  })(),
-];
+);
 

@@ -91,4 +91,29 @@ export function registerRoutes(router: Router, service: SettingsService): void {
   router.get("/currencies", handler(async (_req, res) => {
     res.json({ items: await service.listCurrencies(tenantId(res)) });
   }));
+
+  // Receipt templates — per outlet
+  const receiptSchema = z.object({
+    headerText: z.string().max(255).optional(),
+    footerText: z.string().max(255).optional(),
+    contactInfo: z.string().max(255).optional(),
+    returnPolicy: z.string().max(1000).optional(),
+    showLogo: z.boolean().optional(),
+    showBarcode: z.boolean().optional(),
+    showTaxBreakdown: z.boolean().optional(),
+  });
+
+  router.get("/receipts/:outletId", handler(async (req, res) => {
+    res.json(await service.getReceiptTemplate(String(req.params.outletId), tenantId(res)));
+  }));
+
+  router.post("/receipts/:outletId", handler(async (req, res) => {
+    const body = parseBody(receiptSchema, req.body);
+    res.status(201).json(await service.setReceiptTemplate(String(req.params.outletId), body as Record<string, unknown>, tenantId(res)));
+  }));
+
+  router.patch("/receipts/:outletId", handler(async (req, res) => {
+    const body = parseBody(receiptSchema, req.body);
+    res.json(await service.setReceiptTemplate(String(req.params.outletId), body as Record<string, unknown>, tenantId(res)));
+  }));
 }

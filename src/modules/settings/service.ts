@@ -110,6 +110,34 @@ export class SettingsService {
     );
   }
 
+  // ── Receipt templates (one per outlet, stored in settings_kv) ─────────────
+
+  private receiptKey(outletId: string) { return `receipt_template:${outletId}`; }
+
+  private defaultReceipt(outletId: string) {
+    return {
+      outletId,
+      headerText: "Thank you for visiting!",
+      footerText: "See you again soon.",
+      contactInfo: "",
+      returnPolicy: "Returns accepted within 30 days with receipt.",
+      showLogo: true,
+      showBarcode: true,
+      showTaxBreakdown: true,
+    };
+  }
+
+  async getReceiptTemplate(outletId: string, tenantId: string) {
+    return this.kvGet(this.receiptKey(outletId), tenantId, this.defaultReceipt(outletId));
+  }
+
+  async setReceiptTemplate(outletId: string, data: Record<string, unknown>, tenantId: string) {
+    const current = await this.getReceiptTemplate(outletId, tenantId);
+    const merged = { ...current, ...data, outletId };
+    await this.kvSet(this.receiptKey(outletId), merged, tenantId);
+    return merged;
+  }
+
   /** Seed sensible defaults (idempotent: only when a table is empty). */
   async seedDefaults(tenantId: string) {
     const sm = await this.listShipping(tenantId);

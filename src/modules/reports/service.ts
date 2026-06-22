@@ -103,6 +103,25 @@ export interface Valuation {
   totalRetailCents: number;
 }
 
+export interface SalesByProductItem {
+  productId: string;
+  sku: string;
+  name: string;
+  category: string;
+  units: number;
+  revenueCents: number;
+  costCents: number;
+  marginPct: number;
+}
+
+export interface MarginByCategoryItem {
+  category: string;
+  revenueCents: number;
+  costCents: number;
+  marginPct: number;
+  units: number;
+}
+
 const emptyBuckets = (): AgingBuckets => ({ current: 0, d1_30: 0, d31_60: 0, d61_90: 0, d90_plus: 0, total: 0 });
 
 /** Place an outstanding balance into an aging bucket by days overdue. */
@@ -429,6 +448,62 @@ export class ReportsService {
         ? d.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" })
         : d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
       return { date: key, label, revenueCents: entry.revenueCents, orderCount: entry.orderCount };
+    });
+  }
+
+  async salesByProduct(tenantId: string, sinceMs?: number, limit = 20): Promise<SalesByProductItem[]> {
+    const since = sinceMs ?? 0;
+    const rows = await this.db.query<{
+      product_id: string; sku: string; name: string; category: string;
+      units: number; revenue: number; cost: number;
+    }>(
+      `SELECT ol.product_id,
+              COALESCE(p.sku, '') AS sku,
+              COALESCE(p.name, 'Unknown') AS name,
+              COALESCE(p.category, 'Uncategorized') AS category,
+              SUM(ol.quantity)::int AS units,
+              SUM(ol.unit_price_cents * ol.quantity)::bigint AS revenue,
+              SUM(COALESCE(p.cost_cents, 0) * ol.quantity)::bigint AS cost
+         FROM order_lines ol
+         JOIN orders o ON o.id = ol.order_id
+         LEFT JOIN products p ON p.id = ol.product_id
+        WHERE o.tenant_id = @tenantId AND o.status = 'completed' AND o.created_at >= @since
+        GROUP BY ol.product_id, p.sku, p.name, p.category
+        ORDER BY revenue DESC
+        LIMIT @limit`,
+      { tenantId, since, limit }
+    );
+    return rows.map((r) => {
+      const rev = Number(r.revenue);
+      const cost = Number(r.cost);
+      const marginPct = rev > 0 ? Math.round(((rev - cost) / rev) * 1000) / 10 : 0;
+      return { productId: r.product_id, sku: r.sku, name: r.name, category: r.category,
+               units: Number(r.units), revenueCents: rev, costCents: cost, marginPct };
+    });
+  }
+
+  async marginByCategory(tenantId: string, sinceMs?: number): Promise<MarginByCategoryItem[]> {
+    const since = sinceMs ?? 0;
+    const rows = await this.db.query<{
+      category: string; revenue: number; cost: number; units: number;
+    }>(
+      `SELECT COALESCE(p.category, 'Uncategorized') AS category,
+              SUM(ol.unit_price_cents * ol.quantity)::bigint AS revenue,
+              SUM(COALESCE(p.cost_cents, 0) * ol.quantity)::bigint AS cost,
+              SUM(ol.quantity)::int AS units
+         FROM order_lines ol
+         JOIN orders o ON o.id = ol.order_id
+         LEFT JOIN products p ON p.id = ol.product_id
+        WHERE o.tenant_id = @tenantId AND o.status = 'completed' AND o.created_at >= @since
+        GROUP BY COALESCE(p.category, 'Uncategorized')
+        ORDER BY revenue DESC`,
+      { tenantId, since }
+    );
+    return rows.map((r) => {
+      const rev = Number(r.revenue);
+      const cost = Number(r.cost);
+      const marginPct = rev > 0 ? Math.round(((rev - cost) / rev) * 1000) / 10 : 0;
+      return { category: r.category, revenueCents: rev, costCents: cost, marginPct, units: Number(r.units) };
     });
   }
 

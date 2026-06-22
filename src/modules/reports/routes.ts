@@ -97,6 +97,19 @@ export function registerRoutes(router: Router, service: ReportsService): void {
     res.json({ items: await service.revenueTrend(tenantId(res), days) });
   }));
 
+  // GET /api/v1/reports/sales-by-product?range=…&limit=…
+  router.get("/sales-by-product", handler(async (req, res) => {
+    const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 20;
+    const items = await service.salesByProduct(tenantId(res), sinceFromRange(req), limit);
+    res.json({ items });
+  }));
+
+  // GET /api/v1/reports/margin-by-category?range=…
+  router.get("/margin-by-category", handler(async (req, res) => {
+    const items = await service.marginByCategory(tenantId(res), sinceFromRange(req));
+    res.json({ items });
+  }));
+
   // GET /api/v1/reports/aggregate/daily?date=YYYY-MM-DD — compute daily sales aggregate.
   router.get("/aggregate/daily", handler(async (req, res) => {
     const date = typeof req.query.date === "string" ? req.query.date : new Date().toISOString().slice(0, 10);

@@ -39,11 +39,11 @@ describe("Button", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  it("meets minimum touch target size (44px) via CSS classes", () => {
+  it("meets minimum touch target width (44px) via CSS classes", () => {
     render(<Button>Touch</Button>);
     const btn = screen.getByRole("button");
-    // We check for the class that enforces the touch target
-    expect(btn.className).toContain("min-h-[44px]");
+    // SalesGent spec: 32px height (h-8), 44px min-width for touch targets
+    expect(btn.className).toContain("min-w-[44px]");
   });
 
   it("renders full-width when fullWidth is set", () => {
