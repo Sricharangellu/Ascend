@@ -17,6 +17,8 @@ import type { Order, Payment, CapturePaymentRequest, PaymentMethod } from "@/api
 import { formatMoney, parseToCents, calcChange } from "@/lib/money";
 import { Button } from "@/components/Button";
 import { CardReaderScreen } from "./CardReaderScreen";
+import { enqueueCheckout, requestSync } from "@/lib/offlineOutbox";
+import { getAccessToken } from "@/lib/auth";
 
 interface TenderScreenProps {
   order: Order;
@@ -90,15 +92,43 @@ export function TenderScreen({
           cardCents: cardAmount,
           stripePaymentIntentId,
         };
+
+        // If offline, write to the IndexedDB outbox and request background sync.
+        // Cash-only payments can be queued; card payments require connectivity.
+        if (!navigator.onLine && method === "cash") {
+          const label = `Order ${order.id} — ${formatMoney(cashAmount)} cash`;
+          await enqueueCheckout("/api/v1/payments", req, getAccessToken(), label);
+          await requestSync();
+          // Optimistically complete the sale for the cashier.
+          onSuccess({
+            id: `offline_${Date.now()}`,
+            orderId: order.id,
+            method: "cash",
+            amountCents: order.totalCents,
+            cashCents: cashAmount,
+            cardCents: 0,
+            changeCents: cashAmount - order.totalCents,
+            status: "queued_offline",
+            createdAt: Date.now(),
+          } as unknown as Payment);
+          return;
+        }
+
         const payment = await apiPost<Payment>("/api/v1/payments", req);
         onSuccess(payment);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Payment failed. Please try again.");
+        // Network failure mid-request for cash — offer to queue.
+        const isCash = err instanceof TypeError && (err.message.includes("fetch") || err.message.includes("network"));
+        if (isCash) {
+          setError("Network error. Cash payment saved offline — it will sync when you reconnect.");
+        } else {
+          setError(err instanceof Error ? err.message : "Payment failed. Please try again.");
+        }
       } finally {
         setSubmitting(false);
       }
     },
-    [order.id, onSuccess],
+    [order.id, order.totalCents, onSuccess],
   );
 
   const handleCashSubmit = () => {
