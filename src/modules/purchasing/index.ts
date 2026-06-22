@@ -229,14 +229,20 @@ DO $$
 DECLARE tbl TEXT;
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'set_updated_at') THEN RETURN; END IF;
-  FOREACH tbl IN ARRAY ARRAY['suppliers','purchase_orders']
+  -- Only apply to tables that actually have an updated_at column.
+  FOREACH tbl IN ARRAY ARRAY['suppliers']
   LOOP
     BEGIN
-      EXECUTE format(
-        'CREATE TRIGGER %I_updated_at BEFORE UPDATE ON %I
-         FOR EACH ROW EXECUTE FUNCTION set_updated_at()',
-        tbl, tbl
-      );
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = tbl AND column_name = 'updated_at'
+      ) THEN
+        EXECUTE format(
+          'CREATE TRIGGER %I_updated_at BEFORE UPDATE ON %I
+           FOR EACH ROW EXECUTE FUNCTION set_updated_at()',
+          tbl, tbl
+        );
+      END IF;
     EXCEPTION WHEN duplicate_object THEN NULL;
     END;
   END LOOP;

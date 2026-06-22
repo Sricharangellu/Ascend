@@ -185,11 +185,16 @@ BEGIN
   FOREACH tbl IN ARRAY ARRAY['inventory_locations']
   LOOP
     BEGIN
-      EXECUTE format(
-        'CREATE TRIGGER %I_updated_at BEFORE UPDATE ON %I
-         FOR EACH ROW EXECUTE FUNCTION set_updated_at()',
-        tbl, tbl
-      );
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = tbl AND column_name = 'updated_at'
+      ) THEN
+        EXECUTE format(
+          'CREATE TRIGGER %I_updated_at BEFORE UPDATE ON %I
+           FOR EACH ROW EXECUTE FUNCTION set_updated_at()',
+          tbl, tbl
+        );
+      END IF;
     EXCEPTION WHEN duplicate_object THEN NULL;
     END;
   END LOOP;
