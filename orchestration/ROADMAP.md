@@ -392,11 +392,11 @@ identified in the gaps analysis that survived the "defer" filter.
       Also add `GET /api/v1/sales/reps/:id/performance` (total revenue, orders,
       avg deal size over a date range). (done in 5e4e09f)
 
-- [ ] BE-30: Purchasing — early payment discount on bills: add `discount_pct`
-      and `discount_date` to `bills`; when `PATCH /billing/bills/:id/pay` is
+- [x] BE-30: Purchasing — early payment discount on bills: add `discount_pct`
+      and `discount_date` to `bills`; when `POST /billing/bills/:id/pay` is
       called before `discount_date`, apply the discount and record
       `discount_applied_cents`. Surface in `GET /billing/bills`. See
-      `gaps/PURCHASING_GAPS.md`.
+      `gaps/PURCHASING_GAPS.md`. (done in af7d7a7)
 
 ---
 
@@ -533,5 +533,6 @@ on go-live readiness needs.
 - 2026-06-21 frontend FE-25 -> 8a4cc57: receipt templates section in Settings — per-outlet form (header/footer/contact/return policy + 3 toggles), live thermal receipt preview panel, GET/POST/PATCH mock handlers.
 
 - 2026-06-21 human/assistant SEC-1 -> 5af7a24: full security audit; 6 fixes (customer privilege escalation, receipts/quotation guards, metrics token, logout body injection, CSP headers). Phase 5 system design items added to roadmap; SYSTEM_DESIGN.md created.
+- 2026-06-21 backend BE-30 -> af7d7a7: early payment discount on bills — discount_pct/discount_date/discount_applied_cents columns; payBill applies discount on first payment before deadline; effectiveTotal guards overpayment; mocks seeded.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
