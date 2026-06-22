@@ -420,7 +420,7 @@ export class CatalogService {
     if (items.length === 0) return { imported: 0, barcodes: 0 };
     const now = Date.now();
     let barcodeCount = 0;
-    await this.db.tx(async (tdb) => {
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
       for (const it of items) {
         const category = it.category && it.category.trim() ? it.category.trim() : "general";
         const taxClass = category.toLowerCase() === "groceries" ? "exempt" : "standard";
@@ -861,7 +861,7 @@ export class CatalogService {
 
   async deleteCategory(id: string, tenantId: string): Promise<void> {
     await this.getCategoryOrThrow(id, tenantId);
-    await this.db.tx(async (tdb) => {
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
       await tdb.query("UPDATE categories SET parent_id = NULL WHERE tenant_id = @tenantId AND parent_id = @id", { tenantId, id });
       await tdb.query("DELETE FROM product_categories WHERE tenant_id = @tenantId AND category_id = @id", { tenantId, id });
       await tdb.query("DELETE FROM categories WHERE tenant_id = @tenantId AND id = @id", { tenantId, id });
@@ -883,7 +883,7 @@ export class CatalogService {
     for (const categoryId of categoryIds) {
       await this.getCategoryOrThrow(categoryId, tenantId);
     }
-    await this.db.tx(async (tdb) => {
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
       await tdb.query("DELETE FROM product_categories WHERE tenant_id = @tenantId AND product_id = @productId", { tenantId, productId });
       for (const categoryId of categoryIds) {
         await tdb.query(

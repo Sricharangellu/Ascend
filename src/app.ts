@@ -39,10 +39,30 @@ export interface BuildAppOptions {
  * Wave 0: gateway middleware + identity module + health probes + feature flags.
  */
 export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
-  // Fail fast in production if the JWT signing key is absent — a missing key
-  // would cause every authenticated request to error at runtime.
-  if (process.env["NODE_ENV"] === "production" && !process.env["JWT_SECRET"]) {
-    throw new Error("FATAL: JWT_SECRET environment variable is not set. Set it before starting the server.");
+  // Fail fast in production if required environment variables are absent.
+  if (process.env["NODE_ENV"] === "production") {
+    const REQUIRED_VARS = [
+      ["JWT_SECRET", "JWT signing key — every authenticated request will fail without it"],
+      ["DATABASE_URL", "Postgres connection string — the server cannot start without a database"],
+      ["APP_URL", "Public URL of this service — used in email links and CORS checks"],
+      ["BACKEND_URL", "Internal backend origin — used by the Next.js frontend to reach this API"],
+    ];
+    const missing = REQUIRED_VARS.filter(([name]) => !process.env[name]);
+    if (missing.length > 0) {
+      const lines = missing.map(([name, purpose]) => `  • ${name} — ${purpose}`).join("\n");
+      throw new Error(`FATAL: Missing required environment variables:\n${lines}\n\nSet them before starting the server.`);
+    }
+
+    const WARNED_VARS: [string, string][] = [
+      ["SENDGRID_API_KEY", "password reset and transactional emails will silently fail"],
+      ["STRIPE_SECRET_KEY", "card payments will return 503 — configure Stripe or disable card tender"],
+      ["REDIS_URL", "rate limiting uses in-memory state and will NOT be shared across instances — all replicas will have separate limits"],
+    ];
+    for (const [name, reason] of WARNED_VARS) {
+      if (!process.env[name]) {
+        console.warn(`[startup] WARNING: ${name} is not set — ${reason}`);
+      }
+    }
   }
 
   const schema = options.schema ?? "public";

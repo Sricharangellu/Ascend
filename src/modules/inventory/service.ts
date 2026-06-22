@@ -198,7 +198,7 @@ export class InventoryService {
   async depleteFefo(productId: string, qty: number, tenantId: string): Promise<number> {
     let remaining = Math.abs(qty);
     if (remaining <= 0) return 0;
-    const drawn = await this.db.tx(async (tdb) => {
+    const drawn = await this.db.withTenant(tenantId).tx(async (tdb) => {
       const lots = await tdb.query<{ id: string; qty_on_hand: number }>(
         "SELECT id, qty_on_hand FROM inventory_lots WHERE tenant_id = @tenantId AND product_id = @productId AND qty_on_hand > 0 ORDER BY expiry_date ASC FOR UPDATE",
         { tenantId, productId },
@@ -424,7 +424,7 @@ export class InventoryService {
   }
 
   async setReorderPoint(productId: string, reorderPt: number, tenantId: string): Promise<InventoryRow> {
-    return this.db.tx(async (tdb) => {
+    return this.db.withTenant(tenantId).tx(async (tdb) => {
       const now = Date.now();
       const existing = await tdb.one<InventoryRow>(
         "SELECT * FROM inventory WHERE tenant_id = @tenantId AND product_id = @productId",
@@ -463,7 +463,7 @@ export class InventoryService {
     tenantId: string,
     ref?: string,
   ): Promise<InventoryRow> {
-    const result = await this.db.tx(async (tdb) => {
+    const result = await this.db.withTenant(tenantId).tx(async (tdb) => {
       const now = Date.now();
       const existing = await tdb.one<InventoryRow>(
         "SELECT * FROM inventory WHERE tenant_id = @tenantId AND product_id = @productId",
@@ -749,7 +749,7 @@ export class InventoryService {
     reason: MovementReason,
     ref?: string,
   ): Promise<InventoryStock> {
-    return this.db.tx(async (tdb) => {
+    return this.db.withTenant(tenantId).tx(async (tdb) => {
       const now = Date.now();
       const existing = await tdb.one<InventoryStock>(
         "SELECT * FROM inventory_stock WHERE tenant_id = @tenantId AND location_id = @locationId AND product_id = @productId",

@@ -158,7 +158,7 @@ test("card payment captures with auth code and last4", async () => {
   assert.equal(res.body.change_cents, 0);
   assert.equal(res.body.status, "captured");
   assert.ok(res.body.auth_code, "auth_code present");
-  assert.match(res.body.auth_code, /^EMV-/);
+  assert.match(res.body.auth_code, /^SIM-/);
   assert.match(res.body.card_last4, /^\d{4}$/);
 });
 

@@ -30,6 +30,10 @@ export interface UserRow {
   password_hash: string;
   role: Role;
   custom_role_id: string | null;
+  /** Consecutive failed login attempts since last success or manual reset. */
+  failed_login_attempts: number;
+  /** Unix-ms timestamp until which the account is locked (NULL = not locked). */
+  locked_until_ms: number | null;
   created_at: number;
   updated_at: number;
 }

@@ -237,6 +237,16 @@ CREATE TABLE IF NOT EXISTS security_events (
 CREATE INDEX IF NOT EXISTS security_events_tenant_idx ON security_events (tenant_id, created_at DESC) WHERE tenant_id IS NOT NULL;
 `;
 
+/**
+ * Add lockout columns to users table.
+ * failed_login_attempts: consecutive failures since last success / reset.
+ * locked_until_ms: epoch-ms timestamp after which the account unlocks (NULL = not locked).
+ */
+export const ADD_LOGIN_LOCKOUT_TO_USERS = `
+ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until_ms BIGINT;
+`;
+
 export const IDENTITY_MIGRATIONS = [
   CREATE_TENANTS_TABLE,
   CREATE_USERS_TABLE,
@@ -254,4 +264,5 @@ export const IDENTITY_MIGRATIONS = [
   CREATE_MFA_TABLE,
   CREATE_API_KEYS_TABLE,
   CREATE_PASSWORD_RESET_TABLE,
+  ADD_LOGIN_LOCKOUT_TO_USERS,
 ];

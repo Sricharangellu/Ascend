@@ -88,7 +88,7 @@ export class ShippingService {
       expected_date: input.expectedDate ?? null, shipped_date: null, delivered_date: null,
       notes: input.notes ?? null, created_at: now, updated_at: now,
     };
-    const lines = await this.db.tx(async (tdb) => {
+    const lines = await this.db.withTenant(tenantId).tx(async (tdb) => {
       await tdb.query(
         `INSERT INTO shipping_orders (id, tenant_id, ship_number, invoice_id, customer_id, status, method, carrier, tracking_number, expected_date, shipped_date, delivered_date, notes, created_at, updated_at)
          VALUES (@id,@tenant_id,@ship_number,@invoice_id,@customer_id,@status,@method,@carrier,@tracking_number,@expected_date,@shipped_date,@delivered_date,@notes,@created_at,@updated_at)`,

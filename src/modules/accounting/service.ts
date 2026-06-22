@@ -151,7 +151,7 @@ export class AccountingService {
       description: input.description ?? null, account_id: input.accountId, status: "pending_approval",
       total_cents: total, deposit_date: input.depositDate ?? null, created_at: now, decided_at: null,
     };
-    const items = await this.db.tx(async (tdb) => {
+    const items = await this.db.withTenant(tenantId).tx(async (tdb) => {
       await tdb.query(
         `INSERT INTO batch_deposits (id, tenant_id, batch_number, description, account_id, status, total_cents, deposit_date, created_at, decided_at)
          VALUES (@id,@tenant_id,@batch_number,@description,@account_id,@status,@total_cents,@deposit_date,@created_at,@decided_at)`,

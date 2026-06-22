@@ -112,7 +112,7 @@ export class GiftCardsService {
     // event AFTER the tx commits. The sync outbox (events.onAny) writes via the
     // shared pool, so publishing while the tx still holds the only pooled
     // connection (PG_POOL_MAX=1) would deadlock. This mirrors orders/payments.
-    const { card, balance, status } = await this.db.tx(async (tdb) => {
+    const { card, balance, status } = await this.db.withTenant(tenantId).tx(async (tdb) => {
       const card = await tdb.one<GiftCard>(
         "SELECT * FROM gift_cards WHERE code = @code AND tenant_id = @tenantId FOR UPDATE",
         { code, tenantId },

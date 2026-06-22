@@ -265,7 +265,7 @@ export class SalesService {
       total_cents: subtotal - discount, sales_rep_id: input.salesRepId ?? null, store_id: input.storeId ?? null,
       valid_until: input.validUntil ?? now + 30 * 86_400_000, created_at: now, updated_at: now,
     };
-    const lines = await this.db.tx(async (tdb) => {
+    const lines = await this.db.withTenant(tenantId).tx(async (tdb) => {
       await tdb.query(
         `INSERT INTO quotations (id, tenant_id, quote_number, customer_id, status, subtotal_cents, discount_cents, total_cents, sales_rep_id, store_id, valid_until, created_at, updated_at)
          VALUES (@id,@tenant_id,@quote_number,@customer_id,@status,@subtotal_cents,@discount_cents,@total_cents,@sales_rep_id,@store_id,@valid_until,@created_at,@updated_at)`,
@@ -337,7 +337,7 @@ export class SalesService {
       sales_rep_id: args.salesRepId ?? null, picker_id: args.pickerId ?? null, store_id: args.storeId ?? null,
       created_at: now, updated_at: now,
     };
-    const lines = await this.db.tx(async (tdb) => {
+    const lines = await this.db.withTenant(tenantId).tx(async (tdb) => {
       await tdb.query(
         `INSERT INTO sales_orders (id, tenant_id, so_number, quotation_id, customer_id, status, subtotal_cents, discount_cents, total_cents, sales_rep_id, picker_id, store_id, created_at, updated_at)
          VALUES (@id,@tenant_id,@so_number,@quotation_id,@customer_id,@status,@subtotal_cents,@discount_cents,@total_cents,@sales_rep_id,@picker_id,@store_id,@created_at,@updated_at)`,

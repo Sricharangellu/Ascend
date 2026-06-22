@@ -2,7 +2,9 @@ import type { Router, Request, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody, badRequest } from "../../shared/http.js";
 import { PaymentsService } from "./service.js";
+import { isStripeConfigured, getStripe } from "./stripe.js";
 import type { AuthPayload } from "../../gateway/auth.js";
+import { HttpError } from "../../shared/http.js";
 
 const captureSchema = z.object({
   orderId: z.string().min(1),
@@ -10,8 +12,10 @@ const captureSchema = z.object({
   cashCents: z.number().int().nonnegative().optional(),
   cardCents: z.number().int().nonnegative().optional(),
   tenderedCents: z.number().int().nonnegative().optional(),
-  cardLast4: z.string().length(4).optional(), // from POS terminal UI; backend may override via card reader simulation
   idempotencyKey: z.string().min(1).optional(),
+  // Required for card/split when Stripe is configured; the intent was already
+  // processed by the Terminal reader and just needs to be recorded.
+  stripePaymentIntentId: z.string().min(1).optional(),
 });
 
 function tenantId(res: Response): string {
@@ -19,6 +23,50 @@ function tenantId(res: Response): string {
 }
 
 export function registerRoutes(router: Router, service: PaymentsService): void {
+  // ── Stripe Terminal: connection token (browser SDK uses this to authenticate)
+  router.post(
+    "/connection-token",
+    handler(async (_req, res) => {
+      if (!isStripeConfigured()) {
+        throw new HttpError(503, "payment_unconfigured", "Card payments require STRIPE_SECRET_KEY.");
+      }
+      const token = await getStripe().terminal.connectionTokens.create();
+      res.json({ secret: token.secret });
+    }),
+  );
+
+  // ── Stripe Terminal: create intent + present to reader (server-driven)
+  router.post(
+    "/terminal/start",
+    handler(async (req: Request, res: Response) => {
+      const { orderId } = parseBody(z.object({ orderId: z.string().min(1) }), req.body);
+      const result = await service.createTerminalIntent(orderId, tenantId(res));
+      res.status(201).json(result);
+    }),
+  );
+
+  // ── Stripe Terminal: poll intent status until "succeeded"
+  router.get(
+    "/terminal/status/:intentId",
+    handler(async (req: Request, res: Response) => {
+      const intentId = String(req.params["intentId"]);
+      if (!intentId) throw badRequest("intentId path param is required");
+      const result = await service.getTerminalIntentStatus(intentId);
+      res.json(result);
+    }),
+  );
+
+  // ── Stripe Terminal: cancel intent (customer pressed Cancel before paying)
+  router.post(
+    "/terminal/cancel/:intentId",
+    handler(async (req: Request, res: Response) => {
+      const intentId = String(req.params["intentId"]);
+      await service.cancelTerminalIntent(intentId);
+      res.json({ ok: true });
+    }),
+  );
+
+  // ── Capture payment (cash / card / split)
   router.post(
     "/",
     handler(async (req: Request, res: Response) => {

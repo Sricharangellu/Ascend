@@ -221,7 +221,7 @@ export class OrdersService {
       taxable: r.taxable ? 1 : 0,
     }));
 
-    await this.db.tx(async (tdb) => {
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
       await tdb.query(
         `INSERT INTO orders
            (id, tenant_id, order_number, state_code, status, subtotal_cents,
@@ -305,7 +305,7 @@ export class OrdersService {
       };
     });
 
-    await this.db.tx(async (tdb) => {
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
       // Replace lines.
       await tdb.query("DELETE FROM order_lines WHERE order_id = @id AND tenant_id = @t", { id, t: tenantId });
       for (const l of newLines) {

@@ -3,12 +3,17 @@ import { v7 as uuidv7 } from "uuid";
 import { createHash } from "node:crypto";
 import type { DB } from "../shared/db.js";
 import type { EventBus } from "../shared/events.js";
+import { sendEmail } from "../shared/email.js";
 import { HttpError } from "../shared/http.js";
 import type { Role, TokenClaims, UserRow, AuditLogRow } from "./types.js";
 import { hasRole } from "./types.js";
 
 const ACCESS_TOKEN_TTL = "15m";
 const REFRESH_TOKEN_TTL = "7d";
+
+// Account lockout policy
+const MAX_FAILED_ATTEMPTS = 10;           // lock after 10 consecutive failures
+const LOCKOUT_DURATION_MS = 30 * 60_000; // 30 minutes
 
 export interface LoginInput {
   email: string;
@@ -112,24 +117,49 @@ export class IdentityService {
    * if the hash column is unavailable we fall back to a dev-only plaintext
    * comparison (must not reach production).
    */
-  async login(input: LoginInput): Promise<TokenPair & { user: AuthUser }> {
+  async login(input: LoginInput, ip: string | null = null): Promise<TokenPair & { user: AuthUser }> {
     const user = await this.db.one<UserRow>(
       "SELECT * FROM users WHERE email = @email",
       { email: input.email.toLowerCase().trim() },
     );
 
     if (!user) {
-      await this.logLoginAttempt({ email: input.email, success: false, reason: "invalid_credentials", userId: null, tenantId: null, ip: null });
+      await this.logLoginAttempt({ email: input.email, success: false, reason: "invalid_credentials", userId: null, tenantId: null, ip });
       throw new HttpError(401, "invalid_credentials", "Invalid email or password.");
+    }
+
+    // ── Account lockout check ───────────────────────────────────────────────
+    if (user.locked_until_ms !== null && user.locked_until_ms > Date.now()) {
+      const remainingMs = user.locked_until_ms - Date.now();
+      const remainingMin = Math.ceil(remainingMs / 60_000);
+      await this.logLoginAttempt({ email: input.email, success: false, reason: "account_locked", userId: user.id, tenantId: user.tenant_id, ip });
+      throw new HttpError(
+        429,
+        "account_locked",
+        `Account is temporarily locked after too many failed attempts. Try again in ${remainingMin} minute${remainingMin !== 1 ? "s" : ""}.`,
+      );
     }
 
     const valid = await this.verifyPassword(input.password, user.password_hash);
     if (!valid) {
-      await this.logLoginAttempt({ email: input.email, success: false, reason: "invalid_credentials", userId: user.id, tenantId: user.tenant_id, ip: null });
+      // Increment failure counter; lock when threshold is reached.
+      const newCount = (user.failed_login_attempts ?? 0) + 1;
+      const lockedUntil = newCount >= MAX_FAILED_ATTEMPTS ? Date.now() + LOCKOUT_DURATION_MS : null;
+      await this.db.query(
+        "UPDATE users SET failed_login_attempts = @count, locked_until_ms = @locked, updated_at = @now WHERE id = @id",
+        { count: newCount, locked: lockedUntil, now: Date.now(), id: user.id },
+      );
+      await this.logLoginAttempt({ email: input.email, success: false, reason: "invalid_credentials", userId: user.id, tenantId: user.tenant_id, ip });
       throw new HttpError(401, "invalid_credentials", "Invalid email or password.");
     }
 
-    await this.logLoginAttempt({ email: input.email, success: true, reason: null, userId: user.id, tenantId: user.tenant_id, ip: null });
+    // ── Successful login: reset failure counter ─────────────────────────────
+    await this.db.query(
+      "UPDATE users SET failed_login_attempts = 0, locked_until_ms = NULL, updated_at = @now WHERE id = @id",
+      { now: Date.now(), id: user.id },
+    );
+
+    await this.logLoginAttempt({ email: input.email, success: true, reason: null, userId: user.id, tenantId: user.tenant_id, ip });
 
     const permissions = user.custom_role_id
       ? await this.resolveCustomRolePermissions(user.custom_role_id)
@@ -296,6 +326,10 @@ export class IdentityService {
    * tolerated via ON CONFLICT DO NOTHING. Passwords are bcrypt-hashed.
    */
   async seedDemo(): Promise<void> {
+    // Never seed demo credentials in production — they use well-known passwords
+    // that are committed in plaintext in the source repository.
+    if (process.env["NODE_ENV"] === "production") return;
+
     const existing = await this.db.one<{ c: number }>(
       "SELECT COUNT(*)::int AS c FROM users",
     );
@@ -560,8 +594,17 @@ export class IdentityService {
       "INSERT INTO password_reset_tokens (id, tenant_id, user_id, token_hash, expires_at, created_at) VALUES (@id, @t, @uid, @hash, @exp, @now)",
       { id: `prt_${uuidv7()}`, t: user.tenant_id, uid: user.id, hash, exp: now + 3_600_000, now }
     );
-    // In production: send email. In dev: return token for testing.
-    return { token };
+    const appUrl = process.env["APP_URL"] ?? "https://finder-pos.vercel.app";
+    const resetLink = `${appUrl}/login/reset-password?token=${encodeURIComponent(token)}`;
+    await sendEmail({
+      to: email,
+      from: process.env["EMAIL_FROM"] ?? "noreply@finder-pos.app",
+      subject: "Reset your Finder POS password",
+      text: `You requested a password reset.\n\nClick the link below to set a new password (expires in 1 hour):\n${resetLink}\n\nIf you did not request this, you can safely ignore this email.`,
+      html: `<p>You requested a password reset.</p><p><a href="${resetLink}">Reset my password</a></p><p>This link expires in 1 hour. If you did not request this, ignore this email.</p>`,
+    }).catch(() => { /* email failure must not surface to user */ });
+    // In dev (no SENDGRID_API_KEY), return token directly for testing
+    return process.env["NODE_ENV"] !== "production" ? { token } : null;
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
@@ -619,14 +662,23 @@ export class IdentityService {
   }
 
   private async verifyPassword(plain: string, stored: string): Promise<boolean> {
-    // When the Database agent stores bcrypt hashes, we detect the $2b$ prefix.
-    // Until that schema lands we fall back to a dev-mode string comparison
-    // (blocked by the feature flag `identity.bcrypt_required` in production).
     if (stored.startsWith("$2b$") || stored.startsWith("$2a$")) {
       const { default: bcrypt } = await import("bcryptjs");
       return bcrypt.compare(plain, stored);
     }
-    // Dev/test fallback — not for production.
+
+    // In production, every password_hash MUST be a bcrypt hash.
+    // A non-bcrypt value means the row was written without hashing — refuse
+    // rather than silently comparing plaintext (which would be exploitable).
+    if (process.env["NODE_ENV"] === "production") {
+      throw new HttpError(
+        500,
+        "misconfigured",
+        "User account has an invalid credential format. Contact your administrator.",
+      );
+    }
+
+    // Dev/test only: allow plaintext equality for manually-inserted seed rows.
     return plain === stored;
   }
 

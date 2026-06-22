@@ -22,8 +22,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS employees_tenant_email_idx
   ON employees (tenant_id, email) WHERE email != '';
 `;
 
-const CREATE_SHIFTS = `
-CREATE TABLE IF NOT EXISTS shifts (
+const CREATE_SCHEDULE_SHIFTS = `
+CREATE TABLE IF NOT EXISTS schedule_shifts (
   id TEXT PRIMARY KEY,
   tenant_id TEXT NOT NULL,
   employee_id TEXT NOT NULL,
@@ -34,8 +34,8 @@ CREATE TABLE IF NOT EXISTS shifts (
   created_at BIGINT NOT NULL,
   updated_at BIGINT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS shifts_tenant_date_idx ON shifts (tenant_id, date);
-CREATE INDEX IF NOT EXISTS shifts_tenant_employee_idx ON shifts (tenant_id, employee_id, date);
+CREATE INDEX IF NOT EXISTS schedule_shifts_tenant_date_idx ON schedule_shifts (tenant_id, date);
+CREATE INDEX IF NOT EXISTS schedule_shifts_tenant_employee_idx ON schedule_shifts (tenant_id, employee_id, date);
 `;
 
 const CREATE_TIME_OFF = `
@@ -54,7 +54,7 @@ CREATE INDEX IF NOT EXISTS time_off_tenant_idx ON time_off_requests (tenant_id, 
 
 export const workforceModule: PosModule = {
   name: "workforce",
-  migrations: [CREATE_EMPLOYEES, CREATE_SHIFTS, CREATE_TIME_OFF],
+  migrations: [CREATE_EMPLOYEES, CREATE_SCHEDULE_SHIFTS, CREATE_TIME_OFF],
   register({ db, events, router }: { db: DB; events: EventBus; router: Router }) {
     const svc = workforceService(db, events);
     registerRoutes(router, svc);

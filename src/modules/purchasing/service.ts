@@ -358,7 +358,7 @@ export class PurchasingService {
     const now = Date.now();
     const id = `ret_${uuidv7()}`;
     const total = input.lines.reduce((s, l) => s + l.quantity * (l.unitCostCents ?? 0), 0);
-    await this.db.tx(async (tdb) => {
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
       await tdb.query(
         `INSERT INTO vendor_returns (id, tenant_id, supplier_id, reason, total_cost_cents, credit_id, status, created_at)
          VALUES (@id,@t,@sup,@reason,@total,NULL,'recorded',@now)`,
@@ -428,7 +428,7 @@ export class PurchasingService {
       billed_qty: null,
     }));
     const total = poLines.reduce((s, l) => s + l.line_cost_cents, 0);
-    await this.db.tx(async (tdb) => {
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
       await tdb.query(
         `INSERT INTO purchase_orders (id, tenant_id, supplier_id, status, total_cost_cents, po_number, created_at, received_at)
          VALUES (@id,@tenant_id,@supplier_id,'ordered',@total,@po_number,@created_at,NULL)`,
@@ -519,7 +519,7 @@ export class PurchasingService {
       return { id: l.id, share };
     });
 
-    await this.db.tx(async (tdb) => {
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
       for (const { id, share } of allocations) {
         await tdb.query(
           "UPDATE purchase_order_lines SET landed_cost_cents = @share WHERE id = @id AND tenant_id = @tenantId",
@@ -565,7 +565,7 @@ export class PurchasingService {
     const now = Date.now();
 
     // Apply the increments and compute new PO status.
-    await this.db.tx(async (tdb) => {
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
       for (const rl of receiveLines) {
         await tdb.query(
           "UPDATE purchase_order_lines SET received_qty = received_qty + @qty WHERE id = @lid AND tenant_id = @tenantId",

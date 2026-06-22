@@ -114,7 +114,7 @@ export function workforceService(db: DB, _events: EventBus) {
       if (employee_id) { where.push("s.employee_id = @employee_id"); params["employee_id"] = employee_id; }
       return db.query<Shift>(
         `SELECT s.*, e.name AS employee_name, e.role
-         FROM shifts s
+         FROM schedule_shifts s
          JOIN employees e ON e.id = s.employee_id AND e.tenant_id = s.tenant_id
          WHERE ${where.join(" AND ")}
          ORDER BY s.date, s.start_time`,
@@ -137,7 +137,7 @@ export function workforceService(db: DB, _events: EventBus) {
       const now = Date.now();
       const id = `sh_${uuidv7()}`;
       await db.query(
-        `INSERT INTO shifts (id, tenant_id, employee_id, date, start_time, end_time, notes, created_at, updated_at)
+        `INSERT INTO schedule_shifts (id, tenant_id, employee_id, date, start_time, end_time, notes, created_at, updated_at)
          VALUES (@id, @tenantId, @employee_id, @date, @start_time, @end_time, @notes, @now, @now)`,
         { id, tenantId, employee_id: input.employee_id, date: input.date, start_time: input.start_time, end_time: input.end_time, notes: input.notes ?? null, now }
       );
@@ -153,18 +153,18 @@ export function workforceService(db: DB, _events: EventBus) {
       date: string; start_time: string; end_time: string; notes: string | null;
     }>): Promise<Shift> {
       const rows = await db.query<{ id: string }>(
-        "SELECT id FROM shifts WHERE id = @id AND tenant_id = @tenantId",
+        "SELECT id FROM schedule_shifts WHERE id = @id AND tenant_id = @tenantId",
         { id, tenantId }
       );
       if (!rows[0]) throw notFound("shift");
       const now = Date.now();
-      if (input.date !== undefined)       await db.query("UPDATE shifts SET date=@v, updated_at=@now WHERE id=@id", { v: input.date, now, id });
-      if (input.start_time !== undefined) await db.query("UPDATE shifts SET start_time=@v, updated_at=@now WHERE id=@id", { v: input.start_time, now, id });
-      if (input.end_time !== undefined)   await db.query("UPDATE shifts SET end_time=@v, updated_at=@now WHERE id=@id", { v: input.end_time, now, id });
-      if (input.notes !== undefined)      await db.query("UPDATE shifts SET notes=@v, updated_at=@now WHERE id=@id", { v: input.notes, now, id });
+      if (input.date !== undefined)       await db.query("UPDATE schedule_shifts SET date=@v, updated_at=@now WHERE id=@id", { v: input.date, now, id });
+      if (input.start_time !== undefined) await db.query("UPDATE schedule_shifts SET start_time=@v, updated_at=@now WHERE id=@id", { v: input.start_time, now, id });
+      if (input.end_time !== undefined)   await db.query("UPDATE schedule_shifts SET end_time=@v, updated_at=@now WHERE id=@id", { v: input.end_time, now, id });
+      if (input.notes !== undefined)      await db.query("UPDATE schedule_shifts SET notes=@v, updated_at=@now WHERE id=@id", { v: input.notes, now, id });
       const updated = await db.one<Shift>(
         `SELECT s.*, e.name AS employee_name, e.role
-         FROM shifts s JOIN employees e ON e.id = s.employee_id
+         FROM schedule_shifts s JOIN employees e ON e.id = s.employee_id
          WHERE s.id = @id`,
         { id }
       );
@@ -173,11 +173,11 @@ export function workforceService(db: DB, _events: EventBus) {
 
     async deleteShift(tenantId: string, id: string): Promise<void> {
       const rows = await db.query<{ id: string }>(
-        "SELECT id FROM shifts WHERE id = @id AND tenant_id = @tenantId",
+        "SELECT id FROM schedule_shifts WHERE id = @id AND tenant_id = @tenantId",
         { id, tenantId }
       );
       if (!rows[0]) throw notFound("shift");
-      await db.query("DELETE FROM shifts WHERE id = @id AND tenant_id = @tenantId", { id, tenantId });
+      await db.query("DELETE FROM schedule_shifts WHERE id = @id AND tenant_id = @tenantId", { id, tenantId });
     },
 
     // ── Time-off requests ─────────────────────────────────────────────────

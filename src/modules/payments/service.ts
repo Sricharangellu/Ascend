@@ -3,7 +3,8 @@ import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import { Money, type Cents } from "../../shared/money.js";
-import { notFound, badRequest, conflict } from "../../shared/http.js";
+import { notFound, badRequest, conflict, HttpError } from "../../shared/http.js";
+import { getStripe, isStripeConfigured, resolveChargeDetails } from "./stripe.js";
 
 export type PaymentMethod = "cash" | "card" | "split";
 export type PaymentStatus = "captured" | "declined";
@@ -31,6 +32,12 @@ export interface CapturePaymentInput {
   tenderedCents?: Cents;
   /** Idempotency key: a retried capture with the same key returns the cached result without re-charging. */
   idempotencyKey?: string;
+  /**
+   * Required for card / split payments when STRIPE_SECRET_KEY is configured.
+   * The Stripe PaymentIntent ID that was already processed by the Terminal reader.
+   * The backend retrieves this intent to get real last4 and authorization code.
+   */
+  stripePaymentIntentId?: string;
 }
 
 interface OrderRow {
@@ -40,10 +47,56 @@ interface OrderRow {
 
 const CLOSED_ORDER_STATUSES = new Set(["completed", "refunded", "voided", "paid"]);
 
+// Dev-only simulation — never runs in production (guarded below).
 function simulateCardRead(): { last4: string; authCode: string } {
   const last4 = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
   const token = uuidv7().replace(/-/g, "").slice(0, 12).toUpperCase();
-  return { last4, authCode: `EMV-${token}` };
+  return { last4, authCode: `SIM-${token}` };
+}
+
+/**
+ * Resolve card data from a Stripe PaymentIntent that was already processed
+ * by a Terminal reader. In dev without Stripe configured, falls back to
+ * simulation. In production without Stripe configured, throws 503.
+ */
+async function resolveCardFromStripe(
+  stripePaymentIntentId: string | undefined,
+  amountCents: Cents,
+): Promise<{ cardCents: Cents; last4: string | null; authCode: string | null }> {
+  if (isStripeConfigured()) {
+    if (!stripePaymentIntentId) {
+      throw badRequest(
+        "stripePaymentIntentId is required for card payments when Stripe is configured.",
+      );
+    }
+    const stripe = getStripe();
+    const intent = await stripe.paymentIntents.retrieve(stripePaymentIntentId, {
+      expand: ["latest_charge"],
+    });
+    if (intent.status !== "succeeded") {
+      throw badRequest(
+        `Stripe PaymentIntent ${stripePaymentIntentId} has status '${intent.status}' — only 'succeeded' intents can be recorded.`,
+      );
+    }
+    const { last4, authCode } = resolveChargeDetails(intent);
+    return { cardCents: amountCents, last4, authCode };
+  }
+
+  if (process.env["NODE_ENV"] === "production") {
+    throw new HttpError(
+      503,
+      "payment_unconfigured",
+      "Card payments require STRIPE_SECRET_KEY to be set. Contact your administrator.",
+    );
+  }
+
+  // Development simulation — explicit warning so it's never silent.
+  console.warn(
+    "[payments] STRIPE_SECRET_KEY not set — using card simulation (dev only). " +
+      "Set STRIPE_SECRET_KEY before deploying.",
+  );
+  const { last4, authCode } = simulateCardRead();
+  return { cardCents: amountCents, last4, authCode };
 }
 
 /**
@@ -150,10 +203,10 @@ export class PaymentsService {
         if (owed <= 0) {
           throw badRequest(`cannot charge card for non-positive amount ${owed}`);
         }
-        const { last4, authCode: code } = simulateCardRead();
-        cardCents = owed;
-        cardLast4 = last4;
-        authCode = code;
+        const cardResult = await resolveCardFromStripe(input.stripePaymentIntentId, owed);
+        cardCents = cardResult.cardCents;
+        cardLast4 = cardResult.last4;
+        authCode = cardResult.authCode;
         break;
       }
 
@@ -176,9 +229,9 @@ export class PaymentsService {
         cashCents = cash;
         cardCents = card;
         if (card > 0) {
-          const { last4, authCode: code } = simulateCardRead();
-          cardLast4 = last4;
-          authCode = code;
+          const cardResult = await resolveCardFromStripe(input.stripePaymentIntentId, card);
+          cardLast4 = cardResult.last4;
+          authCode = cardResult.authCode;
         }
         break;
       }
@@ -204,33 +257,35 @@ export class PaymentsService {
       created_at: Date.now(),
     };
 
-    await this.db.query(
-      `INSERT INTO payments
-         (id, tenant_id, order_id, method, amount_cents, cash_cents, card_cents,
-          change_cents, card_last4, auth_code, status, created_at)
-       VALUES
-         (@id, @tenant_id, @order_id, @method, @amount_cents, @cash_cents, @card_cents,
-          @change_cents, @card_last4, @auth_code, @status, @created_at)`,
-      record as unknown as Record<string, unknown>,
-    );
-
-    // Store the idempotency key so retries return the same record.
-    if (input.idempotencyKey && fingerprint) {
-      const now = Date.now();
-      await this.db.query(
-        `INSERT INTO idempotency_keys (id, tenant_id, key, response, created_at, expires_at)
-         VALUES (@id, @tenantId, @key, @response, @created_at, @expires_at)
-         ON CONFLICT (tenant_id, key) DO NOTHING`,
-        {
-          id: `idk_${uuidv7()}`,
-          tenantId,
-          key: input.idempotencyKey,
-          response: JSON.stringify({ fingerprint, record } satisfies IdempotencyEnvelope),
-          created_at: now,
-          expires_at: now + 24 * 60 * 60 * 1000, // 24h TTL
-        },
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
+      await tdb.query(
+        `INSERT INTO payments
+           (id, tenant_id, order_id, method, amount_cents, cash_cents, card_cents,
+            change_cents, card_last4, auth_code, status, created_at)
+         VALUES
+           (@id, @tenant_id, @order_id, @method, @amount_cents, @cash_cents, @card_cents,
+            @change_cents, @card_last4, @auth_code, @status, @created_at)`,
+        record as unknown as Record<string, unknown>,
       );
-    }
+
+      // Store the idempotency key so retries return the same record.
+      if (input.idempotencyKey && fingerprint) {
+        const now = Date.now();
+        await tdb.query(
+          `INSERT INTO idempotency_keys (id, tenant_id, key, response, created_at, expires_at)
+           VALUES (@id, @tenantId, @key, @response, @created_at, @expires_at)
+           ON CONFLICT (tenant_id, key) DO NOTHING`,
+          {
+            id: `idk_${uuidv7()}`,
+            tenantId,
+            key: input.idempotencyKey,
+            response: JSON.stringify({ fingerprint, record } satisfies IdempotencyEnvelope),
+            created_at: now,
+            expires_at: now + 24 * 60 * 60 * 1000, // 24h TTL
+          },
+        );
+      }
+    });
 
     await this.events.publish(
       "payment.captured",
@@ -264,5 +319,86 @@ export class PaymentsService {
       "SELECT * FROM payments WHERE order_id = @orderId AND tenant_id = @tenantId ORDER BY created_at ASC",
       { orderId, tenantId },
     );
+  }
+
+  /**
+   * Create a Stripe PaymentIntent for a Terminal card payment (server-driven flow).
+   * The intent is presented to the registered reader so the customer can tap/insert.
+   * Returns the intent ID and status so the frontend can poll for completion.
+   *
+   * Requires STRIPE_SECRET_KEY and STRIPE_TERMINAL_READER_ID env vars.
+   */
+  async createTerminalIntent(orderId: string, tenantId: string): Promise<{
+    intentId: string;
+    status: string;
+    readerId: string;
+  }> {
+    if (!isStripeConfigured()) {
+      throw new HttpError(
+        503,
+        "payment_unconfigured",
+        "Card payments require STRIPE_SECRET_KEY to be set.",
+      );
+    }
+
+    const readerId = process.env["STRIPE_TERMINAL_READER_ID"];
+    if (!readerId) {
+      throw new HttpError(
+        503,
+        "payment_unconfigured",
+        "STRIPE_TERMINAL_READER_ID is not set. Register a Terminal reader in your Stripe dashboard and set this env var.",
+      );
+    }
+
+    const owed = await this.loadOrderOwed(orderId, tenantId);
+    const stripe = getStripe();
+
+    const intent = await stripe.paymentIntents.create({
+      amount: owed,
+      currency: "usd",
+      payment_method_types: ["card_present"],
+      capture_method: "automatic",
+    });
+
+    // Present the intent to the physical reader.
+    await stripe.terminal.readers.processPaymentIntent(readerId, {
+      payment_intent: intent.id,
+    });
+
+    return { intentId: intent.id, status: intent.status, readerId };
+  }
+
+  /**
+   * Poll the current status of a Stripe PaymentIntent.
+   * The frontend calls this repeatedly until status = "succeeded" or a terminal error.
+   */
+  async getTerminalIntentStatus(intentId: string): Promise<{
+    status: string;
+    last4: string | null;
+    authCode: string | null;
+  }> {
+    if (!isStripeConfigured()) {
+      throw new HttpError(503, "payment_unconfigured", "Card payments require STRIPE_SECRET_KEY.");
+    }
+    const stripe = getStripe();
+    const intent = await stripe.paymentIntents.retrieve(intentId, {
+      expand: ["latest_charge"],
+    });
+    const { last4, authCode } = resolveChargeDetails(intent);
+    return { status: intent.status, last4, authCode };
+  }
+
+  /**
+   * Cancel a Stripe PaymentIntent that was presented to a reader but not yet paid.
+   * Called when the customer presses Cancel on the frontend.
+   */
+  async cancelTerminalIntent(intentId: string): Promise<void> {
+    if (!isStripeConfigured()) return;
+    const stripe = getStripe();
+    try {
+      await stripe.paymentIntents.cancel(intentId);
+    } catch {
+      // If already succeeded/cancelled, ignore.
+    }
   }
 }

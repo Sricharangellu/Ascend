@@ -96,7 +96,7 @@ export class FulfillmentService {
       id: `pkl_${uuidv7()}`, tenant_id: tenantId, pick_list_id: id, product_id: ol.product_id,
       name: ol.name, quantity: Number(ol.quantity), picked_qty: 0, location_code: ol.code ?? null, status: "pending",
     }));
-    await this.db.tx(async (tdb) => {
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
       await tdb.query("INSERT INTO pick_lists (id, tenant_id, order_id, status, created_at, updated_at) VALUES (@id,@t,@o,'picking',@now,@now)", { id, t: tenantId, o: orderId, now });
       for (const l of lines) {
         await tdb.query(
