@@ -384,13 +384,13 @@ identified in the gaps analysis that survived the "defer" filter.
 
 ### Backend lane (Phase 4)
 
-- [ ] BE-29: Sales rep management — `sales_reps(id, tenant_id, name, email,
+- [x] BE-29: Sales rep management — `sales_reps(id, tenant_id, name, email,
       commission_pct, active, created_at)` table + CRUD endpoints
       `GET/POST /api/v1/sales/reps`, `PATCH /api/v1/sales/reps/:id`. The
       existing `sales-by-rep` report currently references `sales_rep_id` in
       quotations/sales-orders but there is no way to create or manage reps.
       Also add `GET /api/v1/sales/reps/:id/performance` (total revenue, orders,
-      avg deal size over a date range).
+      avg deal size over a date range). (done in 5e4e09f)
 
 - [ ] BE-30: Purchasing — early payment discount on bills: add `discount_pct`
       and `discount_date` to `bills`; when `PATCH /billing/bills/:id/pay` is
