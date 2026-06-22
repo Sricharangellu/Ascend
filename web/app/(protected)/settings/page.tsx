@@ -11,24 +11,33 @@ import { useToast } from "@/components/Toast";
 import { formatMoney } from "@/lib/money";
 import { Badge } from "@/components/Badge";
 import type { ShippingMethod, PaymentTerm, PaymentMode, TaxRate, Account, Deposit } from "@/api-client/types";
+import { usePathname, useRouter } from "next/navigation";
 
 type Section = "store" | "shipping" | "terms" | "modes" | "tax" | "flags" | "security" | "coa" | "deposits" | "loyalty" | "api-keys" | "currencies" | "receipts";
 
 interface Business { [key: string]: unknown }
 
 export default function SettingsPage() {
+  const pathname = usePathname();
+  const router = useRouter();
   const role = getUser()?.role ?? "cashier";
   const canManage = role === "owner" || role === "manager";
-  const [section, setSection] = useState<Section>("store");
+  const [section, setSection] = useState<Section>(() => sectionFromPath(pathname));
   const { addToast } = useToast();
 
+  useEffect(() => setSection(sectionFromPath(pathname)), [pathname]);
+
   return (
-    <EnterpriseShell active="settings" title="Settings" subtitle="Store, payments, shipping, and feature flags" contentClassName="overflow-y-auto">
+    <EnterpriseShell active="settings" title="Setup" subtitle="Store, payments, shipping, and feature flags" contentClassName="overflow-y-auto">
       <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-5 px-4 py-6 xl:grid-cols-[16rem_1fr]">
         <Card className="h-fit p-2">
           <nav aria-label="Settings sections" className="flex flex-col gap-1">
             {(["store", "shipping", "terms", "modes", "tax", "flags", "security", "coa", "deposits", "loyalty", "receipts", "api-keys", "currencies"] as Section[]).map((s) => (
-              <SectionButton key={s} active={section === s} onClick={() => setSection(s)} label={sectionLabel(s)} />
+              <SectionButton key={s} active={section === s} onClick={() => {
+                setSection(s);
+                const route = sectionPath(s);
+                if (route) router.replace(route, { scroll: false });
+              }} label={sectionLabel(s)} />
             ))}
           </nav>
         </Card>
@@ -51,6 +60,35 @@ export default function SettingsPage() {
       </div>
     </EnterpriseShell>
   );
+}
+
+function sectionFromPath(pathname: string): Section {
+  if (pathname.endsWith("/shipping")) return "shipping";
+  if (pathname.endsWith("/payment-terms")) return "terms";
+  if (pathname.endsWith("/payment-types") || pathname.endsWith("/payment-modes")) return "modes";
+  if (pathname.endsWith("/taxes")) return "tax";
+  if (pathname.endsWith("/security")) return "security";
+  if (pathname.endsWith("/loyalty")) return "loyalty";
+  if (pathname.endsWith("/devices")) return "receipts";
+  return "store";
+}
+
+function sectionPath(section: Section): string | null {
+  return {
+    store: "/setup",
+    shipping: "/setup/shipping",
+    terms: "/setup/payment-terms",
+    modes: "/setup/payment-modes",
+    tax: "/setup/taxes",
+    security: "/setup/security",
+    loyalty: "/setup/loyalty",
+    receipts: "/setup/devices",
+    flags: null,
+    coa: null,
+    deposits: null,
+    "api-keys": null,
+    currencies: null,
+  }[section];
 }
 
 function sectionLabel(s: Section): string {
@@ -1771,6 +1809,7 @@ function SectionButton({ active, label, onClick }: { active: boolean; label: str
     <button
       type="button"
       onClick={onClick}
+      aria-current={active ? "page" : undefined}
       className={`min-h-[44px] rounded-md px-3 text-left text-sm font-medium transition-colors ${active ? "bg-slate-950 text-white" : "text-slate-700 hover:bg-slate-100"}`}
     >
       {label}

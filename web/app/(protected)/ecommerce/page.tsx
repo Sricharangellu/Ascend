@@ -9,6 +9,7 @@ import { TableSkeleton } from "@/components/TableSkeleton";
 import { formatMoney } from "@/lib/money";
 import { apiGet, apiPatch, ApiResponseError } from "@/api-client/client";
 import type { OnlineOrder } from "@/api-client/types";
+import { usePathname, useRouter } from "next/navigation";
 
 // ── Local types ──────────────────────────────────────────────────────────────
 
@@ -413,7 +414,11 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export default function EcommercePage() {
-  const [activeTab, setActiveTab] = useState<Tab>("catalog");
+  const pathname = usePathname();
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<Tab>(() => ecommerceTabFromPath(pathname));
+
+  useEffect(() => setActiveTab(ecommerceTabFromPath(pathname)), [pathname]);
 
   return (
     <EnterpriseShell
@@ -430,7 +435,11 @@ export default function EcommercePage() {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  router.replace(tab.id === "catalog" ? "/ecommerce/products" : tab.id === "orders" ? "/ecommerce/orders" : "/ecommerce/shipping", { scroll: false });
+                }}
+                aria-current={activeTab === tab.id ? "page" : undefined}
                 className={[
                   "whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition-colors",
                   activeTab === tab.id
@@ -451,4 +460,10 @@ export default function EcommercePage() {
       </div>
     </EnterpriseShell>
   );
+}
+
+function ecommerceTabFromPath(pathname: string): Tab {
+  if (pathname.endsWith("/orders")) return "orders";
+  if (pathname.endsWith("/shipping")) return "settings";
+  return "catalog";
 }

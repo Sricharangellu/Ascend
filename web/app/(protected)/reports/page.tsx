@@ -19,12 +19,26 @@ import { ReportsDashboard } from "@/components/reports/ReportsDashboard";
 import { ReportsSubNav } from "@/components/reports/ReportsSubNav";
 import { Card } from "@/components/Card";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
+import { usePathname, useRouter } from "next/navigation";
+import { useFinderContext, type FinderDateRange } from "@/lib/useFinderContext";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 type Range = "7d" | "30d" | "90d" | "custom";
 type SortKey = "name" | "units" | "revenueCents" | "costCents" | "marginPct";
 type SortDir = "asc" | "desc";
+
+function relativeDateRange(days: number): FinderDateRange {
+  const end = new Date();
+  const start = new Date(end);
+  start.setDate(end.getDate() - days + 1);
+  const iso = (value: Date) => value.toISOString().slice(0, 10);
+  return {
+    startDate: iso(start),
+    endDate: iso(end),
+    preset: days === 7 ? "current_week" : days === 30 ? "current_month" : "custom",
+  };
+}
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -640,13 +654,27 @@ function LowStockSection() {
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const {
+    storeId,
+    outletId,
+    dateRange,
+    comparisonPeriod,
+    granularity,
+    setDateRange,
+    setGranularity,
+  } = useFinderContext();
   const [summary, setSummary] = useState<SalesSummary | null>(null);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [kpiLoading, setKpiLoading] = useState(true);
   const [kpiError, setKpiError] = useState<string | null>(null);
-  const [range, setRange] = useState<Range>("30d");
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo, setCustomTo] = useState("");
+  const [range, setRange] = useState<Range>(() =>
+    dateRange.preset === "today" || dateRange.preset === "current_week" ? "7d" :
+      dateRange.preset === "current_month" ? "30d" : "custom"
+  );
+  const [customFrom, setCustomFrom] = useState(dateRange.startDate);
+  const [customTo, setCustomTo] = useState(dateRange.endDate);
 
   const role = getUser()?.role ?? "cashier";
   const allowed = role === "owner" || role === "manager";
@@ -657,6 +685,46 @@ export default function ReportsPage() {
       : range === "custom"
       ? "30d"
       : range;
+
+  const applyRange = useCallback((next: Range) => {
+    setRange(next);
+    if (next === "7d") setDateRange(relativeDateRange(7));
+    if (next === "30d") setDateRange(relativeDateRange(30));
+    if (next === "90d") setDateRange(relativeDateRange(90));
+  }, [setDateRange]);
+
+  useEffect(() => {
+    if (range === "custom" && customFrom && customTo) {
+      setDateRange({ startDate: customFrom, endDate: customTo, preset: "custom" });
+    }
+  }, [customFrom, customTo, range, setDateRange]);
+
+  useEffect(() => {
+    const definition = {
+      metric: "revenue",
+      dimension: "sales_summary",
+      constraints: [
+        { field: "store_id", operator: "eq", value: storeId },
+        { field: "outlet_id", operator: "eq", value: outletId },
+      ],
+      granularity,
+      periodType: range === "custom" ? "absolute" : "last_n_days",
+      periodCount: range === "custom" ? null : Number.parseInt(range, 10),
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate,
+      comparison: comparisonPeriod,
+      order: { column: "revenue", direction: "desc" },
+      reportView: "table",
+      optionalAggregates: ["sale_count", "gross_profit", "avg_sale_value"],
+      dimensionMetadata: { store_id: "Store", outlet_id: "Outlet" },
+    };
+    const params = new URLSearchParams({
+      definition: window.btoa(JSON.stringify(definition)),
+      id: "overview",
+      type: "prepared",
+    });
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [comparisonPeriod, dateRange, granularity, outletId, pathname, range, router, storeId]);
 
   const loadKpi = useCallback(async () => {
     if (!allowed) {
@@ -701,7 +769,7 @@ export default function ReportsPage() {
   return (
     <EnterpriseShell
       active="reports"
-      title="Reports"
+      title="Reporting"
       subtitle={`Analytics · Demo Store · ${rangeLabel}`}
       contentClassName="overflow-y-auto"
     >
@@ -732,7 +800,7 @@ export default function ReportsPage() {
                   <button
                     key={r}
                     type="button"
-                    onClick={() => setRange(r)}
+                    onClick={() => applyRange(r)}
                     className={`min-h-[34px] rounded-md px-4 text-sm font-medium transition-colors ${
                       range === r
                         ? "bg-slate-950 text-white shadow-sm"
@@ -744,7 +812,7 @@ export default function ReportsPage() {
                 ))}
                 <button
                   type="button"
-                  onClick={() => setRange("custom")}
+                  onClick={() => applyRange("custom")}
                   className={`min-h-[34px] rounded-md px-4 text-sm font-medium transition-colors ${
                     range === "custom"
                       ? "bg-slate-950 text-white shadow-sm"
@@ -773,6 +841,14 @@ export default function ReportsPage() {
                   />
                 </div>
               )}
+              <div role="group" aria-label="Report granularity" className="inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+                {(["day", "week", "month"] as const).map((value) => (
+                  <button key={value} type="button" onClick={() => setGranularity(value)} aria-pressed={granularity === value}
+                    className={`min-h-[34px] rounded-md px-3 text-sm font-medium capitalize transition-colors ${granularity === value ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100"}`}>
+                    {value}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* ── KPI summary ────────────────────────────────────────────── */}

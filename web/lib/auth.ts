@@ -23,6 +23,7 @@ let _expiresAt: number | null = null; // unix ms
 let _user: UserProfile | null = null;
 
 const USER_KEY = "finder_pos_user";
+const MOCK_REFRESH_KEY = "finder_pos_mock_refresh";
 
 // ─── Public getters ───────────────────────────────────────────────────────────
 
@@ -65,6 +66,9 @@ export function setSession(
   // Persist user profile so silentRefresh can restore it across page loads.
   if (typeof window !== "undefined") {
     sessionStorage.setItem(USER_KEY, JSON.stringify(user));
+    if (process.env.NODE_ENV === "development") {
+      sessionStorage.setItem(MOCK_REFRESH_KEY, _refreshToken);
+    }
     document.cookie = "finder_session_hint=1; Path=/; SameSite=Lax";
   }
 }
@@ -88,6 +92,7 @@ export function clearSession(): void {
   _user = null;
   if (typeof window !== "undefined") {
     sessionStorage.removeItem(USER_KEY);
+    sessionStorage.removeItem(MOCK_REFRESH_KEY);
     document.cookie = "finder_session_hint=; Path=/; Max-Age=0; SameSite=Lax";
   }
 }
@@ -128,10 +133,14 @@ export async function silentRefresh(): Promise<boolean> {
     // Import lazily to avoid circular deps (client imports auth)
     const { apiPost } = await import("@/api-client/client");
 
-    // No body needed — the refresh token is in the httpOnly cookie.
+    // Production uses the httpOnly cookie. MSW cannot create that cookie, so
+    // development sends its mock token from session storage instead.
+    const mockRefreshToken = process.env.NODE_ENV === "development"
+      ? sessionStorage.getItem(MOCK_REFRESH_KEY)
+      : null;
     const data = await apiPost<import("@/api-client/types").RefreshResponse>(
       "/api/identity/refresh",
-      {},
+      mockRefreshToken ? { refreshToken: mockRefreshToken } : {},
       { anonymous: true }
     );
 

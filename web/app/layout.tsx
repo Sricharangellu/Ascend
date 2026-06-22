@@ -45,22 +45,22 @@ export default function RootLayout({
           Skip to main content
         </a>
 
-        {/* Initialise MSW browser worker in development */}
-        <MockWorkerInit />
         {/* Register production service worker for offline shell */}
         <ServiceWorkerInit />
         {/* Install global JS error handlers for monitoring */}
         <ErrorMonitor />
 
-        <GlobalErrorBoundary>
-          <FlagProvider>
-            <ToastProvider>
-              <main id="main-content" tabIndex={-1} className="outline-none">
-                {children}
-              </main>
-            </ToastProvider>
-          </FlagProvider>
-        </GlobalErrorBoundary>
+        <MockWorkerInit>
+          <GlobalErrorBoundary>
+            <FlagProvider>
+              <ToastProvider>
+                <main id="main-content" tabIndex={-1} className="outline-none">
+                  {children}
+                </main>
+              </ToastProvider>
+            </FlagProvider>
+          </GlobalErrorBoundary>
+        </MockWorkerInit>
       </body>
     </html>
   );

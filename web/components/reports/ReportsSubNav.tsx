@@ -4,14 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const REPORT_LINKS = [
-  { label: "Overview", href: "/reports" },
-  { label: "Sales", href: "/reports/sales" },
-  { label: "P&L", href: "/reports/p-l" },
-  { label: "By Rep", href: "/reports/sales-by-rep" },
-  { label: "By Vendor", href: "/reports/sales-by-vendor" },
-  { label: "Inventory", href: "/reports/inventory" },
-  { label: "AR Aging", href: "/reports/ar-aging" },
-  { label: "Expiry", href: "/reports/expiry" },
+  { label: "Overview", href: "/reporting" },
+  { label: "Sales", href: "/reporting/sales" },
+  { label: "P&L", href: "/reporting/p-l" },
+  { label: "By Rep", href: "/reporting/sales-by-rep" },
+  { label: "By Vendor", href: "/reporting/sales-by-vendor" },
+  { label: "Inventory", href: "/reporting/inventory" },
+  { label: "AR Aging", href: "/reporting/ar-aging" },
+  { label: "Expiry", href: "/reporting/expiry" },
 ] as const;
 
 export function ReportsSubNav() {
@@ -19,7 +19,7 @@ export function ReportsSubNav() {
   return (
     <div className="flex flex-wrap gap-2">
       {REPORT_LINKS.map((link) => {
-        const active = link.href === "/reports" ? pathname === "/reports" : pathname.startsWith(link.href);
+        const active = link.href === "/reporting" ? pathname === "/reporting" : pathname.startsWith(link.href);
         return (
           <Link
             key={link.href}

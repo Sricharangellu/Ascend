@@ -253,33 +253,29 @@ function EnterpriseRail({
       </div>
 
       <nav aria-label="Primary" className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 py-4">
-        {(["Operate", "Manage", "Analyze", "Platform"] as const).map((group) => (
-          <div key={group} className="space-y-0.5">
-            <p className="hidden px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/30 xl:block">
-              {group}
-            </p>
-            {NAV_ITEMS.filter((item) => item.group === group).map((item) => {
-              const selected = selectedModule === item.key || pathname === item.href;
-              return (
-                <Link
-                  key={item.key}
-                  href={item.href}
-                  aria-current={selected ? "page" : undefined}
-                  className={clsx(
-                    "flex min-h-[40px] items-center justify-center gap-3 rounded-md px-3 text-[13px] font-medium transition-colors xl:justify-start",
-                    selected
-                      ? "text-white"
-                      : "text-white/60 hover:bg-white/10 hover:text-white"
-                  )}
-                  style={selected ? { backgroundColor: "var(--color-sidebar-active)" } : undefined}
-                >
-                  <NavIcon name={item.icon} />
-                  <span className="hidden xl:inline">{item.label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        ))}
+        <div className="space-y-0.5">
+          <p className="hidden px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/30 xl:block">
+            Modules
+          </p>
+          {NAV_ITEMS.map((item) => {
+            const selected = selectedModule === item.key || pathname === item.href;
+            return (
+              <Link
+                key={item.key}
+                href={item.href}
+                aria-current={selected ? "page" : undefined}
+                className={clsx(
+                  "flex min-h-[40px] items-center justify-center gap-3 rounded-md px-3 text-[13px] font-medium transition-colors xl:justify-start",
+                  selected ? "text-white" : "text-white/60 hover:bg-white/10 hover:text-white"
+                )}
+                style={selected ? { backgroundColor: "var(--color-sidebar-active)" } : undefined}
+              >
+                <NavIcon name={item.icon} />
+                <span className="hidden xl:inline">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
       </nav>
 
       {/* Footer — register health indicator */}

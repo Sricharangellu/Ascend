@@ -9,6 +9,7 @@ import { hasRole } from "@/lib/auth";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import type { AgingReport, Bill, Invoice, BillingStatus } from "@/api-client/types";
+import { usePathname, useRouter } from "next/navigation";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -219,7 +220,9 @@ function Toast({ message, onDismiss }: { message: string; onDismiss: () => void 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function FinancePage() {
-  const [tab, setTab] = useState<TabId>("ar");
+  const pathname = usePathname();
+  const router = useRouter();
+  const [tab, setTab] = useState<TabId>(() => financeTabFromPath(pathname));
   const [invoices, setInvoices] = useState<FinanceInvoice[]>([]);
   const [bills, setBills] = useState<FinanceBill[]>([]);
   const [arAging, setArAging] = useState<AgingReport | null>(null);
@@ -227,6 +230,8 @@ export default function FinancePage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => setTab(financeTabFromPath(pathname)), [pathname]);
   const canPay = hasRole("manager");
 
   const load = useCallback(async () => {
@@ -325,7 +330,11 @@ export default function FinancePage() {
           {TABS.map((t) => (
             <button
               key={t.id}
-              onClick={() => setTab(t.id)}
+                onClick={() => {
+                  setTab(t.id);
+                  router.replace(t.id === "ap" ? "/finance/bills" : t.id === "aging" ? "/reporting/ar-aging" : "/finance", { scroll: false });
+                }}
+                aria-current={tab === t.id ? "page" : undefined}
               className={`px-4 py-2 text-sm font-medium transition-colors ${
                 tab === t.id
                   ? "border-b-2 border-slate-950 text-slate-950"
@@ -495,4 +504,9 @@ export default function FinancePage() {
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
     </EnterpriseShell>
   );
+}
+
+function financeTabFromPath(pathname: string): TabId {
+  if (pathname.endsWith("/bills") || pathname.endsWith("/payment-made")) return "ap";
+  return "ar";
 }

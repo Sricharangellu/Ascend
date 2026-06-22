@@ -44,12 +44,15 @@ interface SummaryResponse {
 }
 
 interface TopProductItem {
-  id: string;
-  sku: string;
+  id?: string;
+  productId?: string;
+  sku?: string;
   name: string;
-  category: string;
-  revenue: number;
-  qty: number;
+  category?: string;
+  revenue?: number;
+  revenueCents?: number;
+  qty?: number;
+  units?: number;
 }
 
 interface TopProductsResponse {
@@ -57,10 +60,13 @@ interface TopProductsResponse {
 }
 
 interface TopCustomerItem {
-  customer_id: string;
+  customer_id?: string;
+  key?: string;
   name: string;
-  totalCents: number;
-  orderCount: number;
+  totalCents?: number;
+  revenueCents?: number;
+  orderCount?: number;
+  units?: number;
 }
 
 interface TopCustomersResponse {
@@ -328,8 +334,18 @@ export default function DashboardPage() {
   const { data: categoryData, loading: loadingCategory } =
     useQuery(`dashboard:category:${range}:${scope}`, fetchCategory, { staleMs: 60_000 });
 
-  const topProducts = topProductsData?.items ?? [];
-  const topCustomers = topCustomersData?.items ?? [];
+  const topProducts = (topProductsData?.items ?? []).map((item) => ({
+    ...item,
+    id: item.id ?? item.productId ?? "",
+    qty: item.qty ?? item.units ?? 0,
+    revenue: item.revenue ?? item.revenueCents ?? 0,
+  }));
+  const topCustomers = (topCustomersData?.items ?? []).map((item) => ({
+    ...item,
+    customer_id: item.customer_id ?? item.key ?? "",
+    orderCount: item.orderCount ?? item.units ?? 0,
+    totalCents: item.totalCents ?? item.revenueCents ?? 0,
+  }));
   const loading = loadingSummary || loadingProducts || loadingCustomers;
   const error = errorSummary;
 
