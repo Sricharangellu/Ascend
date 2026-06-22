@@ -5,6 +5,7 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 
 interface SyncStatusReport {
@@ -177,9 +178,11 @@ export default function IntegrationsPage() {
             </div>
 
             {loading ? (
-              <div className="px-4 py-12 text-center text-sm text-slate-500" aria-busy="true">Loading integrations...</div>
+              <TableSkeleton headers={["Provider", "Type", "Status", "Updated"]} rows={5} />
             ) : integrations.length === 0 ? (
-              <div className="px-4 py-12 text-center text-sm text-slate-500">No integrations connected yet.</div>
+              <div className="py-14 text-center">
+                <p className="text-sm font-medium text-[var(--color-text-primary)]">No integrations connected yet.</p>
+              </div>
             ) : (
               <div className="divide-y divide-slate-100">
                 {integrations.map((item) => (

@@ -1,24 +1,17 @@
 "use client";
 
-/**
- * /login/forgot-password — password reset request.
- *
- * No backend reset-by-email endpoint exists yet, so submission is mocked:
- * after a short delay we show the "check your email" confirmation state
- * regardless of whether the address is registered (standard practice to
- * avoid leaking account existence).
- */
-
 import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { AuthShell } from "@/components/AuthShell";
 import { Button } from "@/components/Button";
+import { apiPost } from "@/api-client/client";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [touched, setTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  const [devToken, setDevToken] = useState<string | null>(null);
 
   const emailError = useMemo(() => {
     if (!touched) return null;
@@ -33,10 +26,19 @@ export default function ForgotPasswordPage() {
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
 
     setSubmitting(true);
-    // Mocked: no backend reset-by-email endpoint exists yet.
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    setSubmitting(false);
-    setSent(true);
+    try {
+      const result = await apiPost<{ ok: boolean; token?: string }>(
+        "/api/identity/forgot-password",
+        { email: email.trim() },
+        { anonymous: true }
+      );
+      if (result.token) setDevToken(result.token);
+    } catch {
+      // Always show success to prevent email enumeration — errors are swallowed.
+    } finally {
+      setSubmitting(false);
+      setSent(true);
+    }
   }
 
   return (
@@ -50,14 +52,14 @@ export default function ForgotPasswordPage() {
             <h2 className="mt-4 text-2xl font-bold text-slate-900 dark:text-white">Check your email</h2>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
               If an account exists for <span className="font-medium text-slate-700 dark:text-slate-200">{email}</span>, we&apos;ve
-              sent a link to reset your password. The link expires in 30 minutes.
+              sent a link to reset your password. The link expires in 1 hour.
             </p>
             <Link href="/login" className="mt-6 text-sm font-medium text-brand-600 hover:underline dark:text-brand-400">
               &larr; Back to sign in
             </Link>
-            {process.env.NODE_ENV === "development" && (
+            {devToken && (
               <Link
-                href="/login/reset-password?token=demo"
+                href={`/login/reset-password?token=${encodeURIComponent(devToken)}`}
                 className="mt-3 text-xs text-slate-400 hover:underline dark:text-slate-500"
               >
                 Dev mode: open reset link

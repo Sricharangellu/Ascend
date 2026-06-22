@@ -5,6 +5,7 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { formatMoney, parseToCents } from "@/lib/money";
 import { hasRole } from "@/lib/auth";
@@ -205,9 +206,12 @@ export default function VendorsPage() {
             </div>
 
             {loading ? (
-              <div className="px-4 py-12 text-center text-sm text-slate-500" aria-busy="true">Loading vendors...</div>
+              <TableSkeleton headers={["Vendor", "Email", "Phone", "Balance", "Status"]} rows={6} />
             ) : filteredVendors.length === 0 ? (
-              <div className="px-4 py-12 text-center text-sm text-slate-500">No vendors match the current view.</div>
+              <div className="py-14 text-center">
+                <p className="text-sm font-medium text-[var(--color-text-primary)]">No vendors found.</p>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Add a vendor to get started.</p>
+              </div>
             ) : (
               <div className="divide-y divide-slate-100">
                 {filteredVendors.map((vendor) => (

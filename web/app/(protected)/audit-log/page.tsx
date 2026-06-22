@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, ApiResponseError } from "@/api-client/client";
 import type { AuditEvent, AuditLogResponse, AuditAction } from "@/api-client/types";
 
@@ -127,6 +128,14 @@ export default function AuditLogPage() {
         {error && <p role="alert" className="text-sm text-red-700 bg-red-50 rounded-lg px-4 py-3">{error}</p>}
 
         {/* Table */}
+        {loading ? (
+          <TableSkeleton headers={["When", "Actor", "Action", "Resource", "IP", ""]} rows={10} />
+        ) : items.length === 0 ? (
+          <div className="rounded-xl border border-[var(--color-table-border)] py-16 text-center">
+            <p className="text-sm font-medium text-[var(--color-text-primary)]">No events match the current filters.</p>
+            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Try resetting the filters.</p>
+          </div>
+        ) : (
         <div className="overflow-x-auto rounded-xl border border-gray-200">
           <table className="w-full text-sm">
             <thead>
@@ -140,10 +149,7 @@ export default function AuditLogPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {loading && (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">Loading…</td></tr>
-              )}
-              {!loading && items.length === 0 && (
+              {items.length === 0 && (
                 <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">No events match the current filters.</td></tr>
               )}
               {!loading && items.map(ev => (
@@ -190,6 +196,7 @@ export default function AuditLogPage() {
             </tbody>
           </table>
         </div>
+        )}
 
         {/* Pagination */}
         {total > LIMIT && (

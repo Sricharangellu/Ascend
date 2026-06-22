@@ -52,7 +52,7 @@ function TerminalInner() {
   const [returnMode, setReturnMode] = useState(false);
   const [scannedName, setScannedName] = useState<string | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [activeOutletId, setActiveOutletId] = useState<string>("loc_main");
+  const [activeOutletId, setActiveOutletId] = useState<string>("");
   const [outlets, setOutlets] = useState<{ id: string; name: string; state?: string }[]>([]);
   const [outletState, setOutletState] = useState<string>("");
 
@@ -76,8 +76,12 @@ function TerminalInner() {
       .then((d) => {
         const locs = d.items ?? [];
         setOutlets(locs);
-        const initial = locs.find((l) => l.id === "loc_main") ?? locs[0];
-        if (initial?.state) setOutletState(initial.state);
+        // Use the first real outlet from the API — never assume a hardcoded ID.
+        const initial = locs[0];
+        if (initial) {
+          setActiveOutletId(initial.id);
+          if (initial.state) setOutletState(initial.state);
+        }
       })
       .catch(() => {});
   }, []);

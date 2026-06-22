@@ -18,6 +18,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { formatMoney } from "@/lib/money";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
 import { getUser } from "@/lib/auth";
 import { useToast } from "@/components/Toast";
@@ -249,7 +250,7 @@ function ScheduledReportsTab({ isOwner }: { isOwner: boolean }) {
         )}
 
         {loading ? (
-          <p className="px-4 py-6 text-sm text-slate-500" aria-busy="true">Loading…</p>
+          <TableSkeleton headers={["Name", "Type", "Frequency", "Last sent", "Next send", "Status"]} rows={4} />
         ) : reports.length === 0 ? (
           <div className="px-4 py-10 text-center">
             <p className="text-sm text-slate-500">No scheduled reports yet.</p>

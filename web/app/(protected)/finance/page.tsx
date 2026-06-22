@@ -6,6 +6,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { formatMoney, parseToCents } from "@/lib/money";
 import { hasRole } from "@/lib/auth";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import type { AgingReport, Bill, Invoice, BillingStatus } from "@/api-client/types";
 
@@ -476,7 +477,7 @@ export default function FinancePage() {
               {arAging ? (
                 <AgingTable report={arAging} title="Accounts Receivable" />
               ) : (
-                <p className="py-4 text-center text-sm text-slate-400">Loading…</p>
+                <TableSkeleton headers={["Party", "Current", "1-30d", "31-60d", "61-90d", "90d+", "Total"]} rows={5} />
               )}
             </Card>
 
@@ -484,7 +485,7 @@ export default function FinancePage() {
               {apAging ? (
                 <AgingTable report={apAging} title="Accounts Payable" />
               ) : (
-                <p className="py-4 text-center text-sm text-slate-400">Loading…</p>
+                <TableSkeleton headers={["Party", "Current", "1-30d", "31-60d", "61-90d", "90d+", "Total"]} rows={5} />
               )}
             </Card>
           </div>

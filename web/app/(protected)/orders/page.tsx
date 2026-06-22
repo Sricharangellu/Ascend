@@ -14,6 +14,8 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { Modal } from "@/components/Modal";
+import { TableSkeleton } from "@/components/TableSkeleton";
+import { EmptyState } from "@/components/EmptyState";
 import { formatMoney } from "@/lib/money";
 import { hasRole } from "@/lib/auth";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
@@ -313,15 +315,12 @@ export default function OrdersPage() {
 
         {/* Table */}
         {loading ? (
-          <p className="text-sm text-slate-500" aria-busy="true">
-            Loading…
-          </p>
+          <TableSkeleton headers={["Order #", "Status", "State", "Total", "Date", ""]} rows={8} />
         ) : orders.length === 0 ? (
-          <Card>
-            <p className="text-sm text-slate-500">
-              {tab === "all" ? "No orders yet. Ring up a sale on the Register." : `No ${tab} orders.`}
-            </p>
-          </Card>
+          <EmptyState
+            title={tab === "all" ? "No orders yet" : `No ${tab} orders`}
+            description={tab === "all" ? "Ring up your first sale on the Register." : undefined}
+          />
         ) : (
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <table className="w-full text-left text-sm">

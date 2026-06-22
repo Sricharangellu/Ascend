@@ -5,6 +5,7 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import { hasRole } from "@/lib/auth";
@@ -167,9 +168,11 @@ export default function ReturnsPage() {
             </div>
 
             {loading ? (
-              <div className="px-4 py-12 text-center text-sm text-slate-500" aria-busy="true">Loading returns...</div>
+              <TableSkeleton headers={["Order #", "Status", "Total", "Date", ""]} rows={8} />
             ) : filteredOrders.length === 0 ? (
-              <div className="px-4 py-12 text-center text-sm text-slate-500">No receipts match this view.</div>
+              <div className="py-14 text-center">
+                <p className="text-sm font-medium text-[var(--color-text-primary)]">No orders match this view.</p>
+              </div>
             ) : (
               <div className="divide-y divide-slate-100">
                 {filteredOrders.map((order) => (

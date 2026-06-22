@@ -5,6 +5,7 @@ import { GlobalErrorBoundary } from "@/components/ErrorBoundary";
 import { FlagProvider } from "@/flags/FlagProvider";
 import MockWorkerInit from "@/mocks/MockWorkerInit";
 import { ErrorMonitor } from "@/components/ErrorMonitor";
+import { ServiceWorkerInit } from "@/components/ServiceWorkerInit";
 
 export const metadata: Metadata = {
   title: {
@@ -12,8 +13,14 @@ export const metadata: Metadata = {
     template: "%s | Finder POS",
   },
   description: "Point-of-sale terminal for Finder",
+  manifest: "/manifest.webmanifest",
   // Prevent indexing in non-prod environments
   robots: process.env.NODE_ENV === "production" ? "index,follow" : "noindex",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Finder POS",
+  },
 };
 
 export const viewport: Viewport = {
@@ -40,6 +47,8 @@ export default function RootLayout({
 
         {/* Initialise MSW browser worker in development */}
         <MockWorkerInit />
+        {/* Register production service worker for offline shell */}
+        <ServiceWorkerInit />
         {/* Install global JS error handlers for monitoring */}
         <ErrorMonitor />
 

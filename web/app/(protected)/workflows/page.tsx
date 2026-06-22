@@ -11,6 +11,7 @@ import { useEffect, useState, useCallback } from "react";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
 import type {
   WorkflowDefinition,
@@ -552,7 +553,7 @@ export default function WorkflowsPage() {
             <div>
               <h2 className="text-base font-semibold text-slate-950">Workflow definitions</h2>
               <p className="text-sm text-slate-500">
-                {loading ? "Loading…" : `${workflows.length} ${workflows.length === 1 ? "workflow" : "workflows"}`}
+                {!loading && `${workflows.length} ${workflows.length === 1 ? "workflow" : "workflows"}`}
               </p>
             </div>
             <button
@@ -565,9 +566,7 @@ export default function WorkflowsPage() {
           </div>
 
           {loading ? (
-            <div className="px-4 py-10 text-center">
-              <p className="text-sm text-slate-500" aria-busy="true">Loading…</p>
-            </div>
+            <TableSkeleton headers={["Name", "Trigger", "Steps", "Status", ""]} rows={5} />
           ) : error ? (
             <div className="px-4 py-6">
               <p role="alert" className="text-sm text-red-700">{error}</p>

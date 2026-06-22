@@ -37,11 +37,9 @@ export function TenderScreen({
   const [tab, setTab] = useState<TenderTab>("cash");
   const [cashInput, setCashInput] = useState("");
   const [splitCash, setSplitCash] = useState("");
-  const [cardLast4, setCardLast4] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCardReader, setShowCardReader] = useState(false);
-  const pendingCaptureRef = useRef<(() => void) | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const firstFocusRef = useRef<HTMLButtonElement>(null);
 
@@ -71,29 +69,36 @@ export function TenderScreen({
   const quickAmounts = computeQuickAmounts(totalCents);
 
   // ── Capture ───────────────────────────────────────────────────────────────
+  // cardSplitCentsRef holds the card portion for split payments so the
+  // handleCardReaderComplete closure can read it without stale state.
+  const cardSplitCentsRef = useRef<number>(0);
+
   const capture = useCallback(
-    async (method: PaymentMethod, cashAmount?: number, cardAmount?: number, last4?: string) => {
+    async (
+      method: PaymentMethod,
+      cashAmount: number,
+      cardAmount: number,
+      stripePaymentIntentId?: string,
+    ) => {
       setSubmitting(true);
       setError(null);
       try {
         const req: CapturePaymentRequest = {
           orderId: order.id,
           method,
-          cashCents: cashAmount ?? 0,
-          cardCents: cardAmount ?? 0,
-          cardLast4: last4 || undefined,
+          cashCents: cashAmount,
+          cardCents: cardAmount,
+          stripePaymentIntentId,
         };
         const payment = await apiPost<Payment>("/api/v1/payments", req);
         onSuccess(payment);
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Payment failed. Please try again."
-        );
+        setError(err instanceof Error ? err.message : "Payment failed. Please try again.");
       } finally {
         setSubmitting(false);
       }
     },
-    [order.id, onSuccess]
+    [order.id, onSuccess],
   );
 
   const handleCashSubmit = () => {
@@ -105,19 +110,29 @@ export function TenderScreen({
   };
 
   const handleCardSubmit = () => {
-    pendingCaptureRef.current = () => void capture("card", 0, totalCents, cardLast4 || "0000");
+    cardSplitCentsRef.current = 0;
     setShowCardReader(true);
   };
 
-  const handleCardReaderComplete = useCallback(() => {
-    setShowCardReader(false);
-    pendingCaptureRef.current?.();
-    pendingCaptureRef.current = null;
-  }, []);
+  // Called by CardReaderScreen when the reader has successfully processed the payment.
+  const handleCardReaderComplete = useCallback(
+    (stripePaymentIntentId: string) => {
+      setShowCardReader(false);
+      const splitCardCents = cardSplitCentsRef.current;
+      if (splitCardCents > 0) {
+        // Split tender: cash portion already set, card portion from reader
+        const cash = totalCents - splitCardCents;
+        void capture("split", cash, splitCardCents, stripePaymentIntentId);
+      } else {
+        void capture("card", 0, totalCents, stripePaymentIntentId);
+      }
+    },
+    [capture, totalCents],
+  );
 
   const handleCardReaderCancel = useCallback(() => {
     setShowCardReader(false);
-    pendingCaptureRef.current = null;
+    cardSplitCentsRef.current = 0;
   }, []);
 
   const handleSplitSubmit = () => {
@@ -131,7 +146,7 @@ export function TenderScreen({
       setError("Cash amount exceeds total");
       return;
     }
-    pendingCaptureRef.current = () => void capture("split", cash, card, cardLast4 || "0000");
+    cardSplitCentsRef.current = card;
     setShowCardReader(true);
   };
 
@@ -223,11 +238,7 @@ export function TenderScreen({
 
           {tab === "card" && (
             <div id="tender-panel-card" role="tabpanel" aria-labelledby="tender-tab-card">
-              <CardTab
-                totalCents={totalCents}
-                cardLast4={cardLast4}
-                onLast4Change={setCardLast4}
-              />
+              <CardTab totalCents={totalCents} />
             </div>
           )}
 
@@ -237,8 +248,6 @@ export function TenderScreen({
                 totalCents={totalCents}
                 splitCash={splitCash}
                 onSplitCashChange={(v) => { setSplitCash(v); setError(null); }}
-                cardLast4={cardLast4}
-                onLast4Change={setCardLast4}
               />
             </div>
           )}
@@ -247,6 +256,8 @@ export function TenderScreen({
         {/* Card reader overlay — rendered above this modal */}
         {showCardReader && (
           <CardReaderScreen
+            orderId={order.id}
+            amountCents={totalCents}
             onComplete={handleCardReaderComplete}
             onCancel={handleCardReaderCancel}
           />
@@ -444,59 +455,26 @@ function CashTab({
 
 // ─── Card tab ─────────────────────────────────────────────────────────────────
 
-function CardTab({
-  totalCents,
-  cardLast4,
-  onLast4Change,
-}: {
-  totalCents: number;
-  cardLast4: string;
-  onLast4Change: (v: string) => void;
-}) {
+function CardTab({ totalCents }: { totalCents: number }) {
   return (
     <div className="space-y-5">
-      {/* EMV sim visual */}
       <div className="flex aspect-[1.6/1] flex-col justify-between rounded-lg bg-slate-900 p-5 text-white shadow-lg">
         <div className="flex justify-between items-start">
           <div className="flex gap-1">
             <div className="w-8 h-6 rounded-sm bg-yellow-300/80" />
             <div className="w-5 h-6 rounded-sm bg-yellow-400/40 -ml-3" />
           </div>
-          <span className="text-xs opacity-60">VISA</span>
+          <span className="text-xs opacity-60">CARD</span>
         </div>
         <div>
           <p className="text-sm opacity-60 mb-1">Total to charge</p>
           <p className="text-2xl font-bold">{formatMoney(totalCents)}</p>
-          <p className="text-sm opacity-60 mt-2">
-            •••• •••• •••• {cardLast4 || "____"}
-          </p>
         </div>
       </div>
 
-      <div>
-        <label htmlFor="card-last4" className="block text-sm font-medium text-gray-700 mb-1.5">
-          Card last 4 digits <span className="text-gray-400 font-normal">(optional)</span>
-        </label>
-        <input
-          id="card-last4"
-          type="text"
-          inputMode="numeric"
-          maxLength={4}
-          pattern="\d{4}"
-          value={cardLast4}
-          onChange={(e) => onLast4Change(e.target.value.replace(/\D/g, ""))}
-          placeholder="1234"
-          className={clsx(
-            "w-full rounded-lg border border-gray-300 px-4 py-3 font-mono text-lg",
-            "focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-brand-600",
-            "min-h-[56px]"
-          )}
-          aria-label="Card last 4 digits"
-        />
-      </div>
-
-      <p className="text-center text-xs text-gray-400">
-        Tap "Charge" to simulate EMV capture — no real card data is processed.
+      <p className="text-center text-sm text-gray-500 rounded-lg bg-blue-50 border border-blue-100 p-3">
+        Press <strong>Charge</strong> to present this amount to the card reader.
+        The customer then taps or inserts their card.
       </p>
     </div>
   );
@@ -508,14 +486,10 @@ function SplitTab({
   totalCents,
   splitCash,
   onSplitCashChange,
-  cardLast4,
-  onLast4Change,
 }: {
   totalCents: number;
   splitCash: string;
   onSplitCashChange: (v: string) => void;
-  cardLast4: string;
-  onLast4Change: (v: string) => void;
 }) {
   const cashCents = parseToCents(splitCash);
   const cardCents = !isNaN(cashCents) ? totalCents - cashCents : null;
@@ -523,7 +497,7 @@ function SplitTab({
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">
-        Enter the cash portion; the remainder will be charged to the card.
+        Enter the cash portion; the remainder will be charged to the card reader.
       </p>
 
       <div>
@@ -559,7 +533,7 @@ function SplitTab({
             <span className="font-semibold">{formatMoney(cashCents)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Card</span>
+            <span className="text-gray-500">Card reader</span>
             <span className="font-semibold">{formatMoney(cardCents)}</span>
           </div>
           <div className="flex justify-between text-sm border-t border-gray-200 pt-2 mt-2">
@@ -568,26 +542,6 @@ function SplitTab({
           </div>
         </div>
       )}
-
-      <div>
-        <label htmlFor="split-card-last4" className="block text-sm font-medium text-gray-700 mb-1.5">
-          Card last 4 <span className="text-gray-400 font-normal">(optional)</span>
-        </label>
-        <input
-          id="split-card-last4"
-          type="text"
-          inputMode="numeric"
-          maxLength={4}
-          value={cardLast4}
-          onChange={(e) => onLast4Change(e.target.value.replace(/\D/g, ""))}
-          placeholder="1234"
-          className={clsx(
-            "w-full rounded-lg border border-gray-300 px-4 py-3 font-mono text-lg",
-            "focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-brand-600",
-            "min-h-[56px]"
-          )}
-        />
-      </div>
     </div>
   );
 }

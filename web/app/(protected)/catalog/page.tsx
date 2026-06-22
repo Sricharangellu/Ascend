@@ -13,6 +13,7 @@ import { clsx } from "clsx";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
 import type { Product, ProductsResponse, Category, CategoriesResponse, ProductStatus, TaxClass } from "@/api-client/types";
 
@@ -549,16 +550,14 @@ function ProductsTab({ categories }: { categories: Category[] }) {
         )}
 
         {loading ? (
-          <div className="px-4 py-10 text-center">
-            <p className="text-sm text-slate-500" aria-busy="true">Loading…</p>
-          </div>
+          <TableSkeleton headers={["", "SKU", "Name", "Category", "Price", "Status", ""]} rows={8} />
         ) : error ? (
           <div className="px-4 py-6">
             <p role="alert" className="text-sm text-red-700">{error}</p>
           </div>
         ) : products.length === 0 ? (
           <div className="px-4 py-12 text-center">
-            <p className="text-sm text-slate-500">No products found.</p>
+            <p className="text-sm font-medium text-[var(--color-text-primary)]">No products found.</p>
             {hasFilters && (
               <button type="button" onClick={clearFilters} className="mt-2 text-xs text-brand-600 hover:underline">
                 Clear filters
@@ -869,7 +868,7 @@ function CategoriesTab() {
     }
   };
 
-  if (loading) return <p className="py-6 text-sm text-slate-500" aria-busy="true">Loading…</p>;
+  if (loading) return <TableSkeleton headers={["Name", "Slug", "Products", ""]} rows={6} />;
   if (error)   return <p role="alert" className="py-6 text-sm text-red-700">{error}</p>;
 
   return (

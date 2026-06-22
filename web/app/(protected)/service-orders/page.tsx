@@ -4,6 +4,7 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, apiPatch, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type { ServiceOrder, ServiceOrderStatus, ServiceOrderResponse } from "@/api-client/types";
@@ -188,15 +189,16 @@ export default function ServiceOrdersPage() {
         </div>
 
         {/* Table */}
+        {loading ? (
+          <TableSkeleton headers={["Ticket #", "Customer", "Device", "Status", "Assigned", "Due", ""]} rows={8} />
+        ) : items.length === 0 ? (
+          <div className="rounded-xl border border-[var(--color-table-border)] py-16 text-center">
+            <p className="text-sm font-medium text-[var(--color-text-primary)]">No tickets found</p>
+            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Create your first repair ticket to get started.</p>
+          </div>
+        ) : (
         <Card className="overflow-hidden p-0">
-          {loading ? (
-            <div className="flex items-center justify-center py-16 text-sm text-slate-400">Loading…</div>
-          ) : items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
-              <p className="text-sm font-medium text-slate-700">No tickets found</p>
-              <p className="text-xs text-slate-400">Create your first repair ticket to get started.</p>
-            </div>
-          ) : (
+          {(
             <table className="w-full text-sm">
               <thead className="border-b border-slate-200 bg-slate-50">
                 <tr>
@@ -251,13 +253,15 @@ export default function ServiceOrdersPage() {
                 })}
               </tbody>
             </table>
-          )}
-          {!loading && total > 0 && (
+          )
+          }
+          {total > 0 && (
             <div className="border-t border-slate-200 px-5 py-3 text-xs text-slate-400">
               {total} ticket{total !== 1 ? "s" : ""}
             </div>
           )}
         </Card>
+        )}
       </div>
 
       {/* Detail modal */}

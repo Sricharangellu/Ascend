@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type { Order, OrderStatus, Payment, PaymentMethod } from "@/api-client/types";
@@ -124,9 +125,11 @@ export default function PaymentsPage() {
               <p className="text-sm text-slate-500">Select an order to inspect tender records.</p>
             </div>
             {loadingOrders ? (
-              <div className="px-4 py-10 text-center text-sm text-slate-500" aria-busy="true">Loading orders...</div>
+              <TableSkeleton headers={["Order #", "Status", "Total"]} rows={8} />
             ) : orders.length === 0 ? (
-              <div className="px-4 py-10 text-center text-sm text-slate-500">No orders available.</div>
+              <div className="py-12 text-center">
+                <p className="text-sm font-medium text-[var(--color-text-primary)]">No orders yet.</p>
+              </div>
             ) : (
               <div className="max-h-[34rem] divide-y divide-slate-100 overflow-y-auto">
                 {orders.map((order) => (
@@ -167,9 +170,11 @@ export default function PaymentsPage() {
             </div>
 
             {loadingPayments ? (
-              <div className="px-4 py-12 text-center text-sm text-slate-500" aria-busy="true">Loading payments...</div>
+              <TableSkeleton headers={["Payment", "Method", "Amount", "Status", "Date"]} rows={5} />
             ) : filteredPayments.length === 0 ? (
-              <div className="px-4 py-12 text-center text-sm text-slate-500">No payment records for this view.</div>
+              <div className="py-12 text-center">
+                <p className="text-sm font-medium text-[var(--color-text-primary)]">No payment records for this view.</p>
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

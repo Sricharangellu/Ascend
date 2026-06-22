@@ -594,7 +594,10 @@ function SecuritySection() {
         )}
 
         {mfaStatus === null && !statusError && (
-          <p className="text-sm text-slate-400">Loading MFA status…</p>
+          <div className="flex items-center gap-2" role="status" aria-label="Loading MFA status">
+            <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+            <p className="text-sm text-[var(--color-text-secondary)]">Loading MFA status…</p>
+          </div>
         )}
 
         {mfaStatus !== null && !mfaStatus.enabled && !setupData && (

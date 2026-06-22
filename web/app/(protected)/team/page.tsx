@@ -11,6 +11,7 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
 import { getUser } from "@/lib/auth";
 
@@ -143,7 +144,7 @@ export default function TeamPage() {
         {!allowed ? (
           <Card><p role="alert" className="text-sm text-slate-700">You don&apos;t have permission to view the team directory.</p></Card>
         ) : loading ? (
-          <p className="text-sm text-slate-500" aria-busy="true">Loading…</p>
+          <TableSkeleton headers={["Name", "Email", "Role", "Status", ""]} rows={6} />
         ) : error ? (
           <Card><p role="alert" className="text-sm text-red-700">{error}</p></Card>
         ) : (

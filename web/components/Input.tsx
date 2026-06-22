@@ -1,30 +1,14 @@
-/**
- * Input — accessible form input primitive.
- *
- * - Always has an associated <label> (via `label` prop or external htmlFor)
- * - Error/hint text linked via aria-describedby
- * - Focus ring visible to keyboard users
- * - Minimum 44px height touch target
- */
-
 import React, { useId } from "react";
 import { clsx } from "clsx";
 
 export interface InputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "id"> {
-  /** Visible label — required for accessibility */
   label?: string;
-  /** Optional hint text shown below the input */
   hint?: string;
-  /** Error message; when set the input is styled as invalid */
   error?: string;
-  /** Allow overriding the generated id */
   id?: string;
-  /** Render a full-width block input */
   fullWidth?: boolean;
-  /** Icon or adornment on the left */
   adornmentLeft?: React.ReactNode;
-  /** Icon or adornment on the right */
   adornmentRight?: React.ReactNode;
 }
 
@@ -63,7 +47,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           <label
             htmlFor={id}
             className={clsx(
-              "text-sm font-medium text-gray-700",
+              "text-sm font-medium text-[var(--color-text-primary)]",
               disabled && "opacity-60"
             )}
           >
@@ -80,7 +64,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         <div className="relative flex items-center">
           {adornmentLeft && (
             <div
-              className="pointer-events-none absolute left-3 flex items-center text-gray-400"
+              className="pointer-events-none absolute left-3 flex items-center text-[var(--color-text-secondary)]"
               aria-hidden="true"
             >
               {adornmentLeft}
@@ -96,23 +80,17 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             aria-invalid={!!error}
             aria-describedby={describedBy}
             className={clsx(
-              // Base
-              "block rounded border bg-white text-gray-900",
+              "block rounded border bg-white text-[var(--color-text-primary)]",
               "text-base transition-colors duration-150",
-              "placeholder:text-gray-400",
-              // Minimum touch target height
+              "placeholder:text-[var(--color-text-secondary)]",
               "min-h-[44px] py-2 px-3",
-              // Adornment padding
               adornmentLeft && "pl-9",
               adornmentRight && "pr-9",
-              // Border states
               !error &&
-                "border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500 focus:ring-offset-0",
+                "border-[var(--color-table-border)] focus:border-brand-500 focus:ring-2 focus:ring-brand-500 focus:ring-offset-0",
               error &&
                 "border-danger-500 focus:border-danger-500 focus:ring-2 focus:ring-danger-500",
-              // Disabled
-              disabled && "opacity-60 cursor-not-allowed bg-gray-50",
-              // Width
+              disabled && "opacity-60 cursor-not-allowed bg-[var(--color-page-bg)]",
               fullWidth && "w-full",
               className
             )}
@@ -121,7 +99,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
           {adornmentRight && (
             <div
-              className="pointer-events-none absolute right-3 flex items-center text-gray-400"
+              className="pointer-events-none absolute right-3 flex items-center text-[var(--color-text-secondary)]"
               aria-hidden="true"
             >
               {adornmentRight}
@@ -130,7 +108,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         </div>
 
         {hint && !error && (
-          <p id={hintId} className="text-sm text-gray-500">
+          <p id={hintId} className="text-sm text-[var(--color-text-secondary)]">
             {hint}
           </p>
         )}

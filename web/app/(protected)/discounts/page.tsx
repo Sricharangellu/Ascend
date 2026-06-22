@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { formatMoney } from "@/lib/money";
 import { apiGet, apiPatch, apiPost } from "@/api-client/client";
 import { useToast } from "@/components/Toast";
@@ -681,9 +682,7 @@ export default function DiscountsPage() {
 
           {/* Table */}
           {loading ? (
-            <div className="p-6 text-sm text-gray-500" aria-busy="true">
-              Loading discounts…
-            </div>
+            <TableSkeleton headers={["Name", "Type", "Discount", "Coupon code", "Applies to", "Usage", "Status", ""]} rows={6} />
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 text-sm">

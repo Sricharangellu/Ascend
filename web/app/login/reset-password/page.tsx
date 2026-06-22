@@ -1,18 +1,12 @@
 "use client";
 
-/**
- * /login/reset-password — set a new password from a reset-link token.
- *
- * No backend reset-confirmation endpoint exists yet, so submission is
- * mocked: any non-empty token is accepted and the new password is not
- * persisted anywhere.
- */
-
 import { Suspense, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { AuthShell } from "@/components/AuthShell";
 import { Button } from "@/components/Button";
+import { apiPost, ApiResponseError } from "@/api-client/client";
 
 function scorePassword(password: string): number {
   let score = 0;
@@ -27,7 +21,14 @@ function scorePassword(password: string): number {
 const STRENGTH_LABELS = ["Very weak", "Weak", "Fair", "Good", "Strong"];
 const STRENGTH_COLORS = ["bg-danger-500", "bg-danger-500", "bg-warning-500", "bg-brand-500", "bg-success-500"];
 
+const TOKEN_ERROR_MESSAGES: Record<string, string> = {
+  invalid_token: "This reset link is invalid.",
+  token_used: "This reset link has already been used.",
+  token_expired: "This reset link has expired.",
+};
+
 function ResetPasswordForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
 
@@ -36,6 +37,7 @@ function ResetPasswordForm() {
   const [touched, setTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const strength = useMemo(() => scorePassword(password), [password]);
 
@@ -59,17 +61,31 @@ function ResetPasswordForm() {
     if (!password || password.length < 8 || confirmPassword !== password) return;
 
     setSubmitting(true);
-    // Mocked: no backend reset-confirmation endpoint exists yet.
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    setSubmitting(false);
-    setDone(true);
+    setApiError(null);
+    try {
+      await apiPost<{ ok: boolean }>(
+        "/api/identity/reset-password",
+        { token, password },
+        { anonymous: true }
+      );
+      setDone(true);
+      setTimeout(() => router.replace("/login"), 3000);
+    } catch (err) {
+      if (err instanceof ApiResponseError) {
+        setApiError(TOKEN_ERROR_MESSAGES[err.code] ?? err.message);
+      } else {
+        setApiError("An unexpected error occurred. Please try again.");
+      }
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   if (!token) {
     return (
       <AuthShell>
         <div className="rounded-2xl border border-white/40 bg-white/80 p-6 text-center shadow-2xl shadow-slate-900/10 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70 sm:p-8">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-danger-100 text-danger-700 dark:bg-danger-700/20 dark:text-danger-400">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-danger-100 text-danger-700 dark:bg-danger-700/20 dark:text-danger-400 mx-auto">
             <AlertIcon />
           </div>
           <h2 className="mt-4 text-2xl font-bold text-slate-900 dark:text-white">Invalid reset link</h2>
@@ -97,7 +113,7 @@ function ResetPasswordForm() {
             </div>
             <h2 className="mt-4 text-2xl font-bold text-slate-900 dark:text-white">Password updated</h2>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              Your password has been changed. Sign in with your new password to continue.
+              Your password has been changed. Redirecting you to sign in…
             </p>
             <Link href="/login" className="mt-6 text-sm font-medium text-brand-600 hover:underline dark:text-brand-400">
               &larr; Back to sign in
@@ -111,6 +127,19 @@ function ResetPasswordForm() {
                 Choose a strong password you haven&apos;t used before.
               </p>
             </div>
+
+            {apiError && (
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="mb-5 rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700 dark:border-danger-700/40 dark:bg-danger-700/10 dark:text-danger-300"
+              >
+                {apiError}{" "}
+                <Link href="/login/forgot-password" className="font-medium underline">
+                  Request a new link
+                </Link>
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} noValidate aria-label="Reset password form" className="flex flex-col gap-4">
               <div className="flex flex-col gap-1">

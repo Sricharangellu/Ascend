@@ -2,9 +2,10 @@
  * Typed fetch wrapper — attaches the bearer token, parses the
  * { error: { code, message, requestId } } envelope, and surfaces typed errors.
  *
- * Usage:
- *   import { apiFetch } from "@/api-client/client";
- *   const data = await apiFetch("POST", "/auth/login", { body: { email, password } });
+ * 401 handling: on a 401 from an authenticated request, we attempt one silent
+ * token refresh. If the refresh succeeds the original request is retried
+ * transparently. If it fails the session is cleared and the user is sent to
+ * /login.
  */
 
 import type { ApiError } from "./types";
@@ -26,22 +27,17 @@ export class ApiResponseError extends Error {
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-// Callers pass ABSOLUTE backend paths (e.g. "/api/identity/login",
-// "/api/v1/flags", "/healthz") because the backend splits routes across
-// /api/identity/*, /api/v1/* and root — a single version prefix can't serve
-// all three. NEXT_PUBLIC_API_BASE_URL sets the backend ORIGIN in production
-// (e.g. https://finder-pos-backend.vercel.app); empty = same origin.
-// In a browser, same-origin relative URLs work. In Node (tests / SSR) fetch
-// requires an absolute URL, so we prefix with http://localhost.
 function resolveBase(): string {
   const configured = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
   if (typeof window !== "undefined") return configured;
-  // Node / test environment — make it absolute
   if (configured.startsWith("http")) return configured;
   return `http://localhost${configured}`;
 }
 
 const API_BASE = resolveBase();
+
+// Prevent multiple concurrent refresh attempts.
+let _refreshPromise: Promise<boolean> | null = null;
 
 // ─── Core fetch helper ────────────────────────────────────────────────────────
 
@@ -49,9 +45,11 @@ export interface FetchOptions<TBody = unknown> {
   body?: TBody;
   /** Additional headers; Authorization is set automatically. */
   headers?: Record<string, string>;
-  /** If true, skip attaching the bearer token (used for login). */
+  /** If true, skip attaching the bearer token (used for login/reset flows). */
   anonymous?: boolean;
   signal?: AbortSignal;
+  /** Internal — set to true on the one automatic retry after a token refresh. */
+  _retry?: boolean;
 }
 
 /**
@@ -63,7 +61,7 @@ export async function apiFetch<TResponse>(
   path: string,
   options: FetchOptions = {}
 ): Promise<TResponse> {
-  const { body, headers = {}, anonymous = false, signal } = options;
+  const { body, headers = {}, anonymous = false, signal, _retry = false } = options;
 
   const reqHeaders: Record<string, string> = {
     "Content-Type": "application/json",
@@ -78,7 +76,6 @@ export async function apiFetch<TResponse>(
     }
   }
 
-  // Ensure path starts with /
   const url = `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
 
   const response = await fetch(url, {
@@ -87,6 +84,26 @@ export async function apiFetch<TResponse>(
     body: body !== undefined ? JSON.stringify(body) : undefined,
     signal,
   });
+
+  // 401 on an authenticated request — try a silent token refresh once.
+  if (response.status === 401 && !anonymous && !_retry) {
+    if (!_refreshPromise) {
+      _refreshPromise = import("@/lib/auth")
+        .then(({ silentRefresh }) => silentRefresh())
+        .finally(() => { _refreshPromise = null; });
+    }
+    const refreshed = await _refreshPromise;
+    if (refreshed) {
+      return apiFetch<TResponse>(method, path, { ...options, _retry: true });
+    }
+    // Refresh failed — clear session and redirect to login.
+    await import("@/lib/auth").then(({ clearSession }) => clearSession());
+    if (typeof window !== "undefined") {
+      window.location.href = "/login";
+    }
+    // Throw so any in-flight awaits don't silently continue.
+    throw new ApiResponseError("unauthenticated", "Session expired. Please sign in again.", "", 401);
+  }
 
   // 204 No Content — no body to parse
   if (response.status === 204) {
@@ -105,7 +122,6 @@ export async function apiFetch<TResponse>(
     );
   }
 
-  // Check for the standard error envelope
   if (!response.ok) {
     const envelope = json as Partial<ApiError>;
     const err = envelope?.error;

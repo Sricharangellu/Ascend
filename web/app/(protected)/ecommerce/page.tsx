@@ -5,6 +5,7 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Badge, statusBadge } from "@/components/Badge";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { formatMoney } from "@/lib/money";
 import { apiGet, apiPatch, ApiResponseError } from "@/api-client/client";
 import type { OnlineOrder } from "@/api-client/types";
@@ -224,6 +225,9 @@ function OrdersTab() {
         </div>
       )}
 
+      {loading ? (
+        <TableSkeleton headers={["Order #", "Customer", "Status", "Total", "Date"]} rows={8} />
+      ) : (
       <Card noPadding>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -237,13 +241,7 @@ function OrdersTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
-                    Loading…
-                  </td>
-                </tr>
-              ) : orders.length === 0 ? (
+              {orders.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
                     No online orders yet.
@@ -274,6 +272,7 @@ function OrdersTab() {
           </table>
         </div>
       </Card>
+      )}
     </div>
   );
 }

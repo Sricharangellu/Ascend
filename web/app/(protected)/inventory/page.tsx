@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { formatMoney } from "@/lib/money";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { useToast } from "@/components/Toast";
@@ -334,11 +335,11 @@ function MovementsDrawer({
 
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <div className="p-6 text-sm text-slate-500" aria-busy="true">Loading movements…</div>
+            <TableSkeleton headers={["Date", "Type", "Delta", "Location", "Actor", "Note"]} rows={5} />
           ) : error ? (
             <div className="p-6 text-sm text-danger-700" role="alert">{error}</div>
           ) : movements.length === 0 ? (
-            <div className="p-6 text-sm text-slate-500">No movements recorded yet.</div>
+            <div className="p-6 text-center text-sm text-[var(--color-text-secondary)]">No movements recorded yet.</div>
           ) : (
             <table className="min-w-full divide-y divide-slate-100 text-sm">
               <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
@@ -717,16 +718,15 @@ export default function InventoryPage() {
               </div>
 
               {ledgerLoading ? (
-                <div className="p-6 text-sm text-slate-500" aria-busy="true">
-                  Loading inventory...
-                </div>
+                <TableSkeleton headers={["SKU", "Product", "Category", "Available", "On hand", "Reorder Pt.", "Value", ""]} rows={8} />
               ) : ledgerError ? (
                 <div className="p-6 text-sm text-danger-700" role="alert">
                   {ledgerError}
                 </div>
               ) : filteredRows.length === 0 ? (
-                <div className="p-6 text-sm text-slate-500">
-                  No inventory rows match the current filters.
+                <div className="flex flex-col items-center py-16 text-center">
+                  <p className="text-sm font-medium text-[var(--color-text-primary)]">No inventory rows match the current filters.</p>
+                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Try clearing the search or category filter.</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">

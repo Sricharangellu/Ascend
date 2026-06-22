@@ -6,6 +6,7 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { formatMoney } from "@/lib/money";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import type {
@@ -291,11 +292,14 @@ export default function CustomersPage() {
             </div>
 
             {loading ? (
-              <div className="p-6 text-sm text-slate-500" aria-busy="true">Loading customers...</div>
+              <TableSkeleton headers={["Name", "Email", "Phone", "Segment", "Balance"]} rows={8} />
             ) : error ? (
               <div className="p-6 text-sm text-danger-700" role="alert">{error}</div>
             ) : filteredCustomers.length === 0 ? (
-              <div className="p-6 text-sm text-slate-500">No customers match the current filters.</div>
+              <div className="py-16 text-center">
+                <p className="text-sm font-medium text-[var(--color-text-primary)]">No customers found.</p>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Try clearing the filters or add a new customer.</p>
+              </div>
             ) : (
               <ul className="divide-y divide-slate-100">
                 {filteredCustomers.map((customer) => (
