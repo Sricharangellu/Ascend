@@ -263,6 +263,46 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Mock handlers (IIFE)**: 4 seed reps (Jordan Walsh 5%, Maya Patel 6.5%, Chris Nguyen 4.5% inactive, Dana Okonkwo 5%); GET list (filter ?active=true), POST create, GET :id/performance (seeded revenue/order counts), PATCH update.
 - **Verified:** npm run typecheck — 0 errors (both backend + frontend).
 
+### BE-31: httpOnly cookie auth migration (f7da017)
+
+Moves the refresh token from `sessionStorage` to an httpOnly cookie, closing the
+XSS token-theft vector and enabling true server-side auth enforcement in Next.js.
+
+**Backend (`src/identity/routes.ts`)**:
+- `getCookie(req, name)` helper: parses named cookies from `req.headers.cookie`
+  without a cookie-parser dependency.
+- `setAuthCookies(res, refreshToken)`: sets `finder_refresh` (httpOnly=true,
+  secure=prod, sameSite=lax, maxAge=30d) and `finder_session_hint` (httpOnly=false,
+  same other options). The hint is a presence indicator readable by JS and middleware.
+- `clearAuthCookies(res)`: clears both cookies (used by logout).
+- `POST /login`: calls `setAuthCookies()` after `service.login()`.
+- `POST /refresh`: reads token from `finder_refresh` cookie (preferred) or request
+  body (backward compat). Rotates and sets new cookies on success. Throws 400 if
+  neither source provides a token.
+- `POST /logout`: reads token from cookie or body, revokes it via service, then
+  clears both cookies — browser discards tokens immediately on the same response.
+
+**Frontend (`web/lib/auth.ts`)**:
+- Removed `REFRESH_TOKEN_KEY` / `sessionStorage` usage for the refresh token.
+- `setSession()`: `_refreshToken` param kept for API compat; no longer persisted.
+- `clearSession()`: only removes `USER_KEY` from sessionStorage (user profile).
+- `hasSessionHint()`: reads `document.cookie` for `finder_session_hint=`. Replaces
+  `getStoredRefreshToken()` as the "is a session likely?" signal.
+- `silentRefresh()`: gates on `hasSessionHint()`; sends empty body `{}` to
+  `POST /api/identity/refresh` (cookie sent automatically by the browser).
+
+**Frontend (`web/lib/useAuth.ts`)**:
+- `logout()`: removed `getStoredRefreshToken()` call; posts `{}` to logout
+  (cookie sent automatically); removed unused import.
+
+**Next.js middleware (`web/middleware.ts`)**:
+- Auth enforcement enabled: reads `finder_session_hint` cookie; redirects
+  unauthenticated requests to `/login?next=<path>`.
+- Public prefixes: `/`, `/login`, `/_next`, `/favicon`, `/icons`, `/api`.
+- JSDoc updated to document the two-cookie architecture.
+
+**Verified**: backend tsc 0 errors; frontend tsc 1 pre-existing error (unrelated mock handler type).
+
 ### BE-30: Early payment discount on bills (af7d7a7)
 
 Adds prompt-payment discount (early-pay discount / 2/10 net 30 style) to the
