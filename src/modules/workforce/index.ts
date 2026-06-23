@@ -52,9 +52,25 @@ CREATE TABLE IF NOT EXISTS time_off_requests (
 CREATE INDEX IF NOT EXISTS time_off_tenant_idx ON time_off_requests (tenant_id, status);
 `;
 
+// BE-40: Employee time clock — clock-in/out entries for payroll and time-cards report.
+const CREATE_TIME_ENTRIES = `
+CREATE TABLE IF NOT EXISTS time_entries (
+  id            TEXT PRIMARY KEY,
+  tenant_id     TEXT NOT NULL,
+  employee_id   TEXT NOT NULL,
+  clock_in      BIGINT NOT NULL,
+  clock_out     BIGINT,
+  break_minutes INTEGER NOT NULL DEFAULT 0,
+  notes         TEXT,
+  created_at    BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS time_entries_tenant_emp_idx ON time_entries (tenant_id, employee_id, clock_in DESC);
+CREATE INDEX IF NOT EXISTS time_entries_tenant_date_idx ON time_entries (tenant_id, clock_in DESC);
+`;
+
 export const workforceModule: PosModule = {
   name: "workforce",
-  migrations: [CREATE_EMPLOYEES, CREATE_SCHEDULE_SHIFTS, CREATE_TIME_OFF],
+  migrations: [CREATE_EMPLOYEES, CREATE_SCHEDULE_SHIFTS, CREATE_TIME_OFF, CREATE_TIME_ENTRIES],
   register({ db, events, router }: { db: DB; events: EventBus; router: Router }) {
     const svc = workforceService(db, events);
     registerRoutes(router, svc);

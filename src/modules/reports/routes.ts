@@ -157,4 +157,15 @@ export function registerRoutes(router: Router, service: ReportsService): void {
     const limit = Math.min(Number(req.query.limit ?? 200), 500);
     res.json({ items: await service.purchasesReport(t, { vendorId, from, to, limit }) });
   }));
+
+  // ── BE-40: Time Cards report ──────────────────────────────────────────────
+
+  // GET /api/v1/reports/time-cards?employeeId=&from=&to=
+  router.get("/time-cards", handler(async (req, res) => {
+    const t = tenantId(res);
+    const employeeId = typeof req.query.employeeId === "string" ? req.query.employeeId : undefined;
+    const from = typeof req.query.from === "string" ? Number(req.query.from) : undefined;
+    const to   = typeof req.query.to   === "string" ? Number(req.query.to)   : undefined;
+    res.json(await service.timeCardsReport(t, { employeeId, from, to }));
+  }));
 }

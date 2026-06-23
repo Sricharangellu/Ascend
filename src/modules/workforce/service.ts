@@ -234,5 +234,61 @@ export function workforceService(db: DB, _events: EventBus) {
       );
       return { ...rows[0], status };
     },
+
+    // ── Time clock (BE-40) ───────────────────────────────────────────────────
+
+    async clockIn(employeeId: string, tenantId: string, notes?: string) {
+      // Prevent duplicate open entries
+      const open = await db.one<{ id: string }>(
+        "SELECT id FROM time_entries WHERE tenant_id = @tenantId AND employee_id = @employeeId AND clock_out IS NULL ORDER BY clock_in DESC LIMIT 1",
+        { tenantId, employeeId },
+      );
+      if (open) throw new (await import("../../shared/http.js")).HttpError(409, "already_clocked_in", "Employee is already clocked in.");
+      const id = `te_${uuidv7()}`;
+      const now = Date.now();
+      await db.withTenant(tenantId).tx(async (tdb) => {
+        await tdb.query(
+          "INSERT INTO time_entries (id, tenant_id, employee_id, clock_in, notes, created_at) VALUES (@id, @tenantId, @employeeId, @now, @notes, @now)",
+          { id, tenantId, employeeId, now, notes: notes ?? null },
+        );
+      });
+      return { id, employee_id: employeeId, clock_in: now, clock_out: null, break_minutes: 0, notes: notes ?? null };
+    },
+
+    async clockOut(entryId: string, tenantId: string, breakMinutes?: number) {
+      const entry = await db.one<{ id: string; employee_id: string; clock_in: number; clock_out: number | null }>(
+        "SELECT id, employee_id, clock_in, clock_out FROM time_entries WHERE id = @id AND tenant_id = @tenantId",
+        { id: entryId, tenantId },
+      );
+      if (!entry) throw notFound(`time_entry '${entryId}'`);
+      if (entry.clock_out !== null) throw new (await import("../../shared/http.js")).HttpError(409, "already_clocked_out", "Entry already has a clock-out time.");
+      const now = Date.now();
+      await db.query(
+        "UPDATE time_entries SET clock_out = @now, break_minutes = @break WHERE id = @id AND tenant_id = @tenantId",
+        { now, break: breakMinutes ?? 0, id: entryId, tenantId },
+      );
+      return { ...entry, clock_out: now, break_minutes: breakMinutes ?? 0 };
+    },
+
+    async listTimeEntries(tenantId: string, opts: { employeeId?: string; from?: number; to?: number; limit?: number }) {
+      const where: string[] = ["te.tenant_id = @tenantId"];
+      const params: Record<string, unknown> = { tenantId };
+      if (opts.employeeId) { where.push("te.employee_id = @employeeId"); params.employeeId = opts.employeeId; }
+      if (opts.from)       { where.push("te.clock_in >= @from"); params.from = opts.from; }
+      if (opts.to)         { where.push("te.clock_in <= @to");   params.to   = opts.to;   }
+      params.limit = Math.min(opts.limit ?? 200, 500);
+      return db.query(
+        `SELECT te.id, te.employee_id, e.name AS employee_name,
+                te.clock_in, te.clock_out, te.break_minutes, te.notes,
+                CASE WHEN te.clock_out IS NOT NULL
+                     THEN (te.clock_out - te.clock_in) / 60000 - te.break_minutes
+                     ELSE NULL END AS worked_minutes
+         FROM time_entries te
+         JOIN employees e ON e.id = te.employee_id AND e.tenant_id = te.tenant_id
+         WHERE ${where.join(" AND ")}
+         ORDER BY te.clock_in DESC LIMIT @limit`,
+        params,
+      );
+    },
   };
 }

@@ -611,6 +611,65 @@ export class ReportsService {
     };
   }
 
+  // ── BE-40: Time Cards report ──────────────────────────────────────────────
+
+  async timeCardsReport(
+    tenantId: string,
+    opts: { employeeId?: string; from?: number; to?: number },
+  ) {
+    const since = opts.from ?? (Date.now() - 30 * 86_400_000);
+    const until = opts.to ?? Date.now();
+    const where: string[] = [
+      "te.tenant_id = @tenantId",
+      "te.clock_in >= @since",
+      "te.clock_in <= @until",
+    ];
+    const params: Record<string, unknown> = { tenantId, since, until };
+    if (opts.employeeId) { where.push("te.employee_id = @employeeId"); params.employeeId = opts.employeeId; }
+
+    const entries = await this.db.query<{
+      employee_id: string;
+      employee_name: string;
+      clock_in: number;
+      clock_out: number | null;
+      break_minutes: number;
+      worked_minutes: number | null;
+    }>(
+      `SELECT
+         te.employee_id,
+         e.name AS employee_name,
+         te.clock_in,
+         te.clock_out,
+         te.break_minutes,
+         CASE WHEN te.clock_out IS NOT NULL
+              THEN (te.clock_out - te.clock_in) / 60000 - te.break_minutes
+              ELSE NULL END AS worked_minutes
+       FROM time_entries te
+       JOIN employees e ON e.id = te.employee_id AND e.tenant_id = te.tenant_id
+       WHERE ${where.join(" AND ")}
+       ORDER BY te.clock_in ASC LIMIT 500`,
+      params,
+    );
+
+    // Aggregate total hours per employee
+    const totals = new Map<string, { name: string; totalMinutes: number; entries: number }>();
+    for (const e of entries) {
+      const rec = totals.get(e.employee_id) ?? { name: e.employee_name, totalMinutes: 0, entries: 0 };
+      rec.totalMinutes += Number(e.worked_minutes ?? 0);
+      rec.entries++;
+      totals.set(e.employee_id, rec);
+    }
+
+    const summary = Array.from(totals.entries()).map(([employeeId, rec]) => ({
+      employeeId,
+      employeeName: rec.name,
+      totalHours: Math.round((rec.totalMinutes / 60) * 10) / 10,
+      entryCount: rec.entries,
+    }));
+
+    return { entries, summary };
+  }
+
   // ── BE-36: Register Closures ───────────────────────────────────────────────
 
   async registerClosures(

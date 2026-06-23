@@ -92,4 +92,37 @@ export function registerRoutes(router: Router, svc: WorkforceService): void {
     const { status } = parseBody(z.object({ status: z.enum(["pending", "approved", "denied"]) }), req.body);
     res.json(await svc.updateTimeOffStatus(tid(res), String(req.params["id"]), status as TimeOffStatus));
   }));
+
+  // ── Time clock endpoints (BE-40) ──────────────────────────────────────────
+
+  const clockInSchema = z.object({
+    employeeId: z.string().min(1),
+    notes: z.string().max(200).optional(),
+  });
+
+  const clockOutSchema = z.object({
+    breakMinutes: z.number().int().nonnegative().optional(),
+  });
+
+  // GET  /workforce/time-entries?employeeId=&from=&to=&limit=
+  router.get("/workforce/time-entries", handler(async (req, res) => {
+    const employeeId = typeof req.query.employeeId === "string" ? req.query.employeeId : undefined;
+    const from  = typeof req.query.from  === "string" ? Number(req.query.from)  : undefined;
+    const to    = typeof req.query.to    === "string" ? Number(req.query.to)    : undefined;
+    const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
+    const items = await svc.listTimeEntries(tid(res), { employeeId, from, to, limit });
+    res.json({ items });
+  }));
+
+  // POST /workforce/clock-in — start a new time entry
+  router.post("/workforce/clock-in", handler(async (req, res) => {
+    const body = parseBody(clockInSchema, req.body);
+    res.status(201).json(await svc.clockIn(body.employeeId, tid(res), body.notes));
+  }));
+
+  // POST /workforce/clock-out/:entryId — close an open time entry
+  router.post("/workforce/clock-out/:entryId", handler(async (req, res) => {
+    const body = parseBody(clockOutSchema, req.body);
+    res.json(await svc.clockOut(String(req.params.entryId), tid(res), body.breakMinutes));
+  }));
 }
