@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
-import { apiPost } from "@/api-client/client";
+import { apiGet, apiPost } from "@/api-client/client";
 import type { Order, Payment, CapturePaymentRequest, PaymentMethod } from "@/api-client/types";
 import { formatMoney, parseToCents, calcChange } from "@/lib/money";
 import { Button } from "@/components/Button";
@@ -29,7 +29,7 @@ interface TenderScreenProps {
   splitEnabled?: boolean;
 }
 
-type TenderTab = "cash" | "card" | "split";
+type TenderTab = "cash" | "card" | "split" | "store_credit";
 
 export function TenderScreen({
   order,
@@ -93,6 +93,8 @@ export function TenderScreen({
           cashCents: cashAmount,
           cardCents: cardAmount,
           stripePaymentIntentId,
+          // Required for store_credit — backend verifies balance and deducts atomically.
+          customerId: method === "store_credit" ? (order.customerId ?? undefined) : undefined,
         };
 
         // If offline, write to the IndexedDB outbox and request background sync.
@@ -257,6 +259,9 @@ export function TenderScreen({
           {splitEnabled && (
             <TabButton active={tab === "split"} id="tender-tab-split" panelId="tender-panel-split" onClick={() => setTab("split")} label="Split" icon={<SplitIcon />} />
           )}
+          {order.customerId && (
+            <TabButton active={tab === "store_credit"} id="tender-tab-sc" panelId="tender-panel-sc" onClick={() => setTab("store_credit")} label="Credit" icon={<CashIcon />} />
+          )}
         </div>
 
         {/* Tab content */}
@@ -300,6 +305,13 @@ export function TenderScreen({
                 onSplitCashChange={(v) => { setSplitCash(v); setError(null); }}
               />
             </div>
+          )}
+
+          {tab === "store_credit" && order.customerId && (
+            <StoreCreditTab
+              customerId={order.customerId}
+              totalCents={totalCents}
+            />
           )}
         </div>
 
@@ -363,6 +375,21 @@ export function TenderScreen({
               onClick={handleSplitSubmit}
             >
               Charge Split
+            </Button>
+          )}
+
+          {tab === "store_credit" && order.customerId && (
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={submitting}
+              disabled={submitting}
+              onClick={() => {
+                void capture("store_credit", 0, 0, undefined);
+              }}
+            >
+              Pay {formatMoney(totalCents)} with Store Credit
             </Button>
           )}
         </div>
@@ -657,5 +684,46 @@ function SplitIcon() {
       <path d="M18 11l4 4-4 4" />
       <path d="M6 21v-6a6 6 0 0 1 2.1-4.57" />
     </svg>
+  );
+}
+
+// ─── Store Credit Tab (FE-45) ─────────────────────────────────────────────────
+
+function StoreCreditTab({ customerId, totalCents }: { customerId: string; totalCents: number }) {
+  const [balance, setBalance] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiGet<{ balanceCents: number }>(`/api/v1/customers/${customerId}/store-credit`)
+      .then((r: { balanceCents: number }) => setBalance(r.balanceCents))
+      .catch(() => setBalance(0))
+      .finally(() => setLoading(false));
+  }, [customerId]);
+
+  const sufficient = balance !== null && balance >= totalCents;
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-[var(--color-table-border)] bg-gray-50 p-4 text-center">
+        <p className="text-xs font-medium uppercase tracking-wider text-[var(--color-text-secondary)]">
+          Store credit balance
+        </p>
+        {loading ? (
+          <div className="mx-auto mt-2 h-8 w-28 animate-pulse rounded bg-gray-200" />
+        ) : (
+          <p className={`mt-1 text-3xl font-bold tabular-nums ${sufficient ? "text-success-600" : "text-danger-500"}`}>
+            {formatMoney(balance ?? 0)}
+          </p>
+        )}
+        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          Order total: <span className="font-semibold">{formatMoney(totalCents)}</span>
+        </p>
+      </div>
+      {!loading && !sufficient && (
+        <p className="rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700">
+          Insufficient balance. {formatMoney(totalCents - (balance ?? 0))} short.
+        </p>
+      )}
+    </div>
   );
 }

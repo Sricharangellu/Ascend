@@ -299,4 +299,60 @@ export function registerRoutes(router: Router, service: CustomersService): void 
     );
     res.json(result);
   }));
+
+  // ── Customer-specific product price overrides (BE-39) ─────────────────────
+
+  const priceOverrideSchema = z.object({
+    productId: z.string().min(1),
+    priceCents: z.number().int().nonnegative(),
+  });
+
+  // GET  /:id/product-prices — list all overrides for this customer
+  router.get("/:id/product-prices", handler(async (req, res) => {
+    const rows = await service.listPriceOverrides(String(req.params.id), tenantId(res));
+    res.json({ items: rows });
+  }));
+
+  // POST /:id/product-prices — upsert a price override (manager only)
+  router.post(
+    "/:id/product-prices",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const body = parseBody(priceOverrideSchema, req.body);
+      const row = await service.upsertPriceOverride(
+        String(req.params.id),
+        body.productId,
+        body.priceCents,
+        tenantId(res),
+      );
+      res.status(201).json(row);
+    }),
+  );
+
+  // DELETE /:id/product-prices/:productId — remove a price override (manager only)
+  router.delete(
+    "/:id/product-prices/:productId",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      await service.deletePriceOverride(
+        String(req.params.id),
+        String(req.params.productId),
+        tenantId(res),
+      );
+      res.status(204).end();
+    }),
+  );
+
+  // GET /product-prices/lookup?customerId=&productId= — price resolution at POS
+  // Returns the resolved price for a customer + product combination.
+  router.get("/product-prices/lookup", handler(async (req, res) => {
+    const customerId = typeof req.query.customerId === "string" ? req.query.customerId : undefined;
+    const productId  = typeof req.query.productId  === "string" ? req.query.productId  : undefined;
+    if (!customerId || !productId) {
+      res.status(400).json({ error: { code: "bad_request", message: "customerId and productId are required" } });
+      return;
+    }
+    const resolved = await service.resolvePriceForCustomer(customerId, productId, tenantId(res));
+    res.json(resolved);
+  }));
 }

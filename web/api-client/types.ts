@@ -405,6 +405,7 @@ export interface RetailCustomer {
   email: string | null;
   phone: string | null;
   points: number;
+  store_credit_cents?: number;
   created_at?: number;
 }
 

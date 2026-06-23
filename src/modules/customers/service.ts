@@ -902,6 +902,59 @@ export class CustomersService {
 
   // ── Store Credit ───────────────────────────────────────────────────────────
 
+  // ── Customer-specific price overrides (BE-39) ─────────────────────────────
+
+  async listPriceOverrides(customerId: string, tenantId: string) {
+    return this.db.query(
+      "SELECT id, product_id, price_cents, updated_at FROM customer_product_prices WHERE tenant_id = @tenantId AND customer_id = @customerId ORDER BY updated_at DESC LIMIT 500",
+      { tenantId, customerId },
+    );
+  }
+
+  async upsertPriceOverride(
+    customerId: string,
+    productId: string,
+    priceCents: number,
+    tenantId: string,
+  ) {
+    const now = Date.now();
+    const id = `cpp_${uuidv7()}`;
+    await this.db.query(
+      `INSERT INTO customer_product_prices (id, tenant_id, customer_id, product_id, price_cents, created_at, updated_at)
+       VALUES (@id, @tenantId, @customerId, @productId, @priceCents, @now, @now)
+       ON CONFLICT (tenant_id, customer_id, product_id)
+       DO UPDATE SET price_cents = @priceCents, updated_at = @now`,
+      { id, tenantId, customerId, productId, priceCents, now },
+    );
+    return this.db.one(
+      "SELECT id, product_id, price_cents, updated_at FROM customer_product_prices WHERE tenant_id = @tenantId AND customer_id = @customerId AND product_id = @productId",
+      { tenantId, customerId, productId },
+    );
+  }
+
+  async deletePriceOverride(customerId: string, productId: string, tenantId: string) {
+    await this.db.query(
+      "DELETE FROM customer_product_prices WHERE tenant_id = @tenantId AND customer_id = @customerId AND product_id = @productId",
+      { tenantId, customerId, productId },
+    );
+  }
+
+  /** Resolve the effective price for a customer + product (Implementation Prompt §5.2 rule 1).
+   *  Priority: customer-specific override → product standard price.
+   */
+  async resolvePriceForCustomer(customerId: string, productId: string, tenantId: string) {
+    const override = await this.db.one<{ price_cents: number }>(
+      "SELECT price_cents FROM customer_product_prices WHERE tenant_id = @tenantId AND customer_id = @customerId AND product_id = @productId",
+      { tenantId, customerId, productId },
+    );
+    if (override) return { priceCents: Number(override.price_cents), source: "customer_override" as const };
+    const product = await this.db.one<{ price_cents: number }>(
+      "SELECT price_cents FROM products WHERE tenant_id = @tenantId AND id = @productId",
+      { tenantId, productId },
+    );
+    return { priceCents: Number(product?.price_cents ?? 0), source: "standard" as const };
+  }
+
   /** Return the current store credit balance for a customer. */
   async getStoreCredit(customerId: string, tenantId: string): Promise<{ balanceCents: number }> {
     const row = await this.db.one<{ store_credit_cents: number }>(

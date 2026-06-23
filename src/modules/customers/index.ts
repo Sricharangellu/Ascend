@@ -178,9 +178,26 @@ CREATE TABLE IF NOT EXISTS customer_notes (
 CREATE INDEX IF NOT EXISTS customer_notes_customer_idx ON customer_notes (tenant_id, customer_id, created_at DESC);
 `;
 
+// BE-39: Customer-specific product price overrides.
+// Highest priority in price resolution (before tier pricing and standard price).
+const CREATE_CUSTOMER_PRODUCT_PRICES = `
+CREATE TABLE IF NOT EXISTS customer_product_prices (
+  id          TEXT PRIMARY KEY,
+  tenant_id   TEXT NOT NULL,
+  customer_id TEXT NOT NULL,
+  product_id  TEXT NOT NULL,
+  price_cents BIGINT NOT NULL,
+  created_at  BIGINT NOT NULL,
+  updated_at  BIGINT NOT NULL,
+  UNIQUE (tenant_id, customer_id, product_id)
+);
+CREATE INDEX IF NOT EXISTS cpp_customer_idx ON customer_product_prices (tenant_id, customer_id);
+CREATE INDEX IF NOT EXISTS cpp_product_idx  ON customer_product_prices (tenant_id, product_id);
+`;
+
 export const customersModule: PosModule = {
   name: "customers",
-  migrations: [CREATE_CUSTOMERS_TABLE, CREATE_CUSTOMERS_INDEXES, ADD_PROFILE_COLUMNS, ADD_CUSTOMER_TYPE_FIELDS, ADD_CUSTOMER_XLSX_FIELDS, CREATE_LOYALTY_TIER_RULES, CREATE_CUSTOMER_ADDRESSES, CREATE_CUSTOMER_CONTACTS, CREATE_CUSTOMER_GROUPS, CREATE_CUSTOMER_NOTES],
+  migrations: [CREATE_CUSTOMERS_TABLE, CREATE_CUSTOMERS_INDEXES, ADD_PROFILE_COLUMNS, ADD_CUSTOMER_TYPE_FIELDS, ADD_CUSTOMER_XLSX_FIELDS, CREATE_LOYALTY_TIER_RULES, CREATE_CUSTOMER_ADDRESSES, CREATE_CUSTOMER_CONTACTS, CREATE_CUSTOMER_GROUPS, CREATE_CUSTOMER_NOTES, CREATE_CUSTOMER_PRODUCT_PRICES],
   async register({ db, events, router }) {
     const service = new CustomersService(db, events);
 

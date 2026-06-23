@@ -380,6 +380,9 @@ export default function CustomersPage() {
                   <p className="mt-1 text-sm text-slate-700">{selectedCustomer.notes}</p>
                 </div>
 
+                {/* Store Credit panel — FE-45 */}
+                <StoreCreditPanel customerId={selectedCustomer.id} />
+
                 <div className="grid grid-cols-2 gap-2">
                   <Button variant="secondary" size="sm" fullWidth>Edit profile</Button>
                   <Button variant="primary" size="sm" fullWidth>Add to sale</Button>
@@ -624,6 +627,105 @@ function DisplayStatus({ label, value }: { label: string; value: string }) {
     <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
       <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
       <p className="mt-1 font-semibold text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+// ─── FE-45: Store Credit Panel ────────────────────────────────────────────────
+
+function StoreCreditPanel({ customerId }: { customerId: string }) {
+  const [balance, setBalance] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [adjusting, setAdjusting] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<"add" | "deduct">("add");
+
+  useEffect(() => {
+    setLoading(true);
+    apiGet<{ balanceCents: number }>(`/api/v1/customers/${customerId}/store-credit`)
+      .then((r) => setBalance(r.balanceCents))
+      .catch(() => setBalance(0))
+      .finally(() => setLoading(false));
+  }, [customerId]);
+
+  const handleAdjust = async () => {
+    const cents = Math.round(parseFloat(amount) * 100);
+    if (!cents || cents <= 0) { setError("Enter a positive amount."); return; }
+    if (!reason.trim()) { setError("Reason is required."); return; }
+    setAdjusting(true);
+    setError(null);
+    try {
+      const delta = mode === "add" ? cents : -cents;
+      const result = await apiPost<{ balanceCents: number }>(
+        `/api/v1/customers/${customerId}/store-credit`,
+        { deltaCents: delta, reason: reason.trim() },
+      );
+      setBalance(result.balanceCents);
+      setAmount("");
+      setReason("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Adjustment failed.");
+    } finally {
+      setAdjusting(false);
+    }
+  };
+
+  return (
+    <div className="rounded-md border border-[var(--color-table-border)] bg-white p-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Store Credit</h3>
+        {loading ? (
+          <div className="h-5 w-20 animate-pulse rounded bg-gray-200" />
+        ) : (
+          <span className="text-lg font-bold text-success-600">{formatMoney(balance ?? 0)}</span>
+        )}
+      </div>
+
+      {/* Add / Deduct toggle */}
+      <div className="mt-3 flex gap-1.5">
+        {(["add", "deduct"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setMode(m)}
+            className={`flex-1 rounded-md py-1.5 text-xs font-semibold capitalize transition-colors ${
+              mode === m ? "bg-brand-600 text-white" : "border border-[#D9D9D9] text-[var(--color-text-secondary)] hover:bg-gray-50"
+            }`}
+          >
+            {m === "add" ? "Add credit" : "Deduct"}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-2 space-y-2">
+        <input
+          type="number"
+          min="0.01"
+          step="0.01"
+          placeholder="Amount ($)"
+          value={amount}
+          onChange={(e) => { setAmount(e.target.value); setError(null); }}
+          className="w-full rounded border border-[#D9D9D9] px-3 py-1.5 text-sm outline-none focus:border-brand-600"
+        />
+        <input
+          type="text"
+          placeholder="Reason (required)"
+          value={reason}
+          onChange={(e) => { setReason(e.target.value); setError(null); }}
+          className="w-full rounded border border-[#D9D9D9] px-3 py-1.5 text-sm outline-none focus:border-brand-600"
+        />
+        {error && <p className="text-xs text-danger-500">{error}</p>}
+        <button
+          type="button"
+          disabled={adjusting || !amount || !reason}
+          onClick={handleAdjust}
+          className="w-full rounded-md bg-brand-600 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-40"
+        >
+          {adjusting ? "Applying…" : mode === "add" ? "Add Credit" : "Deduct Credit"}
+        </button>
+      </div>
     </div>
   );
 }

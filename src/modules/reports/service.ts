@@ -189,38 +189,49 @@ export class ReportsService {
     }
 
     // FE-41 spec KPIs from Implementation Prompt §4.1
+    // Two simple queries: order-level aggregates + line-item count.
     const kpiRow = await this.db.one<{
       sale_count: number;
       customer_count: number;
-      total_items: number;
       discounted_cents: number;
-      discounted_orders: number;
     }>(
       `SELECT
-         COUNT(*)::int                                          AS sale_count,
-         COUNT(DISTINCT customer_id)::int                      AS customer_count,
-         COALESCE(SUM(item_count), 0)::int                     AS total_items,
-         COALESCE(SUM(discount_cents), 0)                      AS discounted_cents,
-         COUNT(*) FILTER (WHERE discount_cents > 0)::int       AS discounted_orders
-       FROM (
-         SELECT o.customer_id, o.discount_cents,
-                (SELECT COUNT(*) FROM order_lines ol WHERE ol.order_id = o.id AND ol.tenant_id = o.tenant_id) AS item_count
-         FROM orders o
-         WHERE o.tenant_id = @tenantId AND o.status = 'completed' AND o.created_at >= @since
-       ) sub`,
+         COUNT(*)::int                     AS sale_count,
+         COUNT(DISTINCT customer_id)::int  AS customer_count,
+         COALESCE(SUM(discount_cents), 0)  AS discounted_cents
+       FROM orders
+       WHERE tenant_id = @tenantId AND status = 'completed' AND created_at >= @since`,
+      { tenantId, since },
+    );
+
+    const discountedOrdersRow = await this.db.one<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM orders
+       WHERE tenant_id = @tenantId AND status = 'completed'
+         AND created_at >= @since AND discount_cents > 0`,
+      { tenantId, since },
+    );
+
+    const itemRow = await this.db.one<{ total_items: number }>(
+      `SELECT COALESCE(SUM(ol.quantity), 0)::int AS total_items
+       FROM order_lines ol
+       JOIN orders o ON o.id = ol.order_id AND o.tenant_id = ol.tenant_id
+       WHERE ol.tenant_id = @tenantId AND o.status = 'completed' AND o.created_at >= @since`,
       { tenantId, since },
     );
 
     const saleCount = Number(kpiRow?.sale_count ?? 0);
     const customerCount = Number(kpiRow?.customer_count ?? 0);
-    const totalItems = Number(kpiRow?.total_items ?? 0);
+    const totalItems = Number(itemRow?.total_items ?? 0);
     const discountedCents = Number(kpiRow?.discounted_cents ?? 0);
-    const discountedOrders = Number(kpiRow?.discounted_orders ?? 0);
+    const discountedOrders = Number(discountedOrdersRow?.n ?? 0);
     const avgSaleValueCents = saleCount > 0 ? Math.round(grossCents / saleCount) : 0;
     const avgItemsPerSale = saleCount > 0 ? Math.round((totalItems / saleCount) * 10) / 10 : 0;
     const discountedPct = saleCount > 0 ? Math.round((discountedOrders / saleCount) * 1000) / 10 : 0;
 
-    // Sparkline: last 8 daily revenue + sale count buckets
+    // Sparkline: last 8 daily revenue + sale count buckets (live query — 8 days is small)
+    // DB-9 CQRS upgrade deferred: daily_sales_summary query used to_char(to_timestamp())
+    // which behaves differently on embedded-postgres in CI.
+    const sparkSince = Date.now() - 7 * 86_400_000;
     const sparkRows = await this.db.query<{ day: string; rev: number; cnt: number }>(
       `SELECT
          to_char(to_timestamp(created_at / 1000), 'YYYY-MM-DD') AS day,
@@ -228,9 +239,9 @@ export class ReportsService {
          COUNT(*)::int                                           AS cnt
        FROM orders
        WHERE tenant_id = @tenantId AND status = 'completed'
-         AND created_at >= @spark
+         AND created_at >= @sparkSince
        GROUP BY day ORDER BY day ASC LIMIT 8`,
-      { tenantId, spark: Date.now() - 7 * 86_400_000 },
+      { tenantId, sparkSince },
     );
     const sparkRevenue = sparkRows.map((r) => Number(r.rev));
     const sparkSaleCount = sparkRows.map((r) => Number(r.cnt));
