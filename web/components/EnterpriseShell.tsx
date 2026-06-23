@@ -18,6 +18,7 @@ import type { OutletsResponse } from "@/api-client/types";
 import { useAuth } from "@/lib/useAuth";
 import { useOffline } from "@/lib/useOffline";
 import { useFinderContext } from "@/lib/useFinderContext";
+import { useModuleFlags } from "@/hooks/useModuleFlags";
 
 type NavKey =
   | "dashboard"
@@ -59,22 +60,60 @@ type NavKey =
   | "inventory-counts"
   | "workforce";
 
-const NAV_ITEMS: Array<{
+/** Full nav item definition — module key gates visibility. */
+interface NavItemDef {
   key: NavKey;
   label: string;
   href: string;
   icon: NavKey;
   group: "Operate" | "Manage" | "Analyze" | "Platform";
-}> = [
-  { key: "dashboard", label: "Dashboard", href: "/dashboard", icon: "dashboard", group: "Operate" },
-  { key: "register", label: "Sell", href: "/sell", icon: "register", group: "Operate" },
-  { key: "reports", label: "Reporting", href: "/reporting", icon: "reports", group: "Analyze" },
-  { key: "catalog", label: "Catalog", href: "/catalog", icon: "catalog", group: "Manage" },
-  { key: "inventory", label: "Inventory", href: "/inventory", icon: "inventory", group: "Manage" },
-  { key: "customers", label: "Customers", href: "/customers", icon: "customers", group: "Manage" },
-  { key: "finance", label: "Finance", href: "/finance", icon: "finance", group: "Analyze" },
-  { key: "settings", label: "Setup", href: "/setup", icon: "settings", group: "Platform" },
-  { key: "ecommerce", label: "Ecommerce", href: "/ecommerce", icon: "ecommerce", group: "Platform" },
+  /** Module key that must be enabled to show this item. Omit = always visible. */
+  module?: string;
+}
+
+/** All possible nav items across all verticals.
+ *  Filtered at render time by useModuleFlags(). */
+const ALL_NAV_ITEMS: NavItemDef[] = [
+  // ── Always visible ───────────────────────────────────────────────────────
+  { key: "dashboard",  label: "Dashboard",     href: "/dashboard",    icon: "dashboard",  group: "Operate" },
+  { key: "settings",   label: "Setup",         href: "/setup",        icon: "settings",   group: "Platform" },
+
+  // ── Retail / POS ─────────────────────────────────────────────────────────
+  { key: "register",   label: "Sell",          href: "/sell",         icon: "register",   group: "Operate",  module: "pos_terminal" },
+  { key: "discounts",  label: "Discounts",     href: "/discounts",    icon: "discounts",  group: "Manage",   module: "discounts" },
+  { key: "loyalty",    label: "Loyalty",       href: "/loyalty",      icon: "loyalty",    group: "Manage",   module: "loyalty" },
+  { key: "gift-cards", label: "Gift Cards",    href: "/gift-cards",   icon: "gift-cards", group: "Manage",   module: "gift_cards" },
+  { key: "ecommerce",  label: "Ecommerce",     href: "/ecommerce",    icon: "ecommerce",  group: "Platform", module: "ecommerce" },
+
+  // ── Core always-on modules ────────────────────────────────────────────────
+  { key: "catalog",    label: "Catalog",       href: "/catalog",      icon: "catalog",    group: "Manage" },
+  { key: "inventory",  label: "Inventory",     href: "/inventory",    icon: "inventory",  group: "Manage" },
+  { key: "customers",  label: "Customers",     href: "/customers",    icon: "customers",  group: "Manage" },
+  { key: "reports",    label: "Reporting",     href: "/reporting",    icon: "reports",    group: "Analyze" },
+
+  // ── B2B / Wholesale ───────────────────────────────────────────────────────
+  { key: "quotes",      label: "Quotes",       href: "/quotes",       icon: "quotes",      group: "Operate", module: "quotes" },
+  { key: "sales",       label: "Sales Orders", href: "/sales",        icon: "sales",       group: "Operate", module: "sales_orders" },
+  { key: "purchasing",  label: "Purchasing",   href: "/purchasing",   icon: "purchasing",  group: "Manage",  module: "purchasing" },
+  { key: "vendors",     label: "Vendors",      href: "/vendors",      icon: "vendors",     group: "Manage",  module: "purchasing" },
+  { key: "accounting",  label: "Accounting",   href: "/accounting",   icon: "accounting",  group: "Analyze", module: "accounting" },
+  { key: "finance",     label: "Finance",      href: "/finance",      icon: "finance",     group: "Analyze", module: "billing" },
+
+  // ── Restaurant ────────────────────────────────────────────────────────────
+  { key: "orders",      label: "Tables",       href: "/restaurant/floor-plan", icon: "orders", group: "Operate", module: "tables" },
+
+  // ── Workforce & Operations ─────────────────────────────────────────────────
+  { key: "workforce",   label: "Workforce",    href: "/workforce",    icon: "workforce",  group: "Manage",   module: "workforce" },
+  { key: "operations",  label: "Operations",   href: "/operations",   icon: "operations", group: "Manage",   module: "wms" },
+  { key: "shipping",    label: "Shipping",     href: "/shipping",     icon: "shipping",   group: "Manage",   module: "shipping_mgmt" },
+
+  // ── Platform ──────────────────────────────────────────────────────────────
+  { key: "team",             label: "Team",         href: "/team",              icon: "team",             group: "Platform" },
+  { key: "workflows",        label: "Workflows",    href: "/workflows",         icon: "workflows",        group: "Platform" },
+  { key: "integrations",     label: "Integrations", href: "/integrations",      icon: "integrations",     group: "Platform", module: "webhooks" },
+  { key: "notifications",    label: "Notifications",href: "/notifications",     icon: "notifications",    group: "Platform" },
+  { key: "audit-log",        label: "Audit Log",    href: "/audit-log",         icon: "audit-log",        group: "Platform" },
+  { key: "imports-exports",  label: "Import/Export",href: "/imports-exports",   icon: "imports-exports",  group: "Platform" },
 ];
 
 const MODULE_BY_ACTIVE: Record<NavKey, NavKey> = {
@@ -108,6 +147,7 @@ export function EnterpriseShell({
   contentClassName,
 }: EnterpriseShellProps) {
   const { user, logout } = useAuth();
+  const { enabled: enabledModules } = useModuleFlags();
   const { isOffline } = useOffline();
   const pathname = usePathname();
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -189,7 +229,7 @@ export function EnterpriseShell({
                 </Link>
                 <ChevronRight />
                 <Link
-                  href={NAV_ITEMS.find((i) => i.key === MODULE_BY_ACTIVE[active])?.href ?? "/"}
+                  href={ALL_NAV_ITEMS.find((i) => i.key === MODULE_BY_ACTIVE[active])?.href ?? "/"}
                   className="transition-colors hover:text-brand-600"
                   style={{ color: "var(--color-link)" }}
                 >
@@ -227,6 +267,7 @@ function EnterpriseRail({
   active: NavKey;
   pathname: string;
 }) {
+  const { enabled: enabledModules } = useModuleFlags();
   const selectedModule = MODULE_BY_ACTIVE[active];
 
   return (
@@ -257,7 +298,7 @@ function EnterpriseRail({
           <p className="hidden px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/30 xl:block">
             Modules
           </p>
-          {NAV_ITEMS.map((item) => {
+          {ALL_NAV_ITEMS.filter(item => !item.module || enabledModules.has(item.module) || enabledModules.has("*")).map((item) => {
             const selected = selectedModule === item.key || pathname === item.href;
             return (
               <Link
@@ -293,6 +334,7 @@ function EnterpriseRail({
 }
 
 function MobileNav({ active }: { active: NavKey }) {
+  const { enabled: enabledModules } = useModuleFlags();
   const selectedModule = MODULE_BY_ACTIVE[active];
   return (
     <nav
@@ -300,7 +342,7 @@ function MobileNav({ active }: { active: NavKey }) {
       className="fixed inset-x-0 bottom-0 z-40 flex overflow-x-auto border-t border-white/10 md:hidden"
       style={{ backgroundColor: "var(--color-sidebar-bg)", boxShadow: "0 -4px 16px rgba(0,0,0,0.3)" }}
     >
-      {NAV_ITEMS.map((item) => (
+      {ALL_NAV_ITEMS.filter(item => !item.module || enabledModules.has(item.module) || enabledModules.has("*")).map((item) => (
         <Link
           key={item.key}
           href={item.href}
@@ -517,7 +559,7 @@ function NavIcon({ name }: { name: NavKey }) {
 }
 
 function activeLabel(active: NavKey) {
-  return NAV_ITEMS.find((item) => item.key === MODULE_BY_ACTIVE[active])?.label ?? "Workspace";
+  return ALL_NAV_ITEMS.find((item) => item.key === MODULE_BY_ACTIVE[active])?.label ?? "Workspace";
 }
 
 function ChevronRight() {

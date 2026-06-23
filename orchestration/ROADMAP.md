@@ -672,6 +672,107 @@ See `orchestration/gaps/` restaurant analysis and `memory/project_verticals.md`.
       avg ticket, table turn time, peak hour, top items by quantity.
       Replaces generic dashboard when outlet.type = "restaurant".
 
+
+---
+
+## Phase 8 — Multi-Vertical Expansion (12 Business Types)
+
+Extends the Module Registry to cover all enterprise POS verticals.
+The Business Profile system (Phase 7) provides the infrastructure.
+Each vertical below adds backend endpoints + frontend pages.
+
+### Hospitality (hotel, resort, guest house)
+
+- [ ] BE-H1: Room management — `rooms(id, tenant_id, outlet_id, room_number,
+      type, floor, rate_cents, status)` + `room_charges(id, room_id, order_id,
+      posted_at)`. POST to post charges from POS to a room account.
+      GET /hospitality/rooms, PATCH /:id/status, POST /:id/charge.
+
+- [ ] FE-H1: Rooms page (/hospitality/rooms) — room grid with status badges
+      (available/occupied/checkout/cleaning). Click room → post charge or
+      view folio. Module-gated by `module:room_billing`.
+
+### Services (salon, spa, repair shop, laundry)
+
+- [ ] BE-S1: Appointments module — `appointments(id, tenant_id, customer_id,
+      employee_id, service_id, starts_at, ends_at, status, notes)`.
+      CRUD + conflict detection. GET /appointments?date=&employeeId=.
+
+- [ ] FE-S1: Appointments calendar (/appointments) — day/week grid view,
+      drag-and-drop scheduling, technician columns, status colors.
+      Module-gated by `module:appointments`.
+
+### Healthcare (pharmacy, clinic, optical)
+
+- [ ] BE-HC1: Patient records — `patients(id, tenant_id, name, dob, allergies,
+      notes, created_at)` + `prescriptions(id, patient_id, drug, dosage,
+      prescriber, expiry_date, refills_remaining)`. CRUD endpoints.
+
+- [ ] FE-HC1: Patients page (/healthcare/patients) — searchable patient list,
+      prescription history, allergy alerts. Module-gated by `module:patient_records`.
+
+### Manufacturing (factory outlet, distributor)
+
+- [ ] BE-M1: Production orders — `production_orders(id, tenant_id, product_id,
+      quantity, status, started_at, completed_at)` + BOM line items
+      `(production_order_id, raw_material_id, qty_required, qty_consumed)`.
+
+- [ ] FE-M1: Production orders page (/manufacturing/orders) — create BOM-based
+      orders, track raw material consumption, mark complete (increments
+      finished goods inventory). Module-gated by `module:production_orders`.
+
+### Automotive (workshop, parts store)
+
+- [ ] BE-A1: Vehicles + work orders — `vehicles(id, tenant_id, customer_id,
+      vin, make, model, year, license_plate, mileage)` + `work_orders(id,
+      vehicle_id, technician_id, description, status, labour_cents)`.
+
+- [ ] FE-A1: Vehicles page (/automotive/vehicles) — lookup by VIN/plate,
+      service history, create work order. Module-gated by `module:vehicle_history`.
+
+### Rental (equipment, vehicle, event)
+
+- [ ] BE-R1: Rental contracts — `rental_assets(id, tenant_id, name, sku,
+      daily_rate_cents, status)` + `rental_contracts(id, tenant_id,
+      customer_id, asset_id, starts_at, ends_at, deposit_cents, status)`.
+
+- [ ] FE-R1: Rental assets + contracts (/rental/assets, /rental/contracts) —
+      asset availability calendar, contract creation, deposit tracking.
+      Module-gated by `module:rental_contracts`.
+
+### Entertainment (cinema, park, museum)
+
+- [ ] BE-E1: Tickets + events — `events(id, tenant_id, name, starts_at, ends_at,
+      capacity, price_cents, venue)` + `event_tickets(id, event_id, customer_id,
+      qr_code, redeemed_at)`. Ticket sales via POS or online.
+
+- [ ] FE-E1: Tickets page (/entertainment/tickets) — event list, ticket sales,
+      QR code generation, capacity tracking. Module-gated by `module:tickets`.
+
+### Education (institute, coaching center)
+
+- [ ] BE-ED1: Students + fees — `students(id, tenant_id, name, email, phone,
+      course_id, enrolled_at, status)` + `fee_records(id, student_id,
+      amount_cents, due_date, paid_at, method)`. Fee collection via POS.
+
+- [ ] FE-ED1: Students page (/education/students) — student list, fee status,
+      payment collection, receipt printing. Module-gated by `module:student_accounts`.
+
+### Cross-vertical UX improvements
+
+- [ ] UX-1: Onboarding wizard — first-run wizard (shown to new tenants) that
+      asks for business type and saves business profile before showing the
+      main app. Route: /onboarding. Redirected from /dashboard when no
+      businessType is set.
+
+- [ ] UX-2: Module marketplace page (/setup/modules) — browse all available
+      modules by vertical, toggle on/off, see which plan each module requires.
+      Extends the Business Profile page with a marketplace-style layout.
+
+- [ ] UX-3: Vertical-specific dashboard — when `module:tables` is on, show
+      Table Overview widget on dashboard. When `module:appointments`, show
+      Today's Schedule. Dynamic KPI tiles per business type.
+
 ---
 
 ## PROD — Production-Grade Gaps (audit 2026-06-22)
