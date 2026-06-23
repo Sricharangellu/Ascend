@@ -77,14 +77,30 @@ export function ProductGrid({ onAddProduct }: ProductGridProps) {
 
   const categories = getCategories(allProducts);
 
+  // Auto-focus the search input on mount so keyboard-wedge scanners work immediately.
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
+
+  // Re-focus after each product add so the cashier can scan the next item
+  // without clicking the search box again (critical for barcode scanner workflow).
+  const handleAddProduct = useCallback(
+    (product: Product) => {
+      onAddProduct(product);
+      // Small timeout lets React re-render the cart before stealing focus back.
+      setTimeout(() => searchRef.current?.focus(), 50);
+    },
+    [onAddProduct],
+  );
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent, product: Product) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        onAddProduct(product);
+        handleAddProduct(product);
       }
     },
-    [onAddProduct]
+    [handleAddProduct],
   );
 
   return (
@@ -186,7 +202,7 @@ export function ProductGrid({ onAddProduct }: ProductGridProps) {
               <li key={product.id} role="listitem">
                 <ProductCard
                   product={product}
-                  onAdd={onAddProduct}
+                  onAdd={handleAddProduct}
                   onKeyDown={(e) => handleKeyDown(e, product)}
                 />
               </li>

@@ -17,6 +17,7 @@ import type { Order, Payment, CapturePaymentRequest, PaymentMethod } from "@/api
 import { formatMoney, parseToCents, calcChange } from "@/lib/money";
 import { Button } from "@/components/Button";
 import { CardReaderScreen } from "./CardReaderScreen";
+import { CashNumpadModal } from "./CashNumpadModal";
 import { enqueueCheckout, requestSync } from "@/lib/offlineOutbox";
 import { getAccessToken } from "@/lib/auth";
 
@@ -42,6 +43,7 @@ export function TenderScreen({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCardReader, setShowCardReader] = useState(false);
+  const [showCashNumpad, setShowCashNumpad] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
   const firstFocusRef = useRef<HTMLButtonElement>(null);
 
@@ -137,6 +139,12 @@ export function TenderScreen({
       return;
     }
     void capture("cash", cashCents, 0);
+  };
+
+  // CashNumpadModal confirm — receives tendered cents directly (no string parsing).
+  const handleCashNumpadConfirm = (tenderedCents: number) => {
+    setShowCashNumpad(false);
+    void capture("cash", tenderedCents, 0);
   };
 
   const handleCardSubmit = () => {
@@ -255,6 +263,18 @@ export function TenderScreen({
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {tab === "cash" && (
             <div id="tender-panel-cash" role="tabpanel" aria-labelledby="tender-tab-cash">
+              {/* Numpad trigger button — opens CashNumpadModal for touch-friendly entry */}
+              <button
+                type="button"
+                onClick={() => setShowCashNumpad(true)}
+                className="mb-3 w-full rounded-lg border border-[#D9D9D9] bg-gray-50 px-4 py-3 text-left text-sm text-[var(--color-text-secondary)] hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-1"
+                aria-label="Open cash numpad"
+              >
+                <span className="block text-xs font-medium uppercase tracking-wider text-[var(--color-text-secondary)]">Cash tendered</span>
+                <span className="mt-1 block text-2xl font-bold text-[var(--color-text-primary)]">
+                  {cashInput ? formatMoney(Math.round(parseFloat(cashInput) * 100)) : "Tap to enter amount"}
+                </span>
+              </button>
               <CashTab
                 totalCents={totalCents}
                 cashInput={cashInput}
@@ -283,13 +303,22 @@ export function TenderScreen({
           )}
         </div>
 
-        {/* Card reader overlay — rendered above this modal */}
+        {/* Card reader overlay */}
         {showCardReader && (
           <CardReaderScreen
             orderId={order.id}
             amountCents={totalCents}
             onComplete={handleCardReaderComplete}
             onCancel={handleCardReaderCancel}
+          />
+        )}
+
+        {/* Cash numpad modal — touch-friendly digit entry with quick amounts */}
+        {showCashNumpad && (
+          <CashNumpadModal
+            orderTotalCents={totalCents}
+            onConfirm={handleCashNumpadConfirm}
+            onClose={() => setShowCashNumpad(false)}
           />
         )}
 
