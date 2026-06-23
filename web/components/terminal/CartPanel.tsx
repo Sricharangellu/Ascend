@@ -9,12 +9,13 @@
  * Accessibility: labelled region, keyboard controls, ≥44px targets.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { clsx } from "clsx";
 import type { CartLine, CartContextValue } from "@/lib/useCart";
 import { formatMoney } from "@/lib/money";
 import { Button } from "@/components/Button";
 import { NumpadModal } from "./NumpadModal";
+import { DISPLAY_CHANNEL } from "@/app/(protected)/display/page";
 
 interface CartPanelProps {
   cart: CartContextValue;
@@ -43,6 +44,27 @@ export function CartPanel({ cart, onCharge, onClear, role, ageVerified, onAgeVer
   const hasAgeRestricted = lines.some(l => l.product.ageRestricted);
   const canCharge = !isEmpty && !syncing && order !== null && (!hasAgeRestricted || ageVerified);
   const canClear = role === "owner" || role === "manager" || role === "cashier";
+
+  // FE-31: Broadcast cart state to customer-facing display via BroadcastChannel.
+  useEffect(() => {
+    if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+    const ch = new BroadcastChannel(DISPLAY_CHANNEL);
+    ch.postMessage({
+      type: "cart_update",
+      lines: lines.map((l) => ({
+        id: l.product.id,
+        name: l.product.name,
+        quantity: l.quantity,
+        unitCents: l.product.priceCents,
+        lineCents: l.product.priceCents * l.quantity,
+      })),
+      subtotalCents: subtotal,
+      discountCents: discount,
+      taxCents: tax,
+      totalCents: total,
+    });
+    ch.close();
+  }, [lines, subtotal, discount, tax, total]);
 
   return (
     <section

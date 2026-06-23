@@ -35,3 +35,26 @@ export const logger = pino({
 export function moduleLogger(name: string): pino.Logger {
   return logger.child({ module: name });
 }
+
+/**
+ * DB-17: OpenTelemetry-compatible trace context logger.
+ *
+ * Creates a child logger that includes W3C trace context fields
+ * (trace_id, span_id) for correlation with Datadog/Jaeger/CloudWatch.
+ *
+ * The trace context is extracted from the Express request via requestIdMiddleware
+ * which sets res.locals.traceId and res.locals.spanId.
+ *
+ * This is a lightweight OTEL-compatible foundation that works with any
+ * log aggregator without requiring @opentelemetry/sdk-node (deferred to
+ * when a specific APM vendor is chosen).
+ */
+export function requestLogger(traceId: string, spanId: string, path?: string): pino.Logger {
+  return logger.child({
+    // W3C trace context — parseable by Datadog APM, Jaeger, etc.
+    "trace_id": traceId,
+    "span_id": spanId,
+    // OTEL resource attributes
+    ...(path ? { "http.target": path } : {}),
+  });
+}

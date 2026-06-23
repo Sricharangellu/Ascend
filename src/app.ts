@@ -17,6 +17,7 @@ import {
   errorEnvelopeMiddleware,
   metricsMiddleware,
   renderMetrics,
+  requireRole,
 } from "./gateway/index.js";
 import { handler } from "./shared/http.js";
 import { bootstrapOrchestration } from "./orchestration/index.js";
@@ -362,6 +363,30 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     // Keep the connection open — cleanup handled by the broker on 'close' event.
     req.on("close", () => { /* broker handles it */ });
   });
+
+  // ── BE-34: /api/v1/jobs status endpoint (owner-only)
+  app.get(
+    "/api/v1/jobs",
+    requireRole("owner"),
+    handler(async (_req, res) => {
+      const auth = res.locals["auth"] as AuthPayload;
+      const rows = await db.query<{
+        id: string; type: string; status: string; run_at: number;
+        attempt_count: number; max_attempts: number; created_at: number;
+      }>(
+        `SELECT id, type, status, run_at, attempt_count, max_attempts, created_at
+         FROM job_queue
+         WHERE tenant_id IN (@t, 'system')
+         ORDER BY created_at DESC LIMIT 100`,
+        { t: auth.tenantId },
+      );
+      const counts = { pending: 0, running: 0, done: 0, failed: 0 };
+      for (const r of rows) {
+        if (r.status in counts) (counts as Record<string, number>)[r.status]++;
+      }
+      res.json({ items: rows, summary: counts });
+    }),
+  );
 
   // ── Error handling (errorEnvelope must be last)
   app.use(errorMiddleware);

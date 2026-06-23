@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { HttpError } from "../shared/http.js";
-import { moduleLogger } from "../shared/logger.js";
+import { requestLogger, moduleLogger } from "../shared/logger.js";
 
 const log = moduleLogger("error-envelope");
 
@@ -21,17 +21,24 @@ export function errorEnvelopeMiddleware(
   _next: NextFunction,
 ): void {
   const requestId: string = (res.locals["requestId"] as string | undefined) ?? "unknown";
+  // DB-17: include W3C trace context in error logs for APM correlation.
+  const traceId: string = (res.locals["traceId"] as string | undefined) ?? requestId;
+  const spanId: string  = (res.locals["spanId"]  as string | undefined) ?? "0000000000000000";
+  const reqLog = requestLogger(traceId, spanId, req.path);
 
   if (err instanceof HttpError) {
+    if (err.status >= 500) {
+      reqLog.error({ requestId, method: req.method, status: err.status, code: err.code }, err.message);
+    }
     res.status(err.status).json({
       error: { code: err.code, message: err.message, requestId },
     });
     return;
   }
 
-  // Unexpected error — log it (never expose internals).
+  // Unexpected error — log with trace context, never expose internals to caller.
   const message = err instanceof Error ? err.message : String(err);
-  log.error({
+  reqLog.error({
     requestId,
     path: req.path,
     method: req.method,
