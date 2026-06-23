@@ -82,6 +82,14 @@ export interface Page<T> {
 
 // ─── Products (Wave 1 terminal/cart types — camelCase, used by register flow) ──
 /** Lightweight terminal product used by the register/cart flow (Wave 1). */
+export interface InventoryLot {
+  id: string;
+  lot_code: string | null;
+  expiry_date: number;
+  qty_on_hand: number;
+  unit_cost_cents: number | null;
+}
+
 export interface TerminalProduct {
   id: string;
   sku: string;
@@ -98,6 +106,8 @@ export interface TerminalProduct {
   flavored?: boolean;
   menthol?: boolean;
   msaReportable?: boolean;
+  /** True when this product has inventory lots (requires FEFO lot selection at POS) */
+  lotTracked?: boolean;
   createdAt: number;
   updatedAt: number;
 }

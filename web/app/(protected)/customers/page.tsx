@@ -383,6 +383,9 @@ export default function CustomersPage() {
                 {/* Store Credit panel — FE-45 */}
                 <StoreCreditPanel customerId={selectedCustomer.id} />
 
+                {/* Customer price overrides — FE-50 */}
+                <PriceOverridesPanel customerId={selectedCustomer.id} />
+
                 <div className="grid grid-cols-2 gap-2">
                   <Button variant="secondary" size="sm" fullWidth>Edit profile</Button>
                   <Button variant="primary" size="sm" fullWidth>Add to sale</Button>
@@ -726,6 +729,66 @@ function StoreCreditPanel({ customerId }: { customerId: string }) {
           {adjusting ? "Applying…" : mode === "add" ? "Add Credit" : "Deduct Credit"}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ─── FE-50: Customer Price Overrides Panel ────────────────────────────────────
+
+interface PriceOverride { id?: string; product_id: string; price_cents: number; updated_at?: number; }
+
+function PriceOverridesPanel({ customerId }: { customerId: string }) {
+  const [overrides, setOverrides] = useState<PriceOverride[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+
+  const load = () => {
+    setLoading(true);
+    apiGet<{ items: PriceOverride[] }>(`/api/v1/customers/${customerId}/product-prices`)
+      .then((r) => setOverrides(r.items ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [customerId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        className="flex w-full items-center justify-between rounded-md border border-[var(--color-table-border)] bg-white px-4 py-2.5 text-left text-sm hover:bg-gray-50"
+      >
+        <span className="font-medium text-[var(--color-text-primary)]">Custom Prices</span>
+        <span className="text-xs text-[var(--color-text-secondary)]">
+          {loading ? "…" : `${overrides.length} override${overrides.length !== 1 ? "s" : ""}`}
+        </span>
+      </button>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-[var(--color-table-border)] bg-white">
+      <div className="flex items-center justify-between border-b border-[var(--color-table-border)] px-4 py-2.5">
+        <span className="text-sm font-semibold text-[var(--color-text-primary)]">Custom Prices</span>
+        <button type="button" onClick={() => setExpanded(false)} className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]">Hide</button>
+      </div>
+      {loading ? (
+        <div className="p-4"><div className="h-12 animate-pulse rounded bg-gray-100" /></div>
+      ) : overrides.length === 0 ? (
+        <p className="px-4 py-4 text-sm text-[var(--color-text-secondary)]">
+          No custom prices set. Use the <a href="/catalog/price-book" className="text-brand-600 hover:underline">Price Book</a> to add overrides.
+        </p>
+      ) : (
+        <ul className="divide-y divide-[var(--color-table-border)] px-4">
+          {overrides.map((o) => (
+            <li key={o.product_id} className="flex items-center justify-between py-2 text-sm">
+              <span className="font-mono text-xs text-[var(--color-text-secondary)]">{o.product_id.slice(-8)}</span>
+              <span className="font-semibold text-brand-600">{formatMoney(o.price_cents)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { clsx } from "clsx";
 import { apiGet } from "@/api-client/client";
 import type { TerminalProduct as Product, CatalogListResponse } from "@/api-client/types";
 import { formatMoney } from "@/lib/money";
+import { LotPickerModal } from "./LotPickerModal";
 
 interface ProductGridProps {
   onAddProduct: (product: Product) => void;
@@ -32,6 +33,7 @@ export function ProductGrid({ onAddProduct }: ProductGridProps) {
   const [category, setCategory] = useState("All");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lotPicker, setLotPicker] = useState<Product | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Initial load — fetch full catalog
@@ -86,11 +88,27 @@ export function ProductGrid({ onAddProduct }: ProductGridProps) {
   // without clicking the search box again (critical for barcode scanner workflow).
   const handleAddProduct = useCallback(
     (product: Product) => {
+      // FE-46: If the product has lot tracking, show FEFO lot picker before adding.
+      if (product.lotTracked) {
+        setLotPicker(product);
+        return;
+      }
       onAddProduct(product);
       // Small timeout lets React re-render the cart before stealing focus back.
       setTimeout(() => searchRef.current?.focus(), 50);
     },
     [onAddProduct],
+  );
+
+  const handleLotConfirm = useCallback(
+    (_lotId: string, lotCode: string | null) => {
+      if (!lotPicker) return;
+      // Attach lot code to the product before adding to cart.
+      onAddProduct({ ...lotPicker, barcode: lotCode ?? lotPicker.barcode });
+      setLotPicker(null);
+      setTimeout(() => searchRef.current?.focus(), 50);
+    },
+    [lotPicker, onAddProduct],
   );
 
   const handleKeyDown = useCallback(
@@ -210,6 +228,16 @@ export function ProductGrid({ onAddProduct }: ProductGridProps) {
           </ul>
         )}
       </div>
+
+      {/* FE-46: Lot picker modal — shown for lot-tracked products */}
+      {lotPicker && (
+        <LotPickerModal
+          productId={lotPicker.id}
+          productName={lotPicker.name}
+          onConfirm={handleLotConfirm}
+          onCancel={() => { setLotPicker(null); setTimeout(() => searchRef.current?.focus(), 50); }}
+        />
+      )}
     </section>
   );
 }
