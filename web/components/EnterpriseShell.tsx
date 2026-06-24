@@ -58,7 +58,10 @@ type NavKey =
   | "inventory-serials"
   | "inventory-reorder"
   | "inventory-counts"
-  | "workforce";
+  | "workforce"
+  | "appointments"
+  | "healthcare"
+  | "automotive";
 
 /** Full nav item definition — module key gates visibility. */
 interface NavItemDef {
@@ -100,7 +103,16 @@ const ALL_NAV_ITEMS: NavItemDef[] = [
   { key: "finance",     label: "Finance",      href: "/finance",      icon: "finance",     group: "Analyze", module: "billing" },
 
   // ── Restaurant ────────────────────────────────────────────────────────────
-  { key: "orders",      label: "Tables",       href: "/restaurant/floor-plan", icon: "orders", group: "Operate", module: "tables" },
+  { key: "orders",        label: "Tables",        href: "/restaurant/floor-plan", icon: "orders",        group: "Operate",  module: "tables" },
+
+  // ── Services ─────────────────────────────────────────────────────────────
+  { key: "appointments",  label: "Appointments",  href: "/appointments",          icon: "appointments",  group: "Operate",  module: "appointments" },
+
+  // ── Healthcare ────────────────────────────────────────────────────────────
+  { key: "healthcare",    label: "Patients",      href: "/healthcare",            icon: "healthcare",    group: "Operate",  module: "healthcare" },
+
+  // ── Automotive ────────────────────────────────────────────────────────────
+  { key: "automotive",    label: "Vehicles",      href: "/automotive",            icon: "automotive",    group: "Operate",  module: "automotive" },
 
   // ── Workforce & Operations ─────────────────────────────────────────────────
   { key: "workforce",   label: "Workforce",    href: "/workforce",    icon: "workforce",  group: "Manage",   module: "workforce" },
@@ -127,6 +139,7 @@ const MODULE_BY_ACTIVE: Record<NavKey, NavKey> = {
   customers: "customers", loyalty: "customers", finance: "finance", accounting: "finance",
   ecommerce: "ecommerce", settings: "settings", team: "settings", workflows: "settings",
   integrations: "settings", "imports-exports": "settings", notifications: "settings", "audit-log": "settings",
+  appointments: "appointments", healthcare: "healthcare", automotive: "automotive",
 };
 
 interface EnterpriseShellProps {

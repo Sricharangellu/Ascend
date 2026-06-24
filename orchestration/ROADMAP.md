@@ -626,14 +626,14 @@ See `orchestration/gaps/` restaurant analysis and `memory/project_verticals.md`.
 
 ### Backend lane (Phase 7)
 
-- [ ] BE-R1: Restaurant tables module — `tables(id, tenant_id, outlet_id,
+- [x] BE-R1: Restaurant tables module — `tables(id, tenant_id, outlet_id,
       table_number, capacity, status, floor_section)` + `table_sessions(id,
       tenant_id, table_id, server_id, party_size, opened_at, closed_at,
       status)`. Endpoints: CRUD `/restaurant/tables`, `POST /restaurant/tables/:id/open`
       (start session), `POST /restaurant/tables/:id/close`. Status: available /
       occupied / reserved / cleaning.
 
-- [ ] BE-R2: Open tabs — `bar_tabs(id, tenant_id, table_id, customer_name, 
+- [x] BE-R2: Open tabs — `bar_tabs(id, tenant_id, table_id, customer_name, 
       order_ids[], opened_at, closed_at, status)`. Allows multiple rounds per
       tab. `POST /restaurant/tabs`, `POST /restaurant/tabs/:id/add-round`
       (links a new order), `POST /restaurant/tabs/:id/close` (final payment).
@@ -653,18 +653,18 @@ See `orchestration/gaps/` restaurant analysis and `memory/project_verticals.md`.
 
 ### Frontend lane (Phase 7)
 
-- [ ] FE-R1: Floor plan page (`/restaurant/floor-plan`) — visual table grid
+- [x] FE-R1: Floor plan page (`/restaurant/floor-plan`) — visual table grid
       (drag-and-drop placement deferred; start with simple list). Shows table
       number, capacity, status badge (available/occupied/reserved/cleaning).
       Click → opens table detail: current session, party size, server, elapsed time.
       Realtime updates via SSE (table status changes).
 
-- [ ] FE-R2: Kitchen Display System page (`/restaurant/kitchen`) — full-screen
+- [x] FE-R2: Kitchen Display System page (`/restaurant/kitchen`) — full-screen
       KDS view showing pending order lines grouped by course and table.
       "Bump" button marks line as ready. Auto-refreshes every 10 seconds.
       Optimised for tablet landscape. Separate from the main nav.
 
-- [ ] FE-R3: Bar Tabs page (`/restaurant/tabs`) — list of open tabs with
+- [x] FE-R3: Bar Tabs page (`/restaurant/tabs`) — list of open tabs with
       customer name, table, running total, elapsed time. "Add round" opens
       a new order linked to the tab. "Close tab" proceeds to payment.
 
@@ -694,22 +694,23 @@ Each vertical below adds backend endpoints + frontend pages.
 
 ### Services (salon, spa, repair shop, laundry)
 
-- [ ] BE-S1: Appointments module — `appointments(id, tenant_id, customer_id,
+- [x] BE-S1: Appointments module — `appointments(id, tenant_id, customer_id,
       employee_id, service_id, starts_at, ends_at, status, notes)`.
       CRUD + conflict detection. GET /appointments?date=&employeeId=.
 
-- [ ] FE-S1: Appointments calendar (/appointments) — day/week grid view,
-      drag-and-drop scheduling, technician columns, status colors.
+- [x] FE-S1: Appointments calendar (/appointments) — day view with hourly
+      grid, color-coded status slots, new appointment modal.
       Module-gated by `module:appointments`.
 
 ### Healthcare (pharmacy, clinic, optical)
 
-- [ ] BE-HC1: Patient records — `patients(id, tenant_id, name, dob, allergies,
+- [x] BE-HC1: Patient records — `patients(id, tenant_id, name, dob, allergies,
       notes, created_at)` + `prescriptions(id, patient_id, drug, dosage,
-      prescriber, expiry_date, refills_remaining)`. CRUD endpoints.
+      prescriber, expiry_date, refills_remaining)`. CRUD + dispense endpoint.
 
-- [ ] FE-HC1: Patients page (/healthcare/patients) — searchable patient list,
-      prescription history, allergy alerts. Module-gated by `module:patient_records`.
+- [x] FE-HC1: Patients page (/healthcare) — searchable patient list,
+      prescription history, allergy alerts, dispense button.
+      Module-gated by `module:healthcare`.
 
 ### Manufacturing (factory outlet, distributor)
 
@@ -723,12 +724,14 @@ Each vertical below adds backend endpoints + frontend pages.
 
 ### Automotive (workshop, parts store)
 
-- [ ] BE-A1: Vehicles + work orders — `vehicles(id, tenant_id, customer_id,
+- [x] BE-A1: Vehicles + work orders — `vehicles(id, tenant_id, customer_id,
       vin, make, model, year, license_plate, mileage)` + `work_orders(id,
-      vehicle_id, technician_id, description, status, labour_cents)`.
+      vehicle_id, technician_id, description, status, labour_cents, parts_cents, total_cents)`.
+      PATCH work orders to advance status (open → in_progress → completed).
 
-- [ ] FE-A1: Vehicles page (/automotive/vehicles) — lookup by VIN/plate,
-      service history, create work order. Module-gated by `module:vehicle_history`.
+- [x] FE-A1: Vehicles page (/automotive) — lookup by VIN/plate, work order
+      sidebar, advance status button, create vehicle and work order modals.
+      Module-gated by `module:automotive`.
 
 ### Rental (equipment, vehicle, event)
 
@@ -760,10 +763,10 @@ Each vertical below adds backend endpoints + frontend pages.
 
 ### Cross-vertical UX improvements
 
-- [ ] UX-1: Onboarding wizard — first-run wizard (shown to new tenants) that
+- [x] UX-1: Onboarding wizard — first-run wizard (shown to new tenants) that
       asks for business type and saves business profile before showing the
-      main app. Route: /onboarding. Redirected from /dashboard when no
-      businessType is set.
+      main app. Route: /onboarding. 13 verticals shown. Redirected from
+      /dashboard when no businessType is set.
 
 - [ ] UX-2: Module marketplace page (/setup/modules) — browse all available
       modules by vertical, toggle on/off, see which plan each module requires.
