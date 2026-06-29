@@ -55,12 +55,13 @@ const tierPricesSchema = z.object({
 export function registerRoutes(router: Router, service: SalesService, db: DB): void {
   const mgr = requireRole("manager");
   function auth(res: Response): AuthPayload { return res.locals["auth"] as AuthPayload; }
+  function reqDb(res: Response): DB { return (res.locals["db"] as DB | undefined) ?? db; }
 
   // ── Quotations ─────────────────────────────────────────────────────────
   router.post("/quotations", handler(async (req, res) => {
     const a = auth(res);
     const q = await service.createQuotation(parseBody(quoteSchema, req.body), a.tenantId);
-    await writeAudit(db, { tenantId: a.tenantId, actorId: a.userId, action: "quotation.create", entityType: "quotation", entityId: q.id, after: { quote_number: q.quote_number, customer_id: q.customer_id, total_cents: q.total_cents }, requestId: res.locals["requestId"] ?? null });
+    await writeAudit(reqDb(res), { tenantId: a.tenantId, actorId: a.userId, action: "quotation.create", entityType: "quotation", entityId: q.id, after: { quote_number: q.quote_number, customer_id: q.customer_id, total_cents: q.total_cents }, requestId: res.locals["requestId"] ?? null });
     res.status(201).json(q);
   }));
   router.get("/quotations", handler(async (req, res) => {
@@ -87,7 +88,7 @@ export function registerRoutes(router: Router, service: SalesService, db: DB): v
   router.post("/sales-orders", handler(async (req, res) => {
     const a = auth(res);
     const so = await service.createSalesOrder(parseBody(soSchema, req.body), a.tenantId);
-    await writeAudit(db, { tenantId: a.tenantId, actorId: a.userId, action: "sales_order.create", entityType: "sales_order", entityId: so.id, after: { so_number: so.so_number, customer_id: so.customer_id, total_cents: so.total_cents, status: so.status }, requestId: res.locals["requestId"] ?? null });
+    await writeAudit(reqDb(res), { tenantId: a.tenantId, actorId: a.userId, action: "sales_order.create", entityType: "sales_order", entityId: so.id, after: { so_number: so.so_number, customer_id: so.customer_id, total_cents: so.total_cents, status: so.status }, requestId: res.locals["requestId"] ?? null });
     res.status(201).json(so);
   }));
   router.get("/sales-orders", handler(async (req, res) => {
@@ -106,7 +107,7 @@ export function registerRoutes(router: Router, service: SalesService, db: DB): v
     const a = auth(res);
     const id = String(req.params.id);
     const so = await service.approveSalesOrder(id, a.tenantId);
-    await writeAudit(db, { tenantId: a.tenantId, actorId: a.userId, action: "sales_order.approve", entityType: "sales_order", entityId: id, after: { status: "approved" }, requestId: res.locals["requestId"] ?? null });
+    await writeAudit(reqDb(res), { tenantId: a.tenantId, actorId: a.userId, action: "sales_order.approve", entityType: "sales_order", entityId: id, after: { status: "approved" }, requestId: res.locals["requestId"] ?? null });
     res.json(so);
   }));
   router.post("/sales-orders/:id/assign-picker", mgr, handler(async (req, res) => {
@@ -117,14 +118,14 @@ export function registerRoutes(router: Router, service: SalesService, db: DB): v
     const a = auth(res);
     const id = String(req.params.id);
     const so = await service.convertToInvoice(id, a.tenantId);
-    await writeAudit(db, { tenantId: a.tenantId, actorId: a.userId, action: "sales_order.invoice", entityType: "sales_order", entityId: id, after: { status: "invoiced", total_cents: so.total_cents }, requestId: res.locals["requestId"] ?? null });
+    await writeAudit(reqDb(res), { tenantId: a.tenantId, actorId: a.userId, action: "sales_order.invoice", entityType: "sales_order", entityId: id, after: { status: "invoiced", total_cents: so.total_cents }, requestId: res.locals["requestId"] ?? null });
     res.json(so);
   }));
   router.post("/sales-orders/:id/cancel", mgr, handler(async (req, res) => {
     const a = auth(res);
     const id = String(req.params.id);
     const so = await service.cancelSalesOrder(id, a.tenantId);
-    await writeAudit(db, { tenantId: a.tenantId, actorId: a.userId, action: "sales_order.cancel", entityType: "sales_order", entityId: id, after: { status: "cancelled" }, requestId: res.locals["requestId"] ?? null });
+    await writeAudit(reqDb(res), { tenantId: a.tenantId, actorId: a.userId, action: "sales_order.cancel", entityType: "sales_order", entityId: id, after: { status: "cancelled" }, requestId: res.locals["requestId"] ?? null });
     res.json(so);
   }));
 
