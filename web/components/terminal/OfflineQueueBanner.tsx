@@ -17,27 +17,56 @@ import {
   incrementRetry,
   pendingCount,
 } from "@/lib/syncOutbox";
+import {
+  pendingCount as idbPendingCount,
+  requestSync,
+} from "@/lib/offlineOutbox";
 import { apiPost } from "@/api-client/client";
 import type { SyncQueueItem } from "@/api-client/types";
 
 export function OfflineQueueBanner() {
   const { isOffline, reconnectedAt } = useOffline();
+  // localStorage queue (cart sync orders)
   const [count, setCount] = useState(0);
+  // IndexedDB queue (payment captures awaiting SW Background Sync)
+  const [idbCount, setIdbCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [lastSyncResult, setLastSyncResult] = useState<"success" | "partial" | null>(null);
 
-  // Refresh count whenever offline state changes or component mounts
-  useEffect(() => {
+  const refreshCounts = useCallback(() => {
     setCount(pendingCount());
-  }, [isOffline, reconnectedAt]);
+    idbPendingCount().then(setIdbCount).catch(() => {});
+  }, []);
 
-  // Auto-reconcile when back online
+  // Refresh counts whenever offline state changes or component mounts
+  useEffect(() => { refreshCounts(); }, [isOffline, reconnectedAt, refreshCounts]);
+
+  // Listen for SW messages: OUTBOX_ITEM_REPLAYED / OUTBOX_ITEM_FAILED
   useEffect(() => {
-    if (!isOffline && reconnectedAt !== null && count > 0) {
-      void reconcile();
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    const handler = (event: MessageEvent) => {
+      if (
+        event.data?.type === "OUTBOX_ITEM_REPLAYED" ||
+        event.data?.type === "OUTBOX_ITEM_FAILED"
+      ) {
+        refreshCounts();
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", handler);
+    return () => navigator.serviceWorker.removeEventListener("message", handler);
+  }, [refreshCounts]);
+
+  // Auto-reconcile localStorage queue + trigger SW IDB drain when back online
+  useEffect(() => {
+    if (!isOffline && reconnectedAt !== null) {
+      if (count > 0) void reconcile();
+      // Ask SW to drain the IDB payment-capture queue
+      void requestSync();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reconnectedAt]);
+
+  const totalCount = count + idbCount;
 
   const reconcile = useCallback(async () => {
     const queue = getQueue();
@@ -58,11 +87,11 @@ export function OfflineQueueBanner() {
     }
 
     setSyncing(false);
-    setCount(pendingCount());
+    refreshCounts();
     setLastSyncResult(failed === 0 ? "success" : "partial");
   }, []);
 
-  if (!isOffline && count === 0 && lastSyncResult === null) return null;
+  if (!isOffline && totalCount === 0 && lastSyncResult === null) return null;
 
   return (
     <div
@@ -83,10 +112,10 @@ export function OfflineQueueBanner() {
           <>
             <WifiOffIcon />
             <span className="font-medium">
-              Offline{count > 0 ? ` — ${count} sale${count !== 1 ? "s" : ""} queued` : " — sales will be queued"}
+              Offline{totalCount > 0 ? ` — ${totalCount} item${totalCount !== 1 ? "s" : ""} queued` : " — sales will be queued"}
             </span>
           </>
-        ) : lastSyncResult === "success" ? (
+        ) : lastSyncResult === "success" && totalCount === 0 ? (
           <>
             <CheckIcon />
             <span className="font-medium">All queued sales synced</span>
@@ -96,14 +125,14 @@ export function OfflineQueueBanner() {
             <SyncIcon spinning={syncing} />
             <span className="font-medium">
               {syncing
-                ? `Syncing ${count} queued sale${count !== 1 ? "s" : ""}…`
-                : `${count} sale${count !== 1 ? "s" : ""} pending sync`}
+                ? `Syncing ${count} order${count !== 1 ? "s" : ""}…`
+                : `${totalCount} item${totalCount !== 1 ? "s" : ""} pending sync${idbCount > 0 ? ` (${idbCount} payment${idbCount !== 1 ? "s" : ""} via background sync)` : ""}`}
             </span>
           </>
         )}
       </div>
 
-      {!isOffline && !syncing && count > 0 && (
+      {!isOffline && !syncing && totalCount > 0 && (
         <button
           type="button"
           onClick={() => void reconcile()}
