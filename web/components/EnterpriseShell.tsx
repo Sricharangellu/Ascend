@@ -109,6 +109,7 @@ const ALL_NAV_ITEMS: NavItemDef[] = [
   { key: "vendors",     label: "Vendors",      href: "/vendors",      icon: "vendors",     group: "Manage",  module: "purchasing" },
   { key: "accounting",  label: "Accounting",   href: "/accounting",   icon: "accounting",  group: "Analyze", module: "accounting" },
   { key: "finance",     label: "Finance",      href: "/finance",      icon: "finance",     group: "Analyze", module: "billing" },
+  { key: "invoicing",   label: "Invoicing",    href: "/invoicing",    icon: "invoicing",   group: "Analyze", module: "invoicing" },
 
   // ── Restaurant ────────────────────────────────────────────────────────────
   { key: "orders",        label: "Tables",        href: "/restaurant/floor-plan", icon: "orders",        group: "Operate",  module: "tables" },
@@ -116,6 +117,7 @@ const ALL_NAV_ITEMS: NavItemDef[] = [
   { key: "bar-tabs",      label: "Bar Tabs",      href: "/restaurant/tabs",       icon: "bar-tabs",      group: "Operate",  module: "bar_tabs" },
 
   // ── Services ─────────────────────────────────────────────────────────────
+  { key: "service-orders", label: "Service Orders", href: "/service-orders",       icon: "service-orders", group: "Operate",  module: "service_orders" },
   { key: "appointments",  label: "Appointments",  href: "/appointments",          icon: "appointments",  group: "Operate",  module: "appointments" },
 
   // ── Healthcare ────────────────────────────────────────────────────────────
@@ -148,7 +150,7 @@ const ALL_NAV_ITEMS: NavItemDef[] = [
 
 const MODULE_BY_ACTIVE: Record<NavKey, NavKey> = {
   dashboard: "dashboard", register: "register", sales: "register", orders: "orders",
-  quotes: "register", returns: "register", "service-orders": "register", invoicing: "register",
+  quotes: "register", returns: "register", "service-orders": "service-orders", invoicing: "invoicing",
   payments: "finance", reports: "reports", insights: "reports", "tax-compliance": "reports",
   catalog: "catalog", discounts: "catalog", "gift-cards": "catalog", vendors: "catalog",
   inventory: "inventory", operations: "inventory", purchasing: "inventory", shipping: "inventory",
