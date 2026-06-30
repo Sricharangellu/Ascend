@@ -61,6 +61,85 @@ let paymentModes: any[] = [];
 let taxRates: any[] = [];
 let featureFlags: Record<string, boolean> = { quotations: true, achBatchPayout: false, imeiTracking: false, msaReporting: false, compositeProducts: false, customerPortal: false, ecommerce: true, commissionTracking: false, pickerFulfillment: true, batchDeposits: true, room_billing: true, production_orders: true, rental_contracts: true, tickets: true, student_accounts: true };
 let businessProfile: Record<string, unknown> = {};
+// ── UX-2: Module marketplace state ─────────────────────────────────────────
+type _BPMod = { key: string; name: string; description: string; group: string; core?: boolean; route?: string };
+const _BP_CATALOG: _BPMod[] = [
+  { key: "catalog",       name: "Products & Catalog",      description: "Products, categories, variants, barcodes, price book",          group: "common",        core: true },
+  { key: "inventory",     name: "Inventory",               description: "Stock tracking, receiving, adjustments, FEFO lots",             group: "common",        core: true },
+  { key: "customers",     name: "Customers / CRM",         description: "Customer profiles, history, addresses, store credit",           group: "common",        core: true },
+  { key: "payments",      name: "Payments",                description: "Cash, card, split tender, store credit, Stripe Terminal",       group: "common",        core: true },
+  { key: "reports",       name: "Reports & Analytics",     description: "Sales, inventory, purchasing, payroll, time-card reports",      group: "common",        core: true },
+  { key: "settings",      name: "Settings & Setup",        description: "Business profile, taxes, shipping, outlets, security",          group: "common",        core: true },
+  { key: "team",          name: "Team & Users",            description: "Employees, roles, permissions, time clock, scheduling",         group: "common",        core: true },
+  { key: "notifications", name: "Notifications",           description: "Low-stock alerts, overdue invoices, system notifications",      group: "common",        core: true },
+  { key: "pos_terminal",     name: "POS Terminal",            description: "Touch-screen register, barcode scanner, receipts, numpad",      group: "retail",  route: "/terminal" },
+  { key: "discounts",        name: "Discounts & Promotions",  description: "Coupons, BXGY, volume pricing, auto-applicable rules",          group: "retail",  route: "/discounts" },
+  { key: "loyalty",          name: "Loyalty Programme",       description: "Points, tiers, rewards, automatic tier upgrades",               group: "retail",  route: "/loyalty" },
+  { key: "gift_cards",       name: "Gift Cards",               description: "Issue, redeem, and track gift card balances",                  group: "retail",  route: "/gift-cards" },
+  { key: "compliance",       name: "Compliance",               description: "Age verification, MSA/PACT reporting, state flavor bans",      group: "retail" },
+  { key: "ecommerce",        name: "Ecommerce",                description: "Online store sync, product visibility, online orders",          group: "retail",  route: "/ecommerce" },
+  { key: "customer_display", name: "Customer Display",          description: "Second-screen cart mirror for customer-facing display",        group: "retail",  route: "/display" },
+  { key: "sales_orders",  name: "Sales Orders",        description: "B2B orders, credit terms, fulfilment workflows",              group: "b2b",  route: "/sales" },
+  { key: "purchasing",    name: "Purchasing",           description: "Purchase orders, receiving, vendor management, returns",     group: "b2b",  route: "/purchasing" },
+  { key: "billing",       name: "Billing — AP/AR",      description: "Supplier bills, customer invoices, aging reports",           group: "b2b",  route: "/finance" },
+  { key: "accounting",    name: "Accounting",           description: "Chart of accounts, journal entries, batch deposits, P&L",   group: "b2b",  route: "/accounting" },
+  { key: "price_book",    name: "Price Book",           description: "Customer-specific prices, outlet-specific overrides",        group: "b2b" },
+  { key: "quotes",        name: "Quotes / Quotations",  description: "Create, send, and convert sales quotes to orders",          group: "b2b",  route: "/quotes" },
+  { key: "tables",         name: "Table Management",      description: "Floor plan, table sessions, party size, server assignment",   group: "restaurant", route: "/restaurant/floor-plan" },
+  { key: "kitchen",        name: "Kitchen Display (KDS)", description: "Kitchen tablet view, course ordering, bump when ready",      group: "restaurant", route: "/restaurant/kitchen" },
+  { key: "bar_tabs",       name: "Bar Tabs",              description: "Open tabs, multi-round ordering, tab closing",               group: "restaurant", route: "/restaurant/tabs" },
+  { key: "reservations",   name: "Reservations",          description: "Booking slots, waitlist, guest notes, confirmation emails",  group: "restaurant" },
+  { key: "menu_modifiers", name: "Menu Modifiers",        description: "Add-ons, substitutions, cooking instructions per line",      group: "restaurant" },
+  { key: "room_billing",   name: "Room Billing",      description: "Post charges to guest room accounts, room service",          group: "hospitality", route: "/hospitality/rooms" },
+  { key: "guest_accounts", name: "Guest Accounts",    description: "Open guest folios, split charges, check-out settlement",    group: "hospitality" },
+  { key: "spa_services",   name: "Spa & Services",    description: "Appointment booking, service packages, therapist assignment", group: "hospitality" },
+  { key: "event_mgmt",     name: "Event Management",  description: "Banquets, conference rooms, AV packages, catering billing",  group: "hospitality" },
+  { key: "appointments",     name: "Appointments",       description: "Online/walk-in booking, technician scheduling, reminders",     group: "services", route: "/appointments" },
+  { key: "service_orders",   name: "Service Orders",     description: "Repair tickets, job tracking, status updates, parts used",    group: "services" },
+  { key: "memberships",      name: "Membership Plans",   description: "Recurring memberships, access control, member pricing",       group: "services" },
+  { key: "staff_commission", name: "Staff Commission",   description: "Commission tracking per service, technician payouts",         group: "services" },
+  { key: "prescriptions",   name: "Prescriptions",     description: "Prescription tracking, controlled substances, refill history",   group: "healthcare", route: "/healthcare/prescriptions" },
+  { key: "patient_records", name: "Patient Records",   description: "Patient profiles, visit history, allergy flags",                 group: "healthcare", route: "/healthcare/patients" },
+  { key: "insurance",       name: "Insurance Billing", description: "Insurance claim codes, co-pay tracking, insurer billing",        group: "healthcare" },
+  { key: "expiry_tracking", name: "Expiry Tracking",   description: "Medicine/lot expiry alerts, FEFO dispensing, near-expiry",     group: "healthcare" },
+  { key: "production_orders", name: "Production Orders",  description: "BOM-based production orders, raw material consumption",      group: "manufacturing", route: "/manufacturing/orders" },
+  { key: "raw_materials",     name: "Raw Materials",      description: "Raw material inventory, min levels, reorder automation",     group: "manufacturing" },
+  { key: "batch_mgmt",        name: "Batch Management",   description: "Batch/lot tracking from production to sale, traceability",   group: "manufacturing" },
+  { key: "quality_control",   name: "Quality Control",    description: "Inspection checkpoints, pass/fail logging, hold orders",     group: "manufacturing" },
+  { key: "online_store",      name: "Online Store",        description: "Product visibility, SEO fields, meta title/description",    group: "ecommerce" },
+  { key: "order_fulfillment", name: "Order Fulfillment",   description: "Pick-pack-ship for online orders, tracking integration",    group: "ecommerce" },
+  { key: "marketplace",       name: "Marketplace Sync",    description: "Sync inventory/orders with external marketplaces",          group: "ecommerce" },
+  { key: "shipping_mgmt",     name: "Shipping Management", description: "Carrier integrations, label printing, tracking numbers",    group: "ecommerce", route: "/shipping" },
+  { key: "vehicle_history", name: "Vehicle History",    description: "VIN/license lookup, service history per vehicle, notes",    group: "automotive", route: "/automotive/vehicles" },
+  { key: "parts_inventory", name: "Parts Inventory",    description: "Auto parts with OEM/aftermarket codes, supplier ordering",  group: "automotive" },
+  { key: "work_orders",     name: "Work Orders",        description: "Job cards, technician assignment, time tracking, parts",    group: "automotive", route: "/automotive/work-orders" },
+  { key: "inspection",      name: "Vehicle Inspection", description: "Pre/post service inspection checklists, digital sign-off",  group: "automotive" },
+  { key: "rental_contracts", name: "Rental Contracts",  description: "Rental agreements, duration, return schedule, late fees",  group: "rental", route: "/rental/contracts" },
+  { key: "deposits",         name: "Security Deposits", description: "Deposit collection, refund on return, damage deduction",   group: "rental" },
+  { key: "asset_tracking",   name: "Asset Tracking",    description: "Track each rental unit by serial, location, condition",    group: "rental" },
+  { key: "damage_mgmt",      name: "Damage Management", description: "Damage assessment on return, repair cost billing",         group: "rental" },
+  { key: "tickets",        name: "Ticket Sales",     description: "Event/session tickets, seat selection, QR code tickets",  group: "entertainment", route: "/entertainment/tickets" },
+  { key: "access_control", name: "Access Control",   description: "QR/barcode scan at entry, capacity management, passes",   group: "entertainment" },
+  { key: "concessions",    name: "Concessions",      description: "Food/beverage at events, portable POS, fast checkout",    group: "entertainment" },
+  { key: "season_passes",  name: "Season Passes",    description: "Annual/season pass sales, member lookup, visit tracking",  group: "entertainment" },
+  { key: "fee_collection",    name: "Fee Collection",     description: "Tuition billing, instalment plans, payment receipts",     group: "education", route: "/education/fees" },
+  { key: "student_accounts",  name: "Student Accounts",   description: "Student profiles, academic year, outstanding balances",  group: "education", route: "/education/students" },
+  { key: "course_enrollment", name: "Course Enrollment",  description: "Course catalogue, enrollment, capacity, waiting lists",  group: "education" },
+  { key: "attendance",        name: "Attendance",          description: "Class attendance tracking, absence alerts, reports",     group: "education" },
+  { key: "tee_sheet",     name: "Tee Sheet",       description: "Tee time booking, slot management, cart assignment",       group: "golf" },
+  { key: "golf_bookings", name: "Golf Bookings",    description: "Reservations, group bookings, cancellations, deposits",   group: "golf" },
+  { key: "golf_members",  name: "Golf Memberships", description: "Season passes, member tiers, handicap tracking",          group: "golf" },
+  { key: "pro_shop",      name: "Pro Shop",         description: "Retail sales within the golf context (clubs, apparel)",  group: "golf" },
+  { key: "workforce",          name: "Workforce & Payroll",    description: "Scheduling, time-off requests, commission, payroll prep",  group: "enterprise" },
+  { key: "wms",                name: "Warehouse Management",   description: "Multi-location stock, bin locations, pick-pack routing",   group: "enterprise" },
+  { key: "webhooks",           name: "Webhooks & Public API",  description: "Outbound webhooks, API keys for third-party integrations", group: "enterprise" },
+  { key: "sso",                name: "Single Sign-On",         description: "OIDC/SAML SSO for enterprise identity providers",          group: "enterprise" },
+  { key: "multi_currency",     name: "Multi-Currency",         description: "Accept and report in multiple currencies with FX rates",   group: "enterprise" },
+  { key: "advanced_analytics", name: "Advanced Analytics",     description: "BI dashboards, custom reports, data export, forecasting",  group: "enterprise" },
+];
+const _BP_CORE_KEYS = new Set(_BP_CATALOG.filter(m => m.core).map(m => m.key));
+let _bpType = "retail";
+let _bpEnabled = new Set<string>(["pos_terminal","discounts","loyalty","gift_cards","customer_display"]);
 // Shipping dev stores
 let shipments: any[] = [];
 const shipLines = new Map<string, any[]>();
@@ -1273,6 +1352,33 @@ mockHandlers.push(
   http.put(`${V1}/settings/business`, async ({ request }) => { await lat(); businessProfile = { ...businessProfile, ...((await request.json()) as any) }; return HttpResponse.json(businessProfile); }),
   http.get(`${V1}/settings/feature-flags`, async () => { await lat(); return HttpResponse.json(featureFlags); }),
   http.put(`${V1}/settings/feature-flags`, async ({ request }) => { await lat(); featureFlags = { ...featureFlags, ...((await request.json()) as any) }; return HttpResponse.json(featureFlags); }),
+  // ── Business profile (module marketplace) ──────────────────────────────────
+  http.get(`${V1}/settings/business-profile`, async () => {
+    await lat();
+    return HttpResponse.json({
+      businessType: _bpType,
+      coreModules: [..._BP_CORE_KEYS],
+      modules: _BP_CATALOG.map(m => ({
+        ...m,
+        enabled: m.core ? true : _bpEnabled.has(m.key),
+        flagKey: `module:${m.key}`,
+      })),
+    });
+  }),
+  http.post(`${V1}/settings/business-profile`, async ({ request }) => {
+    await lat();
+    const body = (await request.json()) as { businessType?: string; moduleFlags?: Record<string, boolean>; enabledModules?: string[] };
+    if (body.businessType) _bpType = body.businessType;
+    if (body.moduleFlags) {
+      for (const [fk, on] of Object.entries(body.moduleFlags)) {
+        const key = fk.startsWith("module:") ? fk.slice(7) : fk;
+        if (on) _bpEnabled.add(key); else _bpEnabled.delete(key);
+      }
+    } else if (body.enabledModules) {
+      _bpEnabled = new Set(body.enabledModules.filter(k => !_BP_CORE_KEYS.has(k)));
+    }
+    return HttpResponse.json({ ok: true, businessType: _bpType });
+  }),
   http.get(`${V1}/settings/shipping-methods`, async () => { await lat(); return HttpResponse.json({ items: shippingMethods }); }),
   http.post(`${V1}/settings/shipping-methods`, async ({ request }) => { await lat(); const b = (await request.json()) as any; const r = { id: `shm_${++smSeq}`, tenant_id: "tnt_demo", name: b.name, amount_cents: b.amountCents, free_limit_cents: b.freeLimitCents ?? null, ecommerce: b.ecommerce ? 1 : 0, sequence: b.sequence ?? 0, credit_account_id: b.creditAccountId ?? null, debit_account_id: b.debitAccountId ?? null, active: 1 }; shippingMethods.push(r); return HttpResponse.json(r, { status: 201 }); }),
   http.delete(`${V1}/settings/shipping-methods/:id`, async ({ params }) => { await lat(); shippingMethods = shippingMethods.filter((s) => s.id !== String(params.id)); return HttpResponse.json({ ok: true }); }),
