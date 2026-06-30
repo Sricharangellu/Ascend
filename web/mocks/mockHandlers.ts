@@ -207,9 +207,11 @@ export const mockHandlers = [
   }),
   http.get(`${V1}/purchasing/orders`, async () => {
     await lat();
+    const D = 86400000, now = Date.now();
     return HttpResponse.json({ items: [
-      { id: "po_1", tenant_id: "tnt_demo", supplier_id: "sup_acme", status: "received", total_cost_cents: 24000, created_at: Date.now() - 86400000, received_at: Date.now() - 3600000 },
-      { id: "po_2", tenant_id: "tnt_demo", supplier_id: "sup_tea", status: "ordered", total_cost_cents: 11250, created_at: Date.now() - 3600000, received_at: null },
+      { id: "po_1", tenant_id: "tnt_demo", po_number: 4001, supplier_id: "sup_acme", status: "received",  receive_status: "received", total_cost_cents: 24000, created_at: now - 2*D, received_at: now - D },
+      { id: "po_2", tenant_id: "tnt_demo", po_number: 4002, supplier_id: "sup_tea",  status: "ordered",   receive_status: "pending",  total_cost_cents: 11250, created_at: now - 3600000, received_at: null },
+      { id: "po_3", tenant_id: "tnt_demo", po_number: 4003, supplier_id: "sup_acme", status: "ordered",   receive_status: "partial",  total_cost_cents: 43500, created_at: now - 5*D, received_at: null },
     ] });
   }),
   http.post(`${V1}/purchasing/orders`, async ({ request }) => {
@@ -971,9 +973,53 @@ export const mockHandlers = [
         return HttpResponse.json({ updated });
       }),
 
-      http.post(`${V1}/catalog/import-csv`, async () => {
+      http.post(`${V1}/catalog/import-csv`, async ({ request }) => {
         await lat();
-        return HttpResponse.json({ imported: 3, skipped: 0, errors: [] }, { status: 200 });
+        const body = (await request.json()) as { rows: Array<Record<string, string>> };
+        const rows = body.rows ?? [];
+        let imported = 0;
+        const errors: Array<{ row: number; message: string }> = [];
+        for (let i = 0; i < rows.length; i++) {
+          const r = rows[i];
+          const name = (r["name"] ?? r["Name"] ?? "").trim();
+          if (!name) { errors.push({ row: i + 1, message: "Name is required" }); continue; }
+          const sku = (r["sku"] ?? r["SKU"] ?? `IMP-${++prodSeq}`).trim();
+          const pc = Math.round(parseFloat(r["price"] ?? r["Price"] ?? "0") * 100) || 0;
+          const costPc = Math.round(parseFloat(r["cost"] ?? r["Cost"] ?? "0") * 100) || 0;
+          const p = mkProduct(
+            `prod_${++prodSeq}`, sku, name, pc,
+            (r["category"] ?? r["Category"] ?? "Uncategorized").trim(),
+            ((r["tax_class"] ?? r["Tax Class"] ?? "standard").toLowerCase() === "exempt" ? "exempt" : "standard"),
+            (r["barcode"] ?? r["Barcode"] ?? "").trim(),
+            "draft", false, costPc, 0,
+          );
+          Object.assign(p, {
+            brand: (r["brand"] ?? r["Brand"] ?? null) || null,
+            description: (r["description"] ?? r["Description"] ?? null) || null,
+          });
+          products.push(p);
+          imported++;
+        }
+        return HttpResponse.json({ imported, skipped: 0, errors });
+      }),
+
+      http.post(`${V1}/catalog/:id/duplicate`, async ({ params }) => {
+        await lat();
+        const src = products.find((x) => x.id === String(params["id"]));
+        if (!src) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const copy = {
+          ...src,
+          id: `prod_${++prodSeq}`,
+          name: `${src.name} (Copy)`,
+          sku: `${src.sku}-COPY`,
+          status: "draft" as const,
+          parent_product_id: null,
+          variant_label: null,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        products.push(copy);
+        return HttpResponse.json(copy, { status: 201 });
       }),
 
       // ── Categories ────────────────────────────────────────────────────────
@@ -1670,17 +1716,38 @@ mockHandlers.push(
     return HttpResponse.json(session);
   }),
 
-  // ── PO detail (GET /purchasing/orders/:id) ────────────────────────────────
+  // ── PO detail (GET /purchasing/orders/:id) — rich with product names + margins ─
   http.get(`${V1}/purchasing/orders/:id`, async ({ params }) => {
     await lat();
     const id = String(params.id);
+    const D = 86400000, now = Date.now();
+    // Shared product info lookup (matches catalog mock IDs)
+    const PRODUCTS: Record<string, { name: string; sku: string; barcode: string; selling_price_cents: number; last_cost_cents: number }> = {
+      "prod_1": { name: "Spring Water 500ml",    sku: "BEV-001", barcode: "012345678901", selling_price_cents: 199, last_cost_cents: 80 },
+      "prod_2": { name: "Orange Juice 1L",       sku: "BEV-002", barcode: "012345678902", selling_price_cents: 349, last_cost_cents: 140 },
+      "prod_3": { name: "Potato Chips 150g",     sku: "SNK-001", barcode: "012345678903", selling_price_cents: 299, last_cost_cents: 110 },
+      "prod_4": { name: "Mixed Nuts 200g",       sku: "SNK-002", barcode: "012345678904", selling_price_cents: 599, last_cost_cents: 250 },
+      "prod_5": { name: "Classic Cigarettes 20pk",sku: "TOB-001", barcode: "012345678905", selling_price_cents: 1299, last_cost_cents: 850 },
+    };
+    function enrich(lineId: string, poId: string, productId: string, qty: number, ucost: number, recvd: number, expiry: number | null, lot: string | null, cases: number, upc: number) {
+      const p = PRODUCTS[productId] ?? { name: productId, sku: productId, barcode: "", selling_price_cents: ucost * 2, last_cost_cents: ucost };
+      const lcost = qty * ucost;
+      const margin = p.selling_price_cents > 0 ? Math.round(((p.selling_price_cents - ucost) / p.selling_price_cents) * 100) : 0;
+      return { id: lineId, tenant_id: "tnt_demo", po_id: poId, product_id: productId, product_name: p.name, product_sku: p.sku, product_barcode: p.barcode, selling_price_cents: p.selling_price_cents, last_cost_cents: p.last_cost_cents, margin_pct: margin, quantity: qty, unit_cost_cents: ucost, line_cost_cents: lcost, received_qty: recvd, remaining_qty: qty - recvd, expiry_date: expiry, lot_code: lot, cases_ordered: cases, units_per_case: upc };
+    }
     const seed: Record<string, any> = {
-      po_1: { id: "po_1", tenant_id: "tnt_demo", supplier_id: "sup_acme", status: "received", receive_status: "received", total_cost_cents: 24000, created_at: Date.now() - 86400000, received_at: Date.now() - 3600000, lines: [
-        { id: "pol_1a", tenant_id: "tnt_demo", po_id: "po_1", product_id: "prod_1", quantity: 24, unit_cost_cents: 600, line_cost_cents: 14400, received_qty: 24, expiry_date: null, lot_code: "LOT-001" },
-        { id: "pol_1b", tenant_id: "tnt_demo", po_id: "po_1", product_id: "prod_2", quantity: 12, unit_cost_cents: 800, line_cost_cents: 9600, received_qty: 12, expiry_date: Date.now() + 90 * 86400000, lot_code: "LOT-002" },
+      po_1: { id: "po_1", tenant_id: "tnt_demo", po_number: 4001, supplier_id: "sup_acme", status: "received", receive_status: "received", total_cost_cents: 24000, freight_cost_cents: 0, other_charges_cents: 0, notes: "Weekly delivery", created_at: now - 2*D, received_at: now - D, lines: [
+        enrich("pol_1a","po_1","prod_1",24,600,24,null,"LOT-001",2,12),
+        enrich("pol_1b","po_1","prod_2",12,800,12,now+90*D,"LOT-002",1,12),
       ]},
-      po_2: { id: "po_2", tenant_id: "tnt_demo", supplier_id: "sup_tea", status: "ordered", receive_status: "pending", total_cost_cents: 11250, created_at: Date.now() - 3600000, received_at: null, lines: [
-        { id: "pol_2a", tenant_id: "tnt_demo", po_id: "po_2", product_id: "prod_2", quantity: 15, unit_cost_cents: 750, line_cost_cents: 11250, received_qty: 0, expiry_date: null, lot_code: null },
+      po_2: { id: "po_2", tenant_id: "tnt_demo", po_number: 4002, supplier_id: "sup_tea", status: "ordered", receive_status: "pending", total_cost_cents: 11250, freight_cost_cents: 0, other_charges_cents: 0, notes: null, created_at: now - 3600000, received_at: null, lines: [
+        enrich("pol_2a","po_2","prod_2",15,750,0,null,null,1,15),
+        enrich("pol_2b","po_2","prod_3",24,110,0,now+60*D,null,2,12),
+      ]},
+      po_3: { id: "po_3", tenant_id: "tnt_demo", po_number: 4003, supplier_id: "sup_acme", status: "ordered", receive_status: "partial", total_cost_cents: 43500, freight_cost_cents: 1200, other_charges_cents: 300, notes: "Special order — requires temp check on delivery", created_at: now - 5*D, received_at: null, lines: [
+        enrich("pol_3a","po_3","prod_4",12,250,6,now+30*D,"LOT-WN-2026",1,12),
+        enrich("pol_3b","po_3","prod_5",24,850,0,null,"LOT-CIG-2026",2,12),
+        enrich("pol_3c","po_3","prod_1",60,80,60,null,"LOT-BEV-2026",5,12),
       ]},
     };
     const po = seed[id];
@@ -1737,6 +1804,159 @@ mockHandlers.push(
       { productId: "prod_2", sku: "GRO-HONEY-001", name: "Wildflower Honey", totalUnitsSold: 102, revenueGrossCents: 91698, rank: 2, belowReorderPoint: true },
       { productId: "prod_3", sku: "APP-TSHIRT-001", name: "Finder Logo T-Shirt", totalUnitsSold: 87, revenueGrossCents: 191400, rank: 3, belowReorderPoint: false },
       { productId: "prod_4", sku: "HOME-MUG-001", name: "Ceramic Coffee Mug", totalUnitsSold: 64, revenueGrossCents: 76800, rank: 4, belowReorderPoint: true },
+    ]});
+  }),
+);
+
+// ── Receiving Pipeline: price history, documents, billing-adj, credits, bulk ─
+
+// In-memory stores for pipeline docs and adjustments
+const poDocs: Map<string, any[]> = new Map([
+  ["po_1", [{ id: "doc_1", po_id: "po_1", name: "Invoice-ACM-4001.pdf", type: "invoice", size_bytes: 248320, uploaded_at: Date.now() - 80000 }]],
+  ["po_2", []],
+  ["po_3", [{ id: "doc_3", po_id: "po_3", name: "DeliveryNote-4003.pdf", type: "delivery_note", size_bytes: 51200, uploaded_at: Date.now() - 300000 }]],
+]);
+let docSeq = 10;
+
+const billingAdjs: Map<string, any[]> = new Map([
+  ["po_3", [
+    { id: "badj_1", po_id: "po_3", line_id: "pol_3a", reason: "Overcharge correction", amount_cents: -300, created_at: Date.now() - 3600000 },
+  ]],
+]);
+let badjSeq = 10;
+
+const vendorCreditsStore: any[] = [
+  { id: "vcr_1", tenant_id: "tnt_demo", supplier_id: "sup_acme", type: "chargeback",  amount_cents: 5000, reason: "expired stock return", po_id: null, status: "open",    created_at: Date.now() - 86400000, updated_at: Date.now() - 86400000 },
+  { id: "vcr_2", tenant_id: "tnt_demo", supplier_id: "sup_acme", type: "credit_memo", amount_cents: 2200, reason: "price adjustment",    po_id: "po_3", status: "applied", created_at: Date.now() - 3 * 86400000, updated_at: Date.now() - 3 * 86400000 },
+];
+let vcrSeq = 10;
+
+mockHandlers.push(
+  // Price history: last 3 received costs for this vendor × product
+  http.get(`${V1}/purchasing/orders/:id/price-history`, async ({ params }) => {
+    await lat();
+    const D = 86400000, now = Date.now();
+    return HttpResponse.json({ items: [
+      { product_id: "prod_1", product_name: "Spring Water 500ml", sku: "BEV-001", history: [
+        { unit_cost_cents: 80, received_at: now - 30*D, po_id: "po_1" },
+        { unit_cost_cents: 78, received_at: now - 60*D, po_id: "po_hist_a" },
+        { unit_cost_cents: 75, received_at: now - 90*D, po_id: "po_hist_b" },
+      ]},
+      { product_id: "prod_2", product_name: "Orange Juice 1L", sku: "BEV-002", history: [
+        { unit_cost_cents: 140, received_at: now - 30*D, po_id: "po_1" },
+        { unit_cost_cents: 135, received_at: now - 60*D, po_id: "po_hist_a" },
+      ]},
+      { product_id: "prod_3", product_name: "Potato Chips 150g", sku: "SNK-001", history: [
+        { unit_cost_cents: 110, received_at: now - 45*D, po_id: "po_hist_c" },
+      ]},
+    ]});
+  }),
+
+  // PO documents: list
+  http.get(`${V1}/purchasing/orders/:id/documents`, async ({ params }) => {
+    await lat();
+    const docs = poDocs.get(String(params.id)) ?? [];
+    return HttpResponse.json({ items: docs });
+  }),
+
+  // PO documents: upload (mock — just records metadata)
+  http.post(`${V1}/purchasing/orders/:id/documents`, async ({ params, request }) => {
+    await lat();
+    const b = (await request.json()) as { name: string; type?: string; size_bytes?: number };
+    const doc = { id: `doc_${docSeq++}`, po_id: String(params.id), name: b.name.trim(), type: b.type ?? "other", size_bytes: b.size_bytes ?? 0, uploaded_at: Date.now() };
+    const list = poDocs.get(String(params.id)) ?? [];
+    list.push(doc);
+    poDocs.set(String(params.id), list);
+    return HttpResponse.json(doc, { status: 201 });
+  }),
+
+  // PO documents: delete
+  http.delete(`${V1}/purchasing/orders/:id/documents/:docId`, async ({ params }) => {
+    await lat();
+    const poId = String(params.id);
+    const docId = String(params.docId);
+    const list = (poDocs.get(poId) ?? []).filter((d: any) => d.id !== docId);
+    poDocs.set(poId, list);
+    return HttpResponse.json({ ok: true });
+  }),
+
+  // Landed costs: apply freight + other charges to PO
+  http.post(`${V1}/purchasing/orders/:id/landed-costs`, async ({ params, request }) => {
+    await lat();
+    const b = (await request.json()) as { freightCents: number; otherChargesCents?: number };
+    return HttpResponse.json({ id: String(params.id), freight_cost_cents: b.freightCents, other_charges_cents: b.otherChargesCents ?? 0 });
+  }),
+
+  // Billing adjustments: list
+  http.get(`${V1}/purchasing/orders/:id/billing-adj`, async ({ params }) => {
+    await lat();
+    return HttpResponse.json({ items: billingAdjs.get(String(params.id)) ?? [] });
+  }),
+
+  // Billing adjustments: create (price adjustment or chargeback on a line)
+  http.post(`${V1}/purchasing/orders/:id/billing-adj`, async ({ params, request }) => {
+    await lat();
+    const b = (await request.json()) as { lineId?: string; reason: string; amountCents: number };
+    const adj = { id: `badj_${badjSeq++}`, po_id: String(params.id), line_id: b.lineId ?? null, reason: b.reason, amount_cents: b.amountCents, created_at: Date.now() };
+    const list = billingAdjs.get(String(params.id)) ?? [];
+    list.push(adj);
+    billingAdjs.set(String(params.id), list);
+    return HttpResponse.json(adj, { status: 201 });
+  }),
+
+  // Vendor credits: override GET to support poId filter and use shared store
+  http.get(`${V1}/purchasing/vendor-credits`, async ({ request }) => {
+    await lat();
+    const url = new URL(request.url);
+    const supplierId = url.searchParams.get("supplierId");
+    const poId = url.searchParams.get("poId");
+    let items = [...vendorCreditsStore];
+    if (supplierId) items = items.filter((c) => c.supplier_id === supplierId);
+    if (poId) items = items.filter((c) => c.po_id === poId);
+    return HttpResponse.json({ items });
+  }),
+
+  // Vendor credits: create
+  http.post(`${V1}/purchasing/vendor-credits`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as { supplierId: string; type: string; amountCents: number; reason?: string; poId?: string };
+    const vc = { id: `vcr_${vcrSeq++}`, tenant_id: "tnt_demo", supplier_id: b.supplierId, type: b.type, amount_cents: b.amountCents, reason: b.reason ?? null, po_id: b.poId ?? null, status: "open", created_at: Date.now(), updated_at: Date.now() };
+    vendorCreditsStore.push(vc);
+    return HttpResponse.json(vc, { status: 201 });
+  }),
+
+  // Vendor credits: void
+  http.post(`${V1}/purchasing/vendor-credits/:id/void`, async ({ params }) => {
+    await lat();
+    const idx = vendorCreditsStore.findIndex((c) => c.id === String(params.id));
+    if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+    vendorCreditsStore[idx] = { ...vendorCreditsStore[idx], status: "void", updated_at: Date.now() };
+    return HttpResponse.json(vendorCreditsStore[idx]);
+  }),
+
+  // Bulk expiry update: PATCH /inventory/lots/bulk-expiry
+  // Body: { updates: [{ lotId, expiryDate }] }
+  http.patch(`${V1}/inventory/lots/bulk-expiry`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as { updates: Array<{ lotId: string; expiryDate: number | null }> };
+    return HttpResponse.json({ updated: b.updates.length });
+  }),
+
+  // Bulk location assignment: PATCH /inventory/bulk-location
+  // Body: { productIds: string[]; locationId: string }
+  http.patch(`${V1}/inventory/bulk-location`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as { productIds: string[]; locationId: string };
+    return HttpResponse.json({ updated: b.productIds.length, locationId: b.locationId });
+  }),
+
+  // Vendor returns: override GET to include supplier name
+  http.get(`${V1}/purchasing/returns`, async () => {
+    await lat();
+    const D = 86400000, now = Date.now();
+    return HttpResponse.json({ items: [
+      { id: "ret_1", tenant_id: "tnt_demo", supplier_id: "sup_acme", supplier_name: "Acme Coffee Co", reason: "expired", total_cost_cents: 1200, credit_id: "vcr_1", status: "recorded", created_at: now - D },
+      { id: "ret_2", tenant_id: "tnt_demo", supplier_id: "sup_tea", supplier_name: "Tea Traders", reason: "damaged", total_cost_cents: 450, credit_id: null, status: "recorded", created_at: now - 2*D },
     ]});
   }),
 );
@@ -4361,6 +4581,81 @@ mockHandlers.push(
         if (sIdx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
         wf.steps.splice(sIdx, 1);
         wf.updatedAt = Date.now();
+        return new HttpResponse(null, { status: 204 });
+      }),
+    ];
+  })(),
+
+  // ── Promotions ────────────────────────────────────────────────────────────
+  ...(() => {
+    const DAY = 86_400_000;
+    const NOW = Date.now();
+    let seq = 10;
+    interface Promo {
+      id: string; name: string; code: string | null;
+      type: "percent_off" | "fixed_off" | "bogo" | "bundle";
+      value: number; scope: "all" | "category" | "product"; scope_value: string | null;
+      status: "active" | "scheduled" | "expired" | "draft";
+      starts_at: number; ends_at: number | null;
+      usage_count: number; usage_limit: number | null; created_at: number;
+    }
+    let promos: Promo[] = [
+      { id: "promo_1", name: "Summer Sip Sale", code: "SUMMER20", type: "percent_off", value: 20, scope: "category", scope_value: "Beverages", status: "active", starts_at: NOW - 5 * DAY, ends_at: NOW + 25 * DAY, usage_count: 142, usage_limit: 500, created_at: NOW - 30 * DAY },
+      { id: "promo_2", name: "Snack Attack BOGO", code: null, type: "bogo", value: 1, scope: "category", scope_value: "Snacks", status: "active", starts_at: NOW - 2 * DAY, ends_at: NOW + 12 * DAY, usage_count: 38, usage_limit: null, created_at: NOW - 7 * DAY },
+      { id: "promo_3", name: "$2 Off Energy Drinks", code: "ENERGY2", type: "fixed_off", value: 200, scope: "product", scope_value: "BEV-003", status: "active", starts_at: NOW - 1 * DAY, ends_at: null, usage_count: 7, usage_limit: 100, created_at: NOW - 3 * DAY },
+      { id: "promo_4", name: "Back-to-School Bundle", code: "BTSAVE", type: "bundle", value: 3, scope: "all", scope_value: null, status: "scheduled", starts_at: NOW + 14 * DAY, ends_at: NOW + 30 * DAY, usage_count: 0, usage_limit: 200, created_at: NOW - 2 * DAY },
+      { id: "promo_5", name: "Spring Clearance 15%", code: "SPRING15", type: "percent_off", value: 15, scope: "all", scope_value: null, status: "expired", starts_at: NOW - 60 * DAY, ends_at: NOW - 10 * DAY, usage_count: 324, usage_limit: null, created_at: NOW - 65 * DAY },
+    ];
+
+    return [
+      http.get(`${V1}/promotions`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const status = url.searchParams.get("status") ?? "";
+        const q      = url.searchParams.get("q") ?? "";
+        const limit  = Number(url.searchParams.get("limit") ?? 50);
+        let list = promos;
+        if (status) list = list.filter(p => p.status === status);
+        if (q)      list = list.filter(p => p.name.toLowerCase().includes(q.toLowerCase()) || (p.code ?? "").toLowerCase().includes(q.toLowerCase()));
+        return HttpResponse.json({ items: list.slice(0, limit), total: list.length });
+      }),
+
+      http.post(`${V1}/promotions`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as Partial<Promo>;
+        const promo: Promo = {
+          id: `promo_${++seq}`,
+          name: b.name ?? "Untitled",
+          code: b.code ?? null,
+          type: b.type ?? "percent_off",
+          value: b.value ?? 0,
+          scope: b.scope ?? "all",
+          scope_value: b.scope_value ?? null,
+          status: b.status ?? "draft",
+          starts_at: b.starts_at ?? Date.now(),
+          ends_at: b.ends_at ?? null,
+          usage_count: 0,
+          usage_limit: b.usage_limit ?? null,
+          created_at: Date.now(),
+        };
+        promos.push(promo);
+        return HttpResponse.json(promo, { status: 201 });
+      }),
+
+      http.patch(`${V1}/promotions/:id`, async ({ params, request }) => {
+        await lat();
+        const idx = promos.findIndex(p => p.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const b = (await request.json()) as Partial<Promo>;
+        promos[idx] = { ...promos[idx], ...b };
+        return HttpResponse.json(promos[idx]);
+      }),
+
+      http.delete(`${V1}/promotions/:id`, async ({ params }) => {
+        await lat();
+        const before = promos.length;
+        promos = promos.filter(p => p.id !== String(params["id"]));
+        if (promos.length === before) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
         return new HttpResponse(null, { status: 204 });
       }),
     ];

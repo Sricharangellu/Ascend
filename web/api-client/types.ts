@@ -608,6 +608,11 @@ export interface CatalogProduct {
   qty_increment?: number;
   parent_product_id?: string;
   variant_label?: string;
+  // Pricing extras
+  msrp_cents?: number | null;
+  raw_cost_price_cents?: number | null;
+  wholesale_price_cents?: number | null;
+  // Compliance
   tobacco_type?: string | null;
   flavored?: number;
   menthol?: number;

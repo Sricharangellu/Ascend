@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Badge } from "@/components/Badge";
@@ -65,6 +65,9 @@ export default function ProductDetailPage() {
   const [savingCompliance, setSavingCompliance] = useState(false);
   const [complianceSaveError, setComplianceSaveError] = useState<string | null>(null);
 
+  // Duplicate
+  const [duplicating, setDuplicating] = useState(false);
+
   // Variant management
   const [variants, setVariants] = useState<CatalogProduct[]>([]);
   const [variantsLoading, setVariantsLoading] = useState(false);
@@ -95,12 +98,15 @@ export default function ProductDetailPage() {
     name: "",
     sku: "",
     price_cents: "",
+    msrp_cents: "",
+    raw_cost_price_cents: "",
     description: "",
     brand: "",
     barcode: "",
     category: "",
     tax_class: "standard" as "standard" | "exempt",
     status: "active" as "active" | "draft" | "archived",
+    image_url: "",
     weight_grams: "",
     length_mm: "",
     width_mm: "",
@@ -129,12 +135,15 @@ export default function ProductDetailPage() {
         name: prod.name,
         sku: prod.sku,
         price_cents: String(prod.price_cents / 100),
+        msrp_cents: prod.msrp_cents != null ? String(prod.msrp_cents / 100) : "",
+        raw_cost_price_cents: prod.raw_cost_price_cents != null ? String(prod.raw_cost_price_cents / 100) : "",
         description: prod.description ?? "",
         brand: prod.brand ?? "",
         barcode: prod.barcode ?? "",
         category: prod.category,
         tax_class: prod.tax_class,
         status: prod.status,
+        image_url: prod.image_url ?? "",
         weight_grams: prod.weight_grams != null ? String(prod.weight_grams) : "",
         length_mm: prod.length_mm != null ? String(prod.length_mm) : "",
         width_mm: prod.width_mm != null ? String(prod.width_mm) : "",
@@ -160,16 +169,21 @@ export default function ProductDetailPage() {
     try {
       const priceCents = Math.round(parseFloat(form.price_cents) * 100);
       if (isNaN(priceCents)) throw new Error("Invalid price");
+      const msrpCents = form.msrp_cents ? Math.round(parseFloat(form.msrp_cents) * 100) : undefined;
+      const costCents = form.raw_cost_price_cents ? Math.round(parseFloat(form.raw_cost_price_cents) * 100) : undefined;
       const patch: Partial<CatalogProduct> = {
         name: form.name.trim(),
         sku: form.sku.trim(),
         price_cents: priceCents,
+        msrp_cents: msrpCents ?? null,
+        raw_cost_price_cents: costCents ?? null,
         description: form.description.trim() || undefined,
         brand: form.brand.trim() || undefined,
         barcode: form.barcode.trim() || undefined,
         category: form.category.trim(),
         tax_class: form.tax_class,
         status: form.status,
+        image_url: form.image_url.trim() || undefined,
         weight_grams: form.weight_grams ? Number(form.weight_grams) : undefined,
         length_mm: form.length_mm ? Number(form.length_mm) : undefined,
         width_mm: form.width_mm ? Number(form.width_mm) : undefined,
@@ -198,6 +212,15 @@ export default function ProductDetailPage() {
     } catch (e) {
       setComplianceSaveError(e instanceof ApiResponseError ? e.message : "Failed to save compliance flags.");
     } finally { setSavingCompliance(false); }
+  };
+
+  const handleDuplicate = async () => {
+    setDuplicating(true);
+    try {
+      const copy = await apiPost<CatalogProduct>(`/api/v1/catalog/${id}/duplicate`, {});
+      router.push(`/catalog/${copy.id}`);
+    } catch { /* ignore — button re-enables */ }
+    finally { setDuplicating(false); }
   };
 
   const openAddVariant = async () => {
@@ -283,7 +306,12 @@ export default function ProductDetailPage() {
                 <Button size="sm" variant="primary" loading={saving} onClick={() => void save()}>Save changes</Button>
               </>
             ) : (
-              <Button size="sm" variant="primary" onClick={() => setEditing(true)}>Edit product</Button>
+              <>
+                <Button size="sm" variant="secondary" loading={duplicating} onClick={() => void handleDuplicate()}>
+                  Duplicate
+                </Button>
+                <Button size="sm" variant="primary" onClick={() => setEditing(true)}>Edit product</Button>
+              </>
             )}
           </div>
         </div>
@@ -312,17 +340,29 @@ export default function ProductDetailPage() {
                         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none font-mono" />
                     </Field>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Price ($)">
+                  <div className="grid grid-cols-3 gap-3">
+                    <Field label="Sell price ($)">
                       <input type="number" step="0.01" min="0" value={form.price_cents}
                         onChange={e => setForm(f => ({ ...f, price_cents: e.target.value }))}
                         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
                     </Field>
-                    <Field label="Category">
-                      <input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                    <Field label="MSRP ($)">
+                      <input type="number" step="0.01" min="0" value={form.msrp_cents}
+                        onChange={e => setForm(f => ({ ...f, msrp_cents: e.target.value }))}
+                        placeholder="0.00"
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+                    </Field>
+                    <Field label="Cost price ($)">
+                      <input type="number" step="0.01" min="0" value={form.raw_cost_price_cents}
+                        onChange={e => setForm(f => ({ ...f, raw_cost_price_cents: e.target.value }))}
+                        placeholder="0.00"
                         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
                     </Field>
                   </div>
+                  <Field label="Category">
+                    <input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+                  </Field>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="Tax class">
                       <select value={form.tax_class} onChange={e => setForm(f => ({ ...f, tax_class: e.target.value as "standard" | "exempt" }))}
@@ -344,28 +384,46 @@ export default function ProductDetailPage() {
                     <input value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))}
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
                   </Field>
+                  <Field label="Image URL">
+                    <input type="url" value={form.image_url} onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))}
+                      placeholder="https://…"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+                  </Field>
                   <Field label="Description">
                     <textarea rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none resize-none" />
                   </Field>
                 </div>
               ) : (
-                <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
-                  <DetailRow label="Name" value={product.name} />
-                  <DetailRow label="SKU" value={<span className="font-mono">{product.sku}</span>} />
-                  <DetailRow label="Barcode" value={product.barcode ? <span className="font-mono">{product.barcode}</span> : "—"} />
-                  <DetailRow label="Category" value={product.category} />
-                  <DetailRow label="Price" value={<span className="font-semibold">{formatMoney(product.price_cents)}</span>} />
-                  <DetailRow label="Tax class" value={product.tax_class} />
-                  <DetailRow label="Brand" value={product.brand ?? "—"} />
-                  <DetailRow label="Status" value={<Badge variant={STATUS_BADGE[product.status]}>{product.status}</Badge>} />
-                  {product.description && (
-                    <div className="col-span-2">
-                      <dt className="text-xs font-medium text-gray-500 mb-1">Description</dt>
-                      <dd className="text-gray-900">{product.description}</dd>
+                <div className="space-y-5">
+                  {product.image_url && (
+                    <div className="flex items-start gap-4">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={product.image_url} alt={product.name}
+                        className="h-24 w-24 rounded-xl object-cover border border-gray-200 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-gray-900 text-base leading-snug">{product.name}</p>
+                        {product.brand && <p className="text-sm text-gray-500 mt-0.5">{product.brand}</p>}
+                      </div>
                     </div>
                   )}
-                </dl>
+                  <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                    <DetailRow label="Name" value={product.name} />
+                    <DetailRow label="SKU" value={<span className="font-mono">{product.sku}</span>} />
+                    <DetailRow label="Barcode" value={product.barcode ? <span className="font-mono">{product.barcode}</span> : "—"} />
+                    <DetailRow label="Category" value={product.category} />
+                    <DetailRow label="Price" value={<span className="font-semibold">{formatMoney(product.price_cents)}</span>} />
+                    <DetailRow label="Tax class" value={product.tax_class} />
+                    <DetailRow label="Brand" value={product.brand ?? "—"} />
+                    <DetailRow label="Status" value={<Badge variant={STATUS_BADGE[product.status]}>{product.status}</Badge>} />
+                    {product.description && (
+                      <div className="col-span-2">
+                        <dt className="text-xs font-medium text-gray-500 mb-1">Description</dt>
+                        <dd className="text-gray-900">{product.description}</dd>
+                      </div>
+                    )}
+                  </dl>
+                </div>
               )}
             </Card>
 
@@ -635,8 +693,27 @@ export default function ProductDetailPage() {
             {/* Pricing */}
             <Card>
               <h2 className="text-sm font-semibold text-gray-900 mb-3">Pricing</h2>
-              <dl className="space-y-2 text-sm">
-                <DetailRow label="Retail price" value={<span className="font-semibold">{formatMoney(product.price_cents)}</span>} />
+              <dl className="space-y-2.5 text-sm">
+                <DetailRow label="Retail price" value={<span className="font-semibold text-gray-900">{formatMoney(product.price_cents)}</span>} />
+                {product.msrp_cents != null && (
+                  <DetailRow label="MSRP" value={
+                    <span className="text-gray-500 line-through">{formatMoney(product.msrp_cents)}</span>
+                  } />
+                )}
+                {product.raw_cost_price_cents != null && (
+                  <DetailRow label="Cost" value={formatMoney(product.raw_cost_price_cents)} />
+                )}
+                {product.raw_cost_price_cents != null && product.raw_cost_price_cents > 0 && (
+                  <DetailRow label="Margin" value={
+                    <span className={`font-semibold ${
+                      ((product.price_cents - product.raw_cost_price_cents) / product.price_cents) >= 0.3
+                        ? "text-green-700"
+                        : "text-orange-600"
+                    }`}>
+                      {Math.round(((product.price_cents - product.raw_cost_price_cents) / product.price_cents) * 100)}%
+                    </span>
+                  } />
+                )}
               </dl>
             </Card>
 
