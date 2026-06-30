@@ -40,7 +40,7 @@ function Field({
           error ? "border-red-400 bg-red-50" : "border-slate-300 bg-white hover:border-slate-400"
         }`}
       />
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error && <p role="alert" className="mt-1 text-xs text-red-600">{error}</p>}
     </div>
   );
 }
