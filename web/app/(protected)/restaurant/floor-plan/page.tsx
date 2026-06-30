@@ -11,17 +11,8 @@ import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
-import { apiGet, apiPost, safeLoad } from "@/api-client/client";
+import { apiGet, apiPost, apiPatch, safeLoad } from "@/api-client/client";
 import { useRealtimeStream } from "@/hooks/useRealtimeStream";
-
-interface RestaurantTable {
-  id: string;
-  table_number: string;
-  capacity: number;
-  floor_section: string | null;
-  status: "available" | "occupied" | "reserved" | "cleaning";
-  outlet_id: string | null;
-}
 
 interface TableSession {
   id: string;
@@ -30,6 +21,16 @@ interface TableSession {
   server_id: string | null;
   opened_at: number;
   notes: string | null;
+}
+
+interface RestaurantTable {
+  id: string;
+  table_number: string;
+  capacity: number;
+  floor_section: string | null;
+  status: "available" | "occupied" | "reserved" | "cleaning";
+  outlet_id: string | null;
+  current_session: TableSession | null;
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -54,7 +55,6 @@ function elapsed(ms: number): string {
 
 export default function FloorPlanPage() {
   const [tables, setTables]   = useState<RestaurantTable[]>([]);
-  const [sessions, setSessions] = useState<Record<string, TableSession>>({});
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<RestaurantTable | null>(null);
   const [openModal, setOpenModal] = useState(false);
@@ -96,7 +96,7 @@ export default function FloorPlanPage() {
     if (!selected) return;
     setProcessing(true);
     try {
-      await apiPost(`/api/v1/restaurant/tables/${selected.id}/status`, { status }, { method: "PATCH" } as any);
+      await apiPatch(`/api/v1/restaurant/tables/${selected.id}/status`, { status });
       load();
       setOpenModal(false);
     } finally { setProcessing(false); }
@@ -157,7 +157,7 @@ export default function FloorPlanPage() {
         ) : (
           <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
             {visible.map((table) => {
-              const session = sessions[table.id];
+              const session = table.current_session;
               return (
                 <button
                   key={table.id}

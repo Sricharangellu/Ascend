@@ -67,7 +67,9 @@ type NavKey =
   | "rental"
   | "entertainment"
   | "education"
-  | "module-marketplace";
+  | "module-marketplace"
+  | "kitchen"
+  | "bar-tabs";
 
 /** Full nav item definition — module key gates visibility. */
 interface NavItemDef {
@@ -110,6 +112,8 @@ const ALL_NAV_ITEMS: NavItemDef[] = [
 
   // ── Restaurant ────────────────────────────────────────────────────────────
   { key: "orders",        label: "Tables",        href: "/restaurant/floor-plan", icon: "orders",        group: "Operate",  module: "tables" },
+  { key: "kitchen",       label: "Kitchen",       href: "/restaurant/kitchen",    icon: "kitchen",       group: "Operate",  module: "kitchen" },
+  { key: "bar-tabs",      label: "Bar Tabs",      href: "/restaurant/tabs",       icon: "bar-tabs",      group: "Operate",  module: "bar_tabs" },
 
   // ── Services ─────────────────────────────────────────────────────────────
   { key: "appointments",  label: "Appointments",  href: "/appointments",          icon: "appointments",  group: "Operate",  module: "appointments" },
@@ -143,7 +147,7 @@ const ALL_NAV_ITEMS: NavItemDef[] = [
 ];
 
 const MODULE_BY_ACTIVE: Record<NavKey, NavKey> = {
-  dashboard: "dashboard", register: "register", sales: "register", orders: "register",
+  dashboard: "dashboard", register: "register", sales: "register", orders: "orders",
   quotes: "register", returns: "register", "service-orders": "register", invoicing: "register",
   payments: "finance", reports: "reports", insights: "reports", "tax-compliance": "reports",
   catalog: "catalog", discounts: "catalog", "gift-cards": "catalog", vendors: "catalog",
@@ -156,6 +160,7 @@ const MODULE_BY_ACTIVE: Record<NavKey, NavKey> = {
   appointments: "appointments", healthcare: "healthcare", automotive: "automotive",
   hospitality: "hospitality", manufacturing: "manufacturing", rental: "rental",
   entertainment: "entertainment", education: "education",
+  kitchen: "kitchen", "bar-tabs": "bar-tabs",
   "module-marketplace": "module-marketplace",
 };
 
@@ -585,6 +590,10 @@ function NavIcon({ name }: { name: NavKey }) {
       return <WorkforceIcon />;
     case "module-marketplace":
       return <ModuleMarketplaceIcon />;
+    case "kitchen":
+      return <KitchenIcon />;
+    case "bar-tabs":
+      return <BarTabsIcon />;
     default:
       return <ReportsIcon />;
   }
@@ -993,6 +1002,26 @@ function WorkforceIcon() {
       <circle cx="9" cy="7" r="4" />
       <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function KitchenIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" />
+      <path d="M7 2v20" />
+      <path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />
+    </svg>
+  );
+}
+
+function BarTabsIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 22H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6" />
+      <path d="M18 14v4h4" />
+      <circle cx="18" cy="18" r="4" />
     </svg>
   );
 }

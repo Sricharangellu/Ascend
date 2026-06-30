@@ -3074,13 +3074,6 @@ mockHandlers.push(
       { id: "wo_4", description: "A/C recharge + inspection",    status: "in_progress", make: "BMW",     model: "3 Series", total_cents: 35000 },
     ];
     return [
-      http.get(`${V1}/restaurant/tables`, async ({ request }) => {
-        await lat();
-        const url = new URL(request.url);
-        const status = url.searchParams.get("status");
-        const items = status ? tables.filter(t => t.status === status) : tables;
-        return HttpResponse.json({ items, total: items.length });
-      }),
       http.get(`${V1}/appointments`, async ({ request }) => {
         await lat();
         const url = new URL(request.url);
@@ -3101,6 +3094,106 @@ mockHandlers.push(
         const status = url.searchParams.get("status");
         const items = status ? workOrders.filter(w => w.status === status) : workOrders;
         return HttpResponse.json({ items, total: items.length });
+      }),
+    ];
+  })(),
+
+  // ── Restaurant — floor plan, sessions, bar tabs ───────────────────────────
+  ...(() => {
+    const BASE = Date.now();
+    let sesSeq = 0;
+    let tabSeq = 0;
+
+    interface RS {
+      id: string; table_id: string; party_size: number;
+      server_id: string | null; opened_at: number; notes: string | null;
+    }
+    interface RT {
+      id: string; table_number: string; capacity: number;
+      floor_section: string | null;
+      status: "available" | "occupied" | "reserved" | "cleaning";
+      outlet_id: string | null; current_session: RS | null;
+    }
+    interface RTab {
+      id: string; customer_name: string | null; table_id: string | null;
+      status: "open" | "closed"; opened_at: number; closed_at: number | null;
+      order_ids: string[];
+    }
+
+    let tables: RT[] = [
+      { id: "tbl_1", table_number: "T1", capacity: 4, floor_section: "Main",  status: "occupied",  outlet_id: null, current_session: { id: "ses_1", table_id: "tbl_1", party_size: 3, server_id: null, opened_at: BASE - 35 * 60_000, notes: null } },
+      { id: "tbl_2", table_number: "T2", capacity: 2, floor_section: "Main",  status: "available", outlet_id: null, current_session: null },
+      { id: "tbl_3", table_number: "T3", capacity: 6, floor_section: "Main",  status: "reserved",  outlet_id: null, current_session: null },
+      { id: "tbl_4", table_number: "T4", capacity: 4, floor_section: "Main",  status: "occupied",  outlet_id: null, current_session: { id: "ses_2", table_id: "tbl_4", party_size: 2, server_id: null, opened_at: BASE - 12 * 60_000, notes: null } },
+      { id: "tbl_5", table_number: "T5", capacity: 8, floor_section: "Patio", status: "available", outlet_id: null, current_session: null },
+      { id: "tbl_6", table_number: "T6", capacity: 2, floor_section: "Patio", status: "available", outlet_id: null, current_session: null },
+      { id: "tbl_7", table_number: "T7", capacity: 4, floor_section: "Patio", status: "cleaning",  outlet_id: null, current_session: null },
+      { id: "tbl_8", table_number: "B1", capacity: 6, floor_section: "Bar",   status: "occupied",  outlet_id: null, current_session: { id: "ses_3", table_id: "tbl_8", party_size: 5, server_id: null, opened_at: BASE - 60 * 60_000, notes: "Birthday party" } },
+    ];
+
+    let tabs: RTab[] = [
+      { id: "tab_1", customer_name: "Johnson", table_id: "tbl_8", status: "open",   opened_at: BASE - 55 * 60_000, closed_at: null, order_ids: ["ord_1", "ord_2"] },
+      { id: "tab_2", customer_name: "Smith",   table_id: null,    status: "open",   opened_at: BASE - 20 * 60_000, closed_at: null, order_ids: ["ord_3"] },
+      { id: "tab_3", customer_name: "Lee",     table_id: null,    status: "closed", opened_at: BASE - 180 * 60_000, closed_at: BASE - 60 * 60_000, order_ids: ["ord_4", "ord_5", "ord_6"] },
+    ];
+
+    return [
+      // GET tables (with embedded current_session for floor plan elapsed timer)
+      http.get(`${V1}/restaurant/tables`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const status = url.searchParams.get("status");
+        const items = status ? tables.filter(t => t.status === status) : tables;
+        return HttpResponse.json({ items, total: items.length });
+      }),
+
+      // POST open session → sets table occupied + creates session
+      http.post(`${V1}/restaurant/tables/:id/open-session`, async ({ request, params }) => {
+        await lat();
+        const idx = tables.findIndex(t => t.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as { partySize?: number };
+        const session: RS = { id: `ses_${++sesSeq}`, table_id: tables[idx]!.id, party_size: body.partySize ?? 2, server_id: null, opened_at: Date.now(), notes: null };
+        tables[idx] = { ...tables[idx]!, status: "occupied", current_session: session };
+        return HttpResponse.json(tables[idx], { status: 201 });
+      }),
+
+      // PATCH table status (clear session when table freed/cleaning)
+      http.patch(`${V1}/restaurant/tables/:id/status`, async ({ request, params }) => {
+        await lat();
+        const idx = tables.findIndex(t => t.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as { status?: string };
+        const newStatus = (body.status ?? "available") as RT["status"];
+        tables[idx] = { ...tables[idx]!, status: newStatus, current_session: newStatus === "available" || newStatus === "cleaning" ? null : tables[idx]!.current_session };
+        return HttpResponse.json(tables[idx]);
+      }),
+
+      // GET bar tabs (filterable by status=open|closed)
+      http.get(`${V1}/restaurant/tabs`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const status = url.searchParams.get("status");
+        const items = status ? tabs.filter(t => t.status === status) : tabs;
+        return HttpResponse.json({ items, total: items.length });
+      }),
+
+      // POST create bar tab
+      http.post(`${V1}/restaurant/tabs`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as { customerName?: string; tableId?: string };
+        const tab: RTab = { id: `tab_${++tabSeq}`, customer_name: body.customerName ?? null, table_id: body.tableId ?? null, status: "open", opened_at: Date.now(), closed_at: null, order_ids: [] };
+        tabs.push(tab);
+        return HttpResponse.json(tab, { status: 201 });
+      }),
+
+      // POST close tab
+      http.post(`${V1}/restaurant/tabs/:id/close`, async ({ params }) => {
+        await lat();
+        const idx = tabs.findIndex(t => t.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        tabs[idx] = { ...tabs[idx]!, status: "closed", closed_at: Date.now() };
+        return HttpResponse.json(tabs[idx]);
       }),
     ];
   })(),

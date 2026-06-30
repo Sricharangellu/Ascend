@@ -70,7 +70,7 @@ export default function BarTabsPage() {
   const openCount   = tabs.filter(t => t.status === "open").length;
 
   return (
-    <EnterpriseShell active="orders" title="Bar Tabs" subtitle="Open tabs and multi-round orders">
+    <EnterpriseShell active="bar-tabs" title="Bar Tabs" subtitle="Open tabs and multi-round orders">
       <div className="mx-auto w-full max-w-5xl space-y-5 px-4 py-5 sm:px-6">
 
         {/* Header actions */}
