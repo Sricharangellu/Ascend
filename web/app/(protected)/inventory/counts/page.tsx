@@ -6,6 +6,7 @@ import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
+import { fmtDateTime } from "@/lib/date";
 import type {
   CycleCountSession,
   CycleCountSessionsResponse,
@@ -15,12 +16,6 @@ import type {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtDate(ms: number) {
-  return new Date(ms).toLocaleString("en-US", {
-    month: "short", day: "numeric", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
-  });
-}
 
 function varianceBadge(v: number | null) {
   if (v === null) return <Badge variant="gray">—</Badge>;
@@ -294,7 +289,7 @@ function SessionDetail({ session, onBack, onSessionClosed }: SessionDetailProps)
           <span className="text-xs text-slate-500">
             {session.status === "open"
               ? "Enter counted quantities and press Enter or Tab to save"
-              : `Closed ${session.closed_at ? fmtDate(session.closed_at) : ""}`}
+              : `Closed ${session.closed_at ? fmtDateTime(session.closed_at) : ""}`}
           </span>
         </div>
         {loading ? (
@@ -465,7 +460,7 @@ export default function CycleCountsPage() {
                           className="hover:bg-slate-50 cursor-pointer"
                           onClick={() => setSelected(session)}
                         >
-                          <td className="px-5 py-3 text-slate-700">{fmtDate(session.opened_at)}</td>
+                          <td className="px-5 py-3 text-slate-700">{fmtDateTime(session.opened_at)}</td>
                           <td className="px-5 py-3 text-slate-600 max-w-xs truncate">
                             {session.note ?? <span className="text-slate-400">—</span>}
                           </td>
@@ -476,7 +471,7 @@ export default function CycleCountsPage() {
                             </Badge>
                           </td>
                           <td className="px-5 py-3 text-slate-500 text-xs">
-                            {session.closed_at ? fmtDate(session.closed_at) : "—"}
+                            {session.closed_at ? fmtDateTime(session.closed_at) : "—"}
                           </td>
                           <td className="px-5 py-3 text-right">
                             <span className="text-xs text-blue-600 hover:underline">View →</span>

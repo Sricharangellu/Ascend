@@ -8,6 +8,7 @@ import { Table } from "@/components/Table";
 import { Modal } from "@/components/Modal";
 import { Skeleton } from "@/components/Skeleton";
 import { apiGet, apiPost, apiPatch } from "@/api-client/client";
+import { formatMoney } from "@/lib/money";
 import type { FulfillmentLocation, PickList, Register, Outlet } from "@/api-client/types";
 import { useToast } from "@/components/Toast";
 
@@ -488,7 +489,7 @@ function StockLocationsTab() {
                     <td className="px-4 py-2.5 text-right tabular-nums">{s.quantity_on_hand}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-orange-600">{s.quantity_committed}</td>
                     <td className={`px-4 py-2.5 text-right tabular-nums font-medium ${s.quantity_available <= 0 ? "text-red-600" : "text-green-700"}`}>{s.quantity_available}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-gray-500">${(s.average_cost_cents / 100).toFixed(2)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-gray-500">{formatMoney(s.average_cost_cents)}</td>
                   </tr>
                 ))}
               </tbody>

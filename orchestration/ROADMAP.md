@@ -987,6 +987,29 @@ current codebase. Ordered by value/dependency within each lane.
       products with overrides and apply the override in the cart.
       Consumes BE-39. See §9.2 Customer > Product Price tab and §5.2 rule 1.
 
+- [x] FE-51: Receiving → Purchasing pipeline — standalone receive-stock page
+      (`/inventory/receive-stock`) with barcode scan, cases × units/case live
+      calculation, expiry/lot tracking, sort toggle (insertion / A-Z), document
+      upload (invoice/delivery note/excel); tabbed PO detail page
+      (`/purchasing/[id]`) with Lines (margin %, last cost, price history delta),
+      Receive (cases form + per-line expiry/lot + doc attach), Billing (landed
+      costs, price adjustments/chargebacks, net total), Credits (vendor credits
+      + credit memo by source: expired lots / damaged / manual; void action).
+      Mock handlers: price-history, documents CRUD, landed-costs, billing-adj,
+      vendor-credits (poId filter), bulk-expiry PATCH, bulk-location PATCH.
+      (done in session 2026-06-30)
+
+- [x] FE-52: Reorder suggestions — vendor history + product sort view —
+      enhanced Reorder Suggestions tab on `/purchasing`: (a) "By vendor" mode
+      gains collapsible purchase history panel per vendor (last 3 POs: date,
+      total, item count, status); item rows gain Last cost + Last ordered
+      columns; out-of-stock items flagged with red dot; (b) "By product" mode
+      (new): flat table sorted A-Z with Vendor column — toggle between modes
+      with a pill selector. Mock: `GET /api/v1/purchasing/vendor-history`
+      returns per-vendor PO summary history; suggestions seeded with
+      `last_unit_cost_cents`, `last_ordered_at`, `last_ordered_qty`.
+      (done in session 2026-06-30)
+
 ---
 
 ## Run log (most recent first)
@@ -1045,5 +1068,7 @@ current codebase. Ordered by value/dependency within each lane.
 - 2026-06-22 human/assistant INF-8 -> 74241ec: offline checkout outbox — IndexedDB write-ahead queue, Background Sync, TenderScreen fallback, OfflineBanner with sync status.
 
 - 2026-06-23 human/assistant ALL remaining items -> 609c748: FE-31 customer display, DB-16 webhook AES-256-GCM, BE-34 /api/v1/jobs, DB-17 OTEL trace context. All ROADMAP items complete.
+- 2026-06-30 human/assistant FE-51 -> session: receive-stock standalone page, PO detail tabbed (Lines/Receive/Billing/Credits), pipeline mock handlers.
+- 2026-06-30 human/assistant FE-52 -> session: reorder suggestions vendor history panel + by-product sort view; vendor-history mock endpoint.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._

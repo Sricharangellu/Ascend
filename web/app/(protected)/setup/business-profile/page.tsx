@@ -182,7 +182,7 @@ export default function BusinessProfilePage() {
                       className={`group rounded-xl border-2 p-3 text-left transition-all hover:shadow-sm ${
                         isSelected
                           ? "border-brand-600 bg-brand-50 shadow-sm"
-                          : "border-[#E5E7EB] bg-white hover:border-brand-300"
+                          : "border-slate-200 bg-white hover:border-brand-300"
                       }`}
                     >
                       <div className="mb-1.5 text-2xl">{bundle.icon}</div>

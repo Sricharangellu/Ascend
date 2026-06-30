@@ -16,6 +16,7 @@ import { Badge } from "@/components/Badge";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
+import { fmtDate } from "@/lib/date";
 import type {
   LoyaltyTier,
   LoyaltyTiersResponse,
@@ -50,9 +51,6 @@ const inputCls =
   "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
 const labelCls = "mb-1 block text-sm font-medium text-slate-700";
 
-function fmtDate(ms: number) {
-  return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
 
 // ─── Tier Form Modal ──────────────────────────────────────────────────────────
 

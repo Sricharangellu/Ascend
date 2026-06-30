@@ -6,6 +6,7 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
+import { formatMoney } from "@/lib/money";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -49,7 +50,7 @@ const TYPE_LABELS: Record<PromoType, string> = {
 
 function formatValue(p: Promotion): string {
   if (p.type === "percent_off") return `${p.value}% off`;
-  if (p.type === "fixed_off")   return `$${(p.value / 100).toFixed(2)} off`;
+  if (p.type === "fixed_off")   return `${formatMoney(p.value)} off`;
   if (p.type === "bogo")        return "Buy 1 Get 1 Free";
   return `Bundle: ${p.value} items`;
 }

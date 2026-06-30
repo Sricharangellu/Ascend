@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { clsx } from "clsx";
+import { fmtDate } from "@/lib/date";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
@@ -92,10 +93,6 @@ type DetailTab = "lines" | "receive" | "billing" | "credits";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmtDate(ms: number | null | undefined): string {
-  if (!ms) return "—";
-  return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
 
 function remaining(line: POLine): number {
   return Math.max(0, line.quantity - (line.received_qty ?? 0));

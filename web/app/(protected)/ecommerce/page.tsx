@@ -10,6 +10,7 @@ import { formatMoney } from "@/lib/money";
 import { apiGet, apiPatch, ApiResponseError } from "@/api-client/client";
 import type { OnlineOrder } from "@/api-client/types";
 import { usePathname, useRouter } from "next/navigation";
+import { fmtDate } from "@/lib/date";
 
 // ── Local types ──────────────────────────────────────────────────────────────
 
@@ -32,10 +33,6 @@ type Tab = "catalog" | "orders" | "settings";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtDate(ms: number | null | undefined): string {
-  if (!ms) return "—";
-  return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
 
 function orderTotal(o: OnlineOrder): number {
   return o.total_cents ?? o.totalCents ?? 0;

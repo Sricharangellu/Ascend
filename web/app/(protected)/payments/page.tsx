@@ -8,6 +8,7 @@ import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type { Order, OrderStatus, Payment, PaymentMethod } from "@/api-client/types";
+import { fmtDateTime } from "@/lib/date";
 
 interface OrdersResponse {
   items: Order[];
@@ -28,15 +29,6 @@ const STATUS_BADGE: Record<string, "green" | "red" | "gray"> = {
   declined: "red",
   refunded: "gray",
 };
-
-function fmtDate(ms: number) {
-  return new Date(ms).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 export default function PaymentsPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -195,7 +187,7 @@ export default function PaymentsPage() {
                       <tr key={payment.id} className="hover:bg-slate-50">
                         <td className="px-4 py-3">
                           <p className="font-mono text-xs font-medium text-slate-800">{payment.id}</p>
-                          <p className="mt-1 text-xs text-slate-500">{fmtDate(payment.createdAt)}</p>
+                          <p className="mt-1 text-xs text-slate-500">{fmtDateTime(payment.createdAt)}</p>
                           {payment.authCode && <p className="mt-1 text-xs text-slate-400">{payment.authCode}</p>}
                         </td>
                         <td className="px-4 py-3">
@@ -236,7 +228,7 @@ function OrderButton({ order, selected, onClick }: { order: Order; selected: boo
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-950">{order.orderNumber}</p>
-          <p className="mt-1 text-xs text-slate-500">{fmtDate(order.createdAt)}</p>
+          <p className="mt-1 text-xs text-slate-500">{fmtDateTime(order.createdAt)}</p>
         </div>
         <OrderStatusBadge status={order.status} />
       </div>

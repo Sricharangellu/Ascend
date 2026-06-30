@@ -11,6 +11,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { apiGet, apiPost, safeLoad } from "@/api-client/client";
+import { fmtTime } from "@/lib/date";
 
 interface Appointment {
   id: string;
@@ -32,9 +33,6 @@ const STATUS_COLORS: Record<string, string> = {
   no_show:     "bg-gray-100 text-gray-500 border-gray-300",
 };
 
-function fmtTime(ms: number) {
-  return new Date(ms).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-}
 
 function todayDateStr() {
   return new Date().toISOString().slice(0, 10);

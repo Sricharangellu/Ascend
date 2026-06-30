@@ -13,6 +13,7 @@ import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
+import { fmtDate } from "@/lib/date";
 import { getUser } from "@/lib/auth";
 import { useToast } from "@/components/Toast";
 
@@ -75,9 +76,6 @@ function parseCents(value: string): number {
   return isNaN(n) ? 0 : Math.round(n * 100);
 }
 
-function fmtDate(ts: number): string {
-  return new Date(ts).toLocaleDateString();
-}
 
 // ─── New Quote Modal ──────────────────────────────────────────────────────────
 

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Button } from "@/components/Button";
 import { apiGet, apiPost, apiPatch } from "@/api-client/client";
+import { fmtDate } from "@/lib/date";
 import type { SerialNumber, SerialStatus, SerialsResponse } from "@/api-client/types";
 import { clsx } from "clsx";
 
@@ -33,10 +34,6 @@ function StatusBadge({ status }: { status: SerialStatus }) {
   );
 }
 
-function fmtDate(ms: number | null) {
-  if (!ms) return "—";
-  return new Date(ms).toLocaleDateString();
-}
 
 // ─── Receive Modal ────────────────────────────────────────────────────────────
 

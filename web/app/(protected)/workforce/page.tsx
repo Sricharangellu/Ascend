@@ -6,6 +6,7 @@ import { Button } from "@/components/Button";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/api-client/client";
 import type { Employee, Shift, ShiftsResponse, TimeOffRequest, ShiftRole, TimeOffStatus } from "@/api-client/types";
 import { clsx } from "clsx";
+import { fmtDateShort } from "@/lib/date";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -53,14 +54,11 @@ function weekDates(mon: Date): Date[] {
   });
 }
 
-function fmtDateShort(d: Date): string {
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
 function fmtWeekRange(mon: Date): string {
   const sun = new Date(mon);
   sun.setDate(mon.getDate() + 6);
-  return `${fmtDateShort(mon)} – ${fmtDateShort(sun)}`;
+  return `${fmtDateShort(mon.getTime())} – ${fmtDateShort(sun.getTime())}`;
 }
 
 function isToday(d: Date): boolean {
@@ -230,7 +228,7 @@ function ScheduleGrid({ employees, shifts, dates, onCellClick, onShiftClick }: G
               )}>
                 <div>{DAYS[i]}</div>
                 <div className={clsx("text-xs font-normal mt-0.5", isToday(d) ? "text-blue-500" : "text-slate-400")}>
-                  {fmtDateShort(d)}
+                  {fmtDateShort(d.getTime())}
                 </div>
               </th>
             ))}

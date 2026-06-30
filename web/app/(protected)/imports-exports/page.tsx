@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { getAccessToken } from "@/lib/auth";
+import { fmtDate } from "@/lib/date";
 import { hasRole } from "@/lib/auth";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -64,15 +65,6 @@ const TEMPLATE = [
   "PASTRY-001,Butter Croissant,450,Pastry,012345678902",
 ].join("\n");
 
-function fmtDate(ms: number | null) {
-  if (!ms) return "-";
-  return new Date(ms).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 function splitCsvLine(line: string) {
   const values: string[] = [];

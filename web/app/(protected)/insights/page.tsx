@@ -18,6 +18,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { formatMoney } from "@/lib/money";
+import { fmtDate } from "@/lib/date";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
 import { getUser } from "@/lib/auth";
@@ -84,10 +85,6 @@ const FREQ_LABELS: Record<Frequency, string> = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmtDate(ms: number | null): string {
-  if (!ms) return "Never";
-  return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
 
 function urgencyBadge(rec: ReorderRec): "red" | "yellow" | "gray" {
   if (rec.currentStock === 0) return "red";

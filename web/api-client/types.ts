@@ -1490,3 +1490,70 @@ export interface CycleCountLinesResponse {
   items: CycleCountLine[];
 }
 
+// ── Golf ──────────────────────────────────────────────────────────────────────
+
+export type TeeSlotStatus = "available" | "booked" | "hold" | "closed";
+export type BookingStatus = "confirmed" | "pending" | "cancelled" | "no_show" | "completed";
+export type MembershipTier = "standard" | "premium" | "vip" | "corporate";
+
+export interface TeeSlot {
+  id: string;
+  date: string;           // YYYY-MM-DD
+  tee_time: string;       // HH:MM (24h)
+  holes: 9 | 18;
+  max_players: number;
+  booked_players: number;
+  status: TeeSlotStatus;
+  price_cents: number;
+  cart_fee_cents: number;
+  notes: string | null;
+}
+
+export interface GolfBooking {
+  id: string;
+  slot_id: string;
+  date: string;
+  tee_time: string;
+  holes: 9 | 18;
+  players: number;
+  member_id: string | null;
+  member_name: string | null;
+  guest_name: string | null;
+  guest_phone: string | null;
+  status: BookingStatus;
+  total_cents: number;
+  paid_cents: number;
+  cart_included: boolean;
+  notes: string | null;
+  created_at: number;
+}
+
+export interface GolfMember {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  tier: MembershipTier;
+  handicap: number | null;
+  membership_number: string;
+  joined_at: number;
+  expires_at: number | null;
+  rounds_played: number;
+  outstanding_cents: number;
+  notes: string | null;
+}
+
+export interface ProShopItem {
+  id: string;
+  product_id: string;
+  name: string;
+  sku: string;
+  category: "clubs" | "balls" | "apparel" | "accessories" | "footwear" | "bags";
+  brand: string | null;
+  price_cents: number;
+  cost_cents: number;
+  stock_qty: number;
+  reorder_pt: number;
+  image_url: string | null;
+}
+

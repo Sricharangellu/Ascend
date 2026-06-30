@@ -8,6 +8,7 @@ import { Badge } from "@/components/Badge";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
+import { fmtDate } from "@/lib/date";
 import { hasRole } from "@/lib/auth";
 import type { Order, OrderStatus } from "@/api-client/types";
 
@@ -35,14 +36,6 @@ const STATUS_BADGE: Record<OrderStatus, "green" | "blue" | "yellow" | "gray"> = 
   voided: "gray",
 };
 
-function fmtDate(ms: number) {
-  return new Date(ms).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 export default function ReturnsPage() {
   const [orders, setOrders] = useState<Order[]>([]);

@@ -17,6 +17,7 @@ import { Modal } from "@/components/Modal";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { formatMoney } from "@/lib/money";
+import { fmtDateTime } from "@/lib/date";
 import { hasRole } from "@/lib/auth";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import type { Order, OrderLine, OrderStatus } from "@/api-client/types";
@@ -50,15 +51,6 @@ const STATUS_BADGE: Record<
   voided: "gray",
 };
 
-function fmtDate(ms: number) {
-  return new Date(ms).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -158,7 +150,7 @@ function OrderDetailModal({
           </div>
           <div>
             <span className="text-slate-400">Created</span>
-            <span className="ml-2 text-slate-700">{fmtDate(order.createdAt)}</span>
+            <span className="ml-2 text-slate-700">{fmtDateTime(order.createdAt)}</span>
           </div>
         </div>
 
@@ -362,7 +354,7 @@ export default function OrdersPage() {
                       {formatMoney(order.totalCents)}
                     </td>
                     <td className="px-4 py-3 text-slate-500 text-xs">
-                      {fmtDate(order.createdAt)}
+                      {fmtDateTime(order.createdAt)}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="text-xs text-slate-400 group-hover:text-slate-600">

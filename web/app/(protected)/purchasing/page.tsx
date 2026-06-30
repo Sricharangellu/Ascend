@@ -9,6 +9,7 @@ import { Modal } from "@/components/Modal";
 import { formatMoney, parseToCents } from "@/lib/money";
 import { apiGet, apiPost, apiPatch, ApiResponseError } from "@/api-client/client";
 import { hasRole } from "@/lib/auth";
+import { fmtDateShort } from "@/lib/date";
 import { useFlag } from "@/flags/useFlag";
 import type {
   CreatePurchaseOrderLineRequest,
@@ -32,6 +33,18 @@ interface ReorderSuggestion {
   suggested_qty: number;
   preferred_vendor_id: string | null;
   preferred_vendor_name: string | null;
+  last_unit_cost_cents: number | null;
+  last_ordered_at: number | null;
+  last_ordered_qty: number | null;
+}
+
+interface VendorPOSummary {
+  po_id: string;
+  po_number: number;
+  created_at: number;
+  total_cost_cents: number;
+  item_count: number;
+  status: string;
 }
 
 interface DraftLine {
@@ -146,6 +159,7 @@ export default function PurchasingPage() {
   const [reorderBusy, setReorderBusy] = useState(false);
   const [reorderError, setReorderError] = useState<string | null>(null);
   const [createdPOs, setCreatedPOs] = useState<string[]>([]);
+  const [vendorHistory, setVendorHistory] = useState<Record<string, VendorPOSummary[]>>({});
 
   const canManage = hasRole("manager");
 
@@ -195,8 +209,12 @@ export default function PurchasingPage() {
   const loadReorderSuggestions = useCallback(async () => {
     setReorderLoading(true); setReorderError(null);
     try {
-      const res = await apiGet<{ items: ReorderSuggestion[] }>("/api/v1/inventory/reorder-suggestions");
-      setReorderSuggestions(res.items ?? []);
+      const [sugRes, histRes] = await Promise.all([
+        apiGet<{ items: ReorderSuggestion[] }>("/api/v1/inventory/reorder-suggestions"),
+        apiGet<{ history: Record<string, VendorPOSummary[]> }>("/api/v1/purchasing/vendor-history"),
+      ]);
+      setReorderSuggestions(sugRes.items ?? []);
+      setVendorHistory(histRes.history ?? {});
     } catch (err) {
       setReorderError(err instanceof ApiResponseError ? err.message : "Failed to load reorder suggestions.");
     } finally { setReorderLoading(false); }
@@ -520,6 +538,7 @@ export default function PurchasingPage() {
           {activeTab === "reorder" && (
             <ReorderTab
               suggestions={reorderSuggestions}
+              vendorHistory={vendorHistory}
               loading={reorderLoading}
               busy={reorderBusy}
               error={reorderError}
@@ -556,8 +575,12 @@ export default function PurchasingPage() {
 
 // ─── Reorder Tab ─────────────────────────────────────────────────────────────
 
+type ReorderViewMode = "vendor" | "product";
+
+
 function ReorderTab({
   suggestions,
+  vendorHistory,
   loading,
   busy,
   error,
@@ -567,6 +590,7 @@ function ReorderTab({
   onCreatePO,
 }: {
   suggestions: ReorderSuggestion[];
+  vendorHistory: Record<string, VendorPOSummary[]>;
   loading: boolean;
   busy: boolean;
   error: string | null;
@@ -575,6 +599,9 @@ function ReorderTab({
   onRefresh: () => void;
   onCreatePO: (vendorId: string | null, vendorName: string) => void;
 }) {
+  const [viewMode, setViewMode] = useState<ReorderViewMode>("vendor");
+  const [expandedVendor, setExpandedVendor] = useState<string | null>(null);
+
   // Group by vendor
   const vendorGroups = suggestions.reduce<Map<string, { vendorId: string | null; vendorName: string; items: ReorderSuggestion[] }>>(
     (acc, s) => {
@@ -588,6 +615,9 @@ function ReorderTab({
     new Map(),
   );
 
+  // Flat product list sorted A-Z
+  const sortedByProduct = [...suggestions].sort((a, b) => a.product_name.localeCompare(b.product_name));
+
   if (loading) {
     return (
       <div className="p-6 space-y-3">
@@ -598,12 +628,33 @@ function ReorderTab({
 
   return (
     <div className="p-4 space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-slate-900">Products below reorder point</p>
-          <p className="text-xs text-slate-500 mt-0.5">Grouped by preferred vendor — one PO per vendor</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {viewMode === "vendor" ? "Grouped by vendor — one PO per vendor" : "All items sorted A–Z"}
+          </p>
         </div>
-        <Button variant="secondary" size="sm" disabled={loading} onClick={onRefresh}>Refresh</Button>
+        <div className="flex items-center gap-2">
+          {/* View mode toggle */}
+          <div className="flex rounded-lg border border-slate-200 overflow-hidden text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => setViewMode("vendor")}
+              className={`px-3 py-1.5 transition-colors ${viewMode === "vendor" ? "bg-slate-900 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
+            >
+              By vendor
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("product")}
+              className={`px-3 py-1.5 transition-colors border-l border-slate-200 ${viewMode === "product" ? "bg-slate-900 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
+            >
+              By product
+            </button>
+          </div>
+          <Button variant="secondary" size="sm" disabled={loading} onClick={onRefresh}>Refresh</Button>
+        </div>
       </div>
 
       {error && <p role="alert" className="text-sm text-red-700 bg-red-50 rounded-lg px-4 py-2">{error}</p>}
@@ -622,61 +673,180 @@ function ReorderTab({
           <p className="text-base font-semibold text-slate-700">All stocked up</p>
           <p className="text-sm text-slate-400 mt-1">No products are currently below their reorder point.</p>
         </div>
-      ) : (
+      ) : viewMode === "vendor" ? (
+        // ── By Vendor view ──────────────────────────────────────────────────
         <div className="space-y-4">
-          {Array.from(vendorGroups.values()).map((group) => (
-            <div key={group.vendorId ?? "__none__"} className="rounded-xl border border-slate-200 overflow-hidden">
-              <div className="flex items-center justify-between bg-slate-50 px-4 py-3 border-b border-slate-200">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">{group.vendorName}</p>
-                  <p className="text-xs text-slate-500">{group.items.length} item{group.items.length !== 1 ? "s" : ""} to reorder</p>
+          {Array.from(vendorGroups.values()).map((group) => {
+            const vhKey = group.vendorId ?? "__none__";
+            const history = vendorHistory[group.vendorId ?? ""] ?? [];
+            const lastPO = history[0];
+            const histExpanded = expandedVendor === vhKey;
+
+            return (
+              <div key={vhKey} className="rounded-xl border border-slate-200 overflow-hidden">
+                {/* Vendor header */}
+                <div className="flex items-center justify-between bg-slate-50 px-4 py-3 border-b border-slate-200">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{group.vendorName}</p>
+                      <p className="text-xs text-slate-500">
+                        {group.items.length} item{group.items.length !== 1 ? "s" : ""} to reorder
+                        {lastPO && (
+                          <> · last ordered <span className="font-medium text-slate-700">{fmtDateShort(lastPO.created_at)}</span> · {history.length} previous PO{history.length !== 1 ? "s" : ""}</>
+                        )}
+                      </p>
+                    </div>
+                    {history.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedVendor(histExpanded ? null : vhKey)}
+                        className="shrink-0 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        {histExpanded ? "Hide history" : "View history"}
+                      </button>
+                    )}
+                  </div>
+                  {canManage && (
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      disabled={busy || !group.vendorId}
+                      onClick={() => onCreatePO(group.vendorId, group.vendorName)}
+                    >
+                      Create PO
+                    </Button>
+                  )}
                 </div>
-                {canManage && (
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    disabled={busy || !group.vendorId}
-                    onClick={() => onCreatePO(group.vendorId, group.vendorName)}
-                  >
-                    Create PO
-                  </Button>
+
+                {/* Vendor purchase history (collapsible) */}
+                {histExpanded && history.length > 0 && (
+                  <div className="bg-blue-50 border-b border-blue-100 px-4 py-3">
+                    <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">Purchase history from this vendor</p>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-left text-slate-500 uppercase tracking-wide">
+                          <th className="pb-1 pr-6">PO #</th>
+                          <th className="pb-1 pr-6">Date</th>
+                          <th className="pb-1 pr-6 text-right">Total</th>
+                          <th className="pb-1 pr-6 text-right">Items</th>
+                          <th className="pb-1">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-blue-100">
+                        {history.map((po) => (
+                          <tr key={po.po_id}>
+                            <td className="py-1 pr-6 font-mono text-slate-700">#{po.po_number}</td>
+                            <td className="py-1 pr-6 text-slate-600">{fmtDateShort(po.created_at)}</td>
+                            <td className="py-1 pr-6 text-right font-semibold text-slate-800 tabular-nums">{formatMoney(po.total_cost_cents)}</td>
+                            <td className="py-1 pr-6 text-right text-slate-500">{po.item_count}</td>
+                            <td className="py-1">
+                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700 font-medium">{po.status}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
+
+                {/* Item rows */}
+                <table className="min-w-full divide-y divide-slate-100 text-sm">
+                  <thead className="bg-white">
+                    <tr className="text-xs text-left text-slate-500 uppercase tracking-wide">
+                      <th className="px-4 py-2.5">Product</th>
+                      <th className="px-4 py-2.5 text-right">On hand</th>
+                      <th className="px-4 py-2.5 text-right">Reorder pt</th>
+                      <th className="px-4 py-2.5 text-right">Gap</th>
+                      <th className="px-4 py-2.5 text-right">Suggest qty</th>
+                      <th className="px-4 py-2.5 text-right">Last cost</th>
+                      <th className="px-4 py-2.5 text-right">Last ordered</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 bg-white">
+                    {group.items.map((s) => {
+                      const gap = s.reorder_pt - s.stock_qty;
+                      const critical = s.stock_qty === 0;
+                      return (
+                        <tr key={s.product_id} className={critical ? "bg-red-50/40" : "hover:bg-slate-50"}>
+                          <td className="px-4 py-2.5">
+                            <p className="font-medium text-slate-900">{s.product_name}</p>
+                            <p className="text-xs text-slate-400 font-mono">{s.sku}</p>
+                          </td>
+                          <td className={`px-4 py-2.5 text-right font-bold tabular-nums ${critical ? "text-red-600" : "text-slate-900"}`}>
+                            {critical && <span className="mr-1 text-red-500">●</span>}{s.stock_qty}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-slate-500 tabular-nums">{s.reorder_pt}</td>
+                          <td className={`px-4 py-2.5 text-right tabular-nums font-semibold ${gap > 0 ? "text-amber-600" : "text-slate-400"}`}>
+                            {gap > 0 ? `−${gap}` : "—"}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-blue-700 tabular-nums">{s.suggested_qty}</td>
+                          <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">
+                            {s.last_unit_cost_cents != null ? formatMoney(s.last_unit_cost_cents) : "—"}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-xs text-slate-500">
+                            {s.last_ordered_at != null ? (
+                              <span title={`Qty ${s.last_ordered_qty ?? "?"}`}>{fmtDateShort(s.last_ordered_at)}</span>
+                            ) : "Never"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-              <table className="min-w-full divide-y divide-slate-100 text-sm">
-                <thead className="bg-white">
-                  <tr className="text-xs text-left text-slate-500 uppercase tracking-wide">
-                    <th className="px-4 py-2.5">Product</th>
-                    <th className="px-4 py-2.5 text-right">On hand</th>
-                    <th className="px-4 py-2.5 text-right">Reorder pt</th>
-                    <th className="px-4 py-2.5 text-right">Suggest qty</th>
-                    <th className="px-4 py-2.5 text-right">Gap</th>
+            );
+          })}
+        </div>
+      ) : (
+        // ── By Product view (flat A-Z) ───────────────────────────────────────
+        <div className="rounded-xl border border-slate-200 overflow-hidden">
+          <table className="min-w-full divide-y divide-slate-100 text-sm">
+            <thead className="bg-slate-50">
+              <tr className="text-xs text-left text-slate-500 uppercase tracking-wide">
+                <th className="px-4 py-2.5">Product</th>
+                <th className="px-4 py-2.5">Vendor</th>
+                <th className="px-4 py-2.5 text-right">On hand</th>
+                <th className="px-4 py-2.5 text-right">Reorder pt</th>
+                <th className="px-4 py-2.5 text-right">Gap</th>
+                <th className="px-4 py-2.5 text-right">Suggest qty</th>
+                <th className="px-4 py-2.5 text-right">Last cost</th>
+                <th className="px-4 py-2.5 text-right">Last ordered</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {sortedByProduct.map((s) => {
+                const gap = s.reorder_pt - s.stock_qty;
+                const critical = s.stock_qty === 0;
+                return (
+                  <tr key={s.product_id} className={critical ? "bg-red-50/40" : "hover:bg-slate-50"}>
+                    <td className="px-4 py-2.5">
+                      <p className="font-medium text-slate-900">{s.product_name}</p>
+                      <p className="text-xs text-slate-400 font-mono">{s.sku}</p>
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-600 text-xs">
+                      {s.preferred_vendor_name ?? <span className="text-slate-300 italic">Unassigned</span>}
+                    </td>
+                    <td className={`px-4 py-2.5 text-right font-bold tabular-nums ${critical ? "text-red-600" : "text-slate-900"}`}>
+                      {s.stock_qty}
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-slate-500 tabular-nums">{s.reorder_pt}</td>
+                    <td className={`px-4 py-2.5 text-right tabular-nums font-semibold ${gap > 0 ? "text-amber-600" : "text-slate-400"}`}>
+                      {gap > 0 ? `−${gap}` : "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-blue-700 tabular-nums">{s.suggested_qty}</td>
+                    <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">
+                      {s.last_unit_cost_cents != null ? formatMoney(s.last_unit_cost_cents) : "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-xs text-slate-500">
+                      {s.last_ordered_at != null ? (
+                        <span title={`Qty: ${s.last_ordered_qty ?? "?"}`}>{fmtDateShort(s.last_ordered_at)}</span>
+                      ) : "Never"}
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 bg-white">
-                  {group.items.map((s) => {
-                    const gap = s.reorder_pt - s.stock_qty;
-                    const critical = s.stock_qty === 0;
-                    return (
-                      <tr key={s.product_id} className={critical ? "bg-red-50/50" : "hover:bg-slate-50"}>
-                        <td className="px-4 py-2.5">
-                          <p className="font-medium text-slate-900">{s.product_name}</p>
-                          <p className="text-xs text-slate-400 font-mono">{s.sku}</p>
-                        </td>
-                        <td className={`px-4 py-2.5 text-right font-semibold tabular-nums ${critical ? "text-red-600" : "text-slate-900"}`}>
-                          {s.stock_qty}
-                        </td>
-                        <td className="px-4 py-2.5 text-right text-slate-500 tabular-nums">{s.reorder_pt}</td>
-                        <td className="px-4 py-2.5 text-right font-semibold text-blue-700 tabular-nums">{s.suggested_qty}</td>
-                        <td className={`px-4 py-2.5 text-right tabular-nums ${gap > 0 ? "text-amber-600" : "text-slate-400"}`}>
-                          {gap > 0 ? `−${gap}` : "—"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ))}
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

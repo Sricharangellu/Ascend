@@ -114,7 +114,7 @@ export default function OnboardingPage() {
                 type="button"
                 onClick={() => { setSelected(bt.key); setStep("confirm"); }}
                 className={`group flex flex-col rounded-xl border-2 p-3 text-left transition-all hover:border-brand-500 hover:bg-brand-50 hover:shadow-sm ${
-                  selected === bt.key ? "border-brand-600 bg-brand-50" : "border-[#E5E7EB]"
+                  selected === bt.key ? "border-brand-600 bg-brand-50" : "border-slate-200"
                 }`}
               >
                 <span className="mb-1.5 text-2xl">{bt.icon}</span>

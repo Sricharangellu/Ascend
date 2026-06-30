@@ -108,59 +108,54 @@ Key patterns:
 
 ## Enterprise Guardian — Last Audit
 
-> Run: 2026-06-30  |  Score: 94/100  |  Status: ✅ ENTERPRISE READY (all domains ≥80, zero CRITICAL)
-> Prior score: 82/100 → +12 points this session
+> Run: 2026-06-30 (post FE-51/FE-52)  |  Score: 93/100  |  Status: ✅ LAUNCH-READY (≥88, zero CRITICAL)
+> Prior score: 91/100 → +2 pts (settings split 1818→1003 ln, web/lib/date.ts created + 5 import sites fixed, formatMoney + border-slate-200 fixes)
 
 ### Domain Scores
 
 | Domain | Score | Grade | Top Finding |
 |---|---|---|---|
-| TypeScript strictness | 100/100 | ✅ | Zero `error TS`, zero `as any` in production code |
-| Security | 98/100 | ✅ | Zero secrets, no XSS, no console.log — clean |
-| API contract | 88/100 | ✅ | All stubs valid; Golf handlers + 4 pages complete |
-| Component quality | 80/100 | ✅ | 5 pages still >1200 ln (MEDIUM — split next sprint) |
-| Accessibility | 95/100 | ✅ | All error messages have `role="alert"` |
-| Performance | 85/100 | ✅ | Memoization good; no infinite re-renders |
-| Design system | 95/100 | ✅ | `#D9D9D9` eliminated; `formatMoney()` used throughout |
-| Nav/routing | 100/100 | ✅ | Golf wired; all stubs verified to valid targets |
+| TypeScript strictness | 100/100 | ✅ | Zero `error TS`, zero unguarded `any` in production code |
+| Security | 98/100 | ✅ | Zero secrets, no XSS, no dangerouslySetInnerHTML |
+| API contract | 92/100 | ✅ | All FE-51/FE-52 handlers correct; `await lat()` on all |
+| Component quality | 86/100 | ✅ | settings split done (1818→1003 ln); customers/[id] still at 1705 ln |
+| Accessibility | 95/100 | ✅ | `role="alert"` on all errors; icon buttons labeled |
+| Performance | 87/100 | ✅ | settings/page.tsx split; 5 pages still >800 ln |
+| Design system | 86/100 | ✅ | `web/lib/date.ts` created; 5 import sites fixed; formatMoney + border-slate-200 done |
+| Nav/routing | 97/100 | ✅ | All stubs verified valid; no bad redirects remaining |
 
 ### CRITICAL (blocks launch — fix first)
 
-_None. TypeScript clean, security clean, zero broken redirects._
+_None. TypeScript clean, security clean, all stubs point to real files._
 
-### HIGH (degrading enterprise readiness — fix next sprint)
+### HIGH (degrading enterprise readiness)
 
-_None remaining from original audit._
+_None._
 
 ### MEDIUM (tech debt — fix before v2)
 
-- [ ] **web/app/(protected)/inventory/page.tsx:1134, 1158** — `children?: any` in two local component interfaces. Replace with `React.ReactNode`.
+- [x] **Design system — local date helpers** — ✅ DONE: `web/lib/date.ts` created with `fmtDate`, `fmtDateShort`, `fmtDateTime`, `fmtTime`; 5 import sites fixed (payments, appointments, imports-exports, inventory/counts, inventory/serials). Remaining pages (insights, ecommerce, purchasing, quotes, workforce) still have local definitions — audit these next.
 
-- [ ] **web/app/(protected)/purchasing/[id]/page.tsx:954** — `lot: any` in `.map()`. Replace with typed `ExpiredLot` once defined.
+- [ ] **Design system — money in form inputs** — `(cents / 100).toFixed(2)` used to seed edit-form inputs in `catalog/page.tsx` (ln 94, 98, 99, 843–845), `customers/[id]/page.tsx` (ln 680, 699), `accounting/page.tsx` (ln 336). Correct for edit inputs (need dollar string), but comment-document why to avoid false audit flags.
 
-- [ ] **Design system — money formatting** — 12+ files use `(cents / 100).toFixed(2)` or define local `fmt()` helpers instead of `formatMoney()`. Worst offenders: `catalog/page.tsx` (3 instances + local reimplementation at lines 23 and 281), `catalog/promotions/page.tsx`, `customers/[id]/page.tsx`, `accounting/page.tsx`.
-
-- [ ] **Design system — hard-coded `#D9D9D9`** — Used for form input borders across 15+ files. Replace with `border-slate-200` (Tailwind token). Worst: `customers/page.tsx` (3×), `hospitality/page.tsx` (6×), all reporting pages.
-
-- [ ] **Page size — split required** — Enterprise standard: no page file >800 lines. Violators:
-  - `settings/page.tsx` — 1818 ln → split into `<GeneralSettingsTab>`, `<TaxSettingsTab>`, `<PaymentSettingsTab>`, etc.
-  - `customers/[id]/page.tsx` — 1705 ln → split tabs into separate components
-  - `catalog/page.tsx` — 1501 ln → `<ProductsTab>`, `<VariantsTab>` etc. already done; extract further
-  - `inventory/page.tsx` — 1231 ln
-  - `purchasing/page.tsx` — 1202 ln
+- [ ] **Page size — split required** — 5 pages still exceed 800-line threshold (settings: ✅ done 1818→1003):
+  - `customers/[id]/page.tsx` — 1705 ln → extract tab bodies into `customers/_components/`
+  - `catalog/page.tsx` — 1498 ln
+  - `inventory/page.tsx` — 1229 ln
+  - `purchasing/page.tsx` — ~1202 ln
+  - `purchasing/[id]/page.tsx` — ~982 ln
 
 ### LOW (polish — backlog)
 
-- [ ] `web/lib/offlineOutbox.ts` — `(req.result as T[]).sort((a: any, b: any)...)` — IDB typing limitation, acceptable but could use `IDBRequest<T[]>` typing.
-
-- [ ] `web/lib/offlineOutbox.ts:176` — `(registration as any).sync.register(...)` — ServiceWorker Background Sync API not typed in TS lib. Add `@types/serviceworker` or a local ambient declaration.
+- [ ] `web/lib/offlineOutbox.ts` — IDB typing `(req.result as T[]).sort((a: any, b: any)...)` — use `IDBRequest<T[]>`.
+- [ ] `web/lib/offlineOutbox.ts:176` — `(registration as any).sync.register(...)` — add ambient `BackgroundSyncManager` type.
+- [ ] 9 stub pages report "no loading state" — these are pure re-exports with zero async work; false positive for that check. No action needed.
 
 ### Next session must-do (Claude's priority queue)
 
-Score is now 94/100 — enterprise ready. Remaining MEDIUM items before v2:
+Score: 93/100 — launch-ready, zero CRITICAL. Fix remaining MEDIUM before v2:
 
-1. **Split oversized pages** — settings (1818 ln), customers/[id] (1705 ln), catalog (1501 ln), inventory (1231 ln), purchasing (1202 ln) — extract tab content into separate files under `_components/`
-2. **End-to-end smoke test** — terminal checkout golden path: scan → cart → tender → receipt
-3. **Real backend connection** — replace MSW mocks with live Postgres + Express; use `db-schema` skill for migrations
-4. **Golf booking: payment flow** — mark booking as paid, partial payment tracking
-5. **Golf: recurring tee slot generation** — bulk-create slots for a date range
+1. **Finish date.ts migration** — convert remaining local `fmtDate`/`fmtTime` in insights, ecommerce, purchasing, quotes, workforce to import from `@/lib/date`
+2. **Split oversized pages** — customers/[id] (1705), catalog (1498), inventory (1229), purchasing (~1202) — extract tab content into `_components/` subdirs
+3. **Golf vertical** — tee sheet, bookings, members, pro-shop pages (types + mock handlers complete; pages not yet wired)
+4. **Backend connection** — replace MSW with live Postgres + Express; `db-schema` skill for migrations
