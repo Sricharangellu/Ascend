@@ -1,50 +1,48 @@
 # FinderPOS — Work State
-> Last updated: 2026-06-30  |  Last commit: `1a689a3` — feat(restaurant): complete restaurant vertical end-to-end
+> Last updated: 2026-06-30  |  Last commit: `dff68d4` — fix(retail): three production blockers on the core checkout path
 
 ## Active task
-Restaurant vertical complete (floor plan + kitchen + bar tabs). 
-Next: pick next launch-critical module (service-orders, invoicing, or loyalty polish).
+Retail module production-ready — core checkout path blockers fixed. Next: workforce page API prefix fix + mock handlers.
 
 ## Files in flight
-None — all changes committed and pushed to master.
+None.
 
 ## Recent decisions
-- **INF-8 offline queue** — Two queues: localStorage (cart sync via syncOutbox) + IndexedDB (payment captures via offlineOutbox → SW Background Sync). SW was already complete; TenderScreen already enqueues to IDB. Gap closed: OfflineQueueBanner now tracks IDB count + listens for OUTBOX_ITEM_REPLAYED from SW.
-- **UX-2 module marketplace** — `/setup/modules` page: left sidebar nav, right card grid, toggles, sticky save bar. Mock handler added to mockHandlers.ts for /settings/business-profile.
-- **UX-3 dashboard widgets** — `VerticalWidgets.tsx`: 8 self-fetching widgets, WIDGET_MAP keyed by module name, fails silently, injected above operational widgets in dashboard.
-- **Documentation** — `docs/` tree created with 27 knowledge articles; `contracts/openapi.yaml` updated from 6 paths → 100+ paths covering all modules.
+- **Service Orders** — mock handlers added (GET list w/ q+status filter, POST 201, PATCH status transitions). Seeds 6 tickets across all 5 statuses. Nav item + MODULE_BY_ACTIVE already fixed in prior commit.
+- **Invoicing** — nav item added (Analyze group, `module: "invoicing"`), MODULE_BY_ACTIVE fixed (was → invoicing). Handlers: lookup-upc sub-path (before /:id), GET list, GET :id with lines embedded, POST create, PATCH :id/status. Seeds 6 invoices across all 6 statuses.
+- **Restaurant vertical** — 3 pages fully wired. Floor plan embeds current_session in table response. Bar Tabs uses active="bar-tabs". Kitchen is full-screen KDS (no EnterpriseShell).
+- **E2E suite** — scripts/seed-e2e.ts bypasses NODE_ENV=production guard. CI seeds before Playwright run.
 
 ## Context cliff notes
-- Offline: localStorage = cart sync orders; IDB = payment captures. Both shown in OfflineQueueBanner.
-- SW (`web/public/sw.js`) reads IDB store `checkout_queue` in DB `finder-pos-outbox`; sends OUTBOX_ITEM_REPLAYED to terminal tabs on success.
-- TenderScreen sends `X-Idempotency-Key: <outbox item id>` header on replay — backend idempotency middleware deduplicates.
-- `requestSync()` in offlineOutbox.ts registers Background Sync AND postMessages SW for immediate attempt.
-- `safeLoad` (web/api-client/client.ts) — silent error swallowing for dashboard widgets.
-- Module flags key: `module:<key>` (e.g. `module:tables`); `invalidateModuleFlagsCache()` in useModuleFlags.ts.
+- `web/mocks/mockHandlers.ts` — all mock handlers (NOT lightspeedHandlers.ts)
+- MSW IIFE spread pattern: `...(() => { ... return [...handlers]; })(),`
+- `V1 = "*/api/v1"` wildcard prefix; `await lat()` first line in every handler
+- Sub-paths (e.g. /lookup-upc) must be registered BEFORE `/:id` in handler order
+- `MODULE_BY_ACTIVE` maps active page key → nav key to highlight; wrong mapping = wrong sidebar item
+
+## Modules with NO handlers (next targets)
+| Module | Page | Endpoints needed |
+|---|---|---|
+| Workforce | `/workforce` | GET /workforce/employees, GET/POST/PATCH/DELETE /workforce/shifts, GET/PATCH /workforce/time-off — NOTE: page calls `/workforce/...` (missing `/api/v1/` prefix — bug to fix) |
+| Loyalty (gaps) | `/loyalty` | Handlers exist for /customers/:id/loyalty + /customers/loyalty-tiers but loyalty page itself may have additional calls |
+| Audit Log | `/audit-log` | 2 API calls — likely GET /audit-log with filters |
+| Reporting | `/reporting` | Unknown — needs audit |
 
 ## Next 3 actions
-1. Open /restaurant/floor-plan in browser — verify 8 tables load, click to open session, mark cleaning
-2. Open /restaurant/tabs — verify open/closed toggle, open new tab, close tab
-3. Check Kitchen Display at /restaurant/kitchen — dark full-screen, bump an order
+1. Fix workforce page — update API calls from `/workforce/...` → `/api/v1/workforce/...`
+2. Add workforce mock handlers (employees, shifts, time-off)
+3. Audit loyalty page calls and fill any gaps
 
-## Recent decisions
-- **Restaurant vertical** — 3 pages fully wired. Floor plan tables embed current_session in API response (no second round-trip). Status change uses apiPatch correctly. Kitchen intentionally uses no EnterpriseShell (full-screen tablet KDS). Bar Tabs and Kitchen now in nav gated by bar_tabs/kitchen module flags.
+## Completed modules (handlers + nav + typecheck)
+- dashboard, terminal/register, orders, customers+detail, catalog, inventory
+- sales, purchasing+detail, vendors, gift-cards, discounts, ecommerce, shipping
+- returns, payments, quotes, operations, finance, accounting, insights, reports
+- team, custom-roles, workflows, settings, integrations, tax-compliance, imports-exports
+- onboarding, service-orders, invoicing ← NEW
+- restaurant (floor-plan, kitchen, bar-tabs) ← NEW
+
+## INF items (all closed)
+INF-1 through INF-11 — see prior WORK_STATE for details.
 
 ## Blockers
 None
-
-## Completed INF items (all closed)
-- INF-1 — pg_advisory_xact_lock migration serialization
-- INF-2 — SIGTERM/SIGINT graceful shutdown
-- INF-3 — pino structured logger (src/shared/logger.ts)
-- INF-4 — Stripe webhook signature verification
-- INF-5 — Redis Pub/Sub EventBus fan-out
-- INF-6 — AR dunning self-perpetuating scheduled job
-- INF-7 — DB.poolStats() + /readyz 503 on pool exhaustion
-- INF-8 — Offline terminal: SW drain + IDB client + banner tracking (`f4e4bbb`)
-- INF-9 — E2E suite: seed-e2e.ts, login/checkout/inventory/verticals specs, CI seed step (`e5a15fe`)
-- INF-10 — makeAuthMiddleware(db) + requireScope() API key auth
-- INF-11 — Zero console.* in production source (14 files)
-
-## Remaining
-None — all INF items closed.
