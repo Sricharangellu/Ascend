@@ -3680,4 +3680,148 @@ mockHandlers.push(
       }),
     ];
   })(),
+
+  // ── Workflows — checkout automation definitions ───────────────────────────
+  ...(() => {
+    let wfSeq = 0;
+    let stepSeq = 0;
+    const BASE = Date.now();
+
+    interface WfStep {
+      id: string; workflowId: string; tenantId: string;
+      name: string; stepType: string; triggerCondition: string;
+      config: Record<string, unknown>; position: number;
+      enabled: boolean; createdAt: number; updatedAt: number;
+    }
+    interface Wf {
+      id: string; tenantId: string; name: string;
+      description: string | null; outletId: string | null;
+      enabled: boolean; steps: WfStep[];
+      createdAt: number; updatedAt: number;
+    }
+
+    const workflows: Wf[] = [
+      {
+        id: "wf_1", tenantId: "tnt_demo",
+        name: "Age Verification Gate",
+        description: "Prompt cashier to verify age for restricted products",
+        outletId: null, enabled: true,
+        createdAt: BASE - 30 * 86_400_000, updatedAt: BASE - 5 * 86_400_000,
+        steps: [
+          { id: "stp_1", workflowId: "wf_1", tenantId: "tnt_demo", name: "ID Scan", stepType: "gate", triggerCondition: "age_verification", config: { minAge: 21 }, position: 1, enabled: true, createdAt: BASE - 25 * 86_400_000, updatedAt: BASE - 5 * 86_400_000 },
+          { id: "stp_2", workflowId: "wf_1", tenantId: "tnt_demo", name: "Confirm Over 21", stepType: "prompt", triggerCondition: "age_verification", config: { message: "Is customer 21+?" }, position: 2, enabled: true, createdAt: BASE - 25 * 86_400_000, updatedAt: BASE - 5 * 86_400_000 },
+        ],
+      },
+      {
+        id: "wf_2", tenantId: "tnt_demo",
+        name: "Loyalty Capture",
+        description: "Ask for loyalty number before completing checkout",
+        outletId: null, enabled: true,
+        createdAt: BASE - 15 * 86_400_000, updatedAt: BASE - 2 * 86_400_000,
+        steps: [
+          { id: "stp_3", workflowId: "wf_2", tenantId: "tnt_demo", name: "Capture Loyalty ID", stepType: "capture", triggerCondition: "loyalty_capture", config: { field: "phone_or_card" }, position: 1, enabled: true, createdAt: BASE - 14 * 86_400_000, updatedAt: BASE - 2 * 86_400_000 },
+        ],
+      },
+      {
+        id: "wf_3", tenantId: "tnt_demo",
+        name: "Signature Required",
+        description: "Collect customer signature on large orders",
+        outletId: null, enabled: false,
+        createdAt: BASE - 7 * 86_400_000, updatedAt: BASE - 1 * 86_400_000,
+        steps: [],
+      },
+    ];
+
+    function makeStep(workflowId: string, body: Record<string, unknown>): WfStep {
+      return {
+        id: `stp_${++stepSeq + 10}`, workflowId, tenantId: "tnt_demo",
+        name: String(body["name"] ?? "New Step"),
+        stepType: String(body["stepType"] ?? "prompt"),
+        triggerCondition: String(body["triggerCondition"] ?? "custom_prompt"),
+        config: (body["config"] as Record<string, unknown>) ?? {},
+        position: ((workflows.find(w => w.id === workflowId)?.steps.length ?? 0) + 1),
+        enabled: true, createdAt: Date.now(), updatedAt: Date.now(),
+      };
+    }
+
+    return [
+      // GET /workflows
+      http.get(`${V1}/workflows`, async () => {
+        await lat();
+        return HttpResponse.json({ items: workflows });
+      }),
+
+      // POST /workflows
+      http.post(`${V1}/workflows`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as Record<string, unknown>;
+        const wf: Wf = {
+          id: `wf_${++wfSeq + 10}`, tenantId: "tnt_demo",
+          name: String(body["name"] ?? "New Workflow"),
+          description: (body["description"] as string) ?? null,
+          outletId: (body["outletId"] as string) ?? null,
+          enabled: true, steps: [],
+          createdAt: Date.now(), updatedAt: Date.now(),
+        };
+        workflows.push(wf);
+        return HttpResponse.json(wf, { status: 201 });
+      }),
+
+      // PATCH /workflows/:id
+      http.patch(`${V1}/workflows/:id`, async ({ request, params }) => {
+        await lat();
+        const idx = workflows.findIndex(w => w.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as Partial<Wf>;
+        workflows[idx] = { ...workflows[idx]!, ...body, updatedAt: Date.now() };
+        return HttpResponse.json(workflows[idx]);
+      }),
+
+      // DELETE /workflows/:id
+      http.delete(`${V1}/workflows/:id`, async ({ params }) => {
+        await lat();
+        const idx = workflows.findIndex(w => w.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        workflows.splice(idx, 1);
+        return new HttpResponse(null, { status: 204 });
+      }),
+
+      // POST /workflows/:id/steps
+      http.post(`${V1}/workflows/:id/steps`, async ({ request, params }) => {
+        await lat();
+        const wfIdx = workflows.findIndex(w => w.id === String(params["id"]));
+        if (wfIdx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as Record<string, unknown>;
+        const step = makeStep(String(params["id"]), body);
+        workflows[wfIdx]!.steps.push(step);
+        workflows[wfIdx]!.updatedAt = Date.now();
+        return HttpResponse.json(step, { status: 201 });
+      }),
+
+      // PATCH /workflows/:id/steps/:stepId
+      http.patch(`${V1}/workflows/:id/steps/:stepId`, async ({ request, params }) => {
+        await lat();
+        const wf = workflows.find(w => w.id === String(params["id"]));
+        if (!wf) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const sIdx = wf.steps.findIndex(s => s.id === String(params["stepId"]));
+        if (sIdx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as Partial<WfStep>;
+        wf.steps[sIdx] = { ...wf.steps[sIdx]!, ...body, updatedAt: Date.now() };
+        wf.updatedAt = Date.now();
+        return HttpResponse.json(wf.steps[sIdx]);
+      }),
+
+      // DELETE /workflows/:id/steps/:stepId
+      http.delete(`${V1}/workflows/:id/steps/:stepId`, async ({ params }) => {
+        await lat();
+        const wf = workflows.find(w => w.id === String(params["id"]));
+        if (!wf) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const sIdx = wf.steps.findIndex(s => s.id === String(params["stepId"]));
+        if (sIdx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        wf.steps.splice(sIdx, 1);
+        wf.updatedAt = Date.now();
+        return new HttpResponse(null, { status: 204 });
+      }),
+    ];
+  })(),
 );
