@@ -21,7 +21,18 @@ import type {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type PurchasingTab = "orders" | "suppliers" | "vendor-quotes";
+type PurchasingTab = "orders" | "suppliers" | "vendor-quotes" | "reorder";
+
+interface ReorderSuggestion {
+  product_id: string;
+  product_name: string;
+  sku: string;
+  stock_qty: number;
+  reorder_pt: number;
+  suggested_qty: number;
+  preferred_vendor_id: string | null;
+  preferred_vendor_name: string | null;
+}
 
 interface DraftLine {
   productId: string;
@@ -69,15 +80,16 @@ function emptyLine(): DraftLine {
 function TabBar({
   active,
   onChange,
-  showVendorQuotes,
+  showVendorQuotes = true,
 }: {
   active: PurchasingTab;
   onChange: (t: PurchasingTab) => void;
-  showVendorQuotes: boolean;
+  showVendorQuotes?: boolean;
 }) {
   const tabs: { key: PurchasingTab; label: string }[] = [
     { key: "orders", label: "Purchase Orders" },
     { key: "suppliers", label: "Suppliers" },
+    { key: "reorder", label: "Reorder Suggestions" },
     ...(showVendorQuotes ? [{ key: "vendor-quotes" as PurchasingTab, label: "Vendor Quotes" }] : []),
   ];
   return (
@@ -128,6 +140,13 @@ export default function PurchasingPage() {
   const [showNewQuoteModal, setShowNewQuoteModal] = useState(false);
   const [expandedQuoteId, setExpandedQuoteId] = useState<string | null>(null);
 
+  // Reorder suggestions state
+  const [reorderSuggestions, setReorderSuggestions] = useState<ReorderSuggestion[]>([]);
+  const [reorderLoading, setReorderLoading] = useState(false);
+  const [reorderBusy, setReorderBusy] = useState(false);
+  const [reorderError, setReorderError] = useState<string | null>(null);
+  const [createdPOs, setCreatedPOs] = useState<string[]>([]);
+
   const canManage = hasRole("manager");
 
   const load = useCallback(async () => {
@@ -167,7 +186,37 @@ export default function PurchasingPage() {
     if (activeTab === "vendor-quotes" && vendorQuotationsEnabled) {
       void loadVendorQuotes();
     }
+    if (activeTab === "reorder") {
+      void loadReorderSuggestions();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, vendorQuotationsEnabled, loadVendorQuotes]);
+
+  const loadReorderSuggestions = useCallback(async () => {
+    setReorderLoading(true); setReorderError(null);
+    try {
+      const res = await apiGet<{ items: ReorderSuggestion[] }>("/api/v1/inventory/reorder-suggestions");
+      setReorderSuggestions(res.items ?? []);
+    } catch (err) {
+      setReorderError(err instanceof ApiResponseError ? err.message : "Failed to load reorder suggestions.");
+    } finally { setReorderLoading(false); }
+  }, []);
+
+  const createPOsForVendor = async (vendorId: string | null, vendorName: string) => {
+    const lines = reorderSuggestions
+      .filter((s) => s.preferred_vendor_id === vendorId)
+      .map((s) => ({ productId: s.product_id, vendorId: vendorId ?? "", quantity: s.suggested_qty, unitCostCents: 0 }));
+    if (lines.length === 0) return;
+    setReorderBusy(true); setReorderError(null);
+    try {
+      await apiPost("/api/v1/inventory/reorder-suggestions/create-po", { lines });
+      setCreatedPOs((prev) => [...prev, vendorName]);
+      await load();
+      setActiveTab("orders");
+    } catch (err) {
+      setReorderError(err instanceof ApiResponseError ? err.message : "Failed to create purchase order.");
+    } finally { setReorderBusy(false); }
+  };
 
   const supplierName_ = (id: string) => suppliers.find((s) => s.id === id)?.name ?? id;
 
@@ -467,6 +516,20 @@ export default function PurchasingPage() {
             </div>
           )}
 
+          {/* ── Reorder Suggestions tab ── */}
+          {activeTab === "reorder" && (
+            <ReorderTab
+              suggestions={reorderSuggestions}
+              loading={reorderLoading}
+              busy={reorderBusy}
+              error={reorderError}
+              createdPOs={createdPOs}
+              canManage={canManage}
+              onRefresh={() => void loadReorderSuggestions()}
+              onCreatePO={(vendorId, vendorName) => void createPOsForVendor(vendorId, vendorName)}
+            />
+          )}
+
           {/* ── Vendor Quotes tab ── */}
           {activeTab === "vendor-quotes" && (
             <VendorQuotesTab
@@ -488,6 +551,135 @@ export default function PurchasingPage() {
         </Card>
       </div>
     </EnterpriseShell>
+  );
+}
+
+// ─── Reorder Tab ─────────────────────────────────────────────────────────────
+
+function ReorderTab({
+  suggestions,
+  loading,
+  busy,
+  error,
+  createdPOs,
+  canManage,
+  onRefresh,
+  onCreatePO,
+}: {
+  suggestions: ReorderSuggestion[];
+  loading: boolean;
+  busy: boolean;
+  error: string | null;
+  createdPOs: string[];
+  canManage: boolean;
+  onRefresh: () => void;
+  onCreatePO: (vendorId: string | null, vendorName: string) => void;
+}) {
+  // Group by vendor
+  const vendorGroups = suggestions.reduce<Map<string, { vendorId: string | null; vendorName: string; items: ReorderSuggestion[] }>>(
+    (acc, s) => {
+      const key = s.preferred_vendor_id ?? "__none__";
+      if (!acc.has(key)) {
+        acc.set(key, { vendorId: s.preferred_vendor_id, vendorName: s.preferred_vendor_name ?? "No vendor assigned", items: [] });
+      }
+      acc.get(key)!.items.push(s);
+      return acc;
+    },
+    new Map(),
+  );
+
+  if (loading) {
+    return (
+      <div className="p-6 space-y-3">
+        {[0, 1, 2].map((i) => <div key={i} className="h-16 rounded-xl bg-slate-100 animate-pulse" />)}
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">Products below reorder point</p>
+          <p className="text-xs text-slate-500 mt-0.5">Grouped by preferred vendor — one PO per vendor</p>
+        </div>
+        <Button variant="secondary" size="sm" disabled={loading} onClick={onRefresh}>Refresh</Button>
+      </div>
+
+      {error && <p role="alert" className="text-sm text-red-700 bg-red-50 rounded-lg px-4 py-2">{error}</p>}
+
+      {createdPOs.length > 0 && (
+        <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-2.5 text-sm text-green-800">
+          Purchase orders created for: {createdPOs.join(", ")} — see Purchase Orders tab.
+        </div>
+      )}
+
+      {suggestions.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <svg aria-hidden="true" className="w-10 h-10 text-slate-200 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0-8 4m8-4v10l-8 4m0-10L4 7m8 4v10" />
+          </svg>
+          <p className="text-base font-semibold text-slate-700">All stocked up</p>
+          <p className="text-sm text-slate-400 mt-1">No products are currently below their reorder point.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {Array.from(vendorGroups.values()).map((group) => (
+            <div key={group.vendorId ?? "__none__"} className="rounded-xl border border-slate-200 overflow-hidden">
+              <div className="flex items-center justify-between bg-slate-50 px-4 py-3 border-b border-slate-200">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">{group.vendorName}</p>
+                  <p className="text-xs text-slate-500">{group.items.length} item{group.items.length !== 1 ? "s" : ""} to reorder</p>
+                </div>
+                {canManage && (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    disabled={busy || !group.vendorId}
+                    onClick={() => onCreatePO(group.vendorId, group.vendorName)}
+                  >
+                    Create PO
+                  </Button>
+                )}
+              </div>
+              <table className="min-w-full divide-y divide-slate-100 text-sm">
+                <thead className="bg-white">
+                  <tr className="text-xs text-left text-slate-500 uppercase tracking-wide">
+                    <th className="px-4 py-2.5">Product</th>
+                    <th className="px-4 py-2.5 text-right">On hand</th>
+                    <th className="px-4 py-2.5 text-right">Reorder pt</th>
+                    <th className="px-4 py-2.5 text-right">Suggest qty</th>
+                    <th className="px-4 py-2.5 text-right">Gap</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 bg-white">
+                  {group.items.map((s) => {
+                    const gap = s.reorder_pt - s.stock_qty;
+                    const critical = s.stock_qty === 0;
+                    return (
+                      <tr key={s.product_id} className={critical ? "bg-red-50/50" : "hover:bg-slate-50"}>
+                        <td className="px-4 py-2.5">
+                          <p className="font-medium text-slate-900">{s.product_name}</p>
+                          <p className="text-xs text-slate-400 font-mono">{s.sku}</p>
+                        </td>
+                        <td className={`px-4 py-2.5 text-right font-semibold tabular-nums ${critical ? "text-red-600" : "text-slate-900"}`}>
+                          {s.stock_qty}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-slate-500 tabular-nums">{s.reorder_pt}</td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-blue-700 tabular-nums">{s.suggested_qty}</td>
+                        <td className={`px-4 py-2.5 text-right tabular-nums ${gap > 0 ? "text-amber-600" : "text-slate-400"}`}>
+                          {gap > 0 ? `−${gap}` : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
