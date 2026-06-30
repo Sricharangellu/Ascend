@@ -23,6 +23,34 @@ const ALWAYS_ON = new Set([
   "reports", "settings", "team", "notifications",
 ]);
 
+// Accept both legacy bare module keys from the mock API and the
+// namespaced `module:*` shape used by the shell.
+const MODULE_FLAG_KEYS = new Set([
+  "pos_terminal",
+  "discounts",
+  "loyalty",
+  "gift_cards",
+  "ecommerce",
+  "quotes",
+  "sales_orders",
+  "purchasing",
+  "accounting",
+  "billing",
+  "tables",
+  "appointments",
+  "healthcare",
+  "automotive",
+  "room_billing",
+  "production_orders",
+  "rental_contracts",
+  "tickets",
+  "student_accounts",
+  "workforce",
+  "wms",
+  "shipping_mgmt",
+  "webhooks",
+]);
+
 interface FlagCache {
   flags: Record<string, boolean>;
   at: number;
@@ -80,8 +108,11 @@ export function useModuleFlags(): {
 
   if (flags) {
     for (const [key, value] of Object.entries(flags)) {
-      if (key.startsWith("module:") && value) {
+      if (!value) continue;
+      if (key.startsWith("module:")) {
         enabled.add(key.slice(7)); // strip "module:" prefix
+      } else if (MODULE_FLAG_KEYS.has(key)) {
+        enabled.add(key);
       }
     }
   } else {

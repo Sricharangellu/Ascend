@@ -61,7 +61,12 @@ type NavKey =
   | "workforce"
   | "appointments"
   | "healthcare"
-  | "automotive";
+  | "automotive"
+  | "hospitality"
+  | "manufacturing"
+  | "rental"
+  | "entertainment"
+  | "education";
 
 /** Full nav item definition — module key gates visibility. */
 interface NavItemDef {
@@ -114,6 +119,13 @@ const ALL_NAV_ITEMS: NavItemDef[] = [
   // ── Automotive ────────────────────────────────────────────────────────────
   { key: "automotive",    label: "Vehicles",      href: "/automotive",            icon: "automotive",    group: "Operate",  module: "automotive" },
 
+  // ── Vertical expansion ────────────────────────────────────────────────────
+  { key: "hospitality",   label: "Hospitality",   href: "/hospitality",          icon: "orders",       group: "Operate",  module: "room_billing" },
+  { key: "manufacturing", label: "Manufacturing", href: "/manufacturing",        icon: "operations",   group: "Manage",   module: "production_orders" },
+  { key: "rental",        label: "Rental",        href: "/rental",               icon: "shipping",     group: "Manage",   module: "rental_contracts" },
+  { key: "entertainment", label: "Entertainment", href: "/entertainment",        icon: "sales",        group: "Operate",  module: "tickets" },
+  { key: "education",     label: "Education",     href: "/education",            icon: "customers",    group: "Manage",   module: "student_accounts" },
+
   // ── Workforce & Operations ─────────────────────────────────────────────────
   { key: "workforce",   label: "Workforce",    href: "/workforce",    icon: "workforce",  group: "Manage",   module: "workforce" },
   { key: "operations",  label: "Operations",   href: "/operations",   icon: "operations", group: "Manage",   module: "wms" },
@@ -140,6 +152,8 @@ const MODULE_BY_ACTIVE: Record<NavKey, NavKey> = {
   ecommerce: "ecommerce", settings: "settings", team: "settings", workflows: "settings",
   integrations: "settings", "imports-exports": "settings", notifications: "settings", "audit-log": "settings",
   appointments: "appointments", healthcare: "healthcare", automotive: "automotive",
+  hospitality: "hospitality", manufacturing: "manufacturing", rental: "rental",
+  entertainment: "entertainment", education: "education",
 };
 
 interface EnterpriseShellProps {

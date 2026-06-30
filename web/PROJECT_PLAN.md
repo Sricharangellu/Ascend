@@ -1,5 +1,5 @@
 # Project Plan — FinderPOS
-Last updated: 2026-06-20
+Last updated: 2026-06-24
 
 ## What we built so far
 
@@ -29,6 +29,7 @@ FinderPOS is a full-stack enterprise POS platform across three verticals: **Reta
 - **Settings** — 12 sections: store profile, shipping, payment terms/modes, tax rates, feature flags, security (MFA setup), COA, deposits, loyalty tiers, API keys, currencies
 - **Tax & Compliance** — tax rate management, MSA reporting table (tobacco/vapor UPC data), state tax reference, customer exemptions placeholder
 - **Operations** — fulfillment locations, pick lists, outlets/registers, stock locations tab with View Stock modal
+- **Vertical expansion** — hospitality, manufacturing, rental, entertainment, and education module pages with edition-aware nav
 - **Notifications Center (/notifications)** — notification feed with category filters, mark-read, dismiss, SSE real-time indicator
 - **Audit Log (/audit-log)** — security and change audit log with actor/action/entity filters, cursor pagination, CSV export
 - **Team** — member list, role management, custom-role assignment

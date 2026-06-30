@@ -683,14 +683,16 @@ Each vertical below adds backend endpoints + frontend pages.
 
 ### Hospitality (hotel, resort, guest house)
 
-- [ ] BE-H1: Room management — `rooms(id, tenant_id, outlet_id, room_number,
+- [x] BE-H1: Room management — `rooms(id, tenant_id, outlet_id, room_number,
       type, floor, rate_cents, status)` + `room_charges(id, room_id, order_id,
       posted_at)`. POST to post charges from POS to a room account.
-      GET /hospitality/rooms, PATCH /:id/status, POST /:id/charge.
+      GET /hospitality/rooms, PATCH /:id/status, POST /:id/charge. (done in
+      current worktree)
 
-- [ ] FE-H1: Rooms page (/hospitality/rooms) — room grid with status badges
+- [x] FE-H1: Rooms page (/hospitality/rooms) — room grid with status badges
       (available/occupied/checkout/cleaning). Click room → post charge or
-      view folio. Module-gated by `module:room_billing`.
+      view folio. Module-gated by `module:room_billing`. (done in current
+      worktree)
 
 ### Services (salon, spa, repair shop, laundry)
 
@@ -714,13 +716,15 @@ Each vertical below adds backend endpoints + frontend pages.
 
 ### Manufacturing (factory outlet, distributor)
 
-- [ ] BE-M1: Production orders — `production_orders(id, tenant_id, product_id,
+- [x] BE-M1: Production orders — `production_orders(id, tenant_id, product_id,
       quantity, status, started_at, completed_at)` + BOM line items
       `(production_order_id, raw_material_id, qty_required, qty_consumed)`.
+      (done in current worktree)
 
-- [ ] FE-M1: Production orders page (/manufacturing/orders) — create BOM-based
+- [x] FE-M1: Production orders page (/manufacturing/orders) — create BOM-based
       orders, track raw material consumption, mark complete (increments
       finished goods inventory). Module-gated by `module:production_orders`.
+      (done in current worktree)
 
 ### Automotive (workshop, parts store)
 
@@ -735,31 +739,36 @@ Each vertical below adds backend endpoints + frontend pages.
 
 ### Rental (equipment, vehicle, event)
 
-- [ ] BE-R1: Rental contracts — `rental_assets(id, tenant_id, name, sku,
+- [x] BE-R1: Rental contracts — `rental_assets(id, tenant_id, name, sku,
       daily_rate_cents, status)` + `rental_contracts(id, tenant_id,
       customer_id, asset_id, starts_at, ends_at, deposit_cents, status)`.
+      (done in current worktree)
 
-- [ ] FE-R1: Rental assets + contracts (/rental/assets, /rental/contracts) —
+- [x] FE-R1: Rental assets + contracts (/rental/assets, /rental/contracts) —
       asset availability calendar, contract creation, deposit tracking.
-      Module-gated by `module:rental_contracts`.
+      Module-gated by `module:rental_contracts`. (done in current worktree)
 
 ### Entertainment (cinema, park, museum)
 
-- [ ] BE-E1: Tickets + events — `events(id, tenant_id, name, starts_at, ends_at,
+- [x] BE-E1: Tickets + events — `events(id, tenant_id, name, starts_at, ends_at,
       capacity, price_cents, venue)` + `event_tickets(id, event_id, customer_id,
-      qr_code, redeemed_at)`. Ticket sales via POS or online.
+      qr_code, redeemed_at)`. Ticket sales via POS or online. (done in current
+      worktree)
 
-- [ ] FE-E1: Tickets page (/entertainment/tickets) — event list, ticket sales,
+- [x] FE-E1: Tickets page (/entertainment/tickets) — event list, ticket sales,
       QR code generation, capacity tracking. Module-gated by `module:tickets`.
+      (done in current worktree)
 
 ### Education (institute, coaching center)
 
-- [ ] BE-ED1: Students + fees — `students(id, tenant_id, name, email, phone,
+- [x] BE-ED1: Students + fees — `students(id, tenant_id, name, email, phone,
       course_id, enrolled_at, status)` + `fee_records(id, student_id,
       amount_cents, due_date, paid_at, method)`. Fee collection via POS.
+      (done in current worktree)
 
-- [ ] FE-ED1: Students page (/education/students) — student list, fee status,
+- [x] FE-ED1: Students page (/education/students) — student list, fee status,
       payment collection, receipt printing. Module-gated by `module:student_accounts`.
+      (done in current worktree)
 
 ### Cross-vertical UX improvements
 

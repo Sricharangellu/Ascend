@@ -45,9 +45,9 @@ interface VehicleDetail extends Vehicle {
   workOrders: WorkOrder[];
 }
 
-const STATUS_BADGE: Record<string, "gray" | "blue" | "amber" | "green" | "red"> = {
+const STATUS_BADGE: Record<string, "gray" | "blue" | "yellow" | "green" | "red"> = {
   open:        "blue",
-  in_progress: "amber",
+  in_progress: "yellow",
   completed:   "green",
   cancelled:   "red",
 };

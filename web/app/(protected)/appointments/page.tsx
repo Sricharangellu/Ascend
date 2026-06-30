@@ -131,7 +131,7 @@ export default function AppointmentsPage() {
         </div>
 
         {/* Day grid */}
-        <Card padding="none">
+        <Card noPadding>
           {loading ? (
             <div className="space-y-2 p-4">
               {[1, 2, 3].map(i => <div key={i} className="h-14 animate-pulse rounded-lg bg-gray-100" />)}

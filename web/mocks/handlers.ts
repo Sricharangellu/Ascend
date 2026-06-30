@@ -28,6 +28,7 @@ import type {
   SalesSummary,
 } from "@/api-client/types";
 import { mockHandlers } from "./mockHandlers";
+import { verticalHandlers } from "./verticalModules";
 
 // Match both relative (browser) and absolute (Node/test) URL forms.
 const IDENTITY = "*/api/identity";
@@ -1046,6 +1047,7 @@ export const handlers = [
   // Cycle-3 modules (customers, gift cards, webhooks, inventory overview, team).
   // Maintained in a separate file to avoid cross-agent edit collisions.
   ...mockHandlers,
+  ...verticalHandlers,
 
   // ── API Keys (Sprint 10B) ────────────────────────────────────────────────────
   ...(() => {

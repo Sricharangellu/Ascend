@@ -40,6 +40,11 @@ import { restaurantModule } from "./restaurant/index.js";
 import { appointmentsModule } from "./appointments/index.js";
 import { healthcareModule } from "./healthcare/index.js";
 import { automotiveModule } from "./automotive/index.js";
+import { hospitalityModule } from "./hospitality/index.js";
+import { manufacturingModule } from "./manufacturing/index.js";
+import { rentalModule } from "./rental/index.js";
+import { entertainmentModule } from "./entertainment/index.js";
+import { educationModule } from "./education/index.js";
 
 /**
  * Registration order = migration order. Keep dependencies earlier:
@@ -86,5 +91,10 @@ export const modules: PosModule[] = [
   appointmentsModule,
   healthcareModule,
   automotiveModule,
+  hospitalityModule,
+  manufacturingModule,
+  rentalModule,
+  entertainmentModule,
+  educationModule,
   rlsModule,  // must be last — runs after all tenant tables exist
 ];

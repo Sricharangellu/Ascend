@@ -59,7 +59,7 @@ let shippingMethods: any[] = [];
 let paymentTerms: any[] = [];
 let paymentModes: any[] = [];
 let taxRates: any[] = [];
-let featureFlags: Record<string, boolean> = { quotations: true, achBatchPayout: false, imeiTracking: false, msaReporting: false, compositeProducts: false, customerPortal: false, ecommerce: true, commissionTracking: false, pickerFulfillment: true, batchDeposits: true };
+let featureFlags: Record<string, boolean> = { quotations: true, achBatchPayout: false, imeiTracking: false, msaReporting: false, compositeProducts: false, customerPortal: false, ecommerce: true, commissionTracking: false, pickerFulfillment: true, batchDeposits: true, room_billing: true, production_orders: true, rental_contracts: true, tickets: true, student_accounts: true };
 let businessProfile: Record<string, unknown> = {};
 // Shipping dev stores
 let shipments: any[] = [];
@@ -2944,4 +2944,3 @@ mockHandlers.push(
     ];
   })(),
 );
-
