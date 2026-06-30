@@ -6,7 +6,7 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
-import { apiGet, apiPatch, ApiResponseError } from "@/api-client/client";
+import { apiGet, apiPatch, apiPost, apiDelete, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type { CatalogProduct } from "@/api-client/types";
 
@@ -65,6 +65,17 @@ export default function ProductDetailPage() {
   const [savingCompliance, setSavingCompliance] = useState(false);
   const [complianceSaveError, setComplianceSaveError] = useState<string | null>(null);
 
+  // Variant management
+  const [variants, setVariants] = useState<CatalogProduct[]>([]);
+  const [variantsLoading, setVariantsLoading] = useState(false);
+  const [showAddVariant, setShowAddVariant] = useState(false);
+  const [allProducts, setAllProducts] = useState<Array<{ id: string; sku: string; name: string }>>([]);
+  const [addVariantId, setAddVariantId] = useState("");
+  const [addVariantAxis, setAddVariantAxis] = useState("Size");
+  const [addVariantValue, setAddVariantValue] = useState("");
+  const [addVariantBusy, setAddVariantBusy] = useState(false);
+  const [addVariantError, setAddVariantError] = useState<string | null>(null);
+
   const [complianceForm, setComplianceForm] = useState<{
     tobacco_type: TobaccoType;
     flavored: boolean;
@@ -96,6 +107,14 @@ export default function ProductDetailPage() {
     height_mm: "",
   });
 
+  const loadVariants = useCallback(async () => {
+    setVariantsLoading(true);
+    try {
+      const res = await apiGet<{ items: CatalogProduct[] }>(`/api/v1/catalog/${id}/variants`);
+      setVariants(res.items ?? []);
+    } catch { /* ignore */ } finally { setVariantsLoading(false); }
+  }, [id]);
+
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
@@ -105,6 +124,7 @@ export default function ProductDetailPage() {
       ]);
       setProduct(prod);
       setStock(stk);
+      if (!prod.parent_product_id) void loadVariants();
       setForm({
         name: prod.name,
         sku: prod.sku,
@@ -178,6 +198,40 @@ export default function ProductDetailPage() {
     } catch (e) {
       setComplianceSaveError(e instanceof ApiResponseError ? e.message : "Failed to save compliance flags.");
     } finally { setSavingCompliance(false); }
+  };
+
+  const openAddVariant = async () => {
+    setShowAddVariant(true);
+    setAddVariantError(null);
+    if (allProducts.length === 0) {
+      try {
+        const res = await apiGet<{ items: Array<{ id: string; sku: string; name: string }> }>("/api/v1/catalog?pageSize=200");
+        setAllProducts((res.items ?? []).filter((p) => p.id !== id));
+      } catch { /* ignore */ }
+    }
+  };
+
+  const assignVariant = async () => {
+    if (!addVariantId || !addVariantValue.trim()) {
+      setAddVariantError("Select a product and enter a value.");
+      return;
+    }
+    const label = addVariantAxis === "Custom" ? addVariantValue.trim() : `${addVariantAxis}: ${addVariantValue.trim()}`;
+    setAddVariantBusy(true); setAddVariantError(null);
+    try {
+      await apiPost(`/api/v1/catalog/${id}/variants/assign`, { productIds: [addVariantId], label });
+      setAddVariantId(""); setAddVariantValue(""); setShowAddVariant(false);
+      await loadVariants();
+    } catch (e) {
+      setAddVariantError(e instanceof ApiResponseError ? e.message : "Failed to assign variant.");
+    } finally { setAddVariantBusy(false); }
+  };
+
+  const unlinkVariant = async (childId: string) => {
+    try {
+      await apiDelete(`/api/v1/catalog/${id}/variants/${childId}`);
+      await loadVariants();
+    } catch { /* ignore */ }
   };
 
   const totalOnHand = stock?.locations.reduce((s, l) => s + l.quantity_on_hand, 0) ?? 0;
@@ -403,6 +457,145 @@ export default function ProductDetailPage() {
                 )}
               </div>
             </Card>
+            {/* Variants */}
+            {product.parent_product_id ? (
+              <Card>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700">Child variant</span>
+                  {product.variant_label && (
+                    <span className="text-sm text-gray-500">{product.variant_label}</span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500">
+                  This product is a variant of master product{" "}
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/catalog/${product.parent_product_id}`)}
+                    className="font-medium text-blue-600 hover:underline"
+                  >
+                    {product.parent_product_id}
+                  </button>
+                </p>
+              </Card>
+            ) : (
+              <Card>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-sm font-semibold text-gray-900">Variants</h2>
+                    <p className="text-xs text-gray-400 mt-0.5">Child products (different sizes, colors, etc.)</p>
+                  </div>
+                  <Button size="sm" variant="secondary" onClick={() => void openAddVariant()}>
+                    + Add variant
+                  </Button>
+                </div>
+
+                {showAddVariant && (
+                  <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-3">
+                    <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Add variant</p>
+                    {addVariantError && (
+                      <p role="alert" className="text-xs text-red-700 bg-red-50 rounded px-3 py-1.5">{addVariantError}</p>
+                    )}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Option axis</label>
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {["Size", "Color", "Flavor", "Weight", "Pack", "Custom"].map((ax) => (
+                          <button
+                            key={ax}
+                            type="button"
+                            onClick={() => setAddVariantAxis(ax)}
+                            className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                              addVariantAxis === ax
+                                ? "bg-blue-600 text-white"
+                                : "bg-white border border-gray-300 text-gray-600 hover:border-blue-400"
+                            }`}
+                          >
+                            {ax}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="w-24 shrink-0">
+                          {addVariantAxis !== "Custom" && (
+                            <input
+                              readOnly
+                              value={`${addVariantAxis}:`}
+                              className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-500"
+                            />
+                          )}
+                        </div>
+                        <input
+                          value={addVariantValue}
+                          onChange={(e) => setAddVariantValue(e.target.value)}
+                          placeholder={addVariantAxis === "Custom" ? "e.g. 500ml / Red / King Size" : `e.g. ${addVariantAxis === "Size" ? "Large" : addVariantAxis === "Color" ? "Red" : "value"}`}
+                          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Product to assign</label>
+                      <select
+                        value={addVariantId}
+                        onChange={(e) => setAddVariantId(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                      >
+                        <option value="">Select a product…</option>
+                        {allProducts
+                          .filter((p) => !variants.some((v) => v.id === p.id))
+                          .map((p) => (
+                            <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>
+                          ))}
+                      </select>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="secondary" onClick={() => setShowAddVariant(false)}>Cancel</Button>
+                      <Button size="sm" variant="primary" loading={addVariantBusy} onClick={() => void assignVariant()}>Assign</Button>
+                    </div>
+                  </div>
+                )}
+
+                {variantsLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2].map((i) => <div key={i} className="h-10 rounded-lg bg-gray-100 animate-pulse" />)}
+                  </div>
+                ) : variants.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-4">No variants yet. Add child products above.</p>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {variants.map((v) => (
+                      <div key={v.id} className="flex items-center justify-between py-2.5 gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="inline-block rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 shrink-0">
+                            {v.variant_label ?? "—"}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{v.name}</p>
+                            <p className="text-xs text-gray-400 font-mono">{v.sku}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-sm font-semibold text-gray-700">{formatMoney(v.price_cents)}</span>
+                          <button
+                            type="button"
+                            onClick={() => router.push(`/catalog/${v.id}`)}
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void unlinkVariant(v.id)}
+                            className="text-xs text-red-500 hover:text-red-700"
+                            aria-label={`Unlink ${v.name}`}
+                          >
+                            Unlink
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )}
           </div>
 
           {/* Right sidebar */}
