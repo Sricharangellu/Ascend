@@ -799,6 +799,7 @@ export const mockHandlers = [
       { id: "cat_1", name: "Beverages",  parent_id: null, created_at: Date.now() - 120 * 86_400_000 },
       { id: "cat_2", name: "Snacks",     parent_id: null, created_at: Date.now() - 120 * 86_400_000 },
       { id: "cat_3", name: "Tobacco",    parent_id: null, created_at: Date.now() - 120 * 86_400_000 },
+      { id: "cat_4", name: "Chips",      parent_id: "cat_2", created_at: Date.now() - 90 * 86_400_000 },
     ];
 
     // Products are stored and returned in TerminalProduct shape (camelCase) so
@@ -844,6 +845,15 @@ export const mockHandlers = [
       mkProduct("prod_6","BEV-003","Energy Drink 250ml",249,"Beverages","standard","012345678906","draft",false,100,5),
       mkProduct("prod_7","TOB-FLV","Mango Blast Vape 50mg",1499,"Tobacco","exempt","012345678907","active",true,600,45,
         { tobacco_type: "ecigarette", flavored: true, msa_reportable: true, restricted_states: ["CA","MA","NJ","RI","IL"] }),
+      Object.assign(
+        mkProduct("prod_8","SNK-CHD-025","Pringles Potato Crisps Chips, Cheddar Cheese, Grab N' Go Snack Pack - 2.5 Ounce",249,"Chips","standard","038000845260","active",false,88,30),
+        {
+          brand: "Pringles",
+          description: "A delicious and cheesy snack option. Each tube contains a stack of crispy and flavorful potato chips coated with a savory cheddar cheese seasoning. The 2.5 oz grab-and-go size is perfect for on-the-go snacking or lunchboxes. The resealable tube keeps chips fresh and crispy.",
+          image_url: null,
+          msrp_cents: 269,
+        },
+      ),
     ];
 
     function applyFilters(
