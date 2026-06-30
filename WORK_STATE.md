@@ -1,9 +1,9 @@
 # FinderPOS — Work State
-> Last updated: 2026-06-29  |  Last commit: `e5a15fe` — docs + INF-9 E2E seed + verticals spec
+> Last updated: 2026-06-30  |  Last commit: `1a689a3` — feat(restaurant): complete restaurant vertical end-to-end
 
 ## Active task
-**All INF items complete.** Sprint 1–10 + launch sprint done.
-Next: choose next sprint goals from remaining backlog (vertical pages, UX polish, real backend wiring).
+Restaurant vertical complete (floor plan + kitchen + bar tabs). 
+Next: pick next launch-critical module (service-orders, invoicing, or loyalty polish).
 
 ## Files in flight
 None — all changes committed and pushed to master.
@@ -23,9 +23,12 @@ None — all changes committed and pushed to master.
 - Module flags key: `module:<key>` (e.g. `module:tables`); `invalidateModuleFlagsCache()` in useModuleFlags.ts.
 
 ## Next 3 actions
-1. Pick next sprint theme: (a) real backend wiring, (b) vertical UX polish, or (c) Sentry/PostHog integrations
-2. Run `npm run seed:e2e` locally once DATABASE_URL is set to verify seed script works end-to-end
-3. Trigger CI on master branch to confirm E2E job passes with the new seed step
+1. Open /restaurant/floor-plan in browser — verify 8 tables load, click to open session, mark cleaning
+2. Open /restaurant/tabs — verify open/closed toggle, open new tab, close tab
+3. Check Kitchen Display at /restaurant/kitchen — dark full-screen, bump an order
+
+## Recent decisions
+- **Restaurant vertical** — 3 pages fully wired. Floor plan tables embed current_session in API response (no second round-trip). Status change uses apiPatch correctly. Kitchen intentionally uses no EnterpriseShell (full-screen tablet KDS). Bar Tabs and Kitchen now in nav gated by bar_tabs/kitchen module flags.
 
 ## Blockers
 None
