@@ -131,7 +131,10 @@ const ALL_NAV_ITEMS: NavItemDef[] = [
   { key: "automotive",    label: "Vehicles",      href: "/automotive",            icon: "automotive",    group: "Operate",  module: "automotive" },
 
   // ── Golf ─────────────────────────────────────────────────────────────────────
-  { key: "golf",          label: "Tee Sheet",     href: "/golf",          icon: "golf",          group: "Operate",  module: "golf" },
+  { key: "golf",          label: "Tee Sheet",     href: "/golf",          icon: "golf",          group: "Operate",  module: "tee_sheet" },
+  { key: "golf-bookings", label: "Bookings",      href: "/golf/bookings", icon: "golf",          group: "Operate",  module: "golf_bookings" },
+  { key: "golf-members",  label: "Members",       href: "/golf/members",  icon: "golf",          group: "Operate",  module: "golf_members" },
+  { key: "golf-pro-shop", label: "Pro Shop",      href: "/golf/pro-shop", icon: "golf",          group: "Operate",  module: "pro_shop" },
 
   // ── Vertical expansion ────────────────────────────────────────────────────
   { key: "hospitality",   label: "Hospitality",   href: "/hospitality",          icon: "orders",       group: "Operate",  module: "room_billing" },
