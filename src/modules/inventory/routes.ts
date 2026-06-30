@@ -83,8 +83,48 @@ function userId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).userId ?? "unknown";
 }
 
+const deductSchema = z.object({
+  location_id: z.string().min(1).optional(),
+  order_id: z.string().min(1).nullable().optional(),
+  lines: z.array(
+    z.object({
+      product_id: z.string().min(1),
+      qty: z.number().int().positive(),
+    }),
+  ).min(1),
+});
+
 export function registerRoutes(router: Router, service: InventoryService, purchasing: PurchasingService): void {
   const mgr = requireRole("manager");
+
+  // POST /deduct — decrement stock for multiple products after a completed sale.
+  // Registered before /:productId routes so "deduct" isn't treated as a product id.
+  router.post(
+    "/deduct",
+    handler(async (req, res) => {
+      const body = parseBody(deductSchema, req.body);
+      const t = tenantId(res);
+      const ref = body.order_id ?? undefined;
+      const results: Array<{ product_id: string; deducted: number }> = [];
+
+      if (body.location_id) {
+        // Location-aware deduction: adjusts inventory_stock by location.
+        for (const line of body.lines) {
+          await service.adjustStock(t, body.location_id, line.product_id, -line.qty, "sale", ref);
+          results.push({ product_id: line.product_id, deducted: line.qty });
+        }
+      } else {
+        // Global deduction: adjusts the main inventory table.
+        for (const line of body.lines) {
+          await service.adjust(line.product_id, -line.qty, "sale", t, ref);
+          results.push({ product_id: line.product_id, deducted: line.qty });
+        }
+      }
+
+      res.json({ ok: true, deducted: results });
+    }),
+  );
+
   router.get(
     "/",
     handler(async (req, res) => {

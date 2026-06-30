@@ -191,7 +191,8 @@ export class PaymentsService {
 
     switch (input.method) {
       case "cash": {
-        const tendered = input.tenderedCents ?? 0;
+        // Accept cashCents (frontend TenderScreen field) or legacy tenderedCents.
+        const tendered = input.cashCents ?? input.tenderedCents ?? 0;
         if (tendered < owed) {
           throw badRequest(`insufficient cash: tendered ${tendered} < owed ${owed}`);
         }
