@@ -3098,6 +3098,151 @@ mockHandlers.push(
     ];
   })(),
 
+  // ── Loyalty Program — tiers, members, rewards ────────────────────────────
+  ...(() => {
+    const BASE = Date.now();
+    const DAY = 86_400_000;
+
+    interface Tier { id: string; name: string; level: string; points_required: number; discount_pct: number; description: string | null; member_count: number; created_at: number; updated_at: number; }
+    interface Member { id: string; customer_id: string; customer_name: string; customer_email: string | null; tier_id: string; tier_name: string; tier_level: string; points_balance: number; points_lifetime: number; joined_at: number; last_activity_at: number | null; }
+    interface Reward { id: string; name: string; description: string | null; points_cost: number; discount_cents: number; status: "active" | "inactive" | "archived"; redemption_count: number; created_at: number; updated_at: number; }
+
+    let tiers: Tier[] = [
+      { id: "tier_1", name: "Bronze",   level: "bronze",   points_required: 0,    discount_pct: 0,  description: "Welcome tier for all members.",             member_count: 142, created_at: BASE - DAY * 90, updated_at: BASE - DAY * 90 },
+      { id: "tier_2", name: "Silver",   level: "silver",   points_required: 200,  discount_pct: 5,  description: "5% off every purchase.",                    member_count: 58,  created_at: BASE - DAY * 90, updated_at: BASE - DAY * 30 },
+      { id: "tier_3", name: "Gold",     level: "gold",     points_required: 500,  discount_pct: 10, description: "10% off + free shipping on web orders.",    member_count: 24,  created_at: BASE - DAY * 90, updated_at: BASE - DAY * 30 },
+      { id: "tier_4", name: "Platinum", level: "platinum", points_required: 1000, discount_pct: 15, description: "15% off + priority support + free returns.", member_count: 7,   created_at: BASE - DAY * 90, updated_at: BASE - DAY * 14 },
+    ];
+
+    let members: Member[] = [
+      { id: "mem_1", customer_id: "cust_1", customer_name: "Maria Garcia",   customer_email: "maria@gmail.com",   tier_id: "tier_3", tier_name: "Gold",     tier_level: "gold",     points_balance: 640,  points_lifetime: 840,  joined_at: BASE - DAY * 180, last_activity_at: BASE - DAY * 3  },
+      { id: "mem_2", customer_id: "cust_2", customer_name: "Tom Lee",        customer_email: "tom@bolt.io",       tier_id: "tier_2", tier_name: "Silver",   tier_level: "silver",   points_balance: 310,  points_lifetime: 390,  joined_at: BASE - DAY * 120, last_activity_at: BASE - DAY * 7  },
+      { id: "mem_3", customer_id: "cust_3", customer_name: "Priya Sharma",   customer_email: "priya@gmail.com",   tier_id: "tier_4", tier_name: "Platinum", tier_level: "platinum", points_balance: 1240, points_lifetime: 1680, joined_at: BASE - DAY * 240, last_activity_at: BASE - DAY * 1  },
+      { id: "mem_4", customer_id: "cust_4", customer_name: "Carlos Ruiz",    customer_email: null,                tier_id: "tier_1", tier_name: "Bronze",   tier_level: "bronze",   points_balance: 85,   points_lifetime: 85,   joined_at: BASE - DAY * 30,  last_activity_at: BASE - DAY * 14 },
+      { id: "mem_5", customer_id: "cust_5", customer_name: "Amy Chen",       customer_email: "amy@summit.co",     tier_id: "tier_2", tier_name: "Silver",   tier_level: "silver",   points_balance: 220,  points_lifetime: 420,  joined_at: BASE - DAY * 90,  last_activity_at: BASE - DAY * 2  },
+      { id: "mem_6", customer_id: "cust_6", customer_name: "James O'Brien",  customer_email: "james@obrien.ie",   tier_id: "tier_3", tier_name: "Gold",     tier_level: "gold",     points_balance: 530,  points_lifetime: 730,  joined_at: BASE - DAY * 150, last_activity_at: BASE - DAY * 10 },
+    ];
+
+    let rewards: Reward[] = [
+      { id: "rwd_1", name: "$5 Off",         description: "Redeem 100 points for $5 off your next purchase.",    points_cost: 100,  discount_cents: 500,  status: "active",   redemption_count: 47,  created_at: BASE - DAY * 60, updated_at: BASE - DAY * 5  },
+      { id: "rwd_2", name: "$15 Off",        description: "Redeem 250 points for $15 off.",                      points_cost: 250,  discount_cents: 1500, status: "active",   redemption_count: 23,  created_at: BASE - DAY * 60, updated_at: BASE - DAY * 5  },
+      { id: "rwd_3", name: "Free Coffee",    description: "Redeem 50 points for any house coffee.",              points_cost: 50,   discount_cents: 499,  status: "active",   redemption_count: 112, created_at: BASE - DAY * 45, updated_at: BASE - DAY * 1  },
+      { id: "rwd_4", name: "Birthday Bonus", description: "Double points during birthday month.",                points_cost: 0,    discount_cents: 0,    status: "inactive", redemption_count: 0,   created_at: BASE - DAY * 30, updated_at: BASE - DAY * 30 },
+    ];
+
+    return [
+      // Tiers
+      http.get(`${V1}/loyalty/tiers`, async () => {
+        await lat();
+        return HttpResponse.json({ items: tiers });
+      }),
+
+      http.post(`${V1}/loyalty/tiers`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as Partial<Tier>;
+        const now = Date.now();
+        const tier: Tier = {
+          id: `tier_${Date.now()}`, name: body.name ?? "New Tier", level: body.level ?? "bronze",
+          points_required: body.points_required ?? 0, discount_pct: body.discount_pct ?? 0,
+          description: body.description ?? null, member_count: 0, created_at: now, updated_at: now,
+        };
+        tiers.push(tier);
+        return HttpResponse.json(tier, { status: 201 });
+      }),
+
+      http.patch(`${V1}/loyalty/tiers/:id`, async ({ request, params }) => {
+        await lat();
+        const idx = tiers.findIndex(t => t.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as Partial<Tier>;
+        tiers[idx] = { ...tiers[idx]!, ...body, updated_at: Date.now() };
+        return HttpResponse.json(tiers[idx]);
+      }),
+
+      http.delete(`${V1}/loyalty/tiers/:id`, async ({ params }) => {
+        await lat();
+        const idx = tiers.findIndex(t => t.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        tiers.splice(idx, 1);
+        return new HttpResponse(null, { status: 204 });
+      }),
+
+      // Members
+      http.get(`${V1}/loyalty/members`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const q      = url.searchParams.get("q")?.toLowerCase();
+        const tier   = url.searchParams.get("tier");
+        const limit  = Number(url.searchParams.get("limit")  ?? 50);
+        const offset = Number(url.searchParams.get("offset") ?? 0);
+
+        let filtered = members;
+        if (q) filtered = filtered.filter(m =>
+          m.customer_name.toLowerCase().includes(q) || (m.customer_email ?? "").toLowerCase().includes(q),
+        );
+        if (tier) filtered = filtered.filter(m => m.tier_level === tier);
+
+        const total = filtered.length;
+        return HttpResponse.json({ items: filtered.slice(offset, offset + limit), total });
+      }),
+
+      http.post(`${V1}/loyalty/members/:id/adjust`, async ({ request, params }) => {
+        await lat();
+        const idx = members.findIndex(m => m.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as { delta: number; reason?: string };
+        members[idx] = {
+          ...members[idx]!,
+          points_balance: Math.max(0, members[idx]!.points_balance + body.delta),
+          points_lifetime: body.delta > 0 ? members[idx]!.points_lifetime + body.delta : members[idx]!.points_lifetime,
+          last_activity_at: Date.now(),
+        };
+        return HttpResponse.json(members[idx]);
+      }),
+
+      // Rewards
+      http.get(`${V1}/loyalty/rewards`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const status = url.searchParams.get("status");
+        let filtered = rewards;
+        if (status && status !== "all") filtered = filtered.filter(r => r.status === status);
+        return HttpResponse.json({ items: filtered });
+      }),
+
+      http.post(`${V1}/loyalty/rewards`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as Partial<Reward>;
+        const now = Date.now();
+        const reward: Reward = {
+          id: `rwd_${Date.now()}`, name: body.name ?? "New Reward",
+          description: body.description ?? null, points_cost: body.points_cost ?? 100,
+          discount_cents: body.discount_cents ?? 0, status: "active", redemption_count: 0,
+          created_at: now, updated_at: now,
+        };
+        rewards.push(reward);
+        return HttpResponse.json(reward, { status: 201 });
+      }),
+
+      http.patch(`${V1}/loyalty/rewards/:id`, async ({ request, params }) => {
+        await lat();
+        const idx = rewards.findIndex(r => r.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as Partial<Reward>;
+        rewards[idx] = { ...rewards[idx]!, ...body, updated_at: Date.now() };
+        return HttpResponse.json(rewards[idx]);
+      }),
+
+      http.delete(`${V1}/loyalty/rewards/:id`, async ({ params }) => {
+        await lat();
+        const idx = rewards.findIndex(r => r.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        rewards[idx] = { ...rewards[idx]!, status: "archived", updated_at: Date.now() };
+        return new HttpResponse(null, { status: 204 });
+      }),
+    ];
+  })(),
+
   // ── Workforce — employees, weekly shifts, time-off requests ──────────────
   ...(() => {
     const BASE = Date.now();
