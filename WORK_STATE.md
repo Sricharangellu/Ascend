@@ -2,7 +2,7 @@
 > Last updated: 2026-06-30  |  Last commit: `dff68d4` — fix(retail): three production blockers on the core checkout path
 
 ## Active task
-Retail module production-ready — core checkout path blockers fixed. Next: workforce page API prefix fix + mock handlers.
+None — all pages have mock handler coverage. Next: onboarding wizard wiring or backend module gaps audit.
 
 ## Files in flight
 None.
