@@ -30,6 +30,7 @@ import { ProductGrid } from "@/components/terminal/ProductGrid";
 import { CartPanel } from "@/components/terminal/CartPanel";
 import { TenderScreen } from "@/components/terminal/TenderScreen";
 import { ReceiptView } from "@/components/terminal/ReceiptView";
+import { DiscountModal } from "@/components/terminal/DiscountModal";
 import { OfflineQueueBanner } from "@/components/terminal/OfflineQueueBanner";
 import { RegisterSessionGuard } from "@/components/terminal/RegisterSessionGuard";
 import { ShortcutsOverlay } from "@/components/terminal/ShortcutsOverlay";
@@ -52,6 +53,8 @@ function TerminalInner() {
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
   const [ageVerified, setAgeVerified] = useState(false);
   const [returnMode, setReturnMode] = useState(false);
+  const [discountCents, setDiscountCents] = useState(0);
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [scannedName, setScannedName] = useState<string | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [activeOutletId, setActiveOutletId] = useState<string>("");
@@ -122,16 +125,27 @@ function TerminalInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cart.state.lines]);
 
+  // Re-sync order when cashier applies/removes a discount (order already exists).
+  useEffect(() => {
+    if (cart.state.lines.length === 0 || !orderIdRef.current) return;
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    cart.dispatch({ type: "SET_SYNCING", value: true });
+    syncTimerRef.current = setTimeout(() => { void syncOrder(); }, 200);
+    return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [discountCents]);
+
   const syncOrder = useCallback(async () => {
     const lines = cart.state.lines;
     if (lines.length === 0) return;
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       lines: lines.map((l) => ({
         productId: l.product.id,
         quantity: l.quantity,
         ...(l.product.ageRestricted ? { ageVerified } : {}),
       })),
+      ...(discountCents > 0 ? { discountCents } : {}),
     };
 
     // If offline, queue the sale instead of calling the API
@@ -167,7 +181,7 @@ function TerminalInner() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cart.state.lines, isOffline, ageVerified]);
+  }, [cart.state.lines, isOffline, ageVerified, discountCents]);
 
   const handleAddProduct = useCallback(
     (product: Product) => {
@@ -204,9 +218,13 @@ function TerminalInner() {
   }, [cart.state.order]);
 
   const handleAction = useCallback((action: string) => {
+    if (action === "Discount") {
+      setShowDiscountModal(true);
+      return;
+    }
     addToast({
       title: action,
-      description: "Workflow surface is ready; backend flow is queued for implementation.",
+      description: "Feature coming soon.",
       variant: "info",
     });
   }, [addToast]);
@@ -251,6 +269,7 @@ function TerminalInner() {
     setScreen("terminal");
     setAgeVerified(false);
     setReturnMode(false);
+    setDiscountCents(0);
     addToast({ title: "New sale started", variant: "info" });
   }, [cart, addToast]);
 
@@ -259,6 +278,7 @@ function TerminalInner() {
     orderIdRef.current = null;
     setAgeVerified(false);
     setReturnMode(false);
+    setDiscountCents(0);
   }, [cart]);
 
   const hasAgeRestricted = cart.state.lines.some((line) => line.product.ageRestricted);
@@ -312,6 +332,7 @@ function TerminalInner() {
             totalCents={totalCents}
             returnMode={returnMode}
             hasCart={cart.state.lines.length > 0}
+            discountActive={discountCents > 0}
             onHoldSale={() => handleAction("Hold sale")}
             onDiscount={() => handleAction("Discount")}
             onReturnMode={handleReturnMode}
@@ -338,6 +359,16 @@ function TerminalInner() {
           payment={completedPayment}
           onNewSale={handleNewSale}
           role={user?.role ?? "cashier"}
+        />
+      )}
+
+      {showDiscountModal && (
+        <DiscountModal
+          orderTotalCents={cart.state.order?.totalCents ?? cart.localSubtotalCents}
+          currentDiscountCents={discountCents}
+          onApply={(cents) => { setDiscountCents(cents); setShowDiscountModal(false); }}
+          onRemove={() => { setDiscountCents(0); setShowDiscountModal(false); }}
+          onClose={() => setShowDiscountModal(false)}
         />
       )}
 
@@ -433,6 +464,7 @@ function TerminalActionBar({
   totalCents,
   returnMode,
   hasCart,
+  discountActive,
   onHoldSale,
   onDiscount,
   onReturnMode,
@@ -444,6 +476,7 @@ function TerminalActionBar({
   totalCents: number;
   returnMode: boolean;
   hasCart: boolean;
+  discountActive: boolean;
   onHoldSale: () => void;
   onDiscount: () => void;
   onReturnMode: () => void;
@@ -454,7 +487,7 @@ function TerminalActionBar({
   return (
     <div className="flex flex-none gap-2 overflow-x-auto border-t border-slate-200 bg-white px-3 py-2 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] sm:px-4">
       <TerminalAction label="Hold" disabled={!hasCart} onClick={onHoldSale} icon={<HoldIcon />} />
-      <TerminalAction label="Discount" disabled={!hasCart} onClick={onDiscount} icon={<PercentIcon />} />
+      <TerminalAction label="Discount" disabled={!hasCart} active={discountActive} onClick={onDiscount} icon={<PercentIcon />} />
       <TerminalAction label={returnMode ? "Sale mode" : "Return"} active={returnMode} onClick={onReturnMode} icon={<ReturnIcon />} />
       <TerminalAction label="Drawer" onClick={onCashDrawer} icon={<DrawerIcon />} />
       <TerminalAction label="Receipt" disabled={!hasCart} onClick={onPrintReceipt} icon={<ReceiptIcon />} />
