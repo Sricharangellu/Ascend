@@ -3098,6 +3098,137 @@ mockHandlers.push(
     ];
   })(),
 
+  // ── Workforce — employees, weekly shifts, time-off requests ──────────────
+  ...(() => {
+    const BASE = Date.now();
+    const DAY = 86_400_000;
+    let shiftSeq = 0;
+
+    interface Emp { id: string; name: string; role: string; email: string; avatar_color: string; }
+    interface Sh  { id: string; employee_id: string; employee_name: string; role: string; date: string; start_time: string; end_time: string; notes: string | null; created_at: number; updated_at: number; }
+    interface TO  { id: string; employee_id: string; employee_name: string; date_from: string; date_to: string; reason: string | null; status: "pending" | "approved" | "denied"; created_at: number; }
+
+    const employees: Emp[] = [
+      { id: "emp_1", name: "Jake Torres",   role: "manager",    email: "jake@finder.pos",   avatar_color: "#6366f1" },
+      { id: "emp_2", name: "Sara Mitchell", role: "supervisor", email: "sara@finder.pos",   avatar_color: "#10b981" },
+      { id: "emp_3", name: "Leo Kim",       role: "cashier",    email: "leo@finder.pos",    avatar_color: "#3b82f6" },
+      { id: "emp_4", name: "Priya Nair",    role: "cashier",    email: "priya@finder.pos",  avatar_color: "#f59e0b" },
+      { id: "emp_5", name: "Marco Reyes",   role: "stock",      email: "marco@finder.pos",  avatar_color: "#ef4444" },
+      { id: "emp_6", name: "Amy Chen",      role: "delivery",   email: "amy@finder.pos",    avatar_color: "#8b5cf6" },
+    ];
+
+    function empById(id: string): Emp | undefined { return employees.find(e => e.id === id); }
+
+    // Seed shifts for current week (Mon–Sun)
+    const now = new Date();
+    const mon = new Date(now);
+    const day = now.getDay();
+    mon.setDate(now.getDate() + (day === 0 ? -6 : 1 - day));
+    mon.setHours(0, 0, 0, 0);
+    function dayStr(offset: number): string {
+      const d = new Date(mon);
+      d.setDate(mon.getDate() + offset);
+      return d.toISOString().slice(0, 10);
+    }
+
+    let shifts: Sh[] = [
+      { id: "sh_1", employee_id: "emp_1", employee_name: "Jake Torres",   role: "manager",    date: dayStr(0), start_time: "08:00", end_time: "16:00", notes: "Opening",   created_at: BASE, updated_at: BASE },
+      { id: "sh_2", employee_id: "emp_2", employee_name: "Sara Mitchell", role: "supervisor", date: dayStr(0), start_time: "09:00", end_time: "17:00", notes: null,        created_at: BASE, updated_at: BASE },
+      { id: "sh_3", employee_id: "emp_3", employee_name: "Leo Kim",       role: "cashier",    date: dayStr(0), start_time: "10:00", end_time: "18:00", notes: null,        created_at: BASE, updated_at: BASE },
+      { id: "sh_4", employee_id: "emp_4", employee_name: "Priya Nair",    role: "cashier",    date: dayStr(1), start_time: "09:00", end_time: "17:00", notes: null,        created_at: BASE, updated_at: BASE },
+      { id: "sh_5", employee_id: "emp_5", employee_name: "Marco Reyes",   role: "stock",      date: dayStr(1), start_time: "06:00", end_time: "14:00", notes: "Receiving", created_at: BASE, updated_at: BASE },
+      { id: "sh_6", employee_id: "emp_6", employee_name: "Amy Chen",      role: "delivery",   date: dayStr(2), start_time: "10:00", end_time: "18:00", notes: null,        created_at: BASE, updated_at: BASE },
+      { id: "sh_7", employee_id: "emp_1", employee_name: "Jake Torres",   role: "manager",    date: dayStr(2), start_time: "08:00", end_time: "16:00", notes: null,        created_at: BASE, updated_at: BASE },
+      { id: "sh_8", employee_id: "emp_3", employee_name: "Leo Kim",       role: "cashier",    date: dayStr(3), start_time: "12:00", end_time: "20:00", notes: "Closing",   created_at: BASE, updated_at: BASE },
+      { id: "sh_9", employee_id: "emp_2", employee_name: "Sara Mitchell", role: "supervisor", date: dayStr(4), start_time: "09:00", end_time: "17:00", notes: null,        created_at: BASE, updated_at: BASE },
+    ];
+
+    let timeOff: TO[] = [
+      { id: "to_1", employee_id: "emp_4", employee_name: "Priya Nair",   date_from: dayStr(3), date_to: dayStr(4), reason: "Doctor appointment", status: "pending",  created_at: BASE - DAY * 2 },
+      { id: "to_2", employee_id: "emp_6", employee_name: "Amy Chen",     date_from: dayStr(5), date_to: dayStr(6), reason: "Family visit",        status: "approved", created_at: BASE - DAY * 3 },
+      { id: "to_3", employee_id: "emp_5", employee_name: "Marco Reyes",  date_from: dayStr(6), date_to: dayStr(6), reason: null,                  status: "denied",   created_at: BASE - DAY * 1 },
+    ];
+
+    return [
+      http.get(`${V1}/workforce/employees`, async () => {
+        await lat();
+        return HttpResponse.json({ items: employees });
+      }),
+
+      http.get(`${V1}/workforce/shifts`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const dateFrom = url.searchParams.get("date_from");
+        const dateTo   = url.searchParams.get("date_to");
+
+        let filtered = shifts;
+        if (dateFrom) filtered = filtered.filter(s => s.date >= dateFrom);
+        if (dateTo)   filtered = filtered.filter(s => s.date <= dateTo);
+
+        return HttpResponse.json({ items: filtered, total: filtered.length });
+      }),
+
+      http.post(`${V1}/workforce/shifts`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as Partial<Sh>;
+        const emp = body.employee_id ? empById(body.employee_id) : undefined;
+        const now2 = Date.now();
+        const sh: Sh = {
+          id: `sh_${++shiftSeq}`,
+          employee_id: body.employee_id ?? "",
+          employee_name: emp?.name ?? "Unknown",
+          role: emp?.role ?? "cashier",
+          date: body.date ?? new Date().toISOString().slice(0, 10),
+          start_time: body.start_time ?? "09:00",
+          end_time: body.end_time ?? "17:00",
+          notes: body.notes ?? null,
+          created_at: now2,
+          updated_at: now2,
+        };
+        shifts.push(sh);
+        return HttpResponse.json(sh, { status: 201 });
+      }),
+
+      http.patch(`${V1}/workforce/shifts/:id`, async ({ request, params }) => {
+        await lat();
+        const idx = shifts.findIndex(s => s.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as Partial<Sh>;
+        const emp = body.employee_id ? empById(body.employee_id) : undefined;
+        shifts[idx] = {
+          ...shifts[idx]!,
+          ...body,
+          employee_name: emp?.name ?? shifts[idx]!.employee_name,
+          role: emp?.role ?? shifts[idx]!.role,
+          updated_at: Date.now(),
+        };
+        return HttpResponse.json(shifts[idx]);
+      }),
+
+      http.delete(`${V1}/workforce/shifts/:id`, async ({ params }) => {
+        await lat();
+        const idx = shifts.findIndex(s => s.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        shifts.splice(idx, 1);
+        return new HttpResponse(null, { status: 204 });
+      }),
+
+      http.get(`${V1}/workforce/time-off`, async () => {
+        await lat();
+        return HttpResponse.json({ items: timeOff });
+      }),
+
+      http.patch(`${V1}/workforce/time-off/:id`, async ({ request, params }) => {
+        await lat();
+        const idx = timeOff.findIndex(r => r.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as { status: TO["status"] };
+        timeOff[idx] = { ...timeOff[idx]!, status: body.status };
+        return HttpResponse.json(timeOff[idx]);
+      }),
+    ];
+  })(),
+
   // ── Customer Invoices — create, send, track B2B invoices ─────────────────
   ...(() => {
     const BASE = Date.now();

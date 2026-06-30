@@ -95,8 +95,8 @@ function ShiftModal({ employees, shift, prefillDate, prefillEmployee, onClose, o
     try {
       const payload = { employee_id: employeeId, date, start_time: startTime, end_time: endTime, notes: notes.trim() || null };
       const saved = shift
-        ? await apiPatch<Shift>(`/workforce/shifts/${shift.id}`, payload)
-        : await apiPost<Shift>("/workforce/shifts", payload);
+        ? await apiPatch<Shift>(`/api/v1/workforce/shifts/${shift.id}`, payload)
+        : await apiPost<Shift>("/api/v1/workforce/shifts", payload);
       onSaved(saved);
     } catch {
       setError("Failed to save shift. Please try again.");
@@ -108,7 +108,7 @@ function ShiftModal({ employees, shift, prefillDate, prefillEmployee, onClose, o
     if (!shift || !onDeleted) return;
     setSaving(true);
     try {
-      await apiDelete(`/workforce/shifts/${shift.id}`);
+      await apiDelete(`/api/v1/workforce/shifts/${shift.id}`);
       onDeleted(shift.id);
     } catch {
       setError("Failed to delete shift.");
@@ -392,9 +392,9 @@ export default function WorkforcePage() {
     setLoading(true);
     try {
       const [empData, shiftData, toData] = await Promise.all([
-        apiGet<{ items: Employee[] }>("/workforce/employees"),
-        apiGet<ShiftsResponse>(`/workforce/shifts?date_from=${dateFrom}&date_to=${dateTo}`),
-        apiGet<{ items: TimeOffRequest[] }>("/workforce/time-off"),
+        apiGet<{ items: Employee[] }>("/api/v1/workforce/employees"),
+        apiGet<ShiftsResponse>(`/api/v1/workforce/shifts?date_from=${dateFrom}&date_to=${dateTo}`),
+        apiGet<{ items: TimeOffRequest[] }>("/api/v1/workforce/time-off"),
       ]);
       setEmployees(empData.items);
       setShifts(shiftData.items);
@@ -435,7 +435,7 @@ export default function WorkforcePage() {
 
   async function handleTimeOffStatus(id: string, status: TimeOffStatus) {
     try {
-      const updated = await apiPatch<TimeOffRequest>(`/workforce/time-off/${id}`, { status });
+      const updated = await apiPatch<TimeOffRequest>(`/api/v1/workforce/time-off/${id}`, { status });
       setTimeOff(prev => prev.map(r => r.id === id ? updated : r));
     } catch { /* ignore */ }
   }
