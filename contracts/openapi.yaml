@@ -1,150 +1,55 @@
 openapi: 3.0.3
 info:
   title: Finder POS API
-  version: 1.0.0
+  version: 2.0.0
   description: |
-    Finder POS modular-monolith REST API. Authored by the BACKEND agent.
-    Frontend generates its typed client from this file. All business endpoints
-    require Bearer authentication (JWT issued by POST /api/identity/login).
+    Finder POS modular-monolith REST API. All business endpoints require
+    Bearer authentication (JWT issued by POST /api/identity/login).
 
     ## Authentication
     Short-lived access tokens (15 min) are issued at login. A refresh token
-    (7 days) allows silent renewal via POST /api/identity/refresh.
+    (7 days) allows silent renewal via POST /api/identity/refresh. Tokens are
+    also set as httpOnly cookies for browser clients.
 
     ## Multi-tenancy
     Every JWT carries a `tenantId` claim. The backend enforces tenant isolation
-    at the application layer (and, once RLS is active, at the database layer).
-    Never pass `tenantId` as a request parameter — it is always derived from
-    the authenticated token.
+    via application-layer filtering and Row-Level Security. Never pass
+    `tenantId` as a request parameter.
+
+    ## Money
+    All money values are **integer cents** (e.g. $10.99 → 1099).
+
+    ## Timestamps
+    All timestamps are **Unix epoch milliseconds** (integer).
+
+    ## IDs
+    UUID v7 strings with a resource-type prefix (ord_, prod_, cust_, etc.).
 
     ## Error envelope
-    All errors use a consistent envelope:
+    All errors:
     ```json
     { "error": { "code": "string", "message": "string", "requestId": "string" } }
     ```
 
+    ## Pagination
+    List endpoints use cursor-based pagination unless noted.
+    Pass `cursor` from `nextCursor` in the previous response.
+
 servers:
   - url: /
-    description: Finder POS backend origin. Health probes at root (/healthz, /readyz); identity under /api/identity; versioned business routes under /api/v1. Paths below are absolute.
+    description: Finder POS backend
 
-# ── Security scheme ──────────────────────────────────────────────────────────
+# ── Security ──────────────────────────────────────────────────────────────────
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: |
-        JWT access token. Obtain via POST /api/identity/login.
-        Include as `Authorization: Bearer <token>`.
 
   schemas:
 
-    # ── Tokens ─────────────────────────────────────────────────────────────────
-    TokenPair:
-      type: object
-      required: [accessToken, refreshToken, expiresIn]
-      properties:
-        accessToken:
-          type: string
-          description: Short-lived JWT (15 min). Include in Authorization header.
-        refreshToken:
-          type: string
-          description: Long-lived refresh token (7 days). Store securely; use to renew.
-        expiresIn:
-          type: integer
-          description: Access token lifetime in seconds (900).
-          example: 900
-
-    # ── Identity ───────────────────────────────────────────────────────────────
-    LoginRequest:
-      type: object
-      required: [email, password]
-      properties:
-        email:
-          type: string
-          format: email
-          example: owner@acmecafe.com
-        password:
-          type: string
-          format: password
-          minLength: 1
-
-    RefreshRequest:
-      type: object
-      required: [refreshToken]
-      properties:
-        refreshToken:
-          type: string
-
-    MeResponse:
-      type: object
-      required: [userId, tenantId, role]
-      properties:
-        userId:
-          type: string
-          example: usr_01jz123abc
-        tenantId:
-          type: string
-          example: ten_01jz456def
-        role:
-          $ref: "#/components/schemas/Role"
-
-    Role:
-      type: string
-      enum: [owner, manager, cashier]
-      description: |
-        RBAC role. Ordered by privilege: owner > manager > cashier.
-        - owner: full access; manage users, settings, reports
-        - manager: manage catalog, inventory, orders; void/refund
-        - cashier: ring up sales, view products, process payments
-
-    # ── Health ─────────────────────────────────────────────────────────────────
-    HealthResponse:
-      type: object
-      required: [status, ts]
-      properties:
-        status:
-          type: string
-          enum: [ok]
-        ts:
-          type: integer
-          description: Unix epoch milliseconds
-          example: 1717123456789
-
-    ReadyResponse:
-      type: object
-      required: [status, db, modules, ts]
-      properties:
-        status:
-          type: string
-          enum: [ok]
-        db:
-          type: string
-          enum: [connected]
-        modules:
-          type: array
-          items:
-            type: string
-          example: [identity, catalog, inventory, orders, payments, sync]
-        ts:
-          type: integer
-          description: Unix epoch milliseconds
-
-    # ── Feature flags ──────────────────────────────────────────────────────────
-    FlagsResponse:
-      type: object
-      description: |
-        Map of flag_key → enabled (boolean). Tenant-level overrides shadow
-        global defaults. New behaviour ships behind a flag defaulting to false.
-      additionalProperties:
-        type: boolean
-      example:
-        identity.bcrypt_required: true
-        checkout.split_tender: false
-        catalog.bulk_import: false
-
-    # ── Error envelope ─────────────────────────────────────────────────────────
+    # ── Shared ─────────────────────────────────────────────────────────────────
     ErrorResponse:
       type: object
       required: [error]
@@ -153,127 +58,413 @@ components:
           type: object
           required: [code, message, requestId]
           properties:
-            code:
-              type: string
-              description: Machine-readable error code.
-              example: unauthenticated
-            message:
-              type: string
-              description: Human-readable explanation (safe to display).
-              example: Missing or malformed Authorization header.
-            requestId:
-              type: string
-              description: Correlates this error to backend logs and traces.
-              example: 01935abc-dead-7f00-b33f-01234567890a
+            code: { type: string, example: unauthenticated }
+            message: { type: string }
+            requestId: { type: string }
+
+    PaginatedResponse:
+      type: object
+      properties:
+        items: { type: array, items: {} }
+        nextCursor: { type: string, nullable: true }
+        total: { type: integer }
+
+    # ── Identity ───────────────────────────────────────────────────────────────
+    TokenPair:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn: { type: integer, example: 900 }
+
+    Role:
+      type: string
+      enum: [owner, manager, cashier]
+
+    MeResponse:
+      type: object
+      properties:
+        userId: { type: string, example: usr_01jz123abc }
+        tenantId: { type: string, example: tnt_demo }
+        role: { $ref: "#/components/schemas/Role" }
+
+    # ── Catalog ────────────────────────────────────────────────────────────────
+    Product:
+      type: object
+      properties:
+        id: { type: string }
+        sku: { type: string }
+        name: { type: string }
+        price_cents: { type: integer }
+        cost_cents: { type: integer }
+        tax_class: { type: string, enum: [standard, exempt] }
+        status: { type: string, enum: [active, draft, archived] }
+        barcode: { type: string }
+        category_ids: { type: array, items: { type: string } }
+        reorder_point: { type: integer }
+        created_at: { type: integer }
+
+    # ── Orders ─────────────────────────────────────────────────────────────────
+    OrderLine:
+      type: object
+      properties:
+        productId: { type: string }
+        qty: { type: integer }
+        unit_price_cents: { type: integer }
+        line_total_cents: { type: integer }
+        discountCents: { type: integer }
+
+    Order:
+      type: object
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [open, completed, refunded, voided] }
+        totalCents: { type: integer }
+        discountCents: { type: integer }
+        customerId: { type: string }
+        stateCode: { type: string }
+        lines: { type: array, items: { $ref: "#/components/schemas/OrderLine" } }
+        created_at: { type: integer }
+
+    # ── Customers ──────────────────────────────────────────────────────────────
+    Customer:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string }
+        phone: { type: string }
+        loyalty_points: { type: integer }
+        store_credit_cents: { type: integer }
+        tier: { type: string }
+        created_at: { type: integer }
+
+    # ── Inventory ──────────────────────────────────────────────────────────────
+    InventoryLevel:
+      type: object
+      properties:
+        product_id: { type: string }
+        on_hand: { type: integer }
+        reorder_point: { type: integer }
+        on_order: { type: integer }
+
+    # ── Payments ───────────────────────────────────────────────────────────────
+    Payment:
+      type: object
+      properties:
+        id: { type: string }
+        orderId: { type: string }
+        method: { type: string, enum: [cash, card, store_credit, split, gift_card, ebt] }
+        amountCents: { type: integer }
+        status: { type: string, enum: [captured, declined, refunded] }
+        created_at: { type: integer }
+
+    # ── Vertical schemas ───────────────────────────────────────────────────────
+    Vehicle:
+      type: object
+      properties:
+        id: { type: string }
+        vin: { type: string }
+        plate: { type: string }
+        make: { type: string }
+        model: { type: string }
+        year: { type: integer }
+        color: { type: string }
+        mileage: { type: integer }
+        customer_id: { type: string }
+
+    WorkOrder:
+      type: object
+      properties:
+        id: { type: string }
+        vehicle_id: { type: string }
+        description: { type: string }
+        status: { type: string, enum: [open, in_progress, completed, invoiced] }
+        labour_cents: { type: integer }
+        parts_cents: { type: integer }
+        total_cents: { type: integer }
+        started_at: { type: integer, nullable: true }
+        completed_at: { type: integer, nullable: true }
+
+    Room:
+      type: object
+      properties:
+        id: { type: string }
+        room_number: { type: string }
+        room_type: { type: string }
+        rate_cents: { type: integer }
+        status: { type: string, enum: [available, occupied, checkout, cleaning, maintenance] }
+        guest_name: { type: string, nullable: true }
+        checked_in_at: { type: integer, nullable: true }
+
+    RoomCharge:
+      type: object
+      properties:
+        id: { type: string }
+        room_id: { type: string }
+        description: { type: string }
+        amount_cents: { type: integer }
+        category: { type: string }
+        posted_at: { type: integer }
+        settled_at: { type: integer, nullable: true }
+
+    Appointment:
+      type: object
+      properties:
+        id: { type: string }
+        customer_id: { type: string, nullable: true }
+        service: { type: string }
+        employee_id: { type: string, nullable: true }
+        starts_at: { type: integer }
+        ends_at: { type: integer }
+        status: { type: string, enum: [scheduled, confirmed, in_progress, completed, cancelled, no_show] }
+        notes: { type: string, nullable: true }
+
+    Patient:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        dob: { type: string, format: date }
+        allergies: { type: array, items: { type: string } }
+        phone: { type: string }
+        email: { type: string }
+
+    Prescription:
+      type: object
+      properties:
+        id: { type: string }
+        patient_id: { type: string }
+        drug_name: { type: string }
+        strength: { type: string }
+        prescriber: { type: string }
+        refills_authorized: { type: integer }
+        refills_remaining: { type: integer }
+        instructions: { type: string }
+        written_at: { type: integer }
+        expires_at: { type: integer }
+
+    ProductionOrder:
+      type: object
+      properties:
+        id: { type: string }
+        product_id: { type: string }
+        quantity: { type: integer }
+        status: { type: string, enum: [draft, in_progress, completed] }
+        created_at: { type: integer }
+
+    BomLine:
+      type: object
+      properties:
+        id: { type: string }
+        production_order_id: { type: string }
+        material_id: { type: string }
+        qty_required: { type: number }
+        qty_consumed: { type: number }
+
+    RentalAsset:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        category: { type: string }
+        daily_rate_cents: { type: integer }
+        status: { type: string, enum: [available, rented, maintenance, retired] }
+        serial_number: { type: string }
+
+    RentalContract:
+      type: object
+      properties:
+        id: { type: string }
+        asset_id: { type: string }
+        asset_name: { type: string }
+        customer_id: { type: string, nullable: true }
+        customer_name: { type: string }
+        starts_at: { type: integer }
+        ends_at: { type: integer }
+        total_cents: { type: integer }
+        status: { type: string, enum: [active, returned, cancelled] }
+
+    Event:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        starts_at: { type: integer }
+        ticket_price_cents: { type: integer }
+        capacity: { type: integer }
+        sold: { type: integer }
+        status: { type: string, enum: [draft, on_sale, sold_out, completed, cancelled] }
+
+    Ticket:
+      type: object
+      properties:
+        id: { type: string }
+        event_id: { type: string }
+        customer_name: { type: string, nullable: true }
+        qr_code: { type: string }
+        redeemed_at: { type: integer, nullable: true }
+        issued_at: { type: integer }
+
+    Student:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string }
+        status: { type: string, enum: [active, inactive, graduated, withdrawn] }
+        outstanding: { type: integer, description: Sum of unpaid fees in cents }
+
+    StudentFee:
+      type: object
+      properties:
+        id: { type: string }
+        student_id: { type: string }
+        fee_type: { type: string, enum: [tuition, registration, material, exam, late_fee] }
+        amount_cents: { type: integer }
+        due_date: { type: integer }
+        paid_at: { type: integer, nullable: true }
+        description: { type: string }
 
   responses:
     Unauthorized:
-      description: Authentication required or token invalid/expired.
+      description: Authentication required or token expired.
       content:
         application/json:
-          schema:
-            $ref: "#/components/schemas/ErrorResponse"
-          examples:
-            missing_header:
-              value:
-                error:
-                  code: unauthenticated
-                  message: Missing or malformed Authorization header.
-                  requestId: 01935abc-dead-7f00-b33f-01234567890a
-            token_expired:
-              value:
-                error:
-                  code: token_expired
-                  message: Access token has expired.
-                  requestId: 01935abc-dead-7f00-b33f-01234567890b
-
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
     Forbidden:
-      description: Authenticated but insufficiently privileged.
+      description: Insufficient role.
       content:
         application/json:
-          schema:
-            $ref: "#/components/schemas/ErrorResponse"
-          example:
-            error:
-              code: forbidden
-              message: "Role 'cashier' is not authorized (requires 'manager' or above)."
-              requestId: 01935abc-dead-7f00-b33f-01234567890c
-
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Conflict:
+      description: Business rule violation.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
     TooManyRequests:
       description: Rate limit exceeded.
       headers:
         Retry-After:
-          description: Seconds until the client may retry.
-          schema:
-            type: integer
+          schema: { type: integer }
       content:
         application/json:
-          schema:
-            $ref: "#/components/schemas/ErrorResponse"
-
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
     InternalError:
       description: Unexpected server error.
       content:
         application/json:
-          schema:
-            $ref: "#/components/schemas/ErrorResponse"
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
 
-# ── Default security (override per-path for public endpoints) ────────────────
 security:
   - bearerAuth: []
 
-# ── Paths ────────────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
 paths:
 
-  # ── Liveness probe ──────────────────────────────────────────────────────────
+  # ── Platform ────────────────────────────────────────────────────────────────
   /healthz:
     get:
       summary: Liveness probe
-      description: |
-        Returns 200 if the process is alive. No auth, no DB check.
-        Used by load balancers and container runtimes.
       operationId: healthz
       security: []
       tags: [Platform]
       responses:
-        "200":
-          description: Process is alive.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HealthResponse"
+        "200": { description: Process alive }
 
-  # ── Readiness probe ─────────────────────────────────────────────────────────
   /readyz:
     get:
       summary: Readiness probe
-      description: |
-        Returns 200 if the process is ready to serve traffic (DB reachable).
-        Returns 503 if the DB is unavailable. No auth.
       operationId: readyz
       security: []
       tags: [Platform]
       responses:
-        "200":
-          description: Service is ready.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ReadyResponse"
-        "503":
-          description: Service is not ready (DB unavailable).
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+        "200": { description: Service ready }
+        "503": { description: DB unavailable }
 
-  # ── Auth: login ─────────────────────────────────────────────────────────────
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      operationId: metrics
+      tags: [Platform]
+      description: Bearer token required (not a JWT — see METRICS_TOKEN env var).
+      responses:
+        "200": { description: Prometheus text format }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/flags:
+    get:
+      summary: Feature flags for tenant
+      operationId: getFlags
+      tags: [Platform]
+      responses:
+        "200":
+          description: Flag map
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: { type: boolean }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/stream:
+    get:
+      summary: Server-sent events stream
+      operationId: sseStream
+      tags: [Platform]
+      description: Returns `text/event-stream`. Events mirror webhook payloads.
+      responses:
+        "200":
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/jobs:
+    get:
+      summary: Background job queue status
+      operationId: getJobs
+      tags: [Platform]
+      description: Owner only.
+      responses:
+        "200": { description: Job queue snapshot }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # ── Identity ────────────────────────────────────────────────────────────────
+  /api/identity/register:
+    post:
+      summary: Register new account
+      operationId: register
+      security: []
+      tags: [Identity]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [storeName, email, password]
+              properties:
+                storeName: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenPair" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
   /api/identity/login:
     post:
       summary: Authenticate and issue tokens
-      description: |
-        Verify email + password credentials and return a JWT access token
-        (15 min) and a refresh token (7 days). No auth required.
       operationId: login
       security: []
       tags: [Identity]
@@ -282,39 +473,66 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LoginRequest"
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
       responses:
         "200":
-          description: Credentials accepted. Token pair returned.
+          description: Token pair
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/TokenPair"
-        "400":
-          description: Validation error (e.g. malformed email).
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Invalid credentials.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "429":
-          $ref: "#/components/responses/TooManyRequests"
-        "500":
-          $ref: "#/components/responses/InternalError"
+              schema: { $ref: "#/components/schemas/TokenPair" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
 
-  # ── Auth: refresh ───────────────────────────────────────────────────────────
   /api/identity/refresh:
     post:
       summary: Refresh access token
-      description: |
-        Exchange a valid refresh token for a new token pair. The old refresh
-        token is invalidated (single-use). No auth header required.
       operationId: refreshToken
+      security: []
+      tags: [Identity]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken: { type: string }
+      responses:
+        "200":
+          description: New token pair
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenPair" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/identity/logout:
+    post:
+      summary: Logout and revoke refresh token
+      operationId: logout
+      tags: [Identity]
+      responses:
+        "204": { description: Logged out }
+
+  /api/identity/me:
+    get:
+      summary: Current user identity
+      operationId: getMe
+      tags: [Identity]
+      responses:
+        "200":
+          description: Caller identity
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MeResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/identity/forgot-password:
+    post:
+      summary: Request password reset email
+      operationId: forgotPassword
       security: []
       tags: [Identity]
       requestBody:
@@ -322,72 +540,2521 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/RefreshRequest"
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
       responses:
-        "200":
-          description: New token pair issued.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TokenPair"
-        "400":
-          description: Missing refreshToken field.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "429":
-          $ref: "#/components/responses/TooManyRequests"
-        "500":
-          $ref: "#/components/responses/InternalError"
+        "204": { description: Email sent if account exists }
 
-  # ── Auth: me ────────────────────────────────────────────────────────────────
-  /api/identity/me:
+  /api/identity/reset-password:
+    post:
+      summary: Reset password with token
+      operationId: resetPassword
+      security: []
+      tags: [Identity]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, minLength: 8 }
+      responses:
+        "204": { description: Password reset }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/identity/api-keys:
     get:
-      summary: Current user identity
-      description: Return the authenticated caller's userId, tenantId, and role.
-      operationId: getMe
-      security:
-        - bearerAuth: []
+      summary: List API keys
+      operationId: listApiKeys
+      tags: [Identity]
+      description: Owner only.
+      responses:
+        "200": { description: API key list }
+    post:
+      summary: Create API key
+      operationId: createApiKey
+      tags: [Identity]
+      description: Owner only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                scopes: { type: array, items: { type: string } }
+                expiresAt: { type: integer }
+      responses:
+        "201": { description: API key created (value shown once) }
+
+  /api/identity/api-keys/{id}:
+    delete:
+      summary: Revoke API key
+      operationId: revokeApiKey
+      tags: [Identity]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Key revoked }
+
+  /api/identity/mfa/setup:
+    post:
+      summary: Setup MFA — returns TOTP QR code
+      operationId: mfaSetup
       tags: [Identity]
       responses:
-        "200":
-          description: Caller identity.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MeResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "429":
-          $ref: "#/components/responses/TooManyRequests"
-        "500":
-          $ref: "#/components/responses/InternalError"
+        "200": { description: TOTP secret and QR code }
 
-  # ── Feature flags ───────────────────────────────────────────────────────────
-  /api/v1/flags:
+  /api/identity/mfa/verify:
+    post:
+      summary: Verify and enable MFA
+      operationId: mfaVerify
+      tags: [Identity]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, minLength: 6, maxLength: 6 }
+      responses:
+        "204": { description: MFA enabled }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/identity/mfa/disable:
+    post:
+      summary: Disable MFA
+      operationId: mfaDisable
+      tags: [Identity]
+      responses:
+        "204": { description: MFA disabled }
+
+  # ── Catalog ─────────────────────────────────────────────────────────────────
+  /api/v1/catalog:
     get:
-      summary: Read feature flags for the authenticated tenant
-      description: |
-        Returns all active feature flags for the caller's tenant. Tenant-specific
-        overrides shadow global defaults. All new user-facing behaviour ships
-        behind a flag (default off in production).
-      operationId: getFlags
-      security:
-        - bearerAuth: []
-      tags: [Platform]
+      summary: List products
+      operationId: listProducts
+      tags: [Catalog]
+      parameters:
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, draft, archived] }
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: excludeMasters
+          in: query
+          schema: { type: boolean }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
       responses:
         "200":
-          description: Feature flag map (flag_key → enabled).
+          description: Product list
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FlagsResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "429":
-          $ref: "#/components/responses/TooManyRequests"
-        "500":
-          $ref: "#/components/responses/InternalError"
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/Product" }
+    post:
+      summary: Create product
+      operationId: createProduct
+      tags: [Catalog]
+      description: Manager or above.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sku, name, price_cents]
+              properties:
+                sku: { type: string }
+                name: { type: string }
+                price_cents: { type: integer }
+                cost_cents: { type: integer }
+                tax_class: { type: string, enum: [standard, exempt] }
+                barcode: { type: string }
+                reorder_point: { type: integer }
+      responses:
+        "201":
+          description: Product created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/v1/catalog/{id}:
+    get:
+      summary: Get product
+      operationId: getProduct
+      tags: [Catalog]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Product
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      summary: Update product
+      operationId: updateProduct
+      tags: [Catalog]
+      description: Manager or above.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Updated product
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+    delete:
+      summary: Archive product
+      operationId: archiveProduct
+      tags: [Catalog]
+      description: Manager or above. Blocks if product is on any order.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Archived }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/v1/catalog/barcode/{code}:
+    get:
+      summary: Lookup product by barcode
+      operationId: getProductByBarcode
+      tags: [Catalog]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Product
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/catalog/import-csv:
+    post:
+      summary: Import products from CSV
+      operationId: importProductsCsv
+      tags: [Catalog]
+      description: Manager or above.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [csv]
+              properties:
+                csv: { type: string, description: CSV string with header row }
+      responses:
+        "200": { description: Import result with row counts and errors }
+
+  /api/v1/catalog/export:
+    get:
+      summary: Export catalog as CSV
+      operationId: exportCatalog
+      tags: [Catalog]
+      responses:
+        "200":
+          description: CSV download
+          content:
+            text/csv:
+              schema: { type: string }
+
+  /api/v1/catalog/{id}/compliance:
+    patch:
+      summary: Update product compliance fields
+      operationId: updateCompliance
+      tags: [Catalog]
+      description: Manager or above.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tobacco_type: { type: string, enum: [cigarettes, cigars, smokeless, vape, other] }
+                flavored: { type: boolean }
+                menthol: { type: boolean }
+                msa_reportable: { type: boolean }
+                restricted_states: { type: array, items: { type: string } }
+      responses:
+        "200": { description: Updated }
+
+  # ── Inventory ───────────────────────────────────────────────────────────────
+  /api/v1/inventory:
+    get:
+      summary: List inventory levels
+      operationId: listInventory
+      tags: [Inventory]
+      parameters:
+        - name: lowStock
+          in: query
+          schema: { type: boolean }
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Inventory levels
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/InventoryLevel" }
+
+  /api/v1/inventory/{productId}/receive:
+    post:
+      summary: Receive inventory
+      operationId: receiveInventory
+      tags: [Inventory]
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                quantity: { type: integer }
+                expiryDate: { type: string, format: date }
+                lotCode: { type: string }
+                unitCostCents: { type: integer }
+      responses:
+        "200": { description: Received }
+
+  /api/v1/inventory/{productId}/adjust:
+    post:
+      summary: Adjust inventory quantity
+      operationId: adjustInventory
+      tags: [Inventory]
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [delta]
+              properties:
+                delta: { type: integer, description: Positive = add, negative = remove }
+                reason: { type: string, enum: [receiving, adjustment, damage, theft, write-off] }
+      responses:
+        "200": { description: Adjusted }
+
+  /api/v1/inventory/expiring:
+    get:
+      summary: Products expiring soon
+      operationId: getExpiring
+      tags: [Inventory]
+      parameters:
+        - name: days
+          in: query
+          schema: { type: integer, default: 30 }
+      responses:
+        "200": { description: Expiring product batches }
+
+  # ── Orders ──────────────────────────────────────────────────────────────────
+  /api/v1/orders:
+    get:
+      summary: List orders
+      operationId: listOrders
+      tags: [Orders]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [open, completed, refunded, voided] }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Orders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Order" }
+    post:
+      summary: Create order
+      operationId: createOrder
+      tags: [Orders]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lines]
+              properties:
+                lines:
+                  type: array
+                  items: { $ref: "#/components/schemas/OrderLine" }
+                discountCents: { type: integer }
+                customerId: { type: string }
+                stateCode: { type: string }
+      responses:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+
+  /api/v1/orders/{id}:
+    get:
+      summary: Get order
+      operationId: getOrder
+      tags: [Orders]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/orders/{id}/refund:
+    post:
+      summary: Refund order
+      operationId: refundOrder
+      tags: [Orders]
+      description: Manager or above.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lineIds: { type: array, items: { type: string } }
+                method: { type: string, enum: [original, store_credit] }
+      responses:
+        "200": { description: Refunded }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/v1/orders/{id}/void:
+    post:
+      summary: Void order
+      operationId: voidOrder
+      tags: [Orders]
+      description: Manager or above. Same-day only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Voided }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  # ── Payments ────────────────────────────────────────────────────────────────
+  /api/v1/payments:
+    post:
+      summary: Capture payment
+      operationId: capturePayment
+      tags: [Payments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId, method]
+              properties:
+                orderId: { type: string }
+                method: { type: string, enum: [cash, card, store_credit, split, gift_card, ebt] }
+                cashCents: { type: integer }
+                cardCents: { type: integer }
+                tenderedCents: { type: integer }
+                customerId: { type: string }
+                stripePaymentIntentId: { type: string }
+                idempotencyKey: { type: string }
+      responses:
+        "201":
+          description: Payment captured
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Payment" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/v1/payments/connection-token:
+    post:
+      summary: Get Stripe Terminal connection token
+      operationId: stripeConnectionToken
+      tags: [Payments]
+      responses:
+        "200": { description: Connection token }
+
+  /api/v1/payments/terminal/start:
+    post:
+      summary: Start Stripe Terminal payment intent
+      operationId: terminalStart
+      tags: [Payments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId]
+              properties:
+                orderId: { type: string }
+      responses:
+        "200": { description: Terminal intent started }
+
+  # ── Customers ───────────────────────────────────────────────────────────────
+  /api/v1/customers:
+    get:
+      summary: List customers
+      operationId: listCustomers
+      tags: [Customers]
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Customers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Customer" }
+    post:
+      summary: Create customer
+      operationId: createCustomer
+      tags: [Customers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                email: { type: string, format: email }
+                phone: { type: string }
+      responses:
+        "201":
+          description: Customer created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Customer" }
+
+  /api/v1/customers/{id}:
+    get:
+      summary: Get customer
+      operationId: getCustomer
+      tags: [Customers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Customer
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Customer" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      summary: Update customer
+      operationId: updateCustomer
+      tags: [Customers]
+      description: Manager or above for restricted fields.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Updated customer
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Customer" }
+
+  /api/v1/customers/{id}/store-credit:
+    get:
+      summary: Get store credit balance
+      operationId: getStoreCredit
+      tags: [Customers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Balance }
+    post:
+      summary: Adjust store credit
+      operationId: adjustStoreCredit
+      tags: [Customers]
+      description: Manager or above.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deltaCents, reason]
+              properties:
+                deltaCents: { type: integer }
+                reason: { type: string }
+      responses:
+        "200": { description: Updated balance }
+
+  /api/v1/customers/{id}/product-prices:
+    get:
+      summary: List customer product price overrides
+      operationId: listCustomerPrices
+      tags: [Customers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Price overrides }
+    post:
+      summary: Upsert customer product price override
+      operationId: upsertCustomerPrice
+      tags: [Customers]
+      description: Manager or above.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, priceCents]
+              properties:
+                productId: { type: string }
+                priceCents: { type: integer }
+      responses:
+        "200": { description: Price override saved }
+
+  # ── Discounts ───────────────────────────────────────────────────────────────
+  /api/v1/discounts:
+    get:
+      summary: List discount rules
+      operationId: listDiscounts
+      tags: [Discounts]
+      responses:
+        "200": { description: Discount rules }
+    post:
+      summary: Create discount rule
+      operationId: createDiscount
+      tags: [Discounts]
+      description: Manager or above.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, ruleType, discountType, value]
+              properties:
+                name: { type: string }
+                couponCode: { type: string }
+                ruleType: { type: string, enum: [cart_total, product, category, customer_tier] }
+                discountType: { type: string, enum: [percentage, flat] }
+                value: { type: number }
+      responses:
+        "201": { description: Discount created }
+
+  /api/v1/discounts/evaluate:
+    post:
+      summary: Evaluate applicable discounts for a cart
+      operationId: evaluateDiscounts
+      tags: [Discounts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lines]
+              properties:
+                lines: { type: array, items: { $ref: "#/components/schemas/OrderLine" } }
+                customerTier: { type: string }
+                couponCode: { type: string }
+      responses:
+        "200": { description: Applicable discounts and total savings }
+
+  # ── Gift Cards ──────────────────────────────────────────────────────────────
+  /api/v1/giftcards:
+    get:
+      summary: List gift cards
+      operationId: listGiftCards
+      tags: [Gift Cards]
+      responses:
+        "200": { description: Gift cards }
+    post:
+      summary: Issue gift card
+      operationId: issueGiftCard
+      tags: [Gift Cards]
+      description: Manager or above.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amountCents]
+              properties:
+                amountCents: { type: integer }
+      responses:
+        "201": { description: Gift card with code }
+
+  /api/v1/giftcards/{code}:
+    get:
+      summary: Get gift card by code
+      operationId: getGiftCard
+      tags: [Gift Cards]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Gift card }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/giftcards/{code}/redeem:
+    post:
+      summary: Redeem gift card amount
+      operationId: redeemGiftCard
+      tags: [Gift Cards]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amountCents]
+              properties:
+                amountCents: { type: integer }
+      responses:
+        "200": { description: Redeemed — remaining balance }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  # ── Reports ─────────────────────────────────────────────────────────────────
+  /api/v1/reports/summary:
+    get:
+      summary: Sales summary
+      operationId: reportSummary
+      tags: [Reports]
+      parameters:
+        - name: range
+          in: query
+          schema: { type: string, enum: [today, 7d, 30d, 90d, all], default: 7d }
+      responses:
+        "200": { description: Revenue, transactions, AOV }
+
+  /api/v1/reports/top-products:
+    get:
+      summary: Top products by revenue
+      operationId: reportTopProducts
+      tags: [Reports]
+      parameters:
+        - name: range
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        "200": { description: Top product list }
+
+  /api/v1/reports/revenue-trend:
+    get:
+      summary: Revenue trend (daily data points)
+      operationId: reportRevenueTrend
+      tags: [Reports]
+      parameters:
+        - name: range
+          in: query
+          schema: { type: string, enum: [7d, 30d, 90d] }
+      responses:
+        "200": { description: Daily revenue array }
+
+  /api/v1/reports/hourly:
+    get:
+      summary: Hourly sales breakdown
+      operationId: reportHourly
+      tags: [Reports]
+      parameters:
+        - name: range
+          in: query
+          schema: { type: string }
+      responses:
+        "200": { description: Hourly buckets }
+
+  /api/v1/reports/ar-aging:
+    get:
+      summary: Accounts receivable aging
+      operationId: reportArAging
+      tags: [Reports]
+      responses:
+        "200": { description: AR aging buckets (current, 1-30, 31-60, 61-90, 90+) }
+
+  /api/v1/reports/ap-aging:
+    get:
+      summary: Accounts payable aging
+      operationId: reportApAging
+      tags: [Reports]
+      responses:
+        "200": { description: AP aging buckets }
+
+  /api/v1/reports/inventory-valuation:
+    get:
+      summary: Inventory valuation
+      operationId: reportInventoryValuation
+      tags: [Reports]
+      responses:
+        "200": { description: On-hand value and potential margin per SKU }
+
+  /api/v1/reports/p-l:
+    get:
+      summary: Profit and loss
+      operationId: reportPL
+      tags: [Reports]
+      parameters:
+        - name: range
+          in: query
+          schema: { type: string }
+      responses:
+        "200": { description: Income, COGS, gross margin }
+
+  /api/v1/reports/time-cards:
+    get:
+      summary: Employee time cards
+      operationId: reportTimeCards
+      tags: [Reports]
+      parameters:
+        - name: employeeId
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: integer }
+        - name: to
+          in: query
+          schema: { type: integer }
+      responses:
+        "200": { description: Hours per employee }
+
+  # ── Settings ────────────────────────────────────────────────────────────────
+  /api/v1/settings/business-profile:
+    get:
+      summary: Get business profile with modules
+      operationId: getBusinessProfile
+      tags: [Settings]
+      responses:
+        "200":
+          description: Profile and enabled module list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  businessType: { type: string }
+                  modules: { type: array, items: { type: object } }
+    post:
+      summary: Set business type and module flags
+      operationId: setBusinessProfile
+      tags: [Settings]
+      description: Manager or above.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                businessType: { type: string }
+                moduleFlags: { type: object, additionalProperties: { type: boolean } }
+      responses:
+        "200": { description: Updated }
+
+  /api/v1/settings/tax-rates:
+    get:
+      summary: List tax rates
+      operationId: listTaxRates
+      tags: [Settings]
+      responses:
+        "200": { description: Tax rates }
+    post:
+      summary: Create tax rate
+      operationId: createTaxRate
+      tags: [Settings]
+      description: Manager or above.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, rateBps]
+              properties:
+                name: { type: string }
+                rateBps: { type: integer, description: Rate in basis points (e.g. 825 = 8.25%) }
+      responses:
+        "201": { description: Tax rate created }
+
+  /api/v1/settings/receipts/{outletId}:
+    get:
+      summary: Get receipt template for outlet
+      operationId: getReceiptTemplate
+      tags: [Settings]
+      parameters:
+        - name: outletId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Receipt template }
+    post:
+      summary: Set receipt template
+      operationId: setReceiptTemplate
+      tags: [Settings]
+      description: Manager or above.
+      parameters:
+        - name: outletId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                headerText: { type: string }
+                footerText: { type: string }
+                logoUrl: { type: string }
+                returnPolicy: { type: string }
+                showBarcode: { type: boolean }
+                showCashier: { type: boolean }
+                showTaxBreakdown: { type: boolean }
+      responses:
+        "200": { description: Template saved }
+
+  # ── Outlets ─────────────────────────────────────────────────────────────────
+  /api/v1/outlets:
+    get:
+      summary: List outlets with registers
+      operationId: listOutlets
+      tags: [Outlets]
+      responses:
+        "200": { description: Outlets and their registers }
+    post:
+      summary: Create outlet
+      operationId: createOutlet
+      tags: [Outlets]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                timezone: { type: string }
+      responses:
+        "201": { description: Outlet created }
+
+  /api/v1/outlets/registers/{registerId}/open:
+    post:
+      summary: Open register session
+      operationId: openRegister
+      tags: [Outlets]
+      parameters:
+        - name: registerId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                openingFloatCents: { type: integer }
+      responses:
+        "200": { description: Session opened }
+
+  /api/v1/outlets/registers/{registerId}/close:
+    post:
+      summary: Close register session
+      operationId: closeRegister
+      tags: [Outlets]
+      parameters:
+        - name: registerId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [countedCashCents]
+              properties:
+                countedCashCents: { type: integer }
+                closingFloatCents: { type: integer }
+      responses:
+        "200": { description: Session closed with Z-report }
+
+  # ── Webhooks ────────────────────────────────────────────────────────────────
+  /api/v1/webhooks:
+    get:
+      summary: List webhooks
+      operationId: listWebhooks
+      tags: [Webhooks]
+      description: Owner only.
+      responses:
+        "200": { description: Webhook subscriptions }
+    post:
+      summary: Create webhook subscription
+      operationId: createWebhook
+      tags: [Webhooks]
+      description: Owner only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, format: uri }
+                eventTypes: { type: array, items: { type: string } }
+                secret: { type: string }
+      responses:
+        "201": { description: Webhook created }
+
+  /api/v1/webhooks/{id}:
+    patch:
+      summary: Toggle or update webhook
+      operationId: updateWebhook
+      tags: [Webhooks]
+      description: Owner only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                active: { type: boolean }
+      responses:
+        "200": { description: Updated }
+    delete:
+      summary: Delete webhook
+      operationId: deleteWebhook
+      tags: [Webhooks]
+      description: Owner only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Deleted }
+
+  /api/v1/webhooks/deliveries:
+    get:
+      summary: Webhook delivery log
+      operationId: listWebhookDeliveries
+      tags: [Webhooks]
+      description: Owner only.
+      responses:
+        "200": { description: Recent delivery attempts }
+
+  # ── Notifications ───────────────────────────────────────────────────────────
+  /api/v1/notifications:
+    get:
+      summary: List notifications
+      operationId: listNotifications
+      tags: [Notifications]
+      parameters:
+        - name: unread
+          in: query
+          schema: { type: boolean }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        "200": { description: Notifications }
+    post:
+      summary: Create notification
+      operationId: createNotification
+      tags: [Notifications]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, severity, title, message]
+              properties:
+                type: { type: string }
+                severity: { type: string, enum: [info, warning, error] }
+                title: { type: string }
+                message: { type: string }
+      responses:
+        "201": { description: Notification created }
+
+  /api/v1/notifications/mark-all-read:
+    post:
+      summary: Mark all notifications as read
+      operationId: markAllNotificationsRead
+      tags: [Notifications]
+      responses:
+        "204": { description: Marked }
+
+  /api/v1/notifications/{id}/read:
+    patch:
+      summary: Mark notification as read
+      operationId: markNotificationRead
+      tags: [Notifications]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Marked read }
+
+  # ── Workforce ───────────────────────────────────────────────────────────────
+  /api/v1/workforce/employees:
+    get:
+      summary: List employees
+      operationId: listEmployees
+      tags: [Workforce]
+      responses:
+        "200": { description: Employees }
+    post:
+      summary: Create employee
+      operationId: createEmployee
+      tags: [Workforce]
+      description: Manager or above.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                role: { type: string }
+                email: { type: string, format: email }
+      responses:
+        "201": { description: Employee created }
+
+  /api/v1/workforce/clock-in:
+    post:
+      summary: Clock in employee
+      operationId: clockIn
+      tags: [Workforce]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [employeeId]
+              properties:
+                employeeId: { type: string }
+                notes: { type: string }
+      responses:
+        "201": { description: Time entry started }
+
+  /api/v1/workforce/clock-out/{entryId}:
+    post:
+      summary: Clock out employee
+      operationId: clockOut
+      tags: [Workforce]
+      parameters:
+        - name: entryId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                breakMinutes: { type: integer }
+      responses:
+        "200": { description: Time entry closed }
+
+  # ── Service Orders ──────────────────────────────────────────────────────────
+  /api/v1/service-orders:
+    get:
+      summary: List service orders
+      operationId: listServiceOrders
+      tags: [Service Orders]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+      responses:
+        "200": { description: Service orders }
+    post:
+      summary: Create service order
+      operationId: createServiceOrder
+      tags: [Service Orders]
+      description: Manager or above.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string }
+                description: { type: string }
+                customer_id: { type: string }
+                assigned_to: { type: string }
+                estimate_cents: { type: integer }
+      responses:
+        "201": { description: Service order created }
+
+  /api/v1/service-orders/{id}:
+    get:
+      summary: Get service order
+      operationId: getServiceOrder
+      tags: [Service Orders]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Service order }
+    patch:
+      summary: Update service order
+      operationId: updateServiceOrder
+      tags: [Service Orders]
+      description: Manager or above.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string }
+                actual_cents: { type: integer }
+                notes: { type: string }
+      responses:
+        "200": { description: Updated }
+
+  # ── Appointments ────────────────────────────────────────────────────────────
+  /api/v1/appointments:
+    get:
+      summary: List appointments
+      operationId: listAppointments
+      tags: [Appointments]
+      parameters:
+        - name: date
+          in: query
+          schema: { type: string, format: date }
+        - name: employee_id
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Appointments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Appointment" }
+    post:
+      summary: Create appointment
+      operationId: createAppointment
+      tags: [Appointments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [service, starts_at, ends_at]
+              properties:
+                service: { type: string }
+                customer_id: { type: string }
+                employee_id: { type: string }
+                starts_at: { type: integer }
+                ends_at: { type: integer }
+                notes: { type: string }
+      responses:
+        "201":
+          description: Appointment created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Appointment" }
+
+  /api/v1/appointments/{id}/status:
+    patch:
+      summary: Update appointment status
+      operationId: updateAppointmentStatus
+      tags: [Appointments]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [scheduled, confirmed, in_progress, completed, cancelled, no_show] }
+      responses:
+        "200": { description: Status updated }
+
+  # ── Healthcare ──────────────────────────────────────────────────────────────
+  /api/v1/healthcare/patients:
+    get:
+      summary: List patients
+      operationId: listPatients
+      tags: [Healthcare]
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Patients
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Patient" }
+    post:
+      summary: Create patient
+      operationId: createPatient
+      tags: [Healthcare]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, dob]
+              properties:
+                name: { type: string }
+                dob: { type: string, format: date }
+                allergies: { type: array, items: { type: string } }
+                phone: { type: string }
+                email: { type: string }
+      responses:
+        "201":
+          description: Patient created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Patient" }
+
+  /api/v1/healthcare/patients/{id}:
+    get:
+      summary: Get patient with prescriptions
+      operationId: getPatient
+      tags: [Healthcare]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Patient with prescriptions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Patient"
+                  - type: object
+                    properties:
+                      prescriptions:
+                        type: array
+                        items: { $ref: "#/components/schemas/Prescription" }
+
+  /api/v1/healthcare/prescriptions:
+    post:
+      summary: Create prescription
+      operationId: createPrescription
+      tags: [Healthcare]
+      description: Manager or above.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [patient_id, drug_name, refills_authorized]
+              properties:
+                patient_id: { type: string }
+                drug_name: { type: string }
+                strength: { type: string }
+                prescriber: { type: string }
+                refills_authorized: { type: integer }
+                instructions: { type: string }
+                expires_at: { type: integer }
+      responses:
+        "201":
+          description: Prescription created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Prescription" }
+
+  /api/v1/healthcare/prescriptions/{id}/dispense:
+    post:
+      summary: Dispense prescription (decrement refill)
+      operationId: dispensePrescription
+      tags: [Healthcare]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Dispensed — refills_remaining decremented }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  # ── Automotive ──────────────────────────────────────────────────────────────
+  /api/v1/automotive/vehicles:
+    get:
+      summary: List vehicles
+      operationId: listVehicles
+      tags: [Automotive]
+      parameters:
+        - name: customer_id
+          in: query
+          schema: { type: string }
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Vehicles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Vehicle" }
+    post:
+      summary: Create vehicle
+      operationId: createVehicle
+      tags: [Automotive]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [make, model, year]
+              properties:
+                vin: { type: string, minLength: 17, maxLength: 17 }
+                plate: { type: string }
+                make: { type: string }
+                model: { type: string }
+                year: { type: integer }
+                color: { type: string }
+                mileage: { type: integer }
+                customer_id: { type: string }
+      responses:
+        "201":
+          description: Vehicle created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Vehicle" }
+
+  /api/v1/automotive/work-orders:
+    get:
+      summary: List work orders
+      operationId: listWorkOrders
+      tags: [Automotive]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [open, in_progress, completed, invoiced] }
+        - name: vehicle_id
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Work orders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/WorkOrder" }
+    post:
+      summary: Create work order
+      operationId: createWorkOrder
+      tags: [Automotive]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vehicle_id, description]
+              properties:
+                vehicle_id: { type: string }
+                description: { type: string }
+                labour_cents: { type: integer }
+                parts_cents: { type: integer }
+      responses:
+        "201":
+          description: Work order created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkOrder" }
+
+  /api/v1/automotive/work-orders/{id}/status:
+    patch:
+      summary: Advance work order status
+      operationId: advanceWorkOrderStatus
+      tags: [Automotive]
+      description: Advances to the next status in sequence (open→in_progress→completed).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Updated work order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkOrder" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ── Hospitality ─────────────────────────────────────────────────────────────
+  /api/v1/hospitality/rooms:
+    get:
+      summary: List rooms
+      operationId: listRooms
+      tags: [Hospitality]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [available, occupied, checkout, cleaning, maintenance] }
+      responses:
+        "200":
+          description: Rooms
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Room" }
+    post:
+      summary: Create room
+      operationId: createRoom
+      tags: [Hospitality]
+      description: Manager or above.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [room_number, rate_cents]
+              properties:
+                room_number: { type: string }
+                room_type: { type: string }
+                rate_cents: { type: integer }
+      responses:
+        "201":
+          description: Room created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Room" }
+
+  /api/v1/hospitality/rooms/{id}/status:
+    patch:
+      summary: Update room status
+      operationId: updateRoomStatus
+      tags: [Hospitality]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [available, occupied, checkout, cleaning, maintenance] }
+                guest_name: { type: string }
+      responses:
+        "200":
+          description: Updated room
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Room" }
+
+  /api/v1/hospitality/rooms/{id}/charges:
+    post:
+      summary: Post charge to room folio
+      operationId: postRoomCharge
+      tags: [Hospitality]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [description, amount_cents, category]
+              properties:
+                description: { type: string }
+                amount_cents: { type: integer }
+                category: { type: string }
+      responses:
+        "201":
+          description: Charge posted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RoomCharge" }
+
+  /api/v1/hospitality/rooms/{id}/settle:
+    post:
+      summary: Settle all pending folio charges
+      operationId: settleRoomFolio
+      tags: [Hospitality]
+      description: Marks all charges with settled_at = now and flips room to Checkout.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Settled — total amount collected }
+
+  /api/v1/hospitality/rooms/{id}/folio:
+    get:
+      summary: Get room folio (all charges)
+      operationId: getRoomFolio
+      tags: [Hospitality]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Room charges
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  charges:
+                    type: array
+                    items: { $ref: "#/components/schemas/RoomCharge" }
+                  totalPending: { type: integer }
+
+  # ── Manufacturing ───────────────────────────────────────────────────────────
+  /api/v1/manufacturing/orders:
+    get:
+      summary: List production orders
+      operationId: listProductionOrders
+      tags: [Manufacturing]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [draft, in_progress, completed] }
+      responses:
+        "200":
+          description: Production orders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/ProductionOrder" }
+    post:
+      summary: Create production order with BOM
+      operationId: createProductionOrder
+      tags: [Manufacturing]
+      description: Manager or above.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id, quantity, bomLines]
+              properties:
+                product_id: { type: string }
+                quantity: { type: integer }
+                bomLines:
+                  type: array
+                  items:
+                    type: object
+                    required: [material_id, qty_required]
+                    properties:
+                      material_id: { type: string }
+                      qty_required: { type: number }
+      responses:
+        "201":
+          description: Production order created with BOM lines
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductionOrder" }
+
+  /api/v1/manufacturing/orders/{id}/status:
+    patch:
+      summary: Advance production order status
+      operationId: advanceProductionStatus
+      tags: [Manufacturing]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Status advanced }
+
+  /api/v1/manufacturing/bom-lines/{id}/consume:
+    patch:
+      summary: Record BOM line consumption
+      operationId: consumeBomLine
+      tags: [Manufacturing]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [qty_consumed]
+              properties:
+                qty_consumed: { type: number }
+      responses:
+        "200":
+          description: BOM line updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BomLine" }
+
+  # ── Rental ──────────────────────────────────────────────────────────────────
+  /api/v1/rental/assets:
+    get:
+      summary: List rental assets
+      operationId: listRentalAssets
+      tags: [Rental]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [available, rented, maintenance, retired] }
+      responses:
+        "200":
+          description: Assets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/RentalAsset" }
+    post:
+      summary: Create rental asset
+      operationId: createRentalAsset
+      tags: [Rental]
+      description: Manager or above.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, daily_rate_cents]
+              properties:
+                name: { type: string }
+                category: { type: string }
+                daily_rate_cents: { type: integer }
+                serial_number: { type: string }
+      responses:
+        "201":
+          description: Asset created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RentalAsset" }
+
+  /api/v1/rental/contracts:
+    get:
+      summary: List rental contracts
+      operationId: listRentalContracts
+      tags: [Rental]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, returned, cancelled] }
+      responses:
+        "200":
+          description: Contracts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/RentalContract" }
+    post:
+      summary: Create rental contract
+      operationId: createRentalContract
+      tags: [Rental]
+      description: Asset must be in Available status.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [asset_id, starts_at, ends_at, customer_name]
+              properties:
+                asset_id: { type: string }
+                customer_id: { type: string }
+                customer_name: { type: string }
+                starts_at: { type: integer }
+                ends_at: { type: integer }
+      responses:
+        "201":
+          description: Contract created; asset status flipped to Rented
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RentalContract" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/v1/rental/contracts/{id}/return:
+    post:
+      summary: Return rental asset
+      operationId: returnRentalAsset
+      tags: [Rental]
+      description: Flips asset status back to Available.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                condition: { type: string, enum: [good, damaged] }
+                damage_cents: { type: integer }
+      responses:
+        "200": { description: Returned }
+
+  # ── Entertainment ───────────────────────────────────────────────────────────
+  /api/v1/entertainment/events:
+    get:
+      summary: List events
+      operationId: listEvents
+      tags: [Entertainment]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [draft, on_sale, sold_out, completed, cancelled] }
+      responses:
+        "200":
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Event" }
+    post:
+      summary: Create event
+      operationId: createEvent
+      tags: [Entertainment]
+      description: Manager or above.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, starts_at, ticket_price_cents, capacity]
+              properties:
+                name: { type: string }
+                starts_at: { type: integer }
+                ticket_price_cents: { type: integer }
+                capacity: { type: integer }
+      responses:
+        "201":
+          description: Event created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+
+  /api/v1/entertainment/events/{id}/status:
+    patch:
+      summary: Update event status
+      operationId: updateEventStatus
+      tags: [Entertainment]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [draft, on_sale, completed, cancelled] }
+      responses:
+        "200": { description: Status updated }
+
+  /api/v1/entertainment/tickets:
+    post:
+      summary: Sell tickets (atomic capacity check)
+      operationId: sellTickets
+      tags: [Entertainment]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event_id, quantity]
+              properties:
+                event_id: { type: string }
+                quantity: { type: integer, minimum: 1 }
+                customer_name: { type: string }
+                customer_email: { type: string }
+      responses:
+        "201":
+          description: Tickets issued with QR codes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tickets:
+                    type: array
+                    items: { $ref: "#/components/schemas/Ticket" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/v1/entertainment/tickets/redeem:
+    post:
+      summary: Redeem ticket by QR code
+      operationId: redeemTicket
+      tags: [Entertainment]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [qr_code]
+              properties:
+                qr_code: { type: string }
+      responses:
+        "200": { description: Redeemed — entry granted }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  # ── Education ───────────────────────────────────────────────────────────────
+  /api/v1/education/students:
+    get:
+      summary: List students
+      operationId: listStudents
+      tags: [Education]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, inactive, graduated, withdrawn] }
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Students
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Student" }
+    post:
+      summary: Create student
+      operationId: createStudent
+      tags: [Education]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                email: { type: string }
+                dob: { type: string, format: date }
+                status: { type: string, default: active }
+      responses:
+        "201":
+          description: Student created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Student" }
+
+  /api/v1/education/students/{id}:
+    get:
+      summary: Get student with fees
+      operationId: getStudent
+      tags: [Education]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Student with fee list and outstanding balance
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Student"
+                  - type: object
+                    properties:
+                      fees:
+                        type: array
+                        items: { $ref: "#/components/schemas/StudentFee" }
+
+  /api/v1/education/fees:
+    post:
+      summary: Create student fee
+      operationId: createStudentFee
+      tags: [Education]
+      description: Manager or above.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student_id, fee_type, amount_cents, due_date]
+              properties:
+                student_id: { type: string }
+                fee_type: { type: string, enum: [tuition, registration, material, exam, late_fee] }
+                amount_cents: { type: integer }
+                due_date: { type: integer }
+                description: { type: string }
+      responses:
+        "201":
+          description: Fee created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StudentFee" }
+
+  /api/v1/education/fees/{id}/collect:
+    post:
+      summary: Collect (mark paid) a student fee
+      operationId: collectStudentFee
+      tags: [Education]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                method: { type: string, enum: [cash, card, bank_transfer, cheque] }
+      responses:
+        "200": { description: Fee marked paid }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  # ── Purchasing ──────────────────────────────────────────────────────────────
+  /api/v1/purchasing/suppliers:
+    get:
+      summary: List suppliers
+      operationId: listSuppliers
+      tags: [Purchasing]
+      responses:
+        "200": { description: Suppliers }
+    post:
+      summary: Create supplier
+      operationId: createSupplier
+      tags: [Purchasing]
+      description: Manager or above.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                email: { type: string }
+                phone: { type: string }
+      responses:
+        "201": { description: Supplier created }
+
+  /api/v1/purchasing/orders:
+    get:
+      summary: List purchase orders
+      operationId: listPurchaseOrders
+      tags: [Purchasing]
+      responses:
+        "200": { description: Purchase orders }
+    post:
+      summary: Create purchase order
+      operationId: createPurchaseOrder
+      tags: [Purchasing]
+      description: Manager or above.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [supplierId, lines]
+              properties:
+                supplierId: { type: string }
+                lines:
+                  type: array
+                  items:
+                    type: object
+                    required: [productId, quantity]
+                    properties:
+                      productId: { type: string }
+                      quantity: { type: integer }
+                      unitCostCents: { type: integer }
+      responses:
+        "201": { description: PO created }
+
+  /api/v1/purchasing/orders/{id}/receive:
+    post:
+      summary: Receive purchase order
+      operationId: receivePurchaseOrder
+      tags: [Purchasing]
+      description: Manager or above.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lines]
+              properties:
+                lines:
+                  type: array
+                  items:
+                    type: object
+                    required: [productId, received]
+                    properties:
+                      productId: { type: string }
+                      received: { type: integer }
+      responses:
+        "200": { description: PO received — inventory updated }
+
+  # ── Billing ─────────────────────────────────────────────────────────────────
+  /api/v1/billing/invoices:
+    get:
+      summary: List invoices
+      operationId: listInvoices
+      tags: [Billing]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [open, paid, overdue, voided] }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        "200": { description: Invoices }
+    post:
+      summary: Create invoice
+      operationId: createInvoice
+      tags: [Billing]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customerId, totalCents]
+              properties:
+                customerId: { type: string }
+                orderId: { type: string }
+                totalCents: { type: integer }
+                dueDate: { type: integer }
+      responses:
+        "201": { description: Invoice created }
+
+  /api/v1/billing/invoices/{id}/pay:
+    post:
+      summary: Record invoice payment
+      operationId: payInvoice
+      tags: [Billing]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amountCents]
+              properties:
+                amountCents: { type: integer }
+                method: { type: string }
+      responses:
+        "200": { description: Payment recorded }
+
+  /api/v1/billing/bills:
+    get:
+      summary: List bills (AP)
+      operationId: listBills
+      tags: [Billing]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+      responses:
+        "200": { description: Bills }
+    post:
+      summary: Create bill
+      operationId: createBill
+      tags: [Billing]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                supplierId: { type: string }
+                totalCents: { type: integer }
+                dueDate: { type: integer }
+                discountPct: { type: number }
+                discountDate: { type: integer }
+      responses:
+        "201": { description: Bill created }
+
+  /api/v1/billing/bills/{id}/pay:
+    post:
+      summary: Pay bill
+      operationId: payBill
+      tags: [Billing]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amountCents]
+              properties:
+                amountCents: { type: integer }
+                method: { type: string }
+      responses:
+        "200": { description: Payment recorded; early discount applied if eligible }
+
+  # ── Audit Log ───────────────────────────────────────────────────────────────
+  /api/v1/audit_log:
+    get:
+      summary: List audit log entries
+      operationId: listAuditLog
+      tags: [Audit]
+      parameters:
+        - name: actor
+          in: query
+          schema: { type: string }
+        - name: resource_type
+          in: query
+          schema: { type: string }
+        - name: action
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer }
+      responses:
+        "200": { description: Audit log entries }
+
+  # ── SSO ─────────────────────────────────────────────────────────────────────
+  /api/v1/sso/config:
+    get:
+      summary: Get SSO configuration
+      operationId: getSsoConfig
+      tags: [SSO]
+      description: Owner only.
+      responses:
+        "200": { description: OIDC/SAML config }
+    put:
+      summary: Upsert SSO configuration
+      operationId: setSsoConfig
+      tags: [SSO]
+      description: Owner only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled, clientId, clientSecret, discoveryUrl]
+              properties:
+                enabled: { type: boolean }
+                providerName: { type: string }
+                clientId: { type: string }
+                clientSecret: { type: string }
+                discoveryUrl: { type: string }
+                defaultRole: { $ref: "#/components/schemas/Role" }
+      responses:
+        "200": { description: SSO config saved }
+    delete:
+      summary: Delete SSO configuration
+      operationId: deleteSsoConfig
+      tags: [SSO]
+      description: Owner only.
+      responses:
+        "204": { description: SSO config deleted }
+
+  /api/v1/sso/initiate:
+    post:
+      summary: Initiate OIDC login
+      operationId: ssoInitiate
+      security: []
+      tags: [SSO]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantId, redirectUri]
+              properties:
+                tenantId: { type: string }
+                redirectUri: { type: string }
+      responses:
+        "200": { description: OIDC authorization URL }
+
+  /api/v1/sso/callback:
+    post:
+      summary: Handle OIDC callback
+      operationId: ssoCallback
+      security: []
+      tags: [SSO]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [state, code, redirectUri]
+              properties:
+                state: { type: string }
+                code: { type: string }
+                redirectUri: { type: string }
+      responses:
+        "200":
+          description: Token pair for the authenticated user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenPair" }

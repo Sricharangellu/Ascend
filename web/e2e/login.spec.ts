@@ -14,8 +14,8 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 test("valid credentials redirect to the app", async ({ page }) => {
   await page.goto("/login");
-  await page.getByLabel(/email/i).fill("owner@demo.com");
-  await page.getByLabel(/password/i).fill("demo1234");
+  await page.getByLabel(/email/i).fill("owner@finder-pos.dev");
+  await page.getByLabel(/password/i).fill("FinderDemo!2026");
   await page.getByRole("button", { name: /sign in|log in/i }).click();
 
   await page.waitForURL(/\/(dashboard|terminal|sell)/, { timeout: 15_000 });
@@ -24,7 +24,7 @@ test("valid credentials redirect to the app", async ({ page }) => {
 
 test("wrong password shows error and stays on /login", async ({ page }) => {
   await page.goto("/login");
-  await page.getByLabel(/email/i).fill("owner@demo.com");
+  await page.getByLabel(/email/i).fill("owner@finder-pos.dev");
   await page.getByLabel(/password/i).fill("wrongpassword");
   await page.getByRole("button", { name: /sign in|log in/i }).click();
 
@@ -38,8 +38,8 @@ test("wrong password shows error and stays on /login", async ({ page }) => {
 test("logout returns to /login", async ({ page }) => {
   // Log in first.
   await page.goto("/login");
-  await page.getByLabel(/email/i).fill("owner@demo.com");
-  await page.getByLabel(/password/i).fill("demo1234");
+  await page.getByLabel(/email/i).fill("owner@finder-pos.dev");
+  await page.getByLabel(/password/i).fill("FinderDemo!2026");
   await page.getByRole("button", { name: /sign in|log in/i }).click();
   await page.waitForURL(/\/(dashboard|terminal|sell)/);
 

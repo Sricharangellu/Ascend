@@ -22,9 +22,9 @@ test.describe("POS checkout", () => {
 
   test("search and add a product to the cart", async ({ page }) => {
     const searchBox = page.getByPlaceholder(/search|scan|barcode|sku/i).first();
-    await searchBox.fill("demo");
+    await searchBox.fill("coffee");
     // At least one product result should appear.
-    const firstResult = page.getByRole("button", { name: /add|demo/i }).first();
+    const firstResult = page.getByRole("button", { name: /add|coffee/i }).first();
     await expect(firstResult).toBeVisible({ timeout: 8_000 });
     await firstResult.click();
 
@@ -36,8 +36,8 @@ test.describe("POS checkout", () => {
   test("complete a cash payment end-to-end", async ({ page }) => {
     // Add a product.
     const searchBox = page.getByPlaceholder(/search|scan|barcode|sku/i).first();
-    await searchBox.fill("demo");
-    const firstResult = page.getByRole("button", { name: /add|demo/i }).first();
+    await searchBox.fill("coffee");
+    const firstResult = page.getByRole("button", { name: /add|coffee/i }).first();
     await expect(firstResult).toBeVisible({ timeout: 8_000 });
     await firstResult.click();
 

@@ -138,6 +138,10 @@ jobs:
             curl -sf http://localhost:3001/healthz && break
             sleep 2
           done
+      - name: Seed E2E demo data
+        run: tsx scripts/seed-e2e.ts
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/finder_e2e
       # ── Build and start the frontend ────────────────────────────────────────
       - name: Install frontend deps
         run: npm ci
@@ -170,8 +174,8 @@ jobs:
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
           NEXT_PUBLIC_API_BASE_URL: http://localhost:3001
-          E2E_EMAIL: owner@demo.com
-          E2E_PASSWORD: demo1234
+          E2E_EMAIL: owner@finder-pos.dev
+          E2E_PASSWORD: FinderDemo!2026
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4

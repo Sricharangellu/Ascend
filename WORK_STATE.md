@@ -6,12 +6,13 @@
 Status: not started
 
 ## Files in flight
-None — INF-8 committed cleanly. No uncommitted changes.
+None — INF-8 committed cleanly. Docs and OpenAPI catch-up just written (uncommitted).
 
 ## Recent decisions
 - **INF-8 offline queue** — Two queues: localStorage (cart sync via syncOutbox) + IndexedDB (payment captures via offlineOutbox → SW Background Sync). SW was already complete; TenderScreen already enqueues to IDB. Gap closed: OfflineQueueBanner now tracks IDB count + listens for OUTBOX_ITEM_REPLAYED from SW.
 - **UX-2 module marketplace** — `/setup/modules` page: left sidebar nav, right card grid, toggles, sticky save bar. Mock handler added to mockHandlers.ts for /settings/business-profile.
 - **UX-3 dashboard widgets** — `VerticalWidgets.tsx`: 8 self-fetching widgets, WIDGET_MAP keyed by module name, fails silently, injected above operational widgets in dashboard.
+- **Documentation** — `docs/` tree created with 27 knowledge articles; `contracts/openapi.yaml` updated from 6 paths → 100+ paths covering all modules.
 
 ## Context cliff notes
 - Offline: localStorage = cart sync orders; IDB = payment captures. Both shown in OfflineQueueBanner.

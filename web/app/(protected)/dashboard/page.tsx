@@ -19,6 +19,8 @@ import { LineChart } from "@/components/charts/LineChart";
 import { BarChart } from "@/components/charts/BarChart";
 import { useFinderContext, type FinderDateRange } from "@/lib/useFinderContext";
 import { useRealtimeStream } from "@/hooks/useRealtimeStream";
+import { useModuleFlags } from "@/hooks/useModuleFlags";
+import { VerticalWidgets } from "@/components/dashboard/VerticalWidgets";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -734,6 +736,9 @@ export default function DashboardPage() {
             <QuickActionCard href="/inventory" label="Manage Inventory" icon={<IconBox />} />
           </div>
         </section>
+
+        {/* ── Vertical-specific widgets (UX-3) ──────────────────────────── */}
+        <VerticalWidgets />
 
         {/* ── Operational widgets ────────────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
