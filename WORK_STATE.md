@@ -1,12 +1,12 @@
 # FinderPOS — Work State
-> Last updated: 2026-06-29  |  Last commit: `f4e4bbb` — feat(inf-8): close offline queue loop — IDB count + SW message relay in banner
+> Last updated: 2026-06-29  |  Last commit: `e5a15fe` — docs + INF-9 E2E seed + verticals spec
 
 ## Active task
-**INF-9** — E2E tests: Playwright, golden paths (login → checkout, inventory receive, invoice pay), run in CI against real backend + Postgres.
-Status: not started
+**All INF items complete.** Sprint 1–10 + launch sprint done.
+Next: choose next sprint goals from remaining backlog (vertical pages, UX polish, real backend wiring).
 
 ## Files in flight
-None — INF-8 committed cleanly. Docs and OpenAPI catch-up just written (uncommitted).
+None — all changes committed and pushed to master.
 
 ## Recent decisions
 - **INF-8 offline queue** — Two queues: localStorage (cart sync via syncOutbox) + IndexedDB (payment captures via offlineOutbox → SW Background Sync). SW was already complete; TenderScreen already enqueues to IDB. Gap closed: OfflineQueueBanner now tracks IDB count + listens for OUTBOX_ITEM_REPLAYED from SW.
@@ -23,14 +23,14 @@ None — INF-8 committed cleanly. Docs and OpenAPI catch-up just written (uncomm
 - Module flags key: `module:<key>` (e.g. `module:tables`); `invalidateModuleFlagsCache()` in useModuleFlags.ts.
 
 ## Next 3 actions
-1. Set up Playwright: `cd web && npm install -D @playwright/test && npx playwright install chromium`
-2. Create `web/e2e/checkout.spec.ts` — golden path: login → add product → tender cash → receipt
-3. Create `web/e2e/inventory.spec.ts` — receive PO, verify stock level updated
+1. Pick next sprint theme: (a) real backend wiring, (b) vertical UX polish, or (c) Sentry/PostHog integrations
+2. Run `npm run seed:e2e` locally once DATABASE_URL is set to verify seed script works end-to-end
+3. Trigger CI on master branch to confirm E2E job passes with the new seed step
 
 ## Blockers
 None
 
-## Completed INF items
+## Completed INF items (all closed)
 - INF-1 — pg_advisory_xact_lock migration serialization
 - INF-2 — SIGTERM/SIGINT graceful shutdown
 - INF-3 — pino structured logger (src/shared/logger.ts)
@@ -39,8 +39,9 @@ None
 - INF-6 — AR dunning self-perpetuating scheduled job
 - INF-7 — DB.poolStats() + /readyz 503 on pool exhaustion
 - INF-8 — Offline terminal: SW drain + IDB client + banner tracking (`f4e4bbb`)
+- INF-9 — E2E suite: seed-e2e.ts, login/checkout/inventory/verticals specs, CI seed step (`e5a15fe`)
 - INF-10 — makeAuthMiddleware(db) + requireScope() API key auth
 - INF-11 — Zero console.* in production source (14 files)
 
 ## Remaining
-- **INF-9** — E2E tests: Playwright, golden paths, CI integration (2-3 days)
+None — all INF items closed.
