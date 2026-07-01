@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-06-30  |  Last commit: `fc6aa85`
+> Last updated: 2026-07-01  |  Last commit: `46e1a89`
 
 ---
 
@@ -137,6 +137,8 @@ _None._
 
 - [x] **Design system — local date helpers** — ✅ DONE: `web/lib/date.ts` created with `fmtDate`, `fmtDateShort`, `fmtDateTime`, `fmtTime`; 5 import sites fixed (payments, appointments, imports-exports, inventory/counts, inventory/serials). Remaining pages (insights, ecommerce, purchasing, quotes, workforce) still have local definitions — audit these next.
 
+- [x] **Design system — date helpers migration** — ✅ DONE: all 44 raw `new Date(x).toLocale*()` calls across 26 files replaced with `fmtDate`/`fmtTime`/`fmtDateTime` from `@/lib/date`. 3 custom-format sites kept intentionally (weekday header, 2-digit year, appointment picker). Zero TS errors. Commit `46e1a89`.
+
 - [ ] **Design system — money in form inputs** — `(cents / 100).toFixed(2)` used to seed edit-form inputs in `catalog/page.tsx` (ln 94, 98, 99, 843–845), `customers/[id]/page.tsx` (ln 680, 699), `accounting/page.tsx` (ln 336). Correct for edit inputs (need dollar string), but comment-document why to avoid false audit flags.
 
 - [ ] **Page size — split required** — pages exceeding 800-line threshold:
@@ -159,7 +161,10 @@ Score: 94/100 — launch-ready, zero CRITICAL. Fix remaining MEDIUM before v2:
 1. **Split customers/page.tsx (810 ln)** — extract filter bar, table, customer detail drawer to `_components/`
 2. **Split dashboard/page.tsx (803 ln)** — extract KPI section, top products, payment breakdown
 3. **Split discounts/page.tsx (765 ln)** — extract discount form, promotions section
-4. **Finish date.ts migration** — replace `new Date(x).toLocaleDateString()` with `fmtDate(x)` across: hospitality, golf/members, reporting/purchases, restaurant/tabs, gift-cards, rental, sales, catalog/[id], entertainment, education, operations
+4. ~~**Finish date.ts migration**~~ ✅ DONE — 26 files, 44 instances, commit `46e1a89`
+
+**Done this session (2026-07-01, continued):**
+- Date migration: 44 raw `toLocale*()` calls across 26 files → `fmtDate`/`fmtTime`/`fmtDateTime`; 3 custom formats intentionally kept; zero TS errors; commit `46e1a89`
 
 **Done this session (2026-07-01):**
 - Settings page split: CoaSection + DepositsSection + LoyaltyTiersSection → `_components/` (1003→644 ln)
