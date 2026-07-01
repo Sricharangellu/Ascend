@@ -509,6 +509,35 @@ export const mockHandlers = [
   }),
 
   // ── Inventory transfers ───────────────────────────────────────────────────
+  http.get(`${V1}/inventory/transfers`, async () => {
+    await lat();
+    const D = 86400000, now = Date.now();
+    return HttpResponse.json({ items: [
+      { id: "xfr_1", transfer_number: "TRF-0001", from_location: "Warehouse", to_location: "Main Store", status: "completed", qty: 50, created_at: now - 2*D, due_date: now - D, note: "Weekly restock" },
+      { id: "xfr_2", transfer_number: "TRF-0002", from_location: "Main Store", to_location: "Downtown",  status: "in_transit", qty: 12, created_at: now - 3600000, due_date: now + D, note: null },
+      { id: "xfr_3", transfer_number: "TRF-0003", from_location: "Warehouse", to_location: "Downtown",  status: "pending",    qty: 24, created_at: now - 5*D, due_date: now + 2*D, note: "Low stock alert" },
+      { id: "xfr_4", transfer_number: "TRF-0004", from_location: "Warehouse", to_location: "Main Store", status: "completed", qty: 18, created_at: now - 8*D, due_date: now - 7*D, note: null },
+    ] });
+  }),
+  http.get(`${V1}/inventory/supplier-returns`, async () => {
+    await lat();
+    const D = 86400000, now = Date.now();
+    return HttpResponse.json({ items: [
+      { id: "ret_1", return_number: "RET-0001", supplier: "Acme Coffee Co", from_location: "Main Store", status: "sent",    qty: 8,  total_cost_cents: 4800, created_at: now - 4*D, note: "Damaged goods" },
+      { id: "ret_2", return_number: "RET-0002", supplier: "Tea Traders",    from_location: "Main Store", status: "pending", qty: 4,  total_cost_cents: 2200, created_at: now - D,   note: "Overshipment" },
+      { id: "ret_3", return_number: "RET-0003", supplier: "Acme Coffee Co", from_location: "Downtown",  status: "credited", qty: 12, total_cost_cents: 7200, created_at: now - 10*D, note: "Wrong SKU" },
+    ] });
+  }),
+  // Alias used by inventory Returns tab
+  http.get(`${V1}/inventory/returns`, async () => {
+    await lat();
+    const D = 86400000, now = Date.now();
+    return HttpResponse.json({ items: [
+      { id: "ret_1", number: "RET-0001", from_location: "Main Store", to_location: "Acme Coffee Co", status: "sent",    total_qty: 8,  total_cost_cents: 4800, created_at: now - 4*D,  due_date: null, note: "Damaged goods" },
+      { id: "ret_2", number: "RET-0002", from_location: "Main Store", to_location: "Tea Traders",    status: "pending", total_qty: 4,  total_cost_cents: 2200, created_at: now - D,    due_date: null, note: "Overshipment" },
+      { id: "ret_3", number: "RET-0003", from_location: "Downtown",   to_location: "Acme Coffee Co", status: "received",total_qty: 12, total_cost_cents: 7200, created_at: now - 10*D, due_date: null, note: "Wrong SKU" },
+    ] });
+  }),
   http.post(`${V1}/inventory/transfers`, async ({ request }) => {
     await lat();
     const b = (await request.json()) as { from_location_id: string; to_location_id: string; product_id: string; quantity: number; note?: string };
