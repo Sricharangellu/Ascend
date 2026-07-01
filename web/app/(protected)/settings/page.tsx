@@ -146,7 +146,7 @@ function StoreSection({ canManage, addToast }: { canManage: boolean; addToast: R
 
   return (
     <Card className="flex flex-col gap-4">
-      {error && <div className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
+      {error && <div role="alert" className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-slate-950">Store profile</h2>

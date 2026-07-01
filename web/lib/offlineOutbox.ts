@@ -173,7 +173,7 @@ export async function requestSync(): Promise<void> {
     const registration = await navigator.serviceWorker.ready;
     // Background Sync API — Chrome/Edge; not in Firefox/Safari
     if ("sync" in registration) {
-      await (registration as any).sync.register("checkout-replay");
+      await (registration as unknown as { sync: { register(tag: string): Promise<void> } }).sync.register("checkout-replay");
     }
     // Always also post a message so the SW can try immediately if online
     registration.active?.postMessage({ type: "DRAIN_OUTBOX" });

@@ -134,7 +134,7 @@ export default function AccountingPage() {
           <h1 className="text-lg font-semibold text-slate-950">Accounting operations</h1>
           <p className="mt-1 text-sm text-slate-500">Manage account mapping, deposit approvals, receivables, and payables.</p>
         </div>
-        {error && <div className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
+        {error && <div role="alert" className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
 
         <Card
           title="Chart of Accounts"

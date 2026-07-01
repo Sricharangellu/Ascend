@@ -417,7 +417,7 @@ export default function CustomersPage() {
         size="lg"
         footer={
           <div className="flex items-center justify-between gap-3">
-            {saveError && <p className="text-sm text-red-600">{saveError}</p>}
+            {saveError && <p role="alert" className="text-sm text-red-600">{saveError}</p>}
             <div className="ml-auto flex gap-2">
               <Button variant="secondary" size="sm" onClick={() => setShowNewCustomer(false)}>Cancel</Button>
               <Button type="submit" form="new-customer-form" variant="primary" size="sm" disabled={saving}>

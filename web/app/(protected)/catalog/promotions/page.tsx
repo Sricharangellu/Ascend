@@ -136,7 +136,7 @@ function PromoFormModal({
           <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-lg text-xl text-gray-400 hover:bg-gray-100">&times;</button>
         </div>
         <form id="promo-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {err && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>}
+          {err && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>}
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Promotion name <span className="text-red-500">*</span></label>
@@ -454,7 +454,7 @@ export default function PromotionsPage() {
           <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl" onClick={e => e.stopPropagation()}>
             <h2 className="text-base font-semibold text-gray-900">Delete &ldquo;{deleteTarget.name}&rdquo;?</h2>
             <p className="mt-2 text-sm text-gray-600">This will permanently remove the promotion. This action cannot be undone.</p>
-            {deleteError && <p className="mt-3 text-sm text-red-700">{deleteError}</p>}
+            {deleteError && <p role="alert" className="mt-3 text-sm text-red-700">{deleteError}</p>}
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setDeleteTarget(null)}
                 className="min-h-[40px] rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>

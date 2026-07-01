@@ -179,7 +179,7 @@ export default function GiftCardsPage() {
                 </Button>
               </div>
 
-              {checkError && <p className="text-sm text-red-600">{checkError}</p>}
+              {checkError && <p role="alert" className="text-sm text-red-600">{checkError}</p>}
 
               {checkedCard && (
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-2">

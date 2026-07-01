@@ -122,7 +122,7 @@ function ShiftModal({ employees, shift, prefillDate, prefillEmployee, onClose, o
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
         </div>
         <form id="shift-form" onSubmit={submit} className="p-6 space-y-4">
-          {error && <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>}
+          {error && <div role="alert" className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Employee <span className="text-red-500">*</span></label>
             <select
