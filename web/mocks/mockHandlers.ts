@@ -4505,7 +4505,61 @@ mockHandlers.push(
       { id: "tab_3", customer_name: "Lee",     table_id: null,    status: "closed", opened_at: BASE - 180 * 60_000, closed_at: BASE - 60 * 60_000, order_ids: ["ord_4", "ord_5", "ord_6"] },
     ];
 
+    // ── FE-R4: Dashboard KPI data ────────────────────────────────────────────
+    const TOP_ITEMS = [
+      { name: "Margherita Pizza",    qty_sold: 24, revenue_cents: 50_400 },
+      { name: "Caesar Salad",        qty_sold: 19, revenue_cents: 28_500 },
+      { name: "Espresso",            qty_sold: 41, revenue_cents: 16_400 },
+      { name: "Grilled Salmon",      qty_sold: 14, revenue_cents: 46_200 },
+      { name: "Garlic Bread",        qty_sold: 31, revenue_cents: 12_400 },
+      { name: "Tiramisu",            qty_sold: 18, revenue_cents: 25_200 },
+      { name: "House Wine (Glass)",  qty_sold: 27, revenue_cents: 40_500 },
+    ];
+    const HOURLY = [
+      { hour: "10", label: "10 AM", revenue_cents: 8_200  },
+      { hour: "11", label: "11 AM", revenue_cents: 15_400 },
+      { hour: "12", label: "12 PM", revenue_cents: 42_100 },
+      { hour: "13", label: "1 PM",  revenue_cents: 38_600 },
+      { hour: "14", label: "2 PM",  revenue_cents: 21_300 },
+      { hour: "15", label: "3 PM",  revenue_cents: 14_800 },
+      { hour: "16", label: "4 PM",  revenue_cents: 9_500  },
+      { hour: "17", label: "5 PM",  revenue_cents: 28_900 },
+      { hour: "18", label: "6 PM",  revenue_cents: 47_200 },
+      { hour: "19", label: "7 PM",  revenue_cents: 51_800 },
+      { hour: "20", label: "8 PM",  revenue_cents: 39_400 },
+      { hour: "21", label: "9 PM",  revenue_cents: 18_200 },
+    ];
+
     return [
+      // GET restaurant dashboard KPIs
+      http.get(`${V1}/restaurant/dashboard`, async () => {
+        await lat();
+        const now = Date.now();
+        const occupied = tables.filter(t => t.status === "occupied");
+        const totalCovers = occupied.reduce((s, t) => s + (t.current_session?.party_size ?? 0), 0);
+        return HttpResponse.json({
+          kpis: {
+            covers_today:       47 + totalCovers,
+            avg_ticket_cents:   3_840,
+            table_turns_today:  2.3,
+            peak_hour:          "7:00–8:00 PM",
+            open_tables:        occupied.length,
+            total_tables:       tables.length,
+            revenue_today_cents: 335_400,
+          },
+          top_items: TOP_ITEMS,
+          hourly_revenue: HOURLY,
+          active_sessions: tables
+            .filter(t => t.status === "occupied" && t.current_session)
+            .map(t => ({
+              table_number: t.table_number,
+              floor_section: t.floor_section,
+              party_size: t.current_session!.party_size,
+              elapsed_mins: Math.round((now - t.current_session!.opened_at) / 60_000),
+            })),
+        });
+      }),
+
       // GET tables (with embedded current_session for floor plan elapsed timer)
       http.get(`${V1}/restaurant/tables`, async ({ request }) => {
         await lat();
@@ -4562,6 +4616,80 @@ mockHandlers.push(
         if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
         tabs[idx] = { ...tabs[idx]!, status: "closed", closed_at: Date.now() };
         return HttpResponse.json(tabs[idx]);
+      }),
+
+      // ── BE-R3/R4: Course assignment + Kitchen Display ────────────────────
+
+      // In-memory course assignments: line_id → { course, status }
+      ...(() => {
+        interface KitchenLine {
+          line_id: string; order_id: string; order_number: string;
+          course: string; course_status: string; product_name: string;
+          quantity: number; table_number: string | null; floor_section: string | null;
+          updated_at: number;
+        }
+        const courseMap = new Map<string, KitchenLine>([
+          ["oln_demo_1", { line_id: "oln_demo_1", order_id: "ord_demo_1", order_number: "FP-DEMO0001", course: "appetizer", course_status: "pending", product_name: "Garlic Bread", quantity: 2, table_number: "T1", floor_section: "Main", updated_at: Date.now() - 120000 }],
+          ["oln_demo_2", { line_id: "oln_demo_2", order_id: "ord_demo_1", order_number: "FP-DEMO0001", course: "main",      course_status: "in_progress", product_name: "Margherita Pizza", quantity: 1, table_number: "T1", floor_section: "Main", updated_at: Date.now() - 60000 }],
+          ["oln_demo_3", { line_id: "oln_demo_3", order_id: "ord_demo_2", order_number: "FP-DEMO0002", course: "drinks",   course_status: "pending", product_name: "Espresso", quantity: 3, table_number: "T4", floor_section: "Bar", updated_at: Date.now() - 30000 }],
+        ]);
+
+        return [
+          http.get(`${V1}/restaurant/kitchen/queue`, async ({ request }) => {
+            await lat();
+            const url = new URL(request.url);
+            const outletId = url.searchParams.get("outletId");
+            const section  = url.searchParams.get("section");
+            let items = [...courseMap.values()].filter(i => i.course_status === "pending" || i.course_status === "in_progress");
+            if (section) items = items.filter(i => i.floor_section === section);
+            void outletId;
+            const courses = ["appetizer", "main", "dessert", "drinks"] as const;
+            const grouped: Record<string, KitchenLine[]> = Object.fromEntries(courses.map(c => [c, items.filter(i => i.course === c)]));
+            return HttpResponse.json({ items, grouped });
+          }),
+
+          http.patch(`${V1}/restaurant/kitchen/:lineId/bump`, async ({ params }) => {
+            await lat();
+            const lineId = String(params["lineId"]);
+            const item = courseMap.get(lineId);
+            if (!item) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+            const NEXT: Record<string, string> = { pending: "in_progress", in_progress: "ready", ready: "served" };
+            const updated = { ...item, course_status: NEXT[item.course_status] ?? "served", updated_at: Date.now() };
+            courseMap.set(lineId, updated);
+            return HttpResponse.json(updated);
+          }),
+
+          http.patch(`${V1}/orders/:id/lines/:lineId/course`, async ({ params, request }) => {
+            await lat();
+            const body = (await request.json()) as { course: string };
+            const lineId = String(params["lineId"]);
+            const orderId = String(params["id"]);
+            const existing = courseMap.get(lineId);
+            const now = Date.now();
+            const entry: KitchenLine = { ...(existing ?? { product_name: "Item", quantity: 1, table_number: null, floor_section: null, order_number: `FP-${orderId.slice(-8).toUpperCase()}`, updated_at: now }), line_id: lineId, order_id: orderId, course: body.course, course_status: "pending", updated_at: now };
+            courseMap.set(lineId, entry);
+            return HttpResponse.json({ id: `ocrse_${lineId}`, order_id: orderId, line_id: lineId, course: body.course, status: "pending", created_at: now, updated_at: now });
+          }),
+        ];
+      })(),
+
+      // ── BE-R5: Split check ───────────────────────────────────────────────
+
+      http.post(`${V1}/orders/:id/split`, async ({ params, request }) => {
+        await lat();
+        const body = (await request.json()) as { splitCount?: number; lineIds?: string[][] };
+        const orderId = String(params["id"]);
+        const n = body.splitCount ?? (body.lineIds?.length ?? 2);
+        const now = Date.now();
+        const children = Array.from({ length: n }, (_, i) => ({
+          id: `ord_split_${i + 1}`, tenant_id: "tnt_demo",
+          order_number: `FP-SPL${String(i + 1).padStart(4, "0")}`,
+          state_code: "CA", status: "open",
+          subtotal_cents: 1000, discount_cents: 0, tax_cents: 80, total_cents: 1080,
+          customer_id: null, store_id: null, parent_order_id: orderId,
+          created_at: now, updated_at: now, lines: [],
+        }));
+        return HttpResponse.json(children, { status: 201 });
       }),
     ];
   })(),

@@ -33,7 +33,8 @@ export type NavKey =
   | "inventory-reorder" | "inventory-counts" | "workforce" | "appointments"
   | "healthcare" | "automotive" | "hospitality" | "manufacturing" | "rental"
   | "entertainment" | "education" | "module-marketplace" | "kitchen" | "bar-tabs"
-  | "golf" | "golf-bookings" | "golf-members" | "golf-pro-shop";
+  | "golf" | "golf-bookings" | "golf-members" | "golf-pro-shop"
+  | "restaurant-dashboard" | "restaurant-floor-plan" | "restaurant-tabs";
 
 // ── Section mapping: NavKey → which rail icon is highlighted ──────────────────
 
@@ -61,6 +62,7 @@ const SECTION_MAP: Record<NavKey, RailSection> = {
   automotive: "setup", hospitality: "setup", manufacturing: "setup",
   rental: "setup", entertainment: "setup", education: "setup",
   kitchen: "sell", "bar-tabs": "sell",
+  "restaurant-dashboard": "sell", "restaurant-floor-plan": "sell", "restaurant-tabs": "sell",
   golf: "sell", "golf-bookings": "sell", "golf-members": "sell", "golf-pro-shop": "sell",
 } as Record<NavKey, RailSection>;
 
