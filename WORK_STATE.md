@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-01  |  Last commit: `46e1a89`
+> Last updated: 2026-07-01  |  Last commit: `b7e3278`
 
 ---
 
@@ -36,6 +36,10 @@
 | **Team / Roles** | ✅ Built | Staff list, custom roles, permissions |
 | **Workflows** | ✅ Built | Automation rules, condition/action builder, step editor |
 | **Settings** | ✅ Built | Mega-page: store profile, tax rates, payment modes, loyalty tiers, shipping, security, COA, receipt templates, API keys, currencies |
+| **Settings → Permissions** | ✅ Built | Role-based feature toggles (Admin/Manager/Cashier/Warehouse/Read-only) with RBAC PATCH endpoint |
+| **Settings → Business Modes** | ✅ Built | Enable/disable verticals (Retail/Restaurant/Golf/B2B/Ecommerce/Kiosk/etc.) — wired to moduleFlags API |
+| **Settings → Kiosk Mode** | ✅ Built | Kiosk config: PIN, idle timeout, payment methods, price visibility, portal URL |
+| **Settings → B2B Portal** | ✅ Built | B2B config: customer groups with discount %, payment terms, order approval, credit limits |
 | **Setup** | ✅ Built | Business profile, modules toggle — sub-pages route to correct Settings section |
 | **Integrations** | ✅ Built | App marketplace, connected integrations |
 | **Notifications** | ✅ Built | Notification inbox + channel preferences |
