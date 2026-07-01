@@ -1,15 +1,5 @@
 "use client";
 
-/**
- * EnterpriseShell — retail operations frame.
- *
- * Layout per reference spec:
- *   - Fixed top bar 48px  dark #1a1a1a  (☰ Menu | Search ⌘/ | Help · Bell · User)
- *   - Fixed left rail 52px dark #1a1a1a  (9 icon sections, icon-only)
- *   - "Sell" rail icon → fly-out panel with register context + sub-items
- *   - Content area: top-12 ml-[52px], bg #F5F5F5
- */
-
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -20,7 +10,7 @@ import { useOffline } from "@/lib/useOffline";
 import { useFinderContext } from "@/lib/useFinderContext";
 import { useModuleFlags } from "@/hooks/useModuleFlags";
 
-// ── NavKey type (kept for backward compat — all pages pass active="...") ──────
+// ── NavKey ────────────────────────────────────────────────────────────────────
 
 export type NavKey =
   | "dashboard" | "register" | "inventory" | "purchasing" | "customers"
@@ -34,9 +24,10 @@ export type NavKey =
   | "healthcare" | "automotive" | "hospitality" | "manufacturing" | "rental"
   | "entertainment" | "education" | "module-marketplace" | "kitchen" | "bar-tabs"
   | "golf" | "golf-bookings" | "golf-members" | "golf-pro-shop"
-  | "restaurant-dashboard" | "restaurant-floor-plan" | "restaurant-tabs";
+  | "restaurant-dashboard" | "restaurant-floor-plan" | "restaurant-tabs"
+  | "permissions" | "modes" | "kiosk-settings" | "b2b-settings";
 
-// ── Section mapping: NavKey → which rail icon is highlighted ──────────────────
+// ── Section / nav tree ────────────────────────────────────────────────────────
 
 type RailSection =
   | "home" | "sell" | "online" | "reporting" | "catalog"
@@ -64,17 +55,117 @@ const SECTION_MAP: Record<NavKey, RailSection> = {
   kitchen: "sell", "bar-tabs": "sell",
   "restaurant-dashboard": "sell", "restaurant-floor-plan": "sell", "restaurant-tabs": "sell",
   golf: "sell", "golf-bookings": "sell", "golf-members": "sell", "golf-pro-shop": "sell",
+  permissions: "setup", modes: "setup", "kiosk-settings": "setup", "b2b-settings": "setup",
 } as Record<NavKey, RailSection>;
 
-// Sell section fly-out sub-items
-const SELL_SUBMENU = [
-  { label: "Sell",             href: "/sell" },
-  { label: "Open / Close",     href: "/sell#open-close" },
-  { label: "Sales history",    href: "/sales" },
-  { label: "Cash management",  href: "/sell#cash" },
-  { label: "Status",           href: "/operations" },
-  { label: "Settings",         href: "/setup" },
-  { label: "Quotes",           href: "/quotes" },
+type NavChild = { label: string; href: string };
+
+type NavSection = {
+  section: RailSection;
+  label: string;
+  href?: string;
+  icon: React.ReactNode;
+  children?: NavChild[];
+  moduleGate?: string; // only show if this module flag is enabled
+};
+
+const NAV_TREE: NavSection[] = [
+  {
+    section: "home",
+    label: "Home",
+    href: "/dashboard",
+    icon: <HomeIcon />,
+  },
+  {
+    section: "sell",
+    label: "Sell",
+    icon: <SellIcon />,
+    children: [
+      { label: "Register",       href: "/terminal" },
+      { label: "Sales",          href: "/sales" },
+      { label: "Orders",         href: "/orders" },
+      { label: "Quotes",         href: "/quotes" },
+      { label: "Returns",        href: "/returns" },
+      { label: "Payments",       href: "/payments" },
+      { label: "Service Orders", href: "/service-orders" },
+    ],
+  },
+  {
+    section: "online",
+    label: "Online",
+    href: "/ecommerce",
+    icon: <OnlineIcon />,
+    moduleGate: "ecommerce",
+  },
+  {
+    section: "reporting",
+    label: "Reporting",
+    icon: <ReportingIcon />,
+    children: [
+      { label: "Reports",        href: "/reports" },
+      { label: "Insights",       href: "/insights" },
+      { label: "Tax Compliance", href: "/tax-compliance" },
+    ],
+  },
+  {
+    section: "catalog",
+    label: "Catalog",
+    icon: <CatalogIcon />,
+    children: [
+      { label: "Products",   href: "/catalog" },
+      { label: "Discounts",  href: "/discounts" },
+      { label: "Gift Cards", href: "/gift-cards" },
+      { label: "Loyalty",    href: "/loyalty" },
+    ],
+  },
+  {
+    section: "inventory",
+    label: "Inventory",
+    icon: <InventoryIcon />,
+    children: [
+      { label: "Overview",       href: "/inventory" },
+      { label: "Receive Stock",  href: "/inventory/receive-stock" },
+      { label: "Purchasing",     href: "/purchasing" },
+      { label: "Vendors",        href: "/vendors" },
+      { label: "Operations",     href: "/operations" },
+    ],
+  },
+  {
+    section: "customers",
+    label: "Customers",
+    icon: <CustomersIcon />,
+    children: [
+      { label: "Customers",    href: "/customers" },
+      { label: "Appointments", href: "/appointments" },
+    ],
+  },
+  {
+    section: "finance",
+    label: "Finance",
+    icon: <FinanceIcon />,
+    children: [
+      { label: "Overview",   href: "/finance" },
+      { label: "Accounting", href: "/accounting" },
+      { label: "Invoicing",  href: "/invoicing" },
+    ],
+  },
+  {
+    section: "setup",
+    label: "Setup",
+    icon: <SetupIcon />,
+    children: [
+      { label: "Settings",       href: "/settings" },
+      { label: "Permissions",    href: "/settings/permissions" },
+      { label: "Business Modes", href: "/settings/modes" },
+      { label: "Kiosk Mode",     href: "/settings/kiosk" },
+      { label: "B2B Portal",     href: "/settings/b2b" },
+      { label: "Team",           href: "/team" },
+      { label: "Workflows",      href: "/workflows" },
+      { label: "Integrations",   href: "/integrations" },
+      { label: "Imports/Exports",href: "/imports-exports" },
+      { label: "Audit Log",      href: "/audit-log" },
+    ],
+  },
 ];
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -97,6 +188,7 @@ export function EnterpriseShell({
   contentClassName,
 }: EnterpriseShellProps) {
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(true);
 
   const handleGlobalKey = useCallback((e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "/")) {
@@ -110,25 +202,31 @@ export function EnterpriseShell({
     return () => window.removeEventListener("keydown", handleGlobalKey);
   }, [handleGlobalKey]);
 
+  const sidebarW = sidebarExpanded ? 220 : 52;
+
   return (
     <div className="flex min-h-screen flex-col bg-[#F5F5F5]">
-      {/* Skip link */}
       <a href="#main-content" className="skip-link">Skip to content</a>
 
-      {/* ── Top bar ──────────────────────────────────────────────────────── */}
-      <TopBar onSearchClick={() => setPaletteOpen(true)} />
+      <TopBar
+        onSearchClick={() => setPaletteOpen(true)}
+        onMenuToggle={() => setSidebarExpanded((e) => !e)}
+      />
 
-      {/* ── Body: sidebar + content ───────────────────────────────────────── */}
       <div className="flex flex-1 pt-12">
-        <LeftRail active={active} />
+        <LeftRail
+          active={active}
+          expanded={sidebarExpanded}
+          onCollapseToggle={() => setSidebarExpanded((e) => !e)}
+        />
 
-        {/* Content area — sits right of the 52px rail */}
         <main
           id="main-content"
           className={[
-            "flex flex-1 flex-col min-w-0 ml-[52px]",
+            "flex flex-1 flex-col min-w-0 transition-[margin-left] duration-200 ease-in-out",
             contentClassName ?? "overflow-y-auto",
           ].join(" ")}
+          style={{ marginLeft: sidebarW }}
         >
           {banner}
           {children}
@@ -142,7 +240,13 @@ export function EnterpriseShell({
 
 // ── Top bar ───────────────────────────────────────────────────────────────────
 
-function TopBar({ onSearchClick }: { onSearchClick: () => void }) {
+function TopBar({
+  onSearchClick,
+  onMenuToggle,
+}: {
+  onSearchClick: () => void;
+  onMenuToggle: () => void;
+}) {
   const { user, logout } = useAuth();
   const { isOffline } = useOffline();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -163,17 +267,17 @@ function TopBar({ onSearchClick }: { onSearchClick: () => void }) {
       className="fixed top-0 left-0 right-0 z-50 flex h-12 items-center gap-3 px-3"
       style={{ backgroundColor: "var(--color-topbar-bg)" }}
     >
-      {/* Left: hamburger + Menu label */}
+      {/* Hamburger — toggles sidebar */}
       <button
         type="button"
+        onClick={onMenuToggle}
         className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors shrink-0"
-        aria-label="Toggle menu"
+        aria-label="Toggle sidebar"
       >
         <HamburgerIcon />
-        <span className="text-sm font-medium hidden sm:block">Menu</span>
       </button>
 
-      {/* Center: search */}
+      {/* Search */}
       <button
         type="button"
         onClick={onSearchClick}
@@ -182,21 +286,25 @@ function TopBar({ onSearchClick }: { onSearchClick: () => void }) {
       >
         <SearchIcon />
         <span className="flex-1 text-left">Search…</span>
-        <kbd className="rounded border border-white/20 bg-white/10 px-1.5 py-0.5 text-[11px] text-white/40">⌘/</kbd>
+        <kbd className="rounded border border-white/20 bg-white/10 px-1.5 py-0.5 text-[11px] text-white/40">
+          ⌘/
+        </kbd>
       </button>
 
-      {/* Right: offline pill + Help + Bell + User */}
+      {/* Right controls */}
       <div className="flex items-center gap-3 shrink-0">
         {isOffline && (
           <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[11px] font-semibold text-white">
             Offline
           </span>
         )}
-        <a href="/help" className="hidden sm:block text-sm text-white/60 hover:text-white transition-colors">
+        <a
+          href="/help"
+          className="hidden sm:block text-sm text-white/60 hover:text-white transition-colors"
+        >
           Help
         </a>
         <NotificationBell />
-        {/* User menu */}
         <div className="relative" ref={menuRef}>
           <button
             type="button"
@@ -215,7 +323,12 @@ function TopBar({ onSearchClick }: { onSearchClick: () => void }) {
                 <p className="text-xs font-semibold text-slate-900 truncate">{user?.name}</p>
                 <p className="text-xs text-slate-500 truncate">{user?.email}</p>
               </div>
-              <Link href="/setup" className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">Account settings</Link>
+              <Link
+                href="/setup"
+                className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                Account settings
+              </Link>
               <button
                 type="button"
                 onClick={() => void logout()}
@@ -231,266 +344,324 @@ function TopBar({ onSearchClick }: { onSearchClick: () => void }) {
   );
 }
 
-// ── Left rail ─────────────────────────────────────────────────────────────────
+// ── Left rail / sidebar ───────────────────────────────────────────────────────
 
-function LeftRail({ active }: { active: NavKey }) {
+function LeftRail({
+  active,
+  expanded,
+  onCollapseToggle,
+}: {
+  active: NavKey;
+  expanded: boolean;
+  onCollapseToggle: () => void;
+}) {
   const pathname = usePathname();
   const { enabled: enabledModules } = useModuleFlags();
   const activeSection = SECTION_MAP[active] ?? "home";
-  const [flyout, setFlyout] = useState<RailSection | null>(null);
-  const railRef = useRef<HTMLElement>(null);
-
-  // Close fly-out when clicking outside
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (railRef.current && !railRef.current.contains(e.target as Node)) {
-        setFlyout(null);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
   const { registerId } = useFinderContext();
 
-  // Rail items — show/hide based on enabled modules
-  const railItems: { section: RailSection; label: string; href?: string; icon: React.ReactNode }[] = [
-    { section: "home",      label: "Home",      href: "/dashboard",  icon: <HomeIcon /> },
-    { section: "sell",      label: "Sell",                           icon: <SellIcon /> },
-    ...(enabledModules.has("ecommerce") || enabledModules.has("*")
-      ? [{ section: "online" as RailSection, label: "Online", href: "/ecommerce", icon: <OnlineIcon /> }]
-      : []),
-    { section: "reporting", label: "Reporting", href: "/reporting",  icon: <ReportingIcon /> },
-    { section: "catalog",   label: "Catalog",   href: "/catalog",    icon: <CatalogIcon /> },
-    { section: "inventory", label: "Inventory", href: "/inventory",  icon: <InventoryIcon /> },
-    { section: "customers", label: "Customers", href: "/customers",  icon: <CustomersIcon /> },
-    { section: "finance",   label: "Finance",   href: "/finance",    icon: <FinanceIcon /> },
-    { section: "setup",     label: "Setup",     href: "/setup",      icon: <SetupIcon /> },
-  ];
+  // Track which sections are open (expanded sub-items)
+  const [openSections, setOpenSections] = useState<Set<RailSection>>(
+    new Set([activeSection])
+  );
 
-  function handleRailClick(section: RailSection, href?: string) {
-    if (section === "sell") {
-      setFlyout((prev) => (prev === "sell" ? null : "sell"));
-    } else {
-      setFlyout(null);
-      if (href) window.location.href = href;
-    }
-  }
+  // When active section changes, auto-open it
+  useEffect(() => {
+    setOpenSections((prev) => new Set([...prev, activeSection]));
+  }, [activeSection]);
+
+  const toggleSection = (section: RailSection) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
+      return next;
+    });
+  };
+
+  // Filter nav items by module gates
+  const navItems = NAV_TREE.filter((item) => {
+    if (!item.moduleGate) return true;
+    return enabledModules.has(item.moduleGate) || enabledModules.has("*");
+  });
 
   return (
-    <>
-      <nav
-        ref={railRef}
-        aria-label="Primary navigation"
-        className="fixed left-0 top-12 bottom-0 z-40 flex w-[52px] flex-col items-center py-2 gap-0.5"
-        style={{ backgroundColor: "var(--color-sidebar-bg)" }}
-      >
-        {railItems.map((item) => {
+    <nav
+      aria-label="Primary navigation"
+      className="fixed left-0 top-12 bottom-0 z-40 flex flex-col overflow-hidden transition-[width] duration-200 ease-in-out"
+      style={{
+        width: expanded ? 220 : 52,
+        backgroundColor: "var(--color-sidebar-bg)",
+      }}
+    >
+      {/* ── Nav items ─────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden py-2 scrollbar-hide">
+        {navItems.map((item) => {
           const isActive = activeSection === item.section;
-          const isFlyoutOpen = flyout === item.section;
+          const hasChildren = !!(item.children && item.children.length > 0);
+          const isOpen = openSections.has(item.section);
+
           return (
-            <button
-              key={item.section}
-              type="button"
-              title={item.label}
-              aria-label={item.label}
-              aria-current={isActive ? "true" : undefined}
-              onClick={() => handleRailClick(item.section, item.href)}
-              className="group relative flex w-10 h-10 items-center justify-center rounded-lg transition-colors"
-              style={{
-                backgroundColor: isActive || isFlyoutOpen
-                  ? "var(--color-sidebar-active)"
-                  : "transparent",
-                color: isActive || isFlyoutOpen ? "#fff" : "rgba(255,255,255,0.5)",
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive && !isFlyoutOpen) {
-                  (e.currentTarget as HTMLElement).style.backgroundColor = "var(--color-sidebar-hover)";
-                  (e.currentTarget as HTMLElement).style.color = "#fff";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive && !isFlyoutOpen) {
-                  (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
-                  (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.5)";
-                }
-              }}
-            >
-              {item.icon}
-              {/* Tooltip */}
-              <span className="pointer-events-none absolute left-[52px] rounded bg-[#333] px-2 py-1 text-xs font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-                {item.label}
-              </span>
-            </button>
-          );
-        })}
-
-        {/* Spacer + expand (bottom) */}
-        <div className="flex-1" />
-        <button
-          type="button"
-          title="Expand sidebar"
-          aria-label="Expand sidebar"
-          className="flex h-10 w-10 items-center justify-center rounded-lg text-white/40 hover:text-white transition-colors"
-        >
-          <ExpandIcon />
-        </button>
-      </nav>
-
-      {/* ── Sell fly-out panel ──────────────────────────────────────────── */}
-      {flyout === "sell" && (
-        <div
-          className="fixed left-[52px] top-12 bottom-0 z-30 w-56 flex flex-col shadow-2xl"
-          style={{ backgroundColor: "var(--color-sidebar-flyout)" }}
-        >
-          {/* Register context header */}
-          <div className="border-b border-white/10 px-4 py-3">
-            <p className="text-[11px] font-medium uppercase tracking-widest text-white/40">
-              {registerId ?? "Main Register"}
-            </p>
-            <div className="mt-0.5 flex items-center justify-between">
-              <p className="text-sm font-semibold text-white">Main Outlet</p>
-              <button
-                type="button"
-                className="rounded border border-white/20 px-2 py-0.5 text-[11px] text-white/60 hover:text-white transition-colors"
-              >
-                Switch
-              </button>
-            </div>
-          </div>
-
-          {/* Sub-items */}
-          <nav aria-label="Sell section" className="flex flex-col py-1">
-            {SELL_SUBMENU.map((item) => {
-              const isCurrentPage = pathname === item.href || pathname.startsWith(item.href + "/");
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setFlyout(null)}
-                  className="flex items-center px-4 py-2.5 text-sm transition-colors"
+            <div key={item.section}>
+              {/* Section header button */}
+              {hasChildren || !item.href ? (
+                <button
+                  type="button"
+                  title={expanded ? undefined : item.label}
+                  aria-label={item.label}
+                  aria-expanded={hasChildren ? isOpen : undefined}
+                  onClick={() => {
+                    if (hasChildren) toggleSection(item.section);
+                    else if (item.href) window.location.href = item.href;
+                  }}
+                  className={`group relative flex w-full items-center gap-3 px-3 py-2.5 transition-colors ${
+                    isActive
+                      ? "text-white"
+                      : "text-white/55 hover:text-white"
+                  }`}
                   style={{
-                    backgroundColor: isCurrentPage ? "rgba(93,95,239,0.25)" : "transparent",
-                    color: isCurrentPage ? "#fff" : "rgba(255,255,255,0.65)",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isCurrentPage) (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(255,255,255,0.08)";
-                    (e.currentTarget as HTMLElement).style.color = "#fff";
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isCurrentPage) (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
-                    (e.currentTarget as HTMLElement).style.color = isCurrentPage ? "#fff" : "rgba(255,255,255,0.65)";
+                    backgroundColor: isActive && !expanded
+                      ? "var(--color-sidebar-active)"
+                      : "transparent",
                   }}
                 >
-                  {isCurrentPage && (
-                    <span className="mr-2 h-1.5 w-1.5 rounded-full bg-[#5D5FEF]" />
+                  {/* Active indicator (expanded mode) */}
+                  {expanded && isActive && (
+                    <span className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-[#5D5FEF]" />
                   )}
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-      )}
 
-      {/* Click-away overlay when fly-out is open */}
-      {flyout && (
-        <div
-          className="fixed inset-0 z-20"
-          onClick={() => setFlyout(null)}
-        />
-      )}
-    </>
+                  {/* Icon */}
+                  <span className="shrink-0">{item.icon}</span>
+
+                  {/* Label + chevron — only when expanded */}
+                  {expanded && (
+                    <>
+                      <span className="flex-1 truncate text-left text-sm font-medium">
+                        {item.label}
+                      </span>
+                      {hasChildren && (
+                        <ChevronSmall
+                          className={`shrink-0 transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`}
+                        />
+                      )}
+                    </>
+                  )}
+
+                  {/* Tooltip (collapsed only) */}
+                  {!expanded && (
+                    <span className="pointer-events-none absolute left-[52px] z-50 rounded bg-[#333] px-2 py-1 text-xs font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                      {item.label}
+                    </span>
+                  )}
+                </button>
+              ) : (
+                <Link
+                  href={item.href}
+                  title={expanded ? undefined : item.label}
+                  aria-label={item.label}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`group relative flex w-full items-center gap-3 px-3 py-2.5 transition-colors ${
+                    isActive ? "text-white" : "text-white/55 hover:text-white"
+                  }`}
+                  style={{
+                    backgroundColor: isActive && !expanded
+                      ? "var(--color-sidebar-active)"
+                      : "transparent",
+                  }}
+                >
+                  {expanded && isActive && (
+                    <span className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-[#5D5FEF]" />
+                  )}
+                  <span className="shrink-0">{item.icon}</span>
+                  {expanded && (
+                    <span className="flex-1 truncate text-left text-sm font-medium">
+                      {item.label}
+                    </span>
+                  )}
+                  {!expanded && (
+                    <span className="pointer-events-none absolute left-[52px] z-50 rounded bg-[#333] px-2 py-1 text-xs font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                      {item.label}
+                    </span>
+                  )}
+                </Link>
+              )}
+
+              {/* Sub-items — only in expanded mode */}
+              {expanded && hasChildren && isOpen && item.children && (
+                <div className="pb-1">
+                  {/* Register context header for Sell section */}
+                  {item.section === "sell" && (
+                    <div className="mx-3 mb-1.5 mt-0.5 flex items-center justify-between rounded-md bg-white/5 px-2.5 py-1.5">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-white/35">
+                          {registerId ?? "Main Register"}
+                        </p>
+                        <p className="text-xs font-medium text-white/70">Main Outlet</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="text-[10px] font-medium text-white/40 hover:text-white/70 transition-colors"
+                      >
+                        Switch
+                      </button>
+                    </div>
+                  )}
+
+                  {item.children.map((child) => {
+                    const isCurrent =
+                      pathname === child.href ||
+                      pathname.startsWith(child.href + "/");
+                    return (
+                      <Link
+                        key={child.href}
+                        href={child.href}
+                        className={`flex items-center gap-2 py-1.5 pl-[46px] pr-3 text-xs transition-colors ${
+                          isCurrent
+                            ? "font-semibold text-white"
+                            : "font-normal text-white/50 hover:text-white/80"
+                        }`}
+                      >
+                        {isCurrent && (
+                          <span className="h-1 w-1 shrink-0 rounded-full bg-[#5D5FEF]" />
+                        )}
+                        <span className={isCurrent ? "" : "ml-3"}>{child.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Bottom: collapse toggle ───────────────────────────────────── */}
+      <div className="border-t border-white/10 p-2">
+        <button
+          type="button"
+          onClick={onCollapseToggle}
+          title={expanded ? "Collapse sidebar" : "Expand sidebar"}
+          aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+          className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-white/35 transition-colors hover:bg-white/5 hover:text-white/70"
+        >
+          <CollapseIcon flipped={expanded} />
+          {expanded && (
+            <span className="text-xs font-medium">Collapse</span>
+          )}
+        </button>
+      </div>
+    </nav>
   );
 }
 
-// ── Rail icons (24×24 SVG) ────────────────────────────────────────────────────
+// ── Icons ─────────────────────────────────────────────────────────────────────
 
 function HomeIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
       <polyline points="9 22 9 12 15 12 15 22" />
     </svg>
   );
 }
+
 function SellIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
       <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
     </svg>
   );
 }
+
 function OnlineIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="14" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
     </svg>
   );
 }
+
 function ReportingIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" />
-      <line x1="6" y1="20" x2="6" y2="14" /><line x1="2" y1="20" x2="22" y2="20" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+      <line x1="2" y1="20" x2="22" y2="20" />
     </svg>
   );
 }
+
 function CatalogIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
       <line x1="7" y1="7" x2="7.01" y2="7" />
     </svg>
   );
 }
+
 function InventoryIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-      <polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" />
+      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+      <line x1="12" y1="22.08" x2="12" y2="12" />
     </svg>
   );
 }
+
 function CustomersIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   );
 }
+
 function FinanceIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="12" y1="1" x2="12" y2="23" />
+      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
     </svg>
   );
 }
+
 function SetupIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   );
 }
+
 function HamburgerIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="18" x2="21" y2="18" />
     </svg>
   );
 }
+
 function SearchIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
     </svg>
   );
 }
+
 function ChevronDown() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -498,10 +669,24 @@ function ChevronDown() {
     </svg>
   );
 }
-function ExpandIcon() {
+
+function ChevronSmall({ className }: { className?: string }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polyline points="13 17 18 12 13 7" /><polyline points="6 17 11 12 6 7" />
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={className}>
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}
+
+function CollapseIcon({ flipped }: { flipped: boolean }) {
+  return (
+    <svg
+      width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+      className={`transition-transform duration-200 ${flipped ? "" : "rotate-180"}`}
+    >
+      <polyline points="11 17 6 12 11 7" />
+      <polyline points="18 17 13 12 18 7" />
     </svg>
   );
 }
