@@ -123,7 +123,8 @@ export function registerRoutes(router: Router, service: PurchasingService): void
 
   router.get("/vendor-credits", handler(async (req, res) => {
     const supplierId = typeof req.query.supplierId === "string" ? req.query.supplierId : undefined;
-    res.json({ items: await service.listVendorCredits(tenantId(res), supplierId) });
+    const poId = typeof req.query.poId === "string" ? req.query.poId : undefined;
+    res.json({ items: await service.listVendorCreditsFiltered(tenantId(res), { supplierId, poId }) });
   }));
 
   router.post("/vendor-credits/:id/void", mgr, handler(async (req, res) => {
@@ -203,6 +204,73 @@ export function registerRoutes(router: Router, service: PurchasingService): void
       b.freightCents,
       b.otherChargesCents ?? 0,
     ));
+  }));
+
+  // PO price history
+  router.get("/orders/:id/price-history", handler(async (req, res) => {
+    res.json({ items: await service.priceHistory(String(req.params.id), tenantId(res)) });
+  }));
+
+  // PO documents
+  router.get("/orders/:id/documents", handler(async (req, res) => {
+    res.json({ items: await service.listPODocuments(String(req.params.id), tenantId(res)) });
+  }));
+
+  router.post("/orders/:id/documents", mgr, handler(async (req, res) => {
+    const b = parseBody(z.object({
+      name: z.string().min(1),
+      type: z.string().optional(),
+      size_bytes: z.number().int().nonnegative().optional(),
+    }), req.body);
+    res.status(201).json(await service.addPODocument(String(req.params.id), tenantId(res), {
+      name: b.name, type: b.type ?? "other", sizeBytes: b.size_bytes ?? 0,
+    }));
+  }));
+
+  router.delete("/orders/:id/documents/:docId", mgr, handler(async (req, res) => {
+    await service.deletePODocument(String(req.params.id), String(req.params.docId), tenantId(res));
+    res.status(204).end();
+  }));
+
+  // PO billing adjustments
+  router.get("/orders/:id/billing-adj", handler(async (req, res) => {
+    res.json({ items: await service.listBillingAdj(String(req.params.id), tenantId(res)) });
+  }));
+
+  router.post("/orders/:id/billing-adj", mgr, handler(async (req, res) => {
+    const b = parseBody(z.object({
+      lineId: z.string().min(1).optional(),
+      reason: z.string().min(1),
+      amountCents: z.number().int(),
+    }), req.body);
+    res.status(201).json(await service.createBillingAdj(String(req.params.id), tenantId(res), b));
+  }));
+
+  // Vendor quotes
+  router.get("/vendor-quotes", handler(async (_req, res) => {
+    res.json({ items: await service.listVendorQuotes(tenantId(res)) });
+  }));
+
+  router.post("/vendor-quotes", mgr, handler(async (req, res) => {
+    const b = parseBody(z.object({
+      supplierId: z.string().min(1),
+      expiresAt: z.number().int().positive().optional(),
+      lines: z.array(z.object({
+        productId: z.string().min(1),
+        productName: z.string().optional(),
+        qty: z.number().int().positive(),
+        unitPriceCents: z.number().int().nonnegative(),
+      })).min(1),
+    }), req.body);
+    res.status(201).json(await service.createVendorQuote(tenantId(res), b));
+  }));
+
+  router.patch("/vendor-quotes/:id/accept", mgr, handler(async (req, res) => {
+    res.json(await service.updateVendorQuoteStatus(String(req.params.id), tenantId(res), "accepted"));
+  }));
+
+  router.patch("/vendor-quotes/:id/reject", mgr, handler(async (req, res) => {
+    res.json(await service.updateVendorQuoteStatus(String(req.params.id), tenantId(res), "rejected"));
   }));
 
   // Supplier addresses

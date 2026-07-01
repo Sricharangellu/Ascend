@@ -663,4 +663,152 @@ export class PurchasingService {
     );
     return { id, supplier_id: supplierId, tenant_id: tenantId, ...input, created_at: now, updated_at: now };
   }
+
+  // ── PO documents ─────────────────────────────────────────────────────────────
+
+  async listPODocuments(poId: string, tenantId: string) {
+    return this.db.query<{ id: string; po_id: string; name: string; type: string; size_bytes: number; uploaded_at: number }>(
+      "SELECT id, po_id, name, type, size_bytes, uploaded_at FROM po_documents WHERE po_id = @poId AND tenant_id = @t ORDER BY uploaded_at DESC LIMIT 100",
+      { poId, t: tenantId },
+    );
+  }
+
+  async addPODocument(poId: string, tenantId: string, input: { name: string; type: string; sizeBytes: number }) {
+    const id = `pdoc_${uuidv7()}`;
+    const now = Date.now();
+    await this.db.query(
+      "INSERT INTO po_documents (id, tenant_id, po_id, name, type, size_bytes, uploaded_at) VALUES (@id, @t, @poId, @name, @type, @size, @now)",
+      { id, t: tenantId, poId, name: input.name, type: input.type, size: input.sizeBytes, now },
+    );
+    return { id, po_id: poId, name: input.name, type: input.type, size_bytes: input.sizeBytes, uploaded_at: now };
+  }
+
+  async deletePODocument(poId: string, docId: string, tenantId: string) {
+    await this.db.query(
+      "DELETE FROM po_documents WHERE id = @docId AND po_id = @poId AND tenant_id = @t",
+      { docId, poId, t: tenantId },
+    );
+  }
+
+  // ── PO billing adjustments ───────────────────────────────────────────────────
+
+  async listBillingAdj(poId: string, tenantId: string) {
+    return this.db.query<{ id: string; po_id: string; line_id: string | null; reason: string; amount_cents: number; created_at: number }>(
+      "SELECT id, po_id, line_id, reason, amount_cents, created_at FROM po_billing_adjustments WHERE po_id = @poId AND tenant_id = @t ORDER BY created_at ASC",
+      { poId, t: tenantId },
+    );
+  }
+
+  async createBillingAdj(poId: string, tenantId: string, input: { lineId?: string; reason: string; amountCents: number }) {
+    const id = `badj_${uuidv7()}`;
+    const now = Date.now();
+    await this.db.query(
+      "INSERT INTO po_billing_adjustments (id, tenant_id, po_id, line_id, reason, amount_cents, created_at) VALUES (@id, @t, @poId, @lineId, @reason, @amount, @now)",
+      { id, t: tenantId, poId, lineId: input.lineId ?? null, reason: input.reason, amount: input.amountCents, now },
+    );
+    return { id, po_id: poId, line_id: input.lineId ?? null, reason: input.reason, amount_cents: input.amountCents, created_at: now };
+  }
+
+  // ── Vendor price history ─────────────────────────────────────────────────────
+  // Returns the last 5 unit costs for each product on the given PO, sourced
+  // from product_costs (which is updated on every receive).
+
+  async priceHistory(poId: string, tenantId: string) {
+    const lines = await this.db.query<{ product_id: string; product_name: string | null; unit_cost_cents: number }>(
+      "SELECT product_id, product_name, unit_cost_cents FROM purchase_order_lines WHERE po_id = @poId AND tenant_id = @t",
+      { poId, t: tenantId },
+    );
+    const history = await Promise.all(
+      lines.map(async (l) => {
+        const hist = await this.db.query<{ unit_cost_cents: number; received_at: number; po_id: string }>(
+          `SELECT pol.unit_cost_cents, po.received_at, po.id AS po_id
+           FROM purchase_order_lines pol
+           JOIN purchase_orders po ON po.id = pol.po_id
+           WHERE pol.product_id = @productId AND pol.tenant_id = @t
+             AND po.status IN ('received','partially_received')
+           ORDER BY po.received_at DESC NULLS LAST
+           LIMIT 5`,
+          { productId: l.product_id, t: tenantId },
+        );
+        return {
+          product_id: l.product_id,
+          product_name: l.product_name ?? l.product_id,
+          sku: l.product_id,
+          history: hist,
+        };
+      }),
+    );
+    return history.filter((h) => h.history.length > 0);
+  }
+
+  // ── Vendor quotes ────────────────────────────────────────────────────────────
+
+  async listVendorQuotes(tenantId: string) {
+    const quotes = await this.db.query<{ id: string; supplier_id: string; status: string; expires_at: number | null; total_cents: number; created_at: number; updated_at: number }>(
+      "SELECT id, supplier_id, status, expires_at, total_cents, created_at, updated_at FROM vendor_quotes WHERE tenant_id = @t ORDER BY created_at DESC LIMIT 100",
+      { t: tenantId },
+    );
+    const items = await Promise.all(quotes.map(async (q) => {
+      const lines = await this.db.query<{ id: string; product_id: string; product_name: string | null; qty: number; unit_price_cents: number }>(
+        "SELECT id, product_id, product_name, qty, unit_price_cents FROM vendor_quote_lines WHERE quote_id = @qid AND tenant_id = @t",
+        { qid: q.id, t: tenantId },
+      );
+      const [supplier] = await this.db.query<{ name: string }>("SELECT name FROM suppliers WHERE id = @id AND tenant_id = @t", { id: q.supplier_id, t: tenantId });
+      return { ...q, vendor: supplier?.name ?? q.supplier_id, line_items: lines };
+    }));
+    return items;
+  }
+
+  async createVendorQuote(tenantId: string, input: { supplierId: string; lines: Array<{ productId: string; productName?: string; qty: number; unitPriceCents: number }>; expiresAt?: number }) {
+    const id = `vq_${uuidv7()}`;
+    const now = Date.now();
+    const total = input.lines.reduce((s, l) => s + l.qty * l.unitPriceCents, 0);
+    await this.db.query(
+      "INSERT INTO vendor_quotes (id, tenant_id, supplier_id, status, expires_at, total_cents, created_at, updated_at) VALUES (@id, @t, @sid, 'pending', @exp, @total, @now, @now)",
+      { id, t: tenantId, sid: input.supplierId, exp: input.expiresAt ?? null, total, now },
+    );
+    for (const l of input.lines) {
+      await this.db.query(
+        "INSERT INTO vendor_quote_lines (id, tenant_id, quote_id, product_id, product_name, qty, unit_price_cents) VALUES (@lid, @t, @qid, @pid, @pname, @qty, @price)",
+        { lid: `vql_${uuidv7()}`, t: tenantId, qid: id, pid: l.productId, pname: l.productName ?? null, qty: l.qty, price: l.unitPriceCents },
+      );
+    }
+    const [supplier] = await this.db.query<{ name: string }>("SELECT name FROM suppliers WHERE id = @sid AND tenant_id = @t", { sid: input.supplierId, t: tenantId });
+    return { id, supplier_id: input.supplierId, vendor: supplier?.name ?? input.supplierId, status: "pending", expires_at: input.expiresAt ?? null, total_cents: total, line_items: input.lines.map((l, i) => ({ id: `vql_${i}`, product_id: l.productId, product_name: l.productName ?? null, qty: l.qty, unit_price_cents: l.unitPriceCents })), created_at: now, updated_at: now };
+  }
+
+  async updateVendorQuoteStatus(id: string, tenantId: string, status: "accepted" | "rejected") {
+    await this.db.query(
+      "UPDATE vendor_quotes SET status = @status, updated_at = @now WHERE id = @id AND tenant_id = @t",
+      { status, now: Date.now(), id, t: tenantId },
+    );
+    const [q] = await this.db.query<{ id: string; supplier_id: string; status: string; expires_at: number | null; total_cents: number; created_at: number; updated_at: number }>(
+      "SELECT * FROM vendor_quotes WHERE id = @id AND tenant_id = @t",
+      { id, t: tenantId },
+    );
+    if (!q) throw new HttpError(404, "not_found", "Vendor quote not found");
+    return q;
+  }
+
+  // ── Override listVendorCredits to support poId filter ───────────────────────
+
+  async listVendorCreditsFiltered(tenantId: string, filters: { supplierId?: string; poId?: string }) {
+    const { supplierId, poId } = filters;
+    if (poId) {
+      return this.db.query<VendorCredit>(
+        "SELECT * FROM vendor_credits WHERE tenant_id = @t AND po_id = @poId ORDER BY created_at DESC LIMIT 100",
+        { t: tenantId, poId },
+      );
+    }
+    if (supplierId) {
+      return this.db.query<VendorCredit>(
+        "SELECT * FROM vendor_credits WHERE tenant_id = @t AND supplier_id = @sid ORDER BY created_at DESC LIMIT 100",
+        { t: tenantId, sid: supplierId },
+      );
+    }
+    return this.db.query<VendorCredit>(
+      "SELECT * FROM vendor_credits WHERE tenant_id = @t ORDER BY created_at DESC LIMIT 100",
+      { t: tenantId },
+    );
+  }
 }

@@ -211,6 +211,54 @@ CREATE TABLE IF NOT EXISTS supplier_balances (
 );
 `;
 
+// PO documents, billing adjustments, and vendor quotes for the detail page.
+const CREATE_PO_DOCUMENTS = `
+CREATE TABLE IF NOT EXISTS po_documents (
+  id          TEXT PRIMARY KEY,
+  tenant_id   TEXT NOT NULL,
+  po_id       TEXT NOT NULL,
+  name        TEXT NOT NULL,
+  type        TEXT NOT NULL DEFAULT 'other',
+  size_bytes  BIGINT NOT NULL DEFAULT 0,
+  uploaded_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS po_docs_po_idx ON po_documents (tenant_id, po_id, uploaded_at DESC);
+
+CREATE TABLE IF NOT EXISTS po_billing_adjustments (
+  id          TEXT PRIMARY KEY,
+  tenant_id   TEXT NOT NULL,
+  po_id       TEXT NOT NULL,
+  line_id     TEXT,
+  reason      TEXT NOT NULL,
+  amount_cents BIGINT NOT NULL,
+  created_at  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS po_billing_adj_po_idx ON po_billing_adjustments (tenant_id, po_id, created_at);
+
+CREATE TABLE IF NOT EXISTS vendor_quotes (
+  id          TEXT PRIMARY KEY,
+  tenant_id   TEXT NOT NULL,
+  supplier_id TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'pending',
+  expires_at  BIGINT,
+  total_cents BIGINT NOT NULL DEFAULT 0,
+  created_at  BIGINT NOT NULL,
+  updated_at  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS vendor_quotes_tenant_idx ON vendor_quotes (tenant_id, status, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS vendor_quote_lines (
+  id               TEXT PRIMARY KEY,
+  tenant_id        TEXT NOT NULL,
+  quote_id         TEXT NOT NULL REFERENCES vendor_quotes(id) ON DELETE CASCADE,
+  product_id       TEXT NOT NULL,
+  product_name     TEXT,
+  qty              INTEGER NOT NULL,
+  unit_price_cents BIGINT NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS vql_quote_idx ON vendor_quote_lines (tenant_id, quote_id);
+`;
+
 // PROD-8: FK — purchase_order_lines must reference a real purchase_order row.
 const ADD_PO_LINE_FK = `
 DO $$
@@ -254,7 +302,7 @@ $$;
  *  `purchase_order.received`; inventory listens and increments stock. */
 export const purchasingModule: PosModule = {
   name: "purchasing",
-  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES, ADD_PO_LINE_FK, ADD_PURCHASING_UPDATED_AT_TRIGGERS],
+  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES, ADD_PO_LINE_FK, ADD_PURCHASING_UPDATED_AT_TRIGGERS, CREATE_PO_DOCUMENTS],
   async register({ db, events, router }) {
     const service = new PurchasingService(db, events);
     registerRoutes(router, service);
