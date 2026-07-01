@@ -96,7 +96,7 @@ export default function LandingPage() {
             Start free
           </Link>
           <Link
-            href="/login"
+            href="/login?demo=1"
             className="border border-slate-700 hover:border-slate-500 text-slate-200 font-semibold px-7 py-3 rounded-xl transition-colors text-base"
           >
             View demo

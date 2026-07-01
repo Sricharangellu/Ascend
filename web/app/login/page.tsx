@@ -11,9 +11,9 @@
  *   today) — they render as disabled "coming soon" actions.
  */
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AuthShell } from "@/components/AuthShell";
 import { Button } from "@/components/Button";
 import { useAuth } from "@/lib/useAuth";
@@ -26,13 +26,29 @@ const SSO_PROVIDERS = [
 ] as const;
 
 export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <AuthShell>
+          <LoginCardSkeleton />
+        </AuthShell>
+      }
+    >
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isDemo = searchParams.get("demo") === "1";
   const { status, login, loginError, isLoading } = useAuth();
 
   const [email, setEmail] = useState(
-    process.env.NODE_ENV === "development" ? "cashier@finder-pos.dev" : ""
+    isDemo || process.env.NODE_ENV === "development" ? "owner@finder-pos.dev" : ""
   );
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState(isDemo ? "demo" : "");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [capsLockOn, setCapsLockOn] = useState(false);
@@ -89,6 +105,15 @@ export default function LoginPage() {
             Welcome back. Enter your details to access your workspace.
           </p>
         </div>
+
+        {isDemo && (
+          <div className="mb-5 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800 dark:border-indigo-700/40 dark:bg-indigo-700/10 dark:text-indigo-300">
+            <p className="font-semibold">Demo mode active</p>
+            <p className="mt-0.5 text-indigo-600 dark:text-indigo-400">
+              Credentials are pre-filled. Click <strong>Sign in</strong> to explore the full app with realistic data — no backend required.
+            </p>
+          </div>
+        )}
 
         {loginError && (
           <div
