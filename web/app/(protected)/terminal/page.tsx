@@ -315,8 +315,8 @@ function TerminalInner() {
               <ProductGrid onAddProduct={handleAddProduct} />
             </div>
 
-            {/* Right: Cart panel on desktop; bottom drawer on tablet/mobile */}
-            <div className="h-[42vh] shrink-0 overflow-hidden border-t border-slate-200 lg:h-auto lg:w-80 lg:border-l lg:border-t-0 xl:w-96">
+            {/* Right: Cart panel — spec: 45% width */}
+            <div className="h-[42vh] shrink-0 overflow-hidden border-t border-slate-200 lg:h-auto lg:w-[45%] lg:border-l lg:border-t-0">
               <CartPanel
                 cart={cart}
                 onCharge={handleCharge}
