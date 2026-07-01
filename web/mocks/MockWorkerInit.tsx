@@ -20,37 +20,23 @@ const ENV_MOCKS =
   process.env.NEXT_PUBLIC_MOCK === "true";
 
 export default function MockWorkerInit({ children }: { children: ReactNode }) {
-  // Env-based mocks: block render until the worker registers (original behaviour).
+  // Production non-demo starts as ready; env mocks and demo mode block until worker registers.
   const [ready, setReady] = useState(!ENV_MOCKS);
 
-  // 1. Env-driven mock startup (development / NEXT_PUBLIC_MOCK=true).
   useEffect(() => {
-    if (!ENV_MOCKS) return;
-    let active = true;
-    const fallback = window.setTimeout(() => {
-      if (active) setReady(true);
-    }, 4_000);
+    if (ENV_MOCKS) {
+      // Env-driven path: block render until worker registers (original behaviour).
+      let active = true;
+      const fallback = window.setTimeout(() => { if (active) setReady(true); }, 4_000);
+      import("./browser")
+        .then(({ startWorker }) => startWorker())
+        .catch(() => {})
+        .finally(() => { window.clearTimeout(fallback); if (active) setReady(true); });
+      return () => { active = false; window.clearTimeout(fallback); };
+    }
 
-    import("./browser")
-      .then(({ startWorker }) => startWorker())
-      .catch(() => {})
-      .finally(() => {
-        window.clearTimeout(fallback);
-        if (active) setReady(true);
-      });
-
-    return () => {
-      active = false;
-      window.clearTimeout(fallback);
-    };
-  }, []);
-
-  // 2. Runtime demo mode — activates MSW without a rebuild.
-  //    ?demo=1 sets localStorage so subsequent pages also use mocks.
-  //    The worker registers silently (children are already rendered).
-  useEffect(() => {
-    if (ENV_MOCKS) return; // already handled above
-
+    // Runtime demo mode — check for ?demo=1 or the persisted localStorage flag.
+    let isDemo = false;
     try {
       const params = new URLSearchParams(window.location.search);
       if (params.get("demo") === "1") {
@@ -60,14 +46,23 @@ export default function MockWorkerInit({ children }: { children: ReactNode }) {
         clean.searchParams.delete("demo");
         window.history.replaceState(null, "", clean.toString());
       }
-      if (localStorage.getItem("finder_pos_demo") !== "1") return;
+      isDemo = localStorage.getItem("finder_pos_demo") === "1";
     } catch {
-      return; // localStorage blocked (e.g. private browsing edge cases)
+      // localStorage blocked (private browsing edge cases) — bail out.
     }
 
+    if (!isDemo) return; // Normal production: nothing to do.
+
+    // Demo mode: block rendering until the worker is active so that the first
+    // login request is guaranteed to be intercepted by MSW.
+    setReady(false);
+    let active = true;
+    const fallback = window.setTimeout(() => { if (active) setReady(true); }, 4_000);
     import("./browser")
       .then(({ startWorker }) => startWorker())
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { window.clearTimeout(fallback); if (active) setReady(true); });
+    return () => { active = false; window.clearTimeout(fallback); };
   }, []);
 
   if (!ready) {

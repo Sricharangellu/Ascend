@@ -66,7 +66,12 @@ export function setSession(
   // Persist user profile so silentRefresh can restore it across page loads.
   if (typeof window !== "undefined") {
     sessionStorage.setItem(USER_KEY, JSON.stringify(user));
-    if (process.env.NODE_ENV === "development") {
+    // Store mock refresh token in dev mode AND demo mode so silentRefresh can
+    // send it back to the MSW handler after a page reload.
+    const isMockSession =
+      process.env.NODE_ENV === "development" ||
+      (() => { try { return localStorage.getItem("finder_pos_demo") === "1"; } catch { return false; } })();
+    if (isMockSession) {
       sessionStorage.setItem(MOCK_REFRESH_KEY, _refreshToken);
     }
     document.cookie = "finder_session_hint=1; Path=/; SameSite=Lax";
@@ -134,10 +139,14 @@ export async function silentRefresh(): Promise<boolean> {
     const { apiPost } = await import("@/api-client/client");
 
     // Production uses the httpOnly cookie. MSW cannot create that cookie, so
-    // development sends its mock token from session storage instead.
-    const mockRefreshToken = process.env.NODE_ENV === "development"
-      ? sessionStorage.getItem(MOCK_REFRESH_KEY)
-      : null;
+    // dev mode and demo mode read the mock token stored by setSession instead.
+    let mockRefreshToken: string | null = null;
+    try {
+      const isMockSession =
+        process.env.NODE_ENV === "development" ||
+        localStorage.getItem("finder_pos_demo") === "1";
+      if (isMockSession) mockRefreshToken = sessionStorage.getItem(MOCK_REFRESH_KEY);
+    } catch { /* localStorage blocked */ }
     const data = await apiPost<import("@/api-client/types").RefreshResponse>(
       "/api/identity/refresh",
       mockRefreshToken ? { refreshToken: mockRefreshToken } : {},
