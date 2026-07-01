@@ -48,6 +48,7 @@ export default function ProductDetailPage() {
   const [error, setError]     = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("general");
   const [duplicating, setDuplicating] = useState(false);
+  const [showActions, setShowActions] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -124,19 +125,75 @@ export default function ProductDetailPage() {
 
           {/* Right: actions */}
           <div className="flex items-center gap-2 flex-wrap">
-            <a
-              href="/help"
-              className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 transition-colors"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-              </svg>
-              Help
-            </a>
-            <Button size="sm" variant="secondary" loading={duplicating} onClick={() => void handleDuplicate()}>
-              Duplicate
-            </Button>
+            {/* Quick action menu */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowActions((v) => !v)}
+                className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 transition-colors"
+                aria-haspopup="menu"
+                aria-expanded={showActions}
+              >
+                Actions
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              {showActions && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setShowActions(false)} />
+                  <div className="absolute right-0 top-full z-40 mt-1 w-52 rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+                    <button
+                      type="button"
+                      onClick={() => { setShowActions(false); router.push(`/register?product=${product.id}`); }}
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                      </svg>
+                      Quick Sell
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowActions(false); setActiveTab("returns"); }}
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/>
+                      </svg>
+                      Create Return
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowActions(false); setActiveTab("invoices"); }}
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+                      </svg>
+                      Add to Invoice
+                    </button>
+                    <div className="my-1 border-t border-slate-100" />
+                    <button
+                      type="button"
+                      onClick={() => { setShowActions(false); void handleDuplicate(); }}
+                      disabled={duplicating}
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                      </svg>
+                      {duplicating ? "Duplicating…" : "Duplicate"}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
             <Button size="sm" variant="secondary" onClick={() => router.push("/catalog")}>
               Cancel
             </Button>
