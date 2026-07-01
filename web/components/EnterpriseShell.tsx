@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/useAuth";
 import { useOffline } from "@/lib/useOffline";
 import { useFinderContext } from "@/lib/useFinderContext";
 import { useModuleFlags } from "@/hooks/useModuleFlags";
+import { usePermissions } from "@/contexts/PermissionsContext";
 
 // ── NavKey ────────────────────────────────────────────────────────────────────
 
@@ -58,7 +59,11 @@ const SECTION_MAP: Record<NavKey, RailSection> = {
   permissions: "setup", modes: "setup", "kiosk-settings": "setup", "b2b-settings": "setup",
 } as Record<NavKey, RailSection>;
 
-type NavChild = { label: string; href: string };
+type NavChild = {
+  label: string;
+  href: string;
+  featureGate?: string; // hide if user lacks this feature
+};
 
 type NavSection = {
   section: RailSection;
@@ -66,7 +71,8 @@ type NavSection = {
   href?: string;
   icon: React.ReactNode;
   children?: NavChild[];
-  moduleGate?: string; // only show if this module flag is enabled
+  moduleGate?: string;  // only show if this module flag is enabled
+  featureGate?: string; // hide if user lacks this feature (section-level)
 };
 
 const NAV_TREE: NavSection[] = [
@@ -81,13 +87,13 @@ const NAV_TREE: NavSection[] = [
     label: "Sell",
     icon: <SellIcon />,
     children: [
-      { label: "Register",       href: "/terminal" },
-      { label: "Sales",          href: "/sales" },
-      { label: "Orders",         href: "/orders" },
-      { label: "Quotes",         href: "/quotes" },
-      { label: "Returns",        href: "/returns" },
-      { label: "Payments",       href: "/payments" },
-      { label: "Service Orders", href: "/service-orders" },
+      { label: "Register",       href: "/terminal",       featureGate: "register" },
+      { label: "Sales",          href: "/sales",          featureGate: "sales" },
+      { label: "Orders",         href: "/orders",         featureGate: "orders" },
+      { label: "Quotes",         href: "/quotes",         featureGate: "quotes" },
+      { label: "Returns",        href: "/returns",        featureGate: "returns" },
+      { label: "Payments",       href: "/payments",       featureGate: "payments" },
+      { label: "Service Orders", href: "/service-orders", featureGate: "service-orders" },
     ],
   },
   {
@@ -96,15 +102,16 @@ const NAV_TREE: NavSection[] = [
     href: "/ecommerce",
     icon: <OnlineIcon />,
     moduleGate: "ecommerce",
+    featureGate: "ecommerce",
   },
   {
     section: "reporting",
     label: "Reporting",
     icon: <ReportingIcon />,
     children: [
-      { label: "Reports",        href: "/reports" },
-      { label: "Insights",       href: "/insights" },
-      { label: "Tax Compliance", href: "/tax-compliance" },
+      { label: "Reports",        href: "/reports",        featureGate: "reports" },
+      { label: "Insights",       href: "/insights",       featureGate: "insights" },
+      { label: "Tax Compliance", href: "/tax-compliance", featureGate: "tax-compliance" },
     ],
   },
   {
@@ -112,10 +119,10 @@ const NAV_TREE: NavSection[] = [
     label: "Catalog",
     icon: <CatalogIcon />,
     children: [
-      { label: "Products",   href: "/catalog" },
-      { label: "Discounts",  href: "/discounts" },
-      { label: "Gift Cards", href: "/gift-cards" },
-      { label: "Loyalty",    href: "/loyalty" },
+      { label: "Products",   href: "/catalog",    featureGate: "catalog" },
+      { label: "Discounts",  href: "/discounts",  featureGate: "discounts" },
+      { label: "Gift Cards", href: "/gift-cards", featureGate: "gift-cards" },
+      { label: "Loyalty",    href: "/loyalty",    featureGate: "loyalty" },
     ],
   },
   {
@@ -123,11 +130,11 @@ const NAV_TREE: NavSection[] = [
     label: "Inventory",
     icon: <InventoryIcon />,
     children: [
-      { label: "Overview",       href: "/inventory" },
-      { label: "Receive Stock",  href: "/inventory/receive-stock" },
-      { label: "Purchasing",     href: "/purchasing" },
-      { label: "Vendors",        href: "/vendors" },
-      { label: "Operations",     href: "/operations" },
+      { label: "Overview",      href: "/inventory",               featureGate: "inventory" },
+      { label: "Receive Stock", href: "/inventory/receive-stock", featureGate: "inventory" },
+      { label: "Purchasing",    href: "/purchasing",              featureGate: "purchasing" },
+      { label: "Vendors",       href: "/vendors",                 featureGate: "vendors" },
+      { label: "Operations",    href: "/operations",              featureGate: "operations" },
     ],
   },
   {
@@ -135,8 +142,8 @@ const NAV_TREE: NavSection[] = [
     label: "Customers",
     icon: <CustomersIcon />,
     children: [
-      { label: "Customers",    href: "/customers" },
-      { label: "Appointments", href: "/appointments" },
+      { label: "Customers",    href: "/customers",    featureGate: "customers" },
+      { label: "Appointments", href: "/appointments", featureGate: "appointments" },
     ],
   },
   {
@@ -144,9 +151,9 @@ const NAV_TREE: NavSection[] = [
     label: "Finance",
     icon: <FinanceIcon />,
     children: [
-      { label: "Overview",   href: "/finance" },
-      { label: "Accounting", href: "/accounting" },
-      { label: "Invoicing",  href: "/invoicing" },
+      { label: "Overview",   href: "/finance",    featureGate: "finance" },
+      { label: "Accounting", href: "/accounting", featureGate: "accounting" },
+      { label: "Invoicing",  href: "/invoicing",  featureGate: "invoicing" },
     ],
   },
   {
@@ -154,16 +161,16 @@ const NAV_TREE: NavSection[] = [
     label: "Setup",
     icon: <SetupIcon />,
     children: [
-      { label: "Settings",       href: "/settings" },
-      { label: "Permissions",    href: "/settings/permissions" },
-      { label: "Business Modes", href: "/settings/modes" },
-      { label: "Kiosk Mode",     href: "/settings/kiosk" },
-      { label: "B2B Portal",     href: "/settings/b2b" },
-      { label: "Team",           href: "/team" },
-      { label: "Workflows",      href: "/workflows" },
-      { label: "Integrations",   href: "/integrations" },
-      { label: "Imports/Exports",href: "/imports-exports" },
-      { label: "Audit Log",      href: "/audit-log" },
+      { label: "Settings",        href: "/settings",             featureGate: "settings" },
+      { label: "Permissions",     href: "/settings/permissions", featureGate: "settings" },
+      { label: "Business Modes",  href: "/settings/modes",       featureGate: "settings" },
+      { label: "Kiosk Mode",      href: "/settings/kiosk",       featureGate: "settings" },
+      { label: "B2B Portal",      href: "/settings/b2b",         featureGate: "settings" },
+      { label: "Team",            href: "/team",                 featureGate: "team" },
+      { label: "Workflows",       href: "/workflows",            featureGate: "workflows" },
+      { label: "Integrations",    href: "/integrations",         featureGate: "integrations" },
+      { label: "Imports/Exports", href: "/imports-exports",      featureGate: "imports-exports" },
+      { label: "Audit Log",       href: "/audit-log",            featureGate: "audit-log" },
     ],
   },
 ];
@@ -357,6 +364,7 @@ function LeftRail({
 }) {
   const pathname = usePathname();
   const { enabled: enabledModules } = useModuleFlags();
+  const { hasFeature } = usePermissions();
   const activeSection = SECTION_MAP[active] ?? "home";
   const { registerId } = useFinderContext();
 
@@ -379,10 +387,16 @@ function LeftRail({
     });
   };
 
-  // Filter nav items by module gates
+  // Filter nav items: module gate + feature gate
   const navItems = NAV_TREE.filter((item) => {
-    if (!item.moduleGate) return true;
-    return enabledModules.has(item.moduleGate) || enabledModules.has("*");
+    if (item.moduleGate && !enabledModules.has(item.moduleGate) && !enabledModules.has("*")) return false;
+    if (item.featureGate && !hasFeature(item.featureGate)) return false;
+    // For sections with children, hide if ALL children are gated away
+    if (item.children) {
+      const visible = item.children.filter((c) => !c.featureGate || hasFeature(c.featureGate));
+      if (visible.length === 0) return false;
+    }
+    return true;
   });
 
   return (
@@ -507,7 +521,7 @@ function LeftRail({
                     </div>
                   )}
 
-                  {item.children.map((child) => {
+                  {item.children.filter((c) => !c.featureGate || hasFeature(c.featureGate)).map((child) => {
                     const isCurrent =
                       pathname === child.href ||
                       pathname.startsWith(child.href + "/");

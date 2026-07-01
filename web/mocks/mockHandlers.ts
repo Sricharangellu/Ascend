@@ -5404,7 +5404,33 @@ mockHandlers.push(
     ];
   })(),
 
-  // ── Settings: Role Permissions ───────────────────────────────────────────────
+  // ── Auth: /me ─────────────────────────────────────────────────────────────────
+  ...(() => {
+    const ALL_F = [
+      "register", "sales", "orders", "quotes", "returns", "payments",
+      "price-override", "void-transaction", "service-orders",
+      "catalog", "discounts", "gift-cards", "loyalty",
+      "inventory", "purchasing", "vendors", "operations", "delivery", "shipping",
+      "customers", "appointments",
+      "reports", "insights", "tax-compliance", "finance", "accounting", "invoicing",
+      "ecommerce", "workforce",
+      "team", "settings", "workflows", "integrations", "imports-exports", "audit-log",
+    ];
+    return [
+      http.get(`${V1}/auth/me`, async () => {
+        await lat();
+        return HttpResponse.json({
+          id: "usr_demo_owner",
+          name: "Demo Owner",
+          email: "owner@finder-pos.dev",
+          role: "owner",
+          features: ALL_F,
+        });
+      }),
+    ];
+  })(),
+
+  // ── Settings: Role Permissions + Custom Roles ─────────────────────────────────
   ...(() => {
     const ALL_FEATURES = [
       "register", "sales", "orders", "quotes", "returns", "payments",
@@ -5413,6 +5439,7 @@ mockHandlers.push(
       "inventory", "purchasing", "vendors", "operations", "delivery", "shipping",
       "customers", "appointments",
       "reports", "insights", "tax-compliance", "finance", "accounting", "invoicing",
+      "ecommerce", "workforce",
       "team", "settings", "workflows", "integrations", "imports-exports", "audit-log",
     ];
 
@@ -5431,11 +5458,16 @@ mockHandlers.push(
       warehouse:  ["inventory", "purchasing", "vendors", "operations", "shipping", "catalog"],
     };
 
+    type CRole = { id: string; name: string; description: string; color: string; features: string[] };
+    let customRoles: CRole[] = [];
+    let crlSeq = 100;
+
     return [
       http.get(`${V1}/settings/permissions`, async () => {
         await lat();
         return HttpResponse.json({
           roles: Object.entries(rolePerms).map(([role, features]) => ({ role, features })),
+          customRoles,
         });
       }),
 
@@ -5446,6 +5478,41 @@ mockHandlers.push(
           if (!IMMUTABLE.has(role)) rolePerms[role] = features;
         }
         return HttpResponse.json({ ok: true });
+      }),
+
+      // custom role CRUD — must be BEFORE /settings/custom-roles/:id to avoid clash
+      http.get(`${V1}/settings/custom-roles`, async () => {
+        await lat();
+        return HttpResponse.json({ items: customRoles });
+      }),
+
+      http.post(`${V1}/settings/custom-roles`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as Omit<CRole, "id">;
+        const role: CRole = { id: `crl_${++crlSeq}`, name: b.name, description: b.description ?? "", color: b.color, features: b.features ?? [] };
+        customRoles.push(role);
+        rolePerms[role.id] = role.features;
+        return HttpResponse.json({ id: role.id }, { status: 201 });
+      }),
+
+      http.patch(`${V1}/settings/custom-roles/:id`, async ({ params, request }) => {
+        await lat();
+        const id = String(params["id"]);
+        const b = (await request.json()) as Partial<CRole>;
+        const idx = customRoles.findIndex((r) => r.id === id);
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        customRoles[idx] = { ...customRoles[idx]!, ...b, id };
+        return HttpResponse.json(customRoles[idx]);
+      }),
+
+      http.delete(`${V1}/settings/custom-roles/:id`, async ({ params }) => {
+        await lat();
+        const id = String(params["id"]);
+        const idx = customRoles.findIndex((r) => r.id === id);
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        customRoles.splice(idx, 1);
+        delete rolePerms[id];
+        return new HttpResponse(null, { status: 204 });
       }),
 
       // B2B portal config
