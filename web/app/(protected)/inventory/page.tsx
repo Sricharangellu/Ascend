@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { apiGet, apiPost } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
+import { fmtDate, fmtDateShort } from "@/lib/date";
 import { useToast } from "@/components/Toast";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -69,13 +70,6 @@ const SUPPLIER_NAME: Record<string, string> = {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function fmtDate(ts: number) {
-  return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-function fmtDateShort(ts: number) {
-  return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
 // ── Normalise raw API shapes → StockMovement ──────────────────────────────────
 

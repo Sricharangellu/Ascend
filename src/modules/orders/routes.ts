@@ -1,7 +1,7 @@
 import type { Router, Request, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody, notFound, badRequest } from "../../shared/http.js";
-import type { OrdersService, OrderStatus } from "./service.js";
+import type { OrdersService, OrderStatus, CourseValue } from "./service.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import { sendEmail } from "../../shared/email.js";
 import { Money } from "../../shared/money.js";
@@ -190,6 +190,33 @@ export function registerRoutes(router: Router, service: OrdersService): void {
       const from = process.env["EMAIL_FROM"] ?? `receipts@${storeName.toLowerCase().replace(/\s+/g, "")}.com`;
       const result = await sendEmail({ to, from, subject: `Your receipt from ${storeName} — Order #${order.order_number}`, text, html });
       res.json({ sent: result.sent, to, orderId: id, ...(result.preview ? { preview: result.preview } : {}) });
+    }),
+  );
+
+  // PATCH /:id/lines/:lineId/course — BE-R3: assign a restaurant course to an order line.
+  const courseSchema = z.object({
+    course: z.enum(["appetizer", "main", "dessert", "drinks"]),
+  });
+
+  router.patch(
+    "/:id/lines/:lineId/course",
+    handler(async (req: Request, res: Response) => {
+      const { course } = parseBody(courseSchema, req.body);
+      res.json(await service.assignCourse(String(req.params.id), String(req.params.lineId), course as CourseValue, tenantId(res)));
+    }),
+  );
+
+  // POST /:id/split — BE-R5: split an open order into N child orders.
+  const splitSchema = z.union([
+    z.object({ splitCount: z.number().int().min(2).max(20) }),
+    z.object({ lineIds: z.array(z.array(z.string().min(1))).min(2) }),
+  ]);
+
+  router.post(
+    "/:id/split",
+    handler(async (req: Request, res: Response) => {
+      const body = parseBody(splitSchema, req.body);
+      res.status(201).json(await service.splitOrder(String(req.params.id), body, tenantId(res)));
     }),
   );
 }

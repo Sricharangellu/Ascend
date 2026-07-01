@@ -165,3 +165,4 @@ Score: 94/100 — launch-ready, zero CRITICAL. Fix remaining MEDIUM before v2:
 - Settings page split: CoaSection + DepositsSection + LoyaltyTiersSection → `_components/` (1003→644 ln)
 - FE-R4 Restaurant Dashboard: `/restaurant/dashboard` — covers, avg ticket, table turns, peak hour, hourly revenue chart, top items, active sessions
 - reports/page.tsx split: 4 sections → `_components/` (866→246 ln); shared helpers in reportHelpers.tsx
+- catalog/[id]/page.tsx restructured: 3-tab editor (General | Inventory | Marketing) — 763→136 ln; GeneralTab (price table w/ markup/margin), InventoryTab (supplier, replenish, variants), MarketingTab (loyalty, compliance)

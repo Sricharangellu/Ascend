@@ -121,9 +121,15 @@ END;
 $$;
 `;
 
+// BE-R5: parent_order_id links split-child orders back to the original.
+const ALTER_ORDERS_PARENT_ID = `
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS parent_order_id TEXT;
+CREATE INDEX IF NOT EXISTS orders_parent_id_idx ON orders (parent_order_id) WHERE parent_order_id IS NOT NULL;
+`;
+
 export const ordersModule: PosModule = {
   name: "orders",
-  migrations: [dropLegacyNoTenant("order_lines"), dropLegacyNoTenant("orders"), CREATE_ORDERS_TABLE, CREATE_ORDER_LINES_TABLE, ALTER_ORDERS_STORE_ID, ALTER_ORDERS_CURRENCY, ADD_ENTERPRISE_ORDER_INDEXES, ADD_ORDER_QUANTITY_CHECKS, ADD_ORDER_LINE_FK, ADD_ORDERS_UPDATED_AT_TRIGGERS],
+  migrations: [dropLegacyNoTenant("order_lines"), dropLegacyNoTenant("orders"), CREATE_ORDERS_TABLE, CREATE_ORDER_LINES_TABLE, ALTER_ORDERS_STORE_ID, ALTER_ORDERS_CURRENCY, ADD_ENTERPRISE_ORDER_INDEXES, ADD_ORDER_QUANTITY_CHECKS, ADD_ORDER_LINE_FK, ADD_ORDERS_UPDATED_AT_TRIGGERS, ALTER_ORDERS_PARENT_ID],
   register(ctx: ModuleContext): void {
     const service = new OrdersService(ctx.db, ctx.events);
     registerRoutes(ctx.router, service);
@@ -147,6 +153,10 @@ export type {
   CreateOrderInput,
   CreateOrderLineInput,
   ListOrdersQuery,
+  OrderCourse,
+  CourseValue,
+  CourseStatus,
+  SplitOrderInput,
 } from "./service.js";
 export {
   computeOrderTax,

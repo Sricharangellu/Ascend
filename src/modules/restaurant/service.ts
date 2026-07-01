@@ -5,6 +5,30 @@ import { notFound, HttpError } from "../../shared/http.js";
 
 export type TableStatus = "available" | "occupied" | "reserved" | "cleaning";
 export type TabStatus = "open" | "closed";
+export type CourseStatus = "pending" | "in_progress" | "ready" | "served";
+
+export interface OrderCourse {
+  id: string;
+  order_id: string;
+  line_id: string;
+  course: string;
+  status: CourseStatus;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface KitchenQueueItem {
+  line_id: string;
+  order_id: string;
+  order_number: string;
+  course: string;
+  course_status: CourseStatus;
+  product_name: string;
+  quantity: number;
+  table_number: string | null;
+  floor_section: string | null;
+  updated_at: number;
+}
 
 export interface RestaurantTable {
   id: string;
@@ -231,5 +255,56 @@ export class RestaurantService {
       { id: tabId },
     );
     return { ...tab, status: "closed", closed_at: now, order_ids: orderRows.map((o) => o.order_id) };
+  }
+
+  // ── BE-R4: Kitchen Display ────────────────────────────────────────────────
+
+  async kitchenQueue(tenantId: string, outletId?: string, section?: string): Promise<KitchenQueueItem[]> {
+    const rows = await this.db.query<KitchenQueueItem & { outlet_id: string | null }>(
+      `SELECT oc.line_id, oc.order_id, o.order_number,
+              oc.course, oc.status AS course_status, oc.updated_at,
+              ol.name AS product_name, ol.quantity,
+              rt.table_number, rt.floor_section, rt.outlet_id
+         FROM order_courses oc
+         JOIN order_lines ol  ON ol.id  = oc.line_id
+         JOIN orders      o   ON o.id   = oc.order_id AND o.tenant_id = @t
+         LEFT JOIN bar_tab_orders bto ON bto.order_id = o.id
+         LEFT JOIN bar_tabs       bt  ON bt.id = bto.tab_id
+         LEFT JOIN restaurant_tables rt ON rt.id = bt.table_id
+        WHERE oc.status IN ('pending', 'in_progress')
+          AND ol.tenant_id = @t
+        ORDER BY oc.course ASC, oc.updated_at ASC
+        LIMIT 500`,
+      { t: tenantId },
+    );
+
+    return rows.filter((r) => {
+      if (outletId && r.outlet_id !== outletId) return false;
+      if (section && r.floor_section !== section) return false;
+      return true;
+    });
+  }
+
+  async bumpKitchenLine(lineId: string, tenantId: string): Promise<OrderCourse> {
+    const row = await this.db.one<OrderCourse>(
+      `SELECT oc.* FROM order_courses oc
+         JOIN order_lines ol ON ol.id = oc.line_id
+        WHERE oc.line_id = @lineId AND ol.tenant_id = @t`,
+      { lineId, t: tenantId },
+    );
+    if (!row) throw notFound(`kitchen course for line '${lineId}'`);
+
+    const NEXT: Record<string, CourseStatus> = {
+      pending: "in_progress",
+      in_progress: "ready",
+      ready: "served",
+    };
+    const next: CourseStatus = NEXT[row.status] ?? "served";
+    const now = Date.now();
+    await this.db.query(
+      "UPDATE order_courses SET status = @next, updated_at = @now WHERE line_id = @lineId",
+      { next, now, lineId },
+    );
+    return { ...row, status: next, updated_at: now };
   }
 }

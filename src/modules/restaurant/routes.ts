@@ -3,7 +3,7 @@ import { z } from "zod";
 import { handler, parseBody } from "../../shared/http.js";
 import { requireRole } from "../../gateway/auth.js";
 import type { AuthPayload } from "../../gateway/auth.js";
-import type { RestaurantService, TableStatus } from "./service.js";
+import type { RestaurantService, TableStatus, KitchenQueueItem } from "./service.js";
 
 function tid(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
@@ -78,5 +78,22 @@ export function registerRoutes(router: Router, svc: RestaurantService): void {
 
   router.post("/restaurant/tabs/:id/close", handler(async (req, res) => {
     res.json(await svc.closeTab(String(req.params["id"]), tid(res)));
+  }));
+
+  // ── BE-R4: Kitchen Display ────────────────────────────────────────────────
+
+  router.get("/restaurant/kitchen/queue", handler(async (req, res) => {
+    const outletId = typeof req.query.outletId === "string" ? req.query.outletId : undefined;
+    const section  = typeof req.query.section  === "string" ? req.query.section  : undefined;
+    const items = await svc.kitchenQueue(tid(res), outletId, section);
+    const courses = ["appetizer", "main", "dessert", "drinks"] as const;
+    const grouped: Record<string, KitchenQueueItem[]> = Object.fromEntries(
+      courses.map((c) => [c, items.filter((i) => i.course === c)]),
+    );
+    res.json({ items, grouped });
+  }));
+
+  router.patch("/restaurant/kitchen/:lineId/bump", handler(async (req, res) => {
+    res.json(await svc.bumpKitchenLine(String(req.params["lineId"]), tid(res)));
   }));
 }

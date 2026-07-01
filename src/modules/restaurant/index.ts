@@ -61,9 +61,26 @@ CREATE TABLE IF NOT EXISTS bar_tab_orders (
 );
 `;
 
+// ── BE-R3: Course-based ordering ──────────────────────────────────────────────
+
+const CREATE_ORDER_COURSES = `
+CREATE TABLE IF NOT EXISTS order_courses (
+  id         TEXT PRIMARY KEY,
+  order_id   TEXT NOT NULL,
+  line_id    TEXT NOT NULL,
+  course     TEXT NOT NULL DEFAULT 'main',
+  status     TEXT NOT NULL DEFAULT 'pending',
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  UNIQUE (order_id, line_id)
+);
+CREATE INDEX IF NOT EXISTS ocourses_order_idx ON order_courses (order_id, course);
+CREATE INDEX IF NOT EXISTS ocourses_status_idx ON order_courses (status, course);
+`;
+
 export const restaurantModule: PosModule = {
   name: "restaurant",
-  migrations: [CREATE_TABLES, CREATE_TABLE_SESSIONS, CREATE_BAR_TABS],
+  migrations: [CREATE_TABLES, CREATE_TABLE_SESSIONS, CREATE_BAR_TABS, CREATE_ORDER_COURSES],
   register({ db, events, router }: ModuleContext) {
     const svc = new RestaurantService(db, events);
     registerRoutes(router, svc);

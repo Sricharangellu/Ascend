@@ -8,6 +8,24 @@ import { computeOrderTax, type TaxableLine } from "./tax.js";
 
 export type OrderStatus = "open" | "completed" | "refunded" | "voided";
 
+export type CourseValue = "appetizer" | "main" | "dessert" | "drinks";
+export type CourseStatus = "pending" | "in_progress" | "ready" | "served";
+
+export interface OrderCourse {
+  id: string;
+  order_id: string;
+  line_id: string;
+  course: CourseValue;
+  status: CourseStatus;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface SplitOrderInput {
+  splitCount?: number;
+  lineIds?: string[][];
+}
+
 export interface OrderRow {
   id: string;
   tenant_id: string;
@@ -464,6 +482,129 @@ export class OrdersService {
     );
 
     return { ...order, status: "voided", updated_at: updatedAt };
+  }
+
+  // ── BE-R3: Course assignment ──────────────────────────────────────────────
+
+  async assignCourse(
+    orderId: string,
+    lineId: string,
+    course: CourseValue,
+    tenantId: string,
+  ): Promise<OrderCourse> {
+    const line = await this.db.one<{ id: string }>(
+      "SELECT id FROM order_lines WHERE id = @lineId AND order_id = @orderId AND tenant_id = @t",
+      { lineId, orderId, t: tenantId },
+    );
+    if (!line) throw notFound(`order line '${lineId}' in order '${orderId}'`);
+
+    const now = Date.now();
+    const existing = await this.db.one<OrderCourse>(
+      "SELECT * FROM order_courses WHERE order_id = @orderId AND line_id = @lineId",
+      { orderId, lineId },
+    );
+
+    if (existing) {
+      await this.db.query(
+        "UPDATE order_courses SET course = @course, updated_at = @now WHERE order_id = @orderId AND line_id = @lineId",
+        { course, now, orderId, lineId },
+      );
+      return { ...existing, course, updated_at: now };
+    }
+
+    const id = `ocrse_${uuidv7()}`;
+    const row: OrderCourse = { id, order_id: orderId, line_id: lineId, course, status: "pending", created_at: now, updated_at: now };
+    await this.db.query(
+      `INSERT INTO order_courses (id, order_id, line_id, course, status, created_at, updated_at)
+       VALUES (@id, @order_id, @line_id, @course, @status, @created_at, @updated_at)`,
+      row as unknown as Record<string, unknown>,
+    );
+    return row;
+  }
+
+  // ── BE-R5: Split check ────────────────────────────────────────────────────
+
+  async splitOrder(
+    orderId: string,
+    input: SplitOrderInput,
+    tenantId: string,
+  ): Promise<OrderWithLines[]> {
+    const original = await this.getOrThrow(orderId, tenantId);
+    if (original.status !== "open") throw badRequest("only open orders can be split");
+
+    let partitions: OrderLineRow[][];
+    if (input.lineIds) {
+      partitions = input.lineIds.map((ids) =>
+        ids.map((lineId) => {
+          const found = original.lines.find((l) => l.id === lineId);
+          if (!found) throw badRequest(`line '${lineId}' not found in order '${orderId}'`);
+          return found;
+        }),
+      );
+    } else {
+      const n = input.splitCount ?? 2;
+      if (n < 2 || n > 20) throw badRequest("splitCount must be between 2 and 20");
+      partitions = Array.from({ length: n }, (): OrderLineRow[] => []);
+      original.lines.forEach((line, i) => partitions[i % n]!.push(line));
+    }
+
+    const now = Date.now();
+    const children: OrderWithLines[] = [];
+
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
+      await tdb.query(
+        "UPDATE orders SET status = 'voided', updated_at = @now WHERE id = @id AND tenant_id = @t",
+        { now, id: orderId, t: tenantId },
+      );
+
+      for (const partition of partitions) {
+        if (partition.length === 0) continue;
+        const childId = `ord_${uuidv7()}`;
+        const childNumber = `FP-${childId.slice(-8).toUpperCase()}`;
+        const subtotal = partition.reduce((s, l) => s + Number(l.line_cents), 0);
+        const tax = partition.reduce((s, l) => s + Number(l.tax_cents), 0);
+
+        await tdb.query(
+          `INSERT INTO orders
+             (id, tenant_id, order_number, state_code, status, subtotal_cents, discount_cents,
+              tax_cents, total_cents, customer_id, store_id, parent_order_id, created_at, updated_at)
+           VALUES
+             (@id, @tenant_id, @order_number, @state_code, 'open', @subtotal_cents, 0,
+              @tax_cents, @total_cents, @customer_id, @store_id, @parent_order_id, @created_at, @updated_at)`,
+          {
+            id: childId, tenant_id: tenantId, order_number: childNumber,
+            state_code: original.state_code,
+            subtotal_cents: subtotal, tax_cents: tax, total_cents: subtotal + tax,
+            customer_id: original.customer_id, store_id: original.store_id,
+            parent_order_id: orderId, created_at: now, updated_at: now,
+          },
+        );
+
+        const childLines: OrderLineRow[] = [];
+        for (const line of partition) {
+          const newLine: OrderLineRow = { ...line, id: `oln_${uuidv7()}`, order_id: childId };
+          await tdb.query(
+            `INSERT INTO order_lines
+               (id, tenant_id, order_id, product_id, name, quantity, unit_cents, tax_cents, line_cents, taxable)
+             VALUES
+               (@id, @tenant_id, @order_id, @product_id, @name, @quantity, @unit_cents, @tax_cents, @line_cents, @taxable)`,
+            newLine as unknown as Record<string, unknown>,
+          );
+          childLines.push(newLine);
+        }
+
+        children.push({
+          id: childId, tenant_id: tenantId, order_number: childNumber,
+          state_code: original.state_code, status: "open",
+          subtotal_cents: subtotal, discount_cents: 0, tax_cents: tax, total_cents: subtotal + tax,
+          customer_id: original.customer_id, store_id: original.store_id,
+          created_at: now, updated_at: now, lines: childLines,
+        });
+      }
+    });
+
+    void this.events.publish("order.split", { tenantId, originalOrderId: orderId, childCount: children.length }, orderId);
+    return children;
   }
 }
 

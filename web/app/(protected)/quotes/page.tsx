@@ -14,6 +14,7 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Button } from "@/components/Button";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
+import { fmtDate, fmtDateTime } from "@/lib/date";
 import { useToast } from "@/components/Toast";
 import { getUser } from "@/lib/auth";
 
@@ -70,14 +71,6 @@ const STATUS_STYLE: Record<QuoteStatus, string> = {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function fmtDate(ts: number) {
-  return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-function fmtDateTime(ts: number) {
-  return new Date(ts).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-}
 
 function parseCents(v: string) { const n = parseFloat(v.replace(/,/g, "")); return isNaN(n) ? 0 : Math.round(n * 100); }
 

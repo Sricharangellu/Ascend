@@ -638,18 +638,26 @@ See `orchestration/gaps/` restaurant analysis and `memory/project_verticals.md`.
       tab. `POST /restaurant/tabs`, `POST /restaurant/tabs/:id/add-round`
       (links a new order), `POST /restaurant/tabs/:id/close` (final payment).
 
-- [ ] BE-R3: Course-based ordering — `order_courses(order_id, course, status)`
+- [x] BE-R3: Course-based ordering — `order_courses(order_id, course, status)`
       linking each order_line to a course (appetizer/main/dessert). Kitchen
       can bump individual courses. `PATCH /orders/:id/lines/:lineId/course`.
+      (done: order_courses table migration in restaurant/index.ts; assignCourse()
+      in orders/service.ts; PATCH route in orders/routes.ts; TypeScript clean)
 
-- [ ] BE-R4: Kitchen Display endpoint — `GET /restaurant/kitchen/queue` returns
+- [x] BE-R4: Kitchen Display endpoint — `GET /restaurant/kitchen/queue` returns
       pending/in-progress order lines grouped by course and table. `PATCH
       /restaurant/kitchen/:lineId/bump` (marks a line as ready). Feeds the
       KDS front-end display. Filter by `?outletId=&section=`.
+      (done: kitchenQueue() + bumpKitchenLine() in restaurant/service.ts;
+      GET /restaurant/kitchen/queue + PATCH /restaurant/kitchen/:lineId/bump
+      in restaurant/routes.ts; MSW mock handlers with demo data; TypeScript clean)
 
-- [ ] BE-R5: Split check — `POST /orders/:id/split` accepts `splitCount` or
+- [x] BE-R5: Split check — `POST /orders/:id/split` accepts `splitCount` or
       `{ lineIds[][] }` partition; creates N child orders each with a share of
       the total. Each child can be paid separately via existing capture endpoint.
+      (done: splitOrder() in orders/service.ts; parent_order_id column migration
+      in orders/index.ts; POST /orders/:id/split route; MSW mock handler;
+      TypeScript clean)
 
 ### Frontend lane (Phase 7)
 
