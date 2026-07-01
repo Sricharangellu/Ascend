@@ -35,7 +35,7 @@ interface DisplayMessage {
   thankYouMessage?: string;
 }
 
-export const DISPLAY_CHANNEL = "finder-pos-display";
+import { DISPLAY_CHANNEL } from "@/lib/display-channel";
 
 const IDLE_LOGO = (
   <div className="flex flex-col items-center gap-4">

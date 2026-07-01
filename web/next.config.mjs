@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // ESLint is run separately in CI — skip during build to avoid plugin resolution
+  // issues with Node 24 + eslint-plugin-react's es-abstract peer dep.
+  eslint: { ignoreDuringBuilds: true },
+
   // Standalone output for container/CDN deployments
   output: "standalone",
 
