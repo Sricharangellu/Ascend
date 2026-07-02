@@ -27,6 +27,7 @@ import { StoreCreditTab } from "./_components/StoreCreditTab";
 import { AddressesTab } from "./_components/AddressesTab";
 import { ContactsTab } from "./_components/ContactsTab";
 import { NotesPanel } from "./_components/NotesPanel";
+import { OrdersTab } from "./_components/OrdersTab";
 
 // ─── Merge Modal ──────────────────────────────────────────────────────────────
 
@@ -304,6 +305,7 @@ export default function CustomerDetailPage() {
   const tabs: Array<{ key: DetailTab; label: string }> = [
     { key: "general", label: "General" },
     { key: "transactions", label: "Transactions" },
+    { key: "orders", label: "Orders" },
     { key: "financials", label: "Financials" },
     { key: "store-credit", label: "Store Credit" },
     { key: "contacts", label: "Contacts" },
@@ -395,6 +397,7 @@ export default function CustomerDetailPage() {
           />
         )}
         {activeTab === "transactions" && <TransactionsTab summary={summary} />}
+        {activeTab === "orders" && <OrdersTab customerId={customerId} />}
         {activeTab === "financials" && (
           <FinancialsTab customer={customer} summary={summary} financials={financials} />
         )}
