@@ -989,6 +989,14 @@ export const mockHandlers = [
       { id: "cat_4", name: "Chips",      parent_id: "cat_2", created_at: Date.now() - 90 * 86_400_000 },
     ];
 
+    // Many-to-many: category → set of product IDs
+    const categoryProducts = new Map<string, Set<string>>([
+      ["cat_1", new Set(["prod_1", "prod_2", "prod_6"])],
+      ["cat_2", new Set(["prod_3", "prod_4"])],
+      ["cat_3", new Set(["prod_5", "prod_7"])],
+      ["cat_4", new Set(["prod_8"])],
+    ]);
+
     // Products are stored and returned in TerminalProduct shape (camelCase) so
     // ProductGrid and the barcode scanner both receive the right field names.
     const now = Date.now();
@@ -1210,7 +1218,12 @@ export const mockHandlers = [
       // ── Categories ────────────────────────────────────────────────────────
       http.get(`${V1}/catalog/categories`, async () => {
         await lat();
-        return HttpResponse.json({ items: categories });
+        const items = categories.map((c) => ({
+          ...c,
+          product_count: categoryProducts.get(c.id)?.size ?? 0,
+          slug: c.name.toLowerCase().replace(/\s+/g, "-"),
+        }));
+        return HttpResponse.json({ items });
       }),
 
       http.post(`${V1}/catalog/categories`, async ({ request }) => {
@@ -1235,7 +1248,79 @@ export const mockHandlers = [
         const before = categories.length;
         categories = categories.filter((c) => c.id !== String(params["id"]));
         if (categories.length === before) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        categoryProducts.delete(String(params["id"]));
         return new HttpResponse(null, { status: 204 });
+      }),
+
+      // GET single category with sub-categories + product_count
+      http.get(`${V1}/catalog/categories/:id`, async ({ params }) => {
+        await lat();
+        const id = String(params["id"]);
+        const cat = categories.find((c) => c.id === id);
+        if (!cat) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const subs = categories
+          .filter((c) => c.parent_id === id)
+          .map((s) => ({ ...s, product_count: categoryProducts.get(s.id)?.size ?? 0, slug: s.name.toLowerCase().replace(/\s+/g, "-") }));
+        return HttpResponse.json({
+          ...cat,
+          slug: cat.name.toLowerCase().replace(/\s+/g, "-"),
+          product_count: categoryProducts.get(id)?.size ?? 0,
+          sub_categories: subs,
+        });
+      }),
+
+      // GET products in a category
+      http.get(`${V1}/catalog/categories/:id/products`, async ({ params, request }) => {
+        await lat();
+        const id = String(params["id"]);
+        const url = new URL(request.url);
+        const q = url.searchParams.get("q")?.toLowerCase() ?? "";
+        const pids = categoryProducts.get(id) ?? new Set<string>();
+        let items = products.filter((p) => pids.has(p.id));
+        if (q) items = items.filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
+        return HttpResponse.json({ items, total: items.length });
+      }),
+
+      // Add products to a category
+      http.post(`${V1}/catalog/categories/:id/products`, async ({ params, request }) => {
+        await lat();
+        const id = String(params["id"]);
+        if (!categories.find((c) => c.id === id))
+          return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const { productIds } = (await request.json()) as { productIds: string[] };
+        if (!categoryProducts.has(id)) categoryProducts.set(id, new Set());
+        for (const pid of productIds ?? []) categoryProducts.get(id)!.add(pid);
+        return HttpResponse.json({ added: (productIds ?? []).length });
+      }),
+
+      // Remove a product from a category
+      http.delete(`${V1}/catalog/categories/:id/products/:productId`, async ({ params }) => {
+        await lat();
+        categoryProducts.get(String(params["id"]))?.delete(String(params["productId"]));
+        return new HttpResponse(null, { status: 204 });
+      }),
+
+      // GET categories assigned to a product
+      http.get(`${V1}/catalog/:id/categories`, async ({ params }) => {
+        await lat();
+        const productId = String(params["id"]);
+        const assigned = categories
+          .filter((c) => categoryProducts.get(c.id)?.has(productId))
+          .map((c) => ({ ...c, product_count: categoryProducts.get(c.id)?.size ?? 0, slug: c.name.toLowerCase().replace(/\s+/g, "-") }));
+        return HttpResponse.json({ items: assigned });
+      }),
+
+      // Replace category assignments for a product
+      http.post(`${V1}/catalog/:id/categories`, async ({ params, request }) => {
+        await lat();
+        const productId = String(params["id"]);
+        const { categoryIds } = (await request.json()) as { categoryIds: string[] };
+        for (const [, pids] of categoryProducts) pids.delete(productId);
+        for (const cid of categoryIds ?? []) {
+          if (!categoryProducts.has(cid)) categoryProducts.set(cid, new Set());
+          categoryProducts.get(cid)!.add(productId);
+        }
+        return HttpResponse.json({ ok: true });
       }),
 
       // ── Compliance flags ──────────────────────────────────────────────────

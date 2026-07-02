@@ -1065,6 +1065,8 @@ export interface Category {
   name: string;
   parent_id: string | null;
   created_at: number;
+  product_count?: number;
+  slug?: string;
 }
 
 export interface CategoriesResponse {

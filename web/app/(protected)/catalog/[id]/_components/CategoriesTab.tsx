@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { apiGet, apiPost, apiPatch, ApiResponseError } from "@/api-client/client";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -15,36 +16,35 @@ interface Category {
 
 // ── CategoriesTab ─────────────────────────────────────────────────────────────
 
-export function CategoriesTab({
-  productId,
-  currentCategory,
-  onCategoryChange,
-}: {
-  productId: string;
-  currentCategory: string;
-  onCategoryChange: (cat: string) => void;
-}) {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [newCatName, setNewCatName] = useState("");
-  const [newParent, setNewParent] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [showForm, setShowForm] = useState(false);
+export function CategoriesTab({ productId }: { productId: string }) {
+  const router = useRouter();
 
-  useEffect(() => {
-    apiGet<{ items: Category[] }>("/api/v1/catalog/categories")
-      .then((r) => {
-        setCategories(r.items);
-        // Pre-select the current category by name match
-        const match = r.items.find((c) => c.name.toLowerCase() === currentCategory.toLowerCase());
-        if (match) setSelected(new Set([match.id]));
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [productId, currentCategory]);
+  const [allCats, setAllCats]     = useState<Category[]>([]);
+  const [selected, setSelected]   = useState<Set<string>>(new Set());
+  const [loading, setLoading]     = useState(true);
+  const [saving, setSaving]       = useState(false);
+  const [saved, setSaved]         = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const [newCatName, setNewCatName] = useState("");
+  const [newParent, setNewParent]   = useState("");
+  const [creating, setCreating]     = useState(false);
+  const [showForm, setShowForm]     = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [allRes, assignedRes] = await Promise.all([
+        apiGet<{ items: Category[] }>("/api/v1/catalog/categories"),
+        apiGet<{ items: Category[] }>(`/api/v1/catalog/${productId}/categories`),
+      ]);
+      setAllCats(allRes.items ?? []);
+      setSelected(new Set((assignedRes.items ?? []).map((c) => c.id)));
+    } catch { /* noop */ }
+    finally { setLoading(false); }
+  }, [productId]);
+
+  useEffect(() => { void load(); }, [load]);
 
   const toggleCat = (id: string) => {
     setSelected((prev) => {
@@ -57,19 +57,15 @@ export function CategoriesTab({
   };
 
   const handleSave = async () => {
-    setSaving(true);
+    setSaving(true); setSaveError(null);
     try {
-      const selectedCats = categories.filter((c) => selected.has(c.id));
-      await apiPatch(`/api/v1/catalog/${productId}`, {
-        category: selectedCats.map((c) => c.name).join(", ") || currentCategory,
+      await apiPost(`/api/v1/catalog/${productId}/categories`, {
+        categoryIds: [...selected],
       });
-      if (selectedCats.length > 0) {
-        onCategoryChange(selectedCats[0]!.name);
-      }
       setSaved(true);
       window.setTimeout(() => setSaved(false), 3000);
-    } catch {
-      /* noop */
+    } catch (err) {
+      setSaveError(err instanceof ApiResponseError ? err.message : "Save failed.");
     } finally { setSaving(false); }
   };
 
@@ -81,33 +77,41 @@ export function CategoriesTab({
         name: newCatName.trim(),
         parent_id: newParent || null,
       });
-      setCategories((prev) => [...prev, created]);
+      setAllCats((prev) => [...prev, created]);
       setSelected((prev) => new Set([...prev, created.id]));
       setNewCatName(""); setNewParent(""); setShowForm(false);
+      setSaved(false);
     } catch (e) {
-      alert(e instanceof ApiResponseError ? e.message : "Failed to create category.");
+      setSaveError(e instanceof ApiResponseError ? e.message : "Failed to create category.");
     } finally { setCreating(false); }
   };
 
-  // Group by parent
-  const roots = categories.filter((c) => !c.parent_id);
-  const children = categories.filter((c) => !!c.parent_id);
+  const roots    = allCats.filter((c) => !c.parent_id);
+  const children = allCats.filter((c) => !!c.parent_id);
+  const assigned = allCats.filter((c) => selected.has(c.id));
 
   return (
     <div className="space-y-4">
 
-      {/* Current assignment display */}
-      <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <div>
-          <p className="text-xs text-slate-400">Current category</p>
-          <p className="mt-0.5 font-semibold text-[#111]">{currentCategory || "Uncategorized"}</p>
-        </div>
-        {selected.size > 0 && (
-          <div className="flex flex-wrap gap-1.5 ml-4">
-            {categories.filter((c) => selected.has(c.id)).map((c) => (
-              <span key={c.id} className="rounded-full bg-[#5D5FEF]/10 px-2.5 py-0.5 text-xs font-medium text-[#5D5FEF]">
+      {/* Current assignment chips */}
+      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <p className="text-xs text-slate-400">Assigned categories</p>
+        {assigned.length === 0 ? (
+          <p className="mt-1 text-sm text-slate-400 italic">None — select categories below</p>
+        ) : (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {assigned.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => router.push(`/catalog/categories/${c.id}`)}
+                className="flex items-center gap-1.5 rounded-full border border-[#5D5FEF]/20 bg-[#5D5FEF]/8 px-2.5 py-0.5 text-xs font-medium text-[#5D5FEF] hover:bg-[#5D5FEF]/15 transition-colors"
+              >
                 {c.name}
-              </span>
+                <svg className="h-3 w-3 opacity-60" viewBox="0 0 12 12" fill="none">
+                  <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </button>
             ))}
           </div>
         )}
@@ -116,29 +120,32 @@ export function CategoriesTab({
       {/* Category tree */}
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-          <p className="text-sm font-semibold text-[#111]">Assign Categories</p>
+          <p className="text-sm font-semibold text-[#111]">Select categories</p>
           <button type="button" onClick={() => setShowForm((v) => !v)}
             className="text-xs font-medium text-[#5D5FEF] hover:underline">
             + New category
           </button>
         </div>
 
-        {/* New category form */}
+        {/* New category inline form */}
         {showForm && (
           <div className="flex items-end gap-2 border-b border-slate-100 bg-[#5D5FEF]/5 px-4 py-3">
             <div className="flex-1">
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Name</label>
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">Name</label>
               <input
                 type="text"
                 value={newCatName}
                 onChange={(e) => setNewCatName(e.target.value)}
                 placeholder="Category name"
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none"
-                onKeyDown={(e) => { if (e.key === "Enter") void handleCreateCategory(); if (e.key === "Escape") setShowForm(false); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void handleCreateCategory();
+                  if (e.key === "Escape") setShowForm(false);
+                }}
               />
             </div>
             <div className="w-40">
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Parent (optional)</label>
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">Parent (optional)</label>
               <select value={newParent} onChange={(e) => setNewParent(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none">
                 <option value="">— None —</option>
@@ -153,14 +160,15 @@ export function CategoriesTab({
         )}
 
         {loading ? (
-          <div className="space-y-2 p-4">{[1, 2, 3, 4].map((i) => <div key={i} className="h-8 animate-pulse rounded bg-slate-100" />)}</div>
+          <div className="space-y-2 p-4">
+            {[1, 2, 3, 4].map((i) => <div key={i} className="h-8 animate-pulse rounded bg-slate-100" />)}
+          </div>
         ) : (
           <div className="divide-y divide-slate-50 py-1">
             {roots.map((root) => {
               const subs = children.filter((c) => c.parent_id === root.id);
               return (
                 <div key={root.id}>
-                  {/* Root category row */}
                   <label className="flex cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-slate-50">
                     <input
                       type="checkbox"
@@ -173,7 +181,6 @@ export function CategoriesTab({
                       <span className="text-[11px] text-slate-400">{root.product_count} products</span>
                     )}
                   </label>
-                  {/* Sub-categories */}
                   {subs.map((sub) => (
                     <label key={sub.id} className="flex cursor-pointer items-center gap-3 py-2 pl-10 pr-4 hover:bg-slate-50">
                       <input
@@ -191,7 +198,7 @@ export function CategoriesTab({
                 </div>
               );
             })}
-            {categories.length === 0 && (
+            {allCats.length === 0 && (
               <p className="px-4 py-8 text-center text-sm text-slate-400">No categories yet. Create one above.</p>
             )}
           </div>
@@ -199,6 +206,7 @@ export function CategoriesTab({
       </div>
 
       {/* Save */}
+      {saveError && <p className="text-sm text-red-700">{saveError}</p>}
       <div className="flex items-center justify-end gap-3">
         {saved && <span className="text-sm font-medium text-emerald-600">Saved</span>}
         <button type="button" onClick={() => void handleSave()} disabled={saving}

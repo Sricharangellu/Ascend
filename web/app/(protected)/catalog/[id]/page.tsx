@@ -334,11 +334,7 @@ export default function ProductDetailPage() {
           <VariantsTab product={product} />
         )}
         {activeTab === "categories" && (
-          <CategoriesTab
-            productId={product.id}
-            currentCategory={product.category}
-            onCategoryChange={(cat) => setProduct((p) => p ? { ...p, category: cat } : p)}
-          />
+          <CategoriesTab productId={product.id} />
         )}
         {activeTab === "inventory" && (
           <InventoryTab product={product} onSaved={setProduct} />
