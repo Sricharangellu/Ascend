@@ -8,61 +8,76 @@ import { Button } from "@/components/Button";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type { CatalogProduct } from "@/api-client/types";
+
+// ── New combined tabs ─────────────────────────────────────────────────────────
+import { OverviewTab }      from "./_components/OverviewTab";
+import { TransactionsTab }  from "./_components/TransactionsTab";
+import { PurchasingTab }    from "./_components/PurchasingTab";
+
+// ── Existing tabs ─────────────────────────────────────────────────────────────
 import { GeneralTab }    from "./_components/GeneralTab";
 import { InventoryTab }  from "./_components/InventoryTab";
 import { MarketingTab }  from "./_components/MarketingTab";
 import { ExpiryTab }     from "./_components/ExpiryTab";
-import { CategoriesTab } from "./_components/CategoriesTab";
-import { SalesTab }      from "./_components/SalesTab";
-import { ReturnsTab }    from "./_components/ReturnsTab";
-import { CreditsTab }    from "./_components/CreditsTab";
-import { InvoicesTab }   from "./_components/InvoicesTab";
 import { VariantsTab }   from "./_components/VariantsTab";
 import { EcommerceTab }  from "./_components/EcommerceTab";
-import { PricingTab }                from "./_components/PricingTab";
-import { SuppliersTab }             from "./_components/SuppliersTab";
-import { PurchasesTab }             from "./_components/PurchasesTab";
-import { AnalyticsTab }             from "./_components/AnalyticsTab";
-import { AuditLogTab }              from "./_components/AuditLogTab";
-import { ImagesTab }                from "./_components/ImagesTab";
-import { SalesCustomerTab }         from "./_components/SalesCustomerTab";
-import { ReorderSuggestionsTab }    from "./_components/ReorderSuggestionsTab";
-import { SupplierPriceComparisonTab } from "./_components/SupplierPriceComparisonTab";
-import { LabelsTab }                from "./_components/LabelsTab";
+import { PricingTab }    from "./_components/PricingTab";
+import { AnalyticsTab }  from "./_components/AnalyticsTab";
+import { AuditLogTab }   from "./_components/AuditLogTab";
+import { ImagesTab }     from "./_components/ImagesTab";
+import { LabelsTab }     from "./_components/LabelsTab";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Tab =
-  | "general" | "variants" | "categories" | "inventory" | "expiry"
-  | "sales" | "returns" | "credits" | "invoices" | "marketing" | "ecommerce"
-  | "pricing" | "suppliers" | "purchases" | "analytics" | "audit-log" | "images"
-  | "sales-customer" | "reorder" | "price-comparison" | "labels";
+  | "overview" | "general" | "variants" | "pricing"
+  | "inventory" | "purchasing" | "transactions" | "expiry"
+  | "media" | "ecommerce" | "compliance" | "labels"
+  | "analytics" | "audit-log";
 
 const STATUS_BADGE = { active: "green", draft: "yellow", archived: "gray" } as const;
 
-const TABS: { key: Tab; label: string }[] = [
-  { key: "general",          label: "General" },
-  { key: "variants",         label: "Variants" },
-  { key: "pricing",          label: "Pricing" },
-  { key: "inventory",        label: "Inventory" },
-  { key: "purchases",        label: "Purchase by Supplier" },
-  { key: "sales-customer",   label: "Sales by Customer" },
-  { key: "reorder",          label: "Reorder" },
-  { key: "price-comparison", label: "Supplier Prices" },
-  { key: "suppliers",        label: "Suppliers" },
-  { key: "expiry",           label: "Expiry" },
-  { key: "images",           label: "Images" },
-  { key: "ecommerce",        label: "eCommerce" },
-  { key: "labels",           label: "Labels & Printing" },
-  { key: "categories",       label: "Categories" },
-  { key: "sales",            label: "Sales" },
-  { key: "returns",          label: "Returns" },
-  { key: "credits",          label: "Credits" },
-  { key: "invoices",         label: "Invoices" },
-  { key: "marketing",        label: "Compliance" },
-  { key: "analytics",        label: "Analytics" },
-  { key: "audit-log",        label: "Audit Log" },
+// 14 tabs (down from 21). Grouped logically:
+// Core → Inventory → Activity → Content/Compliance → Insights
+const TABS: { key: Tab; label: string; group: string }[] = [
+  { key: "overview",      label: "Overview",         group: "core" },
+  { key: "general",       label: "Details",          group: "core" },
+  { key: "variants",      label: "Variants",         group: "core" },
+  { key: "pricing",       label: "Pricing",          group: "core" },
+  { key: "inventory",     label: "Inventory",        group: "inventory" },
+  { key: "purchasing",    label: "Purchasing",       group: "inventory" },
+  { key: "expiry",        label: "Expiry",           group: "inventory" },
+  { key: "transactions",  label: "Transactions",     group: "activity" },
+  { key: "media",         label: "Media",            group: "content" },
+  { key: "ecommerce",     label: "Online",           group: "content" },
+  { key: "compliance",    label: "Compliance",       group: "content" },
+  { key: "labels",        label: "Labels",           group: "content" },
+  { key: "analytics",     label: "Analytics",        group: "insights" },
+  { key: "audit-log",     label: "Audit Log",        group: "insights" },
 ];
+
+// Visual separators: show a small divider before the first tab of each new group
+const GROUP_BREAKS = new Set(["inventory", "activity", "content", "insights"]);
+
+// ── Stock badge helper ────────────────────────────────────────────────────────
+
+function StockBadge({ total, reorderPoint }: { total: number; reorderPoint: number }) {
+  if (total === 0) return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+      <span className="h-1.5 w-1.5 rounded-full bg-red-500" />Out of stock
+    </span>
+  );
+  if (total <= reorderPoint) return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />Low stock · {total}
+    </span>
+  );
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />In stock · {total}
+    </span>
+  );
+}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -70,28 +85,35 @@ export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
-  const [product, setProduct] = useState<CatalogProduct | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>("general");
+  const [product, setProduct]       = useState<CatalogProduct | null>(null);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
+  const [activeTab, setActiveTab]   = useState<Tab>("overview");
   const [duplicating, setDuplicating] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [barcodeResult, setBarcodeResult] = useState<"ok" | "not_found" | null>(null);
   const [expiryAlertCount, setExpiryAlertCount] = useState(0);
+  const [stockTotal, setStockTotal] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
       const prod = await apiGet<CatalogProduct>(`/api/v1/catalog/${id}`);
       setProduct(prod);
-      apiGet<{ items: Array<{ expiry_status: string }> }>(`/api/v1/catalog/${id}/expiry`)
-        .then((r) => {
+
+      // Parallel: expiry alert count + stock total for header badge
+      Promise.allSettled([
+        apiGet<{ items: Array<{ expiry_status: string }> }>(`/api/v1/catalog/${id}/expiry`).then((r) => {
           const alerts = (r.items ?? []).filter(
             (b) => b.expiry_status === "expired" || b.expiry_status === "critical"
           ).length;
           setExpiryAlertCount(alerts);
-        })
-        .catch(() => {});
+        }),
+        apiGet<{ locations: Array<{ quantity_on_hand: number }> }>(`/api/v1/catalog/${id}/stock`).then((r) => {
+          const total = (r.locations ?? []).reduce((s, l) => s + l.quantity_on_hand, 0);
+          setStockTotal(total);
+        }),
+      ]);
     } catch (e) {
       setError(e instanceof ApiResponseError ? e.message : "Failed to load product.");
     } finally { setLoading(false); }
@@ -150,7 +172,7 @@ export default function ProductDetailPage() {
 
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-          {/* Left: back + name + badges */}
+          {/* Left: breadcrumb + name + all identity badges */}
           <div className="flex flex-col gap-1.5">
             <button
               type="button"
@@ -164,11 +186,18 @@ export default function ProductDetailPage() {
               </svg>
               Products
             </button>
+
+            {/* Name row */}
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-base font-bold text-slate-900 leading-tight">{product.name}</h1>
               <Badge variant={STATUS_BADGE[product.status]}>{product.status}</Badge>
               <Badge variant="gray">{product.sku}</Badge>
-              {/* Retail price + margin */}
+              {product.tax_class === "exempt" && <Badge variant="yellow">Tax exempt</Badge>}
+              {product.variant_label && <Badge variant="gray">Variant: {product.variant_label}</Badge>}
+            </div>
+
+            {/* Metrics row: price + margin + stock status */}
+            <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-semibold text-slate-700">
                 {formatMoney(product.price_cents)}
               </span>
@@ -176,17 +205,24 @@ export default function ProductDetailPage() {
                 const margin = ((product.price_cents - product.raw_cost_price_cents) / product.price_cents) * 100;
                 return (
                   <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                    margin >= 30 ? "bg-emerald-100 text-emerald-700" : margin > 0 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
+                    margin >= 30 ? "bg-emerald-100 text-emerald-700"
+                    : margin > 0 ? "bg-amber-100 text-amber-700"
+                    : "bg-red-100 text-red-700"
                   }`}>
-                    Margin: {margin.toFixed(1)}%
+                    {margin.toFixed(1)}% margin
                   </span>
                 );
               })()}
-              {product.tax_class === "exempt" && <Badge variant="yellow">Tax exempt</Badge>}
-              {product.variant_label && (
-                <Badge variant="gray">Variant: {product.variant_label}</Badge>
+              {stockTotal !== null && (
+                <StockBadge total={stockTotal} reorderPoint={product.reorder_point ?? 0} />
+              )}
+              {product.barcode && (
+                <span className="rounded-full border border-slate-100 bg-slate-50 px-2.5 py-0.5 font-mono text-[11px] text-slate-500">
+                  {product.barcode}
+                </span>
               )}
             </div>
+
             {product.parent_product_id && (
               <button
                 type="button"
@@ -200,7 +236,6 @@ export default function ProductDetailPage() {
 
           {/* Right: actions */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Quick action menu */}
             <div className="relative">
               <button
                 type="button"
@@ -219,72 +254,53 @@ export default function ProductDetailPage() {
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setShowActions(false)} />
                   <div className="absolute right-0 top-full z-40 mt-1 w-52 rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
-                    <button
-                      type="button"
+                    {[
+                      {
+                        label: "Quick Sell",
+                        icon: <rect x="2" y="3" width="20" height="14" rx="2"/>,
+                        action: () => { setShowActions(false); router.push(`/register?product=${product.id}`); },
+                      },
+                    ].map(() => null) /* using inline below for clarity */}
+                    <button type="button"
                       onClick={() => { setShowActions(false); router.push(`/register?product=${product.id}`); }}
-                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
                       </svg>
                       Quick Sell
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowActions(false); setActiveTab("returns"); }}
-                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <button type="button"
+                      onClick={() => { setShowActions(false); setActiveTab("transactions"); }}
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/>
                       </svg>
                       Create Return
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowActions(false); setActiveTab("invoices"); }}
-                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
-                      </svg>
-                      Add to Invoice
-                    </button>
-                    <button
-                      type="button"
+                    <button type="button"
                       onClick={() => { setShowActions(false); window.open(`/store/${product.id}`, "_blank"); }}
-                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
                       </svg>
                       View on store
                     </button>
                     {product.barcode && (
-                      <button
-                        type="button"
+                      <button type="button"
                         onClick={() => { setShowActions(false); void testBarcode(); }}
-                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
-                      >
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                          strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <rect x="2" y="4" width="2" height="16"/><rect x="6" y="4" width="1" height="16"/><rect x="9" y="4" width="2" height="16"/><rect x="13" y="4" width="1" height="16"/><rect x="16" y="4" width="2" height="16"/><rect x="20" y="4" width="2" height="16"/>
                         </svg>
                         Test barcode scan
                       </button>
                     )}
                     <div className="my-1 border-t border-slate-100" />
-                    <button
-                      type="button"
+                    <button type="button"
                       onClick={() => { setShowActions(false); void handleDuplicate(); }}
                       disabled={duplicating}
-                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                       </svg>
                       {duplicating ? "Duplicating…" : "Duplicate"}
@@ -293,14 +309,8 @@ export default function ProductDetailPage() {
                 </>
               )}
             </div>
-            <Button size="sm" variant="secondary" onClick={() => router.push("/catalog")}>
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={() => window.dispatchEvent(new CustomEvent("finder:save-product"))}
-            >
+            <Button size="sm" variant="secondary" onClick={() => router.push("/catalog")}>Cancel</Button>
+            <Button size="sm" variant="primary" onClick={() => window.dispatchEvent(new CustomEvent("finder:save-product"))}>
               Save
             </Button>
           </div>
@@ -308,110 +318,64 @@ export default function ProductDetailPage() {
 
         {/* ── Barcode test result ──────────────────────────────────────────── */}
         {barcodeResult && (
-          <div
-            role="status"
-            className={`mb-3 flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium ${
-              barcodeResult === "ok"
-                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                : "bg-red-50 text-red-700 border border-red-200"
-            }`}
-          >
+          <div role="status" className={`mb-3 flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium ${
+            barcodeResult === "ok"
+              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+              : "bg-red-50 text-red-700 border border-red-200"
+          }`}>
             {barcodeResult === "ok" ? "✓ Barcode scan verified — product found" : "✗ Barcode not found in scanner lookup"}
           </div>
         )}
 
-        {/* ── Tab nav (scrollable on mobile) ────────────────────────────────── */}
+        {/* ── Tab nav ───────────────────────────────────────────────────────── */}
         <div className="mb-5 -mx-1 overflow-x-auto">
           <div className="flex gap-0 border-b border-slate-200 min-w-max px-1">
-            {TABS.map(({ key, label }) => {
+            {TABS.map(({ key, label, group }, idx) => {
+              const prevGroup = idx > 0 ? TABS[idx - 1].group : group;
+              const showDivider = GROUP_BREAKS.has(group) && prevGroup !== group;
               const badge = key === "expiry" && expiryAlertCount > 0 ? expiryAlertCount : null;
               return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setActiveTab(key)}
-                  className={`relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
-                    activeTab === key
-                      ? "border-b-2 border-[#5D5FEF] text-[#5D5FEF]"
-                      : "border-b-2 border-transparent text-slate-500 hover:text-[#111]"
-                  }`}
-                >
-                  {label}
-                  {badge !== null && (
-                    <span className="flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                      {badge}
-                    </span>
+                <div key={key} className="flex items-center">
+                  {showDivider && (
+                    <div className="mx-1 h-5 w-px bg-slate-200 self-center" aria-hidden="true" />
                   )}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab(key)}
+                    className={`relative flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
+                      activeTab === key
+                        ? "border-b-2 border-[#5D5FEF] text-[#5D5FEF]"
+                        : "border-b-2 border-transparent text-slate-500 hover:text-[#111]"
+                    }`}
+                  >
+                    {label}
+                    {badge !== null && (
+                      <span className="flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                        {badge}
+                      </span>
+                    )}
+                  </button>
+                </div>
               );
             })}
           </div>
         </div>
 
-        {/* ── Tab content ─────────────────────────────────────────────────── */}
-        {activeTab === "general" && (
-          <GeneralTab product={product} onSaved={setProduct} />
-        )}
-        {activeTab === "variants" && (
-          <VariantsTab product={product} />
-        )}
-        {activeTab === "categories" && (
-          <CategoriesTab productId={product.id} />
-        )}
-        {activeTab === "inventory" && (
-          <InventoryTab product={product} onSaved={setProduct} />
-        )}
-        {activeTab === "expiry" && (
-          <ExpiryTab productId={product.id} />
-        )}
-        {activeTab === "sales" && (
-          <SalesTab productId={product.id} />
-        )}
-        {activeTab === "returns" && (
-          <ReturnsTab productId={product.id} />
-        )}
-        {activeTab === "credits" && (
-          <CreditsTab productId={product.id} />
-        )}
-        {activeTab === "invoices" && (
-          <InvoicesTab productId={product.id} />
-        )}
-        {activeTab === "marketing" && (
-          <MarketingTab product={product} onSaved={setProduct} />
-        )}
-        {activeTab === "ecommerce" && (
-          <EcommerceTab product={product} />
-        )}
-        {activeTab === "pricing" && (
-          <PricingTab product={product} />
-        )}
-        {activeTab === "suppliers" && (
-          <SuppliersTab productId={product.id} />
-        )}
-        {activeTab === "purchases" && (
-          <PurchasesTab productId={product.id} />
-        )}
-        {activeTab === "analytics" && (
-          <AnalyticsTab productId={product.id} />
-        )}
-        {activeTab === "audit-log" && (
-          <AuditLogTab productId={product.id} />
-        )}
-        {activeTab === "images" && (
-          <ImagesTab productId={product.id} />
-        )}
-        {activeTab === "sales-customer" && (
-          <SalesCustomerTab productId={product.id} />
-        )}
-        {activeTab === "reorder" && (
-          <ReorderSuggestionsTab productId={product.id} />
-        )}
-        {activeTab === "price-comparison" && (
-          <SupplierPriceComparisonTab productId={product.id} />
-        )}
-        {activeTab === "labels" && (
-          <LabelsTab product={product} />
-        )}
+        {/* ── Tab content ──────────────────────────────────────────────────── */}
+        {activeTab === "overview"     && <OverviewTab product={product} onNavigate={(t) => setActiveTab(t as Tab)} />}
+        {activeTab === "general"      && <GeneralTab product={product} onSaved={setProduct} />}
+        {activeTab === "variants"     && <VariantsTab product={product} />}
+        {activeTab === "pricing"      && <PricingTab product={product} />}
+        {activeTab === "inventory"    && <InventoryTab product={product} onSaved={setProduct} />}
+        {activeTab === "purchasing"   && <PurchasingTab productId={product.id} />}
+        {activeTab === "transactions" && <TransactionsTab productId={product.id} />}
+        {activeTab === "expiry"       && <ExpiryTab productId={product.id} />}
+        {activeTab === "media"        && <ImagesTab productId={product.id} />}
+        {activeTab === "ecommerce"    && <EcommerceTab product={product} />}
+        {activeTab === "compliance"   && <MarketingTab product={product} onSaved={setProduct} />}
+        {activeTab === "labels"       && <LabelsTab product={product} />}
+        {activeTab === "analytics"    && <AnalyticsTab productId={product.id} />}
+        {activeTab === "audit-log"    && <AuditLogTab productId={product.id} />}
 
       </div>
     </EnterpriseShell>

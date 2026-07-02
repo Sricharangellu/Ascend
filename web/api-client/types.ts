@@ -615,6 +615,9 @@ export interface CatalogProduct {
   // Commerce flags
   ecommerce?: number;
   track_inventory?: number;
+  // Inventory replenishment
+  reorder_point?: number | null;
+  reorder_qty?: number | null;
   // Metadata
   tags?: string | null;
   preferred_vendor_name?: string;
