@@ -137,6 +137,20 @@ export default function ProductDetailPage() {
               <h1 className="text-base font-bold text-slate-900 leading-tight">{product.name}</h1>
               <Badge variant={STATUS_BADGE[product.status]}>{product.status}</Badge>
               <Badge variant="gray">{product.sku}</Badge>
+              {/* Retail price + margin */}
+              <span className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                {formatMoney(product.price_cents)}
+              </span>
+              {product.raw_cost_price_cents != null && product.raw_cost_price_cents > 0 && (() => {
+                const margin = ((product.price_cents - product.raw_cost_price_cents) / product.price_cents) * 100;
+                return (
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                    margin >= 30 ? "bg-emerald-100 text-emerald-700" : margin > 0 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
+                  }`}>
+                    Margin: {margin.toFixed(1)}%
+                  </span>
+                );
+              })()}
               {product.tax_class === "exempt" && <Badge variant="yellow">Tax exempt</Badge>}
               {product.variant_label && (
                 <Badge variant="gray">Variant: {product.variant_label}</Badge>
@@ -218,6 +232,19 @@ export default function ProductDetailPage() {
                       </svg>
                       View on store
                     </button>
+                    {product.barcode && (
+                      <button
+                        type="button"
+                        onClick={() => { setShowActions(false); void testBarcode(); }}
+                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+                      >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                          strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <rect x="2" y="4" width="2" height="16"/><rect x="6" y="4" width="1" height="16"/><rect x="9" y="4" width="2" height="16"/><rect x="13" y="4" width="1" height="16"/><rect x="16" y="4" width="2" height="16"/><rect x="20" y="4" width="2" height="16"/>
+                        </svg>
+                        Test barcode scan
+                      </button>
+                    )}
                     <div className="my-1 border-t border-slate-100" />
                     <button
                       type="button"
@@ -247,6 +274,20 @@ export default function ProductDetailPage() {
             </Button>
           </div>
         </div>
+
+        {/* ── Barcode test result ──────────────────────────────────────────── */}
+        {barcodeResult && (
+          <div
+            role="status"
+            className={`mb-3 flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium ${
+              barcodeResult === "ok"
+                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                : "bg-red-50 text-red-700 border border-red-200"
+            }`}
+          >
+            {barcodeResult === "ok" ? "✓ Barcode scan verified — product found" : "✗ Barcode not found in scanner lookup"}
+          </div>
+        )}
 
         {/* ── Tab nav (scrollable on mobile) ────────────────────────────────── */}
         <div className="mb-5 -mx-1 overflow-x-auto">
