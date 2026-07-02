@@ -1235,7 +1235,10 @@ export type NotificationType =
   | "order_fulfilled"
   | "purchase_order_received"
   | "sync_error"
-  | "system";
+  | "system"
+  | "refund_requested"
+  | "price_override"
+  | "reorder_suggestion";
 
 export interface Notification {
   id: string;

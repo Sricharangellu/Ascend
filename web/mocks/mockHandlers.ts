@@ -3670,6 +3670,117 @@ mockHandlers.push(
         notifs.unshift(n);
         return HttpResponse.json(n, { status: 201 });
       }),
+
+      // ── Preferences ─────────────────────────────────────────────────────────
+      ...(() => {
+        type Channel = "in_app" | "email" | "sms" | "push";
+        interface PrefRow { type: string; label: string; in_app: boolean; email: boolean; sms: boolean; push: boolean; min_severity: "info" | "warning" | "critical" }
+        const prefs: PrefRow[] = [
+          { type: "low_stock",              label: "Low Stock Alerts",          in_app: true,  email: true,  sms: false, push: true,  min_severity: "warning"  },
+          { type: "payment_failed",         label: "Payment Failures",          in_app: true,  email: true,  sms: true,  push: true,  min_severity: "critical" },
+          { type: "new_order",              label: "New Orders",                in_app: true,  email: false, sms: false, push: false, min_severity: "info"     },
+          { type: "order_fulfilled",        label: "Order Fulfillment",         in_app: true,  email: true,  sms: false, push: false, min_severity: "info"     },
+          { type: "purchase_order_received",label: "PO Received",               in_app: true,  email: false, sms: false, push: false, min_severity: "info"     },
+          { type: "sync_error",             label: "Sync Errors",               in_app: true,  email: true,  sms: false, push: true,  min_severity: "warning"  },
+          { type: "system",                 label: "System Alerts",             in_app: true,  email: true,  sms: true,  push: true,  min_severity: "warning"  },
+          { type: "refund_requested",       label: "Refund Requests",           in_app: true,  email: true,  sms: false, push: false, min_severity: "warning"  },
+          { type: "price_override",         label: "Price Override Approvals",  in_app: true,  email: false, sms: false, push: false, min_severity: "info"     },
+          { type: "reorder_suggestion",     label: "Reorder Suggestions",       in_app: true,  email: true,  sms: false, push: false, min_severity: "info"     },
+        ];
+        return [
+          http.get(`${V1}/notifications/preferences`, async () => {
+            await lat();
+            return HttpResponse.json({ items: prefs });
+          }),
+          http.patch(`${V1}/notifications/preferences`, async ({ request }) => {
+            await lat();
+            const body = (await request.json()) as Array<{ type: string; channel: Channel; enabled: boolean }>;
+            for (const update of body) {
+              const row = prefs.find(p => p.type === update.type);
+              if (row) (row as Record<string, unknown>)[update.channel] = update.enabled;
+            }
+            return HttpResponse.json({ ok: true });
+          }),
+          http.patch(`${V1}/notifications/preferences/:type/severity`, async ({ params, request }) => {
+            await lat();
+            const row = prefs.find(p => p.type === String(params["type"]));
+            if (!row) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+            const b = (await request.json()) as { min_severity: PrefRow["min_severity"] };
+            row.min_severity = b.min_severity;
+            return HttpResponse.json(row);
+          }),
+        ];
+      })(),
+
+      // ── Alert Rules ──────────────────────────────────────────────────────────
+      ...(() => {
+        let ruleSeq = 10;
+        interface AlertRule {
+          id: string; name: string; trigger: string; condition: string; threshold: number | null;
+          channels: string[]; enabled: boolean; fires_count: number; last_fired_at: number | null; created_at: number;
+        }
+        const rules: AlertRule[] = [
+          { id: "ar_1", name: "Low Stock — Reorder Point", trigger: "inventory", condition: "qty_lte_reorder_point", threshold: null,   channels: ["in_app","email"],        enabled: true,  fires_count: 34, last_fired_at: Date.now() - 3600000,    created_at: Date.now() - 30 * 86400000 },
+          { id: "ar_2", name: "Critical Stock — 0 Units",  trigger: "inventory", condition: "qty_eq",                threshold: 0,      channels: ["in_app","email","sms"],  enabled: true,  fires_count: 7,  last_fired_at: Date.now() - 7 * 3600000, created_at: Date.now() - 25 * 86400000 },
+          { id: "ar_3", name: "Large Refund",               trigger: "payment",   condition: "amount_gte",            threshold: 10000,  channels: ["in_app","email"],        enabled: true,  fires_count: 3,  last_fired_at: Date.now() - 86400000,    created_at: Date.now() - 20 * 86400000 },
+          { id: "ar_4", name: "Payment Failure",            trigger: "payment",   condition: "status_eq_failed",      threshold: null,   channels: ["in_app","email","push"], enabled: true,  fires_count: 12, last_fired_at: Date.now() - 1800000,     created_at: Date.now() - 15 * 86400000 },
+          { id: "ar_5", name: "Daily Sales Drop > 20%",     trigger: "sales",     condition: "pct_drop_gte",          threshold: 20,     channels: ["email"],                 enabled: false, fires_count: 0,  last_fired_at: null,                     created_at: Date.now() - 5 * 86400000  },
+          { id: "ar_6", name: "Overdue Invoice > 7 Days",   trigger: "invoice",   condition: "overdue_days_gte",      threshold: 7,      channels: ["in_app","email"],        enabled: true,  fires_count: 8,  last_fired_at: Date.now() - 2 * 86400000,created_at: Date.now() - 10 * 86400000 },
+        ];
+        return [
+          http.get(`${V1}/notifications/rules`, async () => {
+            await lat();
+            return HttpResponse.json({ items: rules });
+          }),
+          http.post(`${V1}/notifications/rules`, async ({ request }) => {
+            await lat();
+            const b = (await request.json()) as Partial<AlertRule>;
+            const r: AlertRule = { id: `ar_${++ruleSeq}`, name: b.name ?? "New Rule", trigger: b.trigger ?? "inventory", condition: b.condition ?? "qty_lte_reorder_point", threshold: b.threshold ?? null, channels: b.channels ?? ["in_app"], enabled: true, fires_count: 0, last_fired_at: null, created_at: Date.now() };
+            rules.push(r);
+            return HttpResponse.json(r, { status: 201 });
+          }),
+          http.patch(`${V1}/notifications/rules/:id`, async ({ params, request }) => {
+            await lat();
+            const idx = rules.findIndex(r => r.id === String(params["id"]));
+            if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+            const b = (await request.json()) as Partial<AlertRule>;
+            rules[idx] = { ...rules[idx]!, ...b };
+            return HttpResponse.json(rules[idx]);
+          }),
+          http.delete(`${V1}/notifications/rules/:id`, async ({ params }) => {
+            await lat();
+            const idx = rules.findIndex(r => r.id === String(params["id"]));
+            if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+            rules.splice(idx, 1);
+            return new HttpResponse(null, { status: 204 });
+          }),
+        ];
+      })(),
+
+      // ── Digest ───────────────────────────────────────────────────────────────
+      ...(() => {
+        interface DigestConfig {
+          enabled: boolean; frequency: "daily" | "weekly"; day_of_week: number; hour: number;
+          include: string[]; recipient_emails: string[];
+        }
+        const digest: DigestConfig = {
+          enabled: true, frequency: "daily", day_of_week: 1, hour: 8,
+          include: ["low_stock", "payment_failed", "new_order", "sync_error"],
+          recipient_emails: ["owner@store.example.com"],
+        };
+        return [
+          http.get(`${V1}/notifications/digest`, async () => {
+            await lat();
+            return HttpResponse.json(digest);
+          }),
+          http.patch(`${V1}/notifications/digest`, async ({ request }) => {
+            await lat();
+            const b = (await request.json()) as Partial<DigestConfig>;
+            Object.assign(digest, b);
+            return HttpResponse.json(digest);
+          }),
+        ];
+      })(),
     ];
   })(),
 
@@ -7565,6 +7676,134 @@ mockHandlers.push(
         return HttpResponse.json({
           formats: Object.entries(FORMAT_LABELS).map(([key, label]) => ({ key, label })),
         });
+      }),
+    ];
+  })(),
+
+  // ── Document Center ───────────────────────────────────────────────────────
+  ...(() => {
+    const D = 86_400_000;
+    const now = () => Date.now();
+
+    type DocStatus = "active" | "archived" | "draft" | "expired";
+    type DocType =
+      | "spec_sheet" | "msds" | "certificate" | "invoice" | "purchase_order"
+      | "agreement" | "compliance" | "policy" | "template" | "report" | "other";
+
+    interface Doc {
+      id: string; name: string; type: DocType; status: DocStatus;
+      file_name: string; file_size_bytes: number; mime_type: string;
+      linked_entity_type: string | null; linked_entity_id: string | null; linked_entity_name: string | null;
+      uploaded_by: string; uploaded_at: number; expires_at: number | null;
+      tags: string[]; version: number; description: string | null;
+    }
+
+    interface DocTemplate {
+      id: string; name: string; type: DocType; description: string;
+      file_name: string; uses: number; created_at: number;
+    }
+
+    const TYPE_LABELS: Record<DocType, string> = {
+      spec_sheet: "Spec Sheet", msds: "Safety Data Sheet", certificate: "Certificate",
+      invoice: "Invoice", purchase_order: "Purchase Order", agreement: "Agreement",
+      compliance: "Compliance", policy: "Policy", template: "Template", report: "Report", other: "Other",
+    };
+
+    let docs: Doc[] = [
+      { id: "doc_1", name: "Organic Dark Roast — Product Spec", type: "spec_sheet", status: "active", file_name: "acme_dark_roast_spec.pdf", file_size_bytes: 412_800, mime_type: "application/pdf", linked_entity_type: "product", linked_entity_id: "prod_1", linked_entity_name: "Organic Dark Roast Beans", uploaded_by: "Maria S.", uploaded_at: now() - 30 * D, expires_at: null, tags: ["coffee", "organic"], version: 2, description: "Technical specification sheet for the Organic Dark Roast Beans product line." },
+      { id: "doc_2", name: "Wildflower Honey — MSDS", type: "msds", status: "active", file_name: "honey_msds_2026.pdf", file_size_bytes: 186_300, mime_type: "application/pdf", linked_entity_type: "product", linked_entity_id: "prod_2", linked_entity_name: "Wildflower Honey", uploaded_by: "John D.", uploaded_at: now() - 60 * D, expires_at: now() + 305 * D, tags: ["honey", "msds", "safety"], version: 1, description: "Material Safety Data Sheet for handling and storage." },
+      { id: "doc_3", name: "Acme Coffee Co — Supplier Agreement 2026", type: "agreement", status: "active", file_name: "acme_supplier_agreement_2026.pdf", file_size_bytes: 1_248_000, mime_type: "application/pdf", linked_entity_type: "vendor", linked_entity_id: "sup_1", linked_entity_name: "Acme Coffee Co", uploaded_by: "Admin", uploaded_at: now() - 90 * D, expires_at: now() + 275 * D, tags: ["agreement", "acme", "2026"], version: 3, description: "Annual supplier agreement covering pricing, terms, and SLA." },
+      { id: "doc_4", name: "PO-4002 — Tea Traders Purchase Order", type: "purchase_order", status: "active", file_name: "PO-4002_teatraders.pdf", file_size_bytes: 98_400, mime_type: "application/pdf", linked_entity_type: "purchase_order", linked_entity_id: "po_4002", linked_entity_name: "PO-4002", uploaded_by: "Maria S.", uploaded_at: now() - 5 * D, expires_at: null, tags: ["purchase-order", "tea-traders"], version: 1, description: null },
+      { id: "doc_5", name: "Tobacco PACT Act Compliance Report Q2 2026", type: "compliance", status: "active", file_name: "pact_act_q2_2026.xlsx", file_size_bytes: 324_600, mime_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", linked_entity_type: null, linked_entity_id: null, linked_entity_name: null, uploaded_by: "Admin", uploaded_at: now() - 15 * D, expires_at: null, tags: ["compliance", "tobacco", "pact"], version: 1, description: "Quarterly PACT Act compliance filing." },
+      { id: "doc_6", name: "Mango Blast Vape — Age Verification Certificate", type: "certificate", status: "active", file_name: "vape_age_cert_2026.pdf", file_size_bytes: 76_800, mime_type: "application/pdf", linked_entity_type: "product", linked_entity_id: "prod_7", linked_entity_name: "Mango Blast Vape 50mg", uploaded_by: "John D.", uploaded_at: now() - 45 * D, expires_at: now() + 320 * D, tags: ["vape", "age-verification", "certificate"], version: 1, description: "Age verification certificate for vape product sales." },
+      { id: "doc_7", name: "Staff Policy Manual 2026", type: "policy", status: "active", file_name: "staff_policy_2026.pdf", file_size_bytes: 2_048_000, mime_type: "application/pdf", linked_entity_type: null, linked_entity_id: null, linked_entity_name: null, uploaded_by: "Admin", uploaded_at: now() - 120 * D, expires_at: null, tags: ["policy", "staff", "hr"], version: 4, description: "Employee policy manual covering procedures and code of conduct." },
+      { id: "doc_8", name: "Q1 2026 Sales Report", type: "report", status: "archived", file_name: "q1_2026_sales_report.pdf", file_size_bytes: 891_200, mime_type: "application/pdf", linked_entity_type: null, linked_entity_id: null, linked_entity_name: null, uploaded_by: "Maria S.", uploaded_at: now() - 180 * D, expires_at: null, tags: ["report", "q1-2026", "sales"], version: 1, description: "Quarterly sales performance report for Q1 2026." },
+    ];
+
+    const templates: DocTemplate[] = [
+      { id: "tpl_1", name: "Supplier Agreement (Standard)", type: "agreement", description: "Annual supplier agreement with pricing, SLA, and payment terms.", file_name: "supplier_agreement_template.docx", uses: 14, created_at: now() - 200 * D },
+      { id: "tpl_2", name: "Purchase Order", type: "purchase_order", description: "Standard PO template for all supplier orders.", file_name: "purchase_order_template.docx", uses: 87, created_at: now() - 365 * D },
+      { id: "tpl_3", name: "Product Specification Sheet", type: "spec_sheet", description: "Fillable product spec template with fields for ingredients and certifications.", file_name: "product_spec_template.docx", uses: 22, created_at: now() - 150 * D },
+      { id: "tpl_4", name: "Compliance Audit Checklist", type: "compliance", description: "PACT Act and state tobacco compliance checklist.", file_name: "compliance_checklist_template.xlsx", uses: 8, created_at: now() - 90 * D },
+      { id: "tpl_5", name: "Staff Policy Addendum", type: "policy", description: "Policy addendum template for one-off amendments.", file_name: "policy_addendum_template.docx", uses: 3, created_at: now() - 60 * D },
+    ];
+
+    return [
+      // GET /documents/types — must be before /:id
+      http.get(`${V1}/documents/types`, async () => {
+        await lat();
+        return HttpResponse.json({
+          types: Object.entries(TYPE_LABELS).map(([key, label]) => ({
+            key, label, count: docs.filter((d) => d.type === key && d.status !== "archived").length,
+          })),
+        });
+      }),
+
+      // GET /documents/templates — must be before /:id
+      http.get(`${V1}/documents/templates`, async () => {
+        await lat();
+        return HttpResponse.json({ items: templates });
+      }),
+
+      // GET /documents — list
+      http.get(`${V1}/documents`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const type   = url.searchParams.get("type");
+        const status = url.searchParams.get("status");
+        const q      = url.searchParams.get("q");
+        let filtered = docs;
+        if (type && type !== "all")     filtered = filtered.filter((d) => d.type === type);
+        if (status && status !== "all") filtered = filtered.filter((d) => d.status === status);
+        if (q) filtered = filtered.filter((d) =>
+          d.name.toLowerCase().includes(q.toLowerCase()) ||
+          d.tags.some((t) => t.includes(q.toLowerCase()))
+        );
+        return HttpResponse.json({ items: filtered, total: filtered.length });
+      }),
+
+      // GET /documents/:id
+      http.get(`${V1}/documents/:id`, async ({ params }) => {
+        await lat();
+        const doc = docs.find((d) => d.id === String(params["id"]));
+        if (!doc) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json(doc);
+      }),
+
+      // POST /documents
+      http.post(`${V1}/documents`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as Partial<Doc>;
+        const newDoc: Doc = {
+          id: `doc_${rid()}`, name: body.name ?? "Untitled Document", type: body.type ?? "other",
+          status: "active", file_name: body.file_name ?? "document.pdf",
+          file_size_bytes: body.file_size_bytes ?? 102_400, mime_type: body.mime_type ?? "application/pdf",
+          linked_entity_type: body.linked_entity_type ?? null, linked_entity_id: body.linked_entity_id ?? null,
+          linked_entity_name: body.linked_entity_name ?? null, uploaded_by: "Current User",
+          uploaded_at: Date.now(), expires_at: body.expires_at ?? null,
+          tags: body.tags ?? [], version: 1, description: body.description ?? null,
+        };
+        docs.unshift(newDoc);
+        return HttpResponse.json(newDoc, { status: 201 });
+      }),
+
+      // PATCH /documents/:id
+      http.patch(`${V1}/documents/:id`, async ({ params, request }) => {
+        await lat();
+        const idx = docs.findIndex((d) => d.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as Partial<Doc>;
+        docs[idx] = { ...docs[idx], ...body };
+        return HttpResponse.json(docs[idx]);
+      }),
+
+      // DELETE /documents/:id — soft archive
+      http.delete(`${V1}/documents/:id`, async ({ params }) => {
+        await lat();
+        const idx = docs.findIndex((d) => d.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        docs[idx] = { ...docs[idx], status: "archived" };
+        return new HttpResponse(null, { status: 204 });
       }),
     ];
   })(),
