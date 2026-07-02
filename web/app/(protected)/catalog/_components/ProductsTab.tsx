@@ -132,7 +132,6 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   const [duplicating, setDuplicating]         = useState<string | null>(null);
 
   const [showCreate, setShowCreate]       = useState(false);
-  const [editTarget, setEditTarget]       = useState<Product | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<Product | null>(null);
   const [archiving, setArchiving]         = useState(false);
   const [actionError, setActionError]     = useState<string | null>(null);
@@ -220,7 +219,6 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   useEffect(() => { void load(); }, [load]);
 
   const handleCreate = async (body: Record<string, unknown>) => { await apiPost("/api/v1/catalog", body); await load(); };
-  const handleEdit   = async (body: Record<string, unknown>) => { if (!editTarget) return; await apiPatch(`/api/v1/catalog/${editTarget.id}`, body); await load(); };
 
   const handleArchive = async () => {
     if (!archiveTarget) return;
@@ -420,7 +418,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                     return (
                       <tr key={p.id}
                         className={clsx("hover:bg-[#FAFAFA] transition-colors", isSelected && "bg-blue-50")}
-                        onClick={() => { setEditTarget(p); setActionError(null); }}
+                        onClick={() => router.push(`/catalog/${p.id}`)}
                         style={{ cursor: "pointer" }}
                       >
                         {/* Checkbox */}
@@ -495,7 +493,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                         {/* Edit icon */}
                         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                           <button type="button"
-                            onClick={() => { setEditTarget(p); setActionError(null); }}
+                            onClick={() => router.push(`/catalog/${p.id}`)}
                             aria-label={`Edit ${p.name}`}
                             className="text-[#aaa] hover:text-[#5D5FEF] transition-colors">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -513,7 +511,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
             <div className="divide-y divide-slate-100 md:hidden">
               {visibleProducts.map(p => (
                 <ProductListCard key={p.id} product={p}
-                  onEdit={() => { setEditTarget(p); setActionError(null); }}
+                  onEdit={() => router.push(`/catalog/${p.id}`)}
                   onArchive={() => { setArchiveTarget(p); setActionError(null); }} />
               ))}
             </div>
@@ -524,7 +522,6 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
       {showImport    && <ImportCSVModal onDone={async () => { await load(); }} onClose={() => setShowImport(false)} />}
       {showPrintLabels && <PrintLabelsModal selected={selectedProducts} onClose={() => setShowPrintLabels(false)} />}
       {showCreate    && <ProductFormModal categories={categories} onSave={handleCreate} onClose={() => setShowCreate(false)} />}
-      {editTarget    && <ProductFormModal initial={editTarget} categories={categories} onSave={handleEdit} onClose={() => setEditTarget(null)} />}
 
       {archiveTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setArchiveTarget(null)}>
