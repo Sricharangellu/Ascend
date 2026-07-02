@@ -1,11 +1,118 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/Button";
 import { apiGet, apiPatch, apiPost, apiDelete, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type { CatalogProduct } from "@/api-client/types";
+
+// ── Stock by location ─────────────────────────────────────────────────────────
+
+interface LocationStock {
+  location_id: string;
+  location_code: string;
+  location_name: string;
+  quantity_on_hand: number;
+  quantity_committed: number;
+  quantity_available: number;
+  average_cost_cents: number | null;
+}
+
+interface StockResponse {
+  product_id: string;
+  locations: LocationStock[];
+}
+
+function StockByLocation({ productId }: { productId: string }) {
+  const [locations, setLocations] = useState<LocationStock[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiGet<StockResponse>(`/api/v1/catalog/${productId}/stock`)
+      .then((r) => setLocations(r.locations ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [productId]);
+
+  const totals = locations.reduce(
+    (acc, l) => ({
+      on_hand:   acc.on_hand   + l.quantity_on_hand,
+      committed: acc.committed + l.quantity_committed,
+      available: acc.available + l.quantity_available,
+    }),
+    { on_hand: 0, committed: 0, available: 0 },
+  );
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-100 px-5 py-3.5">
+        <h3 className="text-sm font-semibold text-[#111]">Stock by Location</h3>
+        <p className="mt-0.5 text-xs text-slate-400">Live on-hand, committed (reserved), and available-to-sell per location</p>
+      </div>
+      <div className="p-5">
+        {loading ? (
+          <div className="space-y-2">
+            {[1, 2].map((i) => <div key={i} className="h-8 animate-pulse rounded-lg bg-slate-100" />)}
+          </div>
+        ) : locations.length === 0 ? (
+          <p className="text-sm text-slate-400">No location data available.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  <th className="px-4 py-2.5">Location</th>
+                  <th className="px-4 py-2.5 text-right">On Hand</th>
+                  <th className="px-4 py-2.5 text-right">Committed</th>
+                  <th className="px-4 py-2.5 text-right">Available</th>
+                  <th className="px-4 py-2.5 text-right hidden sm:table-cell">Avg Cost</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {locations.map((l) => (
+                  <tr key={l.location_id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-[#111]">{l.location_name}</p>
+                      <p className="text-[11px] font-mono text-slate-400">{l.location_code}</p>
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-[#111] tabular-nums">{l.quantity_on_hand}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      <span className={l.quantity_committed > 0 ? "font-medium text-amber-600" : "text-slate-400"}>
+                        {l.quantity_committed}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      <span className={l.quantity_available > 0 ? "font-semibold text-emerald-600" : "font-semibold text-red-500"}>
+                        {l.quantity_available}
+                      </span>
+                    </td>
+                    <td className="hidden px-4 py-3 text-right text-slate-500 tabular-nums sm:table-cell">
+                      {l.average_cost_cents != null ? formatMoney(l.average_cost_cents) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold text-[#111]">
+                  <td className="px-4 py-3 text-xs uppercase tracking-wide text-slate-500">Total</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{totals.on_hand}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    <span className={totals.committed > 0 ? "text-amber-600" : "text-slate-400"}>{totals.committed}</span>
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    <span className={totals.available > 0 ? "text-emerald-600" : "text-red-500"}>{totals.available}</span>
+                  </td>
+                  <td className="hidden px-4 py-3 sm:table-cell" />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
@@ -523,6 +630,9 @@ export function InventoryTab({
 
   return (
     <div className="space-y-4">
+
+      {/* ── Stock by Location ────────────────────────────────────────────── */}
+      <StockByLocation productId={product.id} />
 
       {/* ── Supplier Information ─────────────────────────────────────────── */}
       <Section
