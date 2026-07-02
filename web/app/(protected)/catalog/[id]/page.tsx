@@ -6,6 +6,7 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
+import { formatMoney } from "@/lib/money";
 import type { CatalogProduct } from "@/api-client/types";
 import { GeneralTab }    from "./_components/GeneralTab";
 import { InventoryTab }  from "./_components/InventoryTab";
@@ -53,6 +54,7 @@ export default function ProductDetailPage() {
   const [activeTab, setActiveTab] = useState<Tab>("general");
   const [duplicating, setDuplicating] = useState(false);
   const [showActions, setShowActions] = useState(false);
+  const [barcodeResult, setBarcodeResult] = useState<"ok" | "not_found" | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -74,6 +76,18 @@ export default function ProductDetailPage() {
       router.push(`/catalog/${copy.id}`);
     } catch { /* button re-enables */ }
     finally { setDuplicating(false); }
+  };
+
+  const testBarcode = async () => {
+    if (!product?.barcode) return;
+    setBarcodeResult(null);
+    try {
+      await apiGet(`/api/v1/catalog/barcode/${product.barcode}`);
+      setBarcodeResult("ok");
+    } catch {
+      setBarcodeResult("not_found");
+    }
+    setTimeout(() => setBarcodeResult(null), 3000);
   };
 
   if (loading) {
