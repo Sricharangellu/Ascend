@@ -7038,4 +7038,131 @@ mockHandlers.push(
       }),
     ];
   })(),
+
+  // ── Warehouse Management (WMS) ──────────────────────────────────────────────
+  ...(() => {
+    const now = Date.now();
+    const d = (days: number) => now - days * 86_400_000;
+    const f = (days: number) => now + days * 86_400_000;
+
+    const locations = [
+      { id: "loc_wh1",   code: "WH-MAIN",  name: "Main Warehouse",   type: "warehouse", parentId: null,     capacity: 5000, occupied: 3820, skuCount: 412, temperature: undefined },
+      { id: "loc_z1",    code: "Z-A",       name: "Zone A — Dry",     type: "zone",      parentId: "loc_wh1", capacity: 1200, occupied: 980,  skuCount: 124, temperature: "Ambient" },
+      { id: "loc_z2",    code: "Z-B",       name: "Zone B — Cold",    type: "zone",      parentId: "loc_wh1", capacity: 800,  occupied: 760,  skuCount: 88,  temperature: "2–8°C" },
+      { id: "loc_z3",    code: "Z-C",       name: "Zone C — Bulk",    type: "zone",      parentId: "loc_wh1", capacity: 2000, occupied: 1400, skuCount: 130, temperature: "Ambient" },
+      { id: "loc_a1",    code: "A-01",      name: "Aisle 1",          type: "aisle",     parentId: "loc_z1",  capacity: 300,  occupied: 240,  skuCount: 30,  temperature: undefined },
+      { id: "loc_a2",    code: "A-02",      name: "Aisle 2",          type: "aisle",     parentId: "loc_z1",  capacity: 300,  occupied: 290,  skuCount: 35,  temperature: undefined },
+      { id: "loc_r1",    code: "A-01-R1",   name: "Rack 1",           type: "rack",      parentId: "loc_a1",  capacity: 80,   occupied: 60,   skuCount: 10,  temperature: undefined },
+      { id: "loc_s1",    code: "A-01-R1-S1",name: "Shelf 1",          type: "shelf",     parentId: "loc_r1",  capacity: 20,   occupied: 18,   skuCount: 5,   temperature: undefined },
+      { id: "loc_b1",    code: "A-01-R1-B1",name: "Bin 01",           type: "bin",       parentId: "loc_s1",  capacity: 6,    occupied: 6,    skuCount: 2,   temperature: undefined },
+      { id: "loc_b2",    code: "A-01-R1-B2",name: "Bin 02",           type: "bin",       parentId: "loc_s1",  capacity: 6,    occupied: 4,    skuCount: 1,   temperature: undefined },
+      { id: "loc_wh2",   code: "WH-SOUTH",  name: "South Branch Store",type:"warehouse", parentId: null,     capacity: 2000, occupied: 1100, skuCount: 198, temperature: undefined },
+      { id: "loc_z4",    code: "S-A",       name: "Zone A — General", type: "zone",      parentId: "loc_wh2", capacity: 1000, occupied: 700,  skuCount: 110, temperature: "Ambient" },
+    ];
+
+    const receiving: Array<{
+      id: string; poNumber: string; vendorName: string; expectedDate: number;
+      itemCount: number; status: "scheduled"|"in_progress"|"partial"|"complete";
+      lines: Array<{ sku: string; name: string; ordered: number; received: number }>;
+    }> = [
+      {
+        id: "rcv_1", poNumber: "PO-3041", vendorName: "Acme Distributors",
+        expectedDate: f(1), itemCount: 3, status: "scheduled",
+        lines: [
+          { sku: "SKU-001", name: "Marlboro Red 20pk", ordered: 200, received: 0 },
+          { sku: "SKU-002", name: "Newport Menthol 20pk", ordered: 150, received: 0 },
+          { sku: "SKU-009", name: "Swisher Sweets Grape", ordered: 100, received: 0 },
+        ],
+      },
+      {
+        id: "rcv_2", poNumber: "PO-3038", vendorName: "Pacific Trading Co",
+        expectedDate: d(1), itemCount: 2, status: "partial",
+        lines: [
+          { sku: "SKU-010", name: "Celsius Energy Berry", ordered: 120, received: 80 },
+          { sku: "SKU-011", name: "Monster Ultra White", ordered: 144, received: 144 },
+        ],
+      },
+      {
+        id: "rcv_3", poNumber: "PO-3035", vendorName: "Tea Leaf Imports",
+        expectedDate: d(3), itemCount: 4, status: "complete",
+        lines: [
+          { sku: "SKU-020", name: "Green Tea 16oz",     ordered: 96,  received: 96 },
+          { sku: "SKU-021", name: "Oolong Reserve 16oz",ordered: 48,  received: 48 },
+          { sku: "SKU-022", name: "White Peach Tea",    ordered: 72,  received: 72 },
+          { sku: "SKU-023", name: "Chamomile Blend",    ordered: 60,  received: 60 },
+        ],
+      },
+    ];
+
+    const putaway = [
+      { id: "pta_1", sku: "SKU-010", productName: "Celsius Energy Berry", qty: 80, fromLocation: "DOCK-A", suggestedBin: "Z-B-R2-B4", poNumber: "PO-3038", receivedAt: d(1), priority: "high" },
+      { id: "pta_2", sku: "SKU-020", productName: "Green Tea 16oz",       qty: 96, fromLocation: "DOCK-B", suggestedBin: "Z-B-R1-B2", poNumber: "PO-3035", receivedAt: d(3), priority: "normal" },
+      { id: "pta_3", sku: "SKU-021", productName: "Oolong Reserve 16oz",  qty: 48, fromLocation: "DOCK-B", suggestedBin: "Z-B-R1-B3", poNumber: "PO-3035", receivedAt: d(3), priority: "normal" },
+    ];
+
+    const picks = [
+      { id: "pk_1", pickNumber: "PICK-0041", orderNumber: "ORD-1021", customerName: "Emma Johnson",     lines: 4, pickedLines: 4, strategy: "FIFO", priority: "urgent",  status: "packed",      dueAt: f(0) },
+      { id: "pk_2", pickNumber: "PICK-0040", orderNumber: "ORD-1020", customerName: "Marcus Rodriguez", lines: 3, pickedLines: 2, strategy: "FIFO", priority: "high",    status: "in_progress", dueAt: f(1) },
+      { id: "pk_3", pickNumber: "PICK-0039", orderNumber: "ORD-1019", customerName: "Sarah Chen",       lines: 6, pickedLines: 0, strategy: "FEFO", priority: "normal",  status: "open",        dueAt: f(2) },
+      { id: "pk_4", pickNumber: "PICK-0038", orderNumber: "ORD-1018", customerName: "Linda Park",       lines: 2, pickedLines: 2, strategy: "FIFO", priority: "normal",  status: "complete",    dueAt: d(1) },
+      { id: "pk_5", pickNumber: "PICK-0037", orderNumber: "ORD-1017", customerName: "Guest",            lines: 1, pickedLines: 0, strategy: "FIFO", priority: "high",    status: "open",        dueAt: d(1) },
+    ];
+
+    const cycleCounts = [
+      { id: "cc_1", countNumber: "CNT-0019", zone: "Zone A — Dry",  abcClass: "A", scheduledDate: f(2),  locationCount: 40,  completedLocations: 0,  variance: undefined,  status: "scheduled" },
+      { id: "cc_2", countNumber: "CNT-0018", zone: "Zone B — Cold", abcClass: "A", scheduledDate: d(1),  locationCount: 30,  completedLocations: 22, variance: undefined,  status: "in_progress" },
+      { id: "cc_3", countNumber: "CNT-0017", zone: "Zone C — Bulk", abcClass: "B", scheduledDate: d(14), locationCount: 80,  completedLocations: 80, variance: -24300,     status: "complete" },
+      { id: "cc_4", countNumber: "CNT-0016", zone: "Aisle 1",       abcClass: "C", scheduledDate: d(30), locationCount: 15,  completedLocations: 15, variance: 0,          status: "approved" },
+      { id: "cc_5", countNumber: "CNT-0015", zone: "Zone A — Dry",  abcClass: "A", scheduledDate: d(45), locationCount: 40,  completedLocations: 40, variance: -8100,      status: "approved" },
+    ];
+
+    const recentActivity = [
+      { id: "act_1", type: "receive",  label: "Received PO-3038 (80 units Celsius Energy Berry)", actor: "J. Rivera",   ts: d(1) - 3_600_000 },
+      { id: "act_2", type: "putaway",  label: "Putaway SKU-011 → Z-B-R2-B1 (144 units)",          actor: "J. Rivera",   ts: d(1) - 1_800_000 },
+      { id: "act_3", type: "pick",     label: "Pick PICK-0041 started for ORD-1021",               actor: "M. Santos",   ts: now - 7_200_000 },
+      { id: "act_4", type: "pick",     label: "Pick PICK-0041 complete — 4/4 lines",               actor: "M. Santos",   ts: now - 5_400_000 },
+      { id: "act_5", type: "count",    label: "Cycle count CNT-0018 started — Zone B Cold",        actor: "K. Williams", ts: now - 3_600_000 },
+      { id: "act_6", type: "transfer", label: "Transfer 24 units SKU-001 → South Branch",          actor: "D. Miller",   ts: now - 1_200_000 },
+    ];
+
+    return [
+      http.get(`${V1}/warehouse/dashboard`, async () => {
+        await lat();
+        return HttpResponse.json({
+          totalLocations: locations.length,
+          occupiedLocations: locations.filter(l => l.occupied >= l.capacity * 0.1).length,
+          pendingReceiving: receiving.filter(r => r.status !== "complete").length,
+          pendingPutaway: putaway.length,
+          openPicks: picks.filter(p => p.status === "open" || p.status === "in_progress").length,
+          scheduledCounts: cycleCounts.filter(c => c.status === "scheduled" || c.status === "in_progress").length,
+          recentActivity,
+        });
+      }),
+
+      http.get(`${V1}/warehouse/locations`, async () => {
+        await lat();
+        return HttpResponse.json({ items: locations });
+      }),
+
+      http.get(`${V1}/warehouse/receiving`, async () => {
+        await lat();
+        return HttpResponse.json({ items: receiving });
+      }),
+
+      http.get(`${V1}/warehouse/putaway`, async () => {
+        await lat();
+        return HttpResponse.json({ items: putaway });
+      }),
+
+      http.get(`${V1}/warehouse/picks`, async () => {
+        await lat();
+        return HttpResponse.json({ items: picks });
+      }),
+
+      http.get(`${V1}/warehouse/cycle-counts`, async () => {
+        await lat();
+        return HttpResponse.json({ items: cycleCounts });
+      }),
+    ];
+  })(),
 );
