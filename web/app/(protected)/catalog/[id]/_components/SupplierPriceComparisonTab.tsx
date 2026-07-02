@@ -2,22 +2,19 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge } from "@/components/Badge";
-import { Button } from "@/components/Button";
 import { apiGet, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
-import { fmtDate } from "@/lib/date";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface PricePoint { date: number; cost: number; }
 
-interface SupplierPriceRow {
+interface SupplierComparison {
   supplier_id: string;
   supplier_name: string;
   is_preferred: boolean;
   vendor_sku: string | null;
-  last_purchase_date: number;
+  last_purchase_date: number | null;
   last_cost_cents: number;
   landed_cost_cents: number;
   moq: number | null;
@@ -26,209 +23,236 @@ interface SupplierPriceRow {
   price_history: PricePoint[];
 }
 
-interface ComparisonData {
-  items: SupplierPriceRow[];
+interface ComparisonResponse {
+  items: SupplierComparison[];
   best_price_supplier_id: string;
   current_retail_price_cents: number;
 }
 
-// ── Tiny trend sparkline ──────────────────────────────────────────────────────
-
-function TrendSparkline({ history }: { history: PricePoint[] }) {
-  if (history.length < 2) return null;
-  const costs  = history.map((h) => h.cost);
-  const minC   = Math.min(...costs);
-  const maxC   = Math.max(...costs);
-  const range  = maxC - minC || 1;
-  const w = 80; const h = 28; const pad = 2;
-  const pts = history.map((pt, i) => {
-    const x = pad + (i / (history.length - 1)) * (w - pad * 2);
-    const y = pad + ((1 - (pt.cost - minC) / range) * (h - pad * 2));
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  const color = history[history.length - 1].cost <= history[0].cost ? "#10b981" : "#ef4444";
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="h-7 w-20" aria-hidden="true">
-      <polyline points={pts.join(" ")} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
-  );
+function fmtDate(ts: number | null) {
+  if (!ts) return "—";
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(ts));
 }
 
-// ── Trend label ───────────────────────────────────────────────────────────────
-
 function TrendBadge({ trend }: { trend: "up" | "down" | "stable" }) {
-  if (trend === "down")   return <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">↓ Falling</span>;
-  if (trend === "up")     return <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-600">↑ Rising</span>;
-  return <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">→ Stable</span>;
+  if (trend === "up")     return <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">↑ Rising</span>;
+  if (trend === "down")   return <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">↓ Falling</span>;
+  return <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">→ Stable</span>;
+}
+
+function MiniSparkline({ history, min, max }: { history: PricePoint[]; min: number; max: number }) {
+  if (history.length < 2) return null;
+  const range = max - min || 1;
+  const w = 80; const h = 28;
+  const pts = history.map((p, i) => {
+    const x = (i / (history.length - 1)) * w;
+    const y = h - ((p.cost - min) / range) * (h - 4) - 2;
+    return `${x},${y}`;
+  }).join(" ");
+  const last = history[history.length - 1]!;
+  const prev = history[history.length - 2]!;
+  const color = last.cost > prev.cost ? "#ef4444" : last.cost < prev.cost ? "#10b981" : "#94a3b8";
+  return (
+    <svg width={w} height={h} className="overflow-visible">
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/>
+    </svg>
+  );
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function SupplierPriceComparisonTab({ productId }: { productId: string }) {
   const router = useRouter();
-  const [data, setData]       = useState<ComparisonData | null>(null);
+  const [data, setData]       = useState<ComparisonResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
-  const [sortBy, setSortBy]   = useState<"cost" | "landed" | "lead_time">("cost");
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const d = await apiGet<ComparisonData>(`/api/v1/catalog/${productId}/supplier-price-comparison`);
+      const d = await apiGet<ComparisonResponse>(`/api/v1/catalog/${productId}/supplier-price-comparison`);
       setData(d);
     } catch (e) {
-      setError(e instanceof ApiResponseError ? e.message : "Failed to load supplier prices.");
+      setError(e instanceof ApiResponseError ? e.message : "Failed to load comparison data.");
     } finally { setLoading(false); }
   }, [productId]);
 
   useEffect(() => { void load(); }, [load]);
 
-  const sorted = data
-    ? [...data.items].sort((a, b) => {
-        if (sortBy === "cost")      return a.last_cost_cents - b.last_cost_cents;
-        if (sortBy === "landed")    return a.landed_cost_cents - b.landed_cost_cents;
-        if (sortBy === "lead_time") return (a.lead_time_days ?? 999) - (b.lead_time_days ?? 999);
-        return 0;
-      })
-    : [];
-
-  const SELECT = "rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 outline-none focus:border-[#5D5FEF]";
-
   if (loading) return (
     <div className="space-y-3">
-      {[1, 2, 3].map((i) => <div key={i} className="h-24 animate-pulse rounded-lg bg-slate-100" />)}
+      {[1, 2, 3].map((i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100" />)}
     </div>
   );
 
   if (error) return <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>;
-  if (!data || data.items.length === 0) return (
-    <div className="rounded-lg border border-dashed border-slate-200 py-12 text-center">
-      <p className="text-sm text-slate-400">No supplier price data available. Add suppliers on the Suppliers tab.</p>
-    </div>
-  );
+  if (!data || data.items.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center">
+        <p className="text-sm text-slate-400">No supplier pricing data available.</p>
+        <button type="button" onClick={() => router.push(`/catalog/${productId}?tab=suppliers`)}
+          className="mt-2 text-sm text-[#5D5FEF] hover:underline">
+          Add a supplier
+        </button>
+      </div>
+    );
+  }
 
-  const bestPrice = Math.min(...data.items.map((s) => s.last_cost_cents));
-  const worstPrice = Math.max(...data.items.map((s) => s.last_cost_cents));
+  const allCosts = data.items.flatMap((s) => s.price_history.map((p) => p.cost));
+  const minCost  = Math.min(...allCosts);
+  const maxCost  = Math.max(...allCosts);
+
+  const retailMargins = data.items.map((s) => ({
+    id: s.supplier_id,
+    margin: ((data.current_retail_price_cents - s.last_cost_cents) / data.current_retail_price_cents) * 100,
+  }));
+
+  const sortedItems = [...data.items].sort((a, b) => a.last_cost_cents - b.last_cost_cents);
+  const cheapest    = sortedItems[0];
 
   return (
     <div className="space-y-5">
 
-      {/* ── Best price alert ──────────────────────────────────────────────── */}
-      {data.items.length > 1 && (
-        (() => {
-          const best = data.items.find((s) => s.supplier_id === data.best_price_supplier_id);
-          const current = data.items.find((s) => s.is_preferred);
-          if (!best || !current || best.supplier_id === current.supplier_id) return null;
-          const saving = current.last_cost_cents - best.last_cost_cents;
-          return (
-            <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-              </svg>
-              <span className="text-emerald-800">
-                <strong>{best.supplier_name}</strong> offers a lower price — saves <strong>{formatMoney(saving)}/unit</strong> vs your preferred supplier.
-              </span>
-            </div>
-          );
-        })()
+      {/* ── Best price callout ────────────────────────────────────────────────── */}
+      {cheapest && (
+        <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+          <svg className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <div>
+            <p className="text-sm font-semibold text-emerald-900">
+              Best price: {formatMoney(cheapest.last_cost_cents)}/unit from {cheapest.supplier_name}
+            </p>
+            <p className="mt-0.5 text-xs text-emerald-700">
+              {data.items.length > 1
+                ? `Saves ${formatMoney(data.items.reduce((max, s) => Math.max(max, s.last_cost_cents - cheapest.last_cost_cents), 0))}/unit vs most expensive option`
+                : "Only supplier on record"}
+            </p>
+          </div>
+        </div>
       )}
 
-      {/* ── Sort + header ─────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">{data.items.length} supplier{data.items.length !== 1 ? "s" : ""} compared</p>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">Sort by</span>
-          <select className={SELECT} value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
-            <option value="cost">Unit cost</option>
-            <option value="landed">Landed cost</option>
-            <option value="lead_time">Lead time</option>
-          </select>
+      {/* ── Comparison table ──────────────────────────────────────────────────── */}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
+          <h3 className="text-sm font-semibold text-slate-900">Supplier pricing comparison</h3>
+          <p className="text-xs text-slate-400">Retail price: {formatMoney(data.current_retail_price_cents)}</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="border-b border-slate-100">
+              <tr className="text-left">
+                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Supplier</th>
+                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Vendor SKU</th>
+                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Unit Cost</th>
+                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Landed Cost</th>
+                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Margin</th>
+                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">MOQ</th>
+                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Lead Time</th>
+                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">30d Trend</th>
+                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Price History</th>
+                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Last Order</th>
+                <th className="px-5 py-2.5" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {sortedItems.map((s, i) => {
+                const isBest = s.last_cost_cents === cheapest?.last_cost_cents;
+                const margin = retailMargins.find((m) => m.id === s.supplier_id)?.margin ?? 0;
+                return (
+                  <tr key={s.supplier_id} className={`hover:bg-slate-50/70 transition-colors ${isBest ? "bg-emerald-50/30" : ""}`}>
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-2">
+                        {isBest && (
+                          <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-700">Best</span>
+                        )}
+                        {s.is_preferred && (
+                          <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-blue-700">Preferred</span>
+                        )}
+                        <span className="font-medium text-slate-900">{s.supplier_name}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3.5 text-xs text-slate-500">{s.vendor_sku ?? "—"}</td>
+                    <td className="px-5 py-3.5">
+                      <span className={`font-semibold ${isBest ? "text-emerald-700" : i === sortedItems.length - 1 ? "text-red-600" : "text-slate-900"}`}>
+                        {formatMoney(s.last_cost_cents)}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-xs text-slate-600">{formatMoney(s.landed_cost_cents)}</td>
+                    <td className="px-5 py-3.5">
+                      <span className={`text-xs font-semibold ${
+                        margin >= 35 ? "text-emerald-700" : margin >= 20 ? "text-amber-600" : "text-red-600"
+                      }`}>
+                        {margin.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-xs text-slate-600">{s.moq ?? "—"}</td>
+                    <td className="px-5 py-3.5 text-xs text-slate-600">{s.lead_time_days != null ? `${s.lead_time_days}d` : "—"}</td>
+                    <td className="px-5 py-3.5"><TrendBadge trend={s.price_30d_trend} /></td>
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-end gap-2">
+                        <MiniSparkline history={s.price_history} min={minCost} max={maxCost} />
+                        <div className="text-right">
+                          <p className="text-[10px] text-slate-400">Low: {formatMoney(Math.min(...s.price_history.map((p) => p.cost)))}</p>
+                          <p className="text-[10px] text-slate-400">High: {formatMoney(Math.max(...s.price_history.map((p) => p.cost)))}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3.5 text-xs text-slate-500">{fmtDate(s.last_purchase_date)}</td>
+                    <td className="px-5 py-3.5">
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/purchasing/new?supplier=${s.supplier_id}&product=${productId}`)}
+                        className="rounded-md bg-[#5D5FEF] px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-600 whitespace-nowrap"
+                      >
+                        Create PO
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* ── Supplier cards ────────────────────────────────────────────────── */}
-      <div className="space-y-3">
-        {sorted.map((row) => {
-          const isBest     = row.last_cost_cents === bestPrice;
-          const isWorst    = row.last_cost_cents === worstPrice && data.items.length > 1;
-          const marginVsRetail = data.current_retail_price_cents > 0
-            ? ((data.current_retail_price_cents - row.last_cost_cents) / data.current_retail_price_cents) * 100
-            : null;
-
-          return (
-            <div
-              key={row.supplier_id}
-              className={`rounded-lg border bg-white shadow-sm transition-all ${isBest ? "border-emerald-300" : row.is_preferred ? "border-[#5D5FEF]" : "border-slate-200"}`}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
-                {/* Left: supplier info */}
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-900">{row.supplier_name}</span>
-                    {row.is_preferred && <Badge variant="blue">Preferred</Badge>}
-                    {isBest && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700">Best price</span>}
-                    {isWorst && !isBest && <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] text-red-500">Highest</span>}
-                  </div>
-                  {row.vendor_sku && <p className="mt-0.5 text-[11px] text-slate-400">Vendor SKU: {row.vendor_sku}</p>}
-                </div>
-
-                {/* Right: price + sparkline */}
-                <div className="flex items-center gap-4">
-                  <TrendSparkline history={row.price_history} />
-                  <div className="text-right">
-                    <p className={`text-xl font-bold ${isBest ? "text-emerald-600" : "text-slate-900"}`}>
-                      {formatMoney(row.last_cost_cents)}
-                    </p>
-                    <p className="text-[11px] text-slate-400">per unit</p>
-                  </div>
-                </div>
+      {/* ── Price history detail ──────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 className="mb-4 text-sm font-semibold text-slate-900">Price history (last 90 days)</h3>
+        <div className="space-y-4">
+          {sortedItems.map((s) => (
+            <div key={s.supplier_id}>
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-700">{s.supplier_name}</span>
+                <span className="text-xs text-slate-400">Current: {formatMoney(s.last_cost_cents)}</span>
               </div>
-
-              {/* Stats row */}
-              <div className="border-t border-slate-100 px-5 py-3">
-                <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-500">
-                  <span>Landed cost: <strong className="text-slate-700">{formatMoney(row.landed_cost_cents)}</strong></span>
-                  <span>MOQ: <strong className="text-slate-700">{row.moq ?? "—"}</strong></span>
-                  <span>Lead time: <strong className="text-slate-700">{row.lead_time_days != null ? `${row.lead_time_days}d` : "—"}</strong></span>
-                  <span>Last bought: <strong className="text-slate-700">{fmtDate(row.last_purchase_date)}</strong></span>
-                  {marginVsRetail != null && (
-                    <span>Margin at retail: <strong className={`${marginVsRetail >= 30 ? "text-emerald-600" : marginVsRetail > 0 ? "text-amber-600" : "text-red-600"}`}>{marginVsRetail.toFixed(1)}%</strong></span>
-                  )}
-                  <TrendBadge trend={row.price_30d_trend} />
-                </div>
-              </div>
-
-              {/* Price history bar */}
-              <div className="border-t border-slate-100 px-5 py-2.5">
-                <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                  <span>90d history:</span>
-                  {row.price_history.map((pt, i) => (
-                    <span key={i} className="rounded bg-slate-50 px-1.5 py-0.5">
-                      {new Date(pt.date).toLocaleDateString("en-US", { month: "short" })}: <strong className="text-slate-700">{formatMoney(pt.cost)}</strong>
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="border-t border-slate-100 px-5 py-3 flex justify-end gap-2">
-                {!row.is_preferred && (
-                  <button type="button" className="rounded border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50">
-                    Set as preferred
-                  </button>
-                )}
-                <Button
-                  size="sm"
-                  variant={isBest ? "primary" : "secondary"}
-                  onClick={() => router.push(`/purchasing?supplier=${row.supplier_id}&product=${productId}`)}
-                >
-                  Create PO with this supplier
-                </Button>
+              <div className="flex gap-3">
+                {s.price_history.map((point, idx) => {
+                  const prevCost = idx > 0 ? s.price_history[idx - 1]!.cost : point.cost;
+                  const pct = maxCost > minCost ? ((point.cost - minCost) / (maxCost - minCost)) * 100 : 50;
+                  return (
+                    <div key={idx} className="flex-1 text-center">
+                      <div className="mb-1 h-12 relative flex items-end justify-center">
+                        <div
+                          className={`w-4 rounded-t transition-all ${
+                            point.cost < prevCost ? "bg-emerald-400" : point.cost > prevCost ? "bg-red-400" : "bg-slate-300"
+                          }`}
+                          style={{ height: `${Math.max(8, pct)}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-900 font-semibold">{formatMoney(point.cost)}</p>
+                      <p className="text-[9px] text-slate-400">
+                        {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(point.date))}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          );
-        })}
+          ))}
+        </div>
       </div>
+
     </div>
   );
 }

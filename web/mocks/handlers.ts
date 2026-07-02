@@ -386,43 +386,7 @@ export const handlers = [
     return HttpResponse.json(response, { status: 200 });
   }),
 
-  // ── GET /api/v1/catalog ──────────────────────────────────────────────────
-  http.get(`${V1}/catalog`, async ({ request }) => {
-    await latency();
-    const url = new URL(request.url);
-    const search = url.searchParams.get("search")?.toLowerCase() ?? "";
-    const category = url.searchParams.get("category") ?? "";
-    const page = parseInt(url.searchParams.get("page") ?? "1", 10);
-    const pageSize = parseInt(url.searchParams.get("pageSize") ?? "50", 10);
-
-    let items = MOCK_PRODUCTS.filter((p) => p.status === "active");
-
-    if (search) {
-      items = items.filter(
-        (p) =>
-          p.name.toLowerCase().includes(search) ||
-          p.sku.toLowerCase().includes(search) ||
-          p.barcode?.toLowerCase().includes(search)
-      );
-    }
-
-    if (category) {
-      items = items.filter((p) => p.category === category);
-    }
-
-    const total = items.length;
-    const start = (page - 1) * pageSize;
-    const paged = items.slice(start, start + pageSize);
-
-    const response: CatalogListResponse = {
-      items: paged,
-      total,
-      page,
-      pageSize,
-    };
-
-    return HttpResponse.json(response, { status: 200 });
-  }),
+  // GET /api/v1/catalog is handled by mockHandlers (richer: filtering, pagination, detail by ID).
 
   // ── POST /api/v1/orders ──────────────────────────────────────────────────
   http.post(`${V1}/orders`, async ({ request }) => {

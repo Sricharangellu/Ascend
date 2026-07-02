@@ -1,5 +1,165 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-01  |  Last commit: `e5c9289`
+> Last updated: 2026-07-02  |  Last commit: `35f9133`
+
+---
+
+## Enterprise Domain Roadmap (authoritative)
+
+> Full spec: [`docs/ENTERPRISE_DOMAIN_ROADMAP.md`](docs/ENTERPRISE_DOMAIN_ROADMAP.md)
+
+**Design principle:** Build in **dependency order**, not feature order. Do not add isolated features — complete domain-by-domain so every module connects through a consistent data model, RBAC, audit logging, and shared business rules.
+
+### Build sequence
+
+| Priority | Domain | Path | Status |
+|---|---|---|---|
+| 1 | Sales & Order Management | `/sales` | 🔶 Partial — **next domain** |
+| 2 | Customer 360 | `/customers/[id]` upgrade | 🔶 Partial |
+| 3 | Supplier 360 | `/vendors/[id]` upgrade | 🔶 Partial |
+| 4 | Warehouse Management (WMS) | `/warehouse` | 🔲 Not started |
+| 5 | Pricing Engine | `/pricing` | 🔶 Embedded in Products |
+| 6 | Promotion Engine | `/promotions` upgrade | 🔶 Basic page |
+| 7 | Enterprise Workflow Engine | `/workflows` upgrade | 🔶 Basic page |
+| 8 | Notification Center | `/notifications` upgrade | 🔶 Basic page |
+| 9 | Document Center | `/documents` | 🔲 Not started |
+| 10 | Business Intelligence | `/analytics` | 🔶 Basic dashboards |
+| 11 | Automation Engine | `/automations` | 🔶 Basic page |
+| 12 | Integration Hub | `/integrations` upgrade | 🔶 Basic page |
+| 13 | Analytics & AI | `/ai-insights` | 🔶 Basic page |
+
+### Order lifecycle (immutable — use status transitions only)
+`Customer → Cart → Order → Payment → Invoice → Delivery → Return → Refund → Accounting`
+
+### Order status state machine
+`Draft → Confirmed → Processing → Packed → Shipped → Delivered → Completed | Returned | Cancelled | Backordered | On Hold`
+
+---
+
+## Enterprise Inventory Pipeline (authoritative)
+
+> Full spec: [`docs/ENTERPRISE_INVENTORY_PIPELINE.md`](docs/ENTERPRISE_INVENTORY_PIPELINE.md)
+
+### Pipeline status flow
+`Suggested → Draft PO → Sent to Supplier → Confirmed → Partially Received → Fully Received → Supplier Billed → Cost Verified → Closed`
+
+### Key design rules
+
+| Rule | Detail |
+|---|---|
+| **Never blind import** | Every EDI/CSV import runs 13 safeguard checks before touching inventory |
+| **Price history always** | Every PO receive → insert into `supplier_product_price_history` |
+| **Preferred supplier lock** | Never overwrite preferred supplier without explicit approval |
+| **Duplicate = hard block** | Duplicate PO number or invoice number = blocked, not warned |
+| **Large cost change → approval** | Threshold configurable per tenant; movement held until approved |
+| **Reorder formula** | `(Avg Daily Sales × Lead Time) + Safety Stock − Available − Incoming` |
+| **Supplier comparison** | Always surface cheapest recent price across all linked suppliers |
+
+### 5 new schema tables
+`supplier_product_price_history`, `reorder_suggestions`, `edi_imports`, `edi_import_errors`, `purchase_invoice_matches`
+
+### 3 new pages needed
+| Page | Path | Status |
+|---|---|---|
+| Inventory Pipeline | `/inventory/pipeline` | Not built |
+| EDI Imports | `/purchasing/edi-imports` | Not built |
+| Error Check Center | `/inventory/errors` | Not built |
+
+---
+
+## Enterprise Product Spec (authoritative)
+
+> Full spec: [`docs/ENTERPRISE_PRODUCT_SPEC.md`](docs/ENTERPRISE_PRODUCT_SPEC.md)
+
+Products are the **central business entity** — every other module references them. The product module is a PIM + Inventory + Supply Chain system, not a CRUD form.
+
+### Key design rules
+
+| Rule | Detail |
+|---|---|
+| **360° workspace** | Product Detail = tabbed workspace (24 tabs), not a form. Left nav + center content + right KPI panel + sticky action bar |
+| **Master → Variant split** | Master holds shared data (name, brand, images, SEO). Variant holds sellable data (SKU, barcode, price, inventory) |
+| **Lifecycle state machine** | Draft → Pending Approval → Approved → Published → Selling → Low Stock → Reorder → Discontinued → Archived |
+| **Tracking modes** | Per product: No/SKU/Barcode/Serial/Batch/Lot/RFID/IMEI/GTIN/Expiry tracking |
+| **Warehouse granularity** | Warehouse → Zone → Aisle → Rack → Shelf → Bin → Pallet (per-location stock) |
+| **List view modes** | Collapsed master / Expanded parent-child / Grid / Ecommerce / Inventory / Label |
+| **Bulk safety** | Preview before apply, audit log per field, rollback, requires `products.bulk_update` permission |
+| **Label printing** | Mixed-type queue, per-product-type templates, 15+ label sizes, USB/BT/Wi-Fi/ZPL/ESC/POS |
+
+### New schema tables (label printing + ecommerce)
+`ecommerce_product_settings`, `label_templates`, `product_label_settings`, `label_print_jobs`, `label_print_job_items`, `printers`, `printer_drivers`, `print_logs`
+
+### New RBAC codes
+`products.bulk_update`, `ecommerce_products.publish`, `labels.print`, `labels.manage_templates`, `printers.test`
+
+---
+
+## Enterprise UX Spec (authoritative)
+
+> Full spec: [`docs/ENTERPRISE_UX_SPEC.md`](docs/ENTERPRISE_UX_SPEC.md)
+
+### UX rules that apply on every new page/component
+
+| Rule | Detail |
+|---|---|
+| **Permission-gated nav** | Hide sidebar items if user lacks `[module].view` |
+| **Permission-gated buttons** | Wrap all create/edit/delete/approve in `<Can permission="...">` |
+| **Page header standard** | Title + description + breadcrumb + gated import/export/create buttons |
+| **Detail page tabs** | Use tab pattern from spec §4 (Product, Customer, Outlet, User, Role) |
+| **Table requirements** | Search + filters + pagination + bulk actions + export + empty/loading/error states |
+| **Form requirements** | Sections + required indicators + inline validation + unsaved-changes guard |
+| **Confirmation modal** | Required for: refund, void, delete, archive, disable user, revoke sessions, receive inventory, change permissions |
+| **Offline UX** | Terminal shows online/offline badge, last-sync time, pending queue count |
+| **Page connections** | Dashboard → detail pages; Orders → Customer; PO → Vendor; etc. Always wire `href` links |
+| **RBAC components** | `Can`, `CanAny`, `CanAll`, `PermissionGuard`, `RoleGuard`, `OutletAccessGuard`, `ReadOnlyWrapper` |
+
+---
+
+## Enterprise Architecture (authoritative)
+
+> Full spec: [`docs/ENTERPRISE_ARCHITECTURE.md`](docs/ENTERPRISE_ARCHITECTURE.md)
+
+### Non-negotiable design rules
+| Rule | Description |
+|---|---|
+| **Multi-tenant first** | Every business-owned table must have `tenant_id UUID NOT NULL`. Never query without tenant filter. |
+| **Inventory ledger** | Every stock change creates an `inventory_movements` record. No simple qty updates. |
+| **Immutable financials** | Orders, payments, refunds: use status changes + adjustment records. Never silent edits. |
+| **Offline-first POS** | IndexedDB, sync queue, idempotency keys, device IDs, conflict resolution. |
+| **Event-driven** | Key actions emit events (`order.created`, `payment.completed`, `inventory.decreased`, etc.). |
+
+### Schema table inventory (30 tables defined)
+
+| Domain | Tables |
+|---|---|
+| Identity & Access | `tenants`, `tenant_settings`, `users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `user_sessions` |
+| Organization | `outlets`, `registers`, `cash_drawer_sessions` |
+| Catalog | `categories`, `brands`, `products`, `product_variants`, `price_books`, `price_book_items` |
+| Inventory Ledger | `inventory_balances`, `inventory_movements`, `stock_transfers`, `stock_transfer_items` |
+| Customers | `customer_groups`, `customers` |
+| Sales | `orders`, `order_items`, `payment_methods`, `payments`, `refunds` |
+| Returns | `returns`, `return_items` |
+| Purchasing | `vendors`, `vendor_products`, `purchase_orders`, `purchase_order_items` |
+| Taxes/Promos | `tax_rates`, `discounts`, `gift_cards`, `gift_card_transactions` |
+| Platform | `audit_logs`, `devices`, `sync_events`, `webhooks`, `webhook_deliveries`, `daily_sales_summary` |
+
+### Build phases
+| Phase | Status | Focus |
+|---|---|---|
+| 1 — Foundation | 🔶 Frontend built, backend mock | tenants, users, roles, outlets, registers, auth, audit_logs |
+| 2 — Catalog & Inventory | 🔶 Frontend built, backend mock | products, variants, inventory_balances, inventory_movements |
+| 3 — POS Sales | 🔶 Frontend built, backend mock | orders, order_items, payments, tax, discounts |
+| 4 — Customers & Loyalty | 🔶 Frontend built, backend mock | customers, customer_groups, gift_cards, loyalty_points |
+| 5 — Purchasing | 🔶 Frontend built, backend mock | vendors, purchase_orders, receiving, cost updates |
+| 6 — Enterprise Layer | 🔲 Partial frontend | sync_events, devices, webhooks, reports, approval workflows |
+| 7 — Scale Layer | 🔲 Not started | Read replicas, queues, analytics warehouse, search, ERP sync |
+
+### Key architecture decisions
+- **Stack**: Next.js 14 + TypeScript (frontend) · Express + TypeScript + PostgreSQL (backend, in `src/`)
+- **ORM target**: Prisma or Drizzle (currently raw SQL in backend)
+- **Auth**: JWT access tokens + refresh token rotation · Argon2 password hashing · MFA for owners
+- **Money**: Always integer cents in DB and API, never floats · `formatMoney(cents)` on display
+- **Inventory movements**: Every balance change must reference a movement type: `SALE`, `RETURN`, `PURCHASE_RECEIVE`, `TRANSFER_IN/OUT`, `ADJUSTMENT_IN/OUT`, `DAMAGE`, `LOSS`, `COUNT_CORRECTION`
+- **Permissions**: 28 granular permission codes across 8 domains (see full spec)
 
 ---
 
@@ -9,7 +169,7 @@
 |---|---|---|
 | **Authentication** | ✅ Built | Login (368 ln), Signup (174 ln), protected layout, route guard |
 | **Terminal / Register** | ✅ Built | Full checkout: barcode scan, cart, tender, receipt, offline queue, card reader screen |
-| **Product Catalog** | ✅ Built | List + filters + sort + bulk update + CSV import/export + duplicate + image + detail page + variants + price book |
+| **Product Catalog** | ✅ Built | List + filters + sort + bulk update + CSV import/export + duplicate + detail page + variants + price book + **20-tab workspace**: General, Variants, Pricing, Inventory, Purchase by Supplier, Sales by Customer, Reorder, Supplier Prices, Suppliers, Expiry, Images, eCommerce, Categories, Sales, Returns, Credits, Invoices, Compliance, Analytics, Audit Log |
 | **Inventory** | ✅ Built | Overview, receive stock, counts, serials, expiry, reorder suggestions, locations, transfers (via operations) |
 | **Purchasing / POs** | ✅ Built | PO list + tabbed detail (lines, receive, billing, credits), reorder suggestions → PO creation |
 | **Orders** | ✅ Built | Order list + status filter |

@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
@@ -186,6 +187,7 @@ function OrderDetailModal({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function OrdersPage() {
+  const router = useRouter();
   const [tab, setTab] = useState<OrderStatus | "all">("all");
   const [orders, setOrders] = useState<Order[]>([]);
   const [total, setTotal] = useState(0);
@@ -318,21 +320,12 @@ export default function OrdersPage() {
             <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-100 bg-slate-50">
                 <tr>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Order #
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    State
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Total
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Date
-                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Order #</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Customer</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Outlet</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Total</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Date</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -341,23 +334,28 @@ export default function OrdersPage() {
                   <tr
                     key={order.id}
                     className="group cursor-pointer hover:bg-slate-50 transition-colors"
-                    onClick={() => setSelectedOrder(order)}
+                    onClick={() => router.push(`/orders/${order.id}`)}
                   >
-                    <td className="px-4 py-3 font-mono text-xs font-medium text-slate-800">
+                    <td className="px-4 py-3 font-mono text-xs font-semibold text-[#5D5FEF]">
                       {order.orderNumber}
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={STATUS_BADGE[order.status]}>{order.status}</Badge>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{order.stateCode}</td>
-                    <td className="px-4 py-3 text-right font-medium text-slate-800">
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                      {(order as unknown as { customer_name?: string }).customer_name ?? <span className="text-slate-400">Guest</span>}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-600">
+                      {(order as unknown as { outlet_name?: string }).outlet_name ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-slate-900">
                       {formatMoney(order.totalCents)}
                     </td>
-                    <td className="px-4 py-3 text-slate-500 text-xs">
+                    <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
                       {fmtDateTime(order.createdAt)}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-xs text-slate-400 group-hover:text-slate-600">
+                      <span className="text-xs font-medium text-slate-400 group-hover:text-[#5D5FEF] transition-colors">
                         View →
                       </span>
                     </td>

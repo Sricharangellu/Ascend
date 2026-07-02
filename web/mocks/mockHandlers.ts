@@ -3590,11 +3590,89 @@ mockHandlers.push(
       id: string; orderNumber: string; stateCode: string; status: string;
       subtotalCents: number; discountCents: number; taxCents: number; totalCents: number;
       customerId?: string;
+      customer_name?: string; outlet_name?: string; cashier_name?: string; channel?: string; notes?: string;
       lines: Array<{ id: string; orderId: string; productId: string; name: string; quantity: number; unitCents: number; taxCents: number; lineCents: number; taxable: boolean }>;
+      payments?: Array<{ id: string; method: string; amountCents: number; cardLast4?: string; authCode?: string; status: string; createdAt: number }>;
       createdAt: number; updatedAt: number;
     }
 
     const termOrders = new Map<string, TermOrder>();
+
+    // ── Seed orders ───────────────────────────────────────────────────────────
+    (() => {
+      const D = 86_400_000;
+      const N = Date.now();
+      const seed: TermOrder[] = [
+        {
+          id: "ord_s_1", orderNumber: "FP-0001", stateCode: "TX", status: "completed",
+          customerId: "cust_1", customer_name: "Emma Johnson", outlet_name: "Main Store", cashier_name: "Alex T.", channel: "in-store",
+          subtotalCents: 7497, discountCents: 0, taxCents: 656, totalCents: 8153,
+          lines: [
+            { id: "ol_s_1_0", orderId: "ord_s_1", productId: "prod_1", name: "Premium Whiskey 750ml", quantity: 3, unitCents: 2499, taxCents: 655, lineCents: 7497, taxable: true },
+          ],
+          payments: [{ id: "pay_s_1", method: "card", amountCents: 8153, cardLast4: "4242", authCode: "AUTH123456", status: "captured", createdAt: N - 2 * D }],
+          createdAt: N - 2 * D, updatedAt: N - 2 * D,
+        },
+        {
+          id: "ord_s_2", orderNumber: "FP-0002", stateCode: "TX", status: "completed",
+          customerId: "cust_2", customer_name: "Marcus Rodriguez", outlet_name: "South Branch", cashier_name: "Maria S.", channel: "in-store",
+          subtotalCents: 14990, discountCents: 1000, taxCents: 1226, totalCents: 15216,
+          lines: [
+            { id: "ol_s_2_0", orderId: "ord_s_2", productId: "prod_3", name: "House Red Wine", quantity: 2, unitCents: 1299, taxCents: 227, lineCents: 2598, taxable: true },
+            { id: "ol_s_2_1", orderId: "ord_s_2", productId: "prod_2", name: "Craft Beer 6-Pack", quantity: 4, unitCents: 1299, taxCents: 454, lineCents: 5196, taxable: true },
+            { id: "ol_s_2_2", orderId: "ord_s_2", productId: "prod_4", name: "Sparkling Water 1L", quantity: 12, unitCents: 599, taxCents: 628, lineCents: 7188, taxable: false },
+          ],
+          payments: [
+            { id: "pay_s_2a", method: "cash", amountCents: 10000, status: "captured", createdAt: N - 3 * D },
+            { id: "pay_s_2b", method: "card", amountCents: 5216, cardLast4: "9876", authCode: "AUTH654321", status: "captured", createdAt: N - 3 * D },
+          ],
+          createdAt: N - 3 * D, updatedAt: N - 3 * D,
+        },
+        {
+          id: "ord_s_3", orderNumber: "FP-0003", stateCode: "TX", status: "refunded",
+          customerId: "cust_3", customer_name: "Sarah Chen", outlet_name: "Main Store", cashier_name: "John D.", channel: "in-store",
+          subtotalCents: 4998, discountCents: 0, taxCents: 437, totalCents: 5435,
+          lines: [
+            { id: "ol_s_3_0", orderId: "ord_s_3", productId: "prod_5", name: "Aged Cheddar 200g", quantity: 2, unitCents: 2499, taxCents: 437, lineCents: 4998, taxable: true },
+          ],
+          payments: [{ id: "pay_s_3", method: "card", amountCents: 5435, cardLast4: "1111", authCode: "AUTH789012", status: "refunded", createdAt: N - 5 * D }],
+          notes: "Customer returned — wrong flavour. Full refund issued.",
+          createdAt: N - 5 * D, updatedAt: N - 4 * D,
+        },
+        {
+          id: "ord_s_4", orderNumber: "FP-0004", stateCode: "TX", status: "open",
+          customer_name: undefined, outlet_name: "Main Store", cashier_name: "Sara K.", channel: "in-store",
+          subtotalCents: 2998, discountCents: 300, taxCents: 235, totalCents: 2933,
+          lines: [
+            { id: "ol_s_4_0", orderId: "ord_s_4", productId: "prod_6", name: "Trail Mix 500g", quantity: 2, unitCents: 1499, taxCents: 262, lineCents: 2998, taxable: true },
+          ],
+          payments: [],
+          createdAt: N - 1 * D, updatedAt: N - 1 * D,
+        },
+        {
+          id: "ord_s_5", orderNumber: "FP-0005", stateCode: "CA", status: "voided",
+          customerId: "cust_4", customer_name: "Linda Park", outlet_name: "South Branch", cashier_name: "Alex T.", channel: "in-store",
+          subtotalCents: 8997, discountCents: 0, taxCents: 787, totalCents: 9784,
+          lines: [
+            { id: "ol_s_5_0", orderId: "ord_s_5", productId: "prod_1", name: "Premium Whiskey 750ml", quantity: 3, unitCents: 2999, taxCents: 787, lineCents: 8997, taxable: true },
+          ],
+          payments: [],
+          notes: "Duplicate order — voided by cashier.",
+          createdAt: N - 6 * D, updatedAt: N - 6 * D,
+        },
+        {
+          id: "ord_s_6", orderNumber: "FP-0006", stateCode: "TX", status: "completed",
+          customer_name: undefined, outlet_name: "Online", cashier_name: "System", channel: "ecommerce",
+          subtotalCents: 5995, discountCents: 500, taxCents: 479, totalCents: 5974,
+          lines: [
+            { id: "ol_s_6_0", orderId: "ord_s_6", productId: "prod_7", name: "Organic Green Tea 100g", quantity: 5, unitCents: 1199, taxCents: 524, lineCents: 5995, taxable: false },
+          ],
+          payments: [{ id: "pay_s_6", method: "card", amountCents: 5974, cardLast4: "3399", authCode: "AUTH345678", status: "captured", createdAt: N }],
+          createdAt: N, updatedAt: N,
+        },
+      ];
+      seed.forEach((o) => termOrders.set(o.id, o));
+    })();
 
     const buildOrder = (id: string, num: number, body: Record<string, unknown>, status = "open"): TermOrder => {
       const lines = (Array.isArray(body.lines) ? body.lines : []) as Array<{ productId: string; quantity: number; name?: string; unitCents?: number }>;
@@ -3678,6 +3756,27 @@ mockHandlers.push(
       http.post(`${V1}/orders/:id/email-receipt`, async () => {
         await lat();
         return HttpResponse.json({ ok: true });
+      }),
+
+      http.get(`${V1}/orders/:id/timeline`, async ({ params }) => {
+        await lat();
+        const id = String(params["id"]);
+        const order = termOrders.get(id);
+        if (!order) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const events: Array<{ id: string; type: string; label: string; actor: string; ts: number; meta?: Record<string, unknown> }> = [
+          { id: "ev_1", type: "created",   label: "Order created",   actor: order.cashier_name ?? "System",  ts: order.createdAt },
+        ];
+        if (order.status === "completed" || order.status === "refunded") {
+          events.push({ id: "ev_2", type: "payment",   label: "Payment captured",  actor: order.cashier_name ?? "System",  ts: order.createdAt + 60_000 });
+          events.push({ id: "ev_3", type: "completed", label: "Order completed",   actor: order.cashier_name ?? "System",  ts: order.createdAt + 61_000 });
+        }
+        if (order.status === "refunded") {
+          events.push({ id: "ev_4", type: "refunded",  label: "Refund issued",     actor: "Manager",   ts: order.updatedAt });
+        }
+        if (order.status === "voided") {
+          events.push({ id: "ev_4", type: "voided",    label: "Order voided",      actor: order.cashier_name ?? "Cashier",  ts: order.updatedAt });
+        }
+        return HttpResponse.json({ items: events });
       }),
 
       // Payments

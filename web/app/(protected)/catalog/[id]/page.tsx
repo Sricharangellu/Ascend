@@ -28,6 +28,7 @@ import { ImagesTab }                from "./_components/ImagesTab";
 import { SalesCustomerTab }         from "./_components/SalesCustomerTab";
 import { ReorderSuggestionsTab }    from "./_components/ReorderSuggestionsTab";
 import { SupplierPriceComparisonTab } from "./_components/SupplierPriceComparisonTab";
+import { LabelsTab }                from "./_components/LabelsTab";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -35,7 +36,7 @@ type Tab =
   | "general" | "variants" | "categories" | "inventory" | "expiry"
   | "sales" | "returns" | "credits" | "invoices" | "marketing" | "ecommerce"
   | "pricing" | "suppliers" | "purchases" | "analytics" | "audit-log" | "images"
-  | "sales-customer" | "reorder" | "price-comparison";
+  | "sales-customer" | "reorder" | "price-comparison" | "labels";
 
 const STATUS_BADGE = { active: "green", draft: "yellow", archived: "gray" } as const;
 
@@ -52,6 +53,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "expiry",           label: "Expiry" },
   { key: "images",           label: "Images" },
   { key: "ecommerce",        label: "eCommerce" },
+  { key: "labels",           label: "Labels & Printing" },
   { key: "categories",       label: "Categories" },
   { key: "sales",            label: "Sales" },
   { key: "returns",          label: "Returns" },
@@ -406,6 +408,9 @@ export default function ProductDetailPage() {
         )}
         {activeTab === "price-comparison" && (
           <SupplierPriceComparisonTab productId={product.id} />
+        )}
+        {activeTab === "labels" && (
+          <LabelsTab product={product} />
         )}
 
       </div>

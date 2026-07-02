@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import {
@@ -47,6 +48,7 @@ function initials(name: string): string {
 type Filter = "all" | "in" | "out" | "suspended";
 
 export default function TeamPage() {
+  const router = useRouter();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -205,7 +207,7 @@ export default function TeamPage() {
                     <tr
                       key={emp.id}
                       className="cursor-pointer transition-colors hover:bg-[#FAFAFA]"
-                      onClick={() => setEditTarget(emp)}
+                      onClick={() => router.push(`/team/${emp.id}`)}
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -261,13 +263,13 @@ export default function TeamPage() {
                               {isClocking ? "…" : emp.clocked_in ? "Clock Out" : "Clock In"}
                             </button>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => setEditTarget(emp)}
+                          <Link
+                            href={`/team/${emp.id}`}
+                            onClick={(e) => e.stopPropagation()}
                             className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
                           >
-                            Edit
-                          </button>
+                            View
+                          </Link>
                         </div>
                       </td>
                     </tr>

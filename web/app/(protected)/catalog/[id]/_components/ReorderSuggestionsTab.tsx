@@ -2,15 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/Button";
-import { Badge } from "@/components/Badge";
 import { apiGet, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
-import { fmtDate } from "@/lib/date";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface ReorderData {
+interface ReorderSuggestion {
   current_stock: number;
   reserved_stock: number;
   available_stock: number;
@@ -29,24 +26,27 @@ interface ReorderData {
   best_price_supplier_cost_cents: number;
   savings_per_unit_cents: number;
   reason: string;
-  last_reorder_date: number;
+  last_reorder_date: number | null;
   open_po_qty: number;
-  status: "suggested" | "in_progress" | "ordered" | "ok";
+  status: "suggested" | "ok" | "critical";
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function ReorderSuggestionsTab({ productId }: { productId: string }) {
-  const router  = useRouter();
-  const [data, setData]       = useState<ReorderData | null>(null);
+  const router = useRouter();
+  const [data, setData]       = useState<ReorderSuggestion | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
+  const [qty, setQty]         = useState("");
+  const [supplier, setSupplier] = useState<"preferred" | "best_price">("preferred");
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const d = await apiGet<ReorderData>(`/api/v1/catalog/${productId}/reorder-suggestions`);
+      const d = await apiGet<ReorderSuggestion>(`/api/v1/catalog/${productId}/reorder-suggestions`);
       setData(d);
+      setQty(String(d.suggested_qty));
     } catch (e) {
       setError(e instanceof ApiResponseError ? e.message : "Failed to load reorder data.");
     } finally { setLoading(false); }
@@ -54,151 +54,179 @@ export function ReorderSuggestionsTab({ productId }: { productId: string }) {
 
   useEffect(() => { void load(); }, [load]);
 
-  const stockoutUrgency = data
-    ? data.days_until_stockout <= 3 ? "red"
-    : data.days_until_stockout <= 7 ? "yellow"
-    : "green"
-    : "gray";
-
-  const urgencyLabel = data
-    ? data.days_until_stockout <= 0 ? "Out of stock"
-    : data.days_until_stockout <= 3 ? `${data.days_until_stockout}d to stockout`
-    : data.days_until_stockout <= 7 ? `~${data.days_until_stockout}d to stockout`
-    : "Stock OK"
-    : "";
-
   if (loading) return (
-    <div className="space-y-4">
-      {[1, 2, 3].map((i) => <div key={i} className="h-28 animate-pulse rounded-lg bg-slate-100" />)}
+    <div className="space-y-3">
+      {[1, 2, 3].map((i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100" />)}
     </div>
   );
 
   if (error) return <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>;
   if (!data) return null;
 
+  const isCritical   = data.days_until_stockout <= 3;
+  const isLow        = data.days_until_stockout <= 7;
+  const chosenCost   = supplier === "preferred" ? data.preferred_supplier_cost_cents : data.best_price_supplier_cost_cents;
+  const chosenName   = supplier === "preferred" ? data.preferred_supplier_name        : data.best_price_supplier_name;
+  const qtyNum       = parseInt(qty) || 0;
+  const totalOrderCost = qtyNum * chosenCost;
+
+  const stockBarPct  = Math.min(100, Math.round((data.current_stock / Math.max(data.reorder_point * 2, 1)) * 100));
+
   return (
     <div className="space-y-5">
 
-      {/* ── Urgency banner ────────────────────────────────────────────────── */}
-      {data.days_until_stockout <= 7 && (
-        <div role="alert" className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium ${stockoutUrgency === "red" ? "bg-red-50 border border-red-200 text-red-700" : "bg-amber-50 border border-amber-200 text-amber-700"}`}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+      {/* ── Alert banner ─────────────────────────────────────────────────────── */}
+      {data.status !== "ok" && (
+        <div className={`flex items-start gap-3 rounded-xl border px-5 py-4 ${
+          isCritical
+            ? "border-red-200 bg-red-50 text-red-800"
+            : "border-amber-200 bg-amber-50 text-amber-800"
+        }`}>
+          <svg className={`mt-0.5 h-5 w-5 shrink-0 ${isCritical ? "text-red-500" : "text-amber-500"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
           </svg>
-          {data.reason}
+          <div>
+            <p className="font-semibold">{isCritical ? "Critical stock level" : "Reorder suggested"}</p>
+            <p className="mt-0.5 text-sm">{data.reason}</p>
+          </div>
         </div>
       )}
 
-      {/* ── Stock snapshot ────────────────────────────────────────────────── */}
-      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
-          <h3 className="text-sm font-semibold text-[#111]">Stock Snapshot</h3>
-          <Badge variant={stockoutUrgency}>{urgencyLabel}</Badge>
-        </div>
-        <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-5">
+      {/* ── Stock overview ────────────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 className="mb-4 text-sm font-semibold text-slate-900">Stock position</h3>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
-            { label: "On Hand",      value: data.current_stock,    color: "text-slate-900" },
-            { label: "Reserved",     value: data.reserved_stock,   color: "text-amber-600" },
-            { label: "Available",    value: data.available_stock,  color: data.available_stock <= data.reorder_point ? "text-red-600" : "text-emerald-600" },
-            { label: "Incoming",     value: data.incoming_stock,   color: "text-blue-600" },
-            { label: "Reorder Point",value: data.reorder_point,    color: "text-slate-500" },
+            { label: "On hand",    value: data.current_stock,    color: isCritical ? "text-red-600" : isLow ? "text-amber-600" : "text-slate-900" },
+            { label: "Reserved",   value: data.reserved_stock,   color: "text-slate-700" },
+            { label: "Available",  value: data.available_stock,  color: "text-emerald-700" },
+            { label: "Incoming",   value: data.incoming_stock,   color: "text-blue-700" },
           ].map(({ label, value, color }) => (
-            <div key={label} className="text-center">
-              <p className={`text-2xl font-bold ${color}`}>{value}</p>
-              <p className="mt-0.5 text-xs text-slate-400">{label}</p>
+            <div key={label} className="rounded-lg bg-slate-50 px-3 py-2.5">
+              <p className="text-xs text-slate-400">{label}</p>
+              <p className={`mt-0.5 text-xl font-bold ${color}`}>{value}</p>
+              <p className="text-[11px] text-slate-400">units</p>
             </div>
           ))}
         </div>
-      </div>
 
-      {/* ── Reorder formula ───────────────────────────────────────────────── */}
-      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 px-5 py-3.5">
-          <h3 className="text-sm font-semibold text-[#111]">Suggested Order Quantity</h3>
-        </div>
-        <div className="p-5 space-y-4">
-          {/* Formula display */}
-          <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-500 font-mono">
-            <span className="text-slate-400">Formula: </span>
-            <span className="text-slate-700">(Avg Daily Sales × Lead Time) + Safety Stock − Available − Incoming</span>
+        {/* Stock bar */}
+        <div className="mt-4">
+          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-500">
+            <span>0</span>
+            <span className="font-medium text-slate-700">Reorder point: {data.reorder_point}</span>
           </div>
-          <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs font-mono">
-            <span className="text-slate-400">= </span>
-            <span className="text-slate-700">({data.avg_daily_sales} × {data.preferred_supplier_lead_days}d) + {data.safety_stock} − {data.available_stock} − {data.incoming_stock}</span>
-            <span className="ml-2 text-lg font-bold text-[#5D5FEF]">= {data.suggested_qty} units</span>
+          <div className="relative h-3 overflow-hidden rounded-full bg-slate-100">
+            <div
+              className={`h-full rounded-full transition-all ${
+                isCritical ? "bg-red-500" : isLow ? "bg-amber-400" : "bg-emerald-500"
+              }`}
+              style={{ width: `${stockBarPct}%` }}
+            />
+            {/* Reorder point marker */}
+            <div
+              className="absolute top-0 h-full w-0.5 bg-slate-400"
+              style={{ left: `${Math.min(100, Math.round((data.reorder_point / Math.max(data.reorder_point * 2, 1)) * 100))}%` }}
+            />
           </div>
-          {/* Stats row */}
-          <div className="grid grid-cols-3 gap-3 text-center text-xs">
-            <div className="rounded border border-slate-200 py-2">
-              <p className="font-semibold text-slate-900">{data.avg_daily_sales}/day</p>
-              <p className="text-slate-400">Avg daily sales</p>
-            </div>
-            <div className="rounded border border-slate-200 py-2">
-              <p className="font-semibold text-slate-900">{data.safety_stock} units</p>
-              <p className="text-slate-400">Safety stock</p>
-            </div>
-            <div className="rounded border border-slate-200 py-2">
-              <p className="font-semibold text-slate-900">{data.preferred_supplier_lead_days} days</p>
-              <p className="text-slate-400">Lead time</p>
-            </div>
+          <div className="mt-1.5 flex items-center gap-4 text-[11px] text-slate-500">
+            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" />Safe</span>
+            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-400" />Low</span>
+            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" />Critical</span>
           </div>
         </div>
       </div>
 
-      {/* ── Supplier options ──────────────────────────────────────────────── */}
-      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 px-5 py-3.5">
-          <h3 className="text-sm font-semibold text-[#111]">Supplier Options</h3>
-        </div>
-        <div className="divide-y divide-slate-100">
-          {/* Preferred supplier */}
-          <div className="flex items-center justify-between px-5 py-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-slate-900">{data.preferred_supplier_name}</span>
-                <Badge variant="blue">Preferred</Badge>
-              </div>
-              <div className="mt-1 flex gap-4 text-xs text-slate-500">
-                <span>Cost: <strong className="text-slate-700">{formatMoney(data.preferred_supplier_cost_cents)}/unit</strong></span>
-                <span>Lead time: <strong className="text-slate-700">{data.preferred_supplier_lead_days}d</strong></span>
-                <span>Total: <strong className="text-slate-700">{formatMoney(data.preferred_supplier_cost_cents * data.suggested_qty)}</strong></span>
-              </div>
-            </div>
-            <Button size="sm" variant="primary" onClick={() => router.push(`/purchasing?supplier=${data.preferred_supplier_id}&product=${productId}&qty=${data.suggested_qty}`)}>
-              Create PO
-            </Button>
+      {/* ── Velocity & forecast ──────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {[
+          { label: "Avg daily sales",     value: `${data.avg_daily_sales.toFixed(1)} units/day`, color: "text-slate-900" },
+          { label: "Days until stockout", value: `${data.days_until_stockout} days`, color: isCritical ? "text-red-600 font-bold" : isLow ? "text-amber-600" : "text-emerald-700" },
+          { label: "Safety stock",        value: `${data.safety_stock} units`,       color: "text-slate-900" },
+          { label: "Open PO qty",         value: `${data.open_po_qty} units`,         color: "text-blue-700" },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <p className="text-[11px] text-slate-400">{label}</p>
+            <p className={`mt-0.5 text-sm font-semibold ${color}`}>{value}</p>
           </div>
-          {/* Best price supplier (if different) */}
-          {data.best_price_supplier_id !== data.preferred_supplier_id && (
-            <div className="flex items-center justify-between px-5 py-4 bg-emerald-50/50">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-slate-900">{data.best_price_supplier_name}</span>
-                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                    Best price — saves {formatMoney(data.savings_per_unit_cents)}/unit
+        ))}
+      </div>
+
+      {/* ── Create purchase order ─────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 className="mb-4 text-sm font-semibold text-slate-900">Create purchase order</h3>
+
+        {/* Supplier selector */}
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
+          {(["preferred", "best_price"] as const).map((s) => {
+            const name = s === "preferred" ? data.preferred_supplier_name : data.best_price_supplier_name;
+            const cost = s === "preferred" ? data.preferred_supplier_cost_cents : data.best_price_supplier_cost_cents;
+            const lead = s === "preferred" ? data.preferred_supplier_lead_days : null;
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setSupplier(s)}
+                className={`relative rounded-xl border-2 p-4 text-left transition-all ${
+                  supplier === s ? "border-[#5D5FEF] bg-[#5D5FEF]/5" : "border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                {s === "best_price" && data.savings_per_unit_cents > 0 && (
+                  <span className="absolute right-3 top-3 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                    Save {formatMoney(data.savings_per_unit_cents)}/unit
                   </span>
-                </div>
-                <div className="mt-1 flex gap-4 text-xs text-slate-500">
-                  <span>Cost: <strong className="text-emerald-700">{formatMoney(data.best_price_supplier_cost_cents)}/unit</strong></span>
-                  <span>Total saving: <strong className="text-emerald-700">{formatMoney(data.savings_per_unit_cents * data.suggested_qty)}</strong> on {data.suggested_qty} units</span>
-                </div>
-              </div>
-              <Button size="sm" variant="secondary" onClick={() => router.push(`/purchasing?supplier=${data.best_price_supplier_id}&product=${productId}&qty=${data.suggested_qty}`)}>
-                Create PO
-              </Button>
-            </div>
-          )}
+                )}
+                {s === "preferred" && (
+                  <span className="absolute right-3 top-3 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                    Preferred
+                  </span>
+                )}
+                <p className="text-sm font-semibold text-slate-900">{name}</p>
+                <p className="mt-1 text-lg font-bold text-slate-900">{formatMoney(cost)}<span className="ml-1 text-xs font-normal text-slate-400">/ unit</span></p>
+                {lead && <p className="mt-0.5 text-[11px] text-slate-400">Lead time: {lead} days</p>}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Qty + total */}
+        <div className="mb-4 flex items-end gap-4">
+          <div className="flex-1">
+            <label className="mb-1.5 block text-xs font-medium text-slate-600">Quantity to order</label>
+            <input
+              type="number"
+              min="1"
+              value={qty}
+              onChange={(e) => setQty(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none focus:ring-1 focus:ring-[#5D5FEF]"
+            />
+            <p className="mt-1 text-[11px] text-slate-400">Suggested: {data.suggested_qty} units</p>
+          </div>
+          <div className="rounded-lg bg-slate-50 px-4 py-2.5 text-right">
+            <p className="text-xs text-slate-400">Estimated cost</p>
+            <p className="text-lg font-bold text-slate-900">{formatMoney(totalOrderCost)}</p>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => router.push(`/purchasing/new?product=${productId}&supplier=${supplier === "preferred" ? data.preferred_supplier_id : data.best_price_supplier_id}&qty=${qtyNum}`)}
+            className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-600"
+          >
+            Create Purchase Order
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push(`/catalog/${productId}?tab=supplier-comparison`)}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+          >
+            Compare supplier prices
+          </button>
         </div>
       </div>
 
-      {/* ── Metadata ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-400">
-        {data.last_reorder_date && <span>Last reordered: <strong className="text-slate-600">{fmtDate(data.last_reorder_date)}</strong></span>}
-        {data.open_po_qty > 0 && <span>Open PO qty: <strong className="text-slate-600">{data.open_po_qty} units</strong></span>}
-        <button type="button" onClick={() => router.push(`/inventory/pipeline`)} className="text-[#5D5FEF] hover:underline">
-          View in Inventory Pipeline →
-        </button>
-      </div>
     </div>
   );
 }

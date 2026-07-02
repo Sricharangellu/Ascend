@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
-import { apiGet, apiPost, apiPatch, apiDelete } from "@/api-client/client";
+import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
 import { FEATURE_GROUPS, ALL_FEATURES } from "@/lib/features";
 import type { CustomRole, RoleEntry } from "./_components/permissionsTypes";
 import { BUILT_IN, BUILT_IN_ORDER } from "./_components/permissionsTypes";
@@ -105,9 +106,379 @@ function RoleMenu({
   );
 }
 
+// ── Permission Request types ──────────────────────────────────────────────────
+
+type PRStatus = "draft" | "submitted" | "pending_review" | "approved" | "rejected" | "expired" | "revoked";
+
+interface PermissionRequest {
+  id: string;
+  requested_for_user_id: string;
+  requested_for_name: string;
+  requested_by_name: string;
+  permission_code: string;
+  reason: string;
+  business_justification: string | null;
+  access_type: "temporary" | "permanent";
+  start_at: number | null;
+  end_at: number | null;
+  urgency: "low" | "normal" | "high" | "urgent";
+  status: PRStatus;
+  reviewed_by_name: string | null;
+  review_notes: string | null;
+  reviewed_at: number | null;
+  created_at: number;
+  risk_level: "low" | "medium" | "high";
+}
+
+const RISK_STYLES = {
+  high:   { bg: "bg-red-100",    text: "text-red-700",    label: "High risk" },
+  medium: { bg: "bg-amber-100",  text: "text-amber-700",  label: "Medium risk" },
+  low:    { bg: "bg-emerald-100",text: "text-emerald-700",label: "Low risk" },
+};
+
+const URGENCY_LABELS: Record<string, string> = { low: "Low", normal: "Normal", high: "High", urgent: "Urgent" };
+
+const URGENCY_COLORS: Record<string, string> = {
+  low: "bg-slate-100 text-slate-500", normal: "bg-blue-100 text-blue-700",
+  high: "bg-orange-100 text-orange-700", urgent: "bg-red-100 text-red-700",
+};
+
+const STATUS_STYLES: Record<PRStatus, { bg: string; text: string; label: string }> = {
+  draft:          { bg: "bg-slate-100",  text: "text-slate-500",  label: "Draft" },
+  submitted:      { bg: "bg-amber-100",  text: "text-amber-700",  label: "Submitted" },
+  pending_review: { bg: "bg-amber-100",  text: "text-amber-700",  label: "Pending" },
+  approved:       { bg: "bg-emerald-100",text: "text-emerald-700",label: "Approved" },
+  rejected:       { bg: "bg-red-100",    text: "text-red-600",    label: "Rejected" },
+  expired:        { bg: "bg-slate-100",  text: "text-slate-500",  label: "Expired" },
+  revoked:        { bg: "bg-red-50",     text: "text-red-500",    label: "Revoked" },
+};
+
+function featLabel(code: string): string {
+  for (const g of FEATURE_GROUPS) {
+    const f = g.features.find((f) => f.id === code);
+    if (f) return f.label;
+  }
+  return code;
+}
+
+// ── Approve modal ─────────────────────────────────────────────────────────────
+
+function ApproveModal({ req, onClose, onDone }: {
+  req: PermissionRequest;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [notes, setNotes] = useState("");
+  const [useExpiry, setUseExpiry] = useState(req.access_type === "temporary");
+  const [expiryDate, setExpiryDate] = useState(
+    req.end_at ? new Date(req.end_at).toISOString().slice(0, 10) : ""
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleApprove = async () => {
+    setSaving(true); setError(null);
+    try {
+      await apiPost(`/api/v1/permission-requests/${req.id}/approve`, {
+        review_notes: notes.trim() || null,
+        expires_at: useExpiry && expiryDate ? new Date(expiryDate).getTime() : null,
+      });
+      onDone();
+    } catch (e) {
+      setError(e instanceof ApiResponseError ? e.message : "Failed to approve.");
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-xl bg-white shadow-2xl">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <h2 className="text-base font-semibold text-slate-900">Approve request</h2>
+          <p className="text-xs text-slate-500">{featLabel(req.permission_code)} for {req.requested_for_name}</p>
+        </div>
+        <div className="space-y-4 p-5">
+          <div className="flex items-center gap-2">
+            <input
+              id="use-expiry"
+              type="checkbox"
+              checked={useExpiry}
+              onChange={(e) => setUseExpiry(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-[#5D5FEF] focus:ring-[#5D5FEF]"
+            />
+            <label htmlFor="use-expiry" className="text-sm text-slate-700">Approve with expiry date</label>
+          </div>
+          {useExpiry && (
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-slate-600">Access expires on</label>
+              <input
+                type="date"
+                value={expiryDate}
+                onChange={(e) => setExpiryDate(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]"
+              />
+            </div>
+          )}
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-slate-600">Approval notes (optional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              placeholder="Add context for the employee or audit log…"
+              className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]"
+            />
+          </div>
+          {error && <p className="text-sm text-red-700">{error}</p>}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
+          <button type="button" onClick={onClose}
+            className="rounded-md border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
+          <button type="button" onClick={handleApprove} disabled={saving}
+            className="rounded-md bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60">
+            {saving ? "Approving…" : "Approve"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Reject modal ──────────────────────────────────────────────────────────────
+
+function RejectModal({ req, onClose, onDone }: {
+  req: PermissionRequest;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleReject = async () => {
+    setSaving(true); setError(null);
+    try {
+      await apiPost(`/api/v1/permission-requests/${req.id}/reject`, { review_notes: notes.trim() || null });
+      onDone();
+    } catch (e) {
+      setError(e instanceof ApiResponseError ? e.message : "Failed.");
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-xl bg-white shadow-2xl">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <h2 className="text-base font-semibold text-slate-900">Reject request</h2>
+          <p className="text-xs text-slate-500">{featLabel(req.permission_code)} for {req.requested_for_name}</p>
+        </div>
+        <div className="space-y-4 p-5">
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-slate-600">Reason for rejection</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              placeholder="Explain why this request was denied…"
+              className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]"
+            />
+          </div>
+          {error && <p className="text-sm text-red-700">{error}</p>}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
+          <button type="button" onClick={onClose}
+            className="rounded-md border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
+          <button type="button" onClick={handleReject} disabled={saving}
+            className="rounded-md bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60">
+            {saving ? "Rejecting…" : "Reject"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Admin Permission Requests Panel ───────────────────────────────────────────
+
+function PermissionRequestsAdmin() {
+  const [requests, setRequests] = useState<PermissionRequest[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"pending" | "all">("pending");
+  const [approving, setApproving] = useState<PermissionRequest | null>(null);
+  const [rejecting, setRejecting] = useState<PermissionRequest | null>(null);
+  const [revoking, setRevoking] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const data = await apiGet<{ items: PermissionRequest[]; pending_count: number }>(
+        "/api/v1/permission-requests"
+      );
+      setRequests(data.items ?? []);
+      setPendingCount(data.pending_count ?? 0);
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => { void load(); }, []);
+
+  const handleRevoke = async (id: string) => {
+    setRevoking(id);
+    try {
+      await apiPost(`/api/v1/permission-requests/${id}/revoke`, { review_notes: "Revoked by admin." });
+      void load();
+    } finally { setRevoking(null); }
+  };
+
+  const shown = filter === "pending"
+    ? requests.filter((r) => r.status === "submitted" || r.status === "pending_review")
+    : requests;
+
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Toolbar */}
+      <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-slate-900">Permission Requests</h2>
+          {pendingCount > 0 && (
+            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[11px] font-bold text-white">
+              {pendingCount}
+            </span>
+          )}
+        </div>
+        <div className="flex gap-1 rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+          {(["pending", "all"] as const).map((f) => (
+            <button key={f} type="button" onClick={() => setFilter(f)}
+              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                filter === f ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}>
+              {f === "pending" ? `Pending (${pendingCount})` : "All requests"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-6 py-4">
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#5D5FEF]" />
+          </div>
+        ) : shown.length === 0 ? (
+          <div className="flex flex-col items-center py-16 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50">
+              <svg className="h-6 w-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <p className="mt-3 text-sm font-medium text-slate-700">All caught up</p>
+            <p className="mt-1 text-xs text-slate-400">No pending permission requests.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {shown.map((req) => {
+              const risk = RISK_STYLES[req.risk_level];
+              const statusStyle = STATUS_STYLES[req.status];
+              const isPending = req.status === "submitted" || req.status === "pending_review";
+              return (
+                <div key={req.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                  <div className="flex items-start gap-4 p-4">
+                    {/* Left: employee + permission info */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          href={`/team/${req.requested_for_user_id}`}
+                          className="text-sm font-semibold text-slate-900 hover:text-[#5D5FEF]"
+                        >
+                          {req.requested_for_name}
+                        </Link>
+                        <svg className="h-3.5 w-3.5 text-slate-300" fill="none" viewBox="0 0 16 16">
+                          <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        <span className="text-sm font-medium text-slate-700">{featLabel(req.permission_code)}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusStyle.bg} ${statusStyle.text}`}>
+                          {statusStyle.label}
+                        </span>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${risk.bg} ${risk.text}`}>
+                          {risk.label}
+                        </span>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${URGENCY_COLORS[req.urgency]}`}>
+                          {URGENCY_LABELS[req.urgency]}
+                        </span>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          req.access_type === "permanent" ? "bg-violet-100 text-violet-700" : "bg-sky-100 text-sky-700"
+                        }`}>
+                          {req.access_type === "permanent" ? "Permanent" : "Temporary"}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 text-sm text-slate-600">{req.reason}</p>
+                      {req.business_justification && (
+                        <p className="mt-0.5 text-xs text-slate-400">
+                          <span className="font-medium text-slate-500">Justification:</span> {req.business_justification}
+                        </p>
+                      )}
+                      {req.review_notes && (
+                        <p className="mt-1 text-xs text-slate-400 italic">
+                          <span className="font-medium not-italic text-slate-500">Review note:</span> {req.review_notes}
+                        </p>
+                      )}
+                      <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
+                        <span>Requested by {req.requested_by_name}</span>
+                        <span>{new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(req.created_at))}</span>
+                        {req.end_at && <span>Until {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(req.end_at))}</span>}
+                        {req.reviewed_by_name && <span>Reviewed by {req.reviewed_by_name}</span>}
+                      </div>
+                    </div>
+
+                    {/* Right: actions */}
+                    <div className="flex shrink-0 flex-col gap-2">
+                      {isPending && (
+                        <>
+                          <button type="button" onClick={() => setApproving(req)}
+                            className="rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100">
+                            Approve
+                          </button>
+                          <button type="button" onClick={() => setRejecting(req)}
+                            className="rounded-md bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100">
+                            Reject
+                          </button>
+                        </>
+                      )}
+                      {req.status === "approved" && (
+                        <button
+                          type="button"
+                          onClick={() => void handleRevoke(req.id)}
+                          disabled={revoking === req.id}
+                          className="rounded-md border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+                        >
+                          {revoking === req.id ? "…" : "Revoke"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {approving && (
+        <ApproveModal req={approving} onClose={() => setApproving(null)} onDone={() => { setApproving(null); void load(); }} />
+      )}
+      {rejecting && (
+        <RejectModal req={rejecting} onClose={() => setRejecting(null)} onDone={() => { setRejecting(null); void load(); }} />
+      )}
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+type PageTab = "roles" | "requests";
+
 export default function PermissionsPage() {
+  const [pageTab, setPageTab] = useState<PageTab>("roles");
+  const [pendingCount, setPendingCount] = useState(0);
+
   const [permissions, setPermissions] = useState<Record<string, Set<string>>>({});
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
   const [activeRoleId, setActiveRoleId] = useState<string>("manager");
@@ -150,6 +521,10 @@ export default function PermissionsPage() {
         setPermissions(perms);
       })
       .finally(() => setLoading(false));
+    // Fetch pending count for tab badge
+    apiGet<{ pending_count: number }>("/api/v1/permission-requests")
+      .then((d) => setPendingCount(d.pending_count ?? 0))
+      .catch(() => {});
   }, []);
 
   const allRoles: RoleEntry[] = [
@@ -236,7 +611,39 @@ export default function PermissionsPage() {
       subtitle="Configure feature access per role — changes apply immediately on next sign-in"
       contentClassName="overflow-hidden"
     >
-      <div className="flex h-full min-h-0">
+      <div className="flex h-full min-h-0 flex-col">
+
+        {/* ── Page-level tab bar ────────────────────────────────────────────── */}
+        <div className="flex shrink-0 border-b border-slate-200 bg-white px-6">
+          {([
+            { id: "roles" as PageTab,    label: "Roles" },
+            { id: "requests" as PageTab, label: "Permission Requests" },
+          ]).map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setPageTab(t.id)}
+              className={[
+                "flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors",
+                pageTab === t.id
+                  ? "border-b-2 border-[#5D5FEF] text-[#5D5FEF]"
+                  : "text-slate-500 hover:text-slate-700",
+              ].join(" ")}
+            >
+              {t.label}
+              {t.id === "requests" && pendingCount > 0 && (
+                <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+                  {pendingCount}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {pageTab === "requests" ? (
+          <PermissionRequestsAdmin />
+        ) : (
+        <div className="flex flex-1 min-h-0">
 
         {/* ── Left: role list ───────────────────────────────────────────────── */}
         <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
@@ -418,6 +825,8 @@ export default function PermissionsPage() {
             <div className="h-6" />
           </div>
         </div>
+        </div>
+        )}
       </div>
 
       {showNewRole && (
