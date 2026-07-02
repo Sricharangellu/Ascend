@@ -27,7 +27,7 @@ export type NavKey =
   | "golf" | "golf-bookings" | "golf-members" | "golf-pro-shop"
   | "restaurant-dashboard" | "restaurant-floor-plan" | "restaurant-tabs"
   | "permissions" | "modes" | "kiosk-settings" | "b2b-settings"
-  | "warehouse";
+  | "warehouse" | "pricing" | "edi-imports";
 
 // ── Section / nav tree ────────────────────────────────────────────────────────
 
@@ -42,8 +42,9 @@ const SECTION_MAP: Record<NavKey, RailSection> = {
   ecommerce: "online",
   reports: "reporting", insights: "reporting", "tax-compliance": "reporting",
   catalog: "catalog", discounts: "catalog", "gift-cards": "catalog",
-  loyalty: "catalog", promotions: "catalog",
+  loyalty: "catalog", promotions: "catalog", pricing: "catalog",
   inventory: "inventory", operations: "inventory", purchasing: "inventory",
+  "edi-imports": "inventory",
   vendors: "inventory", shipping: "inventory", "inventory-locations": "inventory",
   "inventory-expiry": "inventory", "inventory-serials": "inventory",
   "inventory-reorder": "inventory", "inventory-counts": "inventory", "inventory-pipeline": "inventory", workforce: "inventory",
@@ -122,6 +123,7 @@ const NAV_TREE: NavSection[] = [
     icon: <CatalogIcon />,
     children: [
       { label: "Products",   href: "/catalog",    featureGate: "catalog" },
+      { label: "Pricing",    href: "/pricing",    featureGate: "catalog" },
       { label: "Discounts",  href: "/discounts",  featureGate: "discounts" },
       { label: "Gift Cards", href: "/gift-cards", featureGate: "gift-cards" },
       { label: "Loyalty",    href: "/loyalty",    featureGate: "loyalty" },
@@ -137,6 +139,7 @@ const NAV_TREE: NavSection[] = [
       { label: "Receive Stock", href: "/inventory/receive-stock", featureGate: "inventory" },
       { label: "Warehouse",     href: "/warehouse",               featureGate: "inventory" },
       { label: "Purchasing",    href: "/purchasing",              featureGate: "purchasing" },
+      { label: "EDI Imports",   href: "/purchasing/edi-imports",  featureGate: "purchasing" },
       { label: "Vendors",       href: "/vendors",                 featureGate: "vendors" },
       { label: "Operations",    href: "/operations",              featureGate: "operations" },
     ],
