@@ -55,12 +55,21 @@ export default function ProductDetailPage() {
   const [duplicating, setDuplicating] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [barcodeResult, setBarcodeResult] = useState<"ok" | "not_found" | null>(null);
+  const [expiryAlertCount, setExpiryAlertCount] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
       const prod = await apiGet<CatalogProduct>(`/api/v1/catalog/${id}`);
       setProduct(prod);
+      apiGet<{ items: Array<{ expiry_status: string }> }>(`/api/v1/catalog/${id}/expiry`)
+        .then((r) => {
+          const alerts = (r.items ?? []).filter(
+            (b) => b.expiry_status === "expired" || b.expiry_status === "critical"
+          ).length;
+          setExpiryAlertCount(alerts);
+        })
+        .catch(() => {});
     } catch (e) {
       setError(e instanceof ApiResponseError ? e.message : "Failed to load product.");
     } finally { setLoading(false); }
@@ -292,20 +301,28 @@ export default function ProductDetailPage() {
         {/* ── Tab nav (scrollable on mobile) ────────────────────────────────── */}
         <div className="mb-5 -mx-1 overflow-x-auto">
           <div className="flex gap-0 border-b border-slate-200 min-w-max px-1">
-            {TABS.map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setActiveTab(key)}
-                className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
-                  activeTab === key
-                    ? "border-b-2 border-[#5D5FEF] text-[#5D5FEF]"
-                    : "border-b-2 border-transparent text-slate-500 hover:text-[#111]"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+            {TABS.map(({ key, label }) => {
+              const badge = key === "expiry" && expiryAlertCount > 0 ? expiryAlertCount : null;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setActiveTab(key)}
+                  className={`relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
+                    activeTab === key
+                      ? "border-b-2 border-[#5D5FEF] text-[#5D5FEF]"
+                      : "border-b-2 border-transparent text-slate-500 hover:text-[#111]"
+                  }`}
+                >
+                  {label}
+                  {badge !== null && (
+                    <span className="flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                      {badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
