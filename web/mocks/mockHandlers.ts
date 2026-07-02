@@ -13,6 +13,53 @@ const lat = () => delay(Math.floor(Math.random() * 120) + 60);
 const rid = () => `mock-${Math.random().toString(36).slice(2, 10)}`;
 
 // ── In-memory dev stores ────────────────────────────────────────────────────
+
+// Live stock levels shared between catalog and inventory handlers
+// product_id → location_id → { on_hand, committed, avg_cost_cents }
+const catalogStockLevels = new Map<string, Map<string, { on_hand: number; committed: number; avg_cost_cents: number | null }>>();
+
+export const STOCK_LOCATIONS = [
+  { id: "loc_1", code: "MAIN-FLR", name: "Main Floor" },
+  { id: "loc_2", code: "WAREHOUSE", name: "Warehouse" },
+];
+
+// [main_floor_on_hand, warehouse_on_hand, main_floor_committed]
+const SEED_STOCK: Record<string, [number, number, number]> = {
+  prod_1: [42, 58, 6],   prod_2: [12, 38, 2],  prod_3: [27, 0, 0],
+  prod_4: [6,  14, 1],   prod_5: [48, 72, 4],  prod_6: [3,  0, 0],
+  prod_7: [18, 32, 3],   prod_8: [85, 0, 0],
+};
+
+export function getOrInitStock(productId: string, avgCostCents: number | null = null) {
+  if (!catalogStockLevels.has(productId)) {
+    const s = SEED_STOCK[productId] ?? [10, 5, 0];
+    catalogStockLevels.set(productId, new Map([
+      ["loc_1", { on_hand: s[0], committed: s[2], avg_cost_cents: avgCostCents }],
+      ["loc_2", { on_hand: s[1], committed: 0,    avg_cost_cents: avgCostCents }],
+    ]));
+  }
+  return catalogStockLevels.get(productId)!;
+}
+
+// Movement log per product — append-only, newest first
+const catalogMovements = new Map<string, Array<{
+  id: string; type: string; delta: number; location: string;
+  actor: string; note: string | null; created_at: number;
+}>>();
+
+// Seed movement history for prod_1 (demo product)
+const _sNow = Date.now(); const _sD = 86_400_000;
+catalogMovements.set("prod_1", [
+  { id: "mv_p1_1", type: "sale",       delta: -2,  location: "Main Floor", actor: "POS Terminal",      note: "Order #ORD-0042", created_at: _sNow - 2  * 3600_000 },
+  { id: "mv_p1_2", type: "adjustment", delta: +5,  location: "Main Floor", actor: "admin@demo.com",    note: "Cycle count",     created_at: _sNow - 8  * 3600_000 },
+  { id: "mv_p1_3", type: "receive",    delta: +50, location: "Warehouse",  actor: "system",            note: "PO-0019",         created_at: _sNow - _sD },
+  { id: "mv_p1_4", type: "transfer",   delta: -10, location: "Warehouse",  actor: "system",            note: "Transfer → Main", created_at: _sNow - _sD - 3600_000 },
+  { id: "mv_p1_5", type: "sale",       delta: -1,  location: "Main Floor", actor: "POS Terminal",      note: "Order #ORD-0039", created_at: _sNow - 2  * _sD },
+  { id: "mv_p1_6", type: "return",     delta: +1,  location: "Main Floor", actor: "cashier@demo.com",  note: "Customer return", created_at: _sNow - 2  * _sD - 3600_000 },
+  { id: "mv_p1_7", type: "adjustment", delta: -3,  location: "Main Floor", actor: "manager@demo.com",  note: "Damage write-off",created_at: _sNow - 3  * _sD },
+  { id: "mv_p1_8", type: "receive",    delta: +20, location: "Main Floor", actor: "system",            note: "PO-0017",         created_at: _sNow - 5  * _sD },
+]);
+
 const customers = new Map<string, any>();
 const giftcards = new Map<string, any>();
 // Billing: tracks payment-mutated bills/invoices, keyed by id, layered over the base seed rows below.
@@ -591,25 +638,39 @@ export const mockHandlers = [
     });
   }),
 
-  // ── Inventory: adjustments ────────────────────────────────────────────────
+  // ── Inventory: adjustments (live — mutates catalogStockLevels) ───────────
   http.post(`${V1}/inventory/adjustments`, async ({ request }) => {
     await lat();
     const b = (await request.json()) as {
-      product_id: string;
-      location_id: string;
-      delta: number;
-      reason: string;
-      note: string | null;
+      product_id: string; location_id: string;
+      delta: number; mode?: "add" | "remove" | "set";
+      reason: string; note: string | null; actor?: string;
     };
+    const pid = b.product_id; const lid = b.location_id;
+    const stock = getOrInitStock(pid);
+    const loc = stock.get(lid) ?? { on_hand: 0, committed: 0, avg_cost_cents: null };
+    let actualDelta = b.delta;
+    if (b.mode === "set") {
+      actualDelta = b.delta - loc.on_hand;
+    } else if (b.mode === "remove") {
+      actualDelta = -Math.abs(b.delta);
+    }
+    const newOnHand = Math.max(0, loc.on_hand + actualDelta);
+    stock.set(lid, { ...loc, on_hand: newOnHand });
+    // Append to movement log
+    if (!catalogMovements.has(pid)) catalogMovements.set(pid, []);
+    const locationName = STOCK_LOCATIONS.find((l) => l.id === lid)?.name ?? lid;
+    catalogMovements.get(pid)!.unshift({
+      id: `mv_${pid}_${Date.now()}`,
+      type: "adjustment",
+      delta: actualDelta,
+      location: locationName,
+      actor: b.actor ?? "admin@demo.com",
+      note: b.note ?? b.reason,
+      created_at: Date.now(),
+    });
     return HttpResponse.json(
-      {
-        id: `adj_${Math.random().toString(36).slice(2, 12)}`,
-        product_id: b.product_id,
-        location_id: b.location_id,
-        delta: b.delta,
-        reason: b.reason,
-        applied_at: Date.now(),
-      },
+      { id: `adj_${Math.random().toString(36).slice(2,12)}`, product_id: pid, location_id: lid, delta: actualDelta, reason: b.reason, applied_at: Date.now() },
       { status: 201 },
     );
   }),
@@ -617,20 +678,11 @@ export const mockHandlers = [
   // ── Inventory: movement ledger ────────────────────────────────────────────
   http.get(`${V1}/inventory/movements`, async ({ request }) => {
     await lat();
-    const productId = new URL(request.url).searchParams.get("product_id") ?? "prod";
-    const D = 86_400_000;
-    const now = Date.now();
-    const items = [
-      { type: "sale",       delta: -2,  location: "Main Store",  actor: "POS Terminal",           note: "Order #ORD-0042",    created_at: now - 2 * 3600_000 },
-      { type: "adjustment", delta: +5,  location: "Main Store",  actor: "admin@example.com",      note: "Cycle count",        created_at: now - 8 * 3600_000 },
-      { type: "receive",    delta: +50, location: "Warehouse",   actor: "system",                 note: "PO-0019",            created_at: now - D },
-      { type: "transfer",   delta: -10, location: "Warehouse",   actor: "system",                 note: "Transfer to Main",   created_at: now - D - 3600_000 },
-      { type: "sale",       delta: -1,  location: "Main Store",  actor: "POS Terminal",           note: "Order #ORD-0039",    created_at: now - 2 * D },
-      { type: "return",     delta: +1,  location: "Main Store",  actor: "cashier@finder-pos.dev", note: "Customer return",    created_at: now - 2 * D - 3600_000 },
-      { type: "adjustment", delta: -3,  location: "Main Store",  actor: "manager@finder-pos.dev", note: "Damage",             created_at: now - 3 * D },
-      { type: "receive",    delta: +20, location: "Main Store",  actor: "system",                 note: "PO-0017",            created_at: now - 5 * D },
-    ].map((m, i) => ({ ...m, id: `mv_${productId}_${i + 1}` }));
-    return HttpResponse.json({ items });
+    const url = new URL(request.url);
+    const productId = url.searchParams.get("product_id") ?? "";
+    const limit = Number(url.searchParams.get("limit") ?? 30);
+    const items = (catalogMovements.get(productId) ?? []).slice(0, limit);
+    return HttpResponse.json({ items, total: items.length });
   }),
 
   // ── Customers + loyalty ───────────────────────────────────────────────────
@@ -1113,13 +1165,17 @@ export const mockHandlers = [
         const id = String(params["id"]);
         const p = products.find((x) => x.id === id);
         if (!p) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        return HttpResponse.json({
-          product_id: id,
-          locations: [
-            { location_id: "loc_1", location_code: "MAIN-FLR", location_name: "Main Floor", quantity_on_hand: 48, quantity_committed: 6, quantity_available: 42, average_cost_cents: p.raw_cost_price_cents },
-            { location_id: "loc_2", location_code: "WAREHOUSE", location_name: "Warehouse", quantity_on_hand: 120, quantity_committed: 0, quantity_available: 120, average_cost_cents: p.raw_cost_price_cents },
-          ],
+        const stock = getOrInitStock(id, p.raw_cost_price_cents ?? null);
+        const locations = STOCK_LOCATIONS.map((loc) => {
+          const s = stock.get(loc.id) ?? { on_hand: 0, committed: 0, avg_cost_cents: null };
+          return {
+            location_id: loc.id, location_code: loc.code, location_name: loc.name,
+            quantity_on_hand: s.on_hand, quantity_committed: s.committed,
+            quantity_available: Math.max(0, s.on_hand - s.committed),
+            average_cost_cents: s.avg_cost_cents ?? p.raw_cost_price_cents,
+          };
         });
+        return HttpResponse.json({ product_id: id, locations });
       }),
 
       http.get(`${V1}/catalog/:id`, async ({ params }) => {

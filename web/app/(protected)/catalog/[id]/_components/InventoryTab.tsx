@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/Button";
-import { apiGet, apiPatch, apiPost, apiDelete, ApiResponseError } from "@/api-client/client";
+import { useCallback, useEffect, useState } from "react";
+import { apiGet, apiPatch, apiPost, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type { CatalogProduct } from "@/api-client/types";
 
-// ── Stock by location ─────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface LocationStock {
   location_id: string;
@@ -24,117 +22,31 @@ interface StockResponse {
   locations: LocationStock[];
 }
 
-function StockByLocation({ productId }: { productId: string }) {
-  const [locations, setLocations] = useState<LocationStock[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    apiGet<StockResponse>(`/api/v1/catalog/${productId}/stock`)
-      .then((r) => setLocations(r.locations ?? []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [productId]);
-
-  const totals = locations.reduce(
-    (acc, l) => ({
-      on_hand:   acc.on_hand   + l.quantity_on_hand,
-      committed: acc.committed + l.quantity_committed,
-      available: acc.available + l.quantity_available,
-    }),
-    { on_hand: 0, committed: 0, available: 0 },
-  );
-
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-100 px-5 py-3.5">
-        <h3 className="text-sm font-semibold text-[#111]">Stock by Location</h3>
-        <p className="mt-0.5 text-xs text-slate-400">Live on-hand, committed (reserved), and available-to-sell per location</p>
-      </div>
-      <div className="p-5">
-        {loading ? (
-          <div className="space-y-2">
-            {[1, 2].map((i) => <div key={i} className="h-8 animate-pulse rounded-lg bg-slate-100" />)}
-          </div>
-        ) : locations.length === 0 ? (
-          <p className="text-sm text-slate-400">No location data available.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                  <th className="px-4 py-2.5">Location</th>
-                  <th className="px-4 py-2.5 text-right">On Hand</th>
-                  <th className="px-4 py-2.5 text-right">Committed</th>
-                  <th className="px-4 py-2.5 text-right">Available</th>
-                  <th className="px-4 py-2.5 text-right hidden sm:table-cell">Avg Cost</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {locations.map((l) => (
-                  <tr key={l.location_id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-[#111]">{l.location_name}</p>
-                      <p className="text-[11px] font-mono text-slate-400">{l.location_code}</p>
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold text-[#111] tabular-nums">{l.quantity_on_hand}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      <span className={l.quantity_committed > 0 ? "font-medium text-amber-600" : "text-slate-400"}>
-                        {l.quantity_committed}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      <span className={l.quantity_available > 0 ? "font-semibold text-emerald-600" : "font-semibold text-red-500"}>
-                        {l.quantity_available}
-                      </span>
-                    </td>
-                    <td className="hidden px-4 py-3 text-right text-slate-500 tabular-nums sm:table-cell">
-                      {l.average_cost_cents != null ? formatMoney(l.average_cost_cents) : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold text-[#111]">
-                  <td className="px-4 py-3 text-xs uppercase tracking-wide text-slate-500">Total</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{totals.on_hand}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    <span className={totals.committed > 0 ? "text-amber-600" : "text-slate-400"}>{totals.committed}</span>
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    <span className={totals.available > 0 ? "text-emerald-600" : "text-red-500"}>{totals.available}</span>
-                  </td>
-                  <td className="hidden px-4 py-3 sm:table-cell" />
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+interface Movement {
+  id: string;
+  type: string;
+  delta: number;
+  location: string;
+  actor: string;
+  note: string | null;
+  created_at: number;
 }
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
-const FIELD = "w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-[#111] outline-none focus:border-[#5D5FEF] focus:ring-1 focus:ring-[#5D5FEF]";
+const FLD = "w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-[#111] outline-none focus:border-[#5D5FEF] focus:ring-1 focus:ring-[#5D5FEF]";
 
-function Label({ children }: { children: React.ReactNode }) {
+function Lbl({ children }: { children: React.ReactNode }) {
   return <label className="mb-1 block text-xs font-medium text-slate-500">{children}</label>;
 }
 
-function Section({
-  title,
-  sub,
-  action,
-  children,
+function Card({
+  title, sub, action, children,
 }: {
-  title: string;
-  sub?: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
+  title: string; sub?: string; action?: React.ReactNode; children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="flex items-start justify-between border-b border-slate-100 px-5 py-3.5">
         <div>
           <h3 className="text-sm font-semibold text-[#111]">{title}</h3>
@@ -147,288 +59,577 @@ function Section({
   );
 }
 
-// ── Variant price helpers ─────────────────────────────────────────────────────
+// ── Movement type badge ───────────────────────────────────────────────────────
 
-function calcPriceFields(retail: number, cost: number) {
-  if (retail <= 0) return { markup: 0, margin: 0 };
-  const markup = cost > 0 ? ((retail - cost) / cost) * 100 : 0;
-  const margin = ((retail - cost) / retail) * 100;
-  return { markup, margin };
+const MOVEMENT_STYLE: Record<string, string> = {
+  sale:       "bg-blue-50 text-blue-700",
+  receive:    "bg-emerald-50 text-emerald-700",
+  return:     "bg-purple-50 text-purple-700",
+  adjustment: "bg-amber-50 text-amber-700",
+  transfer:   "bg-slate-100 text-slate-600",
+  damage:     "bg-red-50 text-red-700",
+};
+
+function MovementBadge({ type }: { type: string }) {
+  const cls = MOVEMENT_STYLE[type] ?? "bg-slate-100 text-slate-600";
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${cls}`}>
+      {type}
+    </span>
+  );
 }
 
-// ── Variant sub-tab types ─────────────────────────────────────────────────────
+function timeAgo(ts: number) {
+  const diff = Date.now() - ts;
+  const m = Math.floor(diff / 60_000);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
 
-type VariantSubTab = "inventory" | "image" | "price" | "tax" | "marketing" | "dimensions";
+// ── Stock by Location ─────────────────────────────────────────────────────────
 
-const VARIANT_SUB_TABS: { key: VariantSubTab; label: string }[] = [
-  { key: "inventory",  label: "Inventory" },
-  { key: "image",      label: "Image" },
-  { key: "price",      label: "Price" },
-  { key: "tax",        label: "Tax" },
-  { key: "marketing",  label: "Marketing" },
-  { key: "dimensions", label: "Weight and dimensions" },
-];
+function StockByLocation({ productId, refreshKey }: { productId: string; refreshKey: number }) {
+  const [locations, setLocations] = useState<LocationStock[]>([]);
+  const [loading, setLoading] = useState(true);
 
-// ── Variant sub-tab content ───────────────────────────────────────────────────
+  useEffect(() => {
+    setLoading(true);
+    apiGet<StockResponse>(`/api/v1/catalog/${productId}/stock`)
+      .then((r) => setLocations(r.locations ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [productId, refreshKey]);
 
-function VariantPricePane({ variant }: { variant: CatalogProduct }) {
-  const initialRetail = variant.price_cents / 100;
-  const initialCost = (variant.raw_cost_price_cents ?? 0) / 100;
-  const initialSupplier = (variant.wholesale_price_cents ?? 0) / 100;
-  const { markup: initMarkup, margin: initMargin } = calcPriceFields(initialRetail, initialCost);
-
-  const [retail, setRetail] = useState(initialRetail.toFixed(2));
-  const [cost, setCost] = useState(initialCost.toFixed(2));
-  const [markup, setMarkup] = useState(initMarkup > 0 ? initMarkup.toFixed(2) : "");
-  const [margin, setMargin] = useState(initMargin > 0 ? initMargin.toFixed(2) : "");
-
-  function onRetailChange(val: string) {
-    const r = parseFloat(val) || 0;
-    const c = parseFloat(cost) || 0;
-    const { markup: mu, margin: ma } = calcPriceFields(r, c);
-    setRetail(val);
-    setMarkup(mu > 0 ? mu.toFixed(2) : "");
-    setMargin(ma > 0 ? ma.toFixed(2) : "");
-  }
-
-  function onCostChange(val: string) {
-    const c = parseFloat(val) || 0;
-    const r = parseFloat(retail) || 0;
-    const { markup: mu, margin: ma } = calcPriceFields(r, c);
-    setCost(val);
-    setMarkup(mu > 0 ? mu.toFixed(2) : "");
-    setMargin(ma > 0 ? ma.toFixed(2) : "");
-  }
-
-  const marginNum = parseFloat(margin) || 0;
+  const totals = locations.reduce(
+    (acc, l) => ({ on_hand: acc.on_hand + l.quantity_on_hand, committed: acc.committed + l.quantity_committed, available: acc.available + l.quantity_available }),
+    { on_hand: 0, committed: 0, available: 0 },
+  );
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-400">
-          <tr>
-            <th className="px-3 py-2 text-left">Price point</th>
-            <th className="px-3 py-2 text-right">Supplier price</th>
-            <th className="px-3 py-2 text-right">Latest landed cost</th>
-            <th className="px-3 py-2 text-right">Markup %</th>
-            <th className="px-3 py-2 text-right">Margin %</th>
-            <th className="px-3 py-2 text-right">Retail price (excl. tax)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td className="px-3 py-2.5 text-xs text-slate-500">General Price Book</td>
-            <td className="px-3 py-2.5">
-              <div className="flex items-center justify-end gap-1">
-                <span className="text-slate-400 text-xs">$</span>
-                <input
-                  type="number" step="0.01" min="0"
-                  className="w-20 rounded border border-slate-200 px-2 py-1.5 text-right text-sm outline-none focus:border-[#5D5FEF]"
-                  defaultValue={initialSupplier.toFixed(2)}
-                />
-              </div>
-            </td>
-            <td className="px-3 py-2.5 text-right text-xs text-slate-400">
-              {cost ? `$${parseFloat(cost).toFixed(2)}` : "—"}
-            </td>
-            <td className="px-3 py-2.5">
-              <div className="flex items-center justify-end gap-1">
-                <input
-                  type="number" step="0.01" min="0"
-                  className="w-16 rounded border border-slate-200 px-2 py-1.5 text-right text-sm outline-none focus:border-[#5D5FEF]"
-                  value={markup}
-                  onChange={(e) => {
-                    const mu = parseFloat(e.target.value) || 0;
-                    const c = parseFloat(cost) || 0;
-                    if (c > 0) {
-                      const r = c * (1 + mu / 100);
-                      setRetail(r.toFixed(2));
-                      setMargin((mu / (1 + mu / 100)).toFixed(2));
-                    }
-                    setMarkup(e.target.value);
-                  }}
-                  placeholder="0.00"
-                />
-                <span className="text-slate-400 text-xs">%</span>
-              </div>
-            </td>
-            <td className="px-3 py-2.5 text-right">
-              <span className={`text-sm font-semibold ${marginNum >= 30 ? "text-emerald-600" : marginNum > 0 ? "text-amber-600" : "text-slate-400"}`}>
-                {margin ? `${parseFloat(margin).toFixed(1)}%` : "—"}
-              </span>
-            </td>
-            <td className="px-3 py-2.5">
-              <div className="flex items-center justify-end gap-1">
-                <span className="text-slate-400 text-xs">$</span>
-                <input
-                  type="number" step="0.01" min="0"
-                  className="w-24 rounded border border-slate-200 px-2 py-1.5 text-right text-sm font-semibold outline-none focus:border-[#5D5FEF]"
-                  value={retail}
-                  onChange={(e) => onRetailChange(e.target.value)}
-                />
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
+        <div>
+          <h3 className="text-sm font-semibold text-[#111]">Stock by Location</h3>
+          <p className="mt-0.5 text-xs text-slate-400">On-hand, committed (reserved), and available-to-sell per location</p>
+        </div>
+        {!loading && (
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-[11px] text-slate-400">Total on hand</p>
+              <p className="text-lg font-bold text-slate-900">{totals.on_hand}</p>
+            </div>
+            <div className={`rounded-full px-3 py-1 text-xs font-semibold ${totals.available > 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+              {totals.available} available
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="overflow-x-auto">
+        {loading ? (
+          <div className="space-y-2 p-5">{[1, 2].map((i) => <div key={i} className="h-8 animate-pulse rounded-lg bg-slate-100" />)}</div>
+        ) : locations.length === 0 ? (
+          <p className="p-5 text-sm text-slate-400">No location data.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                <th className="px-5 py-2.5">Location</th>
+                <th className="px-4 py-2.5 text-right">On Hand</th>
+                <th className="px-4 py-2.5 text-right">Committed</th>
+                <th className="px-4 py-2.5 text-right">Available</th>
+                <th className="px-4 py-2.5 text-right hidden sm:table-cell">Avg Cost</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {locations.map((l) => (
+                <tr key={l.location_id} className="hover:bg-slate-50/70">
+                  <td className="px-5 py-3">
+                    <p className="font-medium text-[#111]">{l.location_name}</p>
+                    <p className="text-[11px] font-mono text-slate-400">{l.location_code}</p>
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-[#111] tabular-nums">{l.quantity_on_hand}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    <span className={l.quantity_committed > 0 ? "font-medium text-amber-600" : "text-slate-400"}>{l.quantity_committed}</span>
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    <span className={l.quantity_available > 0 ? "font-semibold text-emerald-600" : "font-semibold text-red-500"}>{l.quantity_available}</span>
+                  </td>
+                  <td className="hidden px-4 py-3 text-right text-slate-500 tabular-nums sm:table-cell">
+                    {l.average_cost_cents != null ? formatMoney(l.average_cost_cents) : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold text-[#111]">
+                <td className="px-5 py-3 text-xs uppercase tracking-wide text-slate-500">Total</td>
+                <td className="px-4 py-3 text-right tabular-nums">{totals.on_hand}</td>
+                <td className="px-4 py-3 text-right tabular-nums">
+                  <span className={totals.committed > 0 ? "text-amber-600" : "text-slate-400"}>{totals.committed}</span>
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums">
+                  <span className={totals.available > 0 ? "text-emerald-600" : "text-red-500"}>{totals.available}</span>
+                </td>
+                <td className="hidden px-4 py-3 sm:table-cell" />
+              </tr>
+            </tfoot>
+          </table>
+        )}
+      </div>
     </div>
   );
 }
 
-function VariantInventoryPane({ variant }: { variant: CatalogProduct }) {
-  const [track, setTrack] = useState(!!(variant.track_inventory ?? 1));
+// ── Quick Adjust ──────────────────────────────────────────────────────────────
+
+const ADJUST_REASONS = [
+  "Cycle Count / Correction",
+  "Received Stock",
+  "Customer Return",
+  "Damage / Write-off",
+  "Theft / Shrinkage",
+  "Expiry Removal",
+  "Inter-location Transfer",
+  "Promotional Use",
+  "Other",
+];
+
+function QuickAdjust({
+  productId,
+  locations,
+  onAdjusted,
+}: {
+  productId: string;
+  locations: { id: string; name: string }[];
+  onAdjusted: () => void;
+}) {
+  const [locationId, setLocationId] = useState(locations[0]?.id ?? "loc_1");
+  const [mode, setMode] = useState<"add" | "remove" | "set">("add");
+  const [qty, setQty] = useState("");
+  const [reason, setReason] = useState(ADJUST_REASONS[0]!);
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const n = parseFloat(qty);
+    if (!qty || isNaN(n) || n < 0) { setError("Enter a valid quantity."); return; }
+    setSaving(true); setError(null);
+    try {
+      await apiPost(`/api/v1/inventory/adjustments`, {
+        product_id: productId,
+        location_id: locationId,
+        delta: Math.round(n),
+        mode,
+        reason,
+        note: note.trim() || null,
+      });
+      setQty(""); setNote("");
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 2500);
+      onAdjusted();
+    } catch (err) {
+      setError(err instanceof ApiResponseError ? err.message : "Adjustment failed.");
+    } finally { setSaving(false); }
+  };
+
   return (
-    <div className="space-y-3">
-      <label className="flex cursor-pointer items-center gap-2.5">
+    <Card title="Quick Stock Adjust" sub="Manually add, remove, or set stock quantity">
+      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+        {error && <p className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>}
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Location */}
+          <div>
+            <Lbl>Location</Lbl>
+            <select value={locationId} onChange={(e) => setLocationId(e.target.value)} className={FLD}>
+              {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          </div>
+
+          {/* Reason */}
+          <div>
+            <Lbl>Reason</Lbl>
+            <select value={reason} onChange={(e) => setReason(e.target.value)} className={FLD}>
+              {ADJUST_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Mode + Qty */}
+        <div className="flex items-end gap-3">
+          <div className="flex-1">
+            <Lbl>Adjustment type</Lbl>
+            <div className="flex gap-1 rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+              {(["add", "remove", "set"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  className={`flex-1 rounded-md py-2 text-xs font-semibold capitalize transition-colors ${
+                    mode === m ? "bg-[#5D5FEF] text-white shadow-sm" : "text-slate-500 hover:text-[#111]"
+                  }`}
+                >
+                  {m === "add" ? "+ Add" : m === "remove" ? "− Remove" : "= Set to"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="w-32">
+            <Lbl>Quantity</Lbl>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={qty}
+              onChange={(e) => setQty(e.target.value)}
+              placeholder="0"
+              className={FLD + " text-center text-lg font-bold"}
+            />
+          </div>
+        </div>
+
+        {/* Note */}
+        <div>
+          <Lbl>Note (optional)</Lbl>
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="e.g. Stocktake Jan 2025"
+            className={FLD}
+          />
+        </div>
+
+        <div className="flex items-center justify-end gap-3">
+          {saved && <span className="text-sm font-medium text-emerald-600">✓ Adjustment recorded</span>}
+          <button
+            type="submit"
+            disabled={saving || !qty}
+            className="rounded-xl bg-[#5D5FEF] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors"
+          >
+            {saving ? "Adjusting…" : "Apply Adjustment"}
+          </button>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
+// ── Movement History ──────────────────────────────────────────────────────────
+
+function MovementHistory({ productId, refreshKey }: { productId: string; refreshKey: number }) {
+  const [movements, setMovements] = useState<Movement[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    apiGet<{ items: Movement[] }>(`/api/v1/inventory/movements?product_id=${productId}&limit=25`)
+      .then((r) => setMovements(r.items ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [productId, refreshKey]);
+
+  return (
+    <Card title="Movement History" sub="All stock changes for this product — newest first">
+      {loading ? (
+        <div className="space-y-2">{[1,2,3,4,5].map((i) => <div key={i} className="h-8 animate-pulse rounded-lg bg-slate-100" />)}</div>
+      ) : movements.length === 0 ? (
+        <p className="py-4 text-center text-sm text-slate-400">No movements recorded yet. Adjustments will appear here.</p>
+      ) : (
+        <div className="overflow-x-auto -mx-5">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                <th className="px-5 py-2.5">Type</th>
+                <th className="px-4 py-2.5">Location</th>
+                <th className="px-4 py-2.5 text-center">Change</th>
+                <th className="px-4 py-2.5">Reference / Note</th>
+                <th className="px-4 py-2.5">By</th>
+                <th className="px-4 py-2.5 text-right">When</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {movements.map((m) => (
+                <tr key={m.id} className="hover:bg-slate-50/70">
+                  <td className="px-5 py-3"><MovementBadge type={m.type} /></td>
+                  <td className="px-4 py-3 text-sm text-slate-600">{m.location}</td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`font-bold tabular-nums ${m.delta > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                      {m.delta > 0 ? `+${m.delta}` : m.delta}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 max-w-[200px]">
+                    <p className="truncate text-xs text-slate-500">{m.note ?? "—"}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="text-xs text-slate-500">{m.actor}</p>
+                  </td>
+                  <td className="px-4 py-3 text-right text-xs text-slate-400 whitespace-nowrap">
+                    {timeAgo(m.created_at)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ── Physical Attributes ───────────────────────────────────────────────────────
+
+function PhysicalAttributes({ product, onSaved }: { product: CatalogProduct; onSaved: (p: CatalogProduct) => void }) {
+  const [weight, setWeight] = useState(product.weight_grams != null ? (product.weight_grams / 453.592).toFixed(2) : "");
+  const [length, setLength] = useState(product.length_mm  != null ? (product.length_mm  / 25.4).toFixed(2) : "");
+  const [width,  setWidth]  = useState(product.width_mm   != null ? (product.width_mm   / 25.4).toFixed(2) : "");
+  const [height, setHeight] = useState(product.height_mm  != null ? (product.height_mm  / 25.4).toFixed(2) : "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved]   = useState(false);
+  const [error, setError]   = useState<string | null>(null);
+
+  const handleSave = async () => {
+    setSaving(true); setError(null);
+    try {
+      const patch: Partial<CatalogProduct> = {
+        weight_grams: weight ? Math.round(parseFloat(weight) * 453.592) : undefined,
+        length_mm:    length ? Math.round(parseFloat(length) * 25.4)    : undefined,
+        width_mm:     width  ? Math.round(parseFloat(width)  * 25.4)    : undefined,
+        height_mm:    height ? Math.round(parseFloat(height) * 25.4)    : undefined,
+      };
+      const updated = await apiPatch<CatalogProduct>(`/api/v1/catalog/${product.id}`, patch);
+      onSaved(updated);
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setError(err instanceof ApiResponseError ? err.message : "Save failed.");
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Card title="Physical Attributes" sub="Weight and dimensions used for shipping calculations">
+      {error && <p className="mb-3 rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {([
+          ["Weight (lb)", weight, setWeight],
+          ["Length (in)", length, setLength],
+          ["Width (in)",  width,  setWidth],
+          ["Height (in)", height, setHeight],
+        ] as [string, string, (v: string) => void][]).map(([label, val, setter]) => (
+          <div key={label}>
+            <Lbl>{label}</Lbl>
+            <input
+              type="number" step="0.01" min="0"
+              className={FLD}
+              value={val}
+              onChange={(e) => setter(e.target.value)}
+              placeholder="0.00"
+            />
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 flex items-center justify-end gap-3">
+        {saved && <span className="text-sm font-medium text-emerald-600">Saved</span>}
+        <button
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={saving}
+          className="rounded-xl bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors"
+        >
+          {saving ? "Saving…" : "Save dimensions"}
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+// ── Supplier & Replenishment ──────────────────────────────────────────────────
+
+function SupplierSection({ product, onSaved }: { product: CatalogProduct; onSaved: (p: CatalogProduct) => void }) {
+  const [rows, setRows] = useState([{
+    id: "1",
+    name: product.preferred_vendor_name ?? "",
+    code: product.vendor_upc ?? "",
+    price: product.wholesale_price_cents != null ? String((product.wholesale_price_cents / 100).toFixed(2)) : "",
+  }]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState<string | null>(null);
+  const [saved, setSaved]   = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true); setError(null);
+    try {
+      const primary = rows[0];
+      const updated = await apiPatch<CatalogProduct>(`/api/v1/catalog/${product.id}`, {
+        vendor_upc: primary?.code.trim() || undefined,
+        wholesale_price_cents: primary?.price ? Math.round(parseFloat(primary.price) * 100) : undefined,
+      });
+      onSaved(updated);
+      setSaved(true); window.setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setError(err instanceof ApiResponseError ? err.message : "Save failed.");
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Card
+      title="Supplier Information"
+      action={
+        <button
+          type="button"
+          onClick={() => setRows((r) => [...r, { id: String(Date.now()), name: "", code: "", price: "" }])}
+          className="text-xs font-medium text-[#5D5FEF] hover:underline"
+        >
+          + Add supplier
+        </button>
+      }
+    >
+      {error && <p className="mb-3 rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>}
+      <div className="space-y-3">
+        {rows.map((row, idx) => (
+          <div key={row.id} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              {idx === 0 && <Lbl>Supplier name</Lbl>}
+              <input className={FLD} value={row.name}
+                onChange={(e) => setRows((rs) => rs.map((r) => r.id === row.id ? { ...r, name: e.target.value } : r))}
+                placeholder="Supplier name…" />
+            </div>
+            <div>
+              {idx === 0 && <Lbl>Supplier code / UPC</Lbl>}
+              <input className={FLD} value={row.code}
+                onChange={(e) => setRows((rs) => rs.map((r) => r.id === row.id ? { ...r, code: e.target.value } : r))}
+                placeholder="e.g. 012345678901" />
+            </div>
+            <div>
+              {idx === 0 && <Lbl>Supplier price ($)</Lbl>}
+              <input type="number" step="0.01" min="0" className={FLD} value={row.price}
+                onChange={(e) => setRows((rs) => rs.map((r) => r.id === row.id ? { ...r, price: e.target.value } : r))}
+                placeholder="0.00" />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 flex items-center justify-end gap-3">
+        {saved && <span className="text-sm font-medium text-emerald-600">Saved</span>}
+        <button type="button" onClick={() => void handleSave()} disabled={saving}
+          className="rounded-xl bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors">
+          {saving ? "Saving…" : "Save supplier"}
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+function ReplenishmentSection({ product, onSaved }: { product: CatalogProduct; onSaved: (p: CatalogProduct) => void }) {
+  const [track, setTrack] = useState(!!(product.track_inventory ?? 1));
+  const [method, setMethod] = useState<"min_max" | "reorder_point">("min_max");
+  const [form, setForm] = useState({
+    min_qty:       product.min_qty_to_sell != null ? String(product.min_qty_to_sell) : "",
+    max_qty:       product.max_qty_to_sell != null ? String(product.max_qty_to_sell) : "",
+    reorder_point: "",
+    reorder_qty:   product.qty_increment   != null ? String(product.qty_increment)   : "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved]   = useState(false);
+  const [error, setError]   = useState<string | null>(null);
+
+  const handleSave = async () => {
+    setSaving(true); setError(null);
+    try {
+      const patch: Record<string, unknown> = { track_inventory: track ? 1 : 0 };
+      if (track) {
+        if (method === "min_max") {
+          patch.min_qty_to_sell = form.min_qty ? Number(form.min_qty) : null;
+          patch.max_qty_to_sell = form.max_qty ? Number(form.max_qty) : null;
+        } else {
+          patch.qty_increment = form.reorder_qty ? Number(form.reorder_qty) : null;
+        }
+      }
+      const updated = await apiPatch<CatalogProduct>(`/api/v1/catalog/${product.id}`, patch);
+      onSaved(updated);
+      setSaved(true); window.setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setError(err instanceof ApiResponseError ? err.message : "Save failed.");
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Card title="Replenishment Settings" sub="Configure inventory tracking and reorder thresholds">
+      {error && <p className="mb-3 rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>}
+
+      <label className="mb-4 flex cursor-pointer items-center gap-2.5">
         <input
           type="checkbox"
           className="h-4 w-4 rounded border-slate-300 text-[#5D5FEF] focus:ring-[#5D5FEF]"
           checked={track}
           onChange={(e) => setTrack(e.target.checked)}
         />
-        <span className="text-sm text-[#111]">Track inventory for this variant</span>
+        <span className="text-sm font-medium text-[#111]">Track inventory for this product</span>
       </label>
-    </div>
-  );
-}
 
-function VariantImagePane() {
-  return (
-    <div className="flex flex-col items-center gap-3 rounded-lg border-2 border-dashed border-slate-200 bg-slate-50 py-8">
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400" aria-hidden="true">
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <circle cx="8.5" cy="8.5" r="1.5" />
-        <polyline points="21 15 16 10 5 21" />
-      </svg>
-      <p className="text-xs text-slate-500">No image for this variant</p>
-      <button type="button" className="text-xs font-medium text-[#5D5FEF] hover:underline">
-        Choose image
-      </button>
-    </div>
-  );
-}
+      {track && (
+        <div className="space-y-4">
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Replenishment method</p>
 
-function VariantTaxPane({ variant }: { variant: CatalogProduct }) {
-  return (
-    <div>
-      <Label>Tax class</Label>
-      <select className={FIELD} defaultValue={variant.tax_class}>
-        <option value="standard">Default tax for outlet</option>
-        <option value="exempt">Tax exempt</option>
-      </select>
-    </div>
-  );
-}
+            <label className="flex cursor-pointer items-start gap-3">
+              <input type="radio" className="mt-0.5 h-4 w-4 border-slate-300 text-[#5D5FEF]"
+                checked={method === "min_max"} onChange={() => setMethod("min_max")} />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-[#111]">Min / Max quantity</p>
+                <p className="text-xs text-slate-400">Min triggers replenishment; Max is the refill target</p>
+                {method === "min_max" && (
+                  <div className="mt-2 grid grid-cols-2 gap-3">
+                    <div><Lbl>Min quantity</Lbl>
+                      <input type="number" min="0" className={FLD} value={form.min_qty}
+                        onChange={(e) => setForm((f) => ({ ...f, min_qty: e.target.value }))} placeholder="0" /></div>
+                    <div><Lbl>Max quantity</Lbl>
+                      <input type="number" min="0" className={FLD} value={form.max_qty}
+                        onChange={(e) => setForm((f) => ({ ...f, max_qty: e.target.value }))} placeholder="0" /></div>
+                  </div>
+                )}
+              </div>
+            </label>
 
-function VariantMarketingPane() {
-  const [mode, setMode] = useState<"default" | "custom">("default");
-  return (
-    <div className="space-y-3">
-      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Loyalty</p>
-      <label className="flex cursor-pointer items-start gap-3">
-        <input type="radio" className="mt-0.5 h-4 w-4 border-slate-300 text-[#5D5FEF]"
-          checked={mode === "default"} onChange={() => setMode("default")} />
-        <div>
-          <p className="text-sm font-medium text-[#111]">Earn default loyalty</p>
-          <p className="text-xs text-slate-400">Inherits the default loyalty ratio from the parent product.</p>
-        </div>
-      </label>
-      <label className="flex cursor-pointer items-start gap-3">
-        <input type="radio" className="mt-0.5 h-4 w-4 border-slate-300 text-[#5D5FEF]"
-          checked={mode === "custom"} onChange={() => setMode("custom")} />
-        <div>
-          <p className="text-sm font-medium text-[#111]">Earn custom loyalty</p>
-          {mode === "custom" && (
-            <div className="mt-2 flex items-center gap-2">
-              <input type="number" step="0.01" min="0" max="100"
-                className="w-20 rounded-md border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-[#5D5FEF]"
-                defaultValue="5.00"
-              />
-              <span className="text-sm text-slate-500">%</span>
-            </div>
-          )}
-        </div>
-      </label>
-    </div>
-  );
-}
-
-function VariantDimensionsPane({ variant }: { variant: CatalogProduct }) {
-  return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      {(
-        [
-          ["Weight", variant.weight_grams != null ? (variant.weight_grams / 453.592).toFixed(2) : "", "lb"],
-          ["Length", variant.length_mm != null ? (variant.length_mm / 25.4).toFixed(2) : "", "in"],
-          ["Width",  variant.width_mm  != null ? (variant.width_mm  / 25.4).toFixed(2) : "", "in"],
-          ["Height", variant.height_mm != null ? (variant.height_mm / 25.4).toFixed(2) : "", "in"],
-        ] as const
-      ).map(([lbl, val, unit]) => (
-        <div key={lbl}>
-          <Label>{lbl} ({unit})</Label>
-          <input
-            type="number" step="0.01" min="0"
-            className={FIELD}
-            defaultValue={val}
-            placeholder="0.00"
-          />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ── Expanded variant row ──────────────────────────────────────────────────────
-
-function VariantExpandedRow({
-  variant,
-  colSpan,
-  activeSubTab,
-  onSubTabChange,
-}: {
-  variant: CatalogProduct;
-  colSpan: number;
-  activeSubTab: VariantSubTab;
-  onSubTabChange: (tab: VariantSubTab) => void;
-}) {
-  return (
-    <tr>
-      <td colSpan={colSpan} className="border-b border-slate-100 bg-slate-50 p-0">
-        <div className="px-4 pt-2 pb-4">
-          {/* Sub-tab bar */}
-          <div className="mb-4 flex gap-0 border-b border-slate-200">
-            {VARIANT_SUB_TABS.map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onSubTabChange(key); }}
-                className={`px-3 py-2 text-xs font-medium transition-colors ${
-                  activeSubTab === key
-                    ? "border-b-2 border-[#5D5FEF] text-[#5D5FEF]"
-                    : "border-b-2 border-transparent text-slate-500 hover:text-[#111]"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+            <label className="flex cursor-pointer items-start gap-3">
+              <input type="radio" className="mt-0.5 h-4 w-4 border-slate-300 text-[#5D5FEF]"
+                checked={method === "reorder_point"} onChange={() => setMethod("reorder_point")} />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-[#111]">Reorder point + quantity</p>
+                <p className="text-xs text-slate-400">Triggers when stock drops to the reorder point</p>
+                {method === "reorder_point" && (
+                  <div className="mt-2 grid grid-cols-2 gap-3">
+                    <div><Lbl>Reorder point</Lbl>
+                      <input type="number" min="0" className={FLD} value={form.reorder_point}
+                        onChange={(e) => setForm((f) => ({ ...f, reorder_point: e.target.value }))} placeholder="0" /></div>
+                    <div><Lbl>Reorder quantity</Lbl>
+                      <input type="number" min="0" className={FLD} value={form.reorder_qty}
+                        onChange={(e) => setForm((f) => ({ ...f, reorder_qty: e.target.value }))} placeholder="0" /></div>
+                  </div>
+                )}
+              </div>
+            </label>
           </div>
 
-          {/* Sub-tab content */}
-          {activeSubTab === "price"      && <VariantPricePane variant={variant} />}
-          {activeSubTab === "inventory"  && <VariantInventoryPane variant={variant} />}
-          {activeSubTab === "image"      && <VariantImagePane />}
-          {activeSubTab === "tax"        && <VariantTaxPane variant={variant} />}
-          {activeSubTab === "marketing"  && <VariantMarketingPane />}
-          {activeSubTab === "dimensions" && <VariantDimensionsPane variant={variant} />}
+          <div className="flex items-center justify-end gap-3">
+            {saved && <span className="text-sm font-medium text-emerald-600">Saved</span>}
+            <button type="button" onClick={() => void handleSave()} disabled={saving}
+              className="rounded-xl bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors">
+              {saving ? "Saving…" : "Save settings"}
+            </button>
+          </div>
         </div>
-      </td>
-    </tr>
+      )}
+    </Card>
   );
 }
 
 // ── InventoryTab ──────────────────────────────────────────────────────────────
-
-type AttributeType = "VARIANT" | "MATRIX";
 
 export function InventoryTab({
   product,
@@ -437,609 +638,75 @@ export function InventoryTab({
   product: CatalogProduct;
   onSaved: (p: CatalogProduct) => void;
 }) {
-  const router = useRouter();
+  const [stockRefreshKey, setStockRefreshKey] = useState(0);
 
-  // ── Supplier ──────────────────────────────────────────────────────────────
-  const [supplierRows, setSupplierRows] = useState([
-    {
-      id: "1",
-      name: product.preferred_vendor_name ?? "",
-      code: product.vendor_upc ?? "",
-      price: product.wholesale_price_cents != null
-        ? String((product.wholesale_price_cents / 100).toFixed(2))
-        : "",
-    },
-  ]);
-  const [savingSupplier, setSavingSupplier] = useState(false);
-  const [supplierError, setSupplierError] = useState<string | null>(null);
+  // Load locations from stock endpoint (needed for QuickAdjust dropdown)
+  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
+  const [totalOnHand, setTotalOnHand] = useState<number | null>(null);
+  const [reorderPt, setReorderPt] = useState<number>(product.min_qty_to_sell ?? 0);
 
-  const addSupplierRow = () =>
-    setSupplierRows((rows) => [...rows, { id: String(Date.now()), name: "", code: "", price: "" }]);
+  useEffect(() => {
+    apiGet<StockResponse>(`/api/v1/catalog/${product.id}/stock`)
+      .then((r) => {
+        setLocations((r.locations ?? []).map((l) => ({ id: l.location_id, name: l.location_name })));
+        setTotalOnHand((r.locations ?? []).reduce((s, l) => s + l.quantity_on_hand, 0));
+      })
+      .catch(() => {});
+  }, [product.id, stockRefreshKey]);
 
-  const saveSupplier = async () => {
-    setSavingSupplier(true);
-    setSupplierError(null);
-    try {
-      const primary = supplierRows[0];
-      const updated = await apiPatch<CatalogProduct>(`/api/v1/catalog/${product.id}`, {
-        vendor_upc: primary?.code.trim() || undefined,
-        wholesale_price_cents: primary?.price
-          ? Math.round(parseFloat(primary.price) * 100)
-          : undefined,
-      });
-      onSaved(updated);
-    } catch (e) {
-      setSupplierError(e instanceof ApiResponseError ? e.message : "Save failed.");
-    } finally {
-      setSavingSupplier(false);
-    }
-  };
+  const handleAdjusted = useCallback(() => {
+    setStockRefreshKey((k) => k + 1);
+  }, []);
 
-  // ── Inventory levels ──────────────────────────────────────────────────────
-  const [invForm, setInvForm] = useState({
-    track: true,
-    replenish_method: "min_max" as "min_max" | "reorder_point",
-    min_qty: product.min_qty_to_sell != null ? String(product.min_qty_to_sell) : "",
-    max_qty: product.max_qty_to_sell != null ? String(product.max_qty_to_sell) : "",
-    reorder_point: "",
-    reorder_qty: product.qty_increment != null ? String(product.qty_increment) : "",
-  });
-  const [savingInv, setSavingInv] = useState(false);
-  const [invError, setInvError] = useState<string | null>(null);
-
-  const saveInventory = async () => {
-    setSavingInv(true);
-    setInvError(null);
-    try {
-      const patch: Partial<CatalogProduct> = {};
-      if (invForm.replenish_method === "min_max") {
-        patch.min_qty_to_sell = invForm.min_qty ? Number(invForm.min_qty) : undefined;
-        patch.max_qty_to_sell = invForm.max_qty ? Number(invForm.max_qty) : undefined;
-      } else {
-        patch.qty_increment = invForm.reorder_qty ? Number(invForm.reorder_qty) : undefined;
-      }
-      const updated = await apiPatch<CatalogProduct>(`/api/v1/catalog/${product.id}`, patch);
-      onSaved(updated);
-    } catch (e) {
-      setInvError(e instanceof ApiResponseError ? e.message : "Save failed.");
-    } finally {
-      setSavingInv(false);
-    }
-  };
-
-  // ── Variants ──────────────────────────────────────────────────────────────
-  const [attributeType, setAttributeType] = useState<AttributeType>("VARIANT");
-  const [variants, setVariants] = useState<CatalogProduct[]>([]);
-  const [variantsLoaded, setVariantsLoaded] = useState(false);
-  const [variantsLoading, setVariantsLoading] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [subTabs, setSubTabs] = useState<Record<string, VariantSubTab>>({});
-
-  const [showAddVariant, setShowAddVariant] = useState(false);
-  const [allProducts, setAllProducts] = useState<Array<{ id: string; sku: string; name: string }>>([]);
-  const [addVariantId, setAddVariantId] = useState("");
-  const [addVariantAxis, setAddVariantAxis] = useState("Size");
-  const [addVariantValue, setAddVariantValue] = useState("");
-  const [addVariantBusy, setAddVariantBusy] = useState(false);
-  const [addVariantError, setAddVariantError] = useState<string | null>(null);
-
-  const loadVariants = async () => {
-    if (variantsLoaded) return;
-    setVariantsLoading(true);
-    try {
-      const res = await apiGet<{ items: CatalogProduct[] }>(
-        `/api/v1/catalog/${product.id}/variants`
-      );
-      setVariants(res.items ?? []);
-      setVariantsLoaded(true);
-    } catch {
-      /* ignore */
-    } finally {
-      setVariantsLoading(false);
-    }
-  };
-
-  const openAddVariant = async () => {
-    setShowAddVariant(true);
-    setAddVariantError(null);
-    if (allProducts.length === 0) {
-      try {
-        const res = await apiGet<{ items: Array<{ id: string; sku: string; name: string }> }>(
-          "/api/v1/catalog?pageSize=200"
-        );
-        setAllProducts((res.items ?? []).filter((p) => p.id !== product.id));
-      } catch {
-        /* ignore */
-      }
-    }
-  };
-
-  const assignVariant = async () => {
-    if (!addVariantId || !addVariantValue.trim()) {
-      setAddVariantError("Select a product and enter a value.");
-      return;
-    }
-    const label =
-      addVariantAxis === "Custom"
-        ? addVariantValue.trim()
-        : `${addVariantAxis}: ${addVariantValue.trim()}`;
-    setAddVariantBusy(true);
-    setAddVariantError(null);
-    try {
-      await apiPost(`/api/v1/catalog/${product.id}/variants/assign`, {
-        productIds: [addVariantId],
-        label,
-      });
-      setAddVariantId("");
-      setAddVariantValue("");
-      setShowAddVariant(false);
-      setVariantsLoaded(false);
-      await loadVariants();
-    } catch (e) {
-      setAddVariantError(
-        e instanceof ApiResponseError ? e.message : "Failed to assign variant."
-      );
-    } finally {
-      setAddVariantBusy(false);
-    }
-  };
-
-  const unlinkVariant = async (childId: string) => {
-    try {
-      await apiDelete(`/api/v1/catalog/${product.id}/variants/${childId}`);
-      setVariants((v) => v.filter((x) => x.id !== childId));
-      if (expandedId === childId) setExpandedId(null);
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const toggleExpanded = (id: string) => {
-    if (!variantsLoaded) void loadVariants();
-    setExpandedId((prev) => (prev === id ? null : id));
-    setSubTabs((prev) => ({ ...prev, [id]: prev[id] ?? "inventory" }));
-  };
-
-  // ── Render ────────────────────────────────────────────────────────────────
-
-  if (product.parent_product_id) {
-    return (
-      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center gap-2">
-          <span className="rounded-full bg-[#5D5FEF]/10 px-2.5 py-0.5 text-xs font-semibold text-[#5D5FEF]">
-            Child variant
-          </span>
-          {product.variant_label && (
-            <span className="text-sm text-slate-500">{product.variant_label}</span>
-          )}
-        </div>
-        <p className="mt-2 text-xs text-slate-500">
-          This product is a variant of{" "}
-          <button
-            type="button"
-            onClick={() => router.push(`/catalog/${product.parent_product_id}`)}
-            className="font-medium text-[#5D5FEF] hover:underline"
-          >
-            the master product
-          </button>
-          .
-        </p>
-      </div>
-    );
-  }
+  // Low stock: total on-hand at or below reorder point
+  const isLowStock = totalOnHand !== null && reorderPt > 0 && totalOnHand <= reorderPt;
 
   return (
     <div className="space-y-4">
 
-      {/* ── Stock by Location ────────────────────────────────────────────── */}
-      <StockByLocation productId={product.id} />
-
-      {/* ── Supplier Information ─────────────────────────────────────────── */}
-      <Section
-        title="Supplier Information"
-        action={
-          <Button size="sm" variant="secondary" onClick={addSupplierRow}>
-            + Add another supplier
-          </Button>
-        }
-      >
-        {supplierError && (
-          <p role="alert" className="mb-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-            {supplierError}
-          </p>
-        )}
-        <div className="space-y-3">
-          {supplierRows.map((row, idx) => (
-            <div key={row.id} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div>
-                {idx === 0 && <Label>Supplier</Label>}
-                <input
-                  className={FIELD}
-                  value={row.name}
-                  onChange={(e) => setSupplierRows((rows) => rows.map((r) => r.id === row.id ? { ...r, name: e.target.value } : r))}
-                  placeholder="Supplier name…"
-                />
-              </div>
-              <div>
-                {idx === 0 && <Label>Supplier code</Label>}
-                <input
-                  className={FIELD}
-                  value={row.code}
-                  onChange={(e) => setSupplierRows((rows) => rows.map((r) => r.id === row.id ? { ...r, code: e.target.value } : r))}
-                  placeholder="e.g. SKU-1234"
-                />
-              </div>
-              <div>
-                {idx === 0 && <Label>Supplier price ($)</Label>}
-                <input
-                  type="number" step="0.01" min="0"
-                  className={FIELD}
-                  value={row.price}
-                  onChange={(e) => setSupplierRows((rows) => rows.map((r) => r.id === row.id ? { ...r, price: e.target.value } : r))}
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-4 flex justify-end">
-          <Button size="sm" variant="primary" loading={savingSupplier} onClick={() => void saveSupplier()}>
-            Save supplier
-          </Button>
-        </div>
-      </Section>
-
-      {/* ── Inventory Levels ─────────────────────────────────────────────── */}
-      <Section title="Inventory Levels">
-        {invError && (
-          <p role="alert" className="mb-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-            {invError}
-          </p>
-        )}
-        <label className="mb-4 flex cursor-pointer items-center gap-2.5">
-          <input
-            type="checkbox"
-            className="h-4 w-4 rounded border-slate-300 text-[#5D5FEF] focus:ring-[#5D5FEF]"
-            checked={invForm.track}
-            onChange={(e) => setInvForm((f) => ({ ...f, track: e.target.checked }))}
-          />
-          <span className="text-sm font-medium text-[#111]">Track inventory for this product</span>
-        </label>
-
-        {invForm.track && (
-          <div className="space-y-4">
-            <div>
-              <p className="mb-2 text-xs font-semibold text-slate-500">Replenish method</p>
-              <div className="space-y-3">
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="radio"
-                    className="mt-0.5 h-4 w-4 border-slate-300 text-[#5D5FEF]"
-                    checked={invForm.replenish_method === "min_max"}
-                    onChange={() => setInvForm((f) => ({ ...f, replenish_method: "min_max" }))}
-                  />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-[#111]">Min and max quantity</p>
-                    <p className="text-xs text-slate-500">
-                      Min triggers replenishment; Max is the refill target
-                    </p>
-                    {invForm.replenish_method === "min_max" && (
-                      <div className="mt-2 grid grid-cols-2 gap-3">
-                        <div>
-                          <Label>Min quantity</Label>
-                          <input
-                            type="number" min="0" className={FIELD}
-                            value={invForm.min_qty}
-                            onChange={(e) => setInvForm((f) => ({ ...f, min_qty: e.target.value }))}
-                            placeholder="0"
-                          />
-                        </div>
-                        <div>
-                          <Label>Max quantity</Label>
-                          <input
-                            type="number" min="0" className={FIELD}
-                            value={invForm.max_qty}
-                            onChange={(e) => setInvForm((f) => ({ ...f, max_qty: e.target.value }))}
-                            placeholder="0"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </label>
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="radio"
-                    className="mt-0.5 h-4 w-4 border-slate-300 text-[#5D5FEF]"
-                    checked={invForm.replenish_method === "reorder_point"}
-                    onChange={() => setInvForm((f) => ({ ...f, replenish_method: "reorder_point" }))}
-                  />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-[#111]">Reorder point and reorder quantity</p>
-                    <p className="text-xs text-slate-500">
-                      Reorder point = drop-to level; Reorder quantity = set order amount
-                    </p>
-                    {invForm.replenish_method === "reorder_point" && (
-                      <div className="mt-2 grid grid-cols-2 gap-3">
-                        <div>
-                          <Label>Reorder point</Label>
-                          <input
-                            type="number" min="0" className={FIELD}
-                            value={invForm.reorder_point}
-                            onChange={(e) => setInvForm((f) => ({ ...f, reorder_point: e.target.value }))}
-                            placeholder="0"
-                          />
-                        </div>
-                        <div>
-                          <Label>Reorder quantity</Label>
-                          <input
-                            type="number" min="0" className={FIELD}
-                            value={invForm.reorder_qty}
-                            onChange={(e) => setInvForm((f) => ({ ...f, reorder_qty: e.target.value }))}
-                            placeholder="0"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </label>
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <Button
-                size="sm" variant="primary" loading={savingInv}
-                onClick={() => void saveInventory()}
-              >
-                Save inventory settings
-              </Button>
-            </div>
-          </div>
-        )}
-      </Section>
-
-      {/* ── Variants ─────────────────────────────────────────────────────── */}
-      <Section
-        title="Variants"
-        sub="Child products with different sizes, colors, or other attributes"
-        action={
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="secondary" onClick={() => { void loadVariants(); }}>
-              ✏️ Edit value names
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => { void (variantsLoaded ? Promise.resolve() : loadVariants()); void openAddVariant(); }}
-            >
-              + Add another attribute
-            </Button>
-          </div>
-        }
-      >
-        {/* Attribute type */}
-        <div className="mb-5 flex items-center gap-3">
-          <Label>Attribute type</Label>
-          <div className="flex gap-1">
-            {(["VARIANT", "MATRIX"] as const).map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setAttributeType(type)}
-                className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-                  attributeType === type
-                    ? "bg-[#5D5FEF] text-white"
-                    : "border border-slate-200 bg-white text-slate-600 hover:border-[#5D5FEF]/40"
-                }`}
-              >
-                {type}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Add variant form */}
-        {showAddVariant && (
-          <div className="mb-4 rounded-lg border border-[#5D5FEF]/20 bg-[#5D5FEF]/5 p-4 space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#5D5FEF]">
-              Add attribute value
-            </p>
-            {addVariantError && (
-              <p role="alert" className="rounded bg-red-50 px-3 py-1.5 text-xs text-red-700">
-                {addVariantError}
-              </p>
-            )}
-            <div>
-              <Label>Option axis</Label>
-              <div className="flex flex-wrap gap-1.5 mb-2">
-                {["Size", "Color", "Flavor", "Weight", "Pack", "Custom"].map((ax) => (
-                  <button
-                    key={ax}
-                    type="button"
-                    onClick={() => setAddVariantAxis(ax)}
-                    className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-                      addVariantAxis === ax
-                        ? "bg-[#5D5FEF] text-white"
-                        : "border border-slate-200 bg-white text-slate-600 hover:border-[#5D5FEF]/40"
-                    }`}
-                  >
-                    {ax}
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                {addVariantAxis !== "Custom" && (
-                  <span className="flex h-9 items-center rounded-md border border-slate-100 bg-slate-50 px-3 text-sm text-slate-400 shrink-0">
-                    {addVariantAxis}:
-                  </span>
-                )}
-                <input
-                  value={addVariantValue}
-                  onChange={(e) => setAddVariantValue(e.target.value)}
-                  placeholder={addVariantAxis === "Custom" ? "e.g. 500ml / Red / King Size" : "e.g. Large"}
-                  className={FIELD}
-                />
-              </div>
-            </div>
-            <div>
-              <Label>Product to assign</Label>
-              <select
-                value={addVariantId}
-                onChange={(e) => setAddVariantId(e.target.value)}
-                className={FIELD}
-              >
-                <option value="">Select a product…</option>
-                {allProducts
-                  .filter((p) => !variants.some((v) => v.id === p.id))
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>
-                  ))}
-              </select>
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="secondary" onClick={() => setShowAddVariant(false)}>
-                Cancel
-              </Button>
-              <Button size="sm" variant="primary" loading={addVariantBusy} onClick={() => void assignVariant()}>
-                Assign
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Load trigger */}
-        {!variantsLoaded && !showAddVariant && (
-          <button
-            type="button"
-            className="mb-3 text-xs font-medium text-[#5D5FEF] hover:underline"
-            onClick={() => void loadVariants()}
-          >
-            Load variants
-          </button>
-        )}
-
-        {/* Variants table */}
-        {variantsLoading ? (
-          <div className="space-y-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-10 animate-pulse rounded-lg bg-slate-100" />
-            ))}
-          </div>
-        ) : variantsLoaded && variants.length === 0 ? (
-          <p className="py-4 text-center text-sm text-slate-400">
-            No variants yet.{" "}
-            <button
-              type="button"
-              onClick={() => void openAddVariant()}
-              className="text-[#5D5FEF] hover:underline"
-            >
-              Add a child product
-            </button>
-          </p>
-        ) : variantsLoaded ? (
+      {/* Low stock banner */}
+      {isLowStock && (
+        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <svg className="h-5 w-5 shrink-0 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"/>
+          </svg>
           <div>
-            <p className="mb-2 text-xs text-slate-500 font-medium">
-              This product has {variants.length} variant{variants.length !== 1 ? "s" : ""}
-            </p>
-            <div className="overflow-hidden rounded-lg border border-slate-100">
-              <table className="w-full text-sm">
-                <thead className="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  <tr>
-                    <th className="w-6 px-3 py-2.5" />
-                    <th className="px-4 py-2.5 text-left">Variant</th>
-                    <th className="px-4 py-2.5 text-left">SKU Code</th>
-                    <th className="px-4 py-2.5 text-left">Supplier Code</th>
-                    <th className="px-4 py-2.5 text-right">Supplier Price</th>
-                    <th className="px-4 py-2.5 text-right">Retail Price</th>
-                    <th className="px-4 py-2.5 text-center">Enabled</th>
-                    <th className="px-4 py-2.5" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {variants.map((v) => {
-                    const isExpanded = expandedId === v.id;
-                    const activeSubTab = subTabs[v.id] ?? "inventory";
-                    return (
-                      <>
-                        <tr
-                          key={v.id}
-                          className={`cursor-pointer transition-colors ${isExpanded ? "bg-[#5D5FEF]/5" : "hover:bg-slate-50"}`}
-                          onClick={() => toggleExpanded(v.id)}
-                        >
-                          {/* expand chevron */}
-                          <td className="px-3 py-2.5 text-slate-400">
-                            <svg
-                              width="12" height="12" viewBox="0 0 12 12" fill="none"
-                              stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
-                              strokeLinejoin="round"
-                              aria-hidden="true"
-                              className={`transition-transform ${isExpanded ? "rotate-90" : ""}`}
-                            >
-                              <path d="M4 2l4 4-4 4" />
-                            </svg>
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <span className="inline-block rounded-full bg-[#5D5FEF]/10 px-2 py-0.5 text-xs font-semibold text-[#5D5FEF]">
-                              {v.variant_label ?? "—"}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5 font-mono text-xs text-slate-500">
-                            {v.sku}
-                          </td>
-                          <td className="px-4 py-2.5 text-xs text-slate-400">
-                            {v.vendor_upc ?? "—"}
-                          </td>
-                          <td className="px-4 py-2.5 text-right text-xs text-slate-500">
-                            {v.wholesale_price_cents != null
-                              ? formatMoney(v.wholesale_price_cents)
-                              : "—"}
-                          </td>
-                          <td className="px-4 py-2.5 text-right font-semibold text-[#111]">
-                            {formatMoney(v.price_cents)}
-                          </td>
-                          <td className="px-4 py-2.5 text-center">
-                            <span
-                              className={`inline-block h-2 w-2 rounded-full ${v.status === "active" ? "bg-emerald-500" : "bg-slate-300"}`}
-                            />
-                          </td>
-                          <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              type="button"
-                              onClick={() => router.push(`/catalog/${v.id}`)}
-                              className="mr-3 text-xs text-[#5D5FEF] hover:underline"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void unlinkVariant(v.id)}
-                              className="text-xs text-red-400 hover:text-red-700"
-                              aria-label={`Unlink ${v.name}`}
-                            >
-                              Unlink
-                            </button>
-                          </td>
-                        </tr>
-
-                        {isExpanded && (
-                          <VariantExpandedRow
-                            key={`${v.id}-expanded`}
-                            variant={v}
-                            colSpan={8}
-                            activeSubTab={activeSubTab}
-                            onSubTabChange={(tab) =>
-                              setSubTabs((prev) => ({ ...prev, [v.id]: tab }))
-                            }
-                          />
-                        )}
-                      </>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <p className="text-sm font-semibold text-amber-800">Low stock — {totalOnHand} units remaining</p>
+            <p className="text-xs text-amber-600">Reorder point is {reorderPt} units. Consider placing a purchase order.</p>
           </div>
-        ) : null}
-      </Section>
+        </div>
+      )}
+
+      {/* Stock by location */}
+      <StockByLocation productId={product.id} refreshKey={stockRefreshKey} />
+
+      {/* Quick adjust */}
+      {locations.length > 0 && (
+        <QuickAdjust
+          productId={product.id}
+          locations={locations}
+          onAdjusted={handleAdjusted}
+        />
+      )}
+
+      {/* Movement history */}
+      <MovementHistory productId={product.id} refreshKey={stockRefreshKey} />
+
+      {/* Supplier */}
+      <SupplierSection product={product} onSaved={onSaved} />
+
+      {/* Replenishment */}
+      <ReplenishmentSection
+        product={product}
+        onSaved={(p) => {
+          onSaved(p);
+          setReorderPt(p.min_qty_to_sell ?? 0);
+        }}
+      />
+
+      {/* Physical attributes */}
+      <PhysicalAttributes product={product} onSaved={onSaved} />
+
     </div>
   );
 }
