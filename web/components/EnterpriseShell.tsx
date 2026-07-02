@@ -21,12 +21,13 @@ export type NavKey =
   | "tax-compliance" | "integrations" | "imports-exports" | "workflows"
   | "quotes" | "loyalty" | "notifications" | "audit-log" | "service-orders"
   | "inventory-locations" | "inventory-expiry" | "invoicing" | "inventory-serials"
-  | "inventory-reorder" | "inventory-counts" | "workforce" | "appointments"
+  | "inventory-reorder" | "inventory-counts" | "inventory-pipeline" | "workforce" | "appointments"
   | "healthcare" | "automotive" | "hospitality" | "manufacturing" | "rental"
   | "entertainment" | "education" | "module-marketplace" | "kitchen" | "bar-tabs"
   | "golf" | "golf-bookings" | "golf-members" | "golf-pro-shop"
   | "restaurant-dashboard" | "restaurant-floor-plan" | "restaurant-tabs"
-  | "permissions" | "modes" | "kiosk-settings" | "b2b-settings";
+  | "permissions" | "modes" | "kiosk-settings" | "b2b-settings"
+  | "warehouse";
 
 // ── Section / nav tree ────────────────────────────────────────────────────────
 
@@ -45,7 +46,8 @@ const SECTION_MAP: Record<NavKey, RailSection> = {
   inventory: "inventory", operations: "inventory", purchasing: "inventory",
   vendors: "inventory", shipping: "inventory", "inventory-locations": "inventory",
   "inventory-expiry": "inventory", "inventory-serials": "inventory",
-  "inventory-reorder": "inventory", "inventory-counts": "inventory", workforce: "inventory",
+  "inventory-reorder": "inventory", "inventory-counts": "inventory", "inventory-pipeline": "inventory", workforce: "inventory",
+  warehouse: "inventory",
   customers: "customers", appointments: "customers", healthcare: "customers",
   finance: "finance", accounting: "finance", invoicing: "finance",
   settings: "setup", team: "setup", workflows: "setup", integrations: "setup",
@@ -131,7 +133,9 @@ const NAV_TREE: NavSection[] = [
     icon: <InventoryIcon />,
     children: [
       { label: "Overview",      href: "/inventory",               featureGate: "inventory" },
+      { label: "Pipeline",      href: "/inventory/pipeline",      featureGate: "inventory" },
       { label: "Receive Stock", href: "/inventory/receive-stock", featureGate: "inventory" },
+      { label: "Warehouse",     href: "/warehouse",               featureGate: "inventory" },
       { label: "Purchasing",    href: "/purchasing",              featureGate: "purchasing" },
       { label: "Vendors",       href: "/vendors",                 featureGate: "vendors" },
       { label: "Operations",    href: "/operations",              featureGate: "operations" },
