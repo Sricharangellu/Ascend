@@ -27,7 +27,7 @@ export type NavKey =
   | "golf" | "golf-bookings" | "golf-members" | "golf-pro-shop"
   | "restaurant-dashboard" | "restaurant-floor-plan" | "restaurant-tabs"
   | "permissions" | "modes" | "kiosk-settings" | "b2b-settings"
-  | "warehouse" | "pricing" | "edi-imports";
+  | "warehouse" | "pricing" | "edi-imports" | "promotions";
 
 // ── Section / nav tree ────────────────────────────────────────────────────────
 
@@ -122,11 +122,12 @@ const NAV_TREE: NavSection[] = [
     label: "Catalog",
     icon: <CatalogIcon />,
     children: [
-      { label: "Products",   href: "/catalog",    featureGate: "catalog" },
-      { label: "Pricing",    href: "/pricing",    featureGate: "catalog" },
-      { label: "Discounts",  href: "/discounts",  featureGate: "discounts" },
-      { label: "Gift Cards", href: "/gift-cards", featureGate: "gift-cards" },
-      { label: "Loyalty",    href: "/loyalty",    featureGate: "loyalty" },
+      { label: "Products",    href: "/catalog",             featureGate: "catalog" },
+      { label: "Pricing",     href: "/pricing",             featureGate: "catalog" },
+      { label: "Promotions",  href: "/catalog/promotions",  featureGate: "catalog" },
+      { label: "Discounts",   href: "/discounts",           featureGate: "discounts" },
+      { label: "Gift Cards",  href: "/gift-cards",          featureGate: "gift-cards" },
+      { label: "Loyalty",     href: "/loyalty",             featureGate: "loyalty" },
     ],
   },
   {

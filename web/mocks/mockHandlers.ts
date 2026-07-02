@@ -6174,23 +6174,152 @@ mockHandlers.push(
     const DAY = 86_400_000;
     const NOW = Date.now();
     let seq = 10;
+    let couponSeq = 100;
     interface Promo {
       id: string; name: string; code: string | null;
-      type: "percent_off" | "fixed_off" | "bogo" | "bundle";
+      type: "percent_off" | "fixed_off" | "bogo" | "bundle" | "flash";
       value: number; scope: "all" | "category" | "product"; scope_value: string | null;
       status: "active" | "scheduled" | "expired" | "draft";
       starts_at: number; ends_at: number | null;
-      usage_count: number; usage_limit: number | null; created_at: number;
+      usage_count: number; usage_limit: number | null;
+      per_customer_limit: number | null;
+      channel: "all" | "pos" | "ecommerce";
+      stackable: boolean;
+      revenue_impact_cents: number;
+      created_at: number;
     }
+    interface CouponCode {
+      id: string; code: string; promotion_id: string; promotion_name: string;
+      type: "single_use" | "multi_use";
+      used: boolean; used_at: number | null; customer_name: string | null; created_at: number;
+    }
+    interface FlashSale {
+      id: string; name: string; discount_pct: number;
+      scope: "all" | "category" | "product"; scope_value: string | null;
+      starts_at: number; ends_at: number;
+      status: "upcoming" | "live" | "ended";
+      units_sold: number; revenue_cents: number;
+    }
+    interface BundleRule {
+      id: string; name: string; min_items: number; discount_pct: number;
+      products: Array<{ sku: string; name: string }>;
+      active: boolean; usage_count: number;
+    }
+    interface StackRule {
+      id: string; promo_a_name: string; promo_b_name: string;
+      can_stack: boolean; priority: number; note: string | null;
+    }
+
     let promos: Promo[] = [
-      { id: "promo_1", name: "Summer Sip Sale", code: "SUMMER20", type: "percent_off", value: 20, scope: "category", scope_value: "Beverages", status: "active", starts_at: NOW - 5 * DAY, ends_at: NOW + 25 * DAY, usage_count: 142, usage_limit: 500, created_at: NOW - 30 * DAY },
-      { id: "promo_2", name: "Snack Attack BOGO", code: null, type: "bogo", value: 1, scope: "category", scope_value: "Snacks", status: "active", starts_at: NOW - 2 * DAY, ends_at: NOW + 12 * DAY, usage_count: 38, usage_limit: null, created_at: NOW - 7 * DAY },
-      { id: "promo_3", name: "$2 Off Energy Drinks", code: "ENERGY2", type: "fixed_off", value: 200, scope: "product", scope_value: "BEV-003", status: "active", starts_at: NOW - 1 * DAY, ends_at: null, usage_count: 7, usage_limit: 100, created_at: NOW - 3 * DAY },
-      { id: "promo_4", name: "Back-to-School Bundle", code: "BTSAVE", type: "bundle", value: 3, scope: "all", scope_value: null, status: "scheduled", starts_at: NOW + 14 * DAY, ends_at: NOW + 30 * DAY, usage_count: 0, usage_limit: 200, created_at: NOW - 2 * DAY },
-      { id: "promo_5", name: "Spring Clearance 15%", code: "SPRING15", type: "percent_off", value: 15, scope: "all", scope_value: null, status: "expired", starts_at: NOW - 60 * DAY, ends_at: NOW - 10 * DAY, usage_count: 324, usage_limit: null, created_at: NOW - 65 * DAY },
+      { id: "promo_1", name: "Summer Sip Sale",      code: "SUMMER20",  type: "percent_off", value: 20,  scope: "category", scope_value: "Beverages", status: "active",    starts_at: NOW - 5 * DAY,  ends_at: NOW + 25 * DAY,  usage_count: 142, usage_limit: 500, per_customer_limit: null, channel: "all",       stackable: true,  revenue_impact_cents: 284000, created_at: NOW - 30 * DAY },
+      { id: "promo_2", name: "Snack Attack BOGO",    code: null,        type: "bogo",        value: 1,   scope: "category", scope_value: "Snacks",    status: "active",    starts_at: NOW - 2 * DAY,  ends_at: NOW + 12 * DAY,  usage_count: 38,  usage_limit: null,channel: "pos",       per_customer_limit: 3,    stackable: false, revenue_impact_cents: 95000,  created_at: NOW - 7 * DAY  },
+      { id: "promo_3", name: "$2 Off Energy Drinks", code: "ENERGY2",   type: "fixed_off",   value: 200, scope: "product",  scope_value: "BEV-003",   status: "active",    starts_at: NOW - 1 * DAY,  ends_at: null,             usage_count: 7,   usage_limit: 100, per_customer_limit: 2,    channel: "all",       stackable: true,  revenue_impact_cents: 1400,   created_at: NOW - 3 * DAY  },
+      { id: "promo_4", name: "Back-to-School Bundle",code: "BTSAVE",    type: "bundle",      value: 3,   scope: "all",      scope_value: null,        status: "scheduled", starts_at: NOW + 14 * DAY, ends_at: NOW + 30 * DAY,  usage_count: 0,   usage_limit: 200, per_customer_limit: null, channel: "ecommerce", stackable: false, revenue_impact_cents: 0,      created_at: NOW - 2 * DAY  },
+      { id: "promo_5", name: "Spring Clearance 15%", code: "SPRING15",  type: "percent_off", value: 15,  scope: "all",      scope_value: null,        status: "expired",   starts_at: NOW - 60 * DAY, ends_at: NOW - 10 * DAY,  usage_count: 324, usage_limit: null,per_customer_limit: null, channel: "all",       stackable: true,  revenue_impact_cents: 648000, created_at: NOW - 65 * DAY },
+      { id: "promo_6", name: "Flash Friday 30% Off", code: null,        type: "flash",       value: 30,  scope: "all",      scope_value: null,        status: "active",    starts_at: NOW - 2 * 3600000, ends_at: NOW + 4 * 3600000, usage_count: 89, usage_limit: null,per_customer_limit: 1,   channel: "all",       stackable: false, revenue_impact_cents: 267000, created_at: NOW - 3 * DAY  },
+    ];
+
+    const couponCodes: CouponCode[] = [
+      { id: "cpn_1",  code: "SUMMER20",  promotion_id: "promo_1", promotion_name: "Summer Sip Sale",      type: "multi_use",  used: false, used_at: null,             customer_name: null,          created_at: NOW - 30 * DAY },
+      { id: "cpn_2",  code: "ENERGY2",   promotion_id: "promo_3", promotion_name: "$2 Off Energy Drinks", type: "multi_use",  used: false, used_at: null,             customer_name: null,          created_at: NOW - 3 * DAY  },
+      { id: "cpn_3",  code: "BTSAVE",    promotion_id: "promo_4", promotion_name: "Back-to-School Bundle",type: "multi_use",  used: false, used_at: null,             customer_name: null,          created_at: NOW - 2 * DAY  },
+      { id: "cpn_4",  code: "SPRING15",  promotion_id: "promo_5", promotion_name: "Spring Clearance 15%", type: "multi_use",  used: true,  used_at: NOW - 11 * DAY,  customer_name: null,          created_at: NOW - 65 * DAY },
+      { id: "cpn_5",  code: "SU20-A1B2", promotion_id: "promo_1", promotion_name: "Summer Sip Sale",      type: "single_use", used: true,  used_at: NOW - 3 * DAY,   customer_name: "Alice Nguyen", created_at: NOW - 10 * DAY },
+      { id: "cpn_6",  code: "SU20-C3D4", promotion_id: "promo_1", promotion_name: "Summer Sip Sale",      type: "single_use", used: false, used_at: null,             customer_name: null,          created_at: NOW - 10 * DAY },
+      { id: "cpn_7",  code: "SU20-E5F6", promotion_id: "promo_1", promotion_name: "Summer Sip Sale",      type: "single_use", used: false, used_at: null,             customer_name: null,          created_at: NOW - 10 * DAY },
+      { id: "cpn_8",  code: "EN2-G7H8",  promotion_id: "promo_3", promotion_name: "$2 Off Energy Drinks", type: "single_use", used: true,  used_at: NOW - 1 * DAY,   customer_name: "Bob Martinez", created_at: NOW - 5 * DAY  },
+      { id: "cpn_9",  code: "EN2-I9J0",  promotion_id: "promo_3", promotion_name: "$2 Off Energy Drinks", type: "single_use", used: false, used_at: null,             customer_name: null,          created_at: NOW - 5 * DAY  },
+      { id: "cpn_10", code: "EN2-K1L2",  promotion_id: "promo_3", promotion_name: "$2 Off Energy Drinks", type: "single_use", used: false, used_at: null,             customer_name: null,          created_at: NOW - 5 * DAY  },
+    ];
+
+    const flashSales: FlashSale[] = [
+      { id: "fl_1", name: "Flash Friday 30% Off",     discount_pct: 30, scope: "all",      scope_value: null,       starts_at: NOW - 2 * 3600000, ends_at: NOW + 4 * 3600000,   status: "live",     units_sold: 89,  revenue_cents: 890000  },
+      { id: "fl_2", name: "Happy Hour Snacks 25% Off",discount_pct: 25, scope: "category", scope_value: "Snacks",   starts_at: NOW + 2 * 3600000, ends_at: NOW + 5 * 3600000,   status: "upcoming", units_sold: 0,   revenue_cents: 0       },
+      { id: "fl_3", name: "Morning Rush Coffee 15%",  discount_pct: 15, scope: "category", scope_value: "Coffee",   starts_at: NOW - 30 * DAY,    ends_at: NOW - 29 * DAY + 14400000, status: "ended", units_sold: 203, revenue_cents: 1218000 },
+      { id: "fl_4", name: "Weekend Beverage Blitz",   discount_pct: 20, scope: "category", scope_value: "Beverages",starts_at: NOW + 3 * DAY,     ends_at: NOW + 5 * DAY,       status: "upcoming", units_sold: 0,   revenue_cents: 0       },
+    ];
+
+    const bundleRules: BundleRule[] = [
+      { id: "bnd_1", name: "Morning Bundle",     min_items: 2, discount_pct: 10, active: true,  usage_count: 47,  products: [{ sku: "BEV-001", name: "Dark Roast Coffee" }, { sku: "SNK-003", name: "Blueberry Muffin" }] },
+      { id: "bnd_2", name: "Party Pack",         min_items: 4, discount_pct: 15, active: true,  usage_count: 12,  products: [{ sku: "BEV-007", name: "Sparkling Water (6-pack)" }, { sku: "SNK-001", name: "Mixed Nuts" }, { sku: "SNK-005", name: "Pretzels" }, { sku: "BEV-004", name: "Soda 12-pack" }] },
+      { id: "bnd_3", name: "Energy Starter Kit", min_items: 3, discount_pct: 12, active: true,  usage_count: 28,  products: [{ sku: "BEV-003", name: "Energy Drink Original" }, { sku: "BEV-010", name: "Energy Drink Zero" }, { sku: "SNK-008", name: "Protein Bar" }] },
+      { id: "bnd_4", name: "Old Stock Bundle",   min_items: 2, discount_pct: 20, active: false, usage_count: 156, products: [{ sku: "OLD-001", name: "Legacy SKU A" }, { sku: "OLD-002", name: "Legacy SKU B" }] },
+    ];
+
+    const stackRules: StackRule[] = [
+      { id: "stk_1", promo_a_name: "Summer Sip Sale",    promo_b_name: "$2 Off Energy Drinks", can_stack: true,  priority: 1, note: "Both can apply simultaneously" },
+      { id: "stk_2", promo_a_name: "Snack Attack BOGO",  promo_b_name: "Spring Clearance 15%", can_stack: false, priority: 2, note: "BOGO takes precedence" },
+      { id: "stk_3", promo_a_name: "Flash Friday 30%",   promo_b_name: "Summer Sip Sale",      can_stack: false, priority: 1, note: "Flash sales are always exclusive" },
+      { id: "stk_4", promo_a_name: "Morning Bundle",     promo_b_name: "Summer Sip Sale",      can_stack: true,  priority: 3, note: null },
     ];
 
     return [
+      // Sub-paths BEFORE catch-all /:id
+      http.get(`${V1}/promotions/coupons`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const q = (url.searchParams.get("q") ?? "").toLowerCase();
+        const list = q ? couponCodes.filter(c => c.code.toLowerCase().includes(q) || c.promotion_name.toLowerCase().includes(q)) : couponCodes;
+        return HttpResponse.json({ items: list });
+      }),
+
+      http.post(`${V1}/promotions/coupons/generate`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as { count?: number; type?: "single_use" | "multi_use"; promotion_id?: string };
+        const count = Math.min(b.count ?? 10, 50);
+        const generated: CouponCode[] = [];
+        for (let i = 0; i < count; i++) {
+          couponSeq++;
+          const code = `GEN-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+          const c: CouponCode = {
+            id: `cpn_${couponSeq}`, code, promotion_id: b.promotion_id ?? "promo_1",
+            promotion_name: "Generated Batch", type: b.type ?? "single_use",
+            used: false, used_at: null, customer_name: null, created_at: Date.now(),
+          };
+          couponCodes.push(c);
+          generated.push(c);
+        }
+        return HttpResponse.json({ generated, count: generated.length }, { status: 201 });
+      }),
+
+      http.get(`${V1}/promotions/flash-sales`, async () => {
+        await lat();
+        return HttpResponse.json({ items: flashSales });
+      }),
+
+      http.get(`${V1}/promotions/bundles`, async () => {
+        await lat();
+        return HttpResponse.json({ items: bundleRules });
+      }),
+
+      http.get(`${V1}/promotions/stackability`, async () => {
+        await lat();
+        return HttpResponse.json({ items: stackRules });
+      }),
+
+      http.get(`${V1}/promotions/analytics`, async () => {
+        await lat();
+        const NOW2 = Date.now();
+        const DAY2 = 86_400_000;
+        return HttpResponse.json({
+          total_redemptions: 600,
+          total_revenue_impact_cents: 1295400,
+          avg_order_lift_pct: 18.4,
+          top_promotions: [
+            { name: "Spring Clearance 15%",  redemptions: 324, revenue_cents: 648000  },
+            { name: "Summer Sip Sale",       redemptions: 142, revenue_cents: 284000  },
+            { name: "Flash Friday 30% Off",  redemptions: 89,  revenue_cents: 267000  },
+            { name: "Snack Attack BOGO",     redemptions: 38,  revenue_cents: 95000   },
+            { name: "$2 Off Energy Drinks",  redemptions: 7,   revenue_cents: 1400    },
+          ],
+          redemptions_by_day: Array.from({ length: 14 }, (_, i) => ({
+            date: new Date(NOW2 - (13 - i) * DAY2).toISOString().slice(0, 10),
+            count: Math.floor(Math.random() * 60 + 10),
+          })),
+          channel_split: { pos: 72, ecommerce: 28 },
+        });
+      }),
+
       http.get(`${V1}/promotions`, async ({ request }) => {
         await lat();
         const url = new URL(request.url);
@@ -6219,6 +6348,10 @@ mockHandlers.push(
           ends_at: b.ends_at ?? null,
           usage_count: 0,
           usage_limit: b.usage_limit ?? null,
+          per_customer_limit: b.per_customer_limit ?? null,
+          channel: b.channel ?? "all",
+          stackable: b.stackable ?? true,
+          revenue_impact_cents: 0,
           created_at: Date.now(),
         };
         promos.push(promo);
@@ -6230,7 +6363,7 @@ mockHandlers.push(
         const idx = promos.findIndex(p => p.id === String(params["id"]));
         if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
         const b = (await request.json()) as Partial<Promo>;
-        promos[idx] = { ...promos[idx], ...b };
+        promos[idx] = { ...promos[idx]!, ...b };
         return HttpResponse.json(promos[idx]);
       }),
 
