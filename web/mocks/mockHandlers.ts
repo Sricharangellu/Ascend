@@ -53,6 +53,7 @@ let discounts: any[] = [];
 const registerSessions = new Map<string, any>();
 // Ecommerce dev store
 const onlineProducts = new Map<string, any>();
+const onlineSettings = new Map<string, Record<string, unknown>>();
 let ecSoSeq = 0;
 // Settings dev stores
 let shippingMethods: any[] = [];
@@ -1936,13 +1937,21 @@ mockHandlers.push(
     if (cat) items = items.filter((p) => p.category === cat);
     return HttpResponse.json({ items });
   }),
+  http.get(`${V1}/ecommerce/products/:productId`, async ({ params }) => {
+    await lat();
+    const id = String(params.productId);
+    const existing = onlineSettings.get(id) ?? { online: false, online_price_cents: null, online_title: null, online_description: null, seo_slug: null, seo_title: null, seo_description: null, images: [] };
+    return HttpResponse.json(existing);
+  }),
   http.put(`${V1}/ecommerce/products/:productId/online`, async ({ params, request }) => {
     await lat();
     const id = String(params.productId);
-    const b = (await request.json()) as any;
-    if (b.online) onlineProducts.set(id, { id, sku: `SKU-${id.slice(-4)}`, name: `Product ${id.slice(-4)}`, price_cents: 1500, category: "general" });
+    const b = (await request.json()) as Record<string, unknown>;
+    const settings = { ...(onlineSettings.get(id) ?? {}), ...b };
+    onlineSettings.set(id, settings);
+    if (b.online) onlineProducts.set(id, { id, online: true, ...b });
     else onlineProducts.delete(id);
-    return HttpResponse.json({ productId: id, ecommerce: !!b.online });
+    return HttpResponse.json({ productId: id, ...settings });
   }),
   http.post(`${V1}/ecommerce/checkout`, async ({ request }) => {
     await lat();

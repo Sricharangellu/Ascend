@@ -16,13 +16,14 @@ import { SalesTab }      from "./_components/SalesTab";
 import { ReturnsTab }    from "./_components/ReturnsTab";
 import { CreditsTab }    from "./_components/CreditsTab";
 import { InvoicesTab }   from "./_components/InvoicesTab";
-import { VariantsTab }   from "./_components/VariantsTab";
+import { VariantsTab }    from "./_components/VariantsTab";
+import { EcommerceTab }  from "./_components/EcommerceTab";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Tab =
-  | "general" | "categories" | "inventory" | "expiry"
-  | "sales" | "returns" | "credits" | "invoices" | "marketing" | "variants";
+  | "general" | "variants" | "categories" | "inventory" | "expiry"
+  | "sales" | "returns" | "credits" | "invoices" | "marketing" | "ecommerce";
 
 const STATUS_BADGE = { active: "green", draft: "yellow", archived: "gray" } as const;
 
@@ -37,6 +38,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "credits",    label: "Credits" },
   { key: "invoices",   label: "Invoices" },
   { key: "marketing",  label: "Compliance" },
+  { key: "ecommerce",  label: "eCommerce" },
 ];
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -191,6 +193,17 @@ export default function ProductDetailPage() {
                       </svg>
                       Add to Invoice
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowActions(false); window.open(`/store/${product.id}`, "_blank"); }}
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                      </svg>
+                      View on store
+                    </button>
                     <div className="my-1 border-t border-slate-100" />
                     <button
                       type="button"
@@ -275,6 +288,9 @@ export default function ProductDetailPage() {
         )}
         {activeTab === "marketing" && (
           <MarketingTab product={product} onSaved={setProduct} />
+        )}
+        {activeTab === "ecommerce" && (
+          <EcommerceTab product={product} />
         )}
 
       </div>
