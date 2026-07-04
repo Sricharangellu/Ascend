@@ -292,6 +292,117 @@ test("variants: assign children to a master, list them, and exclude master from 
   assert.ok(including.json.items.some((p: any) => p.id === master.json.id));
 });
 
+test("variants: create a child directly, list it, and clear its parent", async () => {
+  const app = await freshApp();
+
+  const master = await call(app, "POST", "/api/catalog/", { sku: "DIRECT-MASTER", name: "Running Shoe", price_cents: 0, category: "footwear" });
+  const child = await call(app, "POST", "/api/catalog/", {
+    sku: "DIRECT-CHILD-9",
+    name: "Running Shoe - Size 9",
+    price_cents: 7499,
+    category: "footwear",
+    parent_product_id: master.json.id,
+    variant_label: "Size 9",
+  });
+
+  assert.equal(child.status, 201);
+  assert.equal(child.json.parent_product_id, master.json.id);
+  assert.equal(child.json.variant_label, "Size 9");
+
+  const variants = await call(app, "GET", `/api/catalog/${master.json.id}/variants`);
+  assert.deepEqual(variants.json.items.map((p: any) => p.id), [child.json.id]);
+
+  const cleared = await call(app, "PATCH", `/api/catalog/${child.json.id}`, {
+    parent_product_id: null,
+    variant_label: null,
+  });
+  assert.equal(cleared.status, 200);
+  assert.equal(cleared.json.parent_product_id, null);
+  assert.equal(cleared.json.variant_label, null);
+
+  const afterClear = await call(app, "GET", `/api/catalog/${master.json.id}/variants`);
+  assert.equal(afterClear.json.items.length, 0);
+});
+
+test("variants: assign can set a label and unlink a child", async () => {
+  const app = await freshApp();
+
+  const master = await call(app, "POST", "/api/catalog/", { sku: "LINK-MASTER", name: "Bottle", price_cents: 0 });
+  const child = await call(app, "POST", "/api/catalog/", { sku: "LINK-CHILD", name: "Bottle 1L", price_cents: 1299 });
+
+  const assign = await call(app, "POST", `/api/catalog/${master.json.id}/variants/assign`, {
+    productIds: [child.json.id],
+    label: "1L",
+  });
+  assert.equal(assign.status, 200);
+  assert.equal(assign.json.items.length, 1);
+  assert.equal(assign.json.items[0].parent_product_id, master.json.id);
+  assert.equal(assign.json.items[0].variant_label, "1L");
+
+  const unlink = await call(app, "DELETE", `/api/catalog/${master.json.id}/variants/${child.json.id}`);
+  assert.equal(unlink.status, 200);
+  assert.equal(unlink.json.parent_product_id, null);
+  assert.equal(unlink.json.variant_label, null);
+});
+
+test("variants: matrix generation creates missing children and is idempotent", async () => {
+  const app = await freshApp();
+
+  const master = await call(app, "POST", "/api/catalog/", {
+    sku: "MATRIX-TEE",
+    name: "Matrix Tee",
+    price_cents: 2500,
+    category: "apparel",
+    brand: "Finder",
+  });
+
+  const generated = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
+    attributes: [
+      { name: "Size", values: ["S", "M"] },
+      { name: "Color", values: ["Black"] },
+    ],
+  });
+  assert.equal(generated.status, 200);
+  assert.equal(generated.json.items.length, 2);
+  assert.deepEqual(generated.json.items.map((p: any) => p.variant_label).sort(), ["M / Black", "S / Black"]);
+  assert.ok(generated.json.items.every((p: any) => p.parent_product_id === master.json.id));
+  assert.ok(generated.json.items.every((p: any) => p.brand === "Finder"));
+
+  const repeated = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
+    attributes: [
+      { name: "Size", values: ["S", "M"] },
+      { name: "Color", values: ["Black"] },
+    ],
+  });
+  assert.equal(repeated.status, 200);
+  assert.equal(repeated.json.items.length, 2);
+});
+
+test("variants: reject nested master/child graphs", async () => {
+  const app = await freshApp();
+
+  const master = await call(app, "POST", "/api/catalog/", { sku: "NEST-MASTER", name: "Master", price_cents: 0 });
+  const child = await call(app, "POST", "/api/catalog/", {
+    sku: "NEST-CHILD",
+    name: "Child",
+    price_cents: 100,
+    parent_product_id: master.json.id,
+  });
+  const grandchild = await call(app, "POST", "/api/catalog/", { sku: "NEST-GRAND", name: "Grandchild", price_cents: 100 });
+
+  const childAsMaster = await call(app, "POST", `/api/catalog/${child.json.id}/variants/assign`, {
+    productIds: [grandchild.json.id],
+  });
+  assert.equal(childAsMaster.status, 409);
+  assert.equal(childAsMaster.json.error.code, "conflict");
+
+  const masterAsChild = await call(app, "PATCH", `/api/catalog/${master.json.id}`, {
+    parent_product_id: grandchild.json.id,
+  });
+  assert.equal(masterAsChild.status, 409);
+  assert.equal(masterAsChild.json.error.code, "conflict");
+});
+
 test("a product cannot be assigned as its own variant parent", async () => {
   const app = await freshApp();
   const product = await call(app, "POST", "/api/catalog/", { sku: "SELF-VAR", name: "Self", price_cents: 100 });

@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-04 01:35 CDT  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
+> Last updated: 2026-07-04 13:19 CDT  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
 
 ---
 
@@ -7,6 +7,22 @@
 
 **Phase 1: Truth and cleanup** per `WORK/FORWARD_PLAN.md`. Feature/module expansion is
 **PAUSED** until Phase 2 (core release spine) exit criteria pass.
+
+2026-07-04 Codex session G / product catalog variants (parallel non-overlapping
+product workflow proof — full findings in `WORK/AUDIT_2026-07-04H.md`): product
+creation and master/parent/child variant relationships are **Built and verified** for
+the scoped catalog slice. The backend now rejects nested variant graphs, rejects using
+a child as a master, rejects making an existing master a child, supports labeled variant
+assignment, supports child unlink, and can generate idempotent variant matrices from
+attribute groups. The new product page now creates standalone, master, and child
+variant products with the backend-supported pricing, catalog, barcode, inventory-rule,
+physical, operations, ecommerce, and variant fields instead of a shallow SKU/name/price
+payload. Verification passed: backend suite PASS 320/320, backend typecheck PASS,
+smoke PASS 15/15, focused frontend tests PASS 12/12, full frontend Vitest PASS 89/89,
+frontend typecheck PASS, frontend lint PASS with the same 4 pre-existing hook warnings,
+and frontend production build PASS. Remaining product gaps: no searchable parent
+picker, no variant-matrix UI, no Playwright e2e proof for master -> child -> variants,
+and multi-child variant writes are not yet atomic.
 
 2026-07-04 session F / SEC-9 (parallel non-overlapping backend security hardening —
 full findings in `WORK/AUDIT_2026-07-04G.md`, pushed in `a83ed5a`): Redis-backed IP
