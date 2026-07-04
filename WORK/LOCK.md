@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Parallel Non-Overlapping Claim (Codex session H — product variant atomicity)
+
+| Field | Value |
+|---|---|
+| Agent/session | Codex session H |
+| Queue item | Product lifecycle hardening: make multi-child catalog variant assignment/generation atomic so failed operations cannot partially apply |
+| Files/areas expected | `src/modules/catalog/service.ts`, `src/modules/catalog/catalog.test.ts`, WORK evidence only. NO `web/e2e/**` (Antigravity active), NO report/EOD files (session A active), NO orders/payments/outlets/smoke script. |
+| Started | 2026-07-04 13:35 CDT |
+| Last update | 2026-07-04 13:35 CDT |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim (session A — EOD frontend harvest)
 
 | Field | Value |
@@ -11,7 +23,7 @@ Status: ACTIVE
 | Files/areas expected | `web/app/(protected)/reports/end-of-day/page.tsx` (new), `web/app/(protected)/reports/page.tsx` (link), one dev-mode mock handler in `web/mocks/`. Gates: web typecheck/lint/vitest/build ONLY — no dev servers, no ports 3000/3001 (Antigravity e2e active). NO e2e specs, NO inventory/catalog pages (Codex G) |
 | Started | 2026-07-04 |
 | Last update | 2026-07-04 |
-| Status | ACTIVE |
+| Status | RELEASED — scope corrected mid-item: the page + mock handler were ALREADY on master (a prior harvest); actual gaps shipped in `34ff1b8` — no-session handling (null openedAt / 'no_session' status per real endpoint) and a nav entry (page was orphaned; 'End of Day' added to ReportsSubNav → /reporting/closing). Gates: typecheck, lint 0 errors, vitest 89/89, build exit 0. NOTE for all sessions: never run `next build` concurrently in this checkout — two simultaneous builds corrupted `.next` (ENOENT manifest) |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (Codex session G — product catalog variants)
