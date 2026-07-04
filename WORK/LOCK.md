@@ -23,7 +23,7 @@ Status: ACTIVE
 | Files/areas expected | `src/modules/reports/service.ts`, `src/modules/reports/routes.ts`, `src/modules/reports/reports.test.ts`. NO `src/modules/catalog/**` (Codex G), NO `web/**`, NO `scripts/smoke.ts`, no ports |
 | Started | 2026-07-04 |
 | Last update | 2026-07-04 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped in `d61184c`: real Z-report endpoint matching the salvage page's contract exactly (drop-in frontend harvest once e2e web claim releases). Gates: typecheck clean, reports suite 3/3 (new lifecycle test: sessions, change-giving, refunds, variance, 400s), smoke 15/15 |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (session A — audit-log coverage)
