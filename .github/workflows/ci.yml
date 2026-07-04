@@ -115,10 +115,16 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+    # NODE_ENV is deliberately NOT "production" here: production mode forces
+    # SSL to Postgres (the CI service container has no SSL) and marks auth
+    # cookies Secure (rejected by the browser over plain-HTTP localhost), so a
+    # production-mode backend can never pass login on a CI runner. Production
+    # behavior is verified by the staging/production smoke tests over HTTPS.
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/finder_e2e
       JWT_SECRET: e2e-test-secret-not-for-production
-      NODE_ENV: production
+      NODE_ENV: test
+      FINDER_BACKGROUND_JOBS: "false"
       PORT: 3001
     steps:
       - uses: actions/checkout@v4
@@ -127,20 +133,12 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       # ── Build and start the backend ─────────────────────────────────────────
-      # --include=dev is required: NODE_ENV=production at job level makes a
-      # bare `npm ci` skip devDependencies (typescript, tsx), and `npx tsc`
-      # then resolves to the bogus `tsc` npm package.
       - name: Install backend deps
         run: npm ci --include=dev
       - name: Build backend
         run: npx tsc -p tsconfig.json
       - name: Start backend (background)
         run: node dist/src/server.js &
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/finder_e2e
-          JWT_SECRET: e2e-test-secret-not-for-production
-          PORT: 3001
-          NODE_ENV: production
       - name: Wait for backend
         run: |
           for i in $(seq 1 20); do
