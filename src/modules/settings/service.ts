@@ -1,6 +1,13 @@
 import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import { notFound } from "../../shared/http.js";
+import {
+  BUSINESS_BUNDLES,
+  CORE_MODULES,
+  GROUP_LABELS,
+  MODULE_REGISTRY,
+  moduleFlag,
+} from "../../shared/moduleRegistry.js";
 
 /**
  * Settings module (ERP benchmark #13): shipping methods, payment terms, payment
@@ -16,11 +23,82 @@ export interface PaymentTerm { id: string; tenant_id: string; name: string; days
 export interface PaymentMode { id: string; tenant_id: string; name: string; active: number; }
 export interface TaxRate { id: string; tenant_id: string; name: string; rate_bps: number; apply_to_category: string | null; state: string | null; active: number; }
 
+export interface CapabilitiesAuth {
+  tenantId: string;
+  userId: string;
+  role: string;
+  storeIds: string[];
+  customRoleId?: string;
+  permissions: string[];
+  scopes: string[];
+}
+
+type BusinessCapabilityProfile = {
+  requiredFields: Record<string, string[]>;
+  workflows: string[];
+};
+
 const DEFAULT_FLAGS: Record<string, boolean> = {
   quotations: true, achBatchPayout: false, imeiTracking: false, msaReporting: false,
   compositeProducts: false, customerPortal: false, ecommerce: true, commissionTracking: false,
   pickerFulfillment: true, batchDeposits: true,
   groupRetailPOS: true, groupWholesale: true, groupEnterprise: true,
+};
+
+const COMMON_PROFILE: BusinessCapabilityProfile = {
+  requiredFields: {
+    business: ["businessName", "taxProfile", "defaultOutlet", "defaultRegister"],
+    product: ["name", "sku", "retailPriceCents", "taxCategory", "inventoryTracking"],
+    customer: ["name", "phoneOrEmail"],
+    transaction: ["outletId", "operatorId", "lineItems", "paymentTender"],
+  },
+  workflows: ["setup_business_profile", "create_product", "receive_inventory", "sell_or_invoice", "settle_payment", "report_day_end"],
+};
+
+const BUSINESS_CAPABILITY_PROFILES: Record<string, BusinessCapabilityProfile> = {
+  retail: {
+    requiredFields: {
+      business: ["businessName", "taxProfile", "defaultOutlet", "defaultRegister", "receiptTemplate"],
+      product: ["name", "sku", "retailPriceCents", "barcode", "taxCategory", "inventoryTracking"],
+      customer: ["name", "phoneOrEmail"],
+      transaction: ["outletId", "registerId", "cashierId", "lineItems", "paymentTender"],
+    },
+    workflows: ["retail_setup", "create_product", "receive_inventory", "open_register", "pos_sale", "refund_or_return", "close_register", "end_of_day_report"],
+  },
+  wholesale: {
+    requiredFields: {
+      business: ["legalName", "billingAddress", "taxProfile", "paymentTerms"],
+      product: ["name", "sku", "costCents", "priceTiers", "inventoryTracking"],
+      customer: ["legalBusinessName", "primaryContact", "billingAddress", "shippingAddresses", "taxIdOrResaleCertificate", "paymentTerms"],
+      transaction: ["customerAccountId", "quoteOrOrderLines", "fulfillmentLocation", "invoiceTerms"],
+    },
+    workflows: ["wholesale_setup", "create_business_customer", "create_quote", "convert_quote_to_sales_order", "receive_inventory", "invoice_customer", "record_payment"],
+  },
+  restaurant: {
+    requiredFields: {
+      business: ["businessName", "taxProfile", "serviceAreas", "menuTaxes"],
+      product: ["menuItemName", "menuPriceCents", "modifierGroups", "kitchenRoute"],
+      customer: ["guestNameOrWalkIn", "phoneForReservation"],
+      transaction: ["serviceArea", "serverId", "menuLines", "paymentTender"],
+    },
+    workflows: ["restaurant_setup", "create_menu_item", "open_table_or_tab", "send_to_kitchen", "take_payment", "close_shift"],
+  },
+  hybrid: {
+    requiredFields: {
+      business: ["businessName", "businessSegments", "taxProfile", "defaultOutlet", "defaultRegister"],
+      product: ["name", "sku", "retailPriceCents", "costCents", "priceTiers", "inventoryTracking"],
+      customer: ["name", "phoneOrEmail", "businessAccountFieldsWhenB2B"],
+      transaction: ["outletId", "operatorId", "lineItems", "paymentTender", "invoiceTermsWhenB2B"],
+    },
+    workflows: ["hybrid_setup", "create_product", "receive_inventory", "pos_sale", "create_quote_or_invoice", "settle_payment", "end_of_day_report"],
+  },
+  custom: COMMON_PROFILE,
+};
+
+const DEFAULT_PLAN_LIMITS = {
+  maxUsers: 3,
+  maxRegisters: 1,
+  maxOutlets: 1,
 };
 
 export class SettingsService {
@@ -56,6 +134,153 @@ export class SettingsService {
     const merged = { ...cur, ...patch };
     await this.kvSet("feature_flags", merged, tenantId);
     return { ...DEFAULT_FLAGS, ...merged };
+  }
+
+  private async getSubscriptionSummary(tenantId: string) {
+    try {
+      const row = await this.db.one<{
+        plan: string;
+        status: string;
+        max_users: number;
+        max_registers: number;
+        max_outlets: number;
+        trial_ends_at: number | null;
+        renews_at: number | null;
+      }>(
+        `SELECT plan, status, max_users, max_registers, max_outlets, trial_ends_at, renews_at
+         FROM subscriptions
+         WHERE tenant_id = @tenantId
+         LIMIT 1`,
+        { tenantId },
+      );
+      if (!row) {
+        return {
+          name: "starter",
+          status: "active",
+          source: "default",
+          limits: DEFAULT_PLAN_LIMITS,
+        };
+      }
+      return {
+        name: row.plan,
+        status: row.status,
+        source: "subscription",
+        limits: {
+          maxUsers: row.max_users,
+          maxRegisters: row.max_registers,
+          maxOutlets: row.max_outlets,
+        },
+        trialEndsAt: row.trial_ends_at,
+        renewsAt: row.renews_at,
+      };
+    } catch {
+      return {
+        name: "starter",
+        status: "unknown",
+        source: "fallback",
+        limits: DEFAULT_PLAN_LIMITS,
+      };
+    }
+  }
+
+  async getCapabilities(auth: CapabilitiesAuth) {
+    const tenantId = auth.tenantId;
+    const [businessData, flags, plan] = await Promise.all([
+      this.getBusiness(tenantId),
+      this.getFlags(tenantId) as Promise<Record<string, boolean | string>>,
+      this.getSubscriptionSummary(tenantId),
+    ]);
+
+    const storedBusinessType = typeof businessData["businessType"] === "string"
+      ? businessData["businessType"]
+      : undefined;
+    const businessType = storedBusinessType && BUSINESS_BUNDLES[storedBusinessType]
+      ? storedBusinessType
+      : "retail";
+    const bundle = BUSINESS_BUNDLES[businessType] ?? BUSINESS_BUNDLES["retail"];
+    const defaultModules = new Set(bundle.modules);
+    const profile = BUSINESS_CAPABILITY_PROFILES[businessType] ?? COMMON_PROFILE;
+
+    const modules = MODULE_REGISTRY.map((mod) => {
+      const flagKey = moduleFlag(mod.key);
+      const explicitFlag = flags[flagKey];
+      const hasManualOverride = typeof explicitFlag === "boolean";
+      const defaultEnabled = Boolean(mod.core) || defaultModules.has(mod.key);
+      const enabled = mod.core ? true : (hasManualOverride ? explicitFlag : defaultEnabled);
+      const source = mod.core
+        ? "core"
+        : hasManualOverride
+          ? "manual_override"
+          : defaultEnabled
+            ? "business_pack"
+            : "not_in_business_pack";
+      return {
+        ...mod,
+        flagKey,
+        enabled,
+        defaultEnabled,
+        source,
+        disabledReason: enabled ? null : (hasManualOverride ? "manual_override_disabled" : "not_in_business_pack"),
+      };
+    });
+
+    const allAccess = auth.role === "owner" || auth.role === "manager";
+    const enabledModuleKeys = new Set(modules.filter((mod) => mod.enabled).map((mod) => mod.key));
+    const groupRetailPOS = enabledModuleKeys.has("pos_terminal");
+    const groupWholesale = enabledModuleKeys.has("sales_orders") || enabledModuleKeys.has("purchasing");
+    const groupEnterprise = enabledModuleKeys.has("sso") || enabledModuleKeys.has("webhooks");
+    const accountMode = groupEnterprise ? "ENTERPRISE" : groupWholesale ? "WHOLESALE" : "RETAIL";
+    const effectiveFeatures = {
+      ...flags,
+      groupRetailPOS,
+      groupWholesale,
+      groupEnterprise,
+      accountMode,
+    };
+
+    return {
+      capabilitiesVersion: 1,
+      tenant: {
+        id: tenantId,
+      },
+      user: {
+        id: auth.userId,
+        role: auth.role,
+        customRoleId: auth.customRoleId ?? null,
+        storeIds: auth.storeIds,
+        storeScope: auth.storeIds.length === 0 ? "all" : "restricted",
+        permissions: auth.permissions,
+        scopes: auth.scopes,
+        allAccess,
+        apiKeyRestricted: auth.scopes.length > 0,
+      },
+      business: {
+        type: businessType,
+        source: storedBusinessType && BUSINESS_BUNDLES[storedBusinessType] ? "stored" : "default",
+        label: bundle.name,
+        description: bundle.description,
+        icon: bundle.icon,
+      },
+      plan,
+      entitlements: {
+        source: "placeholder",
+        enforced: false,
+        note: "Paid plan-to-module enforcement is not implemented yet; enabled modules currently come from business pack defaults plus feature flag overrides.",
+      },
+      features: effectiveFeatures,
+      requiredFields: profile.requiredFields,
+      workflows: profile.workflows,
+      moduleGroups: GROUP_LABELS,
+      availableBusinessTypes: Object.entries(BUSINESS_BUNDLES).map(([key, item]) => ({
+        key,
+        name: item.name,
+        description: item.description,
+        icon: item.icon,
+        modules: item.modules,
+      })),
+      modules,
+      coreModules: Array.from(CORE_MODULES),
+    };
   }
 
   // ── Shipping methods ──────────────────────────────────────────────────────

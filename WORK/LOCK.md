@@ -1,6 +1,18 @@
 # FinderPOS — Multi-Agent Work Lock
 
-Status: FREE
+Status: ACTIVE
+
+## Parallel Non-Overlapping Claim (Codex session K - business capabilities endpoint)
+
+| Field | Value |
+|---|---|
+| Agent/session | Codex session K |
+| Queue item | Retail-first queue item #1: build the read-only capabilities endpoint that reports the current tenant's business type, enabled module pack, plan placeholder, and effective user access |
+| Files/areas expected | `src/modules/settings/service.ts`, `src/modules/settings/routes.ts`, `src/modules/settings/settings.test.ts`, maybe `src/app.ts` for a top-level alias, WORK evidence only. NO frontend UI rewrite, NO e2e specs, NO product/catalog/order/payment feature changes. |
+| Started | 2026-07-04 15:02 CDT |
+| Last update | 2026-07-04 15:02 CDT |
+| Status | ACTIVE |
+| Blockers | none |
 
 ## Parallel Non-Overlapping Claim (Codex session J - retail-first platform scope rewrite)
 

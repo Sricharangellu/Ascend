@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-04 (Codex session J, retail-first platform plan rewrite)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
+> Last updated: 2026-07-04 (Codex session K, business capabilities endpoint)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
 
 ---
 
@@ -9,6 +9,22 @@
 **PAUSED** until Phase 2 exit criteria pass. Phase 2 is now explicitly the
 **Retail release pack**: finish one complete business type end-to-end before deepening
 wholesale, restaurant, mobile, grocery, ecommerce, or other packs.
+
+2026-07-04 Codex session K (business capabilities endpoint - full findings in
+`WORK/AUDIT_2026-07-04M.md`): retail-first queue item #1 is **Built and verified**.
+The backend now exposes a read-only current-tenant/current-user capabilities contract at
+`GET /api/v1/capabilities`, with a settings-module alias at
+`GET /api/v1/settings/capabilities`. It reports business type, business-pack source,
+module enablement/defaults/manual overrides/disabled reasons, effective feature flags, user access
+scope, subscription plan summary, explicit non-enforced entitlement placeholder,
+required fields, workflows, module groups, core modules, and available business types.
+Fresh tenants default to the retail pack; business-profile selection and manual module
+flag overrides are proven by real-Postgres settings tests. `POST /api/v1/settings/business-profile`
+now accepts every existing `BUSINESS_BUNDLES` key instead of an outdated short subset.
+Verification passed: backend typecheck PASS, focused settings suite PASS 17/17, full
+backend suite PASS 324/324, smoke PASS 15/15, frontend typecheck PASS, frontend lint
+PASS with the same 4 pre-existing hook warnings, frontend Vitest PASS 89/89, and
+frontend production build PASS with `NEXT_PUBLIC_MOCK=false`.
 
 2026-07-04 Codex session J (retail-first platform plan rewrite - full findings in
 `WORK/AUDIT_2026-07-04L.md`): Sri clarified the development strategy. Finder remains
@@ -265,8 +281,8 @@ rewrite):**
 
 1. **Business-pack capabilities endpoint**: build read-only `GET /api/v1/capabilities`
    for the current tenant/user from the existing module registry, business profile,
-   feature flags, plan/entitlement placeholders, and permissions. No UI rewrite until
-   this backend source of truth exists.
+   feature flags, plan/entitlement placeholders, and permissions —
+   **DONE 2026-07-04 Codex session K; see `WORK/AUDIT_2026-07-04M.md`.**
 2. **Business-type impact preview**: read-only endpoint for setup/settings/demo switcher
    that shows what changes before applying a business type/module change.
 3. **Retail setup/auth proof**: signup/login/logout/session recovery -> select retail

@@ -10,6 +10,12 @@ function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
 
+function auth(res: Response): AuthPayload {
+  return res.locals["auth"] as AuthPayload;
+}
+
+const businessTypeValues = Object.keys(BUSINESS_BUNDLES) as [string, ...string[]];
+
 const shippingSchema = z.object({
   name: z.string().min(1), amountCents: z.number().int().nonnegative(),
   freeLimitCents: z.number().int().nonnegative().optional(), ecommerce: z.boolean().optional(),
@@ -33,6 +39,7 @@ export function registerRoutes(router: Router, service: SettingsService): void {
   router.patch("/business", mgr, handler(async (req, res) => res.json(await service.setBusiness(parseBody(businessSchema, req.body), tenantId(res)))));
   router.get("/feature-flags", handler(async (_req, res) => res.json(await service.getFlags(tenantId(res)))));
   router.put("/feature-flags", mgr, handler(async (req, res) => res.json(await service.setFlags(parseBody(flagsSchema, req.body), tenantId(res)))));
+  router.get("/capabilities", handler(async (_req, res) => res.json(await service.getCapabilities(auth(res)))));
 
   // Shipping methods
   router.get("/shipping-methods", handler(async (_req, res) => res.json({ items: await service.listShipping(tenantId(res)) })));
@@ -160,7 +167,7 @@ export function registerRoutes(router: Router, service: SettingsService): void {
     handler(async (req, res) => {
       const body = parseBody(
         z.object({
-          businessType: z.enum(["retail", "restaurant", "wholesale", "golf", "hybrid", "custom"]),
+          businessType: z.enum(businessTypeValues),
           enabledModules: z.array(z.string().min(1)).optional(),
         }),
         req.body,

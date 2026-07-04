@@ -8,6 +8,7 @@ import { logger } from "./shared/logger.js";
 import { buildInfo } from "./shared/version.js";
 import { errorMiddleware } from "./shared/http.js";
 import { modules } from "./modules/index.js";
+import { SettingsService } from "./modules/settings/service.js";
 import { identityModule } from "./identity/index.js";
 import {
   requestIdMiddleware,
@@ -304,6 +305,18 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     }),
   );
 
+  // ── Platform capabilities (tenant-scoped, requires auth)
+  // This is the read-only source of truth that setup/settings/demo switchers
+  // should consume before rendering business-type-specific modules.
+  const settingsService = new SettingsService(db);
+  app.get(
+    "/api/v1/capabilities",
+    handler(async (_req, res) => {
+      const auth = res.locals["auth"] as AuthPayload;
+      res.json(await settingsService.getCapabilities(auth));
+    }),
+  );
+
   // ── Domain modules (mounted under /api/<name>; auth applied via /api/v1 prefix below)
   for (const mod of modules) {
     const router = Router();
@@ -325,6 +338,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
         "/api/identity/login",
         "/api/identity/refresh",
         "/api/v1/flags",
+        "/api/v1/capabilities",
         "/api/catalog",
         "/api/inventory",
         "/api/orders",

@@ -118,6 +118,9 @@ The codebase already has a **Partial** first version:
 
 - `src/shared/moduleRegistry.ts` defines core modules, optional modules, and business bundles.
 - `GET/POST /api/v1/settings/business-profile` reads/writes business type and module flags.
+- `GET /api/v1/capabilities` and `GET /api/v1/settings/capabilities` now expose the
+  read-only tenant/user capabilities contract that setup, settings, shell navigation,
+  and demo switchers should consume before claiming a business pack is active.
 - `GET/PUT /api/v1/settings/feature-flags` stores tenant feature flags.
 - `POST /api/v1/settings/edition` supports simple retail/wholesale/enterprise presets.
 - `web/app/(protected)/setup/business-profile/page.tsx` lets the tenant choose a business type and module bundle.

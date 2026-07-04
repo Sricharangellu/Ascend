@@ -196,6 +196,70 @@ test("get and update feature flags", async () => {
   assert.equal(re.json.batchDeposits, false);
 });
 
+// ─── Platform Capabilities ───────────────────────────────────────────────────
+
+test("capabilities defaults a fresh tenant to the retail business pack", async () => {
+  const app = await freshApp();
+  const r = await call(app, "GET", "/api/capabilities");
+
+  assert.equal(r.status, 200);
+  assert.equal(r.json.capabilitiesVersion, 1);
+  assert.equal(r.json.business.type, "retail");
+  assert.equal(r.json.business.source, "default");
+  assert.equal(r.json.features.accountMode, "RETAIL");
+  assert.equal(r.json.features.groupWholesale, false);
+  assert.equal(r.json.features.groupEnterprise, false);
+  assert.equal(r.json.plan.name, "starter");
+  assert.equal(r.json.entitlements.enforced, false);
+  assert.equal(r.json.user.role, "owner");
+  assert.equal(r.json.user.allAccess, true);
+
+  const pos = r.json.modules.find((m: { key: string }) => m.key === "pos_terminal");
+  const salesOrders = r.json.modules.find((m: { key: string }) => m.key === "sales_orders");
+  const catalog = r.json.modules.find((m: { key: string }) => m.key === "catalog");
+
+  assert.equal(catalog.enabled, true);
+  assert.equal(catalog.source, "core");
+  assert.equal(pos.enabled, true);
+  assert.equal(pos.source, "business_pack");
+  assert.equal(salesOrders.enabled, false);
+  assert.equal(salesOrders.source, "not_in_business_pack");
+  assert.ok(r.json.requiredFields.customer.includes("name"));
+  assert.ok(r.json.workflows.includes("pos_sale"));
+});
+
+test("capabilities reflects selected business bundle and manual module overrides", async () => {
+  const app = await freshApp();
+
+  const profile = await call(app, "POST", "/api/settings/business-profile", {
+    businessType: "wholesale",
+  });
+  assert.equal(profile.status, 200);
+
+  const wholesale = await call(app, "GET", "/api/settings/capabilities");
+  assert.equal(wholesale.status, 200);
+  assert.equal(wholesale.json.business.type, "wholesale");
+  assert.equal(wholesale.json.business.source, "stored");
+  assert.equal(wholesale.json.features.accountMode, "WHOLESALE");
+
+  const salesOrders = wholesale.json.modules.find((m: { key: string }) => m.key === "sales_orders");
+  const loyalty = wholesale.json.modules.find((m: { key: string }) => m.key === "loyalty");
+
+  assert.equal(salesOrders.enabled, true);
+  assert.equal(salesOrders.source, "manual_override");
+  assert.equal(loyalty.enabled, false);
+  assert.equal(loyalty.disabledReason, "manual_override_disabled");
+  assert.ok(wholesale.json.requiredFields.customer.includes("legalBusinessName"));
+  assert.ok(wholesale.json.workflows.includes("create_quote"));
+
+  await call(app, "PUT", "/api/settings/feature-flags", { "module:loyalty": true });
+  const override = await call(app, "GET", "/api/capabilities");
+  const overriddenLoyalty = override.json.modules.find((m: { key: string }) => m.key === "loyalty");
+
+  assert.equal(overriddenLoyalty.enabled, true);
+  assert.equal(overriddenLoyalty.source, "manual_override");
+});
+
 // ─── Edition Presets ──────────────────────────────────────────────────────────
 
 test("set edition to retail enables groupRetailPOS only", async () => {
