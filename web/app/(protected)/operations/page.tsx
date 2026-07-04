@@ -226,6 +226,21 @@ export default function OperationsPage() {
 
 // ─── Stock Locations Tab ──────────────────────────────────────────────────────
 
+interface StockItem {
+  product_id: string;
+  product_name: string;
+  sku: string | null;
+  quantity_on_hand: number;
+  quantity_reserved: number;
+  quantity_available: number;
+}
+
+interface LocationStock {
+  locationId: string;
+  locationName: string;
+  items: StockItem[];
+}
+
 const LOC_TYPE_BADGE: Record<string, "blue" | "gray" | "red" | "yellow"> = {
   floor: "blue",
   warehouse: "gray",
@@ -241,6 +256,13 @@ function StockLocationsTab() {
   const [busy, setBusy] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
 
+  // Stock modal state
+  const [stockModalOpen, setStockModalOpen] = useState(false);
+  const [stockLocationId, setStockLocationId] = useState<string | null>(null);
+  const [stockLocationName, setStockLocationName] = useState<string>("");
+  const [locationStock, setLocationStock] = useState<LocationStock | null>(null);
+  const [stockLoading, setStockLoading] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -250,6 +272,17 @@ function StockLocationsTab() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Fetch stock for a location whenever the modal opens
+  useEffect(() => {
+    if (!stockModalOpen || !stockLocationId) return;
+    setLocationStock(null);
+    setStockLoading(true);
+    apiGet<LocationStock>(`/api/v1/inventory/locations/${stockLocationId}/stock`)
+      .then(data => setLocationStock(data))
+      .catch(() => setLocationStock({ locationId: stockLocationId, locationName: stockLocationName, items: [] }))
+      .finally(() => setStockLoading(false));
+  }, [stockModalOpen, stockLocationId, stockLocationName]);
 
   const create = async () => {
     if (!form.code.trim() || !form.name.trim()) return;
@@ -276,6 +309,12 @@ function StockLocationsTab() {
       setItems(prev => prev.map(l => l.id === loc.id ? { ...l, is_active: !l.is_active } : l));
     } finally { setToggling(null); }
   };
+
+  const handleCloseStockModal = useCallback(() => {
+    setStockModalOpen(false);
+    setStockLocationId(null);
+    setLocationStock(null);
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -317,7 +356,7 @@ function StockLocationsTab() {
       <div className="overflow-x-auto rounded-lg border border-gray-200">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
+            <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
               <th className="px-4 py-3">Code</th>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Type</th>
@@ -325,11 +364,12 @@ function StockLocationsTab() {
               <th className="px-4 py-3">Sellable</th>
               <th className="px-4 py-3">Receiving</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Stock</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {loading && <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">Loading…</td></tr>}
-            {!loading && items.length === 0 && <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">No stock locations yet. Create one above.</td></tr>}
+            {loading && <tr><td colSpan={8} className="px-4 py-6 text-center text-gray-400">Loading…</td></tr>}
+            {!loading && items.length === 0 && <tr><td colSpan={8} className="px-4 py-6 text-center text-gray-400">No stock locations yet. Create one above.</td></tr>}
             {items.map(loc => (
               <tr key={loc.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3">
@@ -358,11 +398,75 @@ function StockLocationsTab() {
                     <span className="sr-only">{loc.is_active ? "Active" : "Inactive"}</span>
                   </button>
                 </td>
+                <td className="px-4 py-3">
+                  <button
+                    onClick={() => { setStockLocationId(loc.id); setStockLocationName(loc.name); setStockModalOpen(true); }}
+                    className="text-xs text-blue-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+                    aria-label={`View stock at ${loc.name}`}
+                  >
+                    View Stock
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Stock modal */}
+      <Modal
+        open={stockModalOpen}
+        onClose={handleCloseStockModal}
+        title={`${stockLocationName} — Stock`}
+        size="lg"
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                <th className="px-4 py-3">Product</th>
+                <th className="px-4 py-3">SKU</th>
+                <th className="px-4 py-3 text-right">On Hand</th>
+                <th className="px-4 py-3 text-right">Reserved</th>
+                <th className="px-4 py-3 text-right">Available</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {stockLoading && (
+                <>
+                  {[0, 1, 2].map(i => (
+                    <tr key={i}>
+                      <td className="px-4 py-3"><div className="h-4 w-36 animate-pulse rounded bg-gray-200" /></td>
+                      <td className="px-4 py-3"><div className="h-4 w-20 animate-pulse rounded bg-gray-200" /></td>
+                      <td className="px-4 py-3"><div className="h-4 w-10 animate-pulse rounded bg-gray-200 ml-auto" /></td>
+                      <td className="px-4 py-3"><div className="h-4 w-10 animate-pulse rounded bg-gray-200 ml-auto" /></td>
+                      <td className="px-4 py-3"><div className="h-4 w-10 animate-pulse rounded bg-gray-200 ml-auto" /></td>
+                    </tr>
+                  ))}
+                </>
+              )}
+              {!stockLoading && locationStock && locationStock.items.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                    No stock recorded at this location
+                  </td>
+                </tr>
+              )}
+              {!stockLoading && locationStock && locationStock.items.map(item => (
+                <tr key={item.product_id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 font-medium text-slate-950">{item.product_name}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-slate-500">{item.sku ?? "—"}</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{item.quantity_on_hand}</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{item.quantity_reserved}</td>
+                  <td className={`px-4 py-3 text-right font-medium ${item.quantity_available <= 0 ? "text-red-600" : item.quantity_available > 0 ? "text-green-700" : "text-slate-700"}`}>
+                    {item.quantity_available}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Modal>
     </div>
   );
 }
