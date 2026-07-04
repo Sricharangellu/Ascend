@@ -9,7 +9,7 @@
 **PAUSED** until Phase 2 (core release spine) exit criteria pass.
 
 2026-07-04 session E part 3 (e2e core-flow triage — full findings in
-`WORK/AUDIT_2026-07-04H.md`): queue item #1 is **Built and verified** — **all 13 core
+`WORK/AUDIT_2026-07-04J.md`): queue item #1 is **Built and verified** — **all 13 core
 specs PASS** against production build (`NEXT_PUBLIC_MOCK=false`) + real backend + real
 Postgres, including a full cash sale (search → add → tender → collect → receipt).
 Baseline was 25/47 with all 10 core-flow specs failing. Went beyond spec fixes: 6 real
@@ -24,6 +24,37 @@ auth + drain-before-close. Double-claim collision with the Antigravity team arbi
 by Sri: session E's implementation kept; team's merged foundation fixes retained
 (next.config webpackBuildWorker — the real cause of the "build hang" — and the
 playwright storageState fix). Vertical-page e2e failures (12) remain deprioritized.
+
+2026-07-04 Codex session H / product variant atomicity (deployment-readiness/product
+lifecycle hardening — full findings in `WORK/AUDIT_2026-07-04I.md`): product variant
+bulk writes are **Built and verified** for database atomicity and post-commit event
+publication. `assignVariants()` and `generateVariants()` now run their multi-row product
+changes inside one tenant-scoped transaction; if any child validation or generated SKU
+allocation fails, the whole operation rolls back. Product `created`/`updated` events are
+deferred until after commit for these bulk operations, fixing the transaction/event
+deadlock found during verification when sync handlers tried to open a second DB
+transaction while the outer variant transaction was still holding the only test-pool
+connection. Verification passed: focused catalog real-Postgres test PASS 31/31, backend
+typecheck PASS, smoke PASS 15/15, full backend suite PASS 322/322, frontend
+typecheck/lint/test/build PASS. Lint still reports the same 4 pre-existing hook
+warnings. The e2e core-flow blocker remains under the active Antigravity lock, so this
+session did not touch `web/e2e/**`.
+
+2026-07-04 Codex session G / product catalog variants (parallel non-overlapping
+product workflow proof — full findings in `WORK/AUDIT_2026-07-04H.md`): product
+creation and master/parent/child variant relationships are **Built and verified** for
+the scoped catalog slice. The backend now rejects nested variant graphs, rejects using
+a child as a master, rejects making an existing master a child, supports labeled variant
+assignment, supports child unlink, and can generate idempotent variant matrices from
+attribute groups. The new product page now creates standalone, master, and child
+variant products with the backend-supported pricing, catalog, barcode, inventory-rule,
+physical, operations, ecommerce, and variant fields instead of a shallow SKU/name/price
+payload. Verification passed: backend suite PASS 320/320, backend typecheck PASS,
+smoke PASS 15/15, focused frontend tests PASS 12/12, full frontend Vitest PASS 89/89,
+frontend typecheck PASS, frontend lint PASS with the same 4 pre-existing hook warnings,
+and frontend production build PASS. Remaining product gaps: no searchable parent
+picker, no variant-matrix UI, no Playwright e2e proof for master -> child -> variants,
+and multi-child variant writes are not yet atomic.
 
 2026-07-04 session F / SEC-9 (parallel non-overlapping backend security hardening —
 full findings in `WORK/AUDIT_2026-07-04G.md`, pushed in `a83ed5a`): Redis-backed IP
@@ -188,7 +219,7 @@ adjustment modal branches are Phase-2 relevant). `NEXT_PUBLIC_MOCK` made env-ove
    invoice-pay ×3, logout ×1 — separate stale locators from real integration gaps; fix
    until core specs green against production build + real backend —
    **DONE 2026-07-04 session E; all 13 core specs PASS incl. full cash sale; 6 product
-   bugs fixed along the way. See AUDIT_2026-07-04H.md.**
+   bugs fixed along the way. See AUDIT_2026-07-04J.md.**
 2. **8 stale vitest tests**: `web/tests/catalogCart.test.tsx` (5), `web/tests/reportsDashboard.test.tsx` (3) — **DONE 2026-07-03 session D; full `cd web && npm test` PASS 83/83.**
 3. **~14 mock-only endpoints** incl. core `POST /inventory/transfers`, `POST /inventory/adjustments`,
    `POST /team`, `GET /team/:id`, `GET /workflows/templates`, Vendor-360 family (6 routes) —

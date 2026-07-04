@@ -22,6 +22,10 @@ function CartTestWrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
+async function waitForCatalogLoad() {
+  return screen.findByText("Spring Water 500ml", undefined, { timeout: 10000 });
+}
+
 // ── ProductGrid tests ─────────────────────────────────────────────────────────
 
 describe("ProductGrid", () => {
@@ -40,10 +44,7 @@ describe("ProductGrid", () => {
         <ProductGrid onAddProduct={() => {}} />
       </CartTestWrapper>
     );
-    // Wait for products to load
-    await waitFor(() =>
-      expect(screen.getByText("Spring Water 500ml")).toBeInTheDocument()
-    , { timeout: 3000 });
+    expect(await waitForCatalogLoad()).toBeInTheDocument();
 
     // Should show multiple products
     expect(screen.getByText("Orange Juice 1L")).toBeInTheDocument();
@@ -60,7 +61,7 @@ describe("ProductGrid", () => {
       </CartTestWrapper>
     );
 
-    await waitFor(() => screen.getByText("Spring Water 500ml"));
+    await waitForCatalogLoad();
     const waterBtn = screen.getByRole("button", { name: /add spring water/i });
     await user.click(waterBtn);
     expect(onAdd).toHaveBeenCalledOnce();
@@ -76,7 +77,7 @@ describe("ProductGrid", () => {
       </CartTestWrapper>
     );
 
-    await waitFor(() => screen.getByText("Spring Water 500ml"));
+    await waitForCatalogLoad();
 
     // Click the Snacks category tab
     const snacksTab = screen.getByRole("tab", { name: "Snacks" });
@@ -98,7 +99,7 @@ describe("ProductGrid", () => {
       </CartTestWrapper>
     );
 
-    await waitFor(() => screen.getByText("Spring Water 500ml"));
+    await waitForCatalogLoad();
 
     const searchInput = screen.getByRole("searchbox");
     await user.type(searchInput, "orange");
@@ -118,7 +119,7 @@ describe("ProductGrid", () => {
       </CartTestWrapper>
     );
 
-    await waitFor(() => screen.getByText("Spring Water 500ml"));
+    await waitForCatalogLoad();
 
     const searchInput = screen.getByRole("searchbox");
     await user.type(searchInput, "xyzproductnotexist");

@@ -158,6 +158,20 @@ const setProductCategoriesSchema = z.object({
 
 const assignVariantsSchema = z.object({
   productIds: z.array(z.string().min(1)).min(1),
+  label: z.string().min(1).nullable().optional(),
+  variant_label: z.string().min(1).nullable().optional(),
+});
+
+const generateVariantsSchema = z.object({
+  attributes: z
+    .array(
+      z.object({
+        name: z.string().min(1),
+        values: z.array(z.string().min(1)).min(1).max(50),
+      }),
+    )
+    .min(1)
+    .max(5),
 });
 
 function parseInt0(value: unknown): number | undefined {
@@ -438,8 +452,28 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     requireRole("manager"),
     handler(async (req, res) => {
       const body = parseBody(assignVariantsSchema, req.body);
-      await service.assignVariants(String(req.params.id), body.productIds, tenantId(res));
-      res.json({ ok: true });
+      const variantLabel = body.variant_label !== undefined ? body.variant_label : body.label;
+      const items = await service.assignVariants(String(req.params.id), body.productIds, tenantId(res), variantLabel);
+      res.json({ ok: true, items });
+    }),
+  );
+
+  router.post(
+    "/:id/variants/generate",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const body = parseBody(generateVariantsSchema, req.body);
+      const items = await service.generateVariants(String(req.params.id), body.attributes, tenantId(res));
+      res.json({ items });
+    }),
+  );
+
+  router.delete(
+    "/:id/variants/:childId",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const product = await service.unlinkVariant(String(req.params.id), String(req.params.childId), tenantId(res));
+      res.json(product);
     }),
   );
 

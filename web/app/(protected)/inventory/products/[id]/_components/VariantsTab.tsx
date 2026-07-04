@@ -20,6 +20,7 @@ export function VariantsTab({ product }: { product: CatalogProduct }) {
   const [assignDone, setAssignDone] = useState(false);
 
   const isMaster = !product.parent_product_id;
+  const createVariantHref = `/inventory/products/new?parent=${encodeURIComponent(product.id)}`;
 
   useEffect(() => {
     if (!isMaster) return;
@@ -76,6 +77,15 @@ export function VariantsTab({ product }: { product: CatalogProduct }) {
 
   return (
     <div className="flex flex-col gap-5">
+      <div className="flex justify-end">
+        <Link
+          href={createVariantHref}
+          className="inline-flex min-h-9 items-center rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:border-slate-500 hover:bg-slate-50"
+        >
+          Create child variant
+        </Link>
+      </div>
+
       <Card title="Child variants">
         {variantsLoading ? (
           <div className="text-sm text-slate-500">Loading...</div>

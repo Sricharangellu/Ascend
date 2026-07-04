@@ -2,6 +2,30 @@
 
 Status: ACTIVE
 
+## Parallel Non-Overlapping Claim (session A — deploy pipeline Node fix + production deploy)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (VSCode, "FIX AND DEPLOY" directive from Sri) |
+| Queue item | deploy-prod.yml pins Node 20 while everything else uses .nvmrc (Node 24) — apiDownload blob test fails only under Node 20's FileReader, blocking the backend deploy. Fix + let the push trigger the production deploy (explicitly authorized by Sri) |
+| Files/areas expected | `.github/workflows/deploy-prod.yml` ONLY. No src/**, no web/**, no e2e |
+| Started | 2026-07-04 |
+| Last update | 2026-07-04 |
+| Status | RELEASED — shipped `ed5f861`; FIRST successful production deploy in this workflow's history (run 28716269968): verify green under Node 24, deploy.sh shipped both Vercel projects, live /healthz returns version=ed5f861 + builtAt (version stamp proven in prod), /readyz 200, frontend 200 |
+| Blockers | none |
+
+## Parallel Non-Overlapping Claim (Codex session H — product variant atomicity)
+
+| Field | Value |
+|---|---|
+| Agent/session | Codex session H |
+| Queue item | Product lifecycle hardening: make multi-child catalog variant assignment/generation atomic so failed operations cannot partially apply |
+| Files/areas expected | `src/modules/catalog/service.ts`, `src/modules/catalog/catalog.test.ts`, WORK evidence only. NO `web/e2e/**` (Antigravity active), NO report/EOD files (session A active), NO orders/payments/outlets/smoke script. |
+| Started | 2026-07-04 13:35 CDT |
+| Last update | 2026-07-04 13:51 CDT |
+| Status | RELEASED - shipped in `efd7873`; catalog focused test 31/31, backend typecheck PASS, smoke 15/15, backend suite 322/322, frontend typecheck/lint/test/build PASS |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim (session A — EOD frontend harvest)
 
 | Field | Value |
@@ -11,7 +35,7 @@ Status: ACTIVE
 | Files/areas expected | `web/app/(protected)/reports/end-of-day/page.tsx` (new), `web/app/(protected)/reports/page.tsx` (link), one dev-mode mock handler in `web/mocks/`. Gates: web typecheck/lint/vitest/build ONLY — no dev servers, no ports 3000/3001 (Antigravity e2e active). NO e2e specs, NO inventory/catalog pages (Codex G) |
 | Started | 2026-07-04 |
 | Last update | 2026-07-04 |
-| Status | ACTIVE |
+| Status | RELEASED — scope corrected mid-item: the page + mock handler were ALREADY on master (a prior harvest); actual gaps shipped in `34ff1b8` — no-session handling (null openedAt / 'no_session' status per real endpoint) and a nav entry (page was orphaned; 'End of Day' added to ReportsSubNav → /reporting/closing). Gates: typecheck, lint 0 errors, vitest 89/89, build exit 0. NOTE for all sessions: never run `next build` concurrently in this checkout — two simultaneous builds corrupted `.next` (ENOENT manifest) |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (Codex session G — product catalog variants)
@@ -22,8 +46,8 @@ Status: ACTIVE
 | Queue item | Product catalog end-to-end proof: strengthen product creation and master/parent/child variant relationships without expanding unrelated features |
 | Files/areas expected | `src/modules/catalog/service.ts`, `src/modules/catalog/catalog.test.ts`, `web/app/(protected)/inventory/products/new/page.tsx`, `web/app/(protected)/inventory/products/[id]/_components/VariantsTab.tsx`, focused frontend test if needed, WORK evidence. NO `src/modules/orders/**`, NO `src/modules/payments/**`, NO `src/modules/outlets/**`, NO `scripts/smoke.ts`, NO `web/e2e/**`. |
 | Started | 2026-07-04 |
-| Last update | 2026-07-04 |
-| Status | ACTIVE |
+| Last update | 2026-07-04 13:23 CDT |
+| Status | RELEASED - shipped in `d9bdd96`; backend suite 320/320, typecheck PASS, smoke 15/15, frontend Vitest 89/89, typecheck/lint/build PASS |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (session A — EOD report backend)
@@ -56,7 +80,7 @@ Status: ACTIVE
 |---|---|
 | Agent/session | Claude session E (desktop app) — collision with Antigravity team resolved by Sri: "keep session E's work, merge theirs" |
 | Queue item | #1 — Triage/fix 10 core-flow e2e failures (checkout ×3, inventory-receive ×3, invoice-pay ×3, logout ×1) |
-| Status | RELEASED — **all 13 core specs PASS** against production build + real backend (login ×3, checkout ×3, inventory-receive ×3, invoice-pay ×3, setup). Went beyond spec-only fixes: 6 real product bugs fixed (hardcoded reg_01 register default, $NaN snake_case/camelCase drift across product/order/payment shapes, session-killing silentRefresh race, register-guard 409 stranding, missing page h1s, unlabeled user menu). See WORK/AUDIT_2026-07-04H.md |
+| Status | RELEASED — **all 13 core specs PASS** against production build + real backend (login ×3, checkout ×3, inventory-receive ×3, invoice-pay ×3, setup). Went beyond spec-only fixes: 6 real product bugs fixed (hardcoded reg_01 register default, $NaN snake_case/camelCase drift across product/order/payment shapes, session-killing silentRefresh race, register-guard 409 stranding, missing page h1s, unlabeled user menu). See WORK/AUDIT_2026-07-04J.md |
 | Blockers | none |
 
 ## Superseded Claim (Antigravity team — e2e core-flow triage)

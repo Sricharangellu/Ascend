@@ -222,6 +222,15 @@ export interface ListProductsQuery {
   excludeMasters?: boolean;
 }
 
+export interface VariantAttributeInput {
+  name: string;
+  values: string[];
+}
+
+interface MutationOptions {
+  publishEvent?: boolean;
+}
+
 /**
  * Tax rule from CONTRACTS.md: products in the 'groceries' category are always
  * tax-exempt. Otherwise the caller's tax_class is respected, defaulting to
@@ -232,13 +241,28 @@ function resolveTaxClass(category: string, requested?: TaxClass): TaxClass {
   return requested ?? "standard";
 }
 
+function variantCombinations(groups: string[][]): string[][] {
+  return groups.reduce<string[][]>(
+    (acc, group) => acc.flatMap((combo) => group.map((value) => [...combo, value])),
+    [[]],
+  );
+}
+
+function skuToken(value: string): string {
+  return value
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+}
+
 export class CatalogService {
   constructor(
     private readonly db: DB,
     private readonly events: EventBus,
   ) {}
 
-  async create(input: CreateProductInput, tenantId: string): Promise<Product> {
+  async create(input: CreateProductInput, tenantId: string, options: MutationOptions = {}): Promise<Product> {
     const existing = await this.db.one(
       "SELECT id FROM products WHERE tenant_id = @tenantId AND sku = @sku",
       { tenantId, sku: input.sku },
@@ -247,14 +271,12 @@ export class CatalogService {
       throw conflict(`product with sku '${input.sku}' already exists`);
     }
 
-    if (input.parent_product_id) {
-      await this.getOrThrow(input.parent_product_id, tenantId);
-    }
-
     const now = Date.now();
     const category = input.category ?? "general";
+    const id = `prod_${uuidv7()}`;
+    await this.assertCanBecomeVariant(id, input.parent_product_id ?? null, tenantId);
     const product: Product = {
-      id: `prod_${uuidv7()}`,
+      id,
       tenant_id: tenantId,
       sku: input.sku,
       name: input.name,
@@ -379,6 +401,14 @@ export class CatalogService {
       throw err;
     }
 
+    if (options.publishEvent !== false) {
+      await this.publishProductCreated(product);
+    }
+
+    return product;
+  }
+
+  private async publishProductCreated(product: Product): Promise<void> {
     await this.events.publish(
       "product.created",
       {
@@ -391,8 +421,6 @@ export class CatalogService {
       },
       product.id,
     );
-
-    return product;
   }
 
   async get(id: string, tenantId: string): Promise<Product | undefined> {
@@ -521,7 +549,7 @@ export class CatalogService {
     return { items, total, limit, offset };
   }
 
-  async update(id: string, input: UpdateProductInput, tenantId: string): Promise<Product> {
+  async update(id: string, input: UpdateProductInput, tenantId: string, options: MutationOptions = {}): Promise<Product> {
     const current = await this.getOrThrow(id, tenantId);
 
     const next: Product = { ...current };
@@ -555,9 +583,8 @@ export class CatalogService {
       changed.tax_class = resolvedTax;
     }
 
-    if (input.parent_product_id) {
-      if (input.parent_product_id === id) throw conflict("a product cannot be its own variant parent");
-      await this.getOrThrow(input.parent_product_id, tenantId);
+    if (input.parent_product_id !== undefined) {
+      await this.assertCanBecomeVariant(id, input.parent_product_id ?? null, tenantId);
     }
 
     // Boolean flag fields — convert boolean input → integer storage.
@@ -647,9 +674,15 @@ export class CatalogService {
       next as unknown as Record<string, unknown>,
     );
 
-    await this.events.publish("product.updated", { id: next.id, ...changed }, next.id);
+    if (options.publishEvent !== false) {
+      await this.publishProductUpdated(next, changed);
+    }
 
     return next;
+  }
+
+  private async publishProductUpdated(product: Product, changed: Partial<Product>): Promise<void> {
+    await this.events.publish("product.updated", { id: product.id, ...changed }, product.id);
   }
 
   /** Soft delete: archive the product. */
@@ -785,6 +818,31 @@ export class CatalogService {
 
   // ---- Master/child variants (BE-8) ----
 
+  private async assertCanBeMaster(masterId: string, tenantId: string): Promise<Product> {
+    const master = await this.getOrThrow(masterId, tenantId);
+    if (master.parent_product_id) {
+      throw conflict("a variant product cannot be used as a master product");
+    }
+    return master;
+  }
+
+  private async hasChildVariants(productId: string, tenantId: string): Promise<boolean> {
+    const row = await this.db.one(
+      "SELECT 1 FROM products WHERE tenant_id = @tenantId AND parent_product_id = @productId LIMIT 1",
+      { tenantId, productId },
+    );
+    return Boolean(row);
+  }
+
+  private async assertCanBecomeVariant(childId: string, parentId: string | null, tenantId: string): Promise<void> {
+    if (!parentId) return;
+    if (parentId === childId) throw conflict("a product cannot be its own variant parent");
+    await this.assertCanBeMaster(parentId, tenantId);
+    if (await this.hasChildVariants(childId, tenantId)) {
+      throw conflict("a master product cannot be assigned as a child variant");
+    }
+  }
+
   /** Child products (variants) assigned to a master product. */
   async listVariants(masterId: string, tenantId: string): Promise<Product[]> {
     await this.getOrThrow(masterId, tenantId);
@@ -795,12 +853,128 @@ export class CatalogService {
   }
 
   /** Bulk-assign the given products as children (variants) of a master product. */
-  async assignVariants(masterId: string, productIds: string[], tenantId: string): Promise<void> {
-    await this.getOrThrow(masterId, tenantId);
-    for (const productId of productIds) {
-      if (productId === masterId) throw conflict("a product cannot be its own variant parent");
-      await this.update(productId, { parent_product_id: masterId }, tenantId);
+  async assignVariants(
+    masterId: string,
+    productIds: string[],
+    tenantId: string,
+    variantLabel?: string | null,
+  ): Promise<Product[]> {
+    const updatedProducts = await this.db.withTenant(tenantId).tx(async (tdb) => {
+      const catalog = new CatalogService(tdb, this.events);
+      const updated: Product[] = [];
+      await catalog.assertCanBeMaster(masterId, tenantId);
+      for (const productId of [...new Set(productIds)]) {
+        if (productId === masterId) throw conflict("a product cannot be its own variant parent");
+        updated.push(
+          await catalog.update(
+            productId,
+            {
+              parent_product_id: masterId,
+              ...(variantLabel !== undefined ? { variant_label: variantLabel } : {}),
+            },
+            tenantId,
+            { publishEvent: false },
+          ),
+        );
+      }
+      return updated;
+    });
+
+    for (const product of updatedProducts) {
+      await this.publishProductUpdated(product, {
+        parent_product_id: product.parent_product_id,
+        ...(variantLabel !== undefined ? { variant_label: product.variant_label } : {}),
+      });
     }
+
+    return this.listVariants(masterId, tenantId);
+  }
+
+  async unlinkVariant(masterId: string, childId: string, tenantId: string): Promise<Product> {
+    await this.assertCanBeMaster(masterId, tenantId);
+    const child = await this.getOrThrow(childId, tenantId);
+    if (child.parent_product_id !== masterId) {
+      throw conflict("product is not a child variant of this master product");
+    }
+    return this.update(childId, { parent_product_id: null, variant_label: null }, tenantId);
+  }
+
+  async generateVariants(masterId: string, attributes: VariantAttributeInput[], tenantId: string): Promise<Product[]> {
+    const createdProducts = await this.db.withTenant(tenantId).tx(async (tdb) => {
+      const catalog = new CatalogService(tdb, this.events);
+      const created: Product[] = [];
+      const master = await catalog.assertCanBeMaster(masterId, tenantId);
+      const normalized = attributes
+        .map((attr) => ({
+          name: attr.name.trim(),
+          values: [...new Set(attr.values.map((value) => value.trim()).filter(Boolean))],
+        }))
+        .filter((attr) => attr.name && attr.values.length > 0);
+
+      if (normalized.length === 0) {
+        throw conflict("variant generation requires at least one attribute with values");
+      }
+
+      const combinations = variantCombinations(normalized.map((attr) => attr.values));
+      if (combinations.length > 200) {
+        throw conflict("variant generation is limited to 200 combinations");
+      }
+
+      const existing = await catalog.listVariants(masterId, tenantId);
+      const existingLabels = new Set(existing.map((variant) => variant.variant_label).filter(Boolean));
+
+      for (const combo of combinations) {
+        const label = combo.join(" / ");
+        if (existingLabels.has(label)) continue;
+        existingLabels.add(label);
+        created.push(
+          await catalog.create(
+            {
+              sku: await catalog.nextVariantSku(master.sku, label, tenantId),
+              name: `${master.name} - ${label}`,
+              price_cents: master.price_cents,
+              category: master.category,
+              tax_class: master.tax_class,
+              status: master.status,
+              description: master.description,
+              brand: master.brand,
+              image_url: master.image_url,
+              parent_product_id: masterId,
+              variant_label: label,
+              age_restricted: master.age_restricted === 1,
+              returnable: master.returnable === 1,
+              service_product: master.service_product === 1,
+              track_inventory: master.track_inventory === 1,
+              ecommerce: master.ecommerce === 1,
+            },
+            tenantId,
+            { publishEvent: false },
+          ),
+        );
+      }
+
+      return created;
+    });
+
+    for (const product of createdProducts) {
+      await this.publishProductCreated(product);
+    }
+
+    return this.listVariants(masterId, tenantId);
+  }
+
+  private async nextVariantSku(masterSku: string, variantLabel: string, tenantId: string): Promise<string> {
+    const suffix = skuToken(variantLabel) || "VARIANT";
+    const base = `${masterSku}-${suffix}`;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const candidate = attempt === 0 ? base : `${base}-${attempt + 1}`;
+      const existing = await this.db.one(
+        "SELECT id FROM products WHERE tenant_id = @tenantId AND sku = @sku",
+        { tenantId, sku: candidate },
+      );
+      if (!existing) return candidate;
+    }
+    throw conflict("could not generate a unique variant SKU");
   }
 
   // ---- Category tree (BE-6) ----
