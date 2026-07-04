@@ -8,6 +8,19 @@
 **Phase 1: Truth and cleanup** per `WORK/FORWARD_PLAN.md`. Feature/module expansion is
 **PAUSED** until Phase 2 (core release spine) exit criteria pass.
 
+2026-07-04 session A (later, three small items — all **Built and verified**, pushed):
+(1) **e2e-in-CI milestone**: after the playwright setup storage-state fix (`ac7ed34` —
+`storageState: undefined` inherits instead of clearing; ENOENT on fresh checkouts), CI
+run 28699188069 completed the FULL suite for the first time ever: **25 passed /
+22 failed (12.2m)** — matches the local baseline; the 22 are session E's item #1.
+(2) **stripe deploy drift fixed** (`de02f29`): exact-pin `stripe@22.2.2` — deploy.sh
+stages fresh `npm install`s that drifted past the pinned apiVersion literal. Deploy
+still needs Sri's valid `VERCEL_TOKEN` secret. (3) **/healthz version stamp**
+(`68fd40b`): reports `version` (git SHA) + `builtAt`; deploy.sh writes `version.json`
+into the staging bundle. Also: git process files (`41c54b2`) — PR template, CODEOWNERS,
+AGENTS.md trunk-based workflow with PR-mode cutover; master branch protection enabled
+(no force-push/deletion); staged PR-required flip is a Sri-only GitHub setting.
+
 2026-07-04 session A (parallel non-overlapping CI hardening — `.github/workflows/ci.yml`
 only): **CI gates are now real.** (1) Backend job gained a `npm run smoke` step —
 full POS lifecycle on the service Postgres — **VERIFIED green in CI run 28696807979**.

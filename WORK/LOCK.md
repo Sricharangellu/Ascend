@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Parallel Non-Overlapping Claim (session A — /healthz version stamp)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (VSCode) |
+| Queue item | Observability quick win: /healthz reports git SHA + build time so "what is running in prod?" is answerable with one curl |
+| Files/areas expected | `src/shared/version.ts` (new), `src/app.ts` (healthz handler), `scripts/deploy.sh` (write version.json into staging dir), `.gitignore`. No `web/**`, no e2e, no ports/DB |
+| Started | 2026-07-04 |
+| Last update | 2026-07-04 |
+| Status | RELEASED — shipped in `68fd40b`; env + version.json resolution paths proven, typecheck clean, smoke 14/14 |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim (session A — stripe deploy drift)
 
 | Field | Value |
@@ -92,6 +104,18 @@ Status: ACTIVE
 | Started | 2026-07-04 |
 | Last update | 2026-07-04 |
 | Status | RELEASED — non-overlapping work complete; backend test runner PASS 313/313, backend typecheck PASS, frontend typecheck/lint/build PASS, smoke PASS 14/14; pushed in `4e2487e` |
+| Blockers | none |
+
+## Parallel Non-Overlapping Claim (Codex session F — SEC-9)
+
+| Field | Value |
+|---|---|
+| Agent/session | Codex session F |
+| Queue item | SEC-9 — upgrade Redis-backed sensitive rate limiting away from fixed-window bursts |
+| Files/areas expected | `src/gateway/rateLimit.ts`, `src/gateway/rateLimit.test.ts`, WORK evidence only. No `.github/**`, no `web/**`, no e2e, no app health/version stamp files, no ports/DB. |
+| Started | 2026-07-04 |
+| Last update | 2026-07-04 |
+| Status | ACTIVE |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim
