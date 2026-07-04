@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Parallel Non-Overlapping Claim (session A — EOD frontend harvest)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (VSCode) |
+| Queue item | Harvest the end-of-day report PAGE from salvage branch `worktree-agent-abecc2986…` and wire it to the real `GET /api/v1/reports/end-of-day` endpoint (shipped `d61184c`). EOD files only — the branch's terminal shortcuts + stock-transfer modal stay parked |
+| Files/areas expected | `web/app/(protected)/reports/end-of-day/page.tsx` (new), `web/app/(protected)/reports/page.tsx` (link), one dev-mode mock handler in `web/mocks/`. Gates: web typecheck/lint/vitest/build ONLY — no dev servers, no ports 3000/3001 (Antigravity e2e active). NO e2e specs, NO inventory/catalog pages (Codex G) |
+| Started | 2026-07-04 |
+| Last update | 2026-07-04 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim (Codex session G — product catalog variants)
 
 | Field | Value |
