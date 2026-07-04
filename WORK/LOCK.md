@@ -55,7 +55,7 @@ Status: ACTIVE
 | Files/areas expected | `web/app/(protected)/catalog/_components/PrintLabelsModal.tsx`, focused test if existing pattern allows, `WORK/WORK_STATE.md`, new audit note. No `.github/**`, no `web/e2e/**`, no backend/server/ports/database. |
 | Started | 2026-07-04 |
 | Last update | 2026-07-04 |
-| Status | READY TO RELEASE AFTER PUSH — non-overlapping work complete; focused Vitest PASS, full frontend Vitest 84/84, frontend typecheck/lint/build PASS, backend typecheck PASS, backend tests PASS 312/312 |
+| Status | RELEASED — non-overlapping work complete; focused Vitest PASS, full frontend Vitest 84/84, frontend typecheck/lint/build PASS, backend typecheck PASS, backend tests PASS 312/312; pushed in `540caf9` |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim
