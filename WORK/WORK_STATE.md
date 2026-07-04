@@ -8,14 +8,32 @@
 **Phase 1: Truth and cleanup** per `WORK/FORWARD_PLAN.md`. Feature/module expansion is
 **PAUSED** until Phase 2 (core release spine) exit criteria pass.
 
-2026-07-03 session: established `WORK/` folder, moved work state here, removed
-`WORK_STATE 2.md` duplicate, ran full verification (see `WORK/AUDIT_2026-07-03.md`),
-repaired `es-abstract` install, fixed JSX lint error in EDI QueueTab.
+2026-07-03 session B (deep verification — full findings in `WORK/AUDIT_2026-07-03B.md`):
+live-stack proof DONE on local Postgres 15. Smoke 13/13 green (real POS lifecycle).
+Endpoint probe: ~464/484 frontend-declared endpoints exist on the real backend.
+**First-ever complete e2e run** (production build, mocks OFF, real backend):
+**25 passed / 22 failed** — 10 core-flow failures (checkout/receive/invoice-pay/logout;
+partly stale locators) + 12 vertical-page failures (some crash without mocks).
+Agent instructions created (`AGENTS.md` repo + workspace; `WORK/RULES.md` = standing
+policy). Cleanups: tracked `src/shared/db 2.ts` removed, 9 clean+merged agent worktrees
+pruned (15 remain, need manual review — 10 unmerged branches). `NEXT_PUBLIC_MOCK` made
+env-overridable (default still "true"). Stale e2e locators fixed (setup + login spec).
 
-**Next 3 actions**
-1. Fix 8 stale frontend tests: `web/tests/catalogCart.test.tsx` (5), `web/tests/reportsDashboard.test.tsx` (3).
-2. Live-stack proof: docker-compose Postgres → `npm run seed:e2e` → run 5 Playwright specs.
-3. Page-by-page mock-dependence matrix for all 143 routes (append to next dated audit).
+**Confirmed defects (priority order — each is one session's work item)**
+1. **Orchestration dead vs real DB**: `workflow_instances`/`saga_instances` tables missing
+   from migrations; every workflow trigger fails silently at runtime; 21 commands
+   unregistered. Fix migrations + registration + make failures loud, or quarantine layer.
+2. **e2e core-flow failures (10/47)**: triage checkout ×3, inventory-receive ×3,
+   invoice-pay ×3, logout ×1 — separate stale locators from real integration gaps; fix
+   until core specs green against production build + real backend.
+3. **8 stale vitest tests**: `web/tests/catalogCart.test.tsx` (5), `web/tests/reportsDashboard.test.tsx` (3).
+4. **~14 mock-only endpoints** incl. core `POST /inventory/transfers`, `POST /inventory/adjustments`,
+   `POST /team`, `GET /team/:id`, `GET /workflows/templates`, Vendor-360 family (6 routes).
+5. **RLS gap**: `withTenant()` adopted in only ~10/46 modules; policy permissive when unset.
+6. **Mock default flip decision**: deployed frontend is 100% mock; needs real-backend
+   deployment target + staging DB before flipping `NEXT_PUBLIC_MOCK` default.
+7. **Vertical pages crash without mocks (12 e2e failures)** — deprioritized per RULES.md
+   expansion pause; do not fix before items 1–6.
 
 **Blockers:** none.
 

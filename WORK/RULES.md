@@ -107,8 +107,9 @@ what passed and failed.
 ## Release-readiness matrix (filled from evidence, 2026-07-03 live-stack audit)
 
 Evidence sources: `npm run smoke` 13/13 on real Postgres; authenticated probe of all 484
-frontend-declared endpoints; production-build Playwright run; unit suites.
-See `WORK/AUDIT_2026-07-03B.md` for details. Update this table only with new evidence.
+frontend-declared endpoints; production-build Playwright run (mocks off, real backend):
+**25 passed / 22 failed** — 10 core-flow failures, 12 vertical-page failures (some crash
+without mocks). See `WORK/AUDIT_2026-07-03B.md` for details. Update only with new evidence.
 
 | Area | Backend | Frontend | Real DB | Tests | E2E | Mocked? | Production-ready? |
 |---|---|---|---|---|---|---|---|
