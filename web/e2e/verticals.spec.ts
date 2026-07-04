@@ -12,7 +12,8 @@
  * activates all modules, so all pages are expected to load fully.
  */
 
-import { test, expect, Page } from "@playwright/test";
+import { test, expect } from "./fixtures";
+import type { Page } from "@playwright/test";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

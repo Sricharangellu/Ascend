@@ -12,7 +12,7 @@
  * assert exact inventory quantities to avoid fragility against re-seeded data.
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 
 test.describe("Purchasing — inventory receive", () => {
   test("purchase orders list loads", async ({ page }) => {

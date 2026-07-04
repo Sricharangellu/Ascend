@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { apiGet, apiPost } from "@/api-client/client";
+import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import { useFinderContext } from "@/lib/useFinderContext";
 
@@ -63,10 +63,11 @@ function RegisterClosedCard({ onOpen }: { onOpen: (floatCents: number, note: str
         <div className="space-y-4">
           {/* Spec: Opening float ($) */}
           <div>
-            <label className="block text-sm font-medium text-[#555] mb-1">
+            <label htmlFor="register-opening-float" className="block text-sm font-medium text-[#555] mb-1">
               Opening float ($)
             </label>
             <input
+              id="register-opening-float"
               type="number" min="0" step="0.01"
               value={openFloat} onChange={e => setOpenFloat(e.target.value)}
               placeholder="0.00"
@@ -76,10 +77,11 @@ function RegisterClosedCard({ onOpen }: { onOpen: (floatCents: number, note: str
 
           {/* Spec: Note textarea */}
           <div>
-            <label className="block text-sm font-medium text-[#555] mb-1">
+            <label htmlFor="register-open-note" className="block text-sm font-medium text-[#555] mb-1">
               Note <span className="text-[#aaa] font-normal">(optional)</span>
             </label>
             <textarea
+              id="register-open-note"
               rows={2} value={note} onChange={e => setNote(e.target.value)}
               placeholder="e.g. Morning shift, float counted by manager…"
               className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm resize-none focus:border-[#5D5FEF] focus:outline-none focus:ring-1 focus:ring-[#5D5FEF]"
@@ -269,12 +271,23 @@ export function RegisterSessionGuard({ registerId, children }: RegisterSessionGu
   useEffect(() => { if (showClose) void loadExpected(); }, [showClose, loadExpected]);
 
   const handleOpen = async (floatCents: number, note: string) => {
-    const s = await apiPost<Session>(`/api/v1/outlets/registers/${registerId}/open`, {
-      openingFloatCents: floatCents,
-      note: note || undefined,
-    });
-    setSession(s);
-    setActiveSessionId(s.id);
+    try {
+      const s = await apiPost<Session>(`/api/v1/outlets/registers/${registerId}/open`, {
+        openingFloatCents: floatCents,
+        note: note || undefined,
+      });
+      setSession(s);
+      setActiveSessionId(s.id);
+    } catch (e) {
+      // "Already has an open session" — the closed card was stale (another
+      // device opened it, or the sessions load transiently failed). Re-sync
+      // to the live session instead of stranding the cashier on an error.
+      if (e instanceof ApiResponseError && e.status === 409) {
+        await load();
+        return;
+      }
+      throw e;
+    }
   };
 
   const handleClose = async (countedCents: number, closingCents: number) => {

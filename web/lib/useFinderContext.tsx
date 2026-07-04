@@ -86,6 +86,39 @@ export function FinderContextProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
+  // Reconcile the persisted register selection with the backend's actual
+  // registers. The default "reg_01" only exists in mock data — a real tenant
+  // gets generated register ids, and a stale selection strands the terminal
+  // on "register not found" until the user manually switches. Runs once on
+  // mount: the API client transparently refreshes the session on 401, and a
+  // fully unauthenticated visitor just falls into the catch below. (Do not
+  // gate this on the user profile — it lives in sessionStorage and is empty
+  // after a browser restart even when the refresh cookie is still valid.)
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { apiGet } = await import("@/api-client/client");
+        const res = await apiGet<{ items: Array<{ id: string; registers?: Array<{ id: string }> }> }>(
+          "/api/v1/outlets",
+        );
+        if (cancelled) return;
+        const registers = res.items.flatMap((o) =>
+          (o.registers ?? []).map((r) => ({ outletId: o.id, registerId: r.id })),
+        );
+        if (registers.length === 0) return;
+        setState((current) => {
+          if (registers.some((r) => r.registerId === current.registerId)) return current;
+          const first = registers[0]!;
+          return { ...current, outletId: first.outletId, registerId: first.registerId };
+        });
+      } catch {
+        // Offline or unauthenticated — keep the persisted selection.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const update = useCallback(<K extends keyof PersistedFinderContext>(key: K, value: PersistedFinderContext[K]) => {
     setState((current) => ({ ...current, [key]: value }));
   }, []);

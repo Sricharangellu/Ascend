@@ -8,16 +8,39 @@
  *   4. Verify receipt / success state
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 
 test.describe("POS checkout", () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to the terminal / sell page.
     await page.goto("/terminal");
+
+    // Against the real backend the register may start closed and the terminal
+    // shows the "Register closed" card — open it with a float first (the mock
+    // backend auto-opens, so this branch only runs on the real stack).
+    // The app also resolves the persisted register id against the real
+    // register list asynchronously, so the card can appear for a stale id and
+    // unmount mid-interaction once the actual register (possibly already
+    // open) resolves. Every interaction here is therefore short-timeout and
+    // failure-tolerant, looping until the product search is actually visible.
+    const openRegisterBtn = page.getByRole("button", { name: /open register/i });
+    const searchBox = page.getByPlaceholder(/search|scan|barcode|sku/i).first();
+    await expect(openRegisterBtn.or(searchBox).first()).toBeVisible({ timeout: 15_000 });
+    const deadline = Date.now() + 20_000;
+    while (!(await searchBox.isVisible()) && Date.now() < deadline) {
+      try {
+        if (await openRegisterBtn.isVisible()) {
+          await page.getByLabel(/opening float/i).fill("100", { timeout: 2_000 });
+          await openRegisterBtn.click({ timeout: 2_000 });
+        }
+      } catch {
+        // Card unmounted mid-interaction — the register resolved to open.
+      }
+      await searchBox.waitFor({ state: "visible", timeout: 2_000 }).catch(() => {});
+    }
+
     // Wait for the POS to be fully loaded (product search visible).
-    await expect(
-      page.getByPlaceholder(/search|scan|barcode|sku/i).first(),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(searchBox).toBeVisible({ timeout: 15_000 });
   });
 
   test("search and add a product to the cart", async ({ page }) => {
@@ -52,8 +75,10 @@ test.describe("POS checkout", () => {
       .or(page.locator('[aria-label*="tender" i]'));
     await expect(tenderDialog.first()).toBeVisible({ timeout: 8_000 });
 
-    // Enter cash amount (overpay to trigger change calculation).
-    const cashInput = page.getByLabel(/cash|amount tendered/i).first();
+    // Enter cash amount (overpay to trigger change calculation). Target the
+    // numeric input specifically — getByLabel(/cash/i) also matches the
+    // "Cash" tabpanel, which cannot be filled.
+    const cashInput = page.getByRole("spinbutton", { name: /cash|amount tendered/i }).first();
     if (await cashInput.isVisible()) {
       await cashInput.fill("100");
     } else {
@@ -66,8 +91,8 @@ test.describe("POS checkout", () => {
       }
     }
 
-    // Submit cash payment.
-    const submitCash = page.getByRole("button", { name: /charge|pay|complete/i }).last();
+    // Submit cash payment ("Collect Cash" / "Collect — Change: $X").
+    const submitCash = page.getByRole("button", { name: /collect|charge|pay|complete/i }).last();
     await submitCash.click();
 
     // Expect success: receipt dialog, order number, or "success" indicator.

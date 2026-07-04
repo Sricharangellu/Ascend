@@ -64,7 +64,46 @@ async function main() {
       );
     }
 
-    console.log("E2E seed complete — demo tenant, owner user, and 4 products ready.");
+    // Stock so checkout can sell without overselling guards interfering.
+    for (const p of products) {
+      await db.query(
+        `INSERT INTO inventory (product_id, tenant_id, stock_qty, reorder_pt, updated_at)
+         VALUES (@pid, @t, 100, 5, @u)
+         ON CONFLICT (tenant_id, product_id) DO NOTHING`,
+        { pid: p.id, t: DEMO_TENANT_ID, u: now },
+      );
+    }
+
+    // A supplier + an open purchase order so the purchasing/receiving e2e
+    // specs have a real row to open (2 lines, 10 × coffee + 5 × honey).
+    // NB: the email must be a bound parameter — the @name placeholder compiler
+    // would otherwise treat the "@e2e" inside a string literal as a parameter.
+    await db.query(
+      `INSERT INTO suppliers (id, tenant_id, name, email, created_at)
+       VALUES ('sup_e2e_001', @t, 'E2E Coffee Supply Co', @email, @c)
+       ON CONFLICT (id) DO NOTHING`,
+      { t: DEMO_TENANT_ID, email: "orders@e2e-supply.dev", c: now },
+    );
+    await db.query(
+      `INSERT INTO purchase_orders (id, tenant_id, supplier_id, status, total_cost_cents, created_at, receive_status)
+       VALUES ('po_e2e_001', @t, 'sup_e2e_001', 'ordered', 12490, @c, 'pending')
+       ON CONFLICT (id) DO NOTHING`,
+      { t: DEMO_TENANT_ID, c: now },
+    );
+    const poLines = [
+      { id: "pol_e2e_001", productId: "prd_demo_001", name: "Organic Dark Roast Coffee Beans", qty: 10, unit: 899 },
+      { id: "pol_e2e_002", productId: "prd_demo_002", name: "Wildflower Honey", qty: 5, unit: 700 },
+    ];
+    for (const l of poLines) {
+      await db.query(
+        `INSERT INTO purchase_order_lines (id, tenant_id, po_id, product_id, product_name, quantity, unit_cost_cents, line_cost_cents, received_qty, remaining_qty)
+         VALUES (@id, @t, 'po_e2e_001', @pid, @name, @qty, @unit, @line, 0, @qty)
+         ON CONFLICT (id) DO NOTHING`,
+        { id: l.id, t: DEMO_TENANT_ID, pid: l.productId, name: l.name, qty: l.qty, unit: l.unit, line: l.qty * l.unit },
+      );
+    }
+
+    console.log("E2E seed complete — demo tenant, owner user, 4 products (stocked), and 1 open PO ready.");
   } finally {
     await db.close();
   }

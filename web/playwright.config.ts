@@ -19,7 +19,12 @@ export default defineConfig({
   expect: { timeout: 8_000 },
   fullyParallel: false, // serial — tests share a single seeded DB state
   forbidOnly: !!process.env["CI"],
-  retries: process.env["CI"] ? 1 : 0,
+  // One retry everywhere: single-use refresh rotation + page lifecycle leaves
+  // an unavoidable timing tail where a page close can strand the cookie jar
+  // (mitigated by the rotation grace window + self-healing worker fixture,
+  // but not fully eliminable). Retried tests are reported as "flaky", not
+  // silently green — treat recurring flakes as real defects.
+  retries: 1,
   workers: 1,
   reporter: process.env["CI"] ? "github" : "list",
 

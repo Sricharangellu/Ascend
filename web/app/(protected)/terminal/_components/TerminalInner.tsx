@@ -9,6 +9,7 @@ import { enqueue } from "@/lib/syncOutbox";
 import { apiGet, apiPost, apiPut, ApiResponseError } from "@/api-client/client";
 import type { Order, Payment, TerminalProduct as Product } from "@/api-client/types";
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
+import { normalizeTerminalProduct, normalizeTerminalOrder } from "@/lib/normalizeTerminalProduct";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { ProductGrid } from "@/components/terminal/ProductGrid";
 import { CartPanel } from "@/components/terminal/CartPanel";
@@ -125,9 +126,9 @@ export function TerminalInner() {
     try {
       let order: Order;
       if (orderIdRef.current) {
-        order = await apiPut<Order>(`/api/v1/orders/${orderIdRef.current}`, payload);
+        order = normalizeTerminalOrder(await apiPut<Order>(`/api/v1/orders/${orderIdRef.current}`, payload));
       } else {
-        order = await apiPost<Order>("/api/v1/orders", payload);
+        order = normalizeTerminalOrder(await apiPost<Order>("/api/v1/orders", payload));
         orderIdRef.current = order.id;
       }
       cart.dispatch({ type: "SET_ORDER", order });
@@ -158,7 +159,8 @@ export function TerminalInner() {
   const handleBarcodeScan = useCallback(async (code: string) => {
     if (screen !== "terminal") return;
     try {
-      const product = await apiGet<Product>(`/api/v1/catalog/barcode/${encodeURIComponent(code)}`);
+      const raw = await apiGet<Product>(`/api/v1/catalog/barcode/${encodeURIComponent(code)}`);
+      const product = normalizeTerminalProduct(raw); // real backend returns snake_case
       cart.addProduct(product);
       setScannedName(product.name);
     } catch {

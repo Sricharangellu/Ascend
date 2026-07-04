@@ -20,6 +20,7 @@ import { CardReaderScreen } from "./CardReaderScreen";
 import { CashNumpadModal } from "./CashNumpadModal";
 import { enqueueCheckout, requestSync } from "@/lib/offlineOutbox";
 import { getAccessToken } from "@/lib/auth";
+import { normalizeTerminalPayment } from "@/lib/normalizeTerminalProduct";
 
 interface TenderScreenProps {
   order: Order;
@@ -118,7 +119,7 @@ export function TenderScreen({
           return;
         }
 
-        const payment = await apiPost<Payment>("/api/v1/payments", req);
+        const payment = normalizeTerminalPayment(await apiPost<Payment>("/api/v1/payments", req));
         onSuccess(payment);
       } catch (err) {
         // Network failure mid-request for cash — offer to queue.

@@ -373,19 +373,36 @@ export class IdentityService {
 
     // Single-use check: look up the hash in the DB.
     const hash = this.hashToken(refreshToken);
+    const now = Date.now();
     const row = await this.db.one<{ id: string }>(
       "SELECT id FROM refresh_tokens WHERE token_hash = @hash AND revoked_at IS NULL AND expires_at > @now",
-      { hash, now: Date.now() },
+      { hash, now },
     );
-    if (!row) {
-      throw new HttpError(401, "invalid_token", "Refresh token is invalid or expired.");
+    if (row) {
+      // Revoke the old token (single-use: cannot be reused).
+      await this.db.query(
+        "UPDATE refresh_tokens SET revoked_at = @now WHERE id = @id",
+        { now, id: row.id },
+      );
+    } else {
+      // Rotation grace window: a rotated token stays acceptable for a few
+      // seconds after revocation. When a page unloads mid-rotation the server
+      // has already revoked the old token but the Set-Cookie carrying its
+      // replacement never lands, permanently logging the user out. Replays
+      // outside the window are still rejected (theft/reuse detection intact).
+      // Tune via REFRESH_REUSE_GRACE_MS; set 0 to enforce strict single-use.
+      const graceMs = Number(process.env["REFRESH_REUSE_GRACE_MS"] ?? 15_000);
+      const graced = graceMs > 0
+        ? await this.db.one<{ id: string }>(
+            "SELECT id FROM refresh_tokens WHERE token_hash = @hash AND revoked_at > @cutoff AND expires_at > @now",
+            { hash, cutoff: now - graceMs, now },
+          )
+        : undefined;
+      if (!graced) {
+        throw new HttpError(401, "invalid_token", "Refresh token is invalid or expired.");
+      }
+      // Within grace: issue a fresh pair without re-revoking anything.
     }
-
-    // Revoke the old token (single-use: cannot be reused).
-    await this.db.query(
-      "UPDATE refresh_tokens SET revoked_at = @now WHERE id = @id",
-      { now: Date.now(), id: row.id },
-    );
 
     // Confirm user still exists and role hasn't changed.
     const user = await this.db.one<UserRow>(

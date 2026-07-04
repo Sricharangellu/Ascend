@@ -26,6 +26,11 @@ setup("authenticate as owner", async ({ page }) => {
   await page.waitForURL(/\/(dashboard|terminal|sell)/, { timeout: 15_000 });
   await expect(page).not.toHaveURL("/login");
 
+  // Let the landing page's boot-time token rotation settle BEFORE saving —
+  // refresh tokens are single-use, so snapshotting mid-rotation saves a
+  // cookie the server has already revoked and every consumer starts dead.
+  await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
+
   // Save the authenticated state (cookies + localStorage).
   await page.context().storageState({ path: AUTH_FILE });
 });

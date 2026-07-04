@@ -8,7 +8,7 @@
  *   4. Navigate to the pay action
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 
 test.describe("Invoice pay", () => {
   test("finance page loads with invoice data", async ({ page }) => {

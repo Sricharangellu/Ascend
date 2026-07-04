@@ -130,8 +130,24 @@ export function getStoredUser(): UserProfile | null {
  *
  * Guarded by the session hint cookie — if that cookie is absent the user is
  * definitely logged out and there is no point hitting the network.
+ *
+ * Single-flight: refresh tokens are single-use (rotated by the backend), so
+ * two concurrent refreshes replay the same cookie — the loser 401s and its
+ * catch clears the session the winner just established, randomly logging
+ * users out. Every caller (useAuth boot, the API client's 401 retry, any
+ * component fetching at mount) must share one in-flight refresh.
  */
-export async function silentRefresh(): Promise<boolean> {
+let _refreshInFlight: Promise<boolean> | null = null;
+
+export function silentRefresh(): Promise<boolean> {
+  if (_refreshInFlight) return _refreshInFlight;
+  _refreshInFlight = doSilentRefresh().finally(() => {
+    _refreshInFlight = null;
+  });
+  return _refreshInFlight;
+}
+
+async function doSilentRefresh(): Promise<boolean> {
   if (!hasSessionHint()) return false;
 
   try {

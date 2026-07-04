@@ -201,6 +201,7 @@ interface EnterpriseShellProps {
 
 export function EnterpriseShell({
   active,
+  title,
   children,
   banner,
   contentClassName,
@@ -246,6 +247,9 @@ export function EnterpriseShell({
           ].join(" ")}
           style={{ marginLeft: sidebarW }}
         >
+          {/* Visually hidden page heading — gives every page an accessible
+              h1 (screen readers, tests) without altering the visual design. */}
+          <h1 className="sr-only">{title}</h1>
           {banner}
           {children}
         </main>
@@ -326,6 +330,9 @@ function TopBar({
         <div className="relative" ref={menuRef}>
           <button
             type="button"
+            aria-label="User menu"
+            aria-haspopup="menu"
+            aria-expanded={userMenuOpen}
             onClick={() => setUserMenuOpen((o) => !o)}
             className="flex items-center gap-1.5 text-sm text-white/80 hover:text-white transition-colors"
           >

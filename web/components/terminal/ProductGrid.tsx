@@ -14,6 +14,7 @@ import { clsx } from "clsx";
 import { apiGet } from "@/api-client/client";
 import type { TerminalProduct as Product, CatalogListResponse } from "@/api-client/types";
 import { formatMoney } from "@/lib/money";
+import { normalizeTerminalProduct } from "@/lib/normalizeTerminalProduct";
 import { LotPickerModal } from "./LotPickerModal";
 
 interface ProductGridProps {
@@ -85,8 +86,11 @@ export function ProductGrid({ onAddProduct }: ProductGridProps) {
     apiGet<CatalogListResponse>("/api/v1/catalog?pageSize=200")
       .then((data) => {
         if (!cancelled) {
-          setAllProducts(data.items);
-          setProducts(data.items);
+          // Normalize: the real backend returns snake_case (price_cents);
+          // the mock layer returns camelCase. See normalizeTerminalProduct.
+          const items = data.items.map(normalizeTerminalProduct);
+          setAllProducts(items);
+          setProducts(items);
           setLoading(false);
         }
       })
