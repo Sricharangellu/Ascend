@@ -1,6 +1,6 @@
 # Finder Forward Plan (authoritative)
 
-Last reviewed: 2026-07-03  
+Last reviewed: 2026-07-04
 Scope reviewed: `/Users/sri/Desktop/Desk/Finder/finder-pos`
 
 > Sequencing is **phase-based, not time-based**. A phase is complete when its exit
@@ -9,17 +9,217 @@ Scope reviewed: `/Users/sri/Desktop/Desk/Finder/finder-pos`
 
 ## Executive summary
 
-Finder POS is moving in a reasonable technical direction, but it is not deployment-ready as a serious production SaaS product yet.
+Finder is moving in a reasonable technical direction, but it is not deployment-ready as a serious production SaaS product yet.
 
 The project has a strong amount of work completed: a real TypeScript/Express backend, PostgreSQL schema/migrations, modular business domains, a large Next.js frontend, API contracts, documentation, Docker setup, CI definitions, e2e test files, and many enterprise workflows. This is not an empty prototype.
 
 The brutal truth is that the project currently looks overbuilt on the surface and under-proven in production quality. Many screens and modules exist, but several areas appear to depend on mocks, demo flows, optimistic documentation, or basic implementations. The codebase has breadth before depth. That is risky for POS, inventory, accounting, payments, and compliance software because correctness matters more than having every module name in the sidebar.
 
-The right move is not to keep adding more pages. The right move is to harden a smaller core path end-to-end: login, tenant setup, catalog, inventory receive, checkout, payment, order lifecycle, return/refund, reporting, audit log, and deployment operations.
+The right move is not to keep adding more pages. The right move is to harden the shared operating engine end-to-end: login, tenant setup, catalog, inventory receive, POS/order/invoice sales, payment, order lifecycle, return/refund, reporting, audit log, and deployment operations.
+
+## Product scope correction
+
+Finder is **not only a retail POS**. Finder is a modular business operating platform
+for product-based businesses. Retail POS is one business pack, not the whole product.
+
+The shared operating model is:
+
+```text
+Buy / produce / receive goods
+-> manage inventory
+-> price products
+-> sell through POS, invoice, ecommerce, service order, table ticket, or sales order
+-> collect payment
+-> fulfill / deliver / close
+-> report, audit, and reconcile
+```
+
+Supported business types should be treated as **business packs on one platform**, not
+separate applications:
+
+- Retail and convenience.
+- Wholesale / B2B / distribution.
+- Restaurants, cafes, bars, and food service.
+- Mobile, electronics, serial/IMEI-heavy stores.
+- Grocery, food inventory, batch/lot/expiry businesses.
+- Ecommerce and omnichannel sellers.
+- Service and repair businesses.
+- Hospitality, golf, rental, education, entertainment, healthcare, manufacturing, and enterprise operations.
+
+The non-negotiable product rule:
+
+```text
+One backend truth. One shared data model. Many configured business experiences.
+```
+
+Do not duplicate product, inventory, order, payment, customer, or reporting systems per
+vertical. Business packs may add fields, workflows, constraints, navigation, and UI, but
+they must reuse the core entities.
+
+## Business pack architecture
+
+Business type selection should create a tenant configuration. It should not fork the app.
+
+Keep these four concepts separate:
+
+| Layer | Meaning | Example |
+|---|---|---|
+| Plan | What the tenant pays for | Starter, Growth, Enterprise |
+| Business type | The operating model selected during onboarding | retail, wholesale, restaurant, mobile_store |
+| Entitlements | Which modules/features the tenant can use | invoices, loyalty, price tiers, kitchen display |
+| Permissions | What a specific user can do | create quote, approve credit, edit price list |
+
+The app should check all four layers:
+
+```text
+Is this module enabled for the tenant?
+Is this feature included in the tenant plan?
+Does this business type allow this workflow?
+Does this user have permission?
+```
+
+Business type selection should install defaults:
+
+- Enabled module bundle.
+- Default navigation.
+- Required fields.
+- Default workflows.
+- Default role templates.
+- Default permissions.
+- Default reports.
+- Default product/customer/order form sections.
+- Default pricing and tax behavior.
+
+Example:
+
+```json
+{
+  "businessType": "wholesale",
+  "enabledModules": ["catalog", "inventory", "customers", "purchasing", "quotes", "invoicing", "payments"],
+  "features": {
+    "pos": false,
+    "quotes": true,
+    "invoices": true,
+    "loyalty": false,
+    "priceTiers": true,
+    "creditTerms": true
+  },
+  "requiredFields": {
+    "account": ["legalName", "billingAddress", "primaryContact"],
+    "product": ["sku", "name", "price", "cost"]
+  },
+  "workflows": ["quote_to_sales_order", "sales_order_to_invoice", "purchase_receive_to_inventory"]
+}
+```
+
+### Current implementation status
+
+The codebase already has a **Partial** first version:
+
+- `src/shared/moduleRegistry.ts` defines core modules, optional modules, and business bundles.
+- `GET/POST /api/v1/settings/business-profile` reads/writes business type and module flags.
+- `GET/PUT /api/v1/settings/feature-flags` stores tenant feature flags.
+- `POST /api/v1/settings/edition` supports simple retail/wholesale/enterprise presets.
+- `web/app/(protected)/setup/business-profile/page.tsx` lets the tenant choose a business type and module bundle.
+- `web/app/(protected)/settings/modes/page.tsx` toggles business modes.
+- `web/components/EnterpriseShell.tsx` hides navigation by feature flags.
+- `web/app/(protected)/settings/permissions/page.tsx` manages role feature access.
+
+This is not the finished architecture yet. Today it mostly controls module visibility.
+It does not fully enforce required fields, workflow constraints, pricing rules, plan
+entitlements, business-pack permissions, or module-by-module impact reporting.
+
+### Target data model
+
+Add or formalize these backend concepts before serious vertical expansion:
+
+```text
+tenant_business_profile
+tenant_enabled_modules
+tenant_feature_entitlements
+tenant_business_settings
+tenant_required_fields
+tenant_pack_versions
+business_pack_registry
+business_pack_module_changes
+role_templates
+tenant_roles
+tenant_permissions
+workflow_templates
+tenant_workflows
+```
+
+For customers, move toward an account model:
+
+```text
+accounts
+contacts
+addresses
+tax_profiles
+price_lists
+credit_terms
+```
+
+Retail can use a simple person account: name, phone, email. Wholesale can unlock the
+full business account: legal name, contacts, licenses, tax profile, multiple addresses,
+customer-specific pricing, payment terms, and credit limits.
+
+## How developers and companies should see business-type changes
+
+Developers need a source-of-truth matrix. Companies need an in-app impact view.
+
+### Developer view
+
+Create a generated or maintained matrix from the business-pack registry:
+
+| Business type | Module | Status | Enabled by default | Required fields | Workflows | Permissions | Backend proof | UI proof |
+|---|---|---|---|---|---|---|---|---|
+| retail | loyalty | Partial | yes | customer phone/email optional | sale -> points | loyalty.manage | test name/link | page route |
+| wholesale | price_book | Partial | yes | account + price list | quote -> invoice | price_list.edit | test name/link | page route |
+| restaurant | kitchen | UI-only/Partial | yes | menu item/modifier | ticket -> KDS | kitchen.view | missing | page route |
+
+Every module change should answer:
+
+- Which core entity does it extend?
+- Which business pack enables it?
+- Which plan includes it?
+- Which permission controls it?
+- Which backend validation enforces it?
+- Which UI changes when enabled or disabled?
+- Which real-backend test proves it?
+- Which migration changed the schema?
+
+### Company/admin view
+
+The app should provide a `Business Profile` or `Plan & Modules` screen that shows:
+
+- Current business type.
+- Enabled packs.
+- Enabled modules.
+- Disabled modules and why: not in plan, not in business type, or manually disabled.
+- Required fields added by the selected business type.
+- Workflows activated by the selected business type.
+- Reports activated by the selected business type.
+- Role/permission changes created by the selected business type.
+- Last module configuration change: actor, time, before/after.
+
+The company should also be able to preview a switch before applying it:
+
+```text
+Switch Retail -> Wholesale
+Adds: Quotes, Invoices, Price Lists, Credit Terms, Business Accounts
+Removes by default: Loyalty Rewards
+Changes customer form: Person -> Account + Contacts + Addresses
+Changes sale flow: POS sale remains optional; Invoice flow becomes primary
+Requires setup: payment terms, tax profile defaults, price tiers
+```
+
+This should be implemented as a backend "capabilities" or "impact" endpoint before the
+UI claims to support business-mode switching.
 
 ## Current state in plain language
 
-Finder is a point-of-sale and business-management application. It has:
+Finder is a modular business operating platform for product-based businesses. It has:
 
 - A backend API that stores and processes business data.
 - A frontend web app for owners, managers, cashiers, and staff.
@@ -342,9 +542,9 @@ Exit criteria:
 - E2E golden path passes locally or in CI.
 - Status docs use honest labels.
 
-### Phase 2: Core release spine
+### Phase 2: Core operating spine
 
-Goal: make the smallest real POS product reliable.
+Goal: make the smallest shared operating engine reliable.
 
 Build and verify:
 
@@ -354,7 +554,8 @@ Build and verify:
 - Catalog products.
 - Inventory receive.
 - Register open/close.
-- Checkout.
+- POS checkout.
+- Invoice sale.
 - Payment capture or simulated payment in non-production.
 - Order creation.
 - Inventory decrement.
@@ -365,7 +566,8 @@ Build and verify:
 
 Exit criteria:
 
-- One complete store workflow works without mocks.
+- One complete POS workflow works without mocks.
+- One complete invoice/wholesale workflow works without mocks.
 - Every mutation has a test.
 - Every mutation is tenant-scoped and permission-checked.
 
@@ -392,21 +594,37 @@ Exit criteria:
 - Security checklist passes.
 - Restore from backup is tested.
 
-### Phase 4: Business expansion
+### Phase 4: Business pack foundation
 
-Goal: expand after the core is trustworthy.
+Goal: turn the current module flags into a real business-pack system after the core is trustworthy.
 
 Priority order:
 
-1. Purchasing and vendor cost history.
-2. Customer 360 and B2B terms.
-3. Reports and analytics.
-4. Accounting depth.
-5. Ecommerce integration.
-6. Advanced workflows.
-7. Vertical modules.
+1. Formal business-pack registry.
+2. Tenant entitlements and plan gating.
+3. Required-field rules by business type.
+4. Workflow templates by business type.
+5. Role templates and permission presets by business type.
+6. Business-mode impact/preview endpoint.
+7. Company-facing Plan & Modules / Business Profile impact screen.
+8. Module readiness matrix generated from code and tests.
 
-Do not continue building vertical-specific modules until the core retail flow is production-grade.
+Do not continue building vertical-specific modules until the core operating spine and
+business-pack foundation are production-grade.
+
+### Phase 5: Business expansion
+
+Goal: expand business packs without duplicating the core.
+
+Priority order:
+
+1. Retail pack: POS, receipts, loyalty, coupons.
+2. Wholesale pack: accounts, price tiers, quotes, invoices, terms, credit limits.
+3. Ecommerce pack: online catalog, order sync, fulfillment, customer portal.
+4. Restaurant/food pack: tables, kitchen display, modifiers, tips, split checks.
+5. Mobile/electronics pack: serial/IMEI, trade-ins, warranties, repairs.
+6. Grocery/food inventory pack: lot/batch/expiry, scale labels, traceability.
+7. Enterprise pack: approvals, SSO, audit depth, workflow automation, advanced analytics.
 
 ## Suggested better architecture decisions moving forward
 
@@ -425,13 +643,17 @@ Improve:
 - Introduce a formal API contract generation workflow so frontend types always match backend routes.
 - Keep orchestration, but avoid making every simple CRUD operation a saga.
 - Create one shared permission registry used by backend, frontend, and docs.
+- Create one shared business-pack registry used by backend, frontend, onboarding, and docs.
+- Add a capabilities endpoint that returns effective modules, features, required fields,
+  workflows, and permissions for the current tenant/user.
+- Add a business-mode impact endpoint before allowing a company to switch packs in production.
 - Use a strict module readiness checklist before calling anything built.
 - Separate demo/mock mode from production mode at build and runtime.
 
 Avoid:
 
 - Microservices.
-- More vertical modules before core reliability.
+- More vertical modules before core reliability and business-pack enforcement.
 - Adding AI features before data correctness.
 - Treating docs as proof of implementation.
 - Treating Vercel deployment success as production readiness.

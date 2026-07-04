@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-04 (session E, e2e core-flow green)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
+> Last updated: 2026-07-04 (Codex session I, production mock-off deploy guard)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
 
 ---
 
@@ -7,6 +7,36 @@
 
 **Phase 1: Truth and cleanup** per `WORK/FORWARD_PLAN.md`. Feature/module expansion is
 **PAUSED** until Phase 2 (core release spine) exit criteria pass.
+
+2026-07-04 Codex session I (production mock-off deploy guard - full findings in
+`WORK/AUDIT_2026-07-04K.md`): queue item #5 is **partially closed for production
+deployment safety**. The production deploy workflow now passes `NEXT_PUBLIC_MOCK=false`,
+and `scripts/deploy.sh` refuses any production frontend deploy that explicitly tries to
+ship with `NEXT_PUBLIC_MOCK` set to anything other than `false`. Non-production
+deployments still default to mock/demo mode so demos and preview URLs remain usable, and
+the existing live-site demo override (`?demo=1` / localStorage demo flag) still works.
+Verification passed: deploy script syntax check PASS, production mock guard refusal PASS,
+and frontend production build PASS with `NEXT_PUBLIC_MOCK=false` plus
+`BACKEND_URL=https://finder-pos-backend.vercel.app`; backend typecheck PASS; frontend
+typecheck PASS; frontend lint PASS with the same 4 pre-existing hook warnings; frontend
+Vitest PASS 89/89; backend full suite PASS 322/322 after a first local 319/322 timeout
+run was isolated to Postgres migration-lock contention (`PG_TX_TIMEOUT_MS=120000` rerun
+green; focused failed files PASS 22/22). Remaining item #5 work is the product decision
+about a dedicated staging database/deploy target and whether to change the source
+default in `web/next.config.mjs`; production can no longer silently ship MSW mock mode
+through the current deploy path.
+
+2026-07-04 Sri product-scope correction (recorded in `WORK/FORWARD_PLAN.md`): Finder is
+**not only a retail POS**. The authoritative scope is now a modular business operating
+platform for product-based businesses: one backend truth and shared core entities, with
+business packs for retail, wholesale/B2B, restaurant/food, mobile/electronics,
+grocery/expiry, ecommerce, services, and enterprise operations. Current business-mode
+implementation is **Partial**: `moduleRegistry`, `business-profile`, feature flags,
+settings modes, module marketplace, nav gates, and permissions exist, but they mostly
+control visibility. The next architecture work is to harden this into real plan +
+business type + entitlement + permission enforcement, required-field rules, workflow
+templates, and a company-facing impact view that shows what changes when a business type
+or module is enabled.
 
 2026-07-04 session E part 3 (e2e core-flow triage — full findings in
 `WORK/AUDIT_2026-07-04J.md`): queue item #1 is **Built and verified** — **all 13 core
@@ -227,8 +257,12 @@ adjustment modal branches are Phase-2 relevant). `NEXT_PUBLIC_MOCK` made env-ove
 4. **RLS gap**: `withTenant()` adopted in only ~10/46 modules; policy permissive when unset —
    **DONE 2026-07-04 session E (request-scoped tenant context; see AUDIT_2026-07-04C.md).
    Follow-up remains: strict deny-when-unset flip, gated on e2e green + login-role split.**
-5. **Mock default flip decision**: deployed frontend is 100% mock; needs real-backend
-   deployment target + staging DB before flipping `NEXT_PUBLIC_MOCK` default.
+5. **Mock default flip decision**: production deploy path is now guarded to build with
+   `NEXT_PUBLIC_MOCK=false` and refuse mock-mode prod deploys
+   (**PARTIAL 2026-07-04 Codex session I; see AUDIT_2026-07-04K.md**). Remaining
+   decision: choose a dedicated staging database/deploy target and then decide whether
+   the source default in `web/next.config.mjs` should flip from mock-on to real-backend
+   by default.
 6. **Vertical pages crash without mocks (12 e2e failures)** — deprioritized per RULES.md
    expansion pause; do not fix before items 1–6.
 

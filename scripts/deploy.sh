@@ -46,11 +46,24 @@ deploy_backend() {
 deploy_frontend() {
   echo "→ Frontend: staging + building…"
   local S; S="$(mktemp -d)"
+  local FRONTEND_MOCK_MODE="${NEXT_PUBLIC_MOCK:-}"
+  if [[ "$DEPLOY_ENV" == "prod" ]]; then
+    FRONTEND_MOCK_MODE="${FRONTEND_MOCK_MODE:-false}"
+    if [[ "$FRONTEND_MOCK_MODE" != "false" ]]; then
+      echo "✗ Refusing production frontend deploy with NEXT_PUBLIC_MOCK=$FRONTEND_MOCK_MODE"
+      echo "  Production must run against the real backend. Use DEPLOY_ENV=testing for mock/demo previews, or ?demo=1 on the live site."
+      exit 1
+    fi
+  else
+    FRONTEND_MOCK_MODE="${FRONTEND_MOCK_MODE:-true}"
+  fi
+
   ( cd "$REPO/web" && tar --exclude=node_modules --exclude=.next --exclude=.vercel -cf - . ) | ( cd "$S" && tar -xf - )
   printf 'node_modules\n.next\n' > "$S/.vercelignore"
   # Build locally first to catch errors before uploading (the mounted FS can segfault next build;
   # mktemp is on the local FS so this is safe).
-  ( cd "$S" && npm install --no-audit --no-fund --loglevel=error && BACKEND_URL="$BACKEND_URL" npm run build )
+  echo "→ Frontend: NEXT_PUBLIC_MOCK=$FRONTEND_MOCK_MODE BACKEND_URL=$BACKEND_URL"
+  ( cd "$S" && npm install --no-audit --no-fund --loglevel=error && BACKEND_URL="$BACKEND_URL" NEXT_PUBLIC_MOCK="$FRONTEND_MOCK_MODE" npm run build )
   echo "→ Frontend: deploying…"
   ( cd "$S" && VERCEL_ORG_ID="$TEAM" VERCEL_PROJECT_ID="$FRONTEND_PID" \
       npx --yes vercel deploy $PROD_FLAG --archive=tgz --yes --token "$VERCEL_TOKEN" )

@@ -42,4 +42,5 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           DEPLOY_ENV: prod
+          NEXT_PUBLIC_MOCK: "false"
         run: ./scripts/deploy.sh both

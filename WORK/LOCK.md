@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Parallel Non-Overlapping Claim (Codex session I — production mock-off deploy guard)
+
+| Field | Value |
+|---|---|
+| Agent/session | Codex session I |
+| Queue item | Queue item #5 preparation: prevent production frontend deploys from silently shipping MSW mock mode now that core real-backend e2e is green |
+| Files/areas expected | `scripts/deploy.sh`, `.github/workflows/deploy-prod.yml` if needed, WORK evidence only. NO `web/e2e/**`, NO app feature code, NO backend business modules. |
+| Started | 2026-07-04 14:08 CDT |
+| Last update | 2026-07-04 14:41 CDT |
+| Status | ACTIVE - implementation and gates complete; release pending commit and push |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim (session A — deploy pipeline Node fix + production deploy)
 
 | Field | Value |
