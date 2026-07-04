@@ -107,6 +107,41 @@ test("login with wrong password returns 401", async () => {
   await app.db.close();
 });
 
+test("login sets refresh cookie with httpOnly and SameSite=Lax", async () => {
+  const app = await freshApp();
+
+  const tenantId = `ten_cookie_${Date.now()}`;
+  const userId = `usr_cookie_${Date.now()}`;
+  await app.db.exec(`
+    INSERT INTO tenants (id, name, slug, created_at, updated_at)
+    VALUES ('${tenantId}', 'Cookie Corp', 'cookie-corp-${Date.now()}', ${Date.now()}, ${Date.now()})
+  `);
+  await app.db.exec(`
+    INSERT INTO users (id, tenant_id, email, password_hash, role, created_at, updated_at)
+    VALUES ('${userId}', '${tenantId}', 'cookie-owner@example.com', 'secret123', 'owner', ${Date.now()}, ${Date.now()})
+  `);
+
+  const { status, headers } = await request(app.express, "POST", "/api/identity/login", {
+    email: "cookie-owner@example.com",
+    password: "secret123",
+  });
+
+  assert.equal(status, 200);
+  const setCookie = headers["set-cookie"];
+  assert.ok(Array.isArray(setCookie), "login should set auth cookies");
+
+  const refreshCookie = setCookie.find((cookie) => cookie.startsWith("finder_refresh=")) ?? "";
+  const sessionHintCookie = setCookie.find((cookie) => cookie.startsWith("finder_session_hint=")) ?? "";
+
+  assert.match(refreshCookie, /HttpOnly/i, "refresh cookie is httpOnly");
+  assert.match(refreshCookie, /SameSite=Lax/i, "refresh cookie uses SameSite=Lax");
+  assert.match(refreshCookie, /Path=\//i, "refresh cookie is scoped to the app");
+  assert.doesNotMatch(sessionHintCookie, /HttpOnly/i, "session hint remains JavaScript-readable");
+  assert.match(sessionHintCookie, /SameSite=Lax/i, "session hint uses SameSite=Lax");
+
+  await app.db.close();
+});
+
 // ── 2. requireRole() denies the wrong role ────────────────────────────────────
 
 test("requireRole allows a sufficiently privileged role", () => {

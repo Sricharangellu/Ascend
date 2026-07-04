@@ -11,7 +11,7 @@ export default function request(
   path: string,
   body?: unknown,
   headers?: Record<string, string>,
-): Promise<{ status: number; json: any }> {
+): Promise<{ status: number; json: any; headers: http.IncomingHttpHeaders }> {
   return new Promise((resolve, reject) => {
     const server = http.createServer(app);
     server.listen(0, () => {
@@ -47,7 +47,7 @@ export default function request(
             } catch {
               json = data;
             }
-            resolve({ status: res.statusCode ?? 0, json });
+            resolve({ status: res.statusCode ?? 0, json, headers: res.headers });
           });
         },
       );

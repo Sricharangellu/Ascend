@@ -70,6 +70,18 @@ Status: ACTIVE
 | Status | RELEASED — non-overlapping work complete; focused API-client Vitest PASS, full frontend Vitest 86/86, frontend typecheck/lint/build PASS, backend typecheck PASS, backend tests PASS 312/312; pushed in `555afc0` |
 | Blockers | none |
 
+## Parallel Non-Overlapping Claim (Codex session E — SEC-7)
+
+| Field | Value |
+|---|---|
+| Agent/session | Codex session E |
+| Queue item | SEC-7 — verify and document `finder_refresh` cookie SameSite behavior end-to-end |
+| Files/areas expected | Auth refresh cookie code/tests and WORK evidence only. No `.github/**`, no `web/e2e/**`, no frontend app pages, no fixed ports. |
+| Started | 2026-07-04 |
+| Last update | 2026-07-04 |
+| Status | READY TO RELEASE AFTER PUSH — non-overlapping work complete; backend test runner PASS 313/313, backend typecheck PASS, frontend typecheck/lint/build PASS, smoke PASS 14/14 |
+| Blockers | unrelated local `.github/workflows/ci.yml` modification exists under active CI hardening claim; will not touch or commit it. |
+
 ## Parallel Non-Overlapping Claim
 
 | Field | Value |

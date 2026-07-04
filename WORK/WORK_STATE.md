@@ -8,6 +8,15 @@
 **Phase 1: Truth and cleanup** per `WORK/FORWARD_PLAN.md`. Feature/module expansion is
 **PAUSED** until Phase 2 (core release spine) exit criteria pass.
 
+2026-07-04 session H (parallel non-overlapping backend auth-cookie proof — full
+findings in `WORK/AUDIT_2026-07-04F.md`): SEC-7 is **Built and verified**. The actual
+Express identity cookie path already sets `sameSite: "lax"` for both `finder_refresh`
+and `finder_session_hint`; added route-level regression coverage proving login returns
+`finder_refresh` with `HttpOnly`, `SameSite=Lax`, and `Path=/`, while the session hint
+remains JavaScript-readable and also uses `SameSite=Lax`. Verification: backend test
+runner PASS 313/313, backend typecheck PASS, frontend typecheck/lint/build PASS, smoke
+PASS 14/14. Lint still reports the same 4 pre-existing hook warnings.
+
 2026-07-04 session G (parallel non-overlapping frontend API hardening — full findings
 in `WORK/AUDIT_2026-07-04E.md`): SEC-8 is **Built and verified**. Catalog CSV export
 no longer uses a direct authenticated `fetch()` from `imports-exports/page.tsx`; it now
@@ -539,7 +548,7 @@ Score: 94/100 — launch-ready, zero CRITICAL.
 
 | ID | Issue |
 |---|---|
-| **SEC-7** | No `SameSite=Strict` or `SameSite=Lax` attribute documented for `finder_refresh` cookie. CSRF risk if backend ever adds state-mutating GET endpoints. |
+| **SEC-7** | **DONE 2026-07-04 session H** — route-level backend test proves login sets `finder_refresh` with `HttpOnly`, `SameSite=Lax`, and `Path=/`; session hint also uses `SameSite=Lax`. |
 | **SEC-8** | **DONE 2026-07-04 session G** — catalog CSV export now uses `apiDownload()` from the shared API client, including bearer auth, API error envelopes, and one-time 401 silent-refresh retry. |
 | **SEC-9** | Rate limiter uses `Math.floor(Date.now() / windowMs)` for Redis fixed-window. This means all clients reset simultaneously at window boundaries — a "thundering herd" burst is possible. Upgrade to sliding window for sensitive endpoints (login, password reset). |
 | **SEC-10** | Password reset and signup pages have no client-side rate limiting UI feedback. Backend rate limits, but UX shows no "too many attempts" state — users retry excessively. |
@@ -719,8 +728,8 @@ Score: 94/100 — launch-ready, zero CRITICAL.
 #### Immediate fixes (before any new features)
 
 1. **SEC-1** — Rotate the Vercel token in `.env` immediately
-2. **SEC-7** — Verify/document refresh cookie SameSite behavior end-to-end
-3. **SEC-9** — Upgrade sensitive rate-limit paths away from fixed-window bursts
+2. **SEC-9** — Upgrade sensitive rate-limit paths away from fixed-window bursts
+3. **SEC-10** — Add user-visible client-side rate-limit feedback to password reset/signup
 
 #### Next domain build
 
