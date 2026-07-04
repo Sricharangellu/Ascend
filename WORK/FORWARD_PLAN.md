@@ -217,6 +217,92 @@ Requires setup: payment terms, tax profile defaults, price tiers
 This should be implemented as a backend "capabilities" or "impact" endpoint before the
 UI claims to support business-mode switching.
 
+## Retail-first execution rule
+
+The business-pack architecture must be built one complete pack at a time.
+
+Current priority:
+
+```text
+1. Finish Retail end-to-end.
+2. Build the business-pack/capabilities control plane needed to support switching.
+3. Only then deepen Wholesale, Restaurant, Mobile/Electronics, Grocery, Ecommerce, and other packs.
+```
+
+Retail is the first complete proof because it exercises the shared engine without the
+extra complexity of B2B credit, restaurant table state, serial/IMEI lifecycle, or
+lot/expiry traceability.
+
+Retail must include:
+
+- Signup, login, logout, session recovery.
+- Setup/onboarding for retail business type.
+- Business profile and module settings showing retail as active.
+- Demo account support that can preview other business types without calling them done.
+- Outlet, register, tax, payment mode, receipt settings.
+- Product create/edit/list/detail.
+- Inventory receive and adjustment through immutable movements.
+- POS checkout with tax, discount, loyalty where enabled, payment, receipt.
+- Register close and end-of-day reporting.
+- Refund/return.
+- Audit log coverage.
+- Permission-gated owner/manager/cashier paths.
+
+Non-retail business types can remain in the registry and demo preview, but they are
+**Planned** or **Partial** until their own end-to-end gates pass after retail.
+
+## Required setup, auth, settings, and demo UX
+
+The product must teach users that Finder is one platform with configurable business
+packs. This should be visible in the first-run and admin flows.
+
+### Signup and setup
+
+- Signup creates the tenant and owner user.
+- Setup asks for business type and starts from a curated pack.
+- Retail is the default first completed pack.
+- Setup must show required next tasks for retail: outlet, register, tax, payment modes,
+  receipt, first product, first receiving.
+- Setup must not present every vertical as equally complete.
+
+### Login and session
+
+- Login should load effective tenant/user capabilities after authentication.
+- The shell/nav should render from capabilities, not from hardcoded assumptions.
+- Demo mode must be explicit and visually distinguishable from production mode.
+
+### Settings
+
+Settings must expose a `Business Profile` / `Plan & Modules` view with:
+
+- current business type
+- active pack
+- enabled modules
+- disabled modules and reason
+- role templates and active permissions
+- required fields by entity
+- active workflows
+- last business-type/module changes with actor and timestamp
+
+### Demo account switcher
+
+A demo account may switch between business types to show how UI/UX changes, but the
+switcher must be based on the same capabilities/pack registry that production will use.
+
+Required demo switcher behavior:
+
+```text
+Retail demo -> shows POS, loyalty, simple customer fields, retail reports
+Wholesale demo -> previews accounts, contacts, quotes, invoices, price tiers
+Restaurant demo -> previews tables, tickets, kitchen display, menu modifiers
+Mobile demo -> previews serial/IMEI, repairs, warranties, trade-ins
+Grocery demo -> previews lot/batch/expiry, scale labels, traceability
+```
+
+Only retail may be marked **Built and verified** until its real-backend gates pass.
+Other demo modes must be labeled **Preview**, **Partial**, or **Mocked** depending on
+their actual implementation.
+
 ## Current state in plain language
 
 Finder is a modular business operating platform for product-based businesses. It has:
@@ -542,20 +628,21 @@ Exit criteria:
 - E2E golden path passes locally or in CI.
 - Status docs use honest labels.
 
-### Phase 2: Core operating spine
+### Phase 2: Retail release pack
 
-Goal: make the smallest shared operating engine reliable.
+Goal: make one complete business type reliable end-to-end. The first complete business
+type is retail.
 
 Build and verify:
 
-- Tenant setup.
-- User login.
+- Signup, login, logout, and session recovery.
+- Retail tenant setup/onboarding.
+- Business profile and module settings showing retail as active.
 - Role/permission basics.
 - Catalog products.
 - Inventory receive.
 - Register open/close.
 - POS checkout.
-- Invoice sale.
 - Payment capture or simulated payment in non-production.
 - Order creation.
 - Inventory decrement.
@@ -563,15 +650,41 @@ Build and verify:
 - Return/refund.
 - End-of-day report.
 - Audit log.
+- Retail demo account path.
 
 Exit criteria:
 
-- One complete POS workflow works without mocks.
-- One complete invoice/wholesale workflow works without mocks.
+- One complete retail POS workflow works without mocks.
+- Retail setup/settings/auth flows work against the real backend.
+- Retail owner/manager/cashier permission paths are proven.
+- Retail demo mode is clearly separated from production mode.
 - Every mutation has a test.
 - Every mutation is tenant-scoped and permission-checked.
 
-### Phase 3: Production hardening
+### Phase 3: Business-pack control plane
+
+Goal: turn current module flags into a reliable capabilities and business-mode system
+without deepening other verticals yet.
+
+Tasks:
+
+- Build `GET /api/v1/capabilities` for the current tenant/user.
+- Build a business-type impact/preview endpoint.
+- Formalize plan, business type, entitlements, modules, required fields, workflows, and
+  permissions as separate concepts.
+- Make setup, settings, shell navigation, and demo mode read from capabilities.
+- Record business-type/module changes with audit history.
+- Add a developer-facing business-pack matrix generated from the registry and test
+  evidence.
+
+Exit criteria:
+
+- A developer can see what each business type changes by reading one matrix/source of truth.
+- A company admin can preview what will change before switching business type.
+- The backend enforces disabled modules/features; frontend hiding is not the only guard.
+- Demo account switching uses the same registry/capabilities model as production.
+
+### Phase 4: Production hardening
 
 Goal: make deployment safe.
 
@@ -594,37 +707,18 @@ Exit criteria:
 - Security checklist passes.
 - Restore from backup is tested.
 
-### Phase 4: Business pack foundation
-
-Goal: turn the current module flags into a real business-pack system after the core is trustworthy.
-
-Priority order:
-
-1. Formal business-pack registry.
-2. Tenant entitlements and plan gating.
-3. Required-field rules by business type.
-4. Workflow templates by business type.
-5. Role templates and permission presets by business type.
-6. Business-mode impact/preview endpoint.
-7. Company-facing Plan & Modules / Business Profile impact screen.
-8. Module readiness matrix generated from code and tests.
-
-Do not continue building vertical-specific modules until the core operating spine and
-business-pack foundation are production-grade.
-
 ### Phase 5: Business expansion
 
 Goal: expand business packs without duplicating the core.
 
 Priority order:
 
-1. Retail pack: POS, receipts, loyalty, coupons.
-2. Wholesale pack: accounts, price tiers, quotes, invoices, terms, credit limits.
-3. Ecommerce pack: online catalog, order sync, fulfillment, customer portal.
-4. Restaurant/food pack: tables, kitchen display, modifiers, tips, split checks.
-5. Mobile/electronics pack: serial/IMEI, trade-ins, warranties, repairs.
-6. Grocery/food inventory pack: lot/batch/expiry, scale labels, traceability.
-7. Enterprise pack: approvals, SSO, audit depth, workflow automation, advanced analytics.
+1. Wholesale pack: accounts, price tiers, quotes, invoices, terms, credit limits.
+2. Ecommerce pack: online catalog, order sync, fulfillment, customer portal.
+3. Restaurant/food pack: tables, kitchen display, modifiers, tips, split checks.
+4. Mobile/electronics pack: serial/IMEI, trade-ins, warranties, repairs.
+5. Grocery/food inventory pack: lot/batch/expiry, scale labels, traceability.
+6. Enterprise pack: approvals, SSO, audit depth, workflow automation, advanced analytics.
 
 ## Suggested better architecture decisions moving forward
 

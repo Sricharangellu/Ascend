@@ -10,7 +10,61 @@ Read this before using Claude, Codex, Cursor, ChatGPT, or any other AI agent on 
 
 Do not build more features until the current project state is verified.
 
-Finder POS already has many modules, pages, documents, and claims. The risk is not lack of ideas. The risk is building wider before proving that the core product works correctly.
+Finder already has many modules, pages, documents, and claims. The risk is not lack of
+ideas. The risk is building wider before proving that the core product works correctly.
+
+## Platform scope and retail-first mandate
+
+Finder is **not only a retail POS**. Finder is one modular business operating platform
+for product-based businesses. Retail, wholesale, restaurant, mobile/electronics,
+grocery, ecommerce, service, and enterprise modes are business packs on top of one
+shared core.
+
+That said, every agent must follow this priority:
+
+```text
+Finish one complete business type end-to-end before expanding another.
+Current priority business type: RETAIL.
+```
+
+Retail is the first release pack because it proves the common operating engine:
+
+```text
+signup/login/setup
+-> select retail business type
+-> configure outlet/register/tax/payment basics
+-> create product
+-> receive inventory
+-> open register
+-> sell via POS
+-> take payment
+-> create receipt
+-> decrement inventory through movements
+-> close register
+-> end-of-day report
+-> refund/return
+-> audit log
+```
+
+Until the retail pack is **Built and verified** end-to-end against the real backend, do
+not deepen wholesale, restaurant, mobile, grocery, hospitality, golf, healthcare,
+education, entertainment, manufacturing, rental, or other vertical-specific experiences.
+Those packs may be documented and represented in demo/preview configuration, but they
+must not be labeled complete and must not distract from retail closure.
+
+Business type selection is a configuration system, not separate apps. It controls:
+
+- modules enabled for the tenant
+- navigation shown to the tenant
+- required fields
+- workflow defaults
+- role and permission templates
+- available reports
+- form sections and UI mode
+- demo/preview experience
+
+The backend must enforce the business type, plan, entitlement, and permission rules.
+Frontend hiding alone is never enough.
 
 ## Multi-agent rule
 
@@ -74,14 +128,16 @@ Do not trust the README, roadmap, or work-state docs without code and test evide
 The first production-quality workflow must be:
 
 ```text
-Login
+Retail signup/login/setup
 → tenant/user/session verified
-→ open register
+→ business type = retail
+→ outlet/register/tax/payment basics configured
 → product exists in catalog
-→ inventory exists
+→ inventory exists through receiving
+→ open register
 → scan/search product
 → add to cart
-→ calculate tax/discount
+→ calculate tax/discount/loyalty where enabled
 → take payment
 → create order
 → create immutable inventory movement
@@ -93,6 +149,30 @@ Login
 ```
 
 If this flow is not proven end-to-end without mocks, the app is not production-ready.
+
+## Required setup/auth/business-mode UX
+
+The signup, login, setup, onboarding, and settings experience must support the platform
+model without confusing users.
+
+Required direction:
+
+- Signup creates or resumes a tenant setup flow.
+- Login authenticates the user and loads effective capabilities for that tenant/user.
+- Setup asks for business type, but retail remains the only pack that may be called
+  complete until retail e2e is green.
+- Settings must show the current business type, enabled modules, enabled packs, disabled
+  modules, and why each disabled module is unavailable.
+- A demo account may allow switching between business types to preview different UI/UX
+  and feature sets, but it must be clearly demo/preview mode and must not be confused
+  with production readiness.
+- Switching business type must show an impact preview before applying:
+  modules added/removed, required fields changed, workflows changed, role permissions
+  changed, setup tasks required, and affected pages.
+- Production tenants must have audit history for business type/module changes.
+
+Future agents must not hardcode one-off UI branches such as `if wholesale show X` across
+the app. Use a capabilities/business-pack source of truth and have pages read from it.
 
 ## Non-negotiable engineering rules
 
@@ -183,6 +263,7 @@ If a page depends on MSW/mock handlers, label it as mocked or partial.
 Do not:
 
 - add another vertical module
+- deepen a non-retail business pack before retail is complete end-to-end
 - add another dashboard just because it looks useful
 - claim something is complete because a page exists
 - build UI without backend contract
@@ -325,6 +406,8 @@ Respect these rules:
 - auditable orders/payments/refunds
 - no production dependency on mocks
 - tests for critical mutations
+- retail-first priority until the retail pack is built and verified end-to-end
+- no non-retail vertical expansion unless the task is business-pack infrastructure
 
 If the requested change would make the app look more complete without making it more correct, stop and explain why.
 
@@ -335,7 +418,20 @@ After implementation, run the relevant typecheck, tests, lint/build, and report 
 
 The next useful work is not a new feature.
 
-The next useful work is a release-readiness matrix.
+The next useful work is the **retail release pack** and the supporting capabilities
+surface needed by setup/settings/demo mode:
+
+1. Read-only `GET /api/v1/capabilities` for the current tenant/user.
+2. Read-only business-type impact preview for demo/setup/settings.
+3. Retail setup flow proof: signup/login -> select retail -> configure outlet/register.
+4. Retail product/inventory proof: create product -> receive stock.
+5. Retail POS proof: open register -> sell -> pay -> receipt -> inventory movement.
+6. Retail closeout proof: close register -> end-of-day report -> audit log.
+7. Retail refund/return proof.
+
+Do not move to wholesale/restaurant/mobile/grocery implementation until this is green.
+
+Historical release-readiness evidence remains below.
 
 **Filled from evidence, 2026-07-03 live-stack audit** (`WORK/AUDIT_2026-07-03B.md`):
 `npm run smoke` 13/13 on real Postgres; authenticated probe of all 484 frontend-declared

@@ -1,12 +1,26 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-04 (Codex session I, production mock-off deploy guard)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
+> Last updated: 2026-07-04 (Codex session J, retail-first platform plan rewrite)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
 
 ---
 
 ## Active task
 
 **Phase 1: Truth and cleanup** per `WORK/FORWARD_PLAN.md`. Feature/module expansion is
-**PAUSED** until Phase 2 (core release spine) exit criteria pass.
+**PAUSED** until Phase 2 exit criteria pass. Phase 2 is now explicitly the
+**Retail release pack**: finish one complete business type end-to-end before deepening
+wholesale, restaurant, mobile, grocery, ecommerce, or other packs.
+
+2026-07-04 Codex session J (retail-first platform plan rewrite - full findings in
+`WORK/AUDIT_2026-07-04L.md`): Sri clarified the development strategy. Finder remains
+one modular business operating platform, but the first product release must be **Retail
+end-to-end**. Future agents must not build deeper wholesale/restaurant/mobile/grocery
+vertical functionality until retail is Built and verified against the real backend.
+`WORK/RULES.md` now carries the binding retail-first mandate. `WORK/FORWARD_PLAN.md`
+now defines Phase 2 as the Retail release pack, Phase 3 as the business-pack control
+plane (`GET /api/v1/capabilities`, impact preview, capabilities-driven setup/settings/
+demo switching), Phase 4 as production hardening, and Phase 5 as non-retail expansion.
+Business-type switching for demo accounts is planned as a capabilities-driven preview,
+not proof that every business pack is production-ready.
 
 2026-07-04 Codex session I (production mock-off deploy guard - full findings in
 `WORK/AUDIT_2026-07-04K.md`): queue item #5 is **partially closed for production
@@ -245,6 +259,31 @@ adjustment modal branches are Phase-2 relevant). `NEXT_PUBLIC_MOCK` made env-ove
 (default still "true"). Stale e2e locators fixed (setup + login spec).
 
 **Confirmed defects (priority order — each is one session's work item)**
+
+**Retail-first development queue (new authoritative build order after this documentation
+rewrite):**
+
+1. **Business-pack capabilities endpoint**: build read-only `GET /api/v1/capabilities`
+   for the current tenant/user from the existing module registry, business profile,
+   feature flags, plan/entitlement placeholders, and permissions. No UI rewrite until
+   this backend source of truth exists.
+2. **Business-type impact preview**: read-only endpoint for setup/settings/demo switcher
+   that shows what changes before applying a business type/module change.
+3. **Retail setup/auth proof**: signup/login/logout/session recovery -> select retail
+   -> configure outlet/register/tax/payment/receipt basics against real backend.
+4. **Retail catalog/inventory proof**: create retail product -> receive stock -> prove
+   inventory movement and product availability.
+5. **Retail POS proof**: open register -> search/scan -> add to cart -> tax/discount/
+   loyalty where enabled -> pay -> receipt -> inventory decrement.
+6. **Retail closeout proof**: close register -> end-of-day report -> audit log.
+7. **Retail refund/return proof**: refund or return -> payment/order status -> inventory
+   movement -> audit log.
+8. **Only after items 1-7 are Built and verified**: deepen wholesale, restaurant,
+   mobile/electronics, grocery, ecommerce, and enterprise packs one at a time.
+
+Legacy queue items below remain historical evidence and follow-up context; they do not
+override the retail-first order above.
+
 1. **e2e core-flow failures (10/47)**: triage checkout ×3, inventory-receive ×3,
    invoice-pay ×3, logout ×1 — separate stale locators from real integration gaps; fix
    until core specs green against production build + real backend —
