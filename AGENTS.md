@@ -45,6 +45,41 @@ are real defects even when the steps pass.
 `Built and verified` · `Built but not verified` · `UI-only` · `Mocked` · `Partial` ·
 `Planned` · `Not production-ready`. Never call something done without one of these.
 
+## Git: where and how
+
+- **Remote:** `origin` = https://github.com/Sricharangellu/finder-pos.git · **branch:** `master`.
+- **Session start:** `git pull --ff-only origin master`. If it refuses, stop and reconcile —
+  never rebase/force-push master.
+- **Session end:** commit (conventional commits, small and scoped) and `git push origin master`
+  ONLY after gates pass: `npm run typecheck && npm test` (root) and
+  `cd web && npm run typecheck && npm run lint && npm run build`. Backend changes also
+  need `npm run smoke` green. Never leave unpushed work on one machine at handoff.
+- **Salvage branches:** 12 `worktree-agent-*` branches are parked pre-pause work — do NOT
+  delete or bulk-merge them; harvest selectively per the inventory in
+  `WORK/AUDIT_2026-07-03B.md`, and only through the RULES.md definition of done.
+- If you create a branch or worktree, remove it before ending the session.
+
+## Local runbook (macOS dev machine)
+
+- **Fast proof (no setup):** `npm run smoke` — boots the real app on embedded Postgres and
+  drives the full POS lifecycle. Local Postgres 15 also available:
+  `export PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH"`.
+- **Real-stack e2e** (mocks OFF requires a PRODUCTION build — `npm run dev` ALWAYS mocks,
+  never use the dev server to verify real-backend behavior):
+  1. `pg_ctl -D /opt/homebrew/var/postgresql@15 start && createdb finder_e2e`
+  2. Backend: `DATABASE_URL=postgresql://$USER@localhost:5432/finder_e2e JWT_SECRET=<any> PORT=3001 npx tsx src/server.ts` (migrations run at boot)
+  3. Seed: same `DATABASE_URL` + `npx tsx scripts/seed-e2e.ts` → login `owner@finder-pos.dev` / `FinderDemo!2026`
+  4. Frontend: `cd web && NEXT_PUBLIC_MOCK=false npm run build && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public && PORT=3000 BACKEND_URL=http://localhost:3001 node .next/standalone/server.js`
+  5. `cd web && npx playwright test` (baseline 2026-07-03: 25 passed / 22 failed)
+  6. Afterwards stop servers and `pg_ctl -D /opt/homebrew/var/postgresql@15 stop`.
+
+## Handoff protocol (every session, no exceptions)
+
+1. Update `WORK/WORK_STATE.md`: what was done, next 3 actions, blockers.
+2. New verification results → new dated `WORK/AUDIT_*.md`; never edit old audits.
+3. Working tree clean, no stray root files, no leftover worktrees/branches, servers stopped.
+4. Commit and push. Report honestly what passed AND what failed, with RULES.md labels.
+
 ## Hard rules
 
 - Never write secrets (VERCEL_TOKEN, keys, tokens) into any file.
