@@ -3697,7 +3697,7 @@ mockHandlers.push(
             const body = (await request.json()) as Array<{ type: string; channel: Channel; enabled: boolean }>;
             for (const update of body) {
               const row = prefs.find(p => p.type === update.type);
-              if (row) (row as Record<string, unknown>)[update.channel] = update.enabled;
+              if (row) (row as unknown as Record<string, unknown>)[update.channel] = update.enabled;
             }
             return HttpResponse.json({ ok: true });
           }),
@@ -7804,6 +7804,139 @@ mockHandlers.push(
         if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
         docs[idx] = { ...docs[idx], status: "archived" };
         return new HttpResponse(null, { status: 204 });
+      }),
+    ];
+  })(),
+
+  // ── Inventory Error Check Center ──────────────────────────────────────────
+  ...(() => {
+    const D = 86_400_000;
+    const now = () => Date.now();
+
+    type ErrCategory =
+      | "sku_mapping" | "supplier_mapping" | "price_mismatch" | "qty_mismatch"
+      | "duplicate_doc" | "missing_barcode" | "missing_cost" | "below_min_order"
+      | "expiry_risk" | "unapproved_supplier" | "edi_parse" | "po_invoice_mismatch"
+      | "receiving_mismatch";
+
+    type ErrSeverity = "critical" | "high" | "medium" | "low";
+    type ErrStatus = "open" | "in_review" | "resolved" | "ignored" | "escalated";
+
+    interface InventoryError {
+      id: string;
+      category: ErrCategory;
+      severity: ErrSeverity;
+      status: ErrStatus;
+      title: string;
+      description: string;
+      affected_entity_type: string;
+      affected_entity_id: string;
+      affected_entity_name: string;
+      detected_at: number;
+      resolved_at: number | null;
+      resolved_by: string | null;
+      resolution: string | null;
+      po_number: string | null;
+      supplier_name: string | null;
+      sku: string | null;
+      notes: string | null;
+    }
+
+    const CATEGORY_LABELS: Record<ErrCategory, string> = {
+      sku_mapping: "SKU Mapping",
+      supplier_mapping: "Supplier Mapping",
+      price_mismatch: "Price Mismatch",
+      qty_mismatch: "Quantity Mismatch",
+      duplicate_doc: "Duplicate Document",
+      missing_barcode: "Missing Barcode",
+      missing_cost: "Missing Cost",
+      below_min_order: "Below Min. Order",
+      expiry_risk: "Expiry Risk",
+      unapproved_supplier: "Unapproved Supplier",
+      edi_parse: "EDI Parse Error",
+      po_invoice_mismatch: "PO / Invoice Mismatch",
+      receiving_mismatch: "Receiving Mismatch",
+    };
+
+    let errors: InventoryError[] = [
+      { id: "err_1", category: "sku_mapping", severity: "critical", status: "open", title: "Unknown SKU on EDI 856 import", description: "EDI ASN received from Acme Coffee Co references SKU 'ACM-88421' which has no matching product in the catalog.", affected_entity_type: "edi_import", affected_entity_id: "edi_4", affected_entity_name: "EDI ASN 2026-07-01", detected_at: now() - 2 * D, resolved_at: null, resolved_by: null, resolution: null, po_number: "PO-4010", supplier_name: "Acme Coffee Co", sku: "ACM-88421", notes: null },
+      { id: "err_2", category: "price_mismatch", severity: "high", status: "open", title: "Invoice price 18% above PO cost", description: "Supplier invoice INV-2026-334 from Tea Traders shows unit cost $14.90 vs PO agreed price $12.60 for Jasmine Green Tea.", affected_entity_type: "invoice", affected_entity_id: "inv_334", affected_entity_name: "INV-2026-334", detected_at: now() - 1 * D, resolved_at: null, resolved_by: null, resolution: null, po_number: "PO-4002", supplier_name: "Tea Traders", sku: "TTR-JGT-100", notes: null },
+      { id: "err_3", category: "qty_mismatch", severity: "high", status: "in_review", title: "Received qty 40 vs ordered 60", description: "PO-3998 for Wildflower Honey shows 40 units received at dock but PO ordered 60. Supplier claims 20 units on backorder.", affected_entity_type: "purchase_order", affected_entity_id: "po_3998", affected_entity_name: "PO-3998", detected_at: now() - 3 * D, resolved_at: null, resolved_by: "Maria S.", resolution: null, po_number: "PO-3998", supplier_name: "Honey Co", sku: "HC-WFH-250", notes: "Waiting for supplier backorder ETA." },
+      { id: "err_4", category: "duplicate_doc", severity: "medium", status: "open", title: "Duplicate PO number detected", description: "PO-4008 was submitted twice. Duplicate detected before processing. Second submission blocked automatically.", affected_entity_type: "purchase_order", affected_entity_id: "po_4008_dup", affected_entity_name: "PO-4008 (duplicate)", detected_at: now() - 4 * D, resolved_at: null, resolved_by: null, resolution: null, po_number: "PO-4008", supplier_name: "Acme Coffee Co", sku: null, notes: null },
+      { id: "err_5", category: "missing_barcode", severity: "medium", status: "open", title: "12 products missing UPC barcode", description: "12 active catalog products have no barcode assigned. They cannot be scanned at POS or in receiving.", affected_entity_type: "catalog", affected_entity_id: "bulk_12", affected_entity_name: "12 products", detected_at: now() - 5 * D, resolved_at: null, resolved_by: null, resolution: null, po_number: null, supplier_name: null, sku: null, notes: null },
+      { id: "err_6", category: "missing_cost", severity: "high", status: "open", title: "No purchase cost for 8 products", description: "8 products have no purchase cost on record. Margin reporting and reorder suggestions will be inaccurate.", affected_entity_type: "catalog", affected_entity_id: "bulk_8", affected_entity_name: "8 products", detected_at: now() - 6 * D, resolved_at: null, resolved_by: null, resolution: null, po_number: null, supplier_name: null, sku: null, notes: null },
+      { id: "err_7", category: "below_min_order", severity: "low", status: "open", title: "Draft PO-4011 below minimum order", description: "Draft PO to Vape Supply Co totals $280. Supplier minimum order is $500. PO will likely be rejected.", affected_entity_type: "purchase_order", affected_entity_id: "po_4011", affected_entity_name: "PO-4011 (Draft)", detected_at: now() - 1 * D, resolved_at: null, resolved_by: null, resolution: null, po_number: "PO-4011", supplier_name: "Vape Supply Co", sku: null, notes: null },
+      { id: "err_8", category: "expiry_risk", severity: "critical", status: "open", title: "43 units expire within 7 days", description: "43 units across 3 products (Organic Dark Roast ×20, Chamomile Tea ×15, Protein Bar ×8) expire within 7 days. Markdown or transfer recommended.", affected_entity_type: "inventory", affected_entity_id: "expiry_batch_07", affected_entity_name: "Near-expiry batch", detected_at: now() - 2 * D, resolved_at: null, resolved_by: null, resolution: null, po_number: null, supplier_name: null, sku: null, notes: null },
+      { id: "err_9", category: "unapproved_supplier", severity: "high", status: "open", title: "PO raised to unapproved supplier", description: "PO-4009 was raised to 'Budget Vapes LLC' which is not on the approved supplier list.", affected_entity_type: "purchase_order", affected_entity_id: "po_4009", affected_entity_name: "PO-4009", detected_at: now() - 3 * D, resolved_at: null, resolved_by: null, resolution: null, po_number: "PO-4009", supplier_name: "Budget Vapes LLC", sku: null, notes: null },
+      { id: "err_10", category: "edi_parse", severity: "high", status: "open", title: "EDI 810 invoice parse failed", description: "Incoming EDI 810 invoice from Frozen Foods Co failed to parse — ISA segment malformed. File rejected.", affected_entity_type: "edi_import", affected_entity_id: "edi_5", affected_entity_name: "EDI 810 — Frozen Foods Co", detected_at: now() - 1 * D, resolved_at: null, resolved_by: null, resolution: null, po_number: null, supplier_name: "Frozen Foods Co", sku: null, notes: null },
+      { id: "err_11", category: "po_invoice_mismatch", severity: "high", status: "in_review", title: "Invoice quantity doesn't match PO", description: "Invoice INV-2026-301 from Grocery Hub bills for 120 units but PO-3985 ordered 100. Reviewing with supplier.", affected_entity_type: "invoice", affected_entity_id: "inv_301", affected_entity_name: "INV-2026-301", detected_at: now() - 7 * D, resolved_at: null, resolved_by: "John D.", resolution: null, po_number: "PO-3985", supplier_name: "Grocery Hub", sku: null, notes: "Supplier says 20 were added due to promo. Verifying." },
+      { id: "err_12", category: "receiving_mismatch", severity: "medium", status: "resolved", title: "Receiving count mismatch on PO-3990", description: "Initial receiving count showed 48 units but physical recount confirmed 50. Record corrected.", affected_entity_type: "purchase_order", affected_entity_id: "po_3990", affected_entity_name: "PO-3990", detected_at: now() - 10 * D, resolved_at: now() - 8 * D, resolved_by: "Maria S.", resolution: "Recount confirmed 50 units. Inventory updated.", po_number: "PO-3990", supplier_name: "Organic Farms", sku: "OF-MIX-VEG", notes: null },
+      { id: "err_13", category: "supplier_mapping", severity: "medium", status: "open", title: "Product has no supplier mapping", description: "Mango Blast Vape 50mg (SKU: VPE-MB-50) has no supplier mapped. Cannot generate reorder suggestions.", affected_entity_type: "product", affected_entity_id: "prod_7", affected_entity_name: "Mango Blast Vape 50mg", detected_at: now() - 4 * D, resolved_at: null, resolved_by: null, resolution: null, po_number: null, supplier_name: null, sku: "VPE-MB-50", notes: null },
+    ];
+
+    return [
+      // GET /inventory/errors/summary
+      http.get(`${V1}/inventory/errors/summary`, async () => {
+        await lat();
+        const open   = errors.filter((e) => e.status === "open").length;
+        const review = errors.filter((e) => e.status === "in_review").length;
+        const critical = errors.filter((e) => e.severity === "critical" && e.status === "open").length;
+        const byCat = Object.fromEntries(
+          (Object.keys(CATEGORY_LABELS) as ErrCategory[]).map((k) => [
+            k,
+            { label: CATEGORY_LABELS[k], open: errors.filter((e) => e.category === k && e.status === "open").length },
+          ])
+        );
+        return HttpResponse.json({ open, in_review: review, critical, by_category: byCat });
+      }),
+
+      // GET /inventory/errors
+      http.get(`${V1}/inventory/errors`, async ({ request }) => {
+        await lat();
+        const url      = new URL(request.url);
+        const category = url.searchParams.get("category");
+        const severity = url.searchParams.get("severity");
+        const status   = url.searchParams.get("status");
+        const q        = url.searchParams.get("q");
+        let filtered = errors;
+        if (category && category !== "all") filtered = filtered.filter((e) => e.category === category);
+        if (severity && severity !== "all") filtered = filtered.filter((e) => e.severity === severity);
+        if (status && status !== "all")    filtered = filtered.filter((e) => e.status === status);
+        if (q) filtered = filtered.filter((e) =>
+          e.title.toLowerCase().includes(q.toLowerCase()) ||
+          (e.supplier_name ?? "").toLowerCase().includes(q.toLowerCase()) ||
+          (e.sku ?? "").toLowerCase().includes(q.toLowerCase())
+        );
+        return HttpResponse.json({ items: filtered, total: filtered.length });
+      }),
+
+      // GET /inventory/errors/:id
+      http.get(`${V1}/inventory/errors/:id`, async ({ params }) => {
+        await lat();
+        const err = errors.find((e) => e.id === String(params["id"]));
+        if (!err) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json(err);
+      }),
+
+      // PATCH /inventory/errors/:id — resolve, ignore, escalate, in_review
+      http.patch(`${V1}/inventory/errors/:id`, async ({ params, request }) => {
+        await lat();
+        const idx = errors.findIndex((e) => e.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as Partial<InventoryError> & { action?: string };
+        const action = body.action;
+        if (action === "resolve") {
+          errors[idx] = { ...errors[idx], status: "resolved", resolved_at: Date.now(), resolved_by: "Current User", resolution: body.resolution ?? "Resolved", notes: body.notes ?? errors[idx].notes };
+        } else if (action === "ignore") {
+          errors[idx] = { ...errors[idx], status: "ignored", resolved_at: Date.now(), resolved_by: "Current User", resolution: body.resolution ?? "Ignored", notes: body.notes ?? errors[idx].notes };
+        } else if (action === "escalate") {
+          errors[idx] = { ...errors[idx], status: "escalated", notes: body.notes ?? errors[idx].notes };
+        } else if (action === "review") {
+          errors[idx] = { ...errors[idx], status: "in_review", resolved_by: "Current User", notes: body.notes ?? errors[idx].notes };
+        } else {
+          errors[idx] = { ...errors[idx], ...body };
+        }
+        return HttpResponse.json(errors[idx]);
       }),
     ];
   })(),

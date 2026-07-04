@@ -27,7 +27,8 @@ export type NavKey =
   | "golf" | "golf-bookings" | "golf-members" | "golf-pro-shop"
   | "restaurant-dashboard" | "restaurant-floor-plan" | "restaurant-tabs"
   | "permissions" | "modes" | "kiosk-settings" | "b2b-settings"
-  | "warehouse" | "pricing" | "edi-imports" | "promotions";
+  | "warehouse" | "pricing" | "edi-imports" | "promotions" | "documents"
+  | "inventory-errors";
 
 // ── Section / nav tree ────────────────────────────────────────────────────────
 
@@ -47,13 +48,13 @@ const SECTION_MAP: Record<NavKey, RailSection> = {
   "edi-imports": "inventory",
   vendors: "inventory", shipping: "inventory", "inventory-locations": "inventory",
   "inventory-expiry": "inventory", "inventory-serials": "inventory",
-  "inventory-reorder": "inventory", "inventory-counts": "inventory", "inventory-pipeline": "inventory", workforce: "inventory",
+  "inventory-reorder": "inventory", "inventory-counts": "inventory", "inventory-pipeline": "inventory", "inventory-errors": "inventory", workforce: "inventory",
   warehouse: "inventory",
   customers: "customers", appointments: "customers", healthcare: "customers",
   finance: "finance", accounting: "finance", invoicing: "finance",
   settings: "setup", team: "setup", workflows: "setup", integrations: "setup",
   notifications: "setup", "audit-log": "setup", "imports-exports": "setup",
-  "module-marketplace": "setup",
+  "module-marketplace": "setup", documents: "setup",
   automotive: "setup", hospitality: "setup", manufacturing: "setup",
   rental: "setup", entertainment: "setup", education: "setup",
   kitchen: "sell", "bar-tabs": "sell",
@@ -141,6 +142,7 @@ const NAV_TREE: NavSection[] = [
       { label: "Warehouse",     href: "/warehouse",               featureGate: "inventory" },
       { label: "Purchasing",    href: "/purchasing",              featureGate: "purchasing" },
       { label: "EDI Imports",   href: "/purchasing/edi-imports",  featureGate: "purchasing" },
+      { label: "Error Center",  href: "/inventory/errors",        featureGate: "inventory" },
       { label: "Vendors",       href: "/vendors",                 featureGate: "vendors" },
       { label: "Operations",    href: "/operations",              featureGate: "operations" },
     ],
@@ -178,6 +180,7 @@ const NAV_TREE: NavSection[] = [
       { label: "Workflows",       href: "/workflows",            featureGate: "workflows" },
       { label: "Integrations",    href: "/integrations",         featureGate: "integrations" },
       { label: "Imports/Exports", href: "/imports-exports",      featureGate: "imports-exports" },
+      { label: "Document Center", href: "/documents",            featureGate: "documents" },
       { label: "Audit Log",       href: "/audit-log",            featureGate: "audit-log" },
     ],
   },
