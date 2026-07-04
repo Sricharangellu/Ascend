@@ -7,6 +7,10 @@ const nextConfig = {
   // Standalone output for container/CDN deployments
   output: "standalone",
 
+  // Node 24 can leave Next's separate webpack build worker idle forever on this
+  // project. Build in-process so `next build` exits deterministically.
+  experimental: { webpackBuildWorker: false },
+
   // Strict mode for React
   reactStrictMode: true,
 

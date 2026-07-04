@@ -8,6 +8,19 @@
 **Phase 1: Truth and cleanup** per `WORK/FORWARD_PLAN.md`. Feature/module expansion is
 **PAUSED** until Phase 2 (core release spine) exit criteria pass.
 
+2026-07-04 session F / SEC-9 (parallel non-overlapping backend security hardening —
+full findings in `WORK/AUDIT_2026-07-04G.md`): Redis-backed IP and tenant rate limiters
+now use a sorted-set rolling window instead of fixed-window bucket keys, so clients
+cannot double-dip across a window boundary. Added focused tests proving both IP and
+tenant Redis paths deny the boundary burst and keep stable non-timestamped Redis keys.
+Verification passed: focused rate-limit test PASS 6/6, backend typecheck PASS, smoke
+PASS 14/14, full backend suite PASS 315/315, frontend typecheck PASS, frontend lint PASS
+with the same 4 pre-existing React hook warnings, and frontend production build PASS.
+The local build hang was traced to a corrupted `web/node_modules/js-tokens/package.json`
+plus Next's separate webpack build worker idling on Node 24; the local package was
+replaced without package-file churn and `web/next.config.mjs` now builds webpack
+in-process so `next build` exits deterministically.
+
 2026-07-04 session A (later, three small items — all **Built and verified**, pushed):
 (1) **e2e-in-CI milestone**: after the playwright setup storage-state fix (`ac7ed34` —
 `storageState: undefined` inherits instead of clearing; ENOENT on fresh checkouts), CI
@@ -584,7 +597,7 @@ Score: 94/100 — launch-ready, zero CRITICAL.
 |---|---|
 | **SEC-7** | **DONE 2026-07-04 session H** — route-level backend test proves login sets `finder_refresh` with `HttpOnly`, `SameSite=Lax`, and `Path=/`; session hint also uses `SameSite=Lax`. |
 | **SEC-8** | **DONE 2026-07-04 session G** — catalog CSV export now uses `apiDownload()` from the shared API client, including bearer auth, API error envelopes, and one-time 401 silent-refresh retry. |
-| **SEC-9** | Rate limiter uses `Math.floor(Date.now() / windowMs)` for Redis fixed-window. This means all clients reset simultaneously at window boundaries — a "thundering herd" burst is possible. Upgrade to sliding window for sensitive endpoints (login, password reset). |
+| **SEC-9** | **DONE 2026-07-04 session F** — Redis-backed IP and tenant limiters now use rolling sorted-set windows with regression tests proving no fixed-boundary double-dip. |
 | **SEC-10** | Password reset and signup pages have no client-side rate limiting UI feedback. Backend rate limits, but UX shows no "too many attempts" state — users retry excessively. |
 
 ---
@@ -762,8 +775,7 @@ Score: 94/100 — launch-ready, zero CRITICAL.
 #### Immediate fixes (before any new features)
 
 1. **SEC-1** — Rotate the Vercel token in `.env` immediately
-2. **SEC-9** — Upgrade sensitive rate-limit paths away from fixed-window bursts
-3. **SEC-10** — Add user-visible client-side rate-limit feedback to password reset/signup
+2. **SEC-10** — Add user-visible client-side rate-limit feedback to password reset/signup
 
 #### Next domain build
 

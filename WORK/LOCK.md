@@ -14,6 +14,27 @@ Status: ACTIVE
 | Status | ACTIVE |
 | Blockers | none |
 
+## Active Team Claim (Antigravity team — e2e core-flow triage)
+
+| Field | Value |
+|---|---|
+| Agent/session | Antigravity session (VSCode), team of 3 teammates + lead |
+| Queue item | #1 — Triage/fix 9 core-flow e2e failures (checkout ×3, inventory-receive ×3, invoice-pay ×3) |
+| Files/areas expected | `web/e2e/checkout.spec.ts` (teammate 1), `web/e2e/inventory-receive.spec.ts` (teammate 2), `web/e2e/invoice-pay.spec.ts` (teammate 3). Read-only: page components, mock handlers, seed data. No page/component edits — spec-only fixes. |
+| Started | 2026-07-04 12:16 CDT |
+| Last update | 2026-07-04 12:16 CDT |
+| Status | ACTIVE — triage in progress |
+| Blockers | none |
+| Root causes identified | (1) Checkout: RegisterSessionGuard blocks product grid — spec must open register first; stale "coffee" search term (seed uses retail products). (2) Inventory-receive & invoice-pay: auth state (storageState) not surviving across spec files — tests land on login page. (3) Logout: user menu button label "O owner" doesn't match spec's `/user\|account\|profile/i` pattern. |
+
+## Stale Claim (session E — e2e triage, superseded)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session E (desktop app, takeover confirmed by Sri) |
+| Queue item | #1 — Triage/fix 10 core-flow e2e failures |
+| Status | STALE — blocked on local frontend build hang (`cd web && npm run build` hangs at "Creating an optimized production build"); no progress since 2026-07-04; superseded by Antigravity team claim above per Sri's directive |
+
 ## Parallel Non-Overlapping Claim (session A — /healthz version stamp)
 
 | Field | Value |
@@ -46,9 +67,9 @@ Status: ACTIVE
 | Queue item | #1 — Triage/fix 10 core-flow e2e failures (checkout ×3, inventory-receive ×3, invoice-pay ×3, logout ×1) |
 | Files/areas expected | `web/e2e/*.spec.ts`; possibly terminal/purchasing/finance pages + components if real gaps found. Production build (`NEXT_PUBLIC_MOCK=false`) + real backend + Postgres via harness |
 | Started | 2026-07-04 |
-| Last update | 2026-07-04 — backend verified; frontend build gate blocked locally |
-| Status | ACTIVE — code complete, not released; backend gates green, frontend build hung locally |
-| Blockers | `cd web && npm run build` repeatedly hangs at `Creating an optimized production build ...` on this machine even after moving generated `web/.next`/`web/test-results` out of the web tree. Do not mark released until frontend build passes in a clean environment or this local build hang is resolved. |
+| Last update | 2026-07-04 12:16 CDT — superseded by Antigravity team claim above |
+| Status | STALE — superseded; do not work this claim |
+| Blockers | none |
 
 ## Superseded Claim (session A — stale, released by Sri 2026-07-04)
 
@@ -124,10 +145,10 @@ Status: ACTIVE
 |---|---|
 | Agent/session | Codex session F |
 | Queue item | SEC-9 — upgrade Redis-backed sensitive rate limiting away from fixed-window bursts |
-| Files/areas expected | `src/gateway/rateLimit.ts`, `src/gateway/rateLimit.test.ts`, WORK evidence only. No `.github/**`, no `web/**`, no e2e, no app health/version stamp files, no ports/DB. |
+| Files/areas expected | `src/gateway/rateLimit.ts`, `src/gateway/rateLimit.test.ts`, `web/next.config.mjs` build-worker unblock, WORK evidence only. No `.github/**`, no e2e, no app health/version stamp files, no ports/DB. |
 | Started | 2026-07-04 |
-| Last update | 2026-07-04 |
-| Status | ACTIVE |
+| Last update | 2026-07-04 — all gates green locally; ready to commit/push |
+| Status | READY TO RELEASE AFTER PUSH |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim

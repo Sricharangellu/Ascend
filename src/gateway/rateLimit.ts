@@ -29,12 +29,21 @@ function extractClientIp(req: Request): string {
   return req.socket.remoteAddress ?? "unknown";
 }
 
-// Lua: atomic fixed-window counter.
+// Lua: atomic rolling-window counter backed by a sorted set.
 // Returns 1 if the request is allowed, 0 if rate-limited.
-const INCR_SCRIPT = `
-local count = redis.call('INCR', KEYS[1])
-if count == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[2]) end
-if count > tonumber(ARGV[1]) then return 0 end
+const SLIDING_WINDOW_SCRIPT = `
+local now = tonumber(ARGV[1])
+local window_ms = tonumber(ARGV[2])
+local limit = tonumber(ARGV[3])
+local member = ARGV[4]
+redis.call('ZREMRANGEBYSCORE', KEYS[1], 0, now - window_ms)
+local count = redis.call('ZCARD', KEYS[1])
+if count >= limit then
+  redis.call('PEXPIRE', KEYS[1], window_ms)
+  return 0
+end
+redis.call('ZADD', KEYS[1], now, member)
+redis.call('PEXPIRE', KEYS[1], window_ms)
 return 1
 `;
 
@@ -60,7 +69,7 @@ export interface RateLimitOptions {
    * instances). Falls back to in-memory token bucket when null/undefined.
    */
   redis?: RedisClient | null;
-  /** Fixed-window duration for the Redis path. Default: 60_000 ms. */
+  /** Rolling-window duration for the Redis path. Default: 60_000 ms. */
   windowMs?: number;
 }
 
@@ -77,16 +86,18 @@ export function rateLimitMiddleware(options: RateLimitOptions = {}) {
     return extractClientIp(req);
   });
   const redis = options.redis ?? null;
+  const allowedFromRedis = (result: unknown) => result === 1 || result === "1";
 
   // ── Redis path ──────────────────────────────────────────────────────────────
   if (redis) {
     return function rateLimit(req: Request, res: Response, next: NextFunction): void {
-      const window = Math.floor(Date.now() / windowMs);
-      const key = `rl:${keyFn(req)}:${window}`;
+      const now = Date.now();
+      const key = `rl:${keyFn(req)}`;
+      const member = `${now}:${Math.random().toString(36).slice(2)}`;
       redis
-        .eval(INCR_SCRIPT, 1, key, String(capacity), String(windowMs))
+        .eval(SLIDING_WINDOW_SCRIPT, 1, key, String(now), String(windowMs), String(capacity), member)
         .then((allowed) => {
-          if (!allowed) {
+          if (!allowedFromRedis(allowed)) {
             res.setHeader("Retry-After", String(Math.ceil(windowMs / 1000)));
             next(new HttpError(429, "rate_limit_exceeded", "Too many requests — slow down."));
           } else {
@@ -163,7 +174,7 @@ export interface TenantRateLimitOptions {
   fallbackKey?: (req: Request) => string;
   /** When provided, uses Redis for distributed state across instances. */
   redis?: RedisClient | null;
-  /** Fixed-window duration for the Redis path. Default: 60_000 ms. */
+  /** Rolling-window duration for the Redis path. Default: 60_000 ms. */
   windowMs?: number;
 }
 
@@ -181,23 +192,26 @@ export function tenantRateLimitMiddleware(options: TenantRateLimitOptions = {}) 
     options.fallbackKey ??
     ((req: Request) =>
       "ip:" + extractClientIp(req));
+  const allowedFromRedis = (result: unknown) => result === 1 || result === "1";
 
   // ── Redis path ──────────────────────────────────────────────────────────────
   if (redis) {
     return function tenantRateLimit(req: Request, res: Response, next: NextFunction): void {
       const auth = res.locals["auth"] as { tenantId?: string } | undefined;
       const tenantId = auth?.tenantId;
-      const key = `trl:${tenantId ?? fallbackKey(req)}:${Math.floor(Date.now() / windowMs)}`;
       const tierName = tenantId ? tierOf(tenantId) : "standard";
       const cfg = tiers[tierName] ?? tiers["standard"] ?? RATE_TIERS["standard"]!;
+      const now = Date.now();
+      const key = `trl:${tenantId ?? fallbackKey(req)}`;
+      const member = `${now}:${Math.random().toString(36).slice(2)}`;
 
       res.setHeader("X-RateLimit-Tier", tierName);
       res.setHeader("X-RateLimit-Limit", String(cfg.capacity));
 
       redis
-        .eval(INCR_SCRIPT, 1, key, String(cfg.capacity), String(windowMs))
+        .eval(SLIDING_WINDOW_SCRIPT, 1, key, String(now), String(windowMs), String(cfg.capacity), member)
         .then((allowed) => {
-          if (!allowed) {
+          if (!allowedFromRedis(allowed)) {
             res.setHeader("Retry-After", String(Math.ceil(windowMs / 1000)));
             next(new HttpError(429, "rate_limit_exceeded", "Tenant rate limit exceeded — slow down."));
           } else {
