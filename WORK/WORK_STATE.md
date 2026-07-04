@@ -15,9 +15,11 @@ Endpoint probe: ~464/484 frontend-declared endpoints exist on the real backend.
 **25 passed / 22 failed** — 10 core-flow failures (checkout/receive/invoice-pay/logout;
 partly stale locators) + 12 vertical-page failures (some crash without mocks).
 Agent instructions created (`AGENTS.md` repo + workspace; `WORK/RULES.md` = standing
-policy). Cleanups: tracked `src/shared/db 2.ts` removed, 9 clean+merged agent worktrees
-pruned (15 remain, need manual review — 10 unmerged branches). `NEXT_PUBLIC_MOCK` made
-env-overridable (default still "true"). Stale e2e locators fixed (setup + login spec).
+policy). Cleanups: tracked `src/shared/db 2.ts` removed; **ALL agent worktrees removed**
+(dirty states preserved as wip salvage commits; 12 salvage branches parked — harvest
+inventory in AUDIT_2026-07-03B appendix; note: end-of-day Z-report and inventory
+adjustment modal branches are Phase-2 relevant). `NEXT_PUBLIC_MOCK` made env-overridable
+(default still "true"). Stale e2e locators fixed (setup + login spec).
 
 **Confirmed defects (priority order — each is one session's work item)**
 1. **Orchestration dead vs real DB**: `workflow_instances`/`saga_instances` tables missing
