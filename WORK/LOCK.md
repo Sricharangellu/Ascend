@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Parallel Non-Overlapping Claim (session A — deploy pipeline Node fix + production deploy)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (VSCode, "FIX AND DEPLOY" directive from Sri) |
+| Queue item | deploy-prod.yml pins Node 20 while everything else uses .nvmrc (Node 24) — apiDownload blob test fails only under Node 20's FileReader, blocking the backend deploy. Fix + let the push trigger the production deploy (explicitly authorized by Sri) |
+| Files/areas expected | `.github/workflows/deploy-prod.yml` ONLY. No src/**, no web/**, no e2e |
+| Started | 2026-07-04 |
+| Last update | 2026-07-04 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim (Codex session H — product variant atomicity)
 
 | Field | Value |
