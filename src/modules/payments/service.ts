@@ -4,6 +4,7 @@ import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import { Money, type Cents } from "../../shared/money.js";
 import { notFound, badRequest, conflict, HttpError } from "../../shared/http.js";
+import { writeAudit } from "../../shared/audit.js";
 import { getStripe, isStripeConfigured, resolveChargeDetails } from "./stripe.js";
 import { moduleLogger } from "../../shared/logger.js";
 
@@ -152,7 +153,7 @@ export class PaymentsService {
     return order.total_cents;
   }
 
-  async capture(input: CapturePaymentInput, tenantId: string): Promise<PaymentRecord> {
+  async capture(input: CapturePaymentInput, tenantId: string, actorId = "system"): Promise<PaymentRecord> {
     // Payment idempotency: if a key is provided and we already processed it,
     // return the cached result without re-charging (Wave 1 requirement). The
     // stored response is fingerprinted with the original request, so a key
@@ -325,6 +326,15 @@ export class PaymentsService {
       },
       record.id,
     );
+
+    await writeAudit(this.db, {
+      tenantId,
+      actorId,
+      action: "payment.captured",
+      entityType: "payment",
+      entityId: record.id,
+      after: { orderId: record.order_id, method: record.method, amountCents: record.amount_cents },
+    });
 
     return record;
   }

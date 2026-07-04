@@ -151,6 +151,21 @@ async function main() {
   assert.deepEqual(failedWorkflows, [], `workflow failures: ${JSON.stringify(failedWorkflows)}`);
   ok(`orchestration recorded no failed workflow instances`);
 
+  // Critical mutations must leave audit trail entries (RULES.md: auditable
+  // orders/payments/refunds). The lifecycle above created, paid, and refunded
+  // an order — all three actions must appear in audit_log for this tenant.
+  const auditActions = await db.query<{ action: string }>(
+    `SELECT DISTINCT action FROM audit_log
+     WHERE action IN ('order.created', 'payment.captured', 'order.refunded')`,
+  );
+  const found = auditActions.map((a) => a.action).sort();
+  assert.deepEqual(
+    found,
+    ["order.created", "order.refunded", "payment.captured"],
+    `audit trail incomplete — found only: ${JSON.stringify(found)}`,
+  );
+  ok(`audit log recorded order.created, payment.captured, order.refunded`);
+
   console.log(`\n✅ SMOKE PASSED — ${step} steps, full POS lifecycle verified end-to-end.\n`);
 }
 

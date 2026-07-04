@@ -78,7 +78,7 @@ export function registerRoutes(router: Router, service: OutletsService): void {
     "/registers/:registerId/close",
     handler(async (req, res) => {
       const body = parseBody(closeSessionSchema, req.body);
-      res.json(await service.closeSession(String(req.params.registerId), body.countedCashCents, body.closingFloatCents ?? 0, tenantId(res)));
+      res.json(await service.closeSession(String(req.params.registerId), body.countedCashCents, body.closingFloatCents ?? 0, tenantId(res), userId(res)));
     }),
   );
 

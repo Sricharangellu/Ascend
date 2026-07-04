@@ -22,6 +22,10 @@ function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
 
+function userId(res: Response): string {
+  return (res.locals["auth"] as AuthPayload).userId;
+}
+
 export function registerRoutes(router: Router, service: PaymentsService): void {
   // ── Stripe Terminal: connection token (browser SDK uses this to authenticate)
   router.post(
@@ -71,7 +75,7 @@ export function registerRoutes(router: Router, service: PaymentsService): void {
     "/",
     handler(async (req: Request, res: Response) => {
       const body = parseBody(captureSchema, req.body);
-      const payment = await service.capture(body, tenantId(res));
+      const payment = await service.capture(body, tenantId(res), userId(res));
       res.status(201).json(payment);
     }),
   );

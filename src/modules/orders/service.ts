@@ -4,6 +4,7 @@ import type { EventBus } from "../../shared/events.js";
 import type { Cents } from "../../shared/money.js";
 import type { StateCode } from "../../shared/types.js";
 import { notFound, badRequest, conflict } from "../../shared/http.js";
+import { writeAudit } from "../../shared/audit.js";
 import { computeOrderTax, type TaxableLine } from "./tax.js";
 
 export type OrderStatus = "open" | "completed" | "refunded" | "voided";
@@ -113,7 +114,7 @@ export class OrdersService {
     private readonly events: EventBus,
   ) {}
 
-  async create(input: CreateOrderInput, tenantId: string): Promise<OrderWithLines> {
+  async create(input: CreateOrderInput, tenantId: string, actorId = "system"): Promise<OrderWithLines> {
     if (input.lines.length === 0) {
       throw badRequest("an order requires at least one line");
     }
@@ -275,6 +276,15 @@ export class OrdersService {
       },
       order.id,
     );
+
+    await writeAudit(this.db, {
+      tenantId,
+      actorId,
+      action: "order.created",
+      entityType: "order",
+      entityId: order.id,
+      after: { orderNumber: order.order_number, totalCents: order.total_cents, lineCount: lines.length },
+    });
 
     return { ...order, lines };
   }
@@ -440,7 +450,7 @@ export class OrdersService {
     return { items, nextCursor, limit };
   }
 
-  async refund(id: string, tenantId: string): Promise<OrderWithLines> {
+  async refund(id: string, tenantId: string, actorId = "system"): Promise<OrderWithLines> {
     const order = await this.getOrThrow(id, tenantId);
     if (order.status === "refunded") {
       throw conflict(`order '${id}' is already refunded`);
@@ -466,10 +476,20 @@ export class OrdersService {
       order.id,
     );
 
+    await writeAudit(this.db, {
+      tenantId,
+      actorId,
+      action: "order.refunded",
+      entityType: "order",
+      entityId: order.id,
+      before: { status: order.status },
+      after: { status: "refunded", totalCents: order.total_cents },
+    });
+
     return { ...order, status: "refunded", updated_at: updatedAt };
   }
 
-  async void(id: string, tenantId: string): Promise<OrderWithLines> {
+  async void(id: string, tenantId: string, actorId = "system"): Promise<OrderWithLines> {
     const order = await this.getOrThrow(id, tenantId);
     if (!VOIDABLE_STATUSES.has(order.status)) {
       throw conflict(`order '${id}' is ${order.status} and cannot be voided`);
@@ -480,6 +500,16 @@ export class OrdersService {
       "UPDATE orders SET status = @status, updated_at = @updated_at WHERE id = @id AND tenant_id = @tenantId",
       { status: "voided", updated_at: updatedAt, id, tenantId },
     );
+
+    await writeAudit(this.db, {
+      tenantId,
+      actorId,
+      action: "order.voided",
+      entityType: "order",
+      entityId: order.id,
+      before: { status: order.status },
+      after: { status: "voided" },
+    });
 
     return { ...order, status: "voided", updated_at: updatedAt };
   }

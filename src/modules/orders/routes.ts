@@ -65,7 +65,7 @@ export function registerRoutes(router: Router, service: OrdersService): void {
       if (body.storeId && storeIds.length > 0 && !storeIds.includes(body.storeId)) {
         throw badRequest(`storeId '${body.storeId}' is not in your allowed stores`);
       }
-      const order = await service.create(body, tenantId(res));
+      const order = await service.create(body, tenantId(res), auth(res).userId);
       res.status(201).json(order);
     }),
   );
@@ -120,14 +120,14 @@ export function registerRoutes(router: Router, service: OrdersService): void {
   router.post(
     "/:id/refund",
     handler(async (req: Request, res: Response) => {
-      res.json(await service.refund(String(req.params.id), tenantId(res)));
+      res.json(await service.refund(String(req.params.id), tenantId(res), auth(res).userId));
     }),
   );
 
   router.post(
     "/:id/void",
     handler(async (req: Request, res: Response) => {
-      res.json(await service.void(String(req.params.id), tenantId(res)));
+      res.json(await service.void(String(req.params.id), tenantId(res), auth(res).userId));
     }),
   );
 

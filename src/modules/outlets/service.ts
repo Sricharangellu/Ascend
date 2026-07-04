@@ -1,6 +1,7 @@
 import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import { HttpError } from "../../shared/http.js";
+import { writeAudit } from "../../shared/audit.js";
 
 /** Outlets (locations) + registers (tills). Multi-location core.
  *  Tenant-scoped. A register opens/closes for a trading session. */
@@ -146,6 +147,16 @@ export class OutletsService {
       session as unknown as Record<string, unknown>,
     );
     await this.setRegisterStatus(registerId, "open", tenantId);
+
+    await writeAudit(this.db, {
+      tenantId,
+      actorId: openedBy,
+      action: "register.session_opened",
+      entityType: "register_session",
+      entityId: session.id,
+      after: { registerId, openingFloatCents },
+    });
+
     return session;
   }
 
@@ -175,7 +186,7 @@ export class OutletsService {
     };
   }
 
-  async closeSession(registerId: string, countedCashCents: number, closingFloatCents: number, tenantId: string): Promise<RegisterSession> {
+  async closeSession(registerId: string, countedCashCents: number, closingFloatCents: number, tenantId: string, actorId = "system"): Promise<RegisterSession> {
     const session = await this.db.one<RegisterSession>(
       "SELECT * FROM register_sessions WHERE register_id = @registerId AND tenant_id = @tenantId AND status = 'open' ORDER BY opened_at DESC LIMIT 1",
       { registerId, tenantId },
@@ -193,6 +204,17 @@ export class OutletsService {
       { counted: countedCashCents, closing: closingFloatCents, variance: varianceCents, now, id: session.id, tenantId },
     );
     await this.setRegisterStatus(registerId, "closed", tenantId);
+
+    await writeAudit(this.db, {
+      tenantId,
+      actorId,
+      action: "register.session_closed",
+      entityType: "register_session",
+      entityId: session.id,
+      before: { status: "open" },
+      after: { registerId, countedCashCents, varianceCents },
+    });
+
     return { ...session, status: "closed", counted_cash_cents: countedCashCents, closing_float_cents: closingFloatCents, variance_cents: varianceCents, closed_at: now };
   }
 
