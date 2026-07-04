@@ -295,6 +295,155 @@ export class PurchasingService {
     }));
   }
 
+  // ── Vendor-360 detail views ─────────────────────────────────────────────────
+
+  /** Full vendor profile: supplier row + spend / credit / fulfillment KPIs. */
+  async vendorDetail(id: string, tenantId: string): Promise<Record<string, unknown>> {
+    const supplier = await this.getSupplier(id, tenantId);
+    if (!supplier) throw new HttpError(404, "not_found", `vendor '${id}' not found`);
+
+    const spend = await this.db.one<{ po_count: number; spent: number }>(
+      `SELECT COUNT(*)::int AS po_count, COALESCE(SUM(total_cost_cents),0) AS spent
+         FROM purchase_orders WHERE tenant_id = @tenantId AND supplier_id = @id AND status = 'received'`,
+      { tenantId, id },
+    );
+    const credits = await this.db.one<{ credits: number }>(
+      `SELECT COALESCE(SUM(amount_cents),0) AS credits
+         FROM vendor_credits WHERE tenant_id = @tenantId AND supplier_id = @id AND status = 'open'`,
+      { tenantId, id },
+    );
+    // Fill rate = received qty vs ordered qty across all non-cancelled PO lines.
+    const fill = await this.db.one<{ ordered: number; received: number }>(
+      `SELECT COALESCE(SUM(l.quantity),0) AS ordered, COALESCE(SUM(l.received_qty),0) AS received
+         FROM purchase_order_lines l
+         JOIN purchase_orders po ON po.id = l.po_id AND po.tenant_id = l.tenant_id
+        WHERE l.tenant_id = @tenantId AND po.supplier_id = @id AND po.status <> 'cancelled'`,
+      { tenantId, id },
+    );
+
+    const poCount = Number(spend?.po_count ?? 0);
+    const totalSpentCents = Number(spend?.spent ?? 0);
+    const ordered = Number(fill?.ordered ?? 0);
+    const received = Number(fill?.received ?? 0);
+    return {
+      ...supplier,
+      poCount,
+      totalSpentCents,
+      openCreditsCents: Number(credits?.credits ?? 0),
+      avg_po_value_cents: poCount > 0 ? Math.round(totalSpentCents / poCount) : 0,
+      fill_rate_pct: ordered > 0 ? Math.round((received / ordered) * 100) : null,
+      on_time_delivery_pct: null, // no promised-date tracking yet
+      dispute_rate_pct: null,
+    };
+  }
+
+  /** Products purchased from this vendor, derived from PO line history. */
+  async vendorProducts(id: string, tenantId: string): Promise<unknown[]> {
+    return this.db.query(
+      `SELECT DISTINCT ON (l.product_id)
+              'vp_' || l.product_id                        AS id,
+              l.product_id,
+              COALESCE(p.name, l.product_id)               AS product_name,
+              p.sku,
+              NULL::text                                    AS vendor_sku,
+              l.unit_cost_cents                             AS cost_cents,
+              p.price_cents                                 AS retail_price_cents,
+              CASE WHEN p.price_cents > 0
+                   THEN ROUND((p.price_cents - l.unit_cost_cents)::numeric * 100 / p.price_cents, 1)::float
+                   ELSE NULL END                            AS margin_pct,
+              l.unit_cost_cents                             AS last_cost_cents,
+              NULL::int                                     AS moq,
+              s.lead_time_days,
+              (p.preferred_vendor_id = @id)                 AS is_preferred,
+              po.created_at                                 AS last_ordered_at
+         FROM purchase_order_lines l
+         JOIN purchase_orders po ON po.id = l.po_id AND po.tenant_id = l.tenant_id
+         LEFT JOIN products p ON p.id = l.product_id AND p.tenant_id = l.tenant_id
+         LEFT JOIN suppliers s ON s.id = po.supplier_id AND s.tenant_id = po.tenant_id
+        WHERE l.tenant_id = @tenantId AND po.supplier_id = @id
+        ORDER BY l.product_id, po.created_at DESC
+        LIMIT 200`,
+      { tenantId, id },
+    );
+  }
+
+  /** Purchase orders placed with this vendor (newest first). */
+  async vendorPurchaseOrders(id: string, tenantId: string): Promise<unknown[]> {
+    return this.db.query(
+      `SELECT po.id,
+              CASE WHEN po.po_number IS NOT NULL THEN 'PO-' || po.po_number
+                   ELSE 'PO-' || UPPER(RIGHT(po.id, 4)) END AS po_number,
+              po.status,
+              po.receive_status,
+              po.total_cost_cents,
+              (SELECT COUNT(*)::int FROM purchase_order_lines l
+                WHERE l.po_id = po.id AND l.tenant_id = po.tenant_id) AS line_count,
+              po.created_at,
+              po.received_at
+         FROM purchase_orders po
+        WHERE po.tenant_id = @tenantId AND po.supplier_id = @id
+        ORDER BY po.created_at DESC
+        LIMIT 200`,
+      { tenantId, id },
+    );
+  }
+
+  /** Supplier bills (AP invoices) for this vendor. Reads the shared bills table. */
+  async vendorInvoices(id: string, tenantId: string): Promise<unknown[]> {
+    return this.db.query(
+      `SELECT b.id, b.bill_number, b.po_id,
+              CASE WHEN po.po_number IS NOT NULL THEN 'PO-' || po.po_number
+                   WHEN b.po_id IS NOT NULL THEN 'PO-' || UPPER(RIGHT(b.po_id, 4)) END AS po_number,
+              b.status, b.total_cents, b.paid_cents, b.due_date, b.issued_at
+         FROM bills b
+         LEFT JOIN purchase_orders po ON po.id = b.po_id AND po.tenant_id = b.tenant_id
+        WHERE b.tenant_id = @tenantId AND b.supplier_id = @id
+        ORDER BY b.issued_at DESC
+        LIMIT 200`,
+      { tenantId, id },
+    );
+  }
+
+  /** Chargebacks and credit memos for this vendor. */
+  async vendorCreditsFor(id: string, tenantId: string): Promise<unknown[]> {
+    return this.db.query(
+      `SELECT vc.id, vc.type, vc.amount_cents, vc.reason, vc.po_id,
+              CASE WHEN po.po_number IS NOT NULL THEN 'PO-' || po.po_number
+                   WHEN vc.po_id IS NOT NULL THEN 'PO-' || UPPER(RIGHT(vc.po_id, 4)) END AS po_number,
+              vc.status, vc.created_at
+         FROM vendor_credits vc
+         LEFT JOIN purchase_orders po ON po.id = vc.po_id AND po.tenant_id = vc.tenant_id
+        WHERE vc.tenant_id = @tenantId AND vc.supplier_id = @id
+        ORDER BY vc.created_at DESC
+        LIMIT 200`,
+      { tenantId, id },
+    );
+  }
+
+  /** Receiving history: per-PO ordered vs received quantities. */
+  async vendorReceiving(id: string, tenantId: string): Promise<unknown[]> {
+    return this.db.query(
+      `SELECT 'rcv_' || po.id                               AS id,
+              po.id                                          AS po_id,
+              'PO-' || UPPER(RIGHT(po.id, 4))                AS po_number,
+              NULL::text                                     AS received_by,
+              po.received_at,
+              COALESCE(SUM(l.quantity),0)::int               AS qty_ordered,
+              COALESCE(SUM(l.received_qty),0)::int           AS qty_received,
+              GREATEST(COALESCE(SUM(l.quantity),0) - COALESCE(SUM(l.received_qty),0), 0)::int AS short_qty,
+              0                                              AS damage_qty,
+              NULL::text                                     AS notes
+         FROM purchase_orders po
+         JOIN purchase_order_lines l ON l.po_id = po.id AND l.tenant_id = po.tenant_id
+        WHERE po.tenant_id = @tenantId AND po.supplier_id = @id
+          AND po.receive_status <> 'pending'
+        GROUP BY po.id, po.received_at
+        ORDER BY po.received_at DESC NULLS LAST
+        LIMIT 200`,
+      { tenantId, id },
+    );
+  }
+
   // ── Vendor AP credits: chargebacks + credit memos ───────────────────────────
   async createVendorCredit(
     input: { supplierId: string; type: VendorCreditType; amountCents: number; reason?: string; poId?: string },

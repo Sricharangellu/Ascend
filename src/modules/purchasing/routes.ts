@@ -115,6 +115,31 @@ export function registerRoutes(router: Router, service: PurchasingService): void
     res.json({ items: await service.vendors(tenantId(res)) });
   }));
 
+  // ── Vendor-360 detail views ────────────────────────────────────────────────
+  router.get("/vendors/:id", handler(async (req, res) => {
+    res.json(await service.vendorDetail(String(req.params.id), tenantId(res)));
+  }));
+
+  router.get("/vendors/:id/products", handler(async (req, res) => {
+    res.json({ items: await service.vendorProducts(String(req.params.id), tenantId(res)) });
+  }));
+
+  router.get("/vendors/:id/purchase-orders", handler(async (req, res) => {
+    res.json({ items: await service.vendorPurchaseOrders(String(req.params.id), tenantId(res)) });
+  }));
+
+  router.get("/vendors/:id/invoices", handler(async (req, res) => {
+    res.json({ items: await service.vendorInvoices(String(req.params.id), tenantId(res)) });
+  }));
+
+  router.get("/vendors/:id/credits", handler(async (req, res) => {
+    res.json({ items: await service.vendorCreditsFor(String(req.params.id), tenantId(res)) });
+  }));
+
+  router.get("/vendors/:id/receiving", handler(async (req, res) => {
+    res.json({ items: await service.vendorReceiving(String(req.params.id), tenantId(res)) });
+  }));
+
   // Vendor AP credits — chargebacks + credit memos.
   router.post("/vendor-credits", mgr, handler(async (req, res) => {
     const b = parseBody(vendorCreditSchema, req.body);

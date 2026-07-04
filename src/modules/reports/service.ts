@@ -330,6 +330,33 @@ export class ReportsService {
     return this.buildAging(rows.map((r) => ({ partyId: r.customer_id, balance: Number(r.balance), dueDate: r.due_date })), now);
   }
 
+  /** Dunning sweep: set dunning_level (1/2/3) on overdue open/partial invoices.
+   *  Same bucketing as billing's runDunning; returns the number of rows whose
+   *  level changed (the frontend's sweep-button contract). */
+  async sweepArAging(tenantId: string, now = Date.now()): Promise<{ updated: number }> {
+    const DAY = 86_400_000;
+    const overdue = await this.db.query<{ id: string; due_date: number; dunning_level: number }>(
+      `SELECT id, due_date, dunning_level FROM invoices
+        WHERE tenant_id = @t
+          AND status IN ('open', 'partial')
+          AND due_date IS NOT NULL
+          AND due_date < @now`,
+      { t: tenantId, now },
+    );
+    let updated = 0;
+    for (const inv of overdue) {
+      const daysOverdue = Math.floor((now - Number(inv.due_date)) / DAY);
+      const level = daysOverdue >= 90 ? 3 : daysOverdue >= 60 ? 2 : 1;
+      if (Number(inv.dunning_level) === level) continue;
+      await this.db.query(
+        "UPDATE invoices SET dunning_level = @level WHERE id = @id AND tenant_id = @t",
+        { level, id: inv.id, t: tenantId },
+      );
+      updated++;
+    }
+    return { updated };
+  }
+
   /** Accounts Payable aging — open supplier bill balances bucketed by days overdue. */
   async apAging(tenantId: string, now = Date.now()): Promise<AgingReport> {
     const rows = await this.db.query<{ supplier_id: string; balance: number; due_date: number | null }>(

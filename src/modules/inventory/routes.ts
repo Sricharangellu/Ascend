@@ -183,6 +183,79 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
     }),
   );
 
+  // Location-to-location transfers — before /:productId so "transfers" isn't an id.
+  router.get(
+    "/transfers",
+    handler(async (_req, res) => {
+      res.json({ items: await service.listTransfers(tenantId(res)) });
+    }),
+  );
+
+  const transferSchema = z.object({
+    from_location_id: z.string().min(1),
+    to_location_id: z.string().min(1),
+    product_id: z.string().min(1),
+    quantity: z.number().int().positive(),
+    note: z.string().nullable().optional(),
+  });
+
+  router.post(
+    "/transfers",
+    handler(async (req, res) => {
+      const body = parseBody(transferSchema, req.body);
+      const row = await service.createTransfer(tenantId(res), {
+        fromLocationId: body.from_location_id,
+        toLocationId: body.to_location_id,
+        productId: body.product_id,
+        quantity: body.quantity,
+        note: body.note ?? null,
+      });
+      res.status(201).json({
+        id: row.id,
+        from_location_id: row.from_location_id,
+        to_location_id: row.to_location_id,
+        product_id: row.product_id,
+        quantity: row.quantity,
+        note: row.note,
+        status: row.status,
+        created_at: row.created_at,
+      });
+    }),
+  );
+
+  // Manual location-level stock correction (add | remove | set) — mock parity.
+  const locationAdjustSchema = z.object({
+    product_id: z.string().min(1),
+    location_id: z.string().min(1),
+    delta: z.number().int(),
+    mode: z.enum(["add", "remove", "set"]).optional(),
+    reason: z.string().min(1),
+    note: z.string().nullable().optional(),
+    actor: z.string().optional(),
+  });
+
+  router.post(
+    "/adjustments",
+    handler(async (req, res) => {
+      const body = parseBody(locationAdjustSchema, req.body);
+      const { actualDelta } = await service.adjustAtLocation(tenantId(res), {
+        productId: body.product_id,
+        locationId: body.location_id,
+        delta: body.delta,
+        mode: body.mode,
+        ref: body.note ?? body.reason,
+      });
+      res.status(201).json({
+        id: `adj_${Date.now().toString(36)}`,
+        product_id: body.product_id,
+        location_id: body.location_id,
+        delta: actualDelta,
+        reason: body.reason,
+        applied_at: Date.now(),
+      });
+    }),
+  );
+
   router.get(
     "/:productId",
     handler(async (req, res) => {

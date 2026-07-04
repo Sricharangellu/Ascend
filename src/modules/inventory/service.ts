@@ -763,11 +763,11 @@ export class InventoryService {
         );
       } else {
         const initQty = Math.max(0, delta);
-        const id = `ist_${uuidv7()}`;
+        // inventory_stock has a composite PK (tenant_id, location_id, product_id) — no id column.
         await tdb.query(
-          `INSERT INTO inventory_stock (id, tenant_id, location_id, product_id, quantity_on_hand, quantity_committed, average_cost_cents, reorder_level, reorder_quantity, updated_at)
-           VALUES (@id, @tenantId, @locationId, @productId, @qty, 0, 0, 0, 0, @now)`,
-          { id, tenantId, locationId, productId, qty: initQty, now },
+          `INSERT INTO inventory_stock (tenant_id, location_id, product_id, quantity_on_hand, quantity_committed, average_cost_cents, reorder_level, reorder_quantity, updated_at)
+           VALUES (@tenantId, @locationId, @productId, @qty, 0, 0, 0, 0, @now)`,
+          { tenantId, locationId, productId, qty: initQty, now },
         );
       }
       await tdb.query(
@@ -781,6 +781,112 @@ export class InventoryService {
       ))!;
     });
   }
+
+  // ── Location-to-location transfers ─────────────────────────────────────────
+
+  async listTransfers(tenantId: string): Promise<InventoryTransferView[]> {
+    return this.db.query<InventoryTransferView>(
+      `SELECT t.id, t.transfer_number, t.status, t.quantity AS qty, t.note, t.created_at, t.due_date,
+              t.product_id,
+              COALESCE(fl.name, t.from_location_id) AS from_location,
+              COALESCE(tl.name, t.to_location_id)   AS to_location
+         FROM inventory_transfers t
+         LEFT JOIN inventory_locations fl ON fl.tenant_id = t.tenant_id AND fl.id = t.from_location_id
+         LEFT JOIN inventory_locations tl ON tl.tenant_id = t.tenant_id AND tl.id = t.to_location_id
+        WHERE t.tenant_id = @tenantId
+        ORDER BY t.created_at DESC
+        LIMIT 200`,
+      { tenantId },
+    );
+  }
+
+  async createTransfer(
+    tenantId: string,
+    input: { fromLocationId: string; toLocationId: string; productId: string; quantity: number; note?: string | null },
+  ): Promise<InventoryTransfer> {
+    if (input.fromLocationId === input.toLocationId) {
+      throw new HttpError(400, "validation", "from and to locations must differ");
+    }
+    const now = Date.now();
+    const id = `xfr_${uuidv7()}`;
+    const countRow = await this.db.one<{ n: number }>(
+      "SELECT COUNT(*)::int AS n FROM inventory_transfers WHERE tenant_id = @tenantId",
+      { tenantId },
+    );
+    const transferNumber = `TRF-${String((countRow?.n ?? 0) + 1).padStart(4, "0")}`;
+
+    // Move stock: out of the source location, into the destination. Both legs
+    // land in the movement ledger with the transfer id as the reference.
+    await this.adjustStock(tenantId, input.fromLocationId, input.productId, -input.quantity, "adjustment", id);
+    await this.adjustStock(tenantId, input.toLocationId, input.productId, input.quantity, "adjustment", id);
+
+    const row: InventoryTransfer = {
+      id,
+      tenant_id: tenantId,
+      transfer_number: transferNumber,
+      from_location_id: input.fromLocationId,
+      to_location_id: input.toLocationId,
+      product_id: input.productId,
+      quantity: input.quantity,
+      status: "completed",
+      note: input.note ?? null,
+      created_at: now,
+      due_date: null,
+    };
+    await this.db.query(
+      `INSERT INTO inventory_transfers (id, tenant_id, transfer_number, from_location_id, to_location_id, product_id, quantity, status, note, created_at, due_date)
+       VALUES (@id, @tenant_id, @transfer_number, @from_location_id, @to_location_id, @product_id, @quantity, @status, @note, @created_at, @due_date)`,
+      row as unknown as Record<string, unknown>,
+    );
+    return row;
+  }
+
+  /** Mode-aware manual stock correction at a location (add | remove | set). */
+  async adjustAtLocation(
+    tenantId: string,
+    input: { productId: string; locationId: string; delta: number; mode?: "add" | "remove" | "set"; ref?: string },
+  ): Promise<{ actualDelta: number; stock: InventoryStock }> {
+    const current = await this.db.one<InventoryStock>(
+      "SELECT * FROM inventory_stock WHERE tenant_id = @tenantId AND location_id = @locationId AND product_id = @productId",
+      { tenantId, locationId: input.locationId, productId: input.productId },
+    );
+    const onHand = Number(current?.quantity_on_hand ?? 0);
+    let actualDelta = input.delta;
+    if (input.mode === "set") actualDelta = input.delta - onHand;
+    else if (input.mode === "remove") actualDelta = -Math.abs(input.delta);
+    if (actualDelta === 0) {
+      throw new HttpError(400, "validation", "adjustment is a no-op (delta resolves to zero)");
+    }
+    const stock = await this.adjustStock(tenantId, input.locationId, input.productId, actualDelta, "adjustment", input.ref);
+    return { actualDelta, stock };
+  }
+}
+
+export interface InventoryTransfer {
+  id: string;
+  tenant_id: string;
+  transfer_number: string;
+  from_location_id: string;
+  to_location_id: string;
+  product_id: string;
+  quantity: number;
+  status: string;
+  note: string | null;
+  created_at: number;
+  due_date: number | null;
+}
+
+export interface InventoryTransferView {
+  id: string;
+  transfer_number: string;
+  from_location: string;
+  to_location: string;
+  product_id: string;
+  status: string;
+  qty: number;
+  note: string | null;
+  created_at: number;
+  due_date: number | null;
 }
 
 export interface ReorderSuggestion {

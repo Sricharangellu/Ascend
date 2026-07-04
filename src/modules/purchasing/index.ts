@@ -154,6 +154,14 @@ CREATE INDEX IF NOT EXISTS suppliers_tenant_type_idx ON suppliers (tenant_id, ve
 CREATE INDEX IF NOT EXISTS suppliers_tenant_status_idx ON suppliers (tenant_id, status);
 `;
 
+// Vendor-360 profile fields the detail page renders that predate this ALTER.
+// (company/phone/contact_name/terms_days already added by ALTER_PO_XLSX_FIELDS.)
+const ALTER_SUPPLIERS_VENDOR_360 = `
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS payment_method TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS lead_time_days INTEGER;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS notes TEXT;
+`;
+
 // Landed costs: freight and other charges applied to a PO after goods are invoiced.
 // freight_cost_cents + other_charges_cents sit on the PO; the total is distributed
 // to lines proportionally by line_cost / goods_total (value method — most common).
@@ -302,7 +310,7 @@ $$;
  *  `purchase_order.received`; inventory listens and increments stock. */
 export const purchasingModule: PosModule = {
   name: "purchasing",
-  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES, ADD_PO_LINE_FK, ADD_PURCHASING_UPDATED_AT_TRIGGERS, CREATE_PO_DOCUMENTS],
+  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_SUPPLIERS_VENDOR_360, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES, ADD_PO_LINE_FK, ADD_PURCHASING_UPDATED_AT_TRIGGERS, CREATE_PO_DOCUMENTS],
   async register({ db, events, router }) {
     const service = new PurchasingService(db, events);
     registerRoutes(router, service);

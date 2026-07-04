@@ -56,6 +56,11 @@ export function registerRoutes(router: Router, service: ReportsService): void {
     res.json(await service.arAging(tenantId(res)));
   }));
 
+  // POST /api/v1/reports/ar-aging/sweep — flag overdue invoices with dunning_level.
+  router.post("/ar-aging/sweep", handler(async (_req, res) => {
+    res.json(await service.sweepArAging(tenantId(res)));
+  }));
+
   // GET /api/v1/reports/ap-aging — Accounts Payable aging buckets.
   router.get("/ap-aging", handler(async (_req, res) => {
     res.json(await service.apAging(tenantId(res)));

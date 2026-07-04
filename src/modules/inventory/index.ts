@@ -204,6 +204,23 @@ $$;
     // DB-14: FIFO/FEFO costing — add unit_cost_cents to inventory_movements.
     // Populated on stock-in (PO receive) so COGS = SUM(|delta| × unit_cost_cents).
     `ALTER TABLE inventory_movements ADD COLUMN IF NOT EXISTS unit_cost_cents BIGINT;`,
+    // Location-to-location stock transfers (mock-only endpoint parity).
+    `
+CREATE TABLE IF NOT EXISTS inventory_transfers (
+  id               TEXT PRIMARY KEY,
+  tenant_id        TEXT NOT NULL,
+  transfer_number  TEXT NOT NULL,
+  from_location_id TEXT NOT NULL,
+  to_location_id   TEXT NOT NULL,
+  product_id       TEXT NOT NULL,
+  quantity         INTEGER NOT NULL,
+  status           TEXT NOT NULL DEFAULT 'completed',
+  note             TEXT,
+  created_at       BIGINT NOT NULL,
+  due_date         BIGINT
+);
+CREATE INDEX IF NOT EXISTS inventory_transfers_tenant_idx ON inventory_transfers (tenant_id, created_at DESC);
+`,
   ],
   register({ db, events, router }) {
     const service = new InventoryService(db, events);
