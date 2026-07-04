@@ -8,6 +8,20 @@
 **Phase 1: Truth and cleanup** per `WORK/FORWARD_PLAN.md`. Feature/module expansion is
 **PAUSED** until Phase 2 (core release spine) exit criteria pass.
 
+2026-07-04 session E part 2 (RLS gap — full findings in `WORK/AUDIT_2026-07-04C.md`):
+queue item #4 is **Built and verified**. Instead of hand-editing 489 raw query sites,
+the fix is systemic: the gateway's `tenantResolver` now enters an AsyncLocalStorage
+tenant scope from the verified JWT, and `shared/db.ts` sets `app.tenant_id` on every
+query in that scope — RLS filters every authenticated request to its tenant even when
+a query forgets its WHERE clause. RLS policy updated to keep `tenant_id IS NULL`
+(global flags) and `tenant_id='system'` (system jobs) rows visible. Also made the 30s
+tx statement_timeout real (SET LOCAL previously ran before BEGIN — a no-op since day
+one). New cross-tenant regression test (`src/gateway/tenant-isolation.test.ts`) proves
+the backstop via a non-superuser role: leaky query returns 0 cross-tenant rows, forged
+INSERT rejected. NOTE: production must run the app as a non-superuser DB role or RLS
+is inert. Strict flip (deny-when-unset) deferred — needs BYPASSRLS login-role split +
+e2e green. Gates: tsc 0 errors, smoke 14/14, probe 22/22, full backend suite green.
+
 2026-07-04 session E (parallel non-overlapping mock-only endpoints — full findings in
 `WORK/AUDIT_2026-07-04B.md`): queue item #3 is **Built and verified**. All ~14 mock-only
 endpoints now exist on the real backend against real Postgres tables: inventory
@@ -78,7 +92,9 @@ adjustment modal branches are Phase-2 relevant). `NEXT_PUBLIC_MOCK` made env-ove
 3. **~14 mock-only endpoints** incl. core `POST /inventory/transfers`, `POST /inventory/adjustments`,
    `POST /team`, `GET /team/:id`, `GET /workflows/templates`, Vendor-360 family (6 routes) —
    **DONE 2026-07-04 session E; live-Postgres probe 22/22, smoke 14/14. See AUDIT_2026-07-04B.md.**
-4. **RLS gap**: `withTenant()` adopted in only ~10/46 modules; policy permissive when unset.
+4. **RLS gap**: `withTenant()` adopted in only ~10/46 modules; policy permissive when unset —
+   **DONE 2026-07-04 session E (request-scoped tenant context; see AUDIT_2026-07-04C.md).
+   Follow-up remains: strict deny-when-unset flip, gated on e2e green + login-role split.**
 5. **Mock default flip decision**: deployed frontend is 100% mock; needs real-backend
    deployment target + staging DB before flipping `NEXT_PUBLIC_MOCK` default.
 6. **Vertical pages crash without mocks (12 e2e failures)** — deprioritized per RULES.md

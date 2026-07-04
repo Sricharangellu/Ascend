@@ -20,10 +20,10 @@ Status: ACTIVE
 |---|---|
 | Agent/session | Claude session E (desktop app, "next" directive from Sri) |
 | Queue item | #4 — RLS gap: request-scoped tenant context (AsyncLocalStorage) so the DB layer sets app.tenant_id on every authenticated query; cross-tenant regression test on real Postgres. Policy stays permissive-when-unset (strict flip deferred until e2e green) |
-| Files/areas expected | `src/shared/db.ts`, `src/shared/tenant-context.ts` (new), `src/app.ts` (middleware wiring), new backend test file — backend only, NO `web/**` edits. Embedded Postgres via test harness (no fixed ports) |
+| Files/areas expected | `src/shared/db.ts`, `src/shared/tenant-context.ts` (new), `src/gateway/auth.ts` (tenantResolver), `src/modules/rls/index.ts` (policy carve-outs), `src/gateway/tenant-isolation.test.ts` (new) — backend only, NO `web/**` edits. Embedded Postgres via test harness (no fixed ports) |
 | Started | 2026-07-04 |
 | Last update | 2026-07-04 |
-| Status | ACTIVE |
+| Status | RELEASED — built + verified (isolation test PASS via non-superuser role, tsc 0 errors, smoke 14/14, probe 22/22, full suite green); committed and pushed. See WORK/AUDIT_2026-07-04C.md |
 | Blockers | none |
 
 ## Released Claims (session E, item #3)
