@@ -1,6 +1,6 @@
 # FinderPOS — Multi-Agent Work Lock
 
-Status: ACTIVE
+Status: FREE
 
 ## Parallel Non-Overlapping Claim (Codex session J - retail-first platform scope rewrite)
 
@@ -10,8 +10,8 @@ Status: ACTIVE
 | Queue item | Documentation/planning rewrite: make retail the first complete business type, define demo business-type switcher and business-pack tracking rules for all future agents |
 | Files/areas expected | `WORK/RULES.md`, `WORK/FORWARD_PLAN.md`, `WORK/WORK_STATE.md`, new audit note only. NO app code, NO backend modules, NO web pages, NO e2e specs. |
 | Started | 2026-07-04 14:56 CDT |
-| Last update | 2026-07-04 14:56 CDT |
-| Status | ACTIVE |
+| Last update | 2026-07-04 14:59 CDT |
+| Status | RELEASED - shipped in `6f59580`; WORK rules/plan/state now mandate retail-first development, capabilities-driven setup/settings/demo switching, and no non-retail deepening until retail is Built and verified |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (Codex session I — production mock-off deploy guard)
