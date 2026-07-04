@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-04  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
+> Last updated: 2026-07-04 01:08 CDT  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
 
 ---
 
@@ -7,6 +7,18 @@
 
 **Phase 1: Truth and cleanup** per `WORK/FORWARD_PLAN.md`. Feature/module expansion is
 **PAUSED** until Phase 2 (core release spine) exit criteria pass.
+
+2026-07-04 session F (parallel non-overlapping frontend security hardening — full
+findings in `WORK/AUDIT_2026-07-04D.md`): SEC-4 is **Built and verified**. The catalog
+print labels modal no longer builds label markup with product fields interpolated into
+an HTML string. It now creates label nodes with DOM APIs and assigns product name/SKU/
+barcode via `textContent`, closing the stored-XSS path from malicious product data.
+Added a regression test with malicious product fields proving no `img`, `script`, or
+`svg` nodes are created and print/close still run. Also verified SEC-3 was already fixed
+before this session: `web/middleware.ts` already sets the HSTS header. Verification:
+focused Vitest PASS, full frontend Vitest PASS 84/84, frontend typecheck PASS, lint PASS
+with the same 4 pre-existing hook warnings, production build PASS, backend typecheck
+PASS, backend tests PASS 312/312.
 
 2026-07-04 session E part 2 (RLS gap — full findings in `WORK/AUDIT_2026-07-04C.md`):
 queue item #4 is **Built and verified**. Instead of hand-editing 489 raw query sites,
@@ -496,7 +508,7 @@ Score: 94/100 — launch-ready, zero CRITICAL.
 |---|---|---|---|
 | **SEC-1** | `.env` (repo root) | A `VERCEL_TOKEN` is stored in `.env` which IS in `.gitignore` but the file EXISTS on disk. If the repo is ever archived, zipped, or deployed via `git archive`, this token leaks. **Rotate this token immediately via the Vercel dashboard.** | Token compromise → unauthorized deploys |
 | **SEC-2** | `web/middleware.ts:54` | CSP uses `'unsafe-eval'` in development. If the dev build is ever accidentally deployed to staging/prod (e.g., via `NODE_ENV` misconfiguration), eval-based XSS becomes possible. Should be `NODE_ENV === "production"` guard verified at deploy time, not runtime. | XSS if wrong build deployed |
-| **SEC-3** | `web/middleware.ts` | **Missing `Strict-Transport-Security` (HSTS) header.** The middleware sets `X-Frame-Options`, `CSP`, etc., but no HSTS. Without it, browsers may downgrade to HTTP on first load before the cookie is set. Add: `Strict-Transport-Security: max-age=31536000; includeSubDomains` | HTTPS downgrade on first visit |
+| **SEC-3** | `web/middleware.ts` | **RESOLVED before 2026-07-04 session F** — middleware already sets `Strict-Transport-Security: max-age=31536000; includeSubDomains`. | Former HTTPS downgrade risk |
 
 ---
 
@@ -504,7 +516,7 @@ Score: 94/100 — launch-ready, zero CRITICAL.
 
 | ID | File | Issue | Risk |
 |---|---|---|---|
-| **SEC-4** | `web/app/(protected)/catalog/_components/PrintLabelsModal.tsx:9` | Uses `win.document.write()` to inject product `name`, `sku`, `barcode` values into a popup window without escaping. If any product field contains `</script>` or `<img onerror=…>`, it executes in the popup context. Mitigation: use `textContent` assignment or sanitize all fields before injection. | Stored XSS via product data |
+| **SEC-4** | `web/app/(protected)/catalog/_components/PrintLabelsModal.tsx` | **DONE 2026-07-04 session F** — label print document now creates DOM nodes and assigns product fields through `textContent`; malicious product-field regression test added. | Former stored XSS via product data |
 | **SEC-5** | `web/middleware.ts` | `middleware.ts` allows `/api` path prefix through without auth check (line: `"/api"` in `PUBLIC_PATH_PREFIXES`). This is correct for MSW in dev, but means all Next.js API routes (`/api/*`) are publicly accessible. If any server-side API routes are added under `web/app/api/`, they must implement their own auth. Currently no real API routes exist there, but this is a silent footgun. | Future API routes exposed |
 | **SEC-6** | `src/app.ts` | CORS uses `isDev = process.env.NODE_ENV !== "production"` — any non-production NODE_ENV value (e.g., `"staging"`, `"test"`) opens CORS to all origins. Should be `isDev = process.env.NODE_ENV === "development"` for safety. | CORS bypass in staging |
 
@@ -693,11 +705,9 @@ Score: 94/100 — launch-ready, zero CRITICAL.
 
 #### Immediate fixes (before any new features)
 
-1. **SEC-3** — Add HSTS header to `web/middleware.ts` (1 line)
-2. **BUG-1** — Remove duplicate `customer-invoices` handlers from `mockHandlers.ts` (lines 5517–5627)
-3. **BUG-2 / BUG-3** — Add `.catch(setError)` to all tab fetches in `/warehouse` and `/pricing`
-4. **SEC-4** — Sanitize product fields before `document.write()` in `PrintLabelsModal.tsx`
-5. **SEC-1** — Rotate the Vercel token in `.env` immediately
+1. **BUG-1** — Remove duplicate `customer-invoices` handlers from `mockHandlers.ts` (lines 5517–5627)
+2. **BUG-2 / BUG-3** — Add `.catch(setError)` to all tab fetches in `/warehouse` and `/pricing`
+3. **SEC-1** — Rotate the Vercel token in `.env` immediately
 
 #### Next domain build
 

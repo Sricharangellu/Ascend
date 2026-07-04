@@ -34,6 +34,30 @@ Status: ACTIVE
 | Status | ACTIVE |
 | Blockers | none |
 
+## Parallel Non-Overlapping Claim (Codex session C — SEC-3)
+
+| Field | Value |
+|---|---|
+| Agent/session | Codex session C |
+| Queue item | SEC-3 — Add frontend HSTS header in `web/middleware.ts` |
+| Files/areas expected | `web/middleware.ts`, `WORK/WORK_STATE.md`, new audit note only. No `.github/**`, no `web/e2e/**`, no backend/server/ports/database. |
+| Started | 2026-07-04 |
+| Last update | 2026-07-04 |
+| Status | RELEASED — no code change needed; current `web/middleware.ts` already sets `Strict-Transport-Security: max-age=31536000; includeSubDomains` |
+| Blockers | none |
+
+## Parallel Non-Overlapping Claim (Codex session C — SEC-4)
+
+| Field | Value |
+|---|---|
+| Agent/session | Codex session C |
+| Queue item | SEC-4 — Remove unsafe `document.write()` product-field injection from print labels modal |
+| Files/areas expected | `web/app/(protected)/catalog/_components/PrintLabelsModal.tsx`, focused test if existing pattern allows, `WORK/WORK_STATE.md`, new audit note. No `.github/**`, no `web/e2e/**`, no backend/server/ports/database. |
+| Started | 2026-07-04 |
+| Last update | 2026-07-04 |
+| Status | READY TO RELEASE AFTER PUSH — non-overlapping work complete; focused Vitest PASS, full frontend Vitest 84/84, frontend typecheck/lint/build PASS, backend typecheck PASS, backend tests PASS 312/312 |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim
 
 | Field | Value |

@@ -3,14 +3,9 @@
 import { formatMoney } from "@/lib/money";
 import type { Product } from "@/api-client/types";
 
-function esc(str: string): string {
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
-function printLabels(products: Product[]) {
-  const win = window.open("", "_blank");
-  if (!win) return;
-  win.document.write(`<!doctype html><html><head><title>Labels</title><style>
+function appendLabelStyles(doc: Document) {
+  const style = doc.createElement("style");
+  style.textContent = `
     body { margin: 0; font-family: monospace; }
     .sheet { display: grid; grid-template-columns: repeat(4, 2in); gap: 0.125in; padding: 0.25in; }
     .label { width: 2in; height: 1in; border: 1px solid #ccc; padding: 4px; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
@@ -19,14 +14,44 @@ function printLabels(products: Product[]) {
     .barcode-box { flex: 1; background: #f3f3f3; margin: 2px 0; display: flex; align-items: center; justify-content: center; font-size: 6px; color: #555; }
     .price { font-size: 13px; font-weight: bold; text-align: right; }
     @media print { @page { margin: 0.25in; } }
-  </style></head><body><div class="sheet">${products.map(p => `
-    <div class="label">
-      <div class="name">${esc(p.name)}</div>
-      <div class="sku">${esc(p.sku)}</div>
-      <div class="barcode-box">${esc(p.barcode ?? p.sku)}</div>
-      <div class="price">${formatMoney(p.price_cents)}</div>
-    </div>`).join("")}</div><script>window.onload=()=>{window.print();window.close();}<\/script></body></html>`);
-  win.document.close();
+  `;
+  doc.head.appendChild(style);
+}
+
+function appendText(doc: Document, parent: HTMLElement, className: string, text: string) {
+  const node = doc.createElement("div");
+  node.className = className;
+  node.textContent = text;
+  parent.appendChild(node);
+}
+
+function printLabels(products: Product[]) {
+  const win = window.open("", "_blank");
+  if (!win) return;
+
+  const doc = win.document;
+  doc.title = "Labels";
+  doc.head.replaceChildren();
+  doc.body.replaceChildren();
+  appendLabelStyles(doc);
+
+  const sheet = doc.createElement("div");
+  sheet.className = "sheet";
+  for (const product of products) {
+    const label = doc.createElement("div");
+    label.className = "label";
+    appendText(doc, label, "name", product.name);
+    appendText(doc, label, "sku", product.sku);
+    appendText(doc, label, "barcode-box", product.barcode ?? product.sku);
+    appendText(doc, label, "price", formatMoney(product.price_cents));
+    sheet.appendChild(label);
+  }
+  doc.body.appendChild(sheet);
+
+  win.setTimeout(() => {
+    win.print();
+    win.close();
+  }, 0);
 }
 
 export function PrintLabelsModal({
