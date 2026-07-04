@@ -8,6 +8,27 @@
 **Phase 1: Truth and cleanup** per `WORK/FORWARD_PLAN.md`. Feature/module expansion is
 **PAUSED** until Phase 2 (core release spine) exit criteria pass.
 
+2026-07-04 session A (parallel non-overlapping CI hardening — `.github/workflows/ci.yml`
+only): **CI gates are now real.** (1) Backend job gained a `npm run smoke` step —
+full POS lifecycle on the service Postgres — **VERIFIED green in CI run 28696807979**.
+(2) The e2e job had NEVER completed in its history; six stacked defects fixed: built with
+dead `NEXT_PUBLIC_E2E_MODE` flag and mocks ON (Playwright was testing MSW, not the
+backend it booted) → now `NEXT_PUBLIC_MOCK=false` + same-origin rewrites; bare `tsx` not
+on Actions PATH → `npx tsx`; `npm start` refuses `output:standalone` → runs
+`.next/standalone/server.js` with assets copied; wait loops swallowed startup failures →
+fail-fast with logs; `npm ci` under job-level `NODE_ENV=production` silently skipped
+devDependencies (typescript/tsx) → `--include=dev`; production mode is structurally
+impossible on a CI runner (forces DB SSL — service container has none — and Secure-only
+cookies over plain HTTP) → backend runs `NODE_ENV=test`, production behavior stays
+covered by HTTPS staging/prod smoke tests. Commits `a0c91fd`, `8049ce1`, `c01e609`.
+**NEW QUEUE ITEM (found, not fixed — outside claim):** `deploy-prod.yml` fails on every
+master push: `src/modules/payments/stripe.ts(15)` pins apiVersion `"2026-05-27.dahlia"`
+but fresh installs resolve newer Stripe types expecting `"2026-06-24.dahlia"` — pin the
+stripe dependency version or update the literal; also the workflow re-typechecks with
+`npm install`-time drift. **BLOCKER at handoff:** GitHub git transport unreachable from
+this network (push/fetch time out; web+API fine) — `c01e609` + lock/work-state commits
+queued locally, background retry loop armed, lock ACTIVE until push lands.
+
 2026-07-04 session H (parallel non-overlapping backend auth-cookie proof — full
 findings in `WORK/AUDIT_2026-07-04F.md`): SEC-7 is **Built and verified**. The actual
 Express identity cookie path already sets `sameSite: "lax"` for both `finder_refresh`
