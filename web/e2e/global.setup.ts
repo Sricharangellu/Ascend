@@ -16,10 +16,10 @@ setup("authenticate as owner", async ({ page }) => {
   await page.goto("/login");
 
   // Wait for the login form to be visible.
-  await expect(page.getByRole("heading", { name: /finder/i })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible({ timeout: 15_000 });
 
   await page.getByLabel(/email/i).fill(E2E_EMAIL);
-  await page.getByLabel(/password/i).fill(E2E_PASSWORD);
+  await page.getByRole("textbox", { name: /password/i }).fill(E2E_PASSWORD);
   await page.getByRole("button", { name: /sign in|log in/i }).click();
 
   // After login, we should land on /dashboard or /terminal.
