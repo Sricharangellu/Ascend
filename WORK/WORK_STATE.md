@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-03  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
+> Last updated: 2026-07-03 21:10 CDT  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
 
 ---
 
@@ -7,6 +7,24 @@
 
 **Phase 1: Truth and cleanup** per `WORK/FORWARD_PLAN.md`. Feature/module expansion is
 **PAUSED** until Phase 2 (core release spine) exit criteria pass.
+
+2026-07-03 session C (orchestration/test-runner follow-up — full findings in `WORK/AUDIT_2026-07-03C.md`):
+orchestration runtime defect is now **Built and verified** at smoke level. Commit
+`54c2c2e` added runtime state tables (`workflow_instances`, `workflow_instance_steps`,
+`workflow_events`, `retry_state`, `workflow_locks`, `job_queue`), avoided the existing
+business `workflow_steps` table collision, synchronized the command registry from the
+actual `CommandBus`, registered the remaining command handlers, and added a smoke
+assertion that fails if any workflow instance ends in `failed`. `npm run smoke` now has
+14 steps and verifies "orchestration recorded no failed workflow instances." Follow-up
+local change: `scripts/test.ts` now runs backend tests with `NODE_ENV=test` and
+`FINDER_BACKGROUND_JOBS=false`, preventing orchestration job timers from keeping tests
+pending after DB pool cleanup. Backend gate after this change: `npm run typecheck` PASS,
+`npm run smoke` PASS, `npm test` PASS 311/311.
+
+Frontend gate: `cd web && npm run typecheck && npm run lint && npm run build` PASS.
+Lint still reports 4 pre-existing React hook warnings. `cd web && npm test` still FAILS
+8 stale Vitest assertions (`web/tests/catalogCart.test.tsx` 5,
+`web/tests/reportsDashboard.test.tsx` 3), matching the known queue item.
 
 2026-07-03 session B (deep verification — full findings in `WORK/AUDIT_2026-07-03B.md`):
 live-stack proof DONE on local Postgres 15. Smoke 13/13 green (real POS lifecycle).
@@ -22,19 +40,16 @@ adjustment modal branches are Phase-2 relevant). `NEXT_PUBLIC_MOCK` made env-ove
 (default still "true"). Stale e2e locators fixed (setup + login spec).
 
 **Confirmed defects (priority order — each is one session's work item)**
-1. **Orchestration dead vs real DB**: `workflow_instances`/`saga_instances` tables missing
-   from migrations; every workflow trigger fails silently at runtime; 21 commands
-   unregistered. Fix migrations + registration + make failures loud, or quarantine layer.
-2. **e2e core-flow failures (10/47)**: triage checkout ×3, inventory-receive ×3,
+1. **e2e core-flow failures (10/47)**: triage checkout ×3, inventory-receive ×3,
    invoice-pay ×3, logout ×1 — separate stale locators from real integration gaps; fix
    until core specs green against production build + real backend.
-3. **8 stale vitest tests**: `web/tests/catalogCart.test.tsx` (5), `web/tests/reportsDashboard.test.tsx` (3).
-4. **~14 mock-only endpoints** incl. core `POST /inventory/transfers`, `POST /inventory/adjustments`,
+2. **8 stale vitest tests**: `web/tests/catalogCart.test.tsx` (5), `web/tests/reportsDashboard.test.tsx` (3).
+3. **~14 mock-only endpoints** incl. core `POST /inventory/transfers`, `POST /inventory/adjustments`,
    `POST /team`, `GET /team/:id`, `GET /workflows/templates`, Vendor-360 family (6 routes).
-5. **RLS gap**: `withTenant()` adopted in only ~10/46 modules; policy permissive when unset.
-6. **Mock default flip decision**: deployed frontend is 100% mock; needs real-backend
+4. **RLS gap**: `withTenant()` adopted in only ~10/46 modules; policy permissive when unset.
+5. **Mock default flip decision**: deployed frontend is 100% mock; needs real-backend
    deployment target + staging DB before flipping `NEXT_PUBLIC_MOCK` default.
-7. **Vertical pages crash without mocks (12 e2e failures)** — deprioritized per RULES.md
+6. **Vertical pages crash without mocks (12 e2e failures)** — deprioritized per RULES.md
    expansion pause; do not fix before items 1–6.
 
 **Blockers:** none.

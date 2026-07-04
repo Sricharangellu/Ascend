@@ -12,7 +12,14 @@ const child = spawn(
   ["--import", "tsx", "--test", ...testFiles],
   {
     stdio: "inherit",
-    env: { ...process.env, DATABASE_URL: url, PG_POOL_MAX: "1", JWT_SECRET: process.env.JWT_SECRET ?? "test-secret-finder-pos" },
+    env: {
+      ...process.env,
+      DATABASE_URL: url,
+      PG_POOL_MAX: "1",
+      JWT_SECRET: process.env.JWT_SECRET ?? "test-secret-finder-pos",
+      NODE_ENV: "test",
+      FINDER_BACKGROUND_JOBS: "false",
+    },
   },
 );
 
