@@ -42,12 +42,12 @@ describe("ProductGrid", () => {
     );
     // Wait for products to load
     await waitFor(() =>
-      expect(screen.getByText("Latte")).toBeInTheDocument()
+      expect(screen.getByText("Spring Water 500ml")).toBeInTheDocument()
     , { timeout: 3000 });
 
     // Should show multiple products
-    expect(screen.getByText("Espresso")).toBeInTheDocument();
-    expect(screen.getByText("Cappuccino")).toBeInTheDocument();
+    expect(screen.getByText("Orange Juice 1L")).toBeInTheDocument();
+    expect(screen.getByText("Potato Chips 150g")).toBeInTheDocument();
   });
 
   it("calls onAddProduct when a product card is clicked", async () => {
@@ -60,11 +60,11 @@ describe("ProductGrid", () => {
       </CartTestWrapper>
     );
 
-    await waitFor(() => screen.getByText("Latte"));
-    const latteBtn = screen.getByRole("button", { name: /add latte/i });
-    await user.click(latteBtn);
+    await waitFor(() => screen.getByText("Spring Water 500ml"));
+    const waterBtn = screen.getByRole("button", { name: /add spring water/i });
+    await user.click(waterBtn);
     expect(onAdd).toHaveBeenCalledOnce();
-    expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ name: "Latte" }));
+    expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ name: "Spring Water 500ml" }));
   });
 
   it("filters products by category", async () => {
@@ -76,16 +76,17 @@ describe("ProductGrid", () => {
       </CartTestWrapper>
     );
 
-    await waitFor(() => screen.getByText("Latte"));
+    await waitFor(() => screen.getByText("Spring Water 500ml"));
 
-    // Click the Pastry category tab
-    const pastryTab = screen.getByRole("tab", { name: "Pastry" });
-    await user.click(pastryTab);
+    // Click the Snacks category tab
+    const snacksTab = screen.getByRole("tab", { name: "Snacks" });
+    await user.click(snacksTab);
 
-    // Latte (Coffee) should not be visible
-    expect(screen.queryByText("Latte")).not.toBeInTheDocument();
-    // Croissant (Pastry) should be visible
-    expect(screen.getByText("Butter Croissant")).toBeInTheDocument();
+    // Spring Water (Beverages) should not be visible
+    expect(screen.queryByText("Spring Water 500ml")).not.toBeInTheDocument();
+    // Snack products should be visible
+    expect(screen.getByText("Potato Chips 150g")).toBeInTheDocument();
+    expect(screen.getByText("Mixed Nuts 200g")).toBeInTheDocument();
   });
 
   it("filters products by search input", async () => {
@@ -97,15 +98,15 @@ describe("ProductGrid", () => {
       </CartTestWrapper>
     );
 
-    await waitFor(() => screen.getByText("Latte"));
+    await waitFor(() => screen.getByText("Spring Water 500ml"));
 
     const searchInput = screen.getByRole("searchbox");
-    await user.type(searchInput, "espresso");
+    await user.type(searchInput, "orange");
 
     await waitFor(() =>
-      expect(screen.queryByText("Latte")).not.toBeInTheDocument()
+      expect(screen.queryByText("Spring Water 500ml")).not.toBeInTheDocument()
     );
-    expect(screen.getByText("Espresso")).toBeInTheDocument();
+    expect(screen.getByText("Orange Juice 1L")).toBeInTheDocument();
   });
 
   it("shows empty state when search has no results", async () => {
@@ -117,7 +118,7 @@ describe("ProductGrid", () => {
       </CartTestWrapper>
     );
 
-    await waitFor(() => screen.getByText("Latte"));
+    await waitFor(() => screen.getByText("Spring Water 500ml"));
 
     const searchInput = screen.getByRole("searchbox");
     await user.type(searchInput, "xyzproductnotexist");

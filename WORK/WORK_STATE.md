@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-03 21:10 CDT  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
+> Last updated: 2026-07-03 21:36 CDT  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
 
 ---
 
@@ -7,6 +7,18 @@
 
 **Phase 1: Truth and cleanup** per `WORK/FORWARD_PLAN.md`. Feature/module expansion is
 **PAUSED** until Phase 2 (core release spine) exit criteria pass.
+
+2026-07-03 session D (parallel non-overlapping stale Vitest cleanup — full findings in
+`WORK/AUDIT_2026-07-03D.md`): queue item #2 is **Built and verified**. Updated only
+`web/tests/catalogCart.test.tsx` and `web/tests/reportsDashboard.test.tsx` to match the
+current mock catalog and current reports dashboard contract. The old assertions expected
+coffee-shop products (`Latte`, `Espresso`, `Pastry`, `Butter Croissant`) and an older
+reports layout (`tax`, `net`, `Order status`); the app now serves retail products
+(`Spring Water 500ml`, `Orange Juice 1L`, snacks categories) and spec metric cards plus
+Products sold / Payment methods tables. Verification: targeted Vitest PASS 12/12,
+full frontend Vitest PASS 83/83, frontend `typecheck && lint && build` PASS. Lint still
+reports the same 4 pre-existing React hook warnings. No backend code, e2e specs, ports,
+or database resources were touched because Claude session A owns queue item #1.
 
 2026-07-03 session C (orchestration/test-runner follow-up — full findings in `WORK/AUDIT_2026-07-03C.md`):
 orchestration runtime defect is now **Built and verified** at smoke level. Commit
@@ -49,7 +61,7 @@ adjustment modal branches are Phase-2 relevant). `NEXT_PUBLIC_MOCK` made env-ove
 1. **e2e core-flow failures (10/47)**: triage checkout ×3, inventory-receive ×3,
    invoice-pay ×3, logout ×1 — separate stale locators from real integration gaps; fix
    until core specs green against production build + real backend.
-2. **8 stale vitest tests**: `web/tests/catalogCart.test.tsx` (5), `web/tests/reportsDashboard.test.tsx` (3).
+2. **8 stale vitest tests**: `web/tests/catalogCart.test.tsx` (5), `web/tests/reportsDashboard.test.tsx` (3) — **DONE 2026-07-03 session D; full `cd web && npm test` PASS 83/83.**
 3. **~14 mock-only endpoints** incl. core `POST /inventory/transfers`, `POST /inventory/adjustments`,
    `POST /team`, `GET /team/:id`, `GET /workflows/templates`, Vendor-360 family (6 routes).
 4. **RLS gap**: `withTenant()` adopted in only ~10/46 modules; policy permissive when unset.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { ReportsDashboard } from "@/components/reports/ReportsDashboard";
 import type { SalesSummary, TopProduct } from "@/api-client/types";
 
@@ -17,23 +17,27 @@ describe("ReportsDashboard", () => {
   it("renders revenue KPIs formatted as money", () => {
     render(<ReportsDashboard summary={summary} />);
     expect(screen.getByText("$216.50")).toBeInTheDocument(); // gross
-    expect(screen.getByText("$16.50")).toBeInTheDocument();  // tax
-    expect(screen.getByText("$200.00")).toBeInTheDocument(); // net
+    expect(screen.getByText("$134.23")).toBeInTheDocument(); // mock gross profit
+    expect(screen.getByText("$43.30")).toBeInTheDocument();  // avg sale value
   });
 
   it("renders order counts and payment methods", () => {
     render(<ReportsDashboard summary={summary} />);
-    expect(screen.getByText("Order status")).toBeInTheDocument();
-    expect(screen.getByText("Completed")).toBeInTheDocument();
+    expect(screen.getByText("Sale Count")).toBeInTheDocument();
     expect(screen.getByText("5")).toBeInTheDocument();
+    expect(screen.getByText("Payment methods")).toBeInTheDocument();
     expect(screen.getByText(/cash/i)).toBeInTheDocument();
     expect(screen.getByText(/card/i)).toBeInTheDocument();
   });
 
   it("renders backend top products when provided", () => {
     render(<ReportsDashboard summary={summary} topProducts={topProducts} />);
-    expect(screen.getByText("Latte")).toBeInTheDocument();
-    expect(screen.getByText("34 units")).toBeInTheDocument();
-    expect(screen.getByText("$169.66")).toBeInTheDocument();
+    expect(screen.getByText("Products sold")).toBeInTheDocument();
+    expect(screen.getByText("34 units total")).toBeInTheDocument();
+
+    const row = screen.getByRole("row", { name: /latte/i });
+    expect(within(row).getByText("Latte")).toBeInTheDocument();
+    expect(within(row).getByText("34")).toBeInTheDocument();
+    expect(within(row).getByText("$169.66")).toBeInTheDocument();
   });
 });

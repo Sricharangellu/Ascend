@@ -14,6 +14,18 @@ Status: ACTIVE
 | Status | ACTIVE |
 | Blockers | none |
 
+## Parallel Non-Overlapping Claim
+
+| Field | Value |
+|---|---|
+| Agent/session | Codex session B |
+| Queue item | #2 — Fix 8 stale frontend Vitest assertions (`catalogCart.test.tsx`, `reportsDashboard.test.tsx`) |
+| Files/areas expected | `web/tests/catalogCart.test.tsx`, `web/tests/reportsDashboard.test.tsx`; read-only inspection of related components/hooks |
+| Started | 2026-07-03 ~21:30 CDT |
+| Last update | 2026-07-03 ~21:36 CDT |
+| Status | RELEASED — non-overlapping work complete; targeted Vitest 12/12, full frontend Vitest 83/83, frontend typecheck/lint/build PASS |
+| Blockers | none |
+
 ## Rules
 
 - Claim one queue item before editing code.
