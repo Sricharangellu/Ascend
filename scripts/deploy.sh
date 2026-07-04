@@ -32,6 +32,10 @@ deploy_backend() {
   node -e "const d=require('$REPO/package.json'); delete (d.devDependencies||{})['embedded-postgres']; require('fs').writeFileSync('$S/package.json', JSON.stringify(d,null,2))"
   # tsconfig: rootDir '.' + include src/** so output stays dist/src/app.js (api/index.js imports it)
   node -e "const d=require('$REPO/tsconfig.json'); d.include=['src/**/*.ts']; d.compilerOptions.rootDir='.'; require('fs').writeFileSync('$S/tsconfig.json', JSON.stringify(d,null,2))"
+  # Deploy metadata: the staged bundle has no .git, so record the commit here;
+  # /healthz reports it (src/shared/version.ts) to answer "what is live?"
+  printf '{"sha":"%s","builtAt":"%s"}' \
+    "$(git -C "$REPO" rev-parse HEAD)" "$(date -u +%FT%TZ)" > "$S/version.json"
   ( cd "$S" && npm install --no-audit --no-fund --loglevel=error && npm run build && test -f dist/src/app.js )
   echo "→ Backend: deploying…"
   ( cd "$S" && VERCEL_ORG_ID="$TEAM" VERCEL_PROJECT_ID="$BACKEND_PID" \

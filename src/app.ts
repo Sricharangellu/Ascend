@@ -5,6 +5,7 @@ import { openDb, type DB } from "./shared/db.js";
 import { openRedis } from "./shared/redis.js";
 import { EventBus } from "./shared/events.js";
 import { logger } from "./shared/logger.js";
+import { buildInfo } from "./shared/version.js";
 import { errorMiddleware } from "./shared/http.js";
 import { modules } from "./modules/index.js";
 import { identityModule } from "./identity/index.js";
@@ -216,7 +217,8 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
 
   // ── Liveness + readiness probes (no auth — infrastructure-level)
   app.get("/healthz", (_req, res) => {
-    res.json({ status: "ok", ts: Date.now() });
+    const { sha, builtAt } = buildInfo();
+    res.json({ status: "ok", ts: Date.now(), version: sha, builtAt });
   });
 
   // ── Prometheus metrics — bearer token required (set METRICS_TOKEN env var;
