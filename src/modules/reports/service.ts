@@ -1,8 +1,36 @@
 import type { DB } from "../../shared/db.js";
+import { badRequest } from "../../shared/http.js";
 
 /** Tenant-scoped sales analytics. Read-only over the orders + order_lines +
  *  payments tables (a lightweight read model / CQRS-lite — reports owns no
  *  tables of its own). Supports a time window via `sinceMs` (epoch ms). */
+
+export interface EndOfDayReport {
+  date: string;
+  businessDate: string;
+  openedAt: number | null;
+  closedAt: number | null;
+  status: string;
+  transactions: { count: number; voidCount: number; refundCount: number; averageTicket_cents: number };
+  sales: {
+    grossSales_cents: number;
+    discounts_cents: number;
+    refunds_cents: number;
+    netSales_cents: number;
+    taxCollected_cents: number;
+    totalCollected_cents: number;
+  };
+  tenders: Array<{ method: string; count: number; total_cents: number }>;
+  topItems: Array<{ productId: string; productName: string; quantitySold: number; total_cents: number }>;
+  cashDrawer: {
+    openingFloat_cents: number;
+    cashSales_cents: number;
+    cashRefunds_cents: number;
+    expectedCash_cents: number;
+    actualCash_cents: number | null;
+    variance_cents: number | null;
+  };
+}
 
 export interface SalesSummary {
   orders: { open: number; completed: number; refunded: number; voided: number; total: number };
@@ -828,5 +856,140 @@ export class ReportsService {
        LIMIT @limit`,
       params,
     );
+  }
+
+  /**
+   * End-of-day (Z-report) for one business day: transaction counts, sales
+   * totals, tender breakdown, top items, and cash-drawer reconciliation.
+   *
+   * Semantics (the daily close sheet, not the general ledger):
+   *  - Window is the UTC day [00:00, 24:00) of `date` (YYYY-MM-DD; default today).
+   *  - "Sold" orders are status completed or refunded; voided orders count as
+   *    transactions but contribute nothing to sales.
+   *  - refunds_cents is the total of refunded orders; netSales = gross −
+   *    discounts − refunds; totalCollected = netSales + taxCollected.
+   *  - Cash tender is net of change given; card is card_cents as captured.
+   *  - The drawer uses the latest register session opened in the window
+   *    (optionally scoped by registerId); expected = openingFloat + cashSales −
+   *    cashRefunds. actual/variance are null while the session is still open.
+   */
+  async endOfDay(tenantId: string, date?: string, registerId?: string): Promise<EndOfDayReport> {
+    const day = date ?? new Date().toISOString().slice(0, 10);
+    const startMs = Date.parse(`${day}T00:00:00.000Z`);
+    if (!Number.isFinite(startMs)) throw badRequest(`invalid date '${date}' — expected YYYY-MM-DD`);
+    const endMs = startMs + 24 * 60 * 60 * 1000;
+    const w = { tenantId, startMs, endMs };
+
+    const tx = await this.db.one<{
+      n: number; voids: number; refunds: number; sold: number;
+      gross: number; discounts: number; refunded_total: number; tax: number; sold_total: number;
+    }>(
+      `SELECT COUNT(*)::int                                                     AS n,
+              COUNT(*) FILTER (WHERE status = 'voided')::int                    AS voids,
+              COUNT(*) FILTER (WHERE status = 'refunded')::int                  AS refunds,
+              COUNT(*) FILTER (WHERE status IN ('completed','refunded'))::int   AS sold,
+              COALESCE(SUM(subtotal_cents) FILTER (WHERE status IN ('completed','refunded')), 0)::bigint AS gross,
+              COALESCE(SUM(discount_cents) FILTER (WHERE status IN ('completed','refunded')), 0)::bigint AS discounts,
+              COALESCE(SUM(total_cents)    FILTER (WHERE status = 'refunded'), 0)::bigint                AS refunded_total,
+              COALESCE(SUM(tax_cents)      FILTER (WHERE status IN ('completed','refunded')), 0)::bigint AS tax,
+              COALESCE(SUM(total_cents)    FILTER (WHERE status IN ('completed','refunded')), 0)::bigint AS sold_total
+         FROM orders
+        WHERE tenant_id = @tenantId AND created_at >= @startMs AND created_at < @endMs
+          AND status <> 'open'`,
+      w,
+    );
+
+    const tenders = await this.db.one<{ cash_n: number; cash: number; card_n: number; card: number; refund_cash: number }>(
+      `SELECT COUNT(*) FILTER (WHERE p.cash_cents > 0)::int                          AS cash_n,
+              COALESCE(SUM(p.cash_cents - p.change_cents), 0)::bigint                AS cash,
+              COUNT(*) FILTER (WHERE p.card_cents > 0)::int                          AS card_n,
+              COALESCE(SUM(p.card_cents), 0)::bigint                                 AS card,
+              COALESCE(SUM(p.cash_cents - p.change_cents)
+                         FILTER (WHERE o.status = 'refunded'), 0)::bigint            AS refund_cash
+         FROM payments p
+         JOIN orders o ON o.id = p.order_id AND o.tenant_id = p.tenant_id
+        WHERE p.tenant_id = @tenantId AND p.created_at >= @startMs AND p.created_at < @endMs
+          AND p.status = 'captured'`,
+      w,
+    );
+
+    const topItems = await this.db.query<{ product_id: string; name: string; qty: number; total: number }>(
+      `SELECT l.product_id, l.name, SUM(l.quantity)::int AS qty, SUM(l.line_cents)::bigint AS total
+         FROM order_lines l
+         JOIN orders o ON o.id = l.order_id AND o.tenant_id = l.tenant_id
+        WHERE l.tenant_id = @tenantId AND o.created_at >= @startMs AND o.created_at < @endMs
+          AND o.status IN ('completed','refunded')
+        GROUP BY l.product_id, l.name
+        ORDER BY total DESC
+        LIMIT 5`,
+      w,
+    );
+
+    const sessionWhere = ["tenant_id = @tenantId", "opened_at >= @startMs", "opened_at < @endMs"];
+    const sessionParams: Record<string, unknown> = { ...w };
+    if (registerId) { sessionWhere.push("register_id = @registerId"); sessionParams["registerId"] = registerId; }
+    const session = await this.db.one<{
+      status: string; opened_at: number; closed_at: number | null;
+      opening_float_cents: number; counted_cash_cents: number | null;
+    }>(
+      `SELECT status, opened_at, closed_at, opening_float_cents, counted_cash_cents
+         FROM register_sessions WHERE ${sessionWhere.join(" AND ")}
+        ORDER BY opened_at DESC LIMIT 1`,
+      sessionParams,
+    );
+
+    const cashSales = Number(tenders?.cash ?? 0);
+    const cashRefunds = Number(tenders?.refund_cash ?? 0);
+    const openingFloat = Number(session?.opening_float_cents ?? 0);
+    const expectedCash = openingFloat + cashSales - cashRefunds;
+    const actualCash = session?.counted_cash_cents ?? null;
+    const gross = Number(tx?.gross ?? 0);
+    const discounts = Number(tx?.discounts ?? 0);
+    const refundedTotal = Number(tx?.refunded_total ?? 0);
+    const taxCollected = Number(tx?.tax ?? 0);
+    const netSales = gross - discounts - refundedTotal;
+    const sold = Number(tx?.sold ?? 0);
+
+    return {
+      date: day,
+      businessDate: new Intl.DateTimeFormat("en-US", {
+        weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "UTC",
+      }).format(new Date(startMs)),
+      openedAt: session?.opened_at ?? null,
+      closedAt: session?.closed_at ?? null,
+      status: session?.status ?? "no_session",
+      transactions: {
+        count: Number(tx?.n ?? 0),
+        voidCount: Number(tx?.voids ?? 0),
+        refundCount: Number(tx?.refunds ?? 0),
+        averageTicket_cents: sold > 0 ? Math.round(Number(tx?.sold_total ?? 0) / sold) : 0,
+      },
+      sales: {
+        grossSales_cents: gross,
+        discounts_cents: discounts,
+        refunds_cents: refundedTotal,
+        netSales_cents: netSales,
+        taxCollected_cents: taxCollected,
+        totalCollected_cents: netSales + taxCollected,
+      },
+      tenders: [
+        { method: "Cash", count: Number(tenders?.cash_n ?? 0), total_cents: cashSales },
+        { method: "Card", count: Number(tenders?.card_n ?? 0), total_cents: Number(tenders?.card ?? 0) },
+      ],
+      topItems: topItems.map((t) => ({
+        productId: t.product_id,
+        productName: t.name,
+        quantitySold: Number(t.qty),
+        total_cents: Number(t.total),
+      })),
+      cashDrawer: {
+        openingFloat_cents: openingFloat,
+        cashSales_cents: cashSales,
+        cashRefunds_cents: cashRefunds,
+        expectedCash_cents: expectedCash,
+        actualCash_cents: actualCash,
+        variance_cents: actualCash === null ? null : Number(actualCash) - expectedCash,
+      },
+    };
   }
 }

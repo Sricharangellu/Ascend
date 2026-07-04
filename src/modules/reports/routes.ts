@@ -51,6 +51,17 @@ export function registerRoutes(router: Router, service: ReportsService): void {
     }),
   );
 
+  // GET /api/v1/reports/end-of-day?date=YYYY-MM-DD&registerId=… — Z-report:
+  // transactions, sales totals, tender breakdown, top items, cash drawer.
+  router.get(
+    "/end-of-day",
+    handler(async (req, res) => {
+      const date = typeof req.query.date === "string" ? req.query.date : undefined;
+      const registerId = typeof req.query.registerId === "string" ? req.query.registerId : undefined;
+      res.json(await service.endOfDay(tenantId(res), date, registerId));
+    }),
+  );
+
   // GET /api/v1/reports/ar-aging — Accounts Receivable aging buckets.
   router.get("/ar-aging", handler(async (_req, res) => {
     res.json(await service.arAging(tenantId(res)));
