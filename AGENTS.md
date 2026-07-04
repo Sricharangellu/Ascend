@@ -30,6 +30,14 @@ hardening → only then expand. One work item per session, verified before commi
 
 Before editing code, check `WORK/LOCK.md`.
 
+**Agent teams** (experimental, enabled in Sri's user settings): a session may spawn
+in-session teammates with a shared task list. The whole team is ONE lock unit — the
+lead claims one queue item in `WORK/LOCK.md` listing the union of files its teammates
+will touch, splits the work so no two teammates edit the same file, and releases the
+claim after the combined result is verified, committed, and pushed. Teammates never
+claim lock entries themselves, and inter-team coordination with other app sessions
+(desktop Claude, Codex, etc.) still happens only through this lock file.
+
 - If it is marked `FREE`, claim exactly one queue item by editing `WORK/LOCK.md` with:
   agent/session name, queue item, files/areas expected, start time, and status `ACTIVE`.
 - If it is `ACTIVE` and the item overlaps your intended work, **stop**. Do not build the
