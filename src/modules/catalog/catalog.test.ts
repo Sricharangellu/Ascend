@@ -345,6 +345,33 @@ test("variants: assign can set a label and unlink a child", async () => {
   assert.equal(unlink.json.variant_label, null);
 });
 
+test("variants: assign rolls back all children when one child is invalid", async () => {
+  const app = await freshApp();
+
+  const targetMaster = await call(app, "POST", "/api/catalog/", { sku: "ROLLBACK-MASTER", name: "Target master", price_cents: 0 });
+  const goodChild = await call(app, "POST", "/api/catalog/", { sku: "ROLLBACK-GOOD", name: "Good child", price_cents: 100 });
+  const existingMaster = await call(app, "POST", "/api/catalog/", { sku: "ROLLBACK-BAD-MASTER", name: "Existing master", price_cents: 0 });
+  await call(app, "POST", "/api/catalog/", {
+    sku: "ROLLBACK-BAD-CHILD",
+    name: "Existing child",
+    price_cents: 100,
+    parent_product_id: existingMaster.json.id,
+  });
+
+  const assign = await call(app, "POST", `/api/catalog/${targetMaster.json.id}/variants/assign`, {
+    productIds: [goodChild.json.id, existingMaster.json.id],
+    label: "Should not persist",
+  });
+  assert.equal(assign.status, 409);
+  assert.equal(assign.json.error.code, "conflict");
+
+  const goodAfter = await call(app, "GET", `/api/catalog/${goodChild.json.id}`);
+  assert.equal(goodAfter.json.parent_product_id, null);
+  assert.equal(goodAfter.json.variant_label, null);
+  const targetVariants = await call(app, "GET", `/api/catalog/${targetMaster.json.id}/variants`);
+  assert.equal(targetVariants.json.items.length, 0);
+});
+
 test("variants: matrix generation creates missing children and is idempotent", async () => {
   const app = await freshApp();
 
@@ -376,6 +403,43 @@ test("variants: matrix generation creates missing children and is idempotent", a
   });
   assert.equal(repeated.status, 200);
   assert.equal(repeated.json.items.length, 2);
+});
+
+test("variants: matrix generation rolls back created children when SKU allocation later fails", async () => {
+  const app = await freshApp();
+  const master = await call(app, "POST", "/api/catalog/", {
+    sku: "ROLLBACK-MATRIX",
+    name: "Rollback Matrix",
+    price_cents: 2500,
+    category: "apparel",
+  });
+
+  const now = Date.now();
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const suffix = attempt === 0 ? "" : `-${attempt + 1}`;
+    await app.db.query(
+      `INSERT INTO products (id, tenant_id, sku, name, price_cents, created_at, updated_at)
+       VALUES (@id, @tenantId, @sku, @name, 100, @now, @now)`,
+      {
+        id: `prod_collision_${attempt}`,
+        tenantId: "tnt_demo",
+        sku: `ROLLBACK-MATRIX-M${suffix}`,
+        name: `Collision ${attempt}`,
+        now,
+      },
+    );
+  }
+
+  const generated = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
+    attributes: [{ name: "Size", values: ["S", "M"] }],
+  });
+  assert.equal(generated.status, 409);
+  assert.equal(generated.json.error.code, "conflict");
+
+  const variants = await call(app, "GET", `/api/catalog/${master.json.id}/variants`);
+  assert.equal(variants.json.items.length, 0);
+  const rolledBackSku = await call(app, "GET", "/api/catalog/?limit=200");
+  assert.ok(!rolledBackSku.json.items.some((product: any) => product.sku === "ROLLBACK-MATRIX-S"));
 });
 
 test("variants: reject nested master/child graphs", async () => {

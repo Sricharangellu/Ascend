@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-04 13:19 CDT  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
+> Last updated: 2026-07-04 13:48 CDT  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
 
 ---
 
@@ -7,6 +7,21 @@
 
 **Phase 1: Truth and cleanup** per `WORK/FORWARD_PLAN.md`. Feature/module expansion is
 **PAUSED** until Phase 2 (core release spine) exit criteria pass.
+
+2026-07-04 Codex session H / product variant atomicity (deployment-readiness/product
+lifecycle hardening — full findings in `WORK/AUDIT_2026-07-04I.md`): product variant
+bulk writes are **Built and verified** for database atomicity and post-commit event
+publication. `assignVariants()` and `generateVariants()` now run their multi-row product
+changes inside one tenant-scoped transaction; if any child validation or generated SKU
+allocation fails, the whole operation rolls back. Product `created`/`updated` events are
+deferred until after commit for these bulk operations, fixing the transaction/event
+deadlock found during verification when sync handlers tried to open a second DB
+transaction while the outer variant transaction was still holding the only test-pool
+connection. Verification passed: focused catalog real-Postgres test PASS 31/31, backend
+typecheck PASS, smoke PASS 15/15, full backend suite PASS 322/322, frontend
+typecheck/lint/test/build PASS. Lint still reports the same 4 pre-existing hook
+warnings. The e2e core-flow blocker remains under the active Antigravity lock, so this
+session did not touch `web/e2e/**`.
 
 2026-07-04 Codex session G / product catalog variants (parallel non-overlapping
 product workflow proof — full findings in `WORK/AUDIT_2026-07-04H.md`): product
