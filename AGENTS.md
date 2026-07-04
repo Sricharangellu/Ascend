@@ -65,19 +65,56 @@ are real defects even when the steps pass.
 `Built and verified` · `Built but not verified` · `UI-only` · `Mocked` · `Partial` ·
 `Planned` · `Not production-ready`. Never call something done without one of these.
 
-## Git: where and how
+## Git: where and how (trunk-based, staged toward PR gating)
 
-- **Remote:** `origin` = https://github.com/Sricharangellu/finder-pos.git · **branch:** `master`.
+- **Remote:** `origin` = https://github.com/Sricharangellu/finder-pos.git · **trunk:** `master`
+  (protected: force-pushes and deletion are blocked). `staging` exists for preview deploys.
 - **Session start:** `git pull --ff-only origin master`. If it refuses, stop and reconcile —
   never rebase/force-push master.
-- **Session end:** commit (conventional commits, small and scoped) and `git push origin master`
-  ONLY after gates pass: `npm run typecheck && npm test` (root) and
-  `cd web && npm run typecheck && npm run lint && npm run build`. Backend changes also
-  need `npm run smoke` green. Never leave unpushed work on one machine at handoff.
-- **Salvage branches:** 12 `worktree-agent-*` branches are parked pre-pause work — do NOT
-  delete or bulk-merge them; harvest selectively per the inventory in
-  `WORK/AUDIT_2026-07-03B.md`, and only through the RULES.md definition of done.
-- If you create a branch or worktree, remove it before ending the session.
+- **Commits:** conventional commits (`feat:`/`fix:`/`chore:`/`docs:`/`ci:`/`test:`), small
+  and scoped, one logical change each. Never commit secrets or generated artifacts.
+- **Gates before any push/PR:** `npm run typecheck && npm test` (root), `npm run smoke`
+  for backend changes, `cd web && npm run typecheck && npm run lint && npm test && npm run build`.
+  Never leave unpushed work on one machine at handoff.
+
+### Current mode (Phase 1): direct-to-master
+
+Solo owner + coordinated AI sessions push directly to `master` after the gates and the
+`WORK/LOCK.md` claim protocol. CI runs on every push and is the regression net.
+
+### Target mode (company-standard, switch when Sri enables PR protection)
+
+Short-lived feature branches + pull requests, exactly how professional teams run trunk-based
+development:
+
+1. `git switch -c <type>/<scope>-<slug>` (e.g. `fix/e2e-checkout-locators`) from fresh master.
+2. Commit, push the branch, open a PR: `gh pr create --fill` (template auto-applies;
+   fill the RULES.md status label and gate results honestly).
+3. CI must be green; enable auto-merge: `gh pr merge --auto --squash --delete-branch`.
+4. Squash-merge keeps master history one-commit-per-change; branch auto-deletes.
+
+The cutover is a GitHub settings change (require PRs + required status checks on master) —
+listed under "Sri-only actions" below. The day that's enabled, direct pushes stop working
+and every agent follows the PR flow above; nothing else about the process changes.
+
+### Sri-only actions (agents cannot do these)
+
+- Flip master to PR-required: Settings → Branches → master rule → "Require a pull request
+  before merging" + "Require status checks" (select: Backend, Frontend, Production guard,
+  E2E) — or ask an agent for the exact `gh api` command when ready.
+- Repo Settings → General: enable "Allow squash merging" only + "Automatically delete
+  head branches".
+- Fix Actions secrets: `VERCEL_TOKEN` (production deploy fails today), `STAGING_BACKEND_URL`,
+  staging DB secrets.
+
+### Branch hygiene
+
+- **Salvage branches:** 12 `worktree-agent-*` branches on origin are parked pre-pause work —
+  do NOT delete or bulk-merge; harvest selectively per `WORK/AUDIT_2026-07-03B.md` through
+  the RULES.md definition of done.
+- Stale merged branches (`dev`, `prod`, `testing`, `backend-cycle3`) are deletion candidates
+  pending Sri's confirmation.
+- If you create a branch or worktree, delete it when merged / before ending the session.
 
 ## Local runbook (macOS dev machine)
 
