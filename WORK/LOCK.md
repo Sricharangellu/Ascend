@@ -18,6 +18,18 @@ Status: ACTIVE
 
 | Field | Value |
 |---|---|
+| Agent/session | Claude session D (desktop app, "next" directive from Sri) |
+| Queue item | #3 — Implement ~14 mock-only endpoints on the real backend (inventory transfers/adjustments first — core; then team invite/detail, workflow templates, AR-aging sweep, Vendor-360 family ×6) |
+| Files/areas expected | `src/modules/inventory/**`, `src/modules/team/**`, `src/modules/workflows/**`, `src/modules/reports/**`, `src/modules/purchasing/**` — backend only, NO `web/**` edits. Embedded Postgres via test harness (no fixed ports) |
+| Started | 2026-07-04 |
+| Last update | 2026-07-04 |
+| Status | ACTIVE |
+| Blockers | none |
+
+## Released Claims
+
+| Field | Value |
+|---|---|
 | Agent/session | Codex session B |
 | Queue item | #2 — Fix 8 stale frontend Vitest assertions (`catalogCart.test.tsx`, `reportsDashboard.test.tsx`) |
 | Files/areas expected | `web/tests/catalogCart.test.tsx`, `web/tests/reportsDashboard.test.tsx`; read-only inspection of related components/hooks |
