@@ -2,8 +2,9 @@
 
 /**
  * /catalog — Product catalog management.
- * Two tabs: Products (filterable list, create/edit modal, archive)
- *           Categories (CRUD list).
+ * Three tabs: Products (filterable list, create/edit modal, archive)
+ *             Categories (CRUD list)
+ *             Compliance (per-product tobacco/vape flags, age, geographic restrictions)
  * Fetches GET /api/v1/catalog and /api/v1/catalog/categories.
  */
 
@@ -12,6 +13,7 @@ import { clsx } from "clsx";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
+import { useToast } from "@/components/Toast";
 import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
 import type { Product, ProductsResponse, Category, CategoriesResponse, ProductStatus, TaxClass } from "@/api-client/types";
 
@@ -812,18 +814,231 @@ function CategoriesTab() {
   );
 }
 
+// ── Compliance Tab ────────────────────────────────────────────────────────────
+
+const US_STATES = [
+  "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA",
+  "HI","ID","IL","IN","IA","KS","KY","LA","ME","MD",
+  "MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ",
+  "NM","NY","NC","ND","OH","OK","OR","PA","RI","SC",
+  "SD","TN","TX","UT","VT","VA","WA","WV","WI","WY",
+];
+
+interface ComplianceFlags {
+  tobacco_type: string | null;
+  flavored: boolean;
+  menthol: boolean;
+  msa_reportable: boolean;
+  age_restricted: boolean;
+  min_age: number;
+  restricted_states: string[];
+}
+
+function emptyCompliance(): ComplianceFlags {
+  return {
+    tobacco_type: null,
+    flavored: false,
+    menthol: false,
+    msa_reportable: false,
+    age_restricted: false,
+    min_age: 21,
+    restricted_states: [],
+  };
+}
+
+function ComplianceTab({ products }: { products: Product[] }) {
+  const { addToast } = useToast();
+  const [selectedProductId, setSelectedProductId] = useState<string>(products[0]?.id ?? "");
+  const [flags, setFlags] = useState<ComplianceFlags>(emptyCompliance());
+  const [saving, setSaving] = useState(false);
+
+  const set = <K extends keyof ComplianceFlags>(k: K, v: ComplianceFlags[K]) =>
+    setFlags((f) => ({ ...f, [k]: v }));
+
+  const toggleState = (abbr: string) => {
+    setFlags((f) => ({
+      ...f,
+      restricted_states: f.restricted_states.includes(abbr)
+        ? f.restricted_states.filter((s) => s !== abbr)
+        : [...f.restricted_states, abbr],
+    }));
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProductId) return;
+    setSaving(true);
+    try {
+      await apiPatch(`/api/v1/catalog/${selectedProductId}/compliance`, flags);
+      addToast({ title: "Compliance settings saved", variant: "success" });
+    } catch (err) {
+      addToast({
+        title: "Save failed",
+        description: err instanceof ApiResponseError ? err.message : "Unknown error",
+        variant: "error",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputCls = "w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-600 bg-white";
+  const labelCls = "mb-1 block text-sm font-medium text-slate-700";
+  const checkCls = "h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500";
+
+  const hasRestrictions = flags.restricted_states.length > 0;
+
+  return (
+    <form onSubmit={handleSave} className="space-y-5">
+      <Card className="p-5">
+        <div className="mb-4">
+          <label className={labelCls}>Product</label>
+          <select
+            value={selectedProductId}
+            onChange={(e) => setSelectedProductId(e.target.value)}
+            className={inputCls}
+          >
+            {products.map((p) => (
+              <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          {/* ── Tobacco/Vape classification ─────────────────────────── */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-slate-500">Tobacco / Vape</h3>
+
+            <div>
+              <label className={labelCls}>Tobacco type</label>
+              <select
+                value={flags.tobacco_type ?? ""}
+                onChange={(e) => set("tobacco_type", e.target.value || null)}
+                className={inputCls}
+              >
+                <option value="">— none —</option>
+                <option value="cigarette">Cigarette</option>
+                <option value="cigar">Cigar</option>
+                <option value="smokeless">Smokeless</option>
+                <option value="e-cigarette">E-cigarette</option>
+                <option value="pipe">Pipe</option>
+                <option value="hookah">Hookah</option>
+              </select>
+            </div>
+
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={flags.flavored} onChange={(e) => set("flavored", e.target.checked)} className={checkCls} />
+              <span>Contains flavored tobacco or flavoring</span>
+            </label>
+
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={flags.menthol} onChange={(e) => set("menthol", e.target.checked)} className={checkCls} />
+              <span>Menthol product</span>
+            </label>
+
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={flags.msa_reportable} onChange={(e) => set("msa_reportable", e.target.checked)} className={checkCls} />
+              <span>Include in monthly MSA sales report</span>
+            </label>
+          </div>
+
+          {/* ── Age restriction ─────────────────────────────────────── */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-slate-500">Age Restriction</h3>
+
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={flags.age_restricted} onChange={(e) => set("age_restricted", e.target.checked)} className={checkCls} />
+              <span>Age restricted</span>
+            </label>
+
+            <div>
+              <label className={labelCls}>Minimum age</label>
+              <input
+                type="number"
+                min={18}
+                max={21}
+                value={flags.min_age}
+                disabled={!flags.age_restricted}
+                onChange={(e) => set("min_age", Number(e.target.value))}
+                className={clsx(inputCls, !flags.age_restricted && "opacity-50 cursor-not-allowed")}
+              />
+              {flags.age_restricted && (
+                <p className="mt-1 text-xs text-slate-500">Cashiers will be prompted to verify ID at checkout</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* ── Geographic restrictions ───────────────────────────────────────── */}
+      <Card className="p-5">
+        <h3 className="mb-1 text-sm font-semibold uppercase tracking-[0.08em] text-slate-500">Geographic Restrictions</h3>
+        <p className="mb-3 text-sm text-slate-500">
+          Block sales in these states.
+          {flags.flavored && (
+            <span className="ml-1 text-slate-400">(CA and MA are common restrictions for flavored products.)</span>
+          )}
+        </p>
+
+        {hasRestrictions && (
+          <div role="alert" className="mb-3 flex items-start gap-2 rounded-md border border-orange-200 bg-orange-50 px-3 py-2">
+            <svg aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-orange-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <p className="text-sm text-orange-800">
+              Sales of this product will be blocked at outlets in the selected states
+              ({flags.restricted_states.join(", ")}).
+            </p>
+          </div>
+        )}
+
+        <div
+          className="overflow-y-auto rounded-md border border-slate-200"
+          style={{ height: 160 }}
+          aria-label="Restricted states"
+        >
+          <div className="grid grid-cols-5 gap-0 p-2 sm:grid-cols-8 lg:grid-cols-10">
+            {US_STATES.map((abbr) => (
+              <label key={abbr} className="flex cursor-pointer items-center gap-1 rounded px-1.5 py-1 text-xs text-slate-700 hover:bg-slate-50">
+                <input
+                  type="checkbox"
+                  checked={flags.restricted_states.includes(abbr)}
+                  onChange={() => toggleState(abbr)}
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                />
+                {abbr}
+              </label>
+            ))}
+          </div>
+        </div>
+      </Card>
+
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          disabled={saving || !selectedProductId}
+          className="min-h-[40px] rounded-md bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+        >
+          {saving ? "Saving..." : "Save compliance settings"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-type Tab = "products" | "categories";
+type Tab = "products" | "categories" | "compliance";
 
 export default function CatalogPage() {
   const [tab, setTab] = useState<Tab>("products");
   const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
 
-  // Pre-load categories so ProductsTab can use them for the filter dropdown
   useEffect(() => {
     apiGet<CategoriesResponse>("/api/v1/catalog/categories")
       .then((d) => setCategories(d.items ?? []))
+      .catch(() => {/* non-fatal */});
+    apiGet<ProductsResponse>("/api/v1/catalog?limit=200&offset=0")
+      .then((d) => setProducts(d.items ?? []))
       .catch(() => {/* non-fatal */});
   }, []);
 
@@ -850,10 +1065,14 @@ export default function CatalogPage() {
           <button type="button" onClick={() => setTab("categories")} className={tabCls("categories")}>
             Categories
           </button>
+          <button type="button" onClick={() => setTab("compliance")} className={tabCls("compliance")}>
+            Compliance
+          </button>
         </div>
 
         {tab === "products"   && <ProductsTab   categories={categories} />}
         {tab === "categories" && <CategoriesTab />}
+        {tab === "compliance" && <ComplianceTab products={products} />}
       </div>
     </EnterpriseShell>
   );
