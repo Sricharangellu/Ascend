@@ -22,6 +22,18 @@ Status: ACTIVE
 | Queue item | #1 — e2e core-flow triage (same item as above) |
 | Status | RELEASED (stale) — no lock update and no pushed commits >24h after claim; Sri confirmed the session is no longer running. Item taken over by session E. |
 
+## Parallel Non-Overlapping Claim (session A — CI hardening)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (VSCode, resumed 2026-07-04; prior stale #1 claim correctly released) |
+| Queue item | CI hardening (AUDIT_2026-07-03B rec #2): make CI gates real — add `npm run smoke` to backend job; fix e2e job (mocks were ON: dead `NEXT_PUBLIC_E2E_MODE`, missing `NEXT_PUBLIC_MOCK=false`; bare `tsx` not on PATH; `npm start` incompatible with standalone output; wait loops never fail) |
+| Files/areas expected | `.github/workflows/ci.yml` ONLY. No `web/**`, no `src/**`, no e2e specs, no local ports — zero overlap with session E's item #1 |
+| Started | 2026-07-04 |
+| Last update | 2026-07-04 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim
 
 | Field | Value |
