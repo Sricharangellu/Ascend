@@ -30,6 +30,19 @@ secure behavior as a failure. Verification passed: live flags auth-boundary curl
 (`401`), `git diff --check` PASS. The broader session M gates were already green on
 the pushed commit before the stale smoke step failed.
 
+2026-07-05 session E part 3 (business-profile contract + audit history — full findings
+in `WORK/AUDIT_2026-07-05G.md`): a real backend/mock drift is **fixed and verified** —
+real `POST /settings/business-profile` required businessType and ignored `moduleFlags`,
+so Business Profile module toggles only worked against the mock (400 on real backend)
+and a type switch reset all manual overrides. The endpoint now supports moduleFlags
+delta updates, enabledModules explicit sets, and businessType bundle resets (empty body
+400), with every change audit-logged (`business_profile.type_changed` /
+`.modules_changed`, real actor ids) — closing the Settings plan bullet "last
+business-type/module changes with actor and timestamp". The Business Profile page shows
+a Recent Changes section (actor + timestamp + human diff) with mock parity. Gates:
+focused settings 23/23 (real Postgres), full backend suite 332/332, smoke 20/20,
+backend+web tsc 0, Vitest 94/94, lint 4 pre-existing warnings, mock-off build green.
+
 2026-07-05 session E part 2 (retail setup checklist + honest onboarding — full
 findings in `WORK/AUDIT_2026-07-05E.md`): two "Signup and setup" plan requirements are
 **Built and verified**. (1) `RetailSetupChecklist` on the dashboard: the seven required
