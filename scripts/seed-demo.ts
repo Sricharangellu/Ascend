@@ -311,6 +311,23 @@ const orders: OrderSpec[] = [
 // ── Main ───────────────────────────────────────────────────────────────────────
 
 async function main() {
+  // SAFETY: this writes demo commerce data (products, customers, orders) into
+  // whatever DATABASE_URL points at. Against a real/production database it
+  // pollutes live data. Refuse in production, and require an explicit opt-in
+  // everywhere else so a stray run against prod cannot silently seed.
+  if (process.env["NODE_ENV"] === "production") {
+    console.error("✗ Refusing to seed demo data: NODE_ENV=production. This is a live database.");
+    process.exit(1);
+  }
+  if (process.env["ALLOW_DEMO_SEED"] !== "1") {
+    console.error(
+      "✗ Refusing to seed demo data.\n" +
+        "  This inserts fake products/customers/orders into the target database.\n" +
+        "  Set ALLOW_DEMO_SEED=1 ONLY against a disposable dev/demo database — never production.",
+    );
+    process.exit(1);
+  }
+
   const db = openDb();
   try {
   console.log(`Seeding tenant: ${TENANT_ID}`);
