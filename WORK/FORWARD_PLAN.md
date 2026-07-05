@@ -700,12 +700,15 @@ Tasks:
 
 - Configure production env vars.
 - Require Redis or equivalent for rate limiting/event propagation.
-- Enable secure metrics token.
+- PARTIAL: enable secure metrics token. Production no-token `/metrics` now closes with
+  `503 metrics_unconfigured`; set `METRICS_TOKEN` to allow authorized scraping.
 - Encrypt webhook secrets.
 - Verify Stripe webhook and payment flows.
 - Verify DB backup/restore.
 - Verify migration lock and rollback plan.
-- Add smoke checks to deployment.
+- DONE: add backend operational readiness checks to deployment via `npm run ops:check`.
+- DONE: add `PG_SSL` override so production-mode checks can run against local/CI
+  Postgres while production still defaults to SSL.
 - Add monitoring and alerting.
 
 Exit criteria:

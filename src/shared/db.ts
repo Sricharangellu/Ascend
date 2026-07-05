@@ -235,6 +235,13 @@ export interface OpenDbOptions {
   max?: number;
 }
 
+function sslConfig(): { rejectUnauthorized: boolean } | undefined {
+  const raw = process.env.PG_SSL?.trim().toLowerCase();
+  if (raw && ["0", "false", "no", "off", "disable", "disabled"].includes(raw)) return undefined;
+  if (raw && ["1", "true", "yes", "on", "require", "required"].includes(raw)) return { rejectUnauthorized: false };
+  return process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined;
+}
+
 /**
  * Open a Postgres-backed DB. Sets each connection's search_path to the requested
  * schema (created on first use) so unqualified table names and IF NOT EXISTS
@@ -255,7 +262,7 @@ export function openDb(options: OpenDbOptions = {}): DB {
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,
     allowExitOnIdle: true,
-    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
+    ssl: sslConfig(),
     options: `-c search_path=${schema}`,
   });
   return makeDb(pool, { isTx: false, pool });

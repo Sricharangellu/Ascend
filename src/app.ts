@@ -62,6 +62,8 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
       ["SENDGRID_API_KEY", "password reset and transactional emails will silently fail"],
       ["STRIPE_SECRET_KEY", "card payments will return 503 — configure Stripe or disable card tender"],
       ["REDIS_URL", "rate limiting uses in-memory state and will NOT be shared across instances — all replicas will have separate limits"],
+      ["METRICS_TOKEN", "Prometheus metrics scraping will be disabled until a bearer token is configured"],
+      ["WEBHOOK_SECRET_KEY", "customer webhook secrets may use plaintext dev fallback instead of encryption"],
     ];
     for (const [name, reason] of WARNED_VARS) {
       if (!process.env[name]) {
@@ -140,7 +142,11 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   const allowedOrigins: Set<string> =
     rawOrigins.trim()
       ? new Set(rawOrigins.split(",").map((o) => o.trim()).filter(Boolean))
-      : new Set(["https://finder-pos.vercel.app", "https://finder-pos-web.vercel.app"]);
+      : new Set([
+        "https://finder-pos.vercel.app",
+        "https://finder-pos-web.vercel.app",
+        "https://finder-pos-frontend.vercel.app",
+      ]);
 
   app.use((req, res, next) => {
     const origin = req.headers.origin ?? "";
@@ -222,10 +228,14 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     res.json({ status: "ok", ts: Date.now(), version: sha, builtAt });
   });
 
-  // ── Prometheus metrics — bearer token required (set METRICS_TOKEN env var;
-  //    configure Prometheus scraper to send Authorization: Bearer <token>).
+  // ── Prometheus metrics — bearer token required in production. In development
+  // and tests, an unset METRICS_TOKEN keeps local smoke checks simple.
   app.get("/metrics", (req, res) => {
     const expected = process.env["METRICS_TOKEN"];
+    if (!expected && process.env["NODE_ENV"] === "production") {
+      res.status(503).type("text/plain").send("metrics_unconfigured\n");
+      return;
+    }
     if (expected) {
       const provided = req.headers.authorization?.replace(/^Bearer\s+/i, "");
       if (provided !== expected) { res.status(401).end(); return; }

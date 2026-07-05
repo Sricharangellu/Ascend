@@ -6,7 +6,8 @@ import type { Request, Response, NextFunction } from "express";
  * standing up a metrics backend. Cardinality is kept low by normalizing dynamic
  * path segments (ids) to ":id" and bucketing status into the exact code.
  *
- * Exposed at GET /metrics (unauthenticated, like the health probes).
+ * Exposed at GET /metrics. The route is bearer-token protected in production by
+ * app.ts; this module only records and renders the metrics payload.
  */
 
 interface DurationAgg {

@@ -40,7 +40,7 @@ deploy_backend() {
   echo "→ Backend: deploying…"
   ( cd "$S" && VERCEL_ORG_ID="$TEAM" VERCEL_PROJECT_ID="$BACKEND_PID" \
       npx --yes vercel deploy $PROD_FLAG --archive=tgz --yes --token "$VERCEL_TOKEN" )
-  curl -fsS -m 25 "$BACKEND_URL/readyz" >/dev/null && echo "✓ backend /readyz OK"
+  ( cd "$REPO" && BACKEND_URL="$BACKEND_URL" npx tsx scripts/ops-check.ts "$BACKEND_URL" )
 }
 
 deploy_frontend() {

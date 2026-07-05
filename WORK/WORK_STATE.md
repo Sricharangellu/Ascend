@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-05 (Codex session L, business impact preview)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
+> Last updated: 2026-07-05 (Codex session M, backend operational readiness)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
 
 ---
 
@@ -9,6 +9,24 @@
 **PAUSED** until Phase 2 exit criteria pass. Phase 2 is now explicitly the
 **Retail release pack**: finish one complete business type end-to-end before deepening
 wholesale, restaurant, mobile, grocery, ecommerce, or other packs.
+
+2026-07-05 Codex session M (backend operational readiness - full findings in
+`WORK/AUDIT_2026-07-05B.md`): production/backend infra readiness is **Built and
+verified as a deploy gate**, not a claim that the whole app is deployment-ready.
+Added `npm run ops:check`, wired backend deployment to run the richer live readiness
+check, closed production metrics by default when `METRICS_TOKEN` is absent, expanded
+the default CORS allowlist for the deployed frontend URLs, and added `PG_SSL` so
+production-mode checks can run against local/CI Postgres without weakening the
+production default. Pre-deploy live truth: the currently deployed backend failed the
+new ops check because `/metrics` was publicly readable and the deployed frontend origin
+did not receive CORS allowance. The code now fixes those classes of drift once deployed,
+but real metrics scraping still requires configuring `METRICS_TOKEN`; without it,
+production `/metrics` is intentionally closed with `503 metrics_unconfigured`.
+Verification passed: backend typecheck PASS, focused ops/metrics tests PASS 4/4,
+local production-mode ops check PASS 6/6, focused settings suite PASS 20/20, full
+backend suite PASS 329/329, smoke PASS 15/15, frontend typecheck PASS, frontend lint
+PASS with the same 4 pre-existing hook warnings, frontend Vitest PASS 89/89, and
+frontend production build PASS with `NEXT_PUBLIC_MOCK=false`.
 
 2026-07-05 Codex session L (business impact preview - full findings in
 `WORK/AUDIT_2026-07-05A.md`): retail-first queue item #2 is **Built and verified**.
