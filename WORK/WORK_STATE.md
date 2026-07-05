@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-05 (Codex session N, production smoke auth alignment)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
+> Last updated: 2026-07-05 (Codex session O, retail-first E2E gate alignment)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
 
 ---
 
@@ -9,6 +9,17 @@
 **PAUSED** until Phase 2 exit criteria pass. Phase 2 is now explicitly the
 **Retail release pack**: finish one complete business type end-to-end before deepening
 wholesale, restaurant, mobile, grocery, ecommerce, or other packs.
+
+2026-07-05 Codex session O (retail-first E2E gate alignment - full findings in
+`WORK/AUDIT_2026-07-05F.md`): the backend operational-readiness work is now proven
+through CI backend gates and production smoke, but the CI Playwright job was red because
+`web/e2e/verticals.spec.ts` still asserted the old false product claim that every
+non-retail vertical is fully active/complete in CI. The E2E suite now matches the
+binding product rule: retail is the current Built/verified release pack; non-retail
+business packs are Preview and should be checked for authenticated rendering/no crash,
+not full workflow readiness. Verification: frontend typecheck PASS, `git diff --check`
+PASS, Playwright test discovery PASS (26 tests). Full Playwright execution is left to
+GitHub CI because another active session's lock avoided ports/concurrent Next builds.
 
 2026-07-05 Codex session N (production smoke auth alignment - full findings in
 `WORK/AUDIT_2026-07-05D.md`): post-deploy CI smoke was corrected after session M's

@@ -55,7 +55,7 @@ test.describe("Purchasing — inventory receive", () => {
     await expect(
       page
         .getByRole("heading", { name: /receive|stock/i })
-        .or(page.getByText(/no.*order|select a PO/i))
+        .or(page.getByText(/no.*order|select pending po|choose a po to receive|scan barcode/i))
         .first(),
     ).toBeVisible({ timeout: 15_000 });
   });
