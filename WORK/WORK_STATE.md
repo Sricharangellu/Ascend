@@ -10,7 +10,7 @@
 **Retail release pack**: finish one complete business type end-to-end before deepening
 wholesale, restaurant, mobile, grocery, ecommerce, or other packs.
 
-2026-07-05 Codex session O follow-up (full findings in `WORK/AUDIT_2026-07-05G.md`):
+2026-07-05 Codex session O follow-up (full findings in `WORK/AUDIT_2026-07-05H.md`):
 the pushed CI run proved backend, frontend build, production deploy, and post-deploy
 smoke green, but Playwright still failed because the module marketplace E2E clicked a
 disabled switch. Several authenticated route checks were also flaky after worker
