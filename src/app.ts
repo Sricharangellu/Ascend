@@ -8,7 +8,7 @@ import { logger } from "./shared/logger.js";
 import { buildInfo } from "./shared/version.js";
 import { errorMiddleware } from "./shared/http.js";
 import { modules } from "./modules/index.js";
-import { SettingsService } from "./modules/settings/service.js";
+import { parseCapabilitiesImpactQuery, SettingsService } from "./modules/settings/service.js";
 import { identityModule } from "./identity/index.js";
 import {
   requestIdMiddleware,
@@ -310,6 +310,13 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   // should consume before rendering business-type-specific modules.
   const settingsService = new SettingsService(db);
   app.get(
+    "/api/v1/capabilities/impact",
+    handler(async (req, res) => {
+      const auth = res.locals["auth"] as AuthPayload;
+      res.json(await settingsService.getCapabilitiesImpact(auth, parseCapabilitiesImpactQuery(req.query as Record<string, unknown>)));
+    }),
+  );
+  app.get(
     "/api/v1/capabilities",
     handler(async (_req, res) => {
       const auth = res.locals["auth"] as AuthPayload;
@@ -339,6 +346,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
         "/api/identity/refresh",
         "/api/v1/flags",
         "/api/v1/capabilities",
+        "/api/v1/capabilities/impact",
         "/api/catalog",
         "/api/inventory",
         "/api/orders",

@@ -260,6 +260,66 @@ test("capabilities reflects selected business bundle and manual module overrides
   assert.equal(overriddenLoyalty.source, "manual_override");
 });
 
+test("capabilities impact previews retail to wholesale switch without writing settings", async () => {
+  const app = await freshApp();
+
+  const impact = await call(app, "GET", "/api/capabilities/impact?businessType=wholesale");
+  assert.equal(impact.status, 200);
+  assert.equal(impact.json.impactVersion, 1);
+  assert.equal(impact.json.readOnly, true);
+  assert.equal(impact.json.from.businessType, "retail");
+  assert.equal(impact.json.to.businessType, "wholesale");
+  assert.equal(impact.json.summary.businessTypeChanged, true);
+
+  const addedKeys = impact.json.modules.added.map((m: { key: string }) => m.key);
+  const removedKeys = impact.json.modules.removed.map((m: { key: string }) => m.key);
+  assert.ok(addedKeys.includes("sales_orders"));
+  assert.ok(addedKeys.includes("purchasing"));
+  assert.ok(addedKeys.includes("quotes"));
+  assert.ok(removedKeys.includes("pos_terminal"));
+  assert.ok(removedKeys.includes("loyalty"));
+  assert.ok(impact.json.requiredFields.added.customer.includes("legalBusinessName"));
+  assert.ok(impact.json.workflows.added.includes("create_quote"));
+  assert.ok(impact.json.permissions.added.includes("purchasing:write"));
+  assert.ok(impact.json.reports.added.includes("quote_conversion"));
+  assert.ok(impact.json.setupTasks.some((task: { key: string }) => task.key === "configure_payment_terms"));
+  assert.deepEqual(impact.json.apply.body, { businessType: "wholesale" });
+
+  const after = await call(app, "GET", "/api/capabilities");
+  assert.equal(after.json.business.type, "retail", "preview must not mutate business type");
+  const salesOrders = after.json.modules.find((m: { key: string }) => m.key === "sales_orders");
+  assert.equal(salesOrders.enabled, false, "preview must not enable target modules");
+});
+
+test("capabilities impact previews module overrides against current business type", async () => {
+  const app = await freshApp();
+
+  const impact = await call(app, "GET", "/api/settings/capabilities/impact?enabledModules=sales_orders&disabledModules=loyalty");
+  assert.equal(impact.status, 200);
+  assert.equal(impact.json.from.businessType, "retail");
+  assert.equal(impact.json.to.businessType, "retail");
+  assert.equal(impact.json.summary.businessTypeChanged, false);
+
+  const addedKeys = impact.json.modules.added.map((m: { key: string }) => m.key);
+  const removedKeys = impact.json.modules.removed.map((m: { key: string }) => m.key);
+  assert.deepEqual(addedKeys, ["sales_orders"]);
+  assert.deepEqual(removedKeys, ["loyalty"]);
+  assert.ok(impact.json.target.enabledModules.includes("sales_orders"));
+  assert.ok(!impact.json.target.enabledModules.includes("loyalty"));
+  assert.equal(impact.json.target.features.accountMode, "WHOLESALE");
+  assert.equal(impact.json.apply.body.businessType, "retail");
+  assert.ok(impact.json.apply.body.enabledModules.includes("sales_orders"));
+  assert.ok(!impact.json.apply.body.enabledModules.includes("loyalty"));
+});
+
+test("capabilities impact rejects unknown modules", async () => {
+  const app = await freshApp();
+
+  const r = await call(app, "GET", "/api/capabilities/impact?enabledModules=not_a_module");
+  assert.equal(r.status, 400);
+  assert.equal(r.json.error.code, "bad_request");
+});
+
 // ─── Edition Presets ──────────────────────────────────────────────────────────
 
 test("set edition to retail enables groupRetailPOS only", async () => {

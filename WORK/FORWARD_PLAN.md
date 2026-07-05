@@ -1,6 +1,6 @@
 # Finder Forward Plan (authoritative)
 
-Last reviewed: 2026-07-04
+Last reviewed: 2026-07-05
 Scope reviewed: `/Users/sri/Desktop/Desk/Finder/finder-pos`
 
 > Sequencing is **phase-based, not time-based**. A phase is complete when its exit
@@ -121,6 +121,9 @@ The codebase already has a **Partial** first version:
 - `GET /api/v1/capabilities` and `GET /api/v1/settings/capabilities` now expose the
   read-only tenant/user capabilities contract that setup, settings, shell navigation,
   and demo switchers should consume before claiming a business pack is active.
+- `GET /api/v1/capabilities/impact` and `GET /api/v1/settings/capabilities/impact`
+  now expose the read-only preview contract for business-type or module changes before
+  applying them to tenant settings.
 - `GET/PUT /api/v1/settings/feature-flags` stores tenant feature flags.
 - `POST /api/v1/settings/edition` supports simple retail/wholesale/enterprise presets.
 - `web/app/(protected)/setup/business-profile/page.tsx` lets the tenant choose a business type and module bundle.
@@ -128,9 +131,10 @@ The codebase already has a **Partial** first version:
 - `web/components/EnterpriseShell.tsx` hides navigation by feature flags.
 - `web/app/(protected)/settings/permissions/page.tsx` manages role feature access.
 
-This is not the finished architecture yet. Today it mostly controls module visibility.
-It does not fully enforce required fields, workflow constraints, pricing rules, plan
-entitlements, business-pack permissions, or module-by-module impact reporting.
+This is not the finished architecture yet. Today it mostly controls and reports module
+visibility. It now has backend capability and impact contracts, but it does not fully
+enforce required fields, workflow constraints, pricing rules, plan entitlements, or
+business-pack permissions.
 
 ### Target data model
 
@@ -217,8 +221,9 @@ Changes sale flow: POS sale remains optional; Invoice flow becomes primary
 Requires setup: payment terms, tax profile defaults, price tiers
 ```
 
-This should be implemented as a backend "capabilities" or "impact" endpoint before the
-UI claims to support business-mode switching.
+This is now implemented at the backend API level through the capabilities and impact
+endpoints. The UI still must consume the same contracts before it claims to support
+business-mode switching.
 
 ## Retail-first execution rule
 
@@ -671,8 +676,8 @@ without deepening other verticals yet.
 
 Tasks:
 
-- Build `GET /api/v1/capabilities` for the current tenant/user.
-- Build a business-type impact/preview endpoint.
+- DONE: Build `GET /api/v1/capabilities` for the current tenant/user.
+- DONE: Build a read-only business-type/module impact preview endpoint.
 - Formalize plan, business type, entitlements, modules, required fields, workflows, and
   permissions as separate concepts.
 - Make setup, settings, shell navigation, and demo mode read from capabilities.

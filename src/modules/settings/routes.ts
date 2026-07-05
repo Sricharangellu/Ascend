@@ -3,7 +3,7 @@ import { z } from "zod";
 import { handler, parseBody } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import { requireRole } from "../../gateway/auth.js";
-import type { SettingsService } from "./service.js";
+import { parseCapabilitiesImpactQuery, type SettingsService } from "./service.js";
 import { MODULE_REGISTRY, BUSINESS_BUNDLES, CORE_MODULES, moduleFlag } from "../../shared/moduleRegistry.js";
 
 function tenantId(res: Response): string {
@@ -40,6 +40,9 @@ export function registerRoutes(router: Router, service: SettingsService): void {
   router.get("/feature-flags", handler(async (_req, res) => res.json(await service.getFlags(tenantId(res)))));
   router.put("/feature-flags", mgr, handler(async (req, res) => res.json(await service.setFlags(parseBody(flagsSchema, req.body), tenantId(res)))));
   router.get("/capabilities", handler(async (_req, res) => res.json(await service.getCapabilities(auth(res)))));
+  router.get("/capabilities/impact", handler(async (req, res) => {
+    res.json(await service.getCapabilitiesImpact(auth(res), parseCapabilitiesImpactQuery(req.query as Record<string, unknown>)));
+  }));
 
   // Shipping methods
   router.get("/shipping-methods", handler(async (_req, res) => res.json({ items: await service.listShipping(tenantId(res)) })));

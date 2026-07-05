@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-04 (Codex session K, business capabilities endpoint)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
+> Last updated: 2026-07-05 (Codex session L, business impact preview)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
 
 ---
 
@@ -9,6 +9,23 @@
 **PAUSED** until Phase 2 exit criteria pass. Phase 2 is now explicitly the
 **Retail release pack**: finish one complete business type end-to-end before deepening
 wholesale, restaurant, mobile, grocery, ecommerce, or other packs.
+
+2026-07-05 Codex session L (business impact preview - full findings in
+`WORK/AUDIT_2026-07-05A.md`): retail-first queue item #2 is **Built and verified**.
+The backend now exposes a read-only business-type/module impact contract at
+`GET /api/v1/capabilities/impact`, with a settings-module alias at
+`GET /api/v1/settings/capabilities/impact`. It previews the difference between the
+current tenant capabilities and a requested target business type or module override
+without writing tenant settings. The response reports added/removed modules, unchanged
+enabled modules, required-field deltas, workflow deltas, permission/report/page deltas,
+setup tasks, slim current/target snapshots, the exact apply payload for
+`POST /api/v1/settings/business-profile`, and warnings that entitlement enforcement is
+still a placeholder and only retail may be treated as Built/verified. Real-Postgres
+tests prove Retail -> Wholesale preview, module override preview, and bad module
+rejection. Verification passed: backend typecheck PASS, focused settings suite PASS
+20/20, full backend suite PASS 327/327, smoke PASS 15/15, frontend typecheck PASS,
+frontend lint PASS with the same 4 pre-existing hook warnings, frontend Vitest PASS
+89/89, and frontend production build PASS with `NEXT_PUBLIC_MOCK=false`.
 
 2026-07-04 Codex session K (business capabilities endpoint - full findings in
 `WORK/AUDIT_2026-07-04M.md`): retail-first queue item #1 is **Built and verified**.
@@ -284,7 +301,8 @@ rewrite):**
    feature flags, plan/entitlement placeholders, and permissions —
    **DONE 2026-07-04 Codex session K; see `WORK/AUDIT_2026-07-04M.md`.**
 2. **Business-type impact preview**: read-only endpoint for setup/settings/demo switcher
-   that shows what changes before applying a business type/module change.
+   that shows what changes before applying a business type/module change —
+   **DONE 2026-07-05 Codex session L; see `WORK/AUDIT_2026-07-05A.md`.**
 3. **Retail setup/auth proof**: signup/login/logout/session recovery -> select retail
    -> configure outlet/register/tax/payment/receipt basics against real backend.
 4. **Retail catalog/inventory proof**: create retail product -> receive stock -> prove
