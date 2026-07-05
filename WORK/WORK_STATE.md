@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-05 (session E, capabilities-driven shell)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
+> Last updated: 2026-07-05 (Codex session N, production smoke auth alignment)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
 
 ---
 
@@ -9,6 +9,15 @@
 **PAUSED** until Phase 2 exit criteria pass. Phase 2 is now explicitly the
 **Retail release pack**: finish one complete business type end-to-end before deepening
 wholesale, restaurant, mobile, grocery, ecommerce, or other packs.
+
+2026-07-05 Codex session N (production smoke auth alignment - full findings in
+`WORK/AUDIT_2026-07-05D.md`): post-deploy CI smoke was corrected after session M's
+production deploy exposed a stale assumption. The live backend correctly returns `401`
+for unauthenticated `GET /api/v1/flags`; the old smoke step still expected public `200`.
+`.github/workflows/ci.yml` now asserts the intended auth boundary instead of treating
+secure behavior as a failure. Verification passed: live flags auth-boundary curl PASS
+(`401`), `git diff --check` PASS. The broader session M gates were already green on
+the pushed commit before the stale smoke step failed.
 
 2026-07-05 session E (capabilities-driven shell + Business Profile — full findings in
 `WORK/AUDIT_2026-07-05C.md`): retail-first queue item #3 is **Built and verified**.
