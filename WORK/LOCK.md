@@ -11,7 +11,7 @@ Status: ACTIVE
 | Files/areas expected | `src/modules/payments/webhook.test.ts` (NEW file only). No source edits (session E on `src/modules/settings/**`), no `scripts/**`, no `.github/**`, no `web/**` |
 | Started | 2026-07-05 |
 | Last update | 2026-07-05 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped `af1b7f1`: 4/4 on real Postgres. Proves valid signature → 200 + verified event on internal bus, bad sig → 400, missing sig → 400, no secret → 503 (fails closed). RULES.md "Stripe/webhook behavior verified" gate now has coverage. NOTE for all sessions: this push also carried another session's local-only e2e commit (`94013a1`) that was sitting uncommitted/committed in the shared checkout, and resolved an AUDIT_2026-07-05G filename collision (session E's kept at G; e2e session's content re-filed at AUDIT_2026-07-05H.md). Reminder: two sessions must not pick the same AUDIT_YYYY-MM-DD<letter> name. |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (session A — signup provisioning + isolation test)
