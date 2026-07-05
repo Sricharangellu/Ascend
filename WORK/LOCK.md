@@ -11,7 +11,7 @@ Status: ACTIVE
 | Files/areas expected | `scripts/seed-demo.ts` ONLY. Does NOT touch session M's new `scripts/ops-check.ts` (session M explicitly disclaims seed changes), no `package.json`, no `web/**`, no prod DB |
 | Started | 2026-07-05 |
 | Last update | 2026-07-05 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped `4af81a0`: refuses in production and requires ALLOW_DEMO_SEED=1 elsewhere; all three paths verified, typecheck clean. Both seed scripts (e2e + demo) now safe against production. |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (session A — production demo credentials)
