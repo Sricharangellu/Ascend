@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Parallel Non-Overlapping Claim (session A — signup provisioning + isolation test)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (VSCode) |
+| Queue item | Verification gap: nothing proves a fresh signup (`POST /api/identity/register`) yields a working, isolated retail tenant. `tenant.registered` has no listener — provisioning is lazy read-time default. New integration test: register → new tenant → GET /capabilities returns retail (source=default) → owner can create outlet+product → cross-tenant isolation (new tenant cannot see demo data). Honest verification; no behavior change. |
+| Files/areas expected | `src/identity/signup-provision.test.ts` (NEW file only). No source edits (session E active on `src/modules/settings/**` + web), no `scripts/**`, no `.github/**`, no `web/**` |
+| Started | 2026-07-05 |
+| Last update | 2026-07-05 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Active Claim (session E — business-profile change contract + audit history)
 
 | Field | Value |
@@ -11,6 +23,18 @@ Status: ACTIVE
 | Files/areas expected | `src/modules/settings/routes.ts`, `src/modules/settings/settings.test.ts`, `web/app/(protected)/settings/modes/page.tsx` (Recent changes section), `web/mocks/mockHandlers.ts` (parity), WORK evidence. NO `scripts/**`, NO `.github/**`, NO e2e, no ports, no concurrent `next build` |
 | Started | 2026-07-05 |
 | Last update | 2026-07-05 |
+| Status | ACTIVE |
+| Blockers | none |
+
+## Parallel Non-Overlapping Claim (Codex session O - retail-first E2E gate alignment)
+
+| Field | Value |
+|---|---|
+| Agent/session | Codex session O |
+| Queue item | Fix the red CI Playwright E2E gate after backend ops readiness: align stale vertical/onboarding E2E assertions with the current retail-first product scope, without touching backend infra or product UI behavior. Non-retail packs are Preview until retail is complete; tests must not claim every vertical page is production-ready. |
+| Files/areas expected | `web/e2e/**`, `WORK/WORK_STATE.md`, new audit note, `WORK/LOCK.md`. NO backend source changes, NO production DB edits, NO scripts, NO app feature/UI implementation outside e2e evidence unless the E2E evidence proves a real retail/core UI bug. Avoid session E's active files: `src/modules/settings/routes.ts`, `src/modules/settings/settings.test.ts`, `web/app/(protected)/settings/modes/page.tsx`, `web/mocks/mockHandlers.ts`. |
+| Started | 2026-07-05 02:20 CDT |
+| Last update | 2026-07-05 02:20 CDT |
 | Status | ACTIVE |
 | Blockers | none |
 
