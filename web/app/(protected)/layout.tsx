@@ -16,6 +16,7 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { AccountModeProvider } from "@/lib/useAccountMode";
 import { FinderContextProvider } from "@/lib/useFinderContext";
 import { PermissionsProvider } from "@/contexts/PermissionsContext";
+import { CapabilitiesProvider } from "@/contexts/CapabilitiesContext";
 
 export default function ProtectedLayout({
   children,
@@ -51,12 +52,14 @@ export default function ProtectedLayout({
 
   return (
     <PermissionsProvider>
-      <AccountModeProvider>
-        <FinderContextProvider>
-          <OfflineBanner />
-          {children}
-        </FinderContextProvider>
-      </AccountModeProvider>
+      <CapabilitiesProvider>
+        <AccountModeProvider>
+          <FinderContextProvider>
+            <OfflineBanner />
+            {children}
+          </FinderContextProvider>
+        </AccountModeProvider>
+      </CapabilitiesProvider>
     </PermissionsProvider>
   );
 }

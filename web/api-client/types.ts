@@ -1692,3 +1692,95 @@ export interface ProShopItem {
   image_url: string | null;
 }
 
+
+// ─── Capabilities (business-pack control plane) ──────────────────────────────
+// Contract of GET /api/v1/capabilities (alias: /api/v1/settings/capabilities).
+// The tenant-layer authority: business type + pack defaults + manual overrides
+// resolved server-side. The shell/nav and Business Profile settings render
+// from this — never from hardcoded business-type assumptions.
+
+export interface CapabilityModule {
+  key: string;
+  name: string;
+  description: string;
+  group: string;
+  core?: boolean;
+  route?: string;
+  flagKey: string;
+  enabled: boolean;
+  defaultEnabled: boolean;
+  source: "core" | "manual_override" | "business_pack" | "not_in_business_pack";
+  disabledReason: string | null;
+}
+
+export interface CapabilityBusinessType {
+  key: string;
+  name: string;
+  description: string;
+  icon: string;
+  modules: string[];
+}
+
+export interface CapabilitiesResponse {
+  capabilitiesVersion: number;
+  tenant: { id: string };
+  user: {
+    id: string;
+    role: string;
+    customRoleId: string | null;
+    storeIds: string[];
+    storeScope: "all" | "restricted";
+    permissions: string[];
+    scopes: string[];
+    allAccess: boolean;
+    apiKeyRestricted: boolean;
+  };
+  business: {
+    type: string;
+    source: "stored" | "default";
+    label: string;
+    description: string;
+    icon: string;
+  };
+  plan: Record<string, unknown> | null;
+  entitlements: { source: string; enforced: boolean; note: string };
+  features: Record<string, boolean | string>;
+  requiredFields: Record<string, string[]>;
+  workflows: string[];
+  moduleGroups: Record<string, string>;
+  availableBusinessTypes: CapabilityBusinessType[];
+  modules: CapabilityModule[];
+  coreModules: string[];
+}
+
+export interface CapabilityImpactModuleSummary {
+  key: string;
+  name: string;
+  group: string;
+  route?: string | null;
+}
+
+export interface CapabilitiesImpactResponse {
+  impactVersion: number;
+  readOnly: boolean;
+  from: { businessType: string; label: string; enabledModuleCount: number };
+  to: { businessType: string; label: string; enabledModuleCount: number };
+  summary: {
+    businessTypeChanged: boolean;
+    modulesAdded: number;
+    modulesRemoved: number;
+    requiredFieldEntitiesChanged: number;
+    workflowsAdded: number;
+    workflowsRemoved: number;
+    setupTasksRequired: number;
+  };
+  modules: {
+    added: CapabilityImpactModuleSummary[];
+    removed: CapabilityImpactModuleSummary[];
+    unchangedEnabled: string[];
+    targetEnabled: string[];
+  };
+  // requiredFields / workflows / permissions / reports / pages / setupTasks —
+  // consumed loosely by the preview UI.
+  [key: string]: unknown;
+}

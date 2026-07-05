@@ -10,6 +10,7 @@ import { useOffline } from "@/lib/useOffline";
 import { useFinderContext } from "@/lib/useFinderContext";
 import { useModuleFlags } from "@/hooks/useModuleFlags";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { useCapabilities } from "@/contexts/CapabilitiesContext";
 
 // ── NavKey ────────────────────────────────────────────────────────────────────
 
@@ -383,6 +384,7 @@ function LeftRail({
   const pathname = usePathname();
   const { enabled: enabledModules } = useModuleFlags();
   const { hasFeature } = usePermissions();
+  const { routeEnabled } = useCapabilities();
   const activeSection = SECTION_MAP[active] ?? "home";
   const { registerId } = useFinderContext();
 
@@ -405,13 +407,19 @@ function LeftRail({
     });
   };
 
-  // Filter nav items: module gate + feature gate
+  // Filter nav items — four-layer check, tenant layer first:
+  //   1. tenant module gate (explicit moduleGate key)
+  //   2. tenant route gate (href owned by a capabilities module that is disabled)
+  //   3. user feature gate (permissions)
+  const childVisible = (c: { href: string; featureGate?: string }) =>
+    routeEnabled(c.href) && (!c.featureGate || hasFeature(c.featureGate));
   const navItems = NAV_TREE.filter((item) => {
     if (item.moduleGate && !enabledModules.has(item.moduleGate) && !enabledModules.has("*")) return false;
+    if (item.href && !routeEnabled(item.href)) return false;
     if (item.featureGate && !hasFeature(item.featureGate)) return false;
     // For sections with children, hide if ALL children are gated away
     if (item.children) {
-      const visible = item.children.filter((c) => !c.featureGate || hasFeature(c.featureGate));
+      const visible = item.children.filter(childVisible);
       if (visible.length === 0) return false;
     }
     return true;
@@ -539,7 +547,7 @@ function LeftRail({
                     </div>
                   )}
 
-                  {item.children.filter((c) => !c.featureGate || hasFeature(c.featureGate)).map((child) => {
+                  {item.children.filter(childVisible).map((child) => {
                     const isCurrent =
                       pathname === child.href ||
                       pathname.startsWith(child.href + "/");

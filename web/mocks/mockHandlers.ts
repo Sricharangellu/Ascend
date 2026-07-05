@@ -2670,6 +2670,105 @@ mockHandlers.push(
     return HttpResponse.json({ ok: true, businessType: _bpType, locked: _btLocked });
   }),
 
+  // ── Capabilities (business-pack control plane) — mirrors the real backend
+  //    contract of GET /api/v1/capabilities so mock and real modes render the
+  //    same shell/nav and Business Profile settings. Derived from the same
+  //    in-memory _bpType/_bpEnabled state the business-profile handlers mutate.
+  ...(() => {
+    const label = (key: string) => key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, " ");
+
+    const buildModules = () =>
+      _BP_CATALOG.map((m) => {
+        const defaultEnabled = Boolean(m.core) || (BT_BUNDLES[_bpType] ?? []).includes(m.key);
+        const enabled = m.core ? true : _bpEnabled.has(m.key);
+        const source = m.core
+          ? "core"
+          : enabled === defaultEnabled
+            ? (enabled ? "business_pack" : "not_in_business_pack")
+            : "manual_override";
+        return {
+          ...m,
+          flagKey: `module:${m.key}`,
+          enabled,
+          defaultEnabled,
+          source,
+          disabledReason: enabled ? null : (source === "manual_override" ? "manual_override_disabled" : "not_in_business_pack"),
+        };
+      });
+
+    const buildCapabilities = () => ({
+      capabilitiesVersion: 1,
+      tenant: { id: "tnt_demo" },
+      user: {
+        id: "usr_demo_owner", role: "owner", customRoleId: null, storeIds: [],
+        storeScope: "all", permissions: [], scopes: [], allAccess: true, apiKeyRestricted: false,
+      },
+      business: {
+        type: _bpType, source: "stored", label: label(_bpType),
+        description: `${label(_bpType)} business pack`, icon: "🏪",
+      },
+      plan: { key: "demo", name: "Demo", source: "mock" },
+      entitlements: { source: "placeholder", enforced: false, note: "Demo mode — plan entitlements are not enforced." },
+      features: { ...featureFlags },
+      requiredFields: { customer: ["name"], product: ["sku", "name", "price_cents"] },
+      workflows: [],
+      moduleGroups: {
+        common: "Common", retail: "Retail", b2b: "B2B / Wholesale", restaurant: "Restaurant",
+        hospitality: "Hospitality", services: "Services", healthcare: "Healthcare",
+        manufacturing: "Manufacturing", ecommerce: "Ecommerce", automotive: "Automotive",
+        rental: "Rental", entertainment: "Entertainment", education: "Education", golf: "Golf",
+      },
+      availableBusinessTypes: Object.entries(BT_BUNDLES).map(([key, modules]) => ({
+        key, name: label(key), description: `${label(key)} module bundle`, icon: "🏪", modules,
+      })),
+      modules: buildModules(),
+      coreModules: [..._BP_CORE_KEYS],
+    });
+
+    const buildImpact = (targetType: string) => {
+      const current = new Set<string>([..._BP_CORE_KEYS, ..._bpEnabled]);
+      const target = new Set<string>([..._BP_CORE_KEYS, ...(BT_BUNDLES[targetType] ?? [])]);
+      const byKey = new Map(_BP_CATALOG.map((m) => [m.key, m]));
+      const summarize = (key: string) => {
+        const m = byKey.get(key);
+        return { key, name: m?.name ?? label(key), group: m?.group ?? "common", route: m?.route ?? null };
+      };
+      const added = [...target].filter((k) => !current.has(k)).map(summarize);
+      const removed = [...current].filter((k) => !target.has(k)).map(summarize);
+      return {
+        impactVersion: 1,
+        readOnly: true,
+        from: { businessType: _bpType, label: label(_bpType), enabledModuleCount: current.size },
+        to: { businessType: targetType, label: label(targetType), enabledModuleCount: target.size },
+        summary: {
+          businessTypeChanged: targetType !== _bpType,
+          modulesAdded: added.length, modulesRemoved: removed.length,
+          requiredFieldEntitiesChanged: 0, workflowsAdded: 0, workflowsRemoved: 0, setupTasksRequired: 0,
+        },
+        modules: {
+          added, removed,
+          unchangedEnabled: [...current].filter((k) => target.has(k)),
+          targetEnabled: [...target],
+        },
+      };
+    };
+
+    const capabilitiesHandler = async () => { await lat(); return HttpResponse.json(buildCapabilities()); };
+    const impactHandler = async ({ request }: { request: Request }) => {
+      await lat();
+      const url = new URL(request.url);
+      const targetType = url.searchParams.get("businessType") ?? _bpType;
+      return HttpResponse.json(buildImpact(targetType));
+    };
+
+    return [
+      http.get(`${V1}/capabilities`, capabilitiesHandler),
+      http.get(`${V1}/settings/capabilities`, capabilitiesHandler),
+      http.get(`${V1}/capabilities/impact`, impactHandler),
+      http.get(`${V1}/settings/capabilities/impact`, impactHandler),
+    ];
+  })(),
+
   // ── Support-only: change business type after account setup ─────────────────
   // Requires header X-Finder-Support-Key: finder-support-2026
   http.patch(`${V1}/admin/business-type`, async ({ request }) => {
