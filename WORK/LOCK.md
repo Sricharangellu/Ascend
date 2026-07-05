@@ -34,8 +34,8 @@ Status: ACTIVE
 | Queue item | Fix the red CI Playwright E2E gate after backend ops readiness: align stale vertical/onboarding E2E assertions with the current retail-first product scope, without touching backend infra or product UI behavior. Non-retail packs are Preview until retail is complete; tests must not claim every vertical page is production-ready. |
 | Files/areas expected | `web/e2e/**`, `WORK/WORK_STATE.md`, new audit note, `WORK/LOCK.md`. NO backend source changes, NO production DB edits, NO scripts, NO app feature/UI implementation outside e2e evidence unless the E2E evidence proves a real retail/core UI bug. Avoid session E's active files: `src/modules/settings/routes.ts`, `src/modules/settings/settings.test.ts`, `web/app/(protected)/settings/modes/page.tsx`, `web/mocks/mockHandlers.ts`. |
 | Started | 2026-07-05 02:20 CDT |
-| Last update | 2026-07-05 02:20 CDT |
-| Status | ACTIVE |
+| Last update | 2026-07-05 17:38 CDT |
+| Status | RELEASED - shipped `5372b82`; Playwright vertical coverage now matches the retail-first scope instead of claiming every Preview vertical is fully production-ready. Verification: frontend typecheck PASS, `git diff --check` PASS, Playwright test discovery PASS (26 tests). Full E2E proof is deferred to GitHub CI because session E's active lock avoids ports/concurrent Next builds. |
 | Blockers | none |
 
 ## Released Claim (session E — retail setup checklist + honest onboarding)
