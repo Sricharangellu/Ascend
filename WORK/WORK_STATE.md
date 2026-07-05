@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-05 (Codex session O, retail-first E2E gate alignment)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
+> Last updated: 2026-07-05 (Codex session O, retail-first E2E CI follow-up)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
 
 ---
 
@@ -9,6 +9,17 @@
 **PAUSED** until Phase 2 exit criteria pass. Phase 2 is now explicitly the
 **Retail release pack**: finish one complete business type end-to-end before deepening
 wholesale, restaurant, mobile, grocery, ecommerce, or other packs.
+
+2026-07-05 Codex session O follow-up (full findings in `WORK/AUDIT_2026-07-05G.md`):
+the pushed CI run proved backend, frontend build, production deploy, and post-deploy
+smoke green, but Playwright still failed because the module marketplace E2E clicked a
+disabled switch. Several authenticated route checks were also flaky after worker
+retries redirected to `/login`. The E2E tests now use explicit authenticated
+navigation recovery, and the module switch test only clicks enabled switches while
+asserting disabled controls honestly when that is what the UI renders. Local
+verification: frontend typecheck PASS, frontend lint PASS with the same four
+pre-existing hook warnings, Playwright test discovery PASS (26 tests), `git diff
+--check` PASS. Full browser proof must come from the next GitHub CI run.
 
 2026-07-05 Codex session O (retail-first E2E gate alignment - full findings in
 `WORK/AUDIT_2026-07-05F.md`): the backend operational-readiness work is now proven

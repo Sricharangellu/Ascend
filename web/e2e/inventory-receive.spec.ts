@@ -13,10 +13,11 @@
  */
 
 import { test, expect } from "./fixtures";
+import { gotoAuthenticated } from "./helpers";
 
 test.describe("Purchasing — inventory receive", () => {
   test("purchase orders list loads", async ({ page }) => {
-    await page.goto("/purchasing");
+    await gotoAuthenticated(page, "/purchasing");
     // The page should load and show either a list or an empty state.
     await expect(
       page
@@ -27,7 +28,7 @@ test.describe("Purchasing — inventory receive", () => {
   });
 
   test("can navigate to a PO detail page", async ({ page }) => {
-    await page.goto("/purchasing");
+    await gotoAuthenticated(page, "/purchasing");
     // If there are POs in the demo data, click the first row.
     const firstPO = page
       .getByRole("row")
@@ -51,7 +52,7 @@ test.describe("Purchasing — inventory receive", () => {
   });
 
   test("receive stock page is reachable", async ({ page }) => {
-    await page.goto("/inventory/receive-stock");
+    await gotoAuthenticated(page, "/inventory/receive-stock");
     await expect(
       page
         .getByRole("heading", { name: /receive|stock/i })

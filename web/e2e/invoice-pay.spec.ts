@@ -9,11 +9,12 @@
  */
 
 import { test, expect } from "./fixtures";
+import { gotoAuthenticated } from "./helpers";
 
 test.describe("Invoice pay", () => {
   test("finance page loads with invoice data", async ({ page }) => {
     // Try /finance or /accounting — both are valid routes in the nav.
-    await page.goto("/finance");
+    await gotoAuthenticated(page, "/finance");
     await expect(
       page
         .getByRole("heading", { name: /finance|invoice|bill/i })
@@ -23,7 +24,7 @@ test.describe("Invoice pay", () => {
   });
 
   test("accounting page shows AR/AP", async ({ page }) => {
-    await page.goto("/accounting");
+    await gotoAuthenticated(page, "/accounting");
     // Should show accounts receivable / payable tabs or data.
     await expect(
       page
@@ -35,7 +36,7 @@ test.describe("Invoice pay", () => {
   });
 
   test("customers page shows open invoices per customer", async ({ page }) => {
-    await page.goto("/customers");
+    await gotoAuthenticated(page, "/customers");
     // Customer list should load.
     await expect(
       page

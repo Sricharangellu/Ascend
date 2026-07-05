@@ -10,14 +10,13 @@
 
 import { test, expect } from "./fixtures";
 import type { Page } from "@playwright/test";
+import { expectNoAppCrash, gotoAuthenticated } from "./helpers";
 
 async function expectAuthenticatedRouteHealthy(page: Page, url: string) {
-  await page.goto(url);
+  await gotoAuthenticated(page, url);
   await expect(page.locator("body")).toBeVisible({ timeout: 15_000 });
   await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
-
-  await expect(page).not.toHaveURL(/\/login/);
-  await expect(page.getByText(/something went wrong|unexpected error|500/i)).not.toBeVisible();
+  await expectNoAppCrash(page);
 }
 
 async function clickIfVisible(page: Page, nameMatcher: RegExp) {
@@ -68,25 +67,40 @@ test.describe("Module Marketplace", () => {
     }
   });
 
-  test("module toggle switches render and respond to click", async ({ page }) => {
+  test("module toggle switches render with honest enabled state", async ({ page }) => {
     await expectAuthenticatedRouteHealthy(page, "/setup/modules");
 
-    const toggle = page.getByRole("switch").first();
-    if (await toggle.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      const wasChecked = await toggle.getAttribute("aria-checked");
-      await toggle.click();
-      await page.waitForTimeout(200);
-      const isNowChecked = await toggle.getAttribute("aria-checked");
-      const isDisabled = await toggle.isDisabled().catch(() => false);
+    const toggles = page.getByRole("switch");
+    const firstToggle = toggles.first();
+    if (await firstToggle.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      let enabledToggle = firstToggle;
+      let hasEnabledToggle = false;
 
-      if (!isDisabled) {
-        expect(wasChecked).not.toEqual(isNowChecked);
+      for (let index = 0; index < await toggles.count(); index += 1) {
+        const candidate = toggles.nth(index);
+        if (!await candidate.isDisabled().catch(() => true)) {
+          enabledToggle = candidate;
+          hasEnabledToggle = true;
+          break;
+        }
       }
 
-      await expect(
-        page.getByText(/unsaved|save changes/i).first(),
-      ).toBeVisible({ timeout: 3_000 }).catch(() => {});
-      await expect(page.getByText(/something went wrong/i)).not.toBeVisible();
+      if (!hasEnabledToggle) {
+        await expect(firstToggle).toBeDisabled();
+        await expectNoAppCrash(page);
+        return;
+      }
+
+      const wasChecked = await enabledToggle.getAttribute("aria-checked");
+      await enabledToggle.click();
+      await page.waitForTimeout(200);
+      const isNowChecked = await enabledToggle.getAttribute("aria-checked");
+
+      expect(wasChecked).not.toEqual(isNowChecked);
+      await expect(page.getByText(/unsaved|save changes/i).first()).toBeVisible({
+        timeout: 3_000,
+      }).catch(() => {});
+      await expectNoAppCrash(page);
     }
   });
 
@@ -100,7 +114,7 @@ test.describe("Module Marketplace", () => {
       await expect(
         page.getByText(/ticket|no module/i).first(),
       ).toBeVisible({ timeout: 5_000 });
-      await expect(page.getByText(/something went wrong/i)).not.toBeVisible();
+      await expectNoAppCrash(page);
     }
   });
 });
@@ -124,7 +138,6 @@ test.describe("Onboarding wizard", () => {
     await expect(page.getByText(/preview/i).first()).toBeVisible({ timeout: 10_000 });
 
     await clickIfVisible(page, /retail store/i);
-    await expect(page.getByText(/preview/i).first()).not.toBeVisible({ timeout: 3_000 }).catch(() => {});
-    await expect(page.getByText(/something went wrong/i)).not.toBeVisible();
+    await expectNoAppCrash(page);
   });
 });
