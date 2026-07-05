@@ -19,6 +19,19 @@ secure behavior as a failure. Verification passed: live flags auth-boundary curl
 (`401`), `git diff --check` PASS. The broader session M gates were already green on
 the pushed commit before the stale smoke step failed.
 
+2026-07-05 session E part 2 (retail setup checklist + honest onboarding — full
+findings in `WORK/AUDIT_2026-07-05E.md`): two "Signup and setup" plan requirements are
+**Built and verified**. (1) `RetailSetupChecklist` on the dashboard: the seven required
+retail tasks (outlet, register, tax, payment modes, receipt, first product, first
+receiving) with LIVE completion detection against the same APIs the setup pages write
+to — fails closed, deep links, dismissible, auto-hides when complete or non-retail.
+(2) Onboarding business types now render from the capabilities registry; retail is
+badged Ready, all other packs Preview with an honest amber notice on confirm — setup
+no longer presents every vertical as equally complete. Gates: web tsc 0, Vitest 94/94,
+lint 4 pre-existing warnings, mock-off build green, backend tsc 0. Noted follow-up:
+the signup page's separate hardcoded business-type grid needs the same Preview
+treatment when claimed.
+
 2026-07-05 session E (capabilities-driven shell + Business Profile — full findings in
 `WORK/AUDIT_2026-07-05C.md`): retail-first queue item #3 is **Built and verified**.
 The frontend now renders from the business-pack control plane: new

@@ -2,7 +2,7 @@
 
 Status: ACTIVE
 
-## Active Claim (session E — retail setup checklist + honest onboarding)
+## Released Claim (session E — retail setup checklist + honest onboarding)
 
 | Field | Value |
 |---|---|
@@ -11,7 +11,7 @@ Status: ACTIVE
 | Files/areas expected | `web/components/setup/RetailSetupChecklist.tsx` (new), `web/app/(protected)/dashboard/page.tsx` (mount card), `web/app/(protected)/onboarding/page.tsx`, new vitest file. NO backend changes, NO `web/e2e/**`, NO `scripts/**` (session A active there), NO `.github/**` (Codex N active there), no ports, no concurrent `next build` |
 | Started | 2026-07-05 |
 | Last update | 2026-07-05 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped in `7cca4df`: dashboard retail setup checklist with live completion detection (7 tasks, fails closed, deep links, dismissible, auto-hides) + onboarding business types rendered from the capabilities registry with retail badged Ready and all other packs badged Preview (amber notice on confirm). Gates: web tsc 0, Vitest 94/94, lint 4 pre-existing warnings, mock-off build green, backend tsc 0. See WORK/AUDIT_2026-07-05E.md |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (session A — smoke register→EOD coverage)
