@@ -21,3 +21,20 @@ web/e2e/.auth/*.json
 
 # Generated deploy metadata (written by scripts/deploy.sh; read by /healthz)
 version.json
+
+# ── Duplicate / copy junk ──────────────────────────────────────────────────────
+# macOS Finder / editor / chat-export flows create "<name> 2.<ext>" copies and
+# merge-recovery leaves "<name>.collision-backup.md". These caused real damage:
+# untracked copies blocked rebases/merges and diverged the working tree. Ignore
+# them so they can never be tracked, committed, or clutter `git status`.
+# (Delete the originals-of-value, not these — these are always throwaway copies.)
+* [0-9].md
+* [0-9].ts
+* [0-9].tsx
+* [0-9].js
+* [0-9].jsx
+* [0-9].json
+* [0-9].yml
+* [0-9].yaml
+* [0-9].sh
+*.collision-backup.md

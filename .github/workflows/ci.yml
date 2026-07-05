@@ -42,6 +42,28 @@ jobs:
             || (echo "❌ Raw string interpolation in SQL — use @param syntax" && exit 1)
           echo "No raw SQL interpolation found ✓"
 
+      - name: No duplicate / copy-junk files committed
+        run: |
+          # macOS/editor/chat-export "<name> 2.<ext>" copies and merge
+          # "*.collision-backup.md" files must never be tracked — they blocked
+          # rebases and diverged the tree in the past. .gitignore prevents them;
+          # this fails the build if one is force-added anyway.
+          dupes=$(git ls-files | grep -E ' [0-9]+\.[A-Za-z0-9]+$|\.collision-backup\.md$' || true)
+          if [ -n "$dupes" ]; then
+            echo "❌ Duplicate/copy-junk files are tracked — remove them:"; echo "$dupes"; exit 1
+          fi
+          echo "No duplicate/copy-junk files tracked ✓"
+
+      - name: One canonical agent-instruction file
+        run: |
+          # "1 file for all agents": exactly one root AGENTS.md; CLAUDE.md may
+          # only exist as a short pointer to it. Guards against doc sprawl.
+          count=$(git ls-files | grep -E '(^|/)AGENTS\.md$' | wc -l | tr -d ' ')
+          if [ "$count" != "1" ]; then
+            echo "❌ Expected exactly one AGENTS.md, found $count:"; git ls-files | grep -E 'AGENTS\.md$'; exit 1
+          fi
+          echo "One canonical AGENTS.md ✓"
+
   backend:
     name: Backend — typecheck + test
     runs-on: ubuntu-latest

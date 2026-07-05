@@ -124,6 +124,27 @@ and every agent follows the PR flow above; nothing else about the process change
   pending Sri's confirmation.
 - If you create a branch or worktree, delete it when merged / before ending the session.
 
+## Repo hygiene & single source of truth (enforced — do not defeat)
+
+Duplicate files and second checkouts caused real damage (blocked rebases, diverged
+trees, lost-then-recovered work). These rules exist so it cannot recur:
+
+- **One agent file:** this `AGENTS.md`. `CLAUDE.md` is only a short pointer to it (Claude
+  Code auto-reads CLAUDE.md). Do not create a second agent-instruction file. CI fails the
+  build if more than one `AGENTS.md` is tracked.
+- **One plan:** `WORK/FORWARD_PLAN.md` is the single plan (commands, rules, phase queue).
+  `WORK/WORK_STATE.md` is live state, `WORK/LOCK.md` is the claim board. Do not fork these.
+- **Never create ` 2.<ext>` copies or `*.collision-backup.md`.** They are `.gitignore`d and
+  a CI guard fails if one is force-committed. If a save/export/merge flow spits one out,
+  delete it — never commit it, never `git add -f` it. If two sessions need the same dated
+  audit, the second uses the next letter (`…G.md` → `…H.md`), never a duplicate name.
+- **One canonical checkout.** Work only in the primary clone. Do NOT make a second clone
+  (e.g. `finder-pos-github`) — two clones of the same remote diverge and collide on push.
+  For parallel sessions use `git worktree add ../wt-<task>` (isolated working dirs sharing
+  one repo) — never independent clones. Confirm your cwd is the canonical checkout before
+  editing.
+- Before ending a session: `git status` must show no untracked ` 2.` / backup junk.
+
 ## Local runbook (macOS dev machine)
 
 - **Fast proof (no setup):** `npm run smoke` — boots the real app on embedded Postgres and
