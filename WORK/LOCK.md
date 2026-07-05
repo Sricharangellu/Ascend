@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Parallel Non-Overlapping Claim (session A — Stripe webhook verification test)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (VSCode) |
+| Queue item | RULES.md pre-production gate "Stripe/webhook behavior must be verified before production" has ZERO coverage. The `/api/stripe/webhook` endpoint (app.ts:91) does signature verification but nothing tests it. New test proves: valid Stripe-signed payload → 200 + internal event published; bad/missing signature → 400; STRIPE_WEBHOOK_SECRET unset → 503. Uses Stripe's generateTestHeaderString (local HMAC, no network). |
+| Files/areas expected | `src/modules/payments/webhook.test.ts` (NEW file only). No source edits (session E on `src/modules/settings/**`), no `scripts/**`, no `.github/**`, no `web/**` |
+| Started | 2026-07-05 |
+| Last update | 2026-07-05 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim (session A — signup provisioning + isolation test)
 
 | Field | Value |
