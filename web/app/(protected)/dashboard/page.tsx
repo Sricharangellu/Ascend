@@ -8,6 +8,7 @@ import { apiGet } from "@/api-client/client";
 import { useFinderContext, type FinderDateRange } from "@/lib/useFinderContext";
 import { useRealtimeStream } from "@/hooks/useRealtimeStream";
 import { VerticalWidgets } from "@/components/dashboard/VerticalWidgets";
+import { RetailSetupChecklist } from "@/components/setup/RetailSetupChecklist";
 import { DashboardTopLists } from "./_components/DashboardTopLists";
 import { DashboardOperational } from "./_components/DashboardOperational";
 import { DashboardKpiSection } from "./_components/DashboardKpiSection";
@@ -180,6 +181,9 @@ export default function DashboardPage() {
       contentClassName="overflow-y-auto"
     >
       <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6">
+
+        {/* ── Retail setup checklist (auto-hides when complete or dismissed) ── */}
+        <RetailSetupChecklist />
 
         {/* ── Filter bar ───────────────────────────────────────────────────── */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-table-border)] pb-4">

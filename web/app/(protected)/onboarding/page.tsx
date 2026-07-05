@@ -2,13 +2,20 @@
 
 /**
  * UX-1: Onboarding Wizard — first-run experience for new tenants.
- * Shows all 13 business verticals; saves business profile on completion.
+ *
+ * Business types render from the capabilities registry
+ * (GET /api/v1/capabilities → availableBusinessTypes) so onboarding and the
+ * backend business packs can never drift; the static list below is only the
+ * fail-open fallback plus icon/description enrichment. Retail is the first
+ * pack completed end-to-end — every other type is labeled Preview, because
+ * setup must not present every vertical as equally complete.
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiPost, safeLoad } from "@/api-client/client";
 import { invalidateModuleFlagsCache } from "@/hooks/useModuleFlags";
+import { useCapabilities } from "@/contexts/CapabilitiesContext";
 
 const BUSINESS_TYPES = [
   { key: "retail",        icon: "🏪", name: "Retail Store",         desc: "Convenience, fashion, electronics, pharmacy, pet, sporting goods" },
@@ -28,13 +35,35 @@ const BUSINESS_TYPES = [
 
 type Step = "welcome" | "type" | "confirm";
 
+/** Only retail has passed its end-to-end release gates so far. */
+const READY_TYPES = new Set(["retail"]);
+
 export default function OnboardingPage() {
   const router = useRouter();
+  const { capabilities } = useCapabilities();
   const [step, setStep]             = useState<Step>("welcome");
   const [selected, setSelected]     = useState<string | null>(null);
   const [saving, setSaving]         = useState(false);
 
-  const selectedBt = BUSINESS_TYPES.find(b => b.key === selected);
+  // Registry-driven type list: capabilities is the authority for WHICH types
+  // exist; the static list enriches icons/descriptions. Retail sorts first.
+  const businessTypes = useMemo(() => {
+    const meta = new Map(BUSINESS_TYPES.map((b) => [b.key, b]));
+    const source = capabilities?.availableBusinessTypes?.length
+      ? capabilities.availableBusinessTypes.map((bt) => ({
+          key: bt.key,
+          icon: meta.get(bt.key)?.icon ?? bt.icon,
+          name: meta.get(bt.key)?.name ?? bt.name,
+          desc: meta.get(bt.key)?.desc ?? bt.description,
+        }))
+      : BUSINESS_TYPES;
+    return [...source].sort((a, b) =>
+      Number(READY_TYPES.has(b.key)) - Number(READY_TYPES.has(a.key)),
+    );
+  }, [capabilities]);
+
+  const selectedBt = businessTypes.find(b => b.key === selected);
+  const selectedReady = selected !== null && READY_TYPES.has(selected);
 
   const progress = { welcome: 25, type: 65, confirm: 100 }[step];
 
@@ -108,21 +137,36 @@ export default function OnboardingPage() {
             Select your industry — we'll activate exactly the right modules for you.
           </p>
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-            {BUSINESS_TYPES.map((bt) => (
-              <button
-                key={bt.key}
-                type="button"
-                onClick={() => { setSelected(bt.key); setStep("confirm"); }}
-                className={`group flex flex-col rounded-xl border-2 p-3 text-left transition-all hover:border-brand-500 hover:bg-brand-50 hover:shadow-sm ${
-                  selected === bt.key ? "border-brand-600 bg-brand-50" : "border-slate-200"
-                }`}
-              >
-                <span className="mb-1.5 text-2xl">{bt.icon}</span>
-                <span className="text-sm font-semibold leading-tight text-[var(--color-text-primary)]">{bt.name}</span>
-                <span className="mt-0.5 text-[11px] leading-tight text-[var(--color-text-secondary)] line-clamp-2">{bt.desc}</span>
-              </button>
-            ))}
+            {businessTypes.map((bt) => {
+              const ready = READY_TYPES.has(bt.key);
+              return (
+                <button
+                  key={bt.key}
+                  type="button"
+                  onClick={() => { setSelected(bt.key); setStep("confirm"); }}
+                  className={`group relative flex flex-col rounded-xl border-2 p-3 text-left transition-all hover:border-brand-500 hover:bg-brand-50 hover:shadow-sm ${
+                    selected === bt.key ? "border-brand-600 bg-brand-50" : "border-slate-200"
+                  }`}
+                >
+                  <span
+                    className={`absolute right-2 top-2 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
+                      ready ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {ready ? "Ready" : "Preview"}
+                  </span>
+                  <span className="mb-1.5 text-2xl">{bt.icon}</span>
+                  <span className="text-sm font-semibold leading-tight text-[var(--color-text-primary)]">{bt.name}</span>
+                  <span className="mt-0.5 text-[11px] leading-tight text-[var(--color-text-secondary)] line-clamp-2">{bt.desc}</span>
+                </button>
+              );
+            })}
           </div>
+          <p className="mt-3 text-[11px] text-[var(--color-text-secondary)]">
+            <span className="font-semibold">Ready</span> = fully built and verified end-to-end.{" "}
+            <span className="font-semibold">Preview</span> = the module pack activates, but its complete
+            workflow is still being finished — Retail first.
+          </p>
           <button type="button" onClick={() => setStep("welcome")}
             className="mt-4 w-full text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]">
             ← Back
@@ -150,6 +194,17 @@ export default function OnboardingPage() {
               </p>
             ))}
           </div>
+
+          {!selectedReady && (
+            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left">
+              <p className="text-sm font-semibold text-amber-800">This business type is a Preview</p>
+              <p className="mt-1 text-xs text-amber-700">
+                Its module pack activates now, but the complete end-to-end workflow is still being
+                finished — Retail is the first fully verified pack. You can start here and every
+                shared feature (products, inventory, customers, payments, reports) works today.
+              </p>
+            </div>
+          )}
 
           <button
             type="button"
