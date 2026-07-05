@@ -39,6 +39,10 @@ CREATE INDEX IF NOT EXISTS product_locations_location_idx ON product_locations (
 
 export const storeLocationsModule: PosModule = {
   name: "store_locations",
+  // Routes are top-level resource names (/store-locations, /product-locations),
+  // which the frontend + mocks call at /api/v1/<resource> — mount there so a
+  // uniform /api/v1/store_locations prefix doesn't 404 those calls.
+  mountPath: "/api/v1",
   migrations: [CREATE_STORE_LOCATIONS, CREATE_PRODUCT_LOCATIONS],
   register({ db, events, router }: { db: DB; events: EventBus; router: Router }) {
     const svc = storeLocationsService(db, events);

@@ -23,6 +23,13 @@ export interface ModuleContext {
 export interface PosModule {
   /** lowercase, url-safe, e.g. "catalog". Used as the route prefix. */
   name: string;
+  /**
+   * Where to mount this module's router. Defaults to `/api/v1/<name>`.
+   * Set to `/api/v1` for a module whose routes are already full top-level
+   * resource names (e.g. store_locations serves `/product-locations` and
+   * `/store-locations`, which the frontend calls at top level).
+   */
+  mountPath?: string;
   /** SQL statements creating/owning this module's tables. */
   migrations: string[];
   /** Wire routes and event handlers onto the provided context. May be async (e.g. seeding). */

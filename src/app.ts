@@ -334,11 +334,13 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     }),
   );
 
-  // ── Domain modules (mounted under /api/<name>; auth applied via /api/v1 prefix below)
+  // ── Domain modules (mounted under /api/v1/<name>; auth applied via /api/v1
+  //    prefix registered above. A module may override with `mountPath` when its
+  //    routes are already top-level resource names.)
   for (const mod of modules) {
     const router = Router();
     await mod.register({ db, events, router });
-    app.use(`/api/v1/${mod.name}`, router);
+    app.use(mod.mountPath ?? `/api/v1/${mod.name}`, router);
   }
 
   // ── Root info
