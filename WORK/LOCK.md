@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Active Claim (session E — §4 dedup: single feature-gating authority)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session E (desktop app, "next" from Sri) |
+| Queue item | Foundation Hardening §4 slice ("feature gating should have ONE source, not three"): `useAccountMode` fires a redundant `/settings/feature-flags` fetch on every protected page to derive accountMode + edition flags that `GET /capabilities` ALREADY returns (features.accountMode + group flags). Nothing calls `useAccountMode()` at runtime (only its type is imported), so rewire its provider to derive from `useCapabilities()` — same public API — dropping the duplicate fetch and making capabilities the single gating authority. NOT a file-move restructure (the big §4 needs Sri's OK first). |
+| Files/areas expected | `web/lib/useAccountMode.tsx` (rewire onto capabilities), `web/contexts/CapabilitiesContext.tsx` if a getter is needed, new/updated vitest. NO backend, NO file moves, NO e2e, no ports, no concurrent next build |
+| Started | 2026-07-06 |
+| Last update | 2026-07-06 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Released Claim (session E — persist verified prod findings to standing surface)
 
 | Field | Value |
