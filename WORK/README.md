@@ -38,7 +38,9 @@ created anywhere else in the repo.
 | `WORK_STATE.md` | Live session state (active task, files in flight, decisions, next actions, blockers) | Override in place after every commit |
 | `LOCK.md` | Multi-agent coordination lock: active queue item, owner, files/areas, status | Update at session start and end; never ignore an active overlapping lock |
 | `FORWARD_PLAN.md` | Authoritative phase-based plan + release gates + audit prompt | Override only when the plan genuinely changes |
-| `AUDIT_YYYY-MM-DD.md` | Immutable audit snapshot + readiness matrix | Append-only during its session; never edited after |
+| `FOUNDATION_HARDENING.md` | Queued whole-repo cleanup/consolidation/wiring initiative (run exclusively) | Update its progress log as sections complete |
+| `audits/AUDIT_<UTC-ISO>-<slug>.md` | Immutable audit snapshots + readiness matrices, archived under `WORK/audits/` | Append-only during its session; never edited after. **Name with a UTC timestamp + slug — NOT the next-free letter** (letters collide between parallel sessions) |
 
 Session read order is: `README.md` → `RULES.md` → `WORK_STATE.md` → `FORWARD_PLAN.md` →
-newest `AUDIT_*.md`.
+newest audit in `WORK/audits/`. Historical `WORK/AUDIT_*.md` references in older docs now
+resolve under `WORK/audits/`.

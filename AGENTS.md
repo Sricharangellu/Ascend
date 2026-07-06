@@ -16,9 +16,9 @@ dated copies of living docs. Full rules: `WORK/README.md`.
 2. `WORK/RULES.md` — build rules, definition of done, per-task prompt, readiness matrix
 3. `WORK/WORK_STATE.md` — active task, next actions, blockers
 4. `WORK/FORWARD_PLAN.md` — phase plan and release gates
-5. Newest `WORK/AUDIT_*.md` — last verified truth
+5. Newest audit in `WORK/audits/` — last verified truth
 
-Do not cold-read the whole repo; the context you need is in those four files.
+Do not cold-read the whole repo; the context you need is in those files.
 
 ## Current marching orders
 
@@ -123,7 +123,7 @@ and every agent follows the PR flow above; nothing else about the process change
 ### Branch hygiene
 
 - **Salvage branches:** 12 `worktree-agent-*` branches on origin are parked pre-pause work —
-  do NOT delete or bulk-merge; harvest selectively per `WORK/AUDIT_2026-07-03B.md` through
+  do NOT delete or bulk-merge; harvest selectively per `WORK/audits/AUDIT_2026-07-03B.md` through
   the RULES.md definition of done.
 - Stale merged branches (`dev`, `prod`, `testing`, `backend-cycle3`) are deletion candidates
   pending Sri's confirmation.
@@ -167,7 +167,7 @@ trees, lost-then-recovered work). These rules exist so it cannot recur:
 ## Handoff protocol (every session, no exceptions)
 
 1. Update `WORK/WORK_STATE.md`: what was done, next 3 actions, blockers.
-2. New verification results → new dated `WORK/AUDIT_*.md`; never edit old audits.
+2. New verification results → new audit `WORK/audits/AUDIT_<UTC-ISO-timestamp>-<short-slug>.md` (collision-proof — never the next-free-letter); never edit old audits.
 3. Working tree clean, no stray root files, no leftover worktrees/branches, servers stopped.
 4. Commit and push. Report honestly what passed AND what failed, with RULES.md labels.
 
