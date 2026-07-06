@@ -112,8 +112,126 @@ export interface UpdateScheduledReportInput {
   enabled?: boolean;
 }
 
+// ── Business health scores ──────────────────────────────────────────────────
+
+export interface HealthSegment {
+  key: "catalog" | "inventory" | "sales" | "margin" | "expenses";
+  label: string;
+  score: number; // 0–100
+  detail: string;
+}
+
+export interface HealthScores {
+  generatedAt: number;
+  overall: number; // 0–100, average of the segments
+  segments: HealthSegment[];
+  signals: {
+    productCount: number;
+    productsWithCost: number;
+    categorizedCount: number;
+    stockedCount: number;
+    lowStockCount: number;
+    orders30d: number;
+    revenueCents: number;
+    cogsCents: number;
+    grossMarginPct: number;
+    expenseCount: number;
+    uncategorizedExpenseCount: number;
+  };
+}
+
 export class InsightsService {
   constructor(private readonly db: DB) {}
+
+  /**
+   * Segmented business health scores (0–100 each, deterministic/rule-based — no
+   * AI) derived from real tenant data across the retail flow. Companion to the
+   * retail-proof audit: proof answers "is it set up?", health answers "how well
+   * is it doing?". Weights are fixed and shown in each segment's detail so a
+   * score is always explainable.
+   */
+  async healthScores(tenantId: string, opts?: { recentDays?: number }): Promise<HealthScores> {
+    const recentDays = Math.max(1, Math.min(365, opts?.recentDays ?? 30));
+    const since = Date.now() - recentDays * 86_400_000;
+
+    const [cat] = await this.db.query<{ total: number; with_cost: number; categorized: number }>(
+      `SELECT COUNT(*)::int AS total,
+              COUNT(*) FILTER (WHERE raw_cost_price_cents IS NOT NULL)::int AS with_cost,
+              COUNT(*) FILTER (WHERE category IS NOT NULL AND category <> 'general')::int AS categorized
+         FROM products WHERE tenant_id = @tenantId AND status = 'active'`,
+      { tenantId },
+    );
+    const [inv] = await this.db.query<{ stocked: number; low_stock: number }>(
+      `SELECT COUNT(*) FILTER (WHERE COALESCE(i.stock_qty, 0) > 0)::int AS stocked,
+              COUNT(*) FILTER (WHERE p.reorder_point IS NOT NULL AND p.reorder_point > 0
+                               AND COALESCE(i.stock_qty, 0) <= p.reorder_point)::int AS low_stock
+         FROM products p
+         LEFT JOIN inventory i ON i.product_id = p.id AND i.tenant_id = p.tenant_id
+        WHERE p.tenant_id = @tenantId AND p.status = 'active'`,
+      { tenantId },
+    );
+    const [ord] = await this.db.query<{ orders30d: number; revenue: number }>(
+      `SELECT COUNT(*)::int AS orders30d, COALESCE(SUM(total_cents), 0)::bigint AS revenue
+         FROM orders WHERE tenant_id = @tenantId AND created_at >= @since`,
+      { tenantId, since },
+    );
+    const [cog] = await this.db.query<{ cogs: number }>(
+      `SELECT COALESCE(SUM(ol.quantity * COALESCE(p.raw_cost_price_cents, 0)), 0)::bigint AS cogs
+         FROM order_lines ol
+         JOIN orders o ON o.id = ol.order_id AND o.tenant_id = ol.tenant_id
+         JOIN products p ON p.id = ol.product_id AND p.tenant_id = ol.tenant_id
+        WHERE ol.tenant_id = @tenantId AND o.created_at >= @since`,
+      { tenantId, since },
+    );
+    const [exp] = await this.db.query<{ cnt: number; uncat: number }>(
+      `SELECT COUNT(*)::int AS cnt,
+              COUNT(*) FILTER (WHERE category IS NULL OR category = '')::int AS uncat
+         FROM expenses WHERE tenant_id = @tenantId`,
+      { tenantId },
+    );
+
+    const total = Number(cat?.total ?? 0);
+    const withCost = Number(cat?.with_cost ?? 0);
+    const categorized = Number(cat?.categorized ?? 0);
+    const stocked = Number(inv?.stocked ?? 0);
+    const lowStock = Number(inv?.low_stock ?? 0);
+    const orders30d = Number(ord?.orders30d ?? 0);
+    const revenueCents = Number(ord?.revenue ?? 0);
+    const cogsCents = Number(cog?.cogs ?? 0);
+    const expenseCount = Number(exp?.cnt ?? 0);
+    const uncat = Number(exp?.uncat ?? 0);
+
+    const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
+    const ratio = (a: number, b: number) => (b > 0 ? a / b : 0);
+    const grossMarginPct = revenueCents > 0 ? ((revenueCents - cogsCents) / revenueCents) * 100 : 0;
+
+    // Fixed weights (documented so scores are explainable):
+    const catalogScore = total === 0 ? 0 : clamp(40 + 30 * ratio(withCost, total) + 30 * ratio(categorized, total));
+    const inventoryScore = total === 0 ? 0 : clamp(60 * ratio(stocked, total) + 40 * (1 - ratio(lowStock, total)));
+    const salesScore = orders30d === 0 ? 0 : clamp(40 + orders30d * 6);
+    const marginScore = revenueCents === 0 ? 0 : clamp(grossMarginPct * 2);
+    const expensesScore = expenseCount === 0 ? 30 : clamp(60 + 40 * ratio(expenseCount - uncat, expenseCount));
+
+    const segments: HealthSegment[] = [
+      { key: "catalog", label: "Catalog", score: catalogScore, detail: total === 0 ? "No active products" : `${withCost}/${total} priced, ${categorized}/${total} categorized` },
+      { key: "inventory", label: "Inventory", score: inventoryScore, detail: total === 0 ? "No products to stock" : `${stocked}/${total} in stock, ${lowStock} low` },
+      { key: "sales", label: "Sales", score: salesScore, detail: orders30d === 0 ? `No sales in ${recentDays}d` : `${orders30d} orders in ${recentDays}d` },
+      { key: "margin", label: "Margin", score: marginScore, detail: revenueCents === 0 ? "No revenue yet" : `${grossMarginPct.toFixed(1)}% gross margin` },
+      { key: "expenses", label: "Expenses", score: expensesScore, detail: expenseCount === 0 ? "No expenses recorded" : `${expenseCount} recorded, ${uncat} uncategorized` },
+    ];
+    const overall = clamp(segments.reduce((s, x) => s + x.score, 0) / segments.length);
+
+    return {
+      generatedAt: Date.now(),
+      overall,
+      segments,
+      signals: {
+        productCount: total, productsWithCost: withCost, categorizedCount: categorized,
+        stockedCount: stocked, lowStockCount: lowStock, orders30d, revenueCents, cogsCents,
+        grossMarginPct: Math.round(grossMarginPct * 10) / 10, expenseCount, uncategorizedExpenseCount: uncat,
+      },
+    };
+  }
 
   // ── Scheduled Reports CRUD ──────────────────────────────────────────────────
 

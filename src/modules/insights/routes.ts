@@ -30,6 +30,22 @@ const UpdateBody = CreateBody.partial().extend({
 });
 
 export function registerRoutes(router: Router, service: InsightsService): void {
+  // ── Business health ─────────────────────────────────────────────────────────
+
+  // GET /api/v1/insights/health-scores?recentDays=30
+  // Deterministic segmented health scores (catalog/inventory/sales/margin/expenses).
+  router.get(
+    "/health-scores",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const recentDays =
+        typeof req.query["recentDays"] === "string"
+          ? Math.max(1, Math.min(365, Number(req.query["recentDays"])))
+          : 30;
+      res.json(await service.healthScores(tenantId(res), { recentDays }));
+    }),
+  );
+
   // ── Scheduled Reports ────────────────────────────────────────────────────────
 
   // GET /api/v1/insights/scheduled-reports
