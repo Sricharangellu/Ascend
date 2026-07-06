@@ -2,7 +2,7 @@
 
 Status: ACTIVE
 
-## Active Claim (session E — auth route drift: /api/v1/auth/* -> real identity paths)
+## Released Claim (session E — auth route drift: /api/v1/auth/* -> real identity paths)
 
 | Field | Value |
 |---|---|
@@ -11,7 +11,7 @@ Status: ACTIVE
 | Files/areas expected | `web/contexts/PermissionsContext.tsx`, `web/app/(protected)/settings/_components/SecuritySection.tsx`, `web/mocks/handlers.ts` or `mockHandlers.ts` (me parity), vitest. NO backend module build (backup-codes backend is separate future work), no file moves |
 | Started | 2026-07-06 |
 | Last update | 2026-07-06 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped in `708f914`: PermissionsContext reads real /api/identity/me (was /api/v1/auth/me → 404 → every user role=owner privilege bug); owner/admin/manager→all, custom roles→granted features. SecuritySection dead backup-codes 404 call removed (missing backend, documented). Mock /api/identity/me added, dead /api/v1/auth/me mock removed. Gates: web tsc 0, Vitest 102/102 (2 new), lint 4 pre-existing, mock-off build. Audit: WORK/audits/AUDIT_2026-07-06T073723Z-auth-route-drift.md |
 | Blockers | none |
 
 ## Released Claim (session E — NEXT_PUBLIC_SHOW_PARTIAL_PAGES gating)
