@@ -154,3 +154,57 @@ test("end-of-day report: transactions, sales, tenders, top items, cash drawer", 
   const bad = await call(app, "GET", "/api/reports/end-of-day?date=not-a-date");
   assert.equal(bad.status, 400);
 });
+
+test("retail-proof: seeded demo tenant (products, no stock/sales) is not ready", async () => {
+  const app = await freshApp();
+
+  const r = await call(app, "GET", "/api/reports/retail-proof");
+  assert.equal(r.status, 200);
+  assert.equal(r.json.ready, false, "no sales yet -> not ready");
+  // Demo tenant boots with products + a default outlet/register, but no stock,
+  // no tax rate, no payment modes, no receipt, no orders.
+  assert.equal(r.json.setup.outlet, true);
+  assert.equal(r.json.setup.register, true);
+  assert.equal(r.json.setup.firstProduct, true, "demo products seeded");
+  assert.equal(r.json.setup.firstReceiving, false, "no stock received yet");
+  assert.equal(r.json.setup.taxRate, false);
+  assert.ok(r.json.metrics.productCount >= 4, "seeded products counted");
+  assert.equal(r.json.metrics.orderCount, 0);
+  const codes = r.json.signals.map((s: { code: string }) => s.code);
+  assert.ok(codes.includes("setup_incomplete"), "flags remaining setup");
+  assert.ok(codes.includes("no_sales_yet"), "flags no sales");
+  assert.ok(!codes.includes("no_products"), "products exist -> no no_products signal");
+  assert.equal(r.json.expenses.available, false, "expenses honestly reported unbuilt");
+});
+
+test("retail-proof: reflects receiving, cost gap, and a real sale", async () => {
+  const app = await freshApp();
+
+  // A brand-new product with stock but NO cost price.
+  const p = await call(app, "POST", "/api/catalog/", {
+    sku: "RP-PROOF", name: "Proof Widget", price_cents: 1000, category: "general",
+  });
+  assert.equal(p.status, 201);
+  await call(app, "POST", `/api/inventory/${p.json.id}/receive`, { quantity: 5 });
+
+  let r = await call(app, "GET", "/api/reports/retail-proof");
+  assert.equal(r.json.setup.firstReceiving, true, "stock received");
+  assert.ok(r.json.metrics.totalStockUnits >= 5);
+  assert.ok(r.json.metrics.productsWithoutCost >= 1, "new product has no cost");
+  let codes = r.json.signals.map((s: { code: string }) => s.code);
+  assert.ok(codes.includes("products_without_cost"));
+  assert.ok(codes.includes("no_sales_yet"), "still no completed sale");
+
+  // Sell 2 units for cash -> completed order + revenue.
+  const o = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA", lines: [{ productId: p.json.id, quantity: 2 }],
+  });
+  assert.equal(o.status, 201);
+  await call(app, "POST", "/api/payments/", { orderId: o.json.id, method: "cash", tenderedCents: o.json.total_cents });
+
+  r = await call(app, "GET", "/api/reports/retail-proof");
+  assert.equal(r.json.metrics.orderCount, 1, "one completed sale");
+  assert.equal(r.json.metrics.revenueCents, o.json.total_cents);
+  codes = r.json.signals.map((s: { code: string }) => s.code);
+  assert.ok(!codes.includes("no_sales_yet"), "sale recorded -> no_sales_yet cleared");
+});

@@ -62,6 +62,14 @@ export function registerRoutes(router: Router, service: ReportsService): void {
     }),
   );
 
+  // GET /api/v1/reports/retail-proof?recentDays=30 — real-data retail readiness
+  // report: setup tasks, metrics, and deterministic rule-based signals.
+  router.get("/retail-proof", handler(async (req, res) => {
+    const raw = typeof req.query.recentDays === "string" ? Number(req.query.recentDays) : 30;
+    const recentDays = Number.isFinite(raw) && raw > 0 ? Math.min(Math.floor(raw), 365) : 30;
+    res.json(await service.retailProof(tenantId(res), recentDays));
+  }));
+
   // GET /api/v1/reports/ar-aging — Accounts Receivable aging buckets.
   router.get("/ar-aging", handler(async (_req, res) => {
     res.json(await service.arAging(tenantId(res)));

@@ -177,6 +177,32 @@ function addToBucket(b: AgingBuckets, balance: number, dueDate: number | null, n
   b.total += balance;
 }
 
+export interface RetailProofSignal {
+  code: string;
+  severity: "info" | "warning" | "critical";
+  count: number;
+  message: string;
+}
+
+export interface RetailProof {
+  ready: boolean;
+  setup: {
+    outlet: boolean; register: boolean; taxRate: boolean; paymentModes: boolean;
+    receipt: boolean; firstProduct: boolean; firstReceiving: boolean;
+    completed: number; total: number;
+  };
+  metrics: {
+    productCount: number; activeProductCount: number; productsWithoutCost: number;
+    totalStockUnits: number; lowStockCount: number; outOfStockCount: number;
+    orderCount: number; revenueCents: number; cogsCents: number; grossProfitCents: number;
+    productsNeverSold: number; productsNoRecentSales: number;
+  };
+  signals: RetailProofSignal[];
+  expenses: { available: false; note: string };
+  generatedAt: number;
+  recentDays: number;
+}
+
 export class ReportsService {
   constructor(private readonly db: DB) {}
 
@@ -990,6 +1016,158 @@ export class ReportsService {
         actualCash_cents: actualCash,
         variance_cents: actualCash === null ? null : Number(actualCash) - expectedCash,
       },
+    };
+  }
+
+  /**
+   * Retail-proof audit — a real-data readiness report for the retail spine.
+   * Answers the retailer questions from AGENTS.md (what I sell / in stock /
+   * sold / made / low-slow-profitable-risky / what next) and is the backend
+   * authority for the setup checklist + the deterministic (rule-based)
+   * recommendation signals. Read-only; every figure comes from real tenant
+   * tables. `recentDays` bounds "recent sales" (default 30).
+   */
+  async retailProof(tenantId: string, recentDays = 30): Promise<RetailProof> {
+    const now = Date.now();
+    const recentSince = now - recentDays * 86_400_000;
+
+    // ── Setup tasks (backend authority) ──────────────────────────────────────
+    const [outletN, registerN, taxN, modeN, productN] = await Promise.all([
+      this.db.one<{ n: number }>("SELECT COUNT(*)::int AS n FROM outlets WHERE tenant_id = @t", { t: tenantId }),
+      this.db.one<{ n: number }>("SELECT COUNT(*)::int AS n FROM registers WHERE tenant_id = @t", { t: tenantId }),
+      this.db.one<{ n: number }>("SELECT COUNT(*)::int AS n FROM tax_rates WHERE tenant_id = @t", { t: tenantId }),
+      this.db.one<{ n: number }>("SELECT COUNT(*)::int AS n FROM payment_modes WHERE tenant_id = @t", { t: tenantId }),
+      this.db.one<{ n: number; active: number }>(
+        "SELECT COUNT(*)::int AS n, COUNT(*) FILTER (WHERE status = 'active')::int AS active FROM products WHERE tenant_id = @t",
+        { t: tenantId },
+      ),
+    ]);
+    // Receipt configured = a saved template with any non-empty text.
+    const receiptRows = await this.db.query<{ value_json: string }>(
+      "SELECT value_json FROM settings_kv WHERE tenant_id = @t AND key LIKE 'receipt_template:%'",
+      { t: tenantId },
+    );
+    const hasReceipt = receiptRows.some((r) => {
+      try {
+        const v = JSON.parse(r.value_json) as { headerText?: string; contactInfo?: string; footerText?: string };
+        return Boolean((v.headerText ?? "").trim() || (v.contactInfo ?? "").trim() || (v.footerText ?? "").trim());
+      } catch {
+        return false;
+      }
+    });
+    // First receiving = any stock on hand, or a recorded 'receiving' movement.
+    const stockAgg = await this.db.one<{ total: number; low: number; out: number; rows: number }>(
+      `SELECT COALESCE(SUM(stock_qty),0)::int AS total,
+              COUNT(*) FILTER (WHERE reorder_pt > 0 AND stock_qty <= reorder_pt)::int AS low,
+              COUNT(*) FILTER (WHERE stock_qty <= 0)::int AS out,
+              COUNT(*)::int AS rows
+         FROM inventory WHERE tenant_id = @t`,
+      { t: tenantId },
+    );
+    const receivingN = await this.db.one<{ n: number }>(
+      "SELECT COUNT(*)::int AS n FROM inventory_movements WHERE tenant_id = @t AND reason = 'receiving'",
+      { t: tenantId },
+    );
+    const hasReceiving = Number(stockAgg?.total ?? 0) > 0 || Number(receivingN?.n ?? 0) > 0;
+
+    const setup = {
+      outlet: Number(outletN?.n ?? 0) > 0,
+      register: Number(registerN?.n ?? 0) > 0,
+      taxRate: Number(taxN?.n ?? 0) > 0,
+      paymentModes: Number(modeN?.n ?? 0) > 0,
+      receipt: hasReceipt,
+      firstProduct: Number(productN?.n ?? 0) > 0,
+      firstReceiving: hasReceiving,
+    };
+    const setupDone = Object.values(setup).filter(Boolean).length;
+    const setupTotal = Object.keys(setup).length;
+
+    // ── Metrics ──────────────────────────────────────────────────────────────
+    const productCount = Number(productN?.n ?? 0);
+    const activeProductCount = Number(productN?.active ?? 0);
+
+    const noCost = await this.db.one<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM products p
+        WHERE p.tenant_id = @t AND p.status = 'active'
+          AND NOT EXISTS (SELECT 1 FROM product_costs c WHERE c.tenant_id = p.tenant_id AND c.product_id = p.id AND c.cost_cents > 0)`,
+      { t: tenantId },
+    );
+
+    const rev = await this.db.one<{ orders: number; revenue: number; cogs: number }>(
+      `SELECT COUNT(DISTINCT o.id)::int AS orders,
+              COALESCE(SUM(o.total_cents),0) AS revenue,
+              COALESCE((SELECT SUM(ol.quantity * COALESCE(pc.cost_cents,0))
+                          FROM order_lines ol
+                          JOIN orders o2 ON o2.id = ol.order_id AND o2.tenant_id = ol.tenant_id
+                          LEFT JOIN product_costs pc ON pc.tenant_id = ol.tenant_id AND pc.product_id = ol.product_id
+                         WHERE o2.tenant_id = @t AND o2.status = 'completed'), 0) AS cogs
+         FROM orders o WHERE o.tenant_id = @t AND o.status = 'completed'`,
+      { t: tenantId },
+    );
+    const revenueCents = Number(rev?.revenue ?? 0);
+    const cogsCents = Number(rev?.cogs ?? 0);
+    const orderCount = Number(rev?.orders ?? 0);
+
+    // Active products with no sale ever, and none in the recent window.
+    const neverSold = await this.db.one<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM products p
+        WHERE p.tenant_id = @t AND p.status = 'active'
+          AND NOT EXISTS (SELECT 1 FROM order_lines ol WHERE ol.tenant_id = p.tenant_id AND ol.product_id = p.id)`,
+      { t: tenantId },
+    );
+    const staleProducts = await this.db.one<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM products p
+        WHERE p.tenant_id = @t AND p.status = 'active'
+          AND EXISTS (SELECT 1 FROM order_lines ol WHERE ol.tenant_id = p.tenant_id AND ol.product_id = p.id)
+          AND NOT EXISTS (
+            SELECT 1 FROM order_lines ol
+              JOIN orders o ON o.id = ol.order_id AND o.tenant_id = ol.tenant_id
+             WHERE ol.tenant_id = p.tenant_id AND ol.product_id = p.id AND o.created_at >= @since)`,
+      { t: tenantId, since: recentSince },
+    );
+
+    const metrics = {
+      productCount,
+      activeProductCount,
+      productsWithoutCost: Number(noCost?.n ?? 0),
+      totalStockUnits: Number(stockAgg?.total ?? 0),
+      lowStockCount: Number(stockAgg?.low ?? 0),
+      outOfStockCount: Number(stockAgg?.out ?? 0),
+      orderCount,
+      revenueCents,
+      cogsCents,
+      grossProfitCents: revenueCents - cogsCents,
+      productsNeverSold: Number(neverSold?.n ?? 0),
+      productsNoRecentSales: Number(staleProducts?.n ?? 0),
+    };
+
+    // ── Deterministic rule-based signals (NOT AI — AGENTS.md) ────────────────
+    const signals: RetailProofSignal[] = [];
+    const push = (code: string, severity: RetailProofSignal["severity"], count: number, message: string) =>
+      signals.push({ code, severity, count, message });
+
+    const setupMissing = setupTotal - setupDone;
+    if (setupMissing > 0) push("setup_incomplete", "warning", setupMissing, `${setupMissing} setup task(s) remaining before the store is ready to sell.`);
+    if (productCount === 0) push("no_products", "critical", 0, "No products yet — add or import products so the register has something to sell.");
+    if (metrics.productsWithoutCost > 0) push("products_without_cost", "warning", metrics.productsWithoutCost, `${metrics.productsWithoutCost} active product(s) have no cost price, so profit cannot be measured.`);
+    if (metrics.outOfStockCount > 0) push("out_of_stock", "warning", metrics.outOfStockCount, `${metrics.outOfStockCount} product(s) are out of stock.`);
+    if (metrics.lowStockCount > 0) push("low_stock", "info", metrics.lowStockCount, `${metrics.lowStockCount} product(s) are at or below their reorder point.`);
+    if (orderCount === 0 && productCount > 0) push("no_sales_yet", "info", 0, "No completed sales recorded yet.");
+    if (metrics.productsNeverSold > 0 && orderCount > 0) push("products_never_sold", "info", metrics.productsNeverSold, `${metrics.productsNeverSold} active product(s) have never sold.`);
+    if (metrics.productsNoRecentSales > 0) push("slow_movers", "info", metrics.productsNoRecentSales, `${metrics.productsNoRecentSales} product(s) had no sales in the last ${recentDays} days.`);
+
+    const ready = setupDone === setupTotal && productCount > 0 && orderCount > 0;
+
+    return {
+      ready,
+      setup: { ...setup, completed: setupDone, total: setupTotal },
+      metrics,
+      signals,
+      // Expenses module is not built yet (FORWARD_PLAN queue #3) — surfaced
+      // honestly so the report never implies expense/profit-net coverage it lacks.
+      expenses: { available: false, note: "Expenses module not built yet (queue #3); net profit is gross only." },
+      generatedAt: now,
+      recentDays,
     };
   }
 }
