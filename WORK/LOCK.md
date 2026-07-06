@@ -2,7 +2,7 @@
 
 Status: ACTIVE
 
-## Active Claim (session E — retail proof audit endpoint)
+## Released Claim (session E — retail proof audit endpoint)
 
 | Field | Value |
 |---|---|
@@ -11,7 +11,7 @@ Status: ACTIVE
 | Files/areas expected | `src/modules/reports/service.ts` (retailProof method), `src/modules/reports/routes.ts` (route), `src/modules/reports/reports.test.ts` (real-Postgres test), WORK evidence. NO web, NO new tables, NO catalog/orders/settings module edits, no ports |
 | Started | 2026-07-06 |
 | Last update | 2026-07-06 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped in `65df42c`: GET /api/v1/reports/retail-proof (setup tasks + metrics + deterministic rule-based signals; expenses unbuilt). Gates: reports 5/5 real Postgres, backend tsc 0, smoke 20/20. INCIDENT during verify (working-tree src deletion in the SECOND clone during concurrent full-suite runs; recovered via reset to clean origin, re-applied, re-verified) — see WORK_STATE + audit. |
 | Blockers | none |
 
 ## Released Claim (session E — auth route drift: /api/v1/auth/* -> real identity paths)

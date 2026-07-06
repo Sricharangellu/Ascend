@@ -8,6 +8,15 @@
 Live production exposures that CODE CANNOT close — they need a human with prod access.
 Every session: re-probe before assuming these are resolved, and update this block.
 
+- ⚠️ **TOOLING INCIDENT 2026-07-06 (recovered, no data lost):** the working tree lost
+  `src/modules/*` + `src/identity/*` from disk during verification while TWO full backend
+  suites ran concurrently in a SECOND clone (`finder-pos-github`). AGENTS.md warns against
+  a second clone. Recovered via `git reset --hard` to the clean origin commit; the in-flight
+  endpoint was re-applied from session record and re-verified. GUIDANCE: work in ONE clone;
+  never run two `scripts/test.ts` full suites at once (use `git worktree`, and isolated
+  single-file runs for spot checks).
+
+
 - 🔴 **`finder-pos.vercel.app` returns HTTP 500.** This is a STALE/ORPHANED Vercel
   project outside the CI deploy pipeline. The pipeline builds + aliases
   **`finder-pos-frontend.vercel.app`** (healthy, 200, wired to the backend). Anyone
