@@ -1,8 +1,8 @@
 # FinderPOS — Multi-Agent Work Lock
 
-Status: ACTIVE
+Status: IDLE — no active claim
 
-## Active Claim (session E — profit visibility metrics)
+## Released Claim (session E — profit visibility metrics)
 
 | Field | Value |
 |---|---|
@@ -11,7 +11,7 @@ Status: ACTIVE
 | Files/areas expected | src/modules/reports/service.ts (retailProof), src/modules/reports/reports.test.ts. NO new module, NO web, single isolated test runs |
 | Started | 2026-07-06 |
 | Last update | 2026-07-06 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped: retail-proof now reports net profit (revenue−COGS−expenses), gross/net margins (null-safe), real expense totals + uncategorizedCount, and deterministic profit signals (negative_net_profit critical, uncategorized_expenses info). Gates: reports 6/6 real Postgres, backend tsc 0, smoke 20/20. Audit: WORK/audits/AUDIT_2026-07-06T14:36:26Z-profit-visibility-metrics.md. |
 | Blockers | none |
 
 ## Released Claim (session E — expenses MVP backend module)

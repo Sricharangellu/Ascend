@@ -195,10 +195,12 @@ export interface RetailProof {
     productCount: number; activeProductCount: number; productsWithoutCost: number;
     totalStockUnits: number; lowStockCount: number; outOfStockCount: number;
     orderCount: number; revenueCents: number; cogsCents: number; grossProfitCents: number;
+    expensesCents: number; netProfitCents: number;
+    grossMarginPct: number | null; netMarginPct: number | null;
     productsNeverSold: number; productsNoRecentSales: number;
   };
   signals: RetailProofSignal[];
-  expenses: { available: false; note: string };
+  expenses: { available: boolean; totalCents: number; count: number; uncategorizedCount: number; note?: string };
   generatedAt: number;
   recentDays: number;
 }
@@ -1107,6 +1109,22 @@ export class ReportsService {
     const revenueCents = Number(rev?.revenue ?? 0);
     const cogsCents = Number(rev?.cogs ?? 0);
     const orderCount = Number(rev?.orders ?? 0);
+    const grossProfitCents = revenueCents - cogsCents;
+
+    // Expenses (queue #3 module) → net profit = gross profit − expenses.
+    const exp = await this.db.one<{ total: number; count: number; uncat: number }>(
+      `SELECT COALESCE(SUM(amount_cents),0) AS total,
+              COUNT(*)::int AS count,
+              COUNT(*) FILTER (WHERE category IS NULL)::int AS uncat
+         FROM expenses WHERE tenant_id = @t`,
+      { t: tenantId },
+    );
+    const expensesCents = Number(exp?.total ?? 0);
+    const expensesCount = Number(exp?.count ?? 0);
+    const uncategorizedExpenses = Number(exp?.uncat ?? 0);
+    const netProfitCents = grossProfitCents - expensesCents;
+    const grossMarginPct = revenueCents > 0 ? Math.round((grossProfitCents / revenueCents) * 1000) / 10 : null;
+    const netMarginPct = revenueCents > 0 ? Math.round((netProfitCents / revenueCents) * 1000) / 10 : null;
 
     // Active products with no sale ever, and none in the recent window.
     const neverSold = await this.db.one<{ n: number }>(
@@ -1136,7 +1154,11 @@ export class ReportsService {
       orderCount,
       revenueCents,
       cogsCents,
-      grossProfitCents: revenueCents - cogsCents,
+      grossProfitCents,
+      expensesCents,
+      netProfitCents,
+      grossMarginPct,
+      netMarginPct,
       productsNeverSold: Number(neverSold?.n ?? 0),
       productsNoRecentSales: Number(staleProducts?.n ?? 0),
     };
@@ -1155,6 +1177,9 @@ export class ReportsService {
     if (orderCount === 0 && productCount > 0) push("no_sales_yet", "info", 0, "No completed sales recorded yet.");
     if (metrics.productsNeverSold > 0 && orderCount > 0) push("products_never_sold", "info", metrics.productsNeverSold, `${metrics.productsNeverSold} active product(s) have never sold.`);
     if (metrics.productsNoRecentSales > 0) push("slow_movers", "info", metrics.productsNoRecentSales, `${metrics.productsNoRecentSales} product(s) had no sales in the last ${recentDays} days.`);
+    // Profit signals — only meaningful once there is revenue to profit from.
+    if (revenueCents > 0 && netProfitCents < 0) push("negative_net_profit", "critical", 0, `Net profit is negative (${grossMarginPct ?? 0}% gross, expenses exceed gross profit) — spending is outpacing margin.`);
+    if (uncategorizedExpenses > 0) push("uncategorized_expenses", "info", uncategorizedExpenses, `${uncategorizedExpenses} expense(s) are uncategorized — categorize them for accurate reporting.`);
 
     const ready = setupDone === setupTotal && productCount > 0 && orderCount > 0;
 
@@ -1163,9 +1188,8 @@ export class ReportsService {
       setup: { ...setup, completed: setupDone, total: setupTotal },
       metrics,
       signals,
-      // Expenses module is not built yet (FORWARD_PLAN queue #3) — surfaced
-      // honestly so the report never implies expense/profit-net coverage it lacks.
-      expenses: { available: false, note: "Expenses module not built yet (queue #3); net profit is gross only." },
+      // Expenses module (queue #3) is live — real totals feed net profit above.
+      expenses: { available: true, totalCents: expensesCents, count: expensesCount, uncategorizedCount: uncategorizedExpenses },
       generatedAt: now,
       recentDays,
     };

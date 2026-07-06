@@ -174,7 +174,8 @@ test("retail-proof: seeded demo tenant (products, no stock/sales) is not ready",
   assert.ok(codes.includes("setup_incomplete"), "flags remaining setup");
   assert.ok(codes.includes("no_sales_yet"), "flags no sales");
   assert.ok(!codes.includes("no_products"), "products exist -> no no_products signal");
-  assert.equal(r.json.expenses.available, false, "expenses honestly reported unbuilt");
+  assert.equal(r.json.expenses.available, true, "expenses module is live");
+  assert.equal(r.json.expenses.totalCents, 0, "seeded demo tenant has no expenses");
 });
 
 test("retail-proof: reflects receiving, cost gap, and a real sale", async () => {
@@ -207,4 +208,43 @@ test("retail-proof: reflects receiving, cost gap, and a real sale", async () => 
   assert.equal(r.json.metrics.revenueCents, o.json.total_cents);
   codes = r.json.signals.map((s: { code: string }) => s.code);
   assert.ok(!codes.includes("no_sales_yet"), "sale recorded -> no_sales_yet cleared");
+});
+
+test("retail-proof: profit visibility — expenses reduce net profit and raise signals", async () => {
+  const app = await freshApp();
+
+  // Product with stock, sold for cash → revenue, gross profit (no cost → COGS 0).
+  const p = await call(app, "POST", "/api/catalog/", {
+    sku: "RP-PROFIT", name: "Profit Widget", price_cents: 1000, category: "general",
+  });
+  await call(app, "POST", `/api/inventory/${p.json.id}/receive`, { quantity: 5 });
+  const o = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA", lines: [{ productId: p.json.id, quantity: 1 }],
+  });
+  assert.equal(o.status, 201, "order created");
+  const pay = await call(app, "POST", "/api/payments/", { orderId: o.json.id, method: "cash", tenderedCents: o.json.total_cents });
+  assert.equal(pay.status, 201, "payment captured");
+
+  let r = await call(app, "GET", "/api/reports/retail-proof");
+  const gross = r.json.metrics.grossProfitCents;
+  assert.ok(gross > 0, "gross profit from the sale");
+  assert.equal(r.json.expenses.available, true, "expenses module is live");
+  assert.equal(r.json.expenses.totalCents, 0, "no expenses yet");
+  assert.equal(r.json.metrics.netProfitCents, gross, "net == gross with no expenses");
+
+  // Record an expense LARGER than gross profit → negative net + signals.
+  const bigExpense = gross + 5000;
+  const e = await call(app, "POST", "/api/expenses/", { amountCents: bigExpense }); // uncategorized
+  assert.equal(e.status, 201);
+
+  r = await call(app, "GET", "/api/reports/retail-proof");
+  assert.equal(r.json.expenses.totalCents, bigExpense, "expense total reflected");
+  assert.equal(r.json.expenses.uncategorizedCount, 1);
+  assert.equal(r.json.metrics.expensesCents, bigExpense);
+  assert.equal(r.json.metrics.netProfitCents, gross - bigExpense, "net = gross - expenses");
+  assert.ok(r.json.metrics.netProfitCents < 0, "net profit is negative");
+  assert.ok(typeof r.json.metrics.netMarginPct === "number", "net margin computed");
+  const codes = r.json.signals.map((s: { code: string }) => s.code);
+  assert.ok(codes.includes("negative_net_profit"), "flags negative net profit");
+  assert.ok(codes.includes("uncategorized_expenses"), "flags uncategorized expense");
 });
