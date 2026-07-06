@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Active Claim (session E — NEXT_PUBLIC_SHOW_PARTIAL_PAGES gating)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session E (desktop app, "next" from Sri — first FORWARD_PLAN queue item: frontend/backend route alignment) |
+| Queue item | Operating-prompt "Mock And Partial Rules": partial/mock-backed pages must stay hidden from nav unless NEXT_PUBLIC_SHOW_PARTIAL_PAGES=true. Flag has ZERO implementation. Mark the wiring-matrix partial pages (Pricing, Promotions, Warehouse, Document Center) as partial in the shell nav and hide them in production unless the flag is set. (Golf already pack-gated for retail; permission-requests now has a real backend via session A.) |
+| Files/areas expected | `web/components/EnterpriseShell.tsx` (nav partial marker + gate), new vitest. NO backend, NO page deletion, NO file moves, no ports |
+| Started | 2026-07-06 |
+| Last update | 2026-07-06 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Released Claim (session E — persist Sri's Agent Operating Prompt as authoritative AGENTS.md)
 
 | Field | Value |
