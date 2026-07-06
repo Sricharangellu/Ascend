@@ -6,12 +6,17 @@ import { ALL_FEATURES } from "@/lib/features";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+// Real GET /api/identity/me returns { userId, tenantId, role }. The mock adds
+// name/email/features. Only role is guaranteed; the rest are optional so the
+// same handler works against both.
 interface MeResponse {
-  id: string;
-  name: string;
-  email: string;
+  userId?: string;
+  tenantId?: string;
+  id?: string;
+  name?: string;
+  email?: string;
   role: string;
-  features: string[];
+  features?: string[];
 }
 
 interface PermissionsState {
@@ -38,14 +43,21 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiGet<MeResponse>("/api/v1/auth/me")
+    // Real backend serves the caller's identity at /api/identity/me (not the
+    // legacy /api/v1/auth/me, which 404s → the old catch kept role="owner" for
+    // EVERY user, a privilege bug). Owner/admin/manager get all features
+    // (matches backend allAccess); custom roles use their granted feature list;
+    // absent a feature list we fail open (the real /me exposes only role — the
+    // capabilities module gate is the tenant-level authority for nav).
+    apiGet<MeResponse>("/api/identity/me")
       .then((r) => {
         setRole(r.role);
-        // Owner and admin always get all features regardless of what the server says
-        if (r.role === "owner" || r.role === "admin") {
+        if (r.role === "owner" || r.role === "admin" || r.role === "manager") {
           setFeatures(new Set(ALL_FEATURES));
-        } else {
+        } else if (r.features && r.features.length > 0) {
           setFeatures(new Set(r.features));
+        } else {
+          setFeatures(new Set(ALL_FEATURES)); // no per-user feature list → fail open
         }
       })
       .catch(() => {

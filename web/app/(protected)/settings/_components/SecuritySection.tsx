@@ -41,7 +41,11 @@ function BackupCodesCard() {
     setCodes(newCodes);
     setCodesState("revealed");
     setConfirmRegen(false);
-    void fetch("/api/v1/auth/backup-codes", { method: "POST" });
+    // NOTE: backup codes are generated client-side only. There is no backend
+    // route to persist/validate them yet (missing feature) — the previous
+    // POST /api/v1/auth/backup-codes 404'd on the real backend. Do not re-add a
+    // production call until a real endpoint exists; until then these codes are
+    // display-only and cannot be verified at login.
   };
 
   const copyAll = async () => {

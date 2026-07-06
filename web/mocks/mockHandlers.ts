@@ -6853,30 +6853,9 @@ mockHandlers.push(
   })(),
 
   // ── Auth: /me ─────────────────────────────────────────────────────────────────
-  ...(() => {
-    const ALL_F = [
-      "register", "sales", "orders", "quotes", "returns", "payments",
-      "price-override", "void-transaction", "service-orders",
-      "catalog", "discounts", "gift-cards", "loyalty",
-      "inventory", "purchasing", "vendors", "operations", "delivery", "shipping",
-      "customers", "appointments",
-      "reports", "insights", "tax-compliance", "finance", "accounting", "invoicing",
-      "ecommerce", "workforce",
-      "team", "settings", "workflows", "integrations", "imports-exports", "audit-log",
-    ];
-    return [
-      http.get(`${V1}/auth/me`, async () => {
-        await lat();
-        return HttpResponse.json({
-          id: "usr_demo_owner",
-          name: "Demo Owner",
-          email: "owner@finder-pos.dev",
-          role: "owner",
-          features: ALL_F,
-        });
-      }),
-    ];
-  })(),
+  // Removed the /api/v1/auth/me mock: that path has NO real backend route (404
+  // in production). PermissionsContext now reads GET /api/identity/me (the real
+  // path), mocked in mocks/handlers.ts. Do not re-add /api/v1/auth/me.
 
   // ── Settings: Role Permissions + Custom Roles ─────────────────────────────────
   ...(() => {

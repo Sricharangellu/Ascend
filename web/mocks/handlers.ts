@@ -986,6 +986,19 @@ export const handlers = [
     return HttpResponse.json({ success: true, merged_from_id: merge_from_id, primary_id: String(params.id) });
   }),
 
+  // ── Current identity — mirrors real GET /api/identity/me ({userId,tenantId,role};
+  //    name/email added for the demo). PermissionsContext reads this. ──────────────
+  http.get("*/api/identity/me", async () => {
+    await latency();
+    return HttpResponse.json({
+      userId: "usr_demo_owner",
+      tenantId: "tnt_demo",
+      role: "owner",
+      name: "Demo Owner",
+      email: "owner@finder-pos.dev",
+    });
+  }),
+
   // ── MFA (Sprint 10C) ─────────────────────────────────────────────────────────
   http.get("*/api/identity/mfa/status", async () => { await latency(); return HttpResponse.json({ enabled: false, setupRequired: true }); }),
   http.post("*/api/identity/mfa/setup", async () => { await latency(); return HttpResponse.json({ secret: "JBSWY3DPEHPK3PXP", otpauthUrl: "otpauth://totp/FinderPOS:demo@example.com?secret=JBSWY3DPEHPK3PXP&issuer=FinderPOS" }); }),
