@@ -111,4 +111,15 @@ you start moving files, then execute it.
 
 ## Progress log (append as sections of this initiative complete)
 
-- _not started — no session has claimed this yet._
+- **2026-07-06 session A (partial — §1–§3 done, §4 deferred):**
+  - §1 cleanup — DONE (`0c7a736`). Junk removed, `.gitignore` hardened.
+  - §2 governance — DONE (`098bbf7`). 25 audits → `WORK/audits/`; collision-proof naming
+    (`AUDIT_<UTC-ISO>-<slug>.md`). Active WORK/ = 6 docs.
+  - §3 wiring — DONE (`eb3b236`). Matrix at `WORK/audits/AUDIT_2026-07-06T010352Z-wiring-matrix.md`:
+    46/54 prefixes wired; drift/gaps classified. Feature-backend builds queued (out of cleanup scope).
+  - §4 structure streamlining — **NOT started.** Deferred to Sri: mass file-moves need an
+    explicit incremental plan + sign-off before moving anything. Governance duplication
+    (RULES.md vs FORWARD_PLAN vs WORK_STATE) intentionally left as-is — collapsing multi-writer
+    live docs is a judgment call for Sri, not a blind merge.
+  - Remaining for a future exclusive run: §4, plus the §3 field-level shape-drift diff
+    (mock camelCase vs backend snake_case) which was out of scope this pass.

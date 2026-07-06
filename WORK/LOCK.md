@@ -1,17 +1,17 @@
 # FinderPOS — Multi-Agent Work Lock
 
-Status: ACTIVE
+Status: FREE
 
-## EXCLUSIVE Claim (session A — Foundation Hardening initiative) — OTHER SESSIONS STAND DOWN
+## EXCLUSIVE Claim (session A — Foundation Hardening initiative) — RELEASED
 
 | Field | Value |
 |---|---|
 | Agent/session | Claude session A (VSCode, Sri: "do as u recommend" → run WORK/FOUNDATION_HARDENING.md) |
-| Queue item | Execute the whole-repo Foundation Hardening initiative (`WORK/FOUNDATION_HARDENING.md`, sections 0–8): cleanup/de-dup, governance consolidation (one agent file + one plan, collision-proof audits), backend↔frontend end-to-end wiring + mock/real drift fixes, structure streamlining. Board confirmed clear before claiming. |
-| Files/areas expected | **BROAD / whole tree** — `WORK/**`, `AGENTS.md`, `CLAUDE.md`, `.gitignore`, `web/**`, `src/**`, `scripts/**` as needed. This is an EXCLUSIVE claim: no other session should start work until released. Executing in phases; presenting a restructure plan to Sri before moving files (per the spec). |
+| Queue item | Execute the whole-repo Foundation Hardening initiative (`WORK/FOUNDATION_HARDENING.md`). Board was clear before claiming. |
+| Files/areas expected | Whole tree (exclusive). |
 | Started | 2026-07-05 |
-| Last update | 2026-07-05 |
-| Status | ACTIVE — EXCLUSIVE |
+| Last update | 2026-07-06 |
+| Status | RELEASED — §1–§3 DONE: cleanup (`0c7a736`), governance archive + collision-proof audit naming (`098bbf7`), wiring matrix (`eb3b236`, 46/54 wired). §4 structural restructure DEFERRED to Sri (mass file-moves need a plan sign-off; the spec requires it). See `WORK/FOUNDATION_HARDENING.md` progress log + `WORK/WORK_STATE.md`. Board FREE — other sessions may resume. |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (session A — persist foundation-hardening initiative)

@@ -10,6 +10,31 @@
 **Retail release pack**: finish one complete business type end-to-end before deepening
 wholesale, restaurant, mobile, grocery, ecommerce, or other packs.
 
+2026-07-06 session A — **Foundation Hardening initiative** (`WORK/FOUNDATION_HARDENING.md`),
+ran under an EXCLUSIVE lock (board was clear). Completed §1–§3:
+- **§1 cleanup** (`0c7a736`): removed orphaned stuck Next build dir + stray
+  `tsconfig*.tsbuildinfo` (all untracked); `.gitignore` now blocks `*.tsbuildinfo`,
+  `.next`/`.next.stuck-*`, and ` N.tsbuildinfo` copies.
+- **§2 governance** (`098bbf7`): archived all 25 `AUDIT_*.md` into `WORK/audits/` (active
+  WORK/ is now 6 clean docs); go-forward audit naming is `WORK/audits/AUDIT_<UTC-ISO>-<slug>.md`
+  (collision-proof, never letters — the letter scheme caused a real merge blocker).
+  AGENTS.md + WORK/README.md updated.
+- **§3 wiring matrix** (`eb3b236`, `WORK/audits/AUDIT_2026-07-06T010352Z-wiring-matrix.md`):
+  runtime-probed all 54 frontend `/api/v1` prefixes vs the real backend. **46/54 wired**
+  (bare-prefix 404s were just no-root-route, confirmed via sub-paths). 8 unwired: `things`
+  = JSDoc false-positive; `auth/*` = real fetch-path drift (small fix); `promotions` +
+  `permission-requests` = real backend gaps (features); `documents`/`pricing`/`warehouse`/
+  `golf` = expected UI-only Preview per RULES.md.
+- **§4 (structural restructure) NOT done** — deferred to Sri: mass file-moves are the risky
+  part the spec says needs a plan sign-off; not worth doing blind.
+
+Gates this session: docs/config/file-moves only, no src/web code changed → typecheck/tests
+unaffected; tree clean; servers stopped.
+
+**Next 3 actions:** (1) fix `auth/*` fetch-path drift (small); (2) decide promotions +
+permission-requests: build backend or mark the pages Preview; (3) if wanted, scope §4
+structural restructure as an explicit incremental plan (don't move blind).
+
 2026-07-05 Codex session O follow-up (full findings in `WORK/AUDIT_2026-07-05H.md`):
 the pushed CI run proved backend, frontend build, production deploy, and post-deploy
 smoke green, but Playwright still failed because the module marketplace E2E clicked a
