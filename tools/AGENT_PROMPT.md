@@ -1,63 +1,82 @@
 # Finder — Coordination Prompt for AI Agents
 
 Paste this to any AI agent/session (Claude, Codex, etc.) joining **finder-pos**. Multiple
-sessions work this repo at once; these steps exist because duplicate files and duplicate
-*work* (two sessions building the same thing) have repeatedly wasted effort. Follow exactly.
+sessions work this repo at once; duplicate files and duplicate *work* (two sessions building
+the same thing) have wasted real effort. The board below prevents it. Follow exactly.
 
-## 1. Orient before touching anything
-- Read, in order: `AGENTS.md` (the operating prompt) → `WORK/FORWARD_PLAN.md` (the queue) →
-  `WORK/LOCK.md` (active claims) → newest `WORK/audits/` if you need verified history.
-- `git pull --ff-only origin master`. If it refuses, STOP and reconcile — never force-push,
-  never rebase `master`.
+## The board = GitHub Issues (free, git-native)
+The queue and coordination live in **GitHub Issues** on `Sricharangellu/finder-pos`, not in a
+file. Lanes are labels: `lane:ready` → `lane:in-progress` → `lane:in-review` → (closed = done),
+plus `lane:blocked`. Kinds: `kind:retail-core`, `kind:security`, `kind:infra`, `sri-only`.
+"Update the board" and "check the git commits" are the same system: issues ↔ branches ↔ PRs ↔
+commits. (A visual Projects v2 kanban can layer on top once the owner grants the `project`
+scope — the process below works with plain Issues today.)
 
-## 2. Work in isolation — do not share the primary checkout
-- Create your own worktree: `tools/new-worktree.sh <task-slug>` → work in
-  `../finder-wt-<slug>` on your own branch. Never make a second `git clone`.
-- If you must use the shared checkout, run ONE session at a time.
+## 1. Orient (check the board + git before doing anything)
+```bash
+git pull --ff-only origin master                 # never force-push, never rebase master
+gh issue list --repo Sricharangellu/finder-pos --label lane:ready         # what's pickable
+gh issue list --repo Sricharangellu/finder-pos --label lane:in-progress   # what's already claimed
+gh pr list  --repo Sricharangellu/finder-pos                              # what's mid-review
+```
+Read `AGENTS.md` (operating prompt) and `WORK/FORWARD_PLAN.md` for the deeper rules/spec.
 
-## 3. Claim before editing (WORK/LOCK.md)
-- If the board is `FREE` (or your files don't overlap an ACTIVE claim), add an ACTIVE claim:
-  session name, queue item, **exact files/areas**, start time. Release (set `FREE`) only
-  after commit + push succeed.
-- If your intended files overlap an ACTIVE claim, STOP. Pick a non-overlapping item or wait.
-  Editing a file another session is on is what causes the collisions.
+## 2. Pick + CLAIM a card (atomic — this replaces WORK/LOCK.md)
+Choose the top `lane:ready` issue with **no assignee**, then claim it in one step:
+```bash
+gh issue edit <n> --repo Sricharangellu/finder-pos \
+  --add-assignee @me --remove-label lane:ready --add-label lane:in-progress
+gh issue comment <n> --body "Claimed. Files/area: <list>. Starting now."
+```
+If it already has an assignee or is `lane:in-progress`, pick a different card — never work a
+claimed one in parallel.
 
-## 4. Before building ANYTHING, prove it doesn't already exist
-- `git grep -ni "<feature-or-route-name>" origin/master` and scan `src/modules/`.
-- If it exists, EXTEND it — never build a parallel version. (Real example: `retail-proof`
-  already lives in `src/modules/reports/`; don't rebuild it in another module.)
+## 3. Prove it doesn't already exist (before building)
+```bash
+gh issue list --repo Sricharangellu/finder-pos --search "<keywords>" --state all
+git grep -ni "<feature-or-route-name>" origin/master ; ls src/modules/
+```
+If it exists, EXTEND it — never build a parallel version. (e.g. `retail-proof` already lives
+in `src/modules/reports/`.)
 
-## 5. Gates — all must pass before you claim "done"
+## 4. Work in isolation
+- `tools/new-worktree.sh issue-<n>` → work in `../finder-wt-issue-<n>` on branch `wt/issue-<n>`.
+  Never make a second `git clone`.
+
+## 5. Gates — all pass before you move to review
 - Backend: `npm run typecheck && npm test && npm run smoke`
 - Frontend: `cd web && npm run typecheck && npm run lint && npm test && npm run build`
 - Hygiene: `node tools/hygiene-check.mjs`
-- Real-backend proof needs a PRODUCTION build (`NEXT_PUBLIC_MOCK=false`); `npm run dev`
-  ALWAYS mocks — never cite it as proof.
+- `npm run dev` ALWAYS mocks — never cite it as proof of real-backend wiring.
 
-## 6. Land via Pull Request (master is PR-protected — no direct pushes)
-1. `git switch -c <type>/<scope>-<slug>` (conventional: feat/fix/chore/docs/ci/test).
-2. Commit small, scoped, explicit file paths (never `git add -A`).
-3. `git push -u origin <branch>` → `gh pr create --fill`.
-4. CI green → `gh pr merge --auto --squash --delete-branch`.
-5. Clean up your worktree/branch: `git worktree remove …` / branch auto-deletes.
+## 6. Land via PR (master is PR-protected once enabled — no direct pushes)
+```bash
+git commit -m "feat(<scope>): …" -m "Closes #<n>"       # 'Closes #<n>' auto-closes the card
+git push -u origin wt/issue-<n>
+gh pr create --fill                                       # links the issue
+gh issue edit <n> --remove-label lane:in-progress --add-label lane:in-review
+# CI green:
+gh pr merge --auto --squash --delete-branch              # merge closes #<n> -> card done
+git worktree remove ../finder-wt-issue-<n>
+```
 
-## 7. Honest status labels (required)
-`built_verified` · `built_unverified` · `partial` · `mocked` · `planned` · `missing`.
-Never call something done without one. A feature is `built_verified` only with: real backend
-endpoint, DB persistence, tenant isolation, permission checks, audit where appropriate,
-frontend wired to the real backend in production mode, loading/empty/error/success states,
-tests, and no production dependency on mocks/fake auth.
+## 7. Honest status labels (in code/docs/PRs)
+`built_verified` · `built_unverified` · `partial` · `mocked` · `planned` · `missing`. A feature
+is `built_verified` only with: real backend endpoint, DB persistence, tenant isolation, RBAC,
+audit where appropriate, frontend wired to the real backend in production mode,
+loading/empty/error/success states, tests, no production dependency on mocks/fake auth.
 
 ## 8. Non-negotiable rules
-- Money in integer **cents**. Tenant-scope every business query. RBAC on sensitive routes.
-  Inventory changes only via immutable movement records.
-- One `AGENTS.md`, one `WORK/FORWARD_PLAN.md`. Never create `CLAUDE.md`/`ROADMAP.md`/
-  `RULES.md`/`WORK_STATE.md`/`PROJECT_PLAN.md` duplicates or `* 2.*` copies.
+- Money in integer **cents**; tenant-scope every business query; RBAC on sensitive routes;
+  inventory changes only via immutable movement records.
+- One `AGENTS.md`, one `WORK/FORWARD_PLAN.md`. Never create `CLAUDE.md`/`ROADMAP.md`/`RULES.md`/
+  `WORK_STATE.md`/`PROJECT_PLAN.md` duplicates or `* 2.*` copies.
 - Never write secrets into any file. Never reference competitor POS/ERP brand names.
-- Product is **retail-first**: harden the core retail flow before adding vertical depth.
-  Mock-backed prefixes (`/promotions` subresources, `/documents`, `/golf`, `/pricing`,
-  `/warehouse`) are not production-ready until real backends exist.
+- Retail-first: harden the core retail flow first. Mock-backed prefixes (`/documents`, `/golf`,
+  `/pricing`, `/warehouse`, `/promotions` subresources) are not production-ready yet (see the
+  in-progress board card).
 
-## 9. Open handoffs (do these when you own the area)
-- **CI owner of `.github/workflows/ci.yml`:** add a guard step `run: node tools/hygiene-check.mjs`.
-- Report honestly at handoff: what changed, files, what was verified, what remains/risky.
+## 9. If blocked or done
+- Blocked: `gh issue edit <n> --remove-label lane:in-progress --add-label lane:blocked` +
+  comment why. Don't leave a silent claim.
+- Handoff report: what changed · files · what was verified · what remains/risky.
