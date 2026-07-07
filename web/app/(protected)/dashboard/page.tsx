@@ -25,7 +25,7 @@ interface SummaryResponse {
   revenue: { grossCents: number; taxCents: number; netCents: number };
   payments: { capturedCount: number; capturedCents: number; byMethod: Record<string, number> };
   kpi?: {
-    saleCount: number; grossProfitCents: number; customerCount: number;
+    saleCount: number; grossProfitCents: number | null; customerCount: number;
     avgSaleValueCents: number; avgItemsPerSale: number;
     discountedAmountCents: number; discountedPct: number;
   };

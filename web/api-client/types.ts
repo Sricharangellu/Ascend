@@ -332,6 +332,20 @@ export interface paths {
 }
 
 // ── Reports (Wave 2 analytics) ──────────────────────────────────────────────
+export interface SalesSummaryKpi {
+  saleCount: number;
+  /** revenue − COGS from recorded product costs; null when nothing sold has a known cost */
+  grossProfitCents: number | null;
+  cogsCents: number;
+  /** 0–100 share of sold units with a known cost — confidence in grossProfitCents */
+  costCoveragePct: number;
+  customerCount: number;
+  avgSaleValueCents: number;
+  avgItemsPerSale: number;
+  discountedAmountCents: number;
+  discountedPct: number; // 0–100
+}
+
 export interface SalesSummary {
   orders: {
     open: number;
@@ -349,6 +363,12 @@ export interface SalesSummary {
     capturedCount: number;
     capturedCents: number;
     byMethod: Record<string, number>;
+  };
+  kpi: SalesSummaryKpi;
+  /** Sparkline points (last 8 daily buckets) */
+  sparklines: {
+    revenue: number[];
+    saleCount: number[];
   };
 }
 

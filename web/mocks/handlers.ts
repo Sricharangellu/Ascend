@@ -752,6 +752,21 @@ export const handlers = [
       orders: { open: 1, completed: 3, refunded: 0, voided: 0, total: 4 },
       revenue: { grossCents: 6497, taxCents: 497, netCents: 6000 },
       payments: { capturedCount: 3, capturedCents: 6497, byMethod: { cash: 3247, card: 3250 } },
+      kpi: {
+        saleCount: 3,
+        grossProfitCents: 2597,
+        cogsCents: 3900,
+        costCoveragePct: 100,
+        customerCount: 2,
+        avgSaleValueCents: 2166,
+        avgItemsPerSale: 2.3,
+        discountedAmountCents: 350,
+        discountedPct: 33.3,
+      },
+      sparklines: {
+        revenue: [4200, 5800, 5100, 7300, 6200, 8000, 7500, 6497],
+        saleCount: [2, 4, 3, 5, 4, 6, 5, 3],
+      },
     };
     return HttpResponse.json(response, { status: 200 });
   }),
