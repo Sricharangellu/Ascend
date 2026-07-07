@@ -54,6 +54,13 @@ jobs:
           fi
           echo "No duplicate/copy-junk files tracked ✓"
 
+      - name: Repo hygiene (duplicates / backups / merge-conflict junk)
+        # Comprehensive superset of the inline check above: scans the whole tree
+        # for "<name> 2.<ext>" copies, *.bak/*.orig backups, and merge-conflict
+        # markers. Fails CI so junk can never land. Runs on the runner's Node
+        # (no deps); the script is a plain ESM module.
+        run: node tools/hygiene-check.mjs
+
       - name: One canonical agent-instruction file
         run: |
           # "1 file for all agents": exactly one root AGENTS.md; CLAUDE.md may
