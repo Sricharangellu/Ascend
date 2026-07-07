@@ -55,6 +55,55 @@ test("sales summary aggregates orders, revenue, and captured payments for the te
   assert.equal(r.json.payments.byMethod.cash, 2165);
 });
 
+test("summary kpi: gross profit is real COGS-based, or null when sold units have no known cost", async () => {
+  const app = await freshApp();
+
+  // Empty window: zero profit at full (vacuous) confidence.
+  let r = await call(app, "GET", "/api/reports/summary");
+  assert.equal(r.json.kpi.grossProfitCents, 0);
+  assert.equal(r.json.kpi.cogsCents, 0);
+  assert.equal(r.json.kpi.costCoveragePct, 100);
+
+  // A product with stock but NO recorded cost: profit must be null, not a fake margin.
+  const p1 = await call(app, "POST", "/api/catalog/", {
+    sku: "KPI-NC", name: "No-cost Widget", price_cents: 1000, category: "general",
+  });
+  await call(app, "POST", `/api/inventory/${p1.json.id}/receive`, { quantity: 10 });
+  const o1 = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA", lines: [{ productId: p1.json.id, quantity: 2 }],
+  });
+  await call(app, "POST", "/api/payments/", { orderId: o1.json.id, method: "cash", tenderedCents: o1.json.total_cents });
+
+  r = await call(app, "GET", "/api/reports/summary");
+  assert.equal(r.json.kpi.grossProfitCents, null, "no known costs -> profit unknown");
+  assert.equal(r.json.kpi.cogsCents, 0);
+  assert.equal(r.json.kpi.costCoveragePct, 0);
+
+  // A second product costed through the purchasing receive flow: profit becomes real.
+  const p2 = await call(app, "POST", "/api/catalog/", {
+    sku: "KPI-C", name: "Costed Widget", price_cents: 500, category: "general",
+  });
+  const s = await call(app, "POST", "/api/purchasing/suppliers", { name: "KPI Co", email: "po@kpi.test" });
+  const po = await call(app, "POST", "/api/purchasing/orders", {
+    supplierId: s.json.id, lines: [{ productId: p2.json.id, quantity: 10, unitCostCents: 200 }],
+  });
+  const recv = await call(app, "POST", `/api/purchasing/orders/${po.json.id}/receive`, {
+    lines: [{ lineId: po.json.lines[0].id, qty: 10 }],
+  });
+  assert.equal(recv.status, 200, `receive failed: ${JSON.stringify(recv.json)}`);
+  const o2 = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA", lines: [{ productId: p2.json.id, quantity: 1 }],
+  });
+  await call(app, "POST", "/api/payments/", { orderId: o2.json.id, method: "cash", tenderedCents: o2.json.total_cents });
+
+  r = await call(app, "GET", "/api/reports/summary");
+  const gross = Number(o1.json.total_cents) + Number(o2.json.total_cents);
+  assert.equal(r.json.revenue.grossCents, gross);
+  assert.equal(r.json.kpi.cogsCents, 200, "COGS = 1 unit @ known cost 200");
+  assert.equal(r.json.kpi.grossProfitCents, gross - 200, "profit = revenue - COGS");
+  assert.equal(r.json.kpi.costCoveragePct, 33, "1 of 3 sold units has a known cost");
+});
+
 test("reports reflect only the caller's tenant data", async () => {
   const app = await freshApp();
   const p = await call(app, "POST", "/api/catalog/", {
