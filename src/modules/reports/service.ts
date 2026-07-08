@@ -39,7 +39,11 @@ export interface SalesSummary {
   /** FE-41: Implementation Prompt §4.1 spec KPIs */
   kpi: {
     saleCount: number;
-    grossProfitCents: number;
+    /** revenue − COGS from product_costs; null when nothing sold has a known cost */
+    grossProfitCents: number | null;
+    cogsCents: number;
+    /** 0–100 share of sold units with a known cost — confidence in grossProfitCents */
+    costCoveragePct: number;
     customerCount: number;
     avgSaleValueCents: number;
     avgItemsPerSale: number;
@@ -330,9 +334,27 @@ export class ReportsService {
       { tenantId, since },
     );
 
+    // COGS over the same window (same join convention as pnl()); costed_units
+    // tracks how many sold units actually had a known cost so gross profit can
+    // be reported honestly instead of assuming a margin.
+    const cogsRow = await this.db.one<{ cogs: number; costed_units: number }>(
+      `SELECT COALESCE(SUM(pc.cost_cents * ol.quantity), 0) AS cogs,
+              COALESCE(SUM(ol.quantity) FILTER (WHERE pc.cost_cents IS NOT NULL), 0)::int AS costed_units
+         FROM order_lines ol
+         JOIN orders o ON o.id = ol.order_id AND o.tenant_id = ol.tenant_id
+         LEFT JOIN product_costs pc ON pc.product_id = ol.product_id AND pc.tenant_id = ol.tenant_id
+        WHERE ol.tenant_id = @tenantId AND o.status = 'completed' AND o.created_at >= @since`,
+      { tenantId, since },
+    );
+
     const saleCount = Number(kpiRow?.sale_count ?? 0);
     const customerCount = Number(kpiRow?.customer_count ?? 0);
     const totalItems = Number(itemRow?.total_items ?? 0);
+    const cogsCents = Number(cogsRow?.cogs ?? 0);
+    const costedUnits = Number(cogsRow?.costed_units ?? 0);
+    const costCoveragePct = totalItems > 0 ? Math.round((costedUnits / totalItems) * 100) : 100;
+    const grossProfitCents =
+      totalItems === 0 ? 0 : costedUnits > 0 ? grossCents - cogsCents : null;
     const discountedCents = Number(kpiRow?.discounted_cents ?? 0);
     const discountedOrders = Number(discountedOrdersRow?.n ?? 0);
     const avgSaleValueCents = saleCount > 0 ? Math.round(grossCents / saleCount) : 0;
@@ -363,7 +385,9 @@ export class ReportsService {
       payments: { capturedCount, capturedCents, byMethod },
       kpi: {
         saleCount,
-        grossProfitCents: grossCents, // full COGS tracking deferred to DB-14
+        grossProfitCents,
+        cogsCents,
+        costCoveragePct,
         customerCount,
         avgSaleValueCents,
         avgItemsPerSale,
