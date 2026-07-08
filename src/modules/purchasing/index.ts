@@ -267,6 +267,38 @@ CREATE TABLE IF NOT EXISTS vendor_quote_lines (
 CREATE INDEX IF NOT EXISTS vql_quote_idx ON vendor_quote_lines (tenant_id, quote_id);
 `;
 
+// Vendor bills: an invoice entered against a PO, validated via 3-way match
+// (ordered vs received vs invoiced) before it is approved and posted.
+const CREATE_PO_BILLS = `
+CREATE TABLE IF NOT EXISTS po_bills (
+  id              TEXT PRIMARY KEY,
+  tenant_id       TEXT NOT NULL,
+  po_id           TEXT NOT NULL,
+  invoice_number  TEXT NOT NULL,
+  invoice_date    BIGINT,
+  document_id     TEXT,
+  subtotal_cents  BIGINT NOT NULL DEFAULT 0,
+  tax_cents       BIGINT NOT NULL DEFAULT 0,
+  total_cents     BIGINT NOT NULL DEFAULT 0,
+  status          TEXT NOT NULL DEFAULT 'draft',
+  created_at      BIGINT NOT NULL,
+  updated_at      BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS po_bills_po_idx ON po_bills (tenant_id, po_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS po_bill_lines (
+  id                     TEXT PRIMARY KEY,
+  tenant_id              TEXT NOT NULL,
+  bill_id                TEXT NOT NULL REFERENCES po_bills(id) ON DELETE CASCADE,
+  line_id                TEXT,
+  product_id             TEXT NOT NULL,
+  product_name           TEXT,
+  invoiced_qty           INTEGER NOT NULL DEFAULT 0,
+  invoiced_unit_cost_cents BIGINT NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS po_bill_lines_bill_idx ON po_bill_lines (tenant_id, bill_id);
+`;
+
 // PROD-8: FK — purchase_order_lines must reference a real purchase_order row.
 const ADD_PO_LINE_FK = `
 DO $$
@@ -310,7 +342,7 @@ $$;
  *  `purchase_order.received`; inventory listens and increments stock. */
 export const purchasingModule: PosModule = {
   name: "purchasing",
-  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_SUPPLIERS_VENDOR_360, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES, ADD_PO_LINE_FK, ADD_PURCHASING_UPDATED_AT_TRIGGERS, CREATE_PO_DOCUMENTS],
+  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_SUPPLIERS_VENDOR_360, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES, ADD_PO_LINE_FK, ADD_PURCHASING_UPDATED_AT_TRIGGERS, CREATE_PO_DOCUMENTS, CREATE_PO_BILLS],
   async register({ db, events, router }) {
     const service = new PurchasingService(db, events);
     registerRoutes(router, service);
