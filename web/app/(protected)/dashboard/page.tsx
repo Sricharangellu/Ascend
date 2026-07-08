@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useQuery, invalidateQuery } from "@/lib/useQuery";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
-import { apiGet } from "@/api-client/client";
+import { apiGet, apiPost } from "@/api-client/client";
 import { useFinderContext, type FinderDateRange } from "@/lib/useFinderContext";
 import { useRealtimeStream } from "@/hooks/useRealtimeStream";
 import { VerticalWidgets } from "@/components/dashboard/VerticalWidgets";
@@ -14,7 +14,20 @@ import { DashboardOperational } from "./_components/DashboardOperational";
 import { DashboardKpiSection } from "./_components/DashboardKpiSection";
 import { DashboardCharts } from "./_components/DashboardCharts";
 import { DashboardQuickActions } from "./_components/DashboardQuickActions";
-import { DashboardRecommendations, type RecommendationReport } from "./_components/DashboardRecommendations";
+import { DashboardRecommendations, type RecommendationReport, type DashboardRecommendation } from "./_components/DashboardRecommendations";
+import ProgressPanel from "./_components/ProgressPanel";
+
+// Map each actionable recommendation signal to the progress verification source
+// Finder can prove it from — so a recommendation-born task can later be
+// system-verified against real data. Signals without a data check stay manual.
+const SIGNAL_TO_VERIFICATION: Record<string, string> = {
+  no_products: "retail.first_product",
+  products_without_cost: "retail.cost_prices_complete",
+  out_of_stock: "retail.first_receiving",
+  low_stock: "retail.first_receiving",
+  no_sales_yet: "retail.first_sale",
+  uncategorized_expenses: "retail.expenses_categorized",
+};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -99,6 +112,7 @@ export default function DashboardPage() {
   const [recentNotifs, setRecentNotifs] = useState<DashNotification[]>([]);
   const [outlets, setOutlets] = useState<OutletItem[]>([]);
   const [selectedOutletId, setSelectedOutletId] = useState<string>(outletId);
+  const [progressRefresh, setProgressRefresh] = useState(0);
 
   useEffect(() => {
     apiGet<{ items: LowStockItem[] }>("/api/v1/inventory/levels?pageSize=200")
@@ -121,6 +135,18 @@ export default function DashboardPage() {
   const fetchHourly = useCallback(() => apiGet<HourlyResponse>(`/api/v1/reports/hourly?range=${range}&${scope}`), [range, scope]);
   const fetchCategory = useCallback(() => apiGet<CategoryResponse>(`/api/v1/reports/sales-by-category?range=${range}&${scope}`), [range, scope]);
   const fetchRecommendations = useCallback(() => apiGet<RecommendationReport>("/api/v1/reports/recommendations?recentDays=30"), []);
+
+  // Turn a recommendation into a progress task, carrying the linked source
+  // context (the reason, the destination, and the data source it verifies from).
+  const onTrackRecommendation = useCallback(async (rec: DashboardRecommendation) => {
+    await apiPost("/api/v1/progress/tasks", {
+      title: rec.title,
+      description: `${rec.detail}\n\nRecommended: ${rec.action} → ${rec.href}`,
+      category: `recommendation:${rec.category}`,
+      verificationSource: (rec.signalCode && SIGNAL_TO_VERIFICATION[rec.signalCode]) || null,
+    });
+    setProgressRefresh((n) => n + 1);
+  }, []);
 
   useRealtimeStream(
     useCallback((event) => {
@@ -253,7 +279,10 @@ export default function DashboardPage() {
           report={recommendationsData}
           loading={loadingRecommendations}
           error={errorRecommendations}
+          onTrackTask={onTrackRecommendation}
         />
+
+        <ProgressPanel refreshSignal={progressRefresh} />
 
         <DashboardCharts
           trendPoints={trendPoints}

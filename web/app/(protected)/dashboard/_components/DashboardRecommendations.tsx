@@ -51,10 +51,14 @@ export function DashboardRecommendations({
   report,
   loading,
   error,
+  onTrackTask,
 }: {
   report?: RecommendationReport;
   loading: boolean;
   error: string | null;
+  /** When provided, each recommendation can be turned into a progress task with
+   *  linked source context. Omitted where progress tracking is unavailable. */
+  onTrackTask?: (rec: DashboardRecommendation) => void | Promise<void>;
 }) {
   const recommendations = [...(report?.recommendations ?? [])].sort((a, b) => a.rank - b.rank);
   const summary = report?.summary;
@@ -114,10 +118,20 @@ export function DashboardRecommendations({
                 </div>
                 <p className="text-sm font-semibold text-slate-950">{rec.title}</p>
                 <p className="mt-1 line-clamp-2 text-xs text-slate-600">{rec.detail}</p>
-                <div className="mt-auto pt-3">
+                <div className="mt-auto flex items-center justify-between gap-2 pt-3">
                   <Link href={rec.href} className="text-sm font-semibold text-blue-700 hover:underline">
                     {rec.action}
                   </Link>
+                  {onTrackTask && (
+                    <button
+                      type="button"
+                      onClick={() => onTrackTask(rec)}
+                      aria-label={`Track "${rec.title}" as a progress task`}
+                      className="shrink-0 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      Track as task
+                    </button>
+                  )}
                 </div>
               </li>
             );

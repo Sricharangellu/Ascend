@@ -1261,6 +1261,126 @@ export const handlers = [
       }),
     ];
   })(),
+
+  // ── Progress intelligence (mirrors src/modules/progress) ──────────────────
+  ...(() => {
+    interface MockProgressTask {
+      id: string; tenant_id: string; hypothesis_id: string | null; title: string;
+      description: string | null; category: string; status: string;
+      verification_source: string | null; due_at: number | null; completed_at: number | null;
+      created_by: string; created_at: number; updated_at: number;
+    }
+    const MANUAL = new Set(["not_started", "planned", "in_progress", "self_reported_done", "blocked", "skipped"]);
+    const ALL_STATUSES = [
+      "not_started", "planned", "in_progress", "self_reported_done", "evidence_attached",
+      "system_verified", "validated", "invalidated", "blocked", "skipped",
+    ];
+    const now = Date.now();
+    let seq = 0;
+    let evidenceCount = 1;
+    const task = (over: Partial<MockProgressTask>): MockProgressTask => ({
+      id: `tsk_seed_${++seq}`, tenant_id: "tnt_demo", hypothesis_id: null, title: "Task",
+      description: null, category: "retail_readiness", status: "planned",
+      verification_source: null, due_at: null, completed_at: null,
+      created_by: "usr_demo_owner", created_at: now, updated_at: now, ...over,
+    });
+    let tasks: MockProgressTask[] = [
+      task({ title: "Add your first products", status: "system_verified", verification_source: "retail.first_product", completed_at: now }),
+      task({ title: "Receive first purchase order", status: "evidence_attached", verification_source: "retail.first_receiving", completed_at: now }),
+      task({ title: "Record your first sale", status: "planned", verification_source: "retail.first_sale" }),
+      task({ title: "Categorize all expenses", status: "self_reported_done", verification_source: "retail.expenses_categorized", completed_at: now }),
+    ];
+
+    const emptyCounts = (): Record<string, number> => Object.fromEntries(ALL_STATUSES.map((s) => [s, 0]));
+
+    return [
+      http.get(`${V1}/progress/summary`, async () => {
+        await latency();
+        const taskCounts = emptyCounts();
+        for (const t of tasks) taskCounts[t.status] = (taskCounts[t.status] ?? 0) + 1;
+        return HttpResponse.json({
+          hypotheses: emptyCounts(),
+          tasks: taskCounts,
+          evidenceCount,
+          decisionsCount: 0,
+        });
+      }),
+      http.get(`${V1}/progress/tasks`, async ({ request }) => {
+        await latency();
+        const status = new URL(request.url).searchParams.get("status");
+        const items = status ? tasks.filter((t) => t.status === status) : tasks;
+        return HttpResponse.json({ items: [...items].sort((a, b) => b.created_at - a.created_at) });
+      }),
+      http.post(`${V1}/progress/tasks`, async ({ request }) => {
+        await latency();
+        const body = (await request.json()) as {
+          title?: string; description?: string | null; category?: string;
+          verificationSource?: string | null; hypothesisId?: string | null; dueAt?: number | null;
+        };
+        const ts = Date.now();
+        const created = task({
+          id: `tsk_mock_${++seq}`,
+          title: body.title?.trim() || "Untitled task",
+          description: body.description?.trim() || null,
+          category: body.category?.trim() || "retail_readiness",
+          verification_source: body.verificationSource ?? null,
+          hypothesis_id: body.hypothesisId ?? null,
+          due_at: body.dueAt ?? null,
+          created_at: ts, updated_at: ts,
+        });
+        tasks.push(created);
+        return HttpResponse.json(created, { status: 201 });
+      }),
+      http.patch(`${V1}/progress/tasks/:id/status`, async ({ request, params }) => {
+        await latency();
+        const t = tasks.find((x) => x.id === String(params["id"]));
+        if (!t) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as { status?: string };
+        const status = body.status ?? "";
+        if (!MANUAL.has(status)) {
+          return HttpResponse.json(
+            { error: { code: "bad_request", message: "validated, invalidated, evidence_attached, and system_verified require evidence, decision, or system verification endpoints" } },
+            { status: 400 },
+          );
+        }
+        t.status = status;
+        t.completed_at = status === "self_reported_done" ? Date.now() : null;
+        t.updated_at = Date.now();
+        return HttpResponse.json(t);
+      }),
+      http.post(`${V1}/progress/tasks/:id/evidence`, async ({ request, params }) => {
+        await latency();
+        const t = tasks.find((x) => x.id === String(params["id"]));
+        if (!t) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as { title?: string; url?: string | null; notes?: string | null; source?: string; evidenceType?: string };
+        const ts = Date.now();
+        evidenceCount += 1;
+        t.status = "evidence_attached";
+        t.completed_at = t.completed_at ?? ts;
+        t.updated_at = ts;
+        return HttpResponse.json({
+          id: `evd_mock_${evidenceCount}`, tenant_id: "tnt_demo", task_id: t.id, hypothesis_id: null,
+          evidence_type: body.evidenceType?.trim() || "note", title: body.title?.trim() || "Evidence",
+          url: body.url?.trim() || null, notes: body.notes?.trim() || null, source: body.source?.trim() || "manual",
+          created_by: "usr_demo_owner", created_at: ts,
+        }, { status: 201 });
+      }),
+      http.post(`${V1}/progress/tasks/:id/system-verify`, async ({ params }) => {
+        await latency();
+        const t = tasks.find((x) => x.id === String(params["id"]));
+        if (!t) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        if (!t.verification_source) {
+          return HttpResponse.json({ error: { code: "bad_request", message: "task has no verification_source" } }, { status: 400 });
+        }
+        const ts = Date.now();
+        evidenceCount += 1;
+        t.status = "system_verified";
+        t.completed_at = ts;
+        t.updated_at = ts;
+        return HttpResponse.json(t);
+      }),
+    ];
+  })(),
 ];
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
