@@ -1814,3 +1814,102 @@ export interface CapabilitiesImpactResponse {
   // consumed loosely by the preview UI.
   [key: string]: unknown;
 }
+
+// ─── Progress intelligence ──────────────────────────────────────────────────
+// Truth-tracking model (Hypothesis → Task → Evidence → Verified Result → Decision)
+// backed by `/api/v1/progress` (src/modules/progress). Field names mirror the
+// backend service DTOs exactly (snake_case), so responses map straight through.
+
+/**
+ * A task/hypothesis truth-status. Ordered loosely from "not done" to "proven".
+ * `system_verified` is reserved for statuses Finder can prove from real tenant
+ * data; `validated`/`invalidated` come only from a hypothesis decision.
+ */
+export type ProgressStatus =
+  | "not_started"
+  | "planned"
+  | "in_progress"
+  | "self_reported_done"
+  | "evidence_attached"
+  | "system_verified"
+  | "validated"
+  | "invalidated"
+  | "blocked"
+  | "skipped";
+
+/** Statuses a user may set directly via `PATCH /tasks/:id/status`. The others are
+ *  earned: evidence attachment, system verification, or a hypothesis decision. */
+export const MANUAL_PROGRESS_STATUSES: readonly ProgressStatus[] = [
+  "not_started",
+  "planned",
+  "in_progress",
+  "self_reported_done",
+  "blocked",
+  "skipped",
+];
+
+/** Verification sources Finder can prove from internal data (backend enum). */
+export type ProgressVerificationSource =
+  | "retail.first_product"
+  | "retail.first_receiving"
+  | "retail.first_sale"
+  | "retail.expenses_categorized"
+  | "retail.cost_prices_complete";
+
+export interface ProgressTask {
+  id: string;
+  tenant_id: string;
+  hypothesis_id: string | null;
+  title: string;
+  description: string | null;
+  category: string;
+  status: ProgressStatus;
+  verification_source: string | null;
+  due_at: number | null;
+  completed_at: number | null;
+  created_by: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ProgressEvidence {
+  id: string;
+  tenant_id: string;
+  task_id: string | null;
+  hypothesis_id: string | null;
+  evidence_type: string;
+  title: string;
+  url: string | null;
+  notes: string | null;
+  source: string;
+  created_by: string;
+  created_at: number;
+}
+
+export interface ProgressSummary {
+  hypotheses: Record<ProgressStatus, number>;
+  tasks: Record<ProgressStatus, number>;
+  evidenceCount: number;
+  decisionsCount: number;
+}
+
+export interface ProgressTasksResponse {
+  items: ProgressTask[];
+}
+
+export interface CreateProgressTaskInput {
+  title: string;
+  description?: string | null;
+  category?: string;
+  hypothesisId?: string | null;
+  verificationSource?: string | null;
+  dueAt?: number | null;
+}
+
+export interface AttachEvidenceInput {
+  title: string;
+  evidenceType?: string;
+  url?: string | null;
+  notes?: string | null;
+  source?: string;
+}
