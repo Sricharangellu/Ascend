@@ -324,6 +324,37 @@ test("variants: create a child directly, list it, and clear its parent", async (
   assert.equal(afterClear.json.items.length, 0);
 });
 
+test("variants: create a child through the variant endpoint with UPC, SKU, price, and category", async () => {
+  const app = await freshApp();
+
+  const master = await call(app, "POST", "/api/catalog/", {
+    sku: "WIZ-MASTER",
+    name: "Coffee Bag",
+    price_cents: 1499,
+    category: "coffee",
+    barcode: "000MASTER",
+  });
+
+  const created = await call(app, "POST", `/api/catalog/${master.json.id}/variants`, {
+    variant_label: "Dark Roast",
+    upc: "000DARK",
+    sku: "WIZ-DARK",
+    selling_price_cents: 1699,
+    category: "coffee-beans",
+  });
+
+  assert.equal(created.status, 201);
+  assert.equal(created.json.parent_product_id, master.json.id);
+  assert.equal(created.json.variant_label, "Dark Roast");
+  assert.equal(created.json.barcode, "000DARK");
+  assert.equal(created.json.sku, "WIZ-DARK");
+  assert.equal(created.json.price_cents, 1699);
+  assert.equal(created.json.category, "coffee-beans");
+
+  const variants = await call(app, "GET", `/api/catalog/${master.json.id}/variants`);
+  assert.deepEqual(variants.json.items.map((p: any) => p.id), [created.json.id]);
+});
+
 test("variants: assign can set a label and unlink a child", async () => {
   const app = await freshApp();
 
