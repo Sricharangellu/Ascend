@@ -174,6 +174,14 @@ const generateVariantsSchema = z.object({
     .max(5),
 });
 
+const createVariantSchema = z.object({
+  variant_label: z.string().min(1),
+  upc: z.string().min(1),
+  sku: z.string().min(1),
+  selling_price_cents: z.number().int().nonnegative(),
+  category: z.string().min(1),
+});
+
 function parseInt0(value: unknown): number | undefined {
   if (typeof value !== "string" || value.trim() === "") return undefined;
   const n = Number(value);
@@ -444,6 +452,16 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     "/:id/variants",
     handler(async (req, res) => {
       res.json({ items: await service.listVariants(String(req.params.id), tenantId(res)) });
+    }),
+  );
+
+  router.post(
+    "/:id/variants",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const body = parseBody(createVariantSchema, req.body);
+      const product = await service.createVariant(String(req.params.id), body, tenantId(res));
+      res.status(201).json(product);
     }),
   );
 

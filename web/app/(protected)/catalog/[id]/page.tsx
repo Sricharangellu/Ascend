@@ -40,9 +40,9 @@ const STATUS_BADGE = { active: "green", draft: "yellow", archived: "gray" } as c
 // 14 tabs (down from 21). Grouped logically:
 // Core → Inventory → Activity → Content/Compliance → Insights
 const TABS: { key: Tab; label: string; group: string }[] = [
+  { key: "general",       label: "Product Details",  group: "core" },
+  { key: "variants",      label: "Master & Variants", group: "core" },
   { key: "overview",      label: "Overview",         group: "core" },
-  { key: "general",       label: "Details",          group: "core" },
-  { key: "variants",      label: "Variants",         group: "core" },
   { key: "pricing",       label: "Pricing",          group: "core" },
   { key: "inventory",     label: "Inventory",        group: "inventory" },
   { key: "purchasing",    label: "Purchasing",       group: "inventory" },
@@ -88,7 +88,7 @@ export default function ProductDetailPage() {
   const [product, setProduct]       = useState<CatalogProduct | null>(null);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState<string | null>(null);
-  const [activeTab, setActiveTab]   = useState<Tab>("overview");
+  const [activeTab, setActiveTab]   = useState<Tab>("general");
   const [duplicating, setDuplicating] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [barcodeResult, setBarcodeResult] = useState<"ok" | "not_found" | null>(null);
