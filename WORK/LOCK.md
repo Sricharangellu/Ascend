@@ -2,6 +2,18 @@
 
 Status: IDLE — no active claim
 
+## Released Claim (Claude session A — behavior-preserving pipeline cleanup)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, refactor/optimization pass) |
+| Queue item | Behavior-preserving cleanup of the delivery pipeline: (1) fulfillment.buildPickList returns a `created` flag so the sales-order path stops running a redundant pick_lists existence query; (2) extract a shipment factory in shipping to remove the duplicated ShippingOrder literal between createFromInvoice/createFromSalesOrder. No behavior change; verified by the existing pipeline tests. |
+| Files/areas expected | `src/modules/fulfillment/service.ts`, `src/modules/shipping/service.ts`; WORK audit + this LOCK. NO route/schema/contract changes. |
+| Started | 2026-07-12 |
+| Last update | 2026-07-12 |
+| Status | RELEASED — built_verified, no behavior change. fulfillment.buildPickList returns {pickList,created} (drops a redundant pick_lists SELECT on the SO path); shipping.newShipment factory dedups the ShippingOrder literal. Gates: backend typecheck / test 389/389 / smoke 20/20 / hygiene 916. Audit: WORK/audits/AUDIT_2026-07-12T230449Z-pipeline-refactor.md. |
+| Blockers | none |
+
 ## Released Claim (Claude session A — local dev quickstart + honest status)
 
 | Field | Value |

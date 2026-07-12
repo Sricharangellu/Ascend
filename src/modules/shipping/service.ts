@@ -65,6 +65,22 @@ export class ShippingService {
     return `SHP-${String(Number(row?.n ?? 0) + 1).padStart(5, "0")}`;
   }
 
+  /** Build a fresh pending shipment for either source (invoice or sales order),
+   *  filling the boilerplate defaults so the two create paths can't drift. */
+  private async newShipment(
+    tenantId: string,
+    src: { invoiceId?: string | null; salesOrderId?: string | null; customerId: string; method?: ShipMethod; expectedDate?: number; notes?: string },
+  ): Promise<ShippingOrder> {
+    const now = Date.now();
+    return {
+      id: `shp_${uuidv7()}`, tenant_id: tenantId, ship_number: await this.nextNumber(tenantId),
+      invoice_id: src.invoiceId ?? null, sales_order_id: src.salesOrderId ?? null, customer_id: src.customerId,
+      status: "pending_shipment", method: src.method ?? "delivery", carrier: null, tracking_number: null,
+      expected_date: src.expectedDate ?? null, shipped_date: null, delivered_date: null,
+      notes: src.notes ?? null, created_at: now, updated_at: now,
+    };
+  }
+
   /** Insert a shipping order + its lines in one transaction. Shared by the
    *  invoice and sales-order create paths. */
   private async persist(so: ShippingOrder, srcLines: Array<{ product_id: string; name: string; quantity: number }>, tenantId: string): Promise<ShippingOrder & { lines: ShippingLine[] }> {
@@ -110,14 +126,10 @@ export class ShippingService {
       );
     }
 
-    const now = Date.now();
-    const so: ShippingOrder = {
-      id: `shp_${uuidv7()}`, tenant_id: tenantId, ship_number: await this.nextNumber(tenantId),
-      invoice_id: input.invoiceId, sales_order_id: null, customer_id: inv.customer_id, status: "pending_shipment",
-      method: input.method ?? "delivery", carrier: null, tracking_number: null,
-      expected_date: input.expectedDate ?? null, shipped_date: null, delivered_date: null,
-      notes: input.notes ?? null, created_at: now, updated_at: now,
-    };
+    const so = await this.newShipment(tenantId, {
+      invoiceId: input.invoiceId, customerId: inv.customer_id,
+      method: input.method, expectedDate: input.expectedDate, notes: input.notes,
+    });
     return this.persist(so, srcLines, tenantId);
   }
 
@@ -138,14 +150,10 @@ export class ShippingService {
       "SELECT product_id, name, quantity FROM sales_order_lines WHERE sales_order_id = @o AND tenant_id = @t",
       { o: salesOrderId, t: tenantId },
     );
-    const now = Date.now();
-    const shipment: ShippingOrder = {
-      id: `shp_${uuidv7()}`, tenant_id: tenantId, ship_number: await this.nextNumber(tenantId),
-      invoice_id: null, sales_order_id: salesOrderId, customer_id: so.customer_id, status: "pending_shipment",
-      method: opts.method ?? "delivery", carrier: null, tracking_number: null,
-      expected_date: opts.expectedDate ?? null, shipped_date: null, delivered_date: null,
-      notes: opts.notes ?? null, created_at: now, updated_at: now,
-    };
+    const shipment = await this.newShipment(tenantId, {
+      salesOrderId, customerId: so.customer_id,
+      method: opts.method, expectedDate: opts.expectedDate, notes: opts.notes,
+    });
     return this.persist(shipment, srcLines, tenantId);
   }
 

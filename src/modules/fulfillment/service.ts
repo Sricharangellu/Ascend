@@ -84,33 +84,34 @@ export class FulfillmentService {
   async createPickList(orderId: string, tenantId: string): Promise<PickList & { lines: PickListLine[] }> {
     const order = await this.db.one("SELECT id FROM orders WHERE id = @o AND tenant_id = @t", { o: orderId, t: tenantId });
     if (!order) throw new HttpError(404, "not_found", `order '${orderId}' not found`);
-    return this.buildPickList(orderId, "order", "order_lines", "order_id", tenantId);
+    return (await this.buildPickList(orderId, "order", "order_lines", "order_id", tenantId)).pickList;
   }
 
   /** Build a pick list from a sales order (B2B or ecommerce). Lines come from
-   *  sales_order_lines; on creation the sales order advances to `picking`. */
+   *  sales_order_lines; on first creation the sales order advances to `picking`
+   *  (a repeat call returns the existing list without re-advancing). */
   async createPickListForSalesOrder(salesOrderId: string, tenantId: string): Promise<PickList & { lines: PickListLine[] }> {
     const so = await this.db.one("SELECT id FROM sales_orders WHERE id = @o AND tenant_id = @t", { o: salesOrderId, t: tenantId });
     if (!so) throw new HttpError(404, "not_found", `sales order '${salesOrderId}' not found`);
-    const existing = await this.db.one<PickList>("SELECT * FROM pick_lists WHERE order_id = @o AND tenant_id = @t", { o: salesOrderId, t: tenantId });
-    if (existing) return { ...existing, lines: await this.lines(existing.id, tenantId) };
-    const pl = await this.buildPickList(salesOrderId, "sales_order", "sales_order_lines", "sales_order_id", tenantId);
-    if (this.sales) await this.sales.setFulfillmentStatus(salesOrderId, "picking", tenantId);
-    return pl;
+    const { pickList, created } = await this.buildPickList(salesOrderId, "sales_order", "sales_order_lines", "sales_order_id", tenantId);
+    if (created && this.sales) await this.sales.setFulfillmentStatus(salesOrderId, "picking", tenantId);
+    return pickList;
   }
 
   /** Shared pick-list builder. Resolves each source line to its product's pick
    *  location and inserts the list + lines in one transaction. Idempotent per
-   *  source id (the unique index on (tenant_id, order_id) guards duplicates). */
+   *  source id (the unique index on (tenant_id, order_id) guards duplicates); the
+   *  returned `created` flag lets callers run once-only side effects (e.g. advance
+   *  the sales order) without a second existence query. */
   private async buildPickList(
     sourceId: string,
     sourceType: PickSource,
     lineTable: "order_lines" | "sales_order_lines",
     parentCol: "order_id" | "sales_order_id",
     tenantId: string,
-  ): Promise<PickList & { lines: PickListLine[] }> {
+  ): Promise<{ pickList: PickList & { lines: PickListLine[] }; created: boolean }> {
     const existing = await this.db.one<PickList>("SELECT * FROM pick_lists WHERE order_id = @o AND tenant_id = @t", { o: sourceId, t: tenantId });
-    if (existing) return { ...existing, lines: await this.lines(existing.id, tenantId) };
+    if (existing) return { pickList: { ...existing, lines: await this.lines(existing.id, tenantId) }, created: false };
 
     const srcLines = await this.db.query<{ product_id: string; name: string; quantity: number; code: string | null }>(
       `SELECT ol.product_id, ol.name, ol.quantity, l.code
@@ -139,7 +140,7 @@ export class FulfillmentService {
         );
       }
     });
-    return { id, tenant_id: tenantId, order_id: sourceId, source_type: sourceType, status: "picking", created_at: now, updated_at: now, lines };
+    return { pickList: { id, tenant_id: tenantId, order_id: sourceId, source_type: sourceType, status: "picking", created_at: now, updated_at: now, lines }, created: true };
   }
 
   async lines(pickListId: string, tenantId: string): Promise<PickListLine[]> {
