@@ -507,6 +507,29 @@ export class CatalogService {
     );
   }
 
+  private async assertBarcodeAvailable(barcode: string, tenantId: string, exceptProductId?: string): Promise<void> {
+    const normalized = barcode.trim();
+    if (!normalized) return;
+    const existing = await this.db.one<{ id: string }>(
+      `SELECT p.id
+         FROM products p
+        WHERE p.tenant_id = @tenantId
+          AND p.barcode = @barcode
+          AND (@exceptProductId::text IS NULL OR p.id <> @exceptProductId)
+        UNION
+       SELECT pb.product_id AS id
+         FROM product_barcodes pb
+        WHERE pb.tenant_id = @tenantId
+          AND pb.barcode = @barcode
+          AND (@exceptProductId::text IS NULL OR pb.product_id <> @exceptProductId)
+        LIMIT 1`,
+      { tenantId, barcode: normalized, exceptProductId: exceptProductId ?? null },
+    );
+    if (existing) {
+      throw conflict(`barcode '${normalized}' is already assigned to another product`);
+    }
+  }
+
   /** All UPCs registered for a product. */
   async listBarcodes(productId: string, tenantId: string): Promise<Array<{ barcode: string; kind: string; pack_size: number }>> {
     return this.db.query("SELECT barcode, kind, pack_size FROM product_barcodes WHERE tenant_id = @tenantId AND product_id = @productId ORDER BY kind", { tenantId, productId });
@@ -910,6 +933,8 @@ export class CatalogService {
   async createVariant(masterId: string, input: CreateVariantInput, tenantId: string): Promise<Product> {
     const master = await this.assertCanBeMaster(masterId, tenantId);
     const label = input.variant_label.trim();
+    const upc = input.upc.trim();
+    await this.assertBarcodeAvailable(upc, tenantId);
     const product = await this.create(
       {
         sku: input.sku.trim(),
@@ -917,7 +942,7 @@ export class CatalogService {
         price_cents: input.selling_price_cents,
         category: input.category.trim(),
         tax_class: master.tax_class,
-        barcode: input.upc.trim(),
+        barcode: upc,
         status: master.status,
         description: master.description,
         brand: master.brand,
