@@ -63,7 +63,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
       ["STRIPE_SECRET_KEY", "card payments will return 503 — configure Stripe or disable card tender"],
       ["REDIS_URL", "rate limiting uses in-memory state and will NOT be shared across instances — all replicas will have separate limits"],
       ["METRICS_TOKEN", "Prometheus metrics scraping will be disabled until a bearer token is configured"],
-      ["WEBHOOK_SECRET_KEY", "customer webhook secrets may use plaintext dev fallback instead of encryption"],
+      ["WEBHOOK_SECRET_KEY", "webhook secret encryption is unconfigured — creating/rotating a webhook subscription will fail closed with 503 until this is set"],
     ];
     for (const [name, reason] of WARNED_VARS) {
       if (!process.env[name]) {

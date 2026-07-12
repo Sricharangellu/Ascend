@@ -2,6 +2,31 @@
 
 Status: IDLE — no active claim
 
+## Released Claim (Claude session A — webhook secret prod fail-closed)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, "next" → Phase-4 hardening) |
+| Queue item | Phase-4 hardening: stop production from silently storing plaintext webhook secrets. Make `encryptSecret` fail closed (503 webhook_encryption_unconfigured) in production when `WEBHOOK_SECRET_KEY` is unset; update the app.ts startup warning; add tests. Extend existing webhooks module only. |
+| Files/areas expected | `src/modules/webhooks/service.ts`, `src/modules/webhooks/webhooks.test.ts`, `src/app.ts` (warning text), WORK audit + this LOCK. NO web, NO other modules, NO db schema. |
+| Started | 2026-07-11 |
+| Last update | 2026-07-11 |
+| Status | RELEASED — built_verified. `encryptSecret` fails closed (503 webhook_encryption_unconfigured) in production without WEBHOOK_SECRET_KEY. Gates: backend typecheck PASS, `npm test` 384/384 PASS, smoke 20/20 PASS, hygiene PASS. Audit: `WORK/audits/AUDIT_2026-07-12T013607Z-webhook-secret-fail-closed.md`. |
+| Blockers | none |
+
+
+## Released Claim (Claude session A — fresh end-to-end audit)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, "work on this project" → fresh audit) |
+| Queue item | Establish current truth: run the full gate suite (backend typecheck/test/smoke/hygiene, web typecheck/lint/test/build) and inspect module/page live-vs-mock status. Write a new dated `WORK/AUDIT_*.md`. Read-only inspection; no product code changes. |
+| Files/areas expected | NEW `WORK/audits/AUDIT_*.md`; this LOCK. NO src, NO web, NO db product changes. |
+| Started | 2026-07-11 |
+| Last update | 2026-07-11 |
+| Status | RELEASED — audit written: `WORK/audits/AUDIT_2026-07-11T222436Z-fresh-end-to-end.md`. Gates all PASS: backend typecheck / test 382/382 / smoke 20/20 / hygiene; web typecheck / lint / test 152/152 / build. FINDING: live Vercel token in `deploy.sh` is in git history — needs human rotation. |
+| Blockers | none |
+
 ## Released Claim (Codex session P — retail progress truth tracking)
 
 | Field | Value |
