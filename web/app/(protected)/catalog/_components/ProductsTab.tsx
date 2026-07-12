@@ -160,6 +160,21 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
     setPriceMin(""); setPriceMax("");
   };
 
+  const openCreate = () => {
+    setActionError(null);
+    setShowCreate(true);
+    if (searchParams.get("new") !== "product") {
+      router.push("/catalog?new=product");
+    }
+  };
+
+  const closeCreate = () => {
+    setShowCreate(false);
+    if (searchParams.get("new") === "product") {
+      router.replace("/catalog", { scroll: false });
+    }
+  };
+
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(search), 300);
     return () => clearTimeout(t);
@@ -284,7 +299,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
               className="flex items-center gap-1.5 rounded border border-[#D9D9D9] bg-white px-3 py-1.5 text-sm text-[#555] hover:bg-gray-50 transition-colors">
               ↑ Import
             </button>
-            <button type="button" onClick={() => { setShowCreate(true); setActionError(null); }}
+            <button type="button" onClick={openCreate}
               className="rounded bg-[#5D5FEF] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#4849d0] transition-colors">
               + Add product
             </button>
@@ -531,7 +546,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
 
       {showImport    && <ImportCSVModal onDone={async () => { await load(); }} onClose={() => setShowImport(false)} />}
       {showPrintLabels && <PrintLabelsModal selected={selectedProducts} onClose={() => setShowPrintLabels(false)} />}
-      {showCreate    && <ProductFormModal categories={categories} onSave={handleCreate} onClose={() => setShowCreate(false)} />}
+      {showCreate    && <ProductFormModal categories={categories} onSave={handleCreate} onClose={closeCreate} />}
 
       {archiveTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setArchiveTarget(null)}>
