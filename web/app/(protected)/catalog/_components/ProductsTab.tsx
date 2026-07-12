@@ -63,8 +63,8 @@ function CatalogMetric({ label, value, helper, tone = "neutral", active = false 
   );
 }
 
-function ProductListCard({ product, onEdit, onArchive }: {
-  product: Product; onEdit: () => void; onArchive: () => void;
+function ProductListCard({ product, productType, onEdit, onArchive }: {
+  product: Product; productType: string; onEdit: () => void; onArchive: () => void;
 }) {
   const style = productStatusStyle(product.status);
   return (
@@ -81,6 +81,7 @@ function ProductListCard({ product, onEdit, onArchive }: {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant={statusBadge(product.status)}>{product.status.charAt(0).toUpperCase() + product.status.slice(1)}</Badge>
+        <span className="rounded-md bg-white px-2 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200">{productType}</span>
         <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{product.category}</span>
         {product.brand && <span className="text-xs text-slate-500">{product.brand}</span>}
         {product.age_restricted === 1 && (
@@ -115,6 +116,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   const [filterTaxClass, setFilterTaxClass]           = useState("");
   const [filterBrand, setFilterBrand]                 = useState("");
   const [filterAgeRestricted, setFilterAgeRestricted] = useState(false);
+  const [filterProductType, setFilterProductType]     = useState<"all" | "standalone" | "master" | "variant">("all");
   const [priceMin, setPriceMin]                       = useState("");
   const [priceMax, setPriceMax]                       = useState("");
   const [showMoreFilters, setShowMoreFilters]          = useState(false);
@@ -142,7 +144,18 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   const archivedCount   = products.filter(p => p.status === "archived").length;
   const restrictedCount = products.filter(p => p.age_restricted === 1).length;
 
-  const hasFilters = Boolean(filterStatus || filterCategory || debouncedQ || filterTaxClass || filterBrand || filterAgeRestricted || priceMin || priceMax);
+  const masterIds = useMemo(() => new Set(products.map((p) => p.parent_product_id).filter(Boolean) as string[]), [products]);
+  const getProductType = useCallback((product: Product): "Standalone" | "Master" | "Variant" => {
+    if (product.parent_product_id) return "Variant";
+    if (masterIds.has(product.id)) return "Master";
+    return "Standalone";
+  }, [masterIds]);
+
+  const standaloneCount = products.filter((p) => !p.parent_product_id && !masterIds.has(p.id)).length;
+  const masterCount = products.filter((p) => !p.parent_product_id && masterIds.has(p.id)).length;
+  const variantCount = products.filter((p) => Boolean(p.parent_product_id)).length;
+
+  const hasFilters = Boolean(filterStatus || filterCategory || debouncedQ || filterTaxClass || filterBrand || filterAgeRestricted || filterProductType !== "all" || priceMin || priceMax);
 
   const filterSummary = [
     filterStatus         ? `Status: ${filterStatus}`          : null,
@@ -151,12 +164,14 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
     filterTaxClass       ? `Tax: ${filterTaxClass}`           : null,
     filterBrand          ? `Brand: "${filterBrand}"`          : null,
     filterAgeRestricted  ? "Age restricted only"              : null,
+    filterProductType !== "all" ? `Type: ${filterProductType}` : null,
     priceMin && priceMax ? `Price: $${priceMin}–$${priceMax}` : priceMin ? `Price ≥ $${priceMin}` : priceMax ? `Price ≤ $${priceMax}` : null,
   ].filter(Boolean);
 
   const clearFilters = () => {
     setFilterStatus(""); setFilterCategory(""); setSearch(""); setDebouncedQ("");
     setFilterTaxClass(""); setFilterBrand(""); setFilterAgeRestricted(false);
+    setFilterProductType("all");
     setPriceMin(""); setPriceMax("");
   };
 
@@ -185,6 +200,9 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
     if (filterTaxClass)      result = result.filter(p => p.tax_class === filterTaxClass);
     if (filterBrand)         result = result.filter(p => (p.brand ?? "").toLowerCase().includes(filterBrand.toLowerCase()));
     if (filterAgeRestricted) result = result.filter(p => p.age_restricted === 1);
+    if (filterProductType !== "all") {
+      result = result.filter((p) => getProductType(p).toLowerCase() === filterProductType);
+    }
     if (priceMin)            result = result.filter(p => p.price_cents >= parseFloat(priceMin) * 100);
     if (priceMax)            result = result.filter(p => p.price_cents <= parseFloat(priceMax) * 100);
     return [...result].sort((a, b) => {
@@ -200,7 +218,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
       if (av > bv) return sortDir === "asc" ?  1 : -1;
       return 0;
     });
-  }, [products, filterTaxClass, filterBrand, filterAgeRestricted, priceMin, priceMax, sortCol, sortDir]);
+  }, [products, filterTaxClass, filterBrand, filterAgeRestricted, filterProductType, getProductType, priceMin, priceMax, sortCol, sortDir]);
 
   const selectedProducts = visibleProducts.filter(p => selectedIds.has(p.id));
   const allSelected      = visibleProducts.length > 0 && visibleProducts.every(p => selectedIds.has(p.id));
@@ -306,6 +324,30 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
           </div>
         </div>
 
+        <div className="grid gap-3 border-b border-[#E8E8E8] bg-slate-50 px-5 py-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+          <button type="button" onClick={() => { setFilterStatus(""); setFilterProductType("all"); setFilterAgeRestricted(false); }}>
+            <CatalogMetric label="Total" value={total} helper={`${products.length} loaded`} active={!filterStatus && filterProductType === "all" && !filterAgeRestricted} />
+          </button>
+          <button type="button" onClick={() => setFilterStatus("active")}>
+            <CatalogMetric label="Active" value={activeCount} helper="sellable" tone="success" active={filterStatus === "active"} />
+          </button>
+          <button type="button" onClick={() => setFilterStatus("draft")}>
+            <CatalogMetric label="Draft" value={draftCount} helper="needs review" tone="warning" active={filterStatus === "draft"} />
+          </button>
+          <button type="button" onClick={() => setFilterStatus("archived")}>
+            <CatalogMetric label="Archived" value={archivedCount} helper="hidden" tone="muted" active={filterStatus === "archived"} />
+          </button>
+          <button type="button" onClick={() => setFilterProductType("master")}>
+            <CatalogMetric label="Masters" value={masterCount} helper="variant groups" active={filterProductType === "master"} />
+          </button>
+          <button type="button" onClick={() => setFilterProductType("variant")}>
+            <CatalogMetric label="Variants" value={variantCount} helper="sellable SKUs" active={filterProductType === "variant"} />
+          </button>
+          <button type="button" onClick={() => setFilterAgeRestricted((v) => !v)}>
+            <CatalogMetric label="Restricted" value={restrictedCount} helper="ID required" tone="restricted" active={filterAgeRestricted} />
+          </button>
+        </div>
+
         {/* ── Spec: standard filter bar ────────────────────────────────────── */}
         <div className="border-b border-[#E8E8E8] bg-white px-5 py-3">
           <div className="flex flex-wrap items-end gap-3">
@@ -323,6 +365,17 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                 className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
                 <option value="">All categories</option>
                 {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>
+            </div>
+            {/* Product type */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-[#555]">Product type</label>
+              <select value={filterProductType} onChange={e => setFilterProductType(e.target.value as typeof filterProductType)}
+                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
+                <option value="all">All types</option>
+                <option value="standalone">Standalone</option>
+                <option value="master">Master</option>
+                <option value="variant">Variant</option>
               </select>
             </div>
             {/* Brand */}
@@ -424,6 +477,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                       <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} aria-label="Select all products" className="h-4 w-4 rounded border-slate-300" />
                     </th>
                     <SortTh col="name"        label="Name"          cur={sortCol} dir={sortDir} onSort={handleSort} />
+                    <th className="px-4 py-3">Type</th>
                     <SortTh col="brand"       label="Brand"         cur={sortCol} dir={sortDir} onSort={handleSort} />
                     <th className="px-4 py-3">Supplier</th>
                     <th className="px-4 py-3">Available</th>
@@ -437,6 +491,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                   {visibleProducts.map(p => {
                     const isSelected = selectedIds.has(p.id);
                     const isAvailable = p.status === "active";
+                    const productType = getProductType(p);
                     const createdDate = p.created_at
                       ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "2-digit" }).format(new Date(p.created_at))
                       : "—";
@@ -470,6 +525,17 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                               <p className="text-[11px] text-[#888] font-mono">{p.sku}</p>
                             </div>
                           </div>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <span className={clsx(
+                            "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                            productType === "Variant" ? "bg-blue-50 text-blue-700"
+                              : productType === "Master" ? "bg-violet-50 text-violet-700"
+                              : "bg-slate-100 text-slate-600"
+                          )}>
+                            {productType}
+                          </span>
                         </td>
 
                         {/* Brand */}
@@ -536,6 +602,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
             <div className="divide-y divide-slate-100 md:hidden">
               {visibleProducts.map(p => (
                 <ProductListCard key={p.id} product={p}
+                  productType={getProductType(p)}
                   onEdit={() => router.push(`/catalog/${p.id}`)}
                   onArchive={() => { setArchiveTarget(p); setActionError(null); }} />
               ))}
