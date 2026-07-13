@@ -300,11 +300,11 @@ function variantCombinations(groups: string[][]): string[][] {
 
 /**
  * The one separator used between variant attribute values everywhere in the app
- * (labels and generated names). Never insert "/" — that was the old behavior this
- * replaces. A variant's display name is `${master.name}${SEP}${values.join(SEP)}`,
- * e.g. "Tee - Small - Red".
+ * (labels and generated names). A single space — values read together with no
+ * dash/slash/pipe. A variant's display name is `${master.name}${SEP}${values.join(SEP)}`,
+ * e.g. "Tee Small Red".
  */
-export const VARIANT_SEPARATOR = " - ";
+export const VARIANT_SEPARATOR = " ";
 
 /** Ordered attribute name -> value map that identifies a variant (e.g. {Size:"S"}). */
 export type VariantOptions = Record<string, string>;

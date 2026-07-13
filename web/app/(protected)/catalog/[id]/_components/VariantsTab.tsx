@@ -20,7 +20,7 @@ interface GeneratePayload {
   exclude?: string[][];
 }
 
-const VARIANT_SEPARATOR = " - "; // must match the backend VARIANT_SEPARATOR
+const VARIANT_SEPARATOR = " "; // must match the backend VARIANT_SEPARATOR
 
 function comboLabel(values: string[]): string {
   return values.join(VARIANT_SEPARATOR);

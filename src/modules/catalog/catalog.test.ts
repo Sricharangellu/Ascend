@@ -391,9 +391,9 @@ test("variants: matrix generation creates missing children and is idempotent", a
   });
   assert.equal(generated.status, 200);
   assert.equal(generated.json.items.length, 2);
-  // Standardized separator (" - "), never "/".
-  assert.deepEqual(generated.json.items.map((p: any) => p.variant_label).sort(), ["M - Black", "S - Black"]);
-  assert.ok(generated.json.items.every((p: any) => !String(p.variant_label).includes("/")));
+  // Values read together with a single space — no dash/slash/pipe.
+  assert.deepEqual(generated.json.items.map((p: any) => p.variant_label).sort(), ["M Black", "S Black"]);
+  assert.ok(generated.json.items.every((p: any) => !/[/|-]/.test(String(p.variant_label))));
   assert.ok(generated.json.items.every((p: any) => p.parent_product_id === master.json.id));
   assert.ok(generated.json.items.every((p: any) => p.brand === "Ascend"));
 
@@ -552,7 +552,7 @@ test("category mutations are manager/owner-gated", async () => {
   assert.equal(json.error.code, "forbidden");
 });
 
-test("generated variant name uses the standardized separator, never '/' (#3)", async () => {
+test("generated variant name joins values with a space, no dash/slash/pipe (#3)", async () => {
   const app = await freshApp();
   const master = await call(app, "POST", "/api/catalog/", { sku: "COKE", name: "Coca-Cola", price_cents: 0, category: "beverages" });
   const gen = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
@@ -560,9 +560,9 @@ test("generated variant name uses the standardized separator, never '/' (#3)", a
   });
   assert.equal(gen.status, 200);
   const v = gen.json.items[0];
-  assert.equal(v.variant_label, "330ml - 6ct");     // one separator between values
-  assert.equal(v.name, "Coca-Cola - 330ml - 6ct");  // master joined by the same separator
-  assert.ok(!v.name.includes("/"));                 // never a slash
+  assert.equal(v.variant_label, "330ml 6ct");     // values together, single space
+  assert.equal(v.name, "Coca-Cola 330ml 6ct");    // master joined by a space too
+  assert.ok(!/[/|]/.test(v.name));                // never a slash or pipe
 });
 
 test("assigning a product as a variant inherits the master's category (#1)", async () => {
@@ -699,8 +699,8 @@ test("generate stores structured variant_options per child (#1/#8)", async () =>
   });
   const v = gen.json.items[0];
   assert.deepEqual(JSON.parse(v.variant_options), { Size: "S", Color: "Red" });
-  assert.equal(v.variant_label, "S - Red");
-  assert.equal(v.name, "Tee - S - Red");
+  assert.equal(v.variant_label, "S Red");
+  assert.equal(v.name, "Tee S Red");
 });
 
 test("re-generating with an added value keeps existing variants (same id/sku) and only adds the new one (#6)", async () => {
@@ -737,7 +737,7 @@ test("re-generating with a changed attribute order does not duplicate (order-ind
   });
   assert.equal(second.json.items.length, 1);      // not duplicated
   assert.equal(second.json.items[0].id, id1);     // same variant
-  assert.equal(second.json.items[0].variant_label, "Red - S"); // name follows new order
+  assert.equal(second.json.items[0].variant_label, "Red S"); // name follows new order
 });
 
 test("a product's sku can be reassigned, and collisions are rejected (wizard step 1)", async () => {
@@ -762,7 +762,7 @@ test("generate honors an exclude list — removed combinations are not created (
   });
   assert.equal(gen.status, 200);
   const labels = gen.json.items.map((p: any) => p.variant_label).sort();
-  assert.deepEqual(labels, ["M - Red", "S - Blue", "S - Red"]); // 3 of 4 — "M - Blue" excluded
+  assert.deepEqual(labels, ["M Red", "S Blue", "S Red"]); // 3 of 4 — "M Blue" excluded
 });
 
 test("editing a variant's options updates its name/label in place, preserving id and sku (#4)", async () => {
@@ -777,5 +777,5 @@ test("editing a variant's options updates its name/label in place, preserving id
   assert.equal(patched.json.id, v.id);              // never recreated
   assert.equal(patched.json.sku, v.sku);            // sku preserved
   assert.equal(patched.json.variant_label, "M");    // label recomputed
-  assert.equal(patched.json.name, "Tee - M");       // name recomputed
+  assert.equal(patched.json.name, "Tee M");         // name recomputed
 });
