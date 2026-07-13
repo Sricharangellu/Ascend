@@ -2,6 +2,18 @@
 
 Status: IDLE — no active claim
 
+## Released Claim (Claude session A — Matrix Builder workspace v1)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, Product Matrix Builder PRD — UI slice) |
+| Queue item | New `/catalog/matrix` workspace: category→master→variant hierarchy, expandable groups, inline edit (selling/cost price), online/active toggles, bulk selection + sticky toolbar (activate/deactivate, enable/disable online, adjust selling price by %), search, loading/empty/error states, manager-gated. Frontend only; wired to existing catalog APIs (GET /catalog, PATCH /:id, POST /bulk-update). |
+| Files/areas expected | NEW `web/app/(protected)/catalog/matrix/page.tsx`; `web/components/EnterpriseShell.tsx` (nav); WORK audit + LOCK. NO backend changes. |
+| Started | 2026-07-13 |
+| Last update | 2026-07-13 |
+| Status | RELEASED — built_not_verified. /catalog/matrix workspace: master→variant hierarchy, inline price/cost edit, online/active toggles + badges, bulk selection + sticky toolbar (activate/deactivate/online + sell price ±%), search, loading/empty/error, manager-gated. Web typecheck/lint/build PASS (route 6.13 kB). Browser e2e blocked by local auth harness + no seeded variant data. Audit: AUDIT_2026-07-13T030727Z-product-matrix-builder-v1.md. Deferred PRD slices listed there. |
+| Blockers | none |
+
 ## Released Claim (Claude session A — race-free doc numbering + delivery e2e + UI polish)
 
 | Field | Value |
