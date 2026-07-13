@@ -195,6 +195,9 @@ const generateVariantsSchema = z.object({
     )
     .min(1)
     .max(5),
+  // Value combinations to skip (removed/disabled in the preview), each a list of
+  // attribute values. Matched order-independently against the generated matrix.
+  exclude: z.array(z.array(z.string().min(1))).max(200).optional(),
 });
 const channelSchema = z.enum(["online", "offline"]);
 const reorderVariantsSchema = z.object({
@@ -531,7 +534,7 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     requireRole("manager"),
     handler(async (req, res) => {
       const body = parseBody(generateVariantsSchema, req.body);
-      const items = await service.generateVariants(String(req.params.id), body.attributes, tenantId(res));
+      const items = await service.generateVariants(String(req.params.id), body.attributes, tenantId(res), body.exclude);
       res.json({ items });
     }),
   );

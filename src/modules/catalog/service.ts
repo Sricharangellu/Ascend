@@ -1116,7 +1116,9 @@ export class CatalogService {
    * deleted, unlinked, or duplicated. Legacy variants without stored options are
    * matched by their parsed label so a first re-generate backfills them cleanly.
    */
-  async generateVariants(masterId: string, attributes: VariantAttributeInput[], tenantId: string): Promise<Product[]> {
+  async generateVariants(masterId: string, attributes: VariantAttributeInput[], tenantId: string, exclude?: string[][]): Promise<Product[]> {
+    // Combinations the caller removed/disabled in the preview — matched order-independently.
+    const excludeKeys = new Set((exclude ?? []).map((values) => valuesKey(values.map((v) => v.trim()).filter(Boolean))));
     const touched = await this.db.withTenant(tenantId).tx(async (tdb) => {
       const catalog = new CatalogService(tdb, this.events);
       const created: Product[] = [];
@@ -1155,6 +1157,7 @@ export class CatalogService {
       const claimed = new Set<string>();
 
       for (const combo of combinations) {
+        if (excludeKeys.has(valuesKey(combo))) continue; // removed/disabled in the preview
         const options: VariantOptions = {};
         normalized.forEach((attr, i) => { options[attr.name] = combo[i]; });
         const label = variantLabelFrom(combo);

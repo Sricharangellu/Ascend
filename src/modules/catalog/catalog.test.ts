@@ -740,6 +740,18 @@ test("re-generating with a changed attribute order does not duplicate (order-ind
   assert.equal(second.json.items[0].variant_label, "Red - S"); // name follows new order
 });
 
+test("generate honors an exclude list — removed combinations are not created (#7)", async () => {
+  const app = await freshApp();
+  const master = await call(app, "POST", "/api/catalog/", { sku: "EXC-M", name: "Tee", price_cents: 2000, category: "apparel" });
+  const gen = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
+    attributes: [{ name: "Size", values: ["S", "M"] }, { name: "Color", values: ["Red", "Blue"] }],
+    exclude: [["M", "Blue"]], // matched order-independently
+  });
+  assert.equal(gen.status, 200);
+  const labels = gen.json.items.map((p: any) => p.variant_label).sort();
+  assert.deepEqual(labels, ["M - Red", "S - Blue", "S - Red"]); // 3 of 4 — "M - Blue" excluded
+});
+
 test("editing a variant's options updates its name/label in place, preserving id and sku (#4)", async () => {
   const app = await freshApp();
   const master = await call(app, "POST", "/api/catalog/", { sku: "EDIT-M", name: "Tee", price_cents: 2000, category: "apparel" });

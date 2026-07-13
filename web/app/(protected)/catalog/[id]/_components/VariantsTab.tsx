@@ -11,11 +11,23 @@ import type { CatalogProduct } from "@/api-client/types";
 interface Attribute {
   id: string;
   name: string;
-  values: string; // comma-separated
+  values: string[];
 }
 
 interface GeneratePayload {
   attributes: { name: string; values: string[] }[];
+  exclude?: string[][];
+}
+
+const VARIANT_SEPARATOR = " - "; // must match the backend VARIANT_SEPARATOR
+
+function comboLabel(values: string[]): string {
+  return values.join(VARIANT_SEPARATOR);
+}
+
+/** Order-independent key for a combination (matches the backend's valuesKey). */
+function comboKey(values: string[]): string {
+  return JSON.stringify(values.map((v) => v.trim().toLowerCase()).sort());
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -35,33 +47,133 @@ const STATUS_COLOR: Record<string, string> = {
 
 const FLD = "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none";
 
+// ── Value chips input ──────────────────────────────────────────────────────────
+// Enter-based value chips over the attribute's `values` array: type a value and
+// press Enter to add a chip, click × or Backspace-on-empty to remove. Duplicates
+// (case-insensitive) and empty values are ignored. No commas — each value is its
+// own chip. Pasting multiple newline-separated values adds them all at once.
+function ValueChipsInput({
+  values,
+  onChange,
+  placeholder,
+}: {
+  values: string[];
+  onChange: (next: string[]) => void;
+  placeholder?: string;
+}) {
+  const [draft, setDraft] = useState("");
+
+  const commit = (incoming: string[]) => {
+    const cleaned = incoming.map((s) => s.trim()).filter(Boolean);
+    if (cleaned.length === 0) return;
+    const next = [...values];
+    for (const t of cleaned) {
+      if (!next.some((x) => x.toLowerCase() === t.toLowerCase())) next.push(t);
+    }
+    onChange(next);
+  };
+
+  const removeAt = (i: number) => onChange(values.filter((_, idx) => idx !== i));
+
+  return (
+    <div className="flex min-h-[2.5rem] w-full flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus-within:border-[#5D5FEF]">
+      {values.map((t, i) => (
+        <span
+          key={`${t}-${i}`}
+          className="inline-flex items-center gap-1 rounded-md bg-[#5D5FEF]/10 px-2 py-0.5 text-xs font-medium text-[#5D5FEF]"
+        >
+          {t}
+          <button
+            type="button"
+            onClick={() => removeAt(i)}
+            className="text-[#5D5FEF]/60 transition-colors hover:text-[#5D5FEF]"
+            aria-label={`Remove ${t}`}
+          >
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </span>
+      ))}
+      <input
+        className="min-w-[6rem] flex-1 border-0 bg-transparent p-0 text-sm focus:outline-none focus:ring-0"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); commit([draft]); setDraft(""); }
+          else if (e.key === "Backspace" && draft === "" && values.length > 0) { removeAt(values.length - 1); }
+        }}
+        onPaste={(e) => {
+          const text = e.clipboardData.getData("text");
+          // Only intercept multi-line pastes; a plain single value types normally.
+          if (/[\n\r\t]/.test(text)) { e.preventDefault(); commit(text.split(/[\n\r\t]+/)); setDraft(""); }
+        }}
+        onBlur={() => { if (draft.trim()) { commit([draft]); setDraft(""); } }}
+        placeholder={values.length === 0 ? placeholder : ""}
+        aria-label="Add value"
+      />
+    </div>
+  );
+}
+
 // ── Attribute row ─────────────────────────────────────────────────────────────
 
 function AttrRow({
   attr,
-  onChange,
+  index,
+  dragging,
+  onName,
+  onValues,
   onRemove,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
 }: {
   attr: Attribute;
-  onChange: (id: string, field: keyof Attribute, val: string) => void;
+  index: number;
+  dragging: boolean;
+  onName: (id: string, name: string) => void;
+  onValues: (id: string, values: string[]) => void;
   onRemove: (id: string) => void;
+  onDragStart: (index: number) => void;
+  onDragOver: (index: number) => void;
+  onDrop: () => void;
+  onDragEnd: () => void;
 }) {
   return (
-    <div className="flex items-start gap-2">
-      <div className="w-36">
+    <div
+      className={`flex items-start gap-2 rounded-lg ${dragging ? "opacity-40" : ""}`}
+      onDragOver={(e) => { e.preventDefault(); onDragOver(index); }}
+      onDrop={(e) => { e.preventDefault(); onDrop(); }}
+    >
+      {/* Drag handle — reorders attributes, which drives variant naming order. */}
+      <button
+        type="button"
+        draggable
+        onDragStart={() => onDragStart(index)}
+        onDragEnd={onDragEnd}
+        className="mt-1.5 cursor-grab touch-none rounded p-1 text-slate-300 hover:text-slate-500 active:cursor-grabbing"
+        aria-label={`Reorder ${attr.name || "attribute"}`}
+        title="Drag to reorder"
+      >
+        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z" />
+        </svg>
+      </button>
+      <div className="w-32">
         <input
           className={FLD}
           value={attr.name}
-          onChange={(e) => onChange(attr.id, "name", e.target.value)}
+          onChange={(e) => onName(attr.id, e.target.value)}
           placeholder="e.g. Size"
         />
       </div>
       <div className="flex-1">
-        <input
-          className={FLD}
-          value={attr.values}
-          onChange={(e) => onChange(attr.id, "values", e.target.value)}
-          placeholder="e.g. S, M, L, XL (comma-separated)"
+        <ValueChipsInput
+          values={attr.values}
+          onChange={(next) => onValues(attr.id, next)}
+          placeholder="Type a value, press Enter (S ⏎ M ⏎ L ⏎)"
         />
       </div>
       <button
@@ -231,11 +343,18 @@ export function VariantsTab({
   const router = useRouter();
   const [children, setChildren]       = useState<CatalogProduct[]>([]);
   const [loading, setLoading]         = useState(true);
-  const [attrs, setAttrs]             = useState<Attribute[]>([{ id: "a1", name: "", values: "" }]);
+  const [attrs, setAttrs]             = useState<Attribute[]>([{ id: "a1", name: "", values: [] }]);
   const [generating, setGenerating]   = useState(false);
   const [genError, setGenError]       = useState<string | null>(null);
   const [showLink, setShowLink]       = useState(false);
   const [unlinkId, setUnlinkId]       = useState<string | null>(null);
+  // Preview controls
+  const [excluded, setExcluded]       = useState<Set<string>>(new Set()); // comboKey set
+  const [previewSearch, setPreviewSearch] = useState("");
+  const [previewSort, setPreviewSort] = useState<"matrix" | "az">("matrix");
+  // Attribute drag-and-drop
+  const dragFrom = useRef<number | null>(null);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
 
   const isChild = !!product.parent_product_id;
 
@@ -252,29 +371,59 @@ export function VariantsTab({
 
   // Attr helpers
   const addAttr = () =>
-    setAttrs((prev) => [...prev, { id: `a${Date.now()}`, name: "", values: "" }]);
+    setAttrs((prev) => [...prev, { id: `a${Date.now()}`, name: "", values: [] }]);
 
-  const updateAttr = (id: string, field: keyof Attribute, val: string) =>
-    setAttrs((prev) => prev.map((a) => (a.id === id ? { ...a, [field]: val } : a)));
+  const setAttrName = (id: string, name: string) =>
+    setAttrs((prev) => prev.map((a) => (a.id === id ? { ...a, name } : a)));
+
+  const setAttrValues = (id: string, values: string[]) =>
+    setAttrs((prev) => prev.map((a) => (a.id === id ? { ...a, values } : a)));
 
   const removeAttr = (id: string) =>
-    setAttrs((prev) => prev.filter((a) => a.id !== id));
+    setAttrs((prev) => (prev.length > 1 ? prev.filter((a) => a.id !== id) : prev));
+
+  // Reorder attributes via drag-and-drop — order drives variant naming order.
+  const moveAttr = (from: number, to: number) =>
+    setAttrs((prev) => {
+      if (from === to || from < 0 || to < 0 || from >= prev.length || to >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
 
   // Matrix preview
-  const validAttrs = attrs.filter((a) => a.name.trim() && a.values.trim());
+  const validAttrs = attrs.filter((a) => a.name.trim() && a.values.length > 0);
   const combos = validAttrs.length > 0
-    ? cartesian(validAttrs.map((a) => a.values.split(",").map((v) => v.trim()).filter(Boolean)))
+    ? cartesian(validAttrs.map((a) => a.values))
     : [];
+
+  // Preview list, with search + sort applied. Excluded combos stay visible (dimmed).
+  const previewCombos = (() => {
+    const term = previewSearch.trim().toLowerCase();
+    let list = combos.map((values) => ({ values, key: comboKey(values), label: comboLabel(values) }));
+    if (term) list = list.filter((c) => c.label.toLowerCase().includes(term));
+    if (previewSort === "az") list = [...list].sort((a, b) => a.label.localeCompare(b.label));
+    return list;
+  })();
+  const includedCount = combos.filter((v) => !excluded.has(comboKey(v))).length;
+
+  const toggleExcluded = (key: string) =>
+    setExcluded((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
 
   const handleGenerate = async () => {
     if (validAttrs.length === 0) { setGenError("Add at least one attribute with values."); return; }
+    if (includedCount === 0) { setGenError("All combinations are excluded — include at least one."); return; }
     setGenerating(true); setGenError(null);
     try {
+      const exclude = combos.filter((v) => excluded.has(comboKey(v)));
       const payload: GeneratePayload = {
-        attributes: validAttrs.map((a) => ({
-          name: a.name.trim(),
-          values: a.values.split(",").map((v) => v.trim()).filter(Boolean),
-        })),
+        attributes: validAttrs.map((a) => ({ name: a.name.trim(), values: a.values })),
+        ...(exclude.length ? { exclude } : {}),
       };
       const res = await apiPost<{ items: CatalogProduct[] }>(`/api/v1/catalog/${product.id}/variants/generate`, payload);
       setChildren(res.items);
@@ -339,20 +488,40 @@ export function VariantsTab({
             </p>
           </div>
           <span className="rounded-full border border-[#5D5FEF]/20 bg-[#5D5FEF]/5 px-2.5 py-0.5 text-xs font-semibold text-[#5D5FEF]">
-            {combos.length} combination{combos.length !== 1 ? "s" : ""}
+            {includedCount === combos.length
+              ? `${combos.length} combination${combos.length !== 1 ? "s" : ""}`
+              : `${includedCount} of ${combos.length}`}
           </span>
         </div>
 
         <div className="space-y-3 px-5 py-4">
           {/* Column headers */}
-          <div className="flex gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-            <span className="w-36">Attribute</span>
-            <span className="flex-1">Values (comma-separated)</span>
+          <div className="flex gap-2 pl-6 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            <span className="w-32">Attribute</span>
+            <span className="flex-1">Values</span>
           </div>
 
-          {/* Attribute rows */}
-          {attrs.map((a) => (
-            <AttrRow key={a.id} attr={a} onChange={updateAttr} onRemove={removeAttr} />
+          {/* Attribute rows — drag the handle to reorder (drives naming order) */}
+          {attrs.map((a, i) => (
+            <AttrRow
+              key={a.id}
+              attr={a}
+              index={i}
+              dragging={dragIdx === i}
+              onName={setAttrName}
+              onValues={setAttrValues}
+              onRemove={removeAttr}
+              onDragStart={(idx) => { dragFrom.current = idx; setDragIdx(idx); }}
+              onDragOver={(idx) => {
+                if (dragFrom.current !== null && dragFrom.current !== idx) {
+                  moveAttr(dragFrom.current, idx);
+                  dragFrom.current = idx;
+                  setDragIdx(idx);
+                }
+              }}
+              onDrop={() => { dragFrom.current = null; setDragIdx(null); }}
+              onDragEnd={() => { dragFrom.current = null; setDragIdx(null); }}
+            />
           ))}
 
           <button
@@ -366,20 +535,66 @@ export function VariantsTab({
             Add attribute
           </button>
 
-          {/* Combination preview */}
+          {/* Combination preview — search, sort, and remove/disable before generating */}
           {combos.length > 0 && (
             <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Preview — {combos.length} variants</p>
-              <div className="flex flex-wrap gap-1.5">
-                {combos.slice(0, 30).map((combo, i) => (
-                  <span key={i} className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-medium text-slate-700">
-                    {combo.join(" / ")}
-                  </span>
-                ))}
-                {combos.length > 30 && (
-                  <span className="text-xs text-slate-400">+{combos.length - 30} more</span>
-                )}
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                  Preview — {includedCount} of {combos.length} will be created
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    value={previewSearch}
+                    onChange={(e) => setPreviewSearch(e.target.value)}
+                    placeholder="Search…"
+                    aria-label="Search combinations"
+                    className="w-28 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs focus:border-[#5D5FEF] focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setPreviewSort((s) => (s === "az" ? "matrix" : "az"))}
+                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                    title="Toggle sort order"
+                  >
+                    Sort: {previewSort === "az" ? "A–Z" : "Matrix"}
+                  </button>
+                  {excluded.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setExcluded(new Set())}
+                      className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                    >
+                      Reset ({excluded.size})
+                    </button>
+                  )}
+                </div>
               </div>
+              {previewCombos.length === 0 ? (
+                <p className="py-3 text-center text-xs text-slate-400">No combinations match “{previewSearch}”.</p>
+              ) : (
+                <div className="flex max-h-56 flex-wrap gap-1.5 overflow-y-auto">
+                  {previewCombos.map((c) => {
+                    const off = excluded.has(c.key);
+                    return (
+                      <button
+                        key={c.key}
+                        type="button"
+                        onClick={() => toggleExcluded(c.key)}
+                        title={off ? "Excluded — click to include" : "Included — click to exclude"}
+                        aria-pressed={!off}
+                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                          off
+                            ? "border-slate-200 bg-slate-100 text-slate-400 line-through"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-[#5D5FEF]/40"
+                        }`}
+                      >
+                        {c.label}
+                        <span className={off ? "text-slate-400" : "text-slate-300"}>{off ? "+" : "×"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
