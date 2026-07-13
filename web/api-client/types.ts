@@ -971,6 +971,7 @@ export interface FulfillmentLocationsResponse {
 export interface PickListLine {
   id: string;
   product_id: string;
+  name?: string;
   quantity: number;
   picked_qty: number;
   status: string;

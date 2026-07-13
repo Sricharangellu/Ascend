@@ -2,6 +2,18 @@
 
 Status: IDLE — no active claim
 
+## Released Claim (Claude session A — race-free doc numbering + delivery e2e + UI polish)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, follow-ups from review remediation) |
+| Queue item | (A) Build a reusable race-free document-number primitive (`document_counters` table + `shared/docnumber.ts`) and adopt it in shipping (replace the retry hack) and sales (SO/QT), with safe max-suffix seeding; flag other modules for incremental adoption. (B) Add a `/delivery` Playwright golden-path e2e matching repo conventions. |
+| Files/areas expected | NEW `src/shared/docnumber.ts`, `src/modules/sequences/*`; `src/modules/{sales,shipping}/*`; `src/modules/index.ts`; NEW `web/e2e/delivery.spec.ts`; tests; WORK audit + LOCK. |
+| Started | 2026-07-13 |
+| Last update | 2026-07-13 |
+| Status | RELEASED — (A) numbering fix committed 5340dc1 (isolation 15/15, smoke 20/20). (B) /delivery e2e spec + UI polish (loading/skeleton, product names, button spinners, aria/role, stepper overflow, list scroll): web typecheck/lint/build PASS. Local e2e blocked by the repo's shared login fixture (two-port auth flake), not the spec — did NOT touch the auth/e2e harness. Audits: race-free-doc-numbering + delivery-ui-polish. |
+| Blockers | Local Playwright auth harness (fixtures.ts login) times out in this env; CI runs it. |
+
 ## Released Claim (Claude session A — fix reviewed findings 1–7)
 
 | Field | Value |

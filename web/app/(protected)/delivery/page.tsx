@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
+import { Skeleton } from "@/components/Skeleton";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import { hasRole } from "@/lib/auth";
@@ -72,6 +73,8 @@ export default function DeliveryPage() {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [ordersLoaded, setOrdersLoaded] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
   const canManage = hasRole("manager");
 
   const selected = useMemo(() => orders.find((o) => o.id === selectedId) ?? null, [orders, selectedId]);
@@ -84,6 +87,8 @@ export default function DeliveryPage() {
       setSelectedId((cur) => cur ?? res.items?.[0]?.id ?? null);
     } catch (err) {
       setError(err instanceof ApiResponseError ? err.message : "Could not load sales orders.");
+    } finally {
+      setOrdersLoaded(true);
     }
   }, []);
 
@@ -98,6 +103,7 @@ export default function DeliveryPage() {
     setPickList(null);
     setShipment(null);
     setInvoice(null);
+    setDetailLoading(true);
     try {
       // Query each resource by this order directly — no full-table fetch + client
       // filter, so it stays correct and cheap regardless of tenant volume.
@@ -116,6 +122,8 @@ export default function DeliveryPage() {
       if (detailReqId.current === reqId) {
         setError(err instanceof ApiResponseError ? err.message : "Could not load pipeline detail.");
       }
+    } finally {
+      if (detailReqId.current === reqId) setDetailLoading(false);
     }
   }, []);
 
@@ -160,27 +168,40 @@ export default function DeliveryPage() {
     >
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6">
         {error && (
-          <Card className="border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
+          <Card role="alert" className="border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
             {error}
           </Card>
         )}
 
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:items-start">
           {/* ── Sales order list ─────────────────────────────────────────── */}
           <Card className="overflow-hidden p-0">
             <div className="border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
               <h2 className="text-sm font-semibold">Sales orders</h2>
             </div>
-            {orders.length === 0 ? (
+            {!ordersLoaded ? (
+              <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <li key={i} className="flex items-center justify-between gap-3 px-4 py-3">
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <Skeleton className="h-3.5 w-24" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </li>
+                ))}
+              </ul>
+            ) : orders.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-neutral-500">
                 No sales orders yet. Create one from Sales or an ecommerce checkout.
               </p>
             ) : (
-              <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
+              <ul className="max-h-[70vh] divide-y divide-neutral-100 overflow-y-auto dark:divide-neutral-800">
                 {orders.map((o) => (
                   <li key={o.id}>
                     <button
                       onClick={() => setSelectedId(o.id)}
+                      aria-current={o.id === selectedId ? "true" : undefined}
                       className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-neutral-50 dark:hover:bg-neutral-800/50 ${
                         o.id === selectedId ? "bg-blue-50 dark:bg-blue-900/20" : ""
                       }`}
@@ -211,7 +232,13 @@ export default function DeliveryPage() {
                   <StageBadge status={selected.fulfillment_status} />
                 </div>
 
-                <StageStepper status={selected.fulfillment_status} />
+                <div className="-mx-1 overflow-x-auto px-1 pb-1">
+                  <StageStepper status={selected.fulfillment_status} />
+                </div>
+
+                {detailLoading && (
+                  <p className="text-xs text-neutral-500" role="status">Loading delivery detail…</p>
+                )}
 
                 {!canManage && (
                   <p className="text-xs text-neutral-500">You need the manager role to advance the pipeline.</p>
@@ -220,9 +247,9 @@ export default function DeliveryPage() {
                 {/* Stage-appropriate action */}
                 <div className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
                   {selected.fulfillment_status === "unfulfilled" && (
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                       <p className="text-sm text-neutral-600 dark:text-neutral-300">Create a pick list to begin fulfilment.</p>
-                      <Button onClick={() => startPicking(selected)} disabled={busy || !canManage}>Start picking</Button>
+                      <Button onClick={() => startPicking(selected)} loading={busy} disabled={busy || !canManage}>Start picking</Button>
                     </div>
                   )}
 
@@ -233,14 +260,15 @@ export default function DeliveryPage() {
                         {(pickList.lines ?? []).map((l) => (
                           <li key={l.id} className="flex items-center justify-between gap-3 text-sm">
                             <span className="min-w-0 truncate">
-                              {l.product_id} — {l.picked_qty}/{l.quantity}
+                              <span className="font-medium text-neutral-700 dark:text-neutral-200">{l.name ?? l.product_id}</span>
+                              <span className="text-neutral-500"> · {l.picked_qty}/{l.quantity}</span>
                             </span>
                             {l.status === "picked" ? (
-                              <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/40 dark:text-green-300">
+                              <span className="inline-flex shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/40 dark:text-green-300">
                                 Picked
                               </span>
                             ) : (
-                              <Button size="sm" variant="secondary" onClick={() => pickLine(l.id)} disabled={busy || !canManage}>
+                              <Button size="sm" variant="secondary" onClick={() => pickLine(l.id)} disabled={busy || !canManage} className="shrink-0">
                                 Pick
                               </Button>
                             )}
@@ -248,27 +276,27 @@ export default function DeliveryPage() {
                         ))}
                       </ul>
                       <div className="flex justify-end">
-                        <Button onClick={pack} disabled={busy || !canManage || !allPicked}>Pack</Button>
+                        <Button onClick={pack} loading={busy} disabled={busy || !canManage || !allPicked}>Pack</Button>
                       </div>
                     </div>
                   )}
 
                   {selected.fulfillment_status === "packed" && (
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                       <p className="text-sm text-neutral-600 dark:text-neutral-300">
                         Packed{shipment ? ` — shipment ${shipment.ship_number} ready` : ""}. Ship it out.
                       </p>
-                      <Button onClick={ship} disabled={busy || !canManage || !shipment}>Mark shipped</Button>
+                      <Button onClick={ship} loading={busy} disabled={busy || !canManage || !shipment}>Mark shipped</Button>
                     </div>
                   )}
 
                   {selected.fulfillment_status === "shipped" && (
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-sm text-neutral-600 dark:text-neutral-300">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="min-w-0 break-words text-sm text-neutral-600 dark:text-neutral-300">
                         In transit{shipment?.carrier ? ` via ${shipment.carrier}` : ""}
                         {shipment?.tracking_number ? ` (${shipment.tracking_number})` : ""}.
                       </div>
-                      <Button onClick={deliver} disabled={busy || !canManage || !shipment}>Mark delivered</Button>
+                      <Button onClick={deliver} loading={busy} disabled={busy || !canManage || !shipment}>Mark delivered</Button>
                     </div>
                   )}
 
@@ -281,12 +309,12 @@ export default function DeliveryPage() {
 
                 {/* Billing — parallel to fulfilment. Show the linked AR invoice, or
                     offer to raise one once the order is approved. */}
-                <div className="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
                   {invoice ? (
-                    <p className="flex flex-wrap items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-neutral-600 dark:text-neutral-300">
                       Invoice <span className="font-medium">{invoice.invoice_number}</span> — {formatMoney(invoice.total_cents)}
                       <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
                           invoice.status === "paid"
                             ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
                             : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
@@ -300,7 +328,7 @@ export default function DeliveryPage() {
                   ) : selected.status === "approved" ? (
                     <>
                       <p className="text-sm text-neutral-600 dark:text-neutral-300">Not invoiced yet.</p>
-                      <Button variant="secondary" onClick={createInvoice} disabled={busy || !canManage}>Create invoice</Button>
+                      <Button variant="secondary" onClick={createInvoice} loading={busy} disabled={busy || !canManage}>Create invoice</Button>
                     </>
                   ) : (
                     <p className="text-sm text-neutral-500">Approve the order to raise an invoice.</p>
