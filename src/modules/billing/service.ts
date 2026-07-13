@@ -101,6 +101,12 @@ export class BillingService {
        VALUES (@id,@tenant_id,@supplier_id,@po_id,@bill_number,@status,@total_cents,@paid_cents,@due_date,@issued_at,@discount_pct,@discount_date,@discount_applied_cents)`,
       bill as unknown as Record<string, unknown>,
     );
+    // Accounting listens: Dr GRNI / Cr Accounts Payable for the bill total.
+    await this.events?.publish(
+      "bill.created",
+      { tenantId, billId: bill.id, supplierId, poId: input.poId ?? null, totalCents: total },
+      bill.id,
+    );
     return bill;
   }
 
@@ -141,7 +147,7 @@ export class BillingService {
 
   async payBill(id: string, amountCents: number, method: string, tenantId: string): Promise<Bill> {
     if (amountCents <= 0) throw new HttpError(400, "bad_request", "amountCents must be positive");
-    return this.db.withTenant(tenantId).tx(async (tdb) => {
+    const result = await this.db.withTenant(tenantId).tx(async (tdb) => {
       const bill = await tdb.one<Bill>("SELECT * FROM bills WHERE id = @id AND tenant_id = @t FOR UPDATE", { id, t: tenantId });
       if (!bill) throw new HttpError(404, "not_found", `bill '${id}' not found`);
       if (bill.status === "void") throw new HttpError(409, "void", "bill is void");
@@ -173,6 +179,10 @@ export class BillingService {
       );
       return { ...bill, paid_cents: paid, status, discount_applied_cents: discountApplied };
     });
+    // Published after the tx commits so a ledger posting can't precede the payment.
+    // Accounting listens: Dr Accounts Payable / Cr Bank for the amount paid.
+    await this.events?.publish("bill.paid", { tenantId, billId: id, amountCents, method }, id);
+    return result;
   }
 
   // ── Invoices (AR) ─────────────────────────────────────────────────────────────

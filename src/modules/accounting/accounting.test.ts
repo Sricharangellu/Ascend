@@ -153,3 +153,109 @@ test("list deposits filtered by status", async () => {
   assert.equal(pending.status, 200);
   assert.ok(pending.json.items.every((d: { status: string }) => d.status === "pending_approval"));
 });
+
+// ─── Posting ledger ───────────────────────────────────────────────────────────
+
+async function setupReceivedPO(app: App) {
+  const prod = await call(app, "POST", "/api/catalog/", { sku: `LED-${Date.now()}`, name: "Ledger Widget", price_cents: 1500, category: "general" });
+  assert.equal(prod.status, 201);
+  const sup = await call(app, "POST", "/api/purchasing/suppliers", { name: "Ledger Supply Co" });
+  assert.equal(sup.status, 201);
+  const po = await call(app, "POST", "/api/purchasing/orders", {
+    supplierId: sup.json.id,
+    lines: [{ productId: prod.json.id, quantity: 10, unitCostCents: 500 }], // $50 goods
+  });
+  assert.equal(po.status, 201);
+  const recv = await call(app, "POST", `/api/purchasing/orders/${po.json.id}/receive`, {});
+  assert.equal(recv.status, 200);
+  return { poId: po.json.id as string };
+}
+
+test("receiving a PO posts Dr Inventory / Cr GRNI, and the auto-bill posts GRNI -> AP", async () => {
+  const app = await freshApp();
+  const { poId } = await setupReceivedPO(app);
+
+  // Receipt posting: 5000 into Inventory, 5000 into GRNI.
+  const receipt = await call(app, "GET", "/api/accounting/journal?docType=purchase_receipt");
+  assert.equal(receipt.status, 200);
+  assert.equal(receipt.json.items.length, 2);
+  const dr = receipt.json.items.find((e: any) => e.debit_cents > 0);
+  const cr = receipt.json.items.find((e: any) => e.credit_cents > 0);
+  assert.equal(dr.account_code, "1200"); // Inventory Asset
+  assert.equal(dr.debit_cents, 5000);
+  assert.equal(cr.account_code, "2050"); // GRNI
+  assert.equal(cr.credit_cents, 5000);
+  assert.equal(dr.entry_group, cr.entry_group); // one balanced transaction
+  assert.ok(String(dr.memo).includes(poId));
+
+  // Auto-drafted bill (billing listens to purchase_order.received) relieves GRNI into AP.
+  const billPost = await call(app, "GET", "/api/accounting/journal?docType=bill");
+  assert.equal(billPost.json.items.length, 2);
+  const billDr = billPost.json.items.find((e: any) => e.debit_cents > 0);
+  const billCr = billPost.json.items.find((e: any) => e.credit_cents > 0);
+  assert.equal(billDr.account_code, "2050");
+  assert.equal(billCr.account_code, "2000"); // Accounts Payable
+  assert.equal(billCr.credit_cents, 5000);
+});
+
+test("paying a bill posts Dr AP / Cr Bank, and the trial balance stays balanced", async () => {
+  const app = await freshApp();
+  await setupReceivedPO(app);
+
+  const bills = await call(app, "GET", "/api/billing/bills");
+  assert.equal(bills.status, 200);
+  const bill = bills.json.items[0];
+  const pay = await call(app, "POST", `/api/billing/bills/${bill.id}/pay`, { amountCents: 5000, method: "ach" });
+  assert.equal(pay.status, 200);
+
+  const payment = await call(app, "GET", "/api/accounting/journal?docType=bill_payment");
+  assert.equal(payment.json.items.length, 2);
+  const dr = payment.json.items.find((e: any) => e.debit_cents > 0);
+  const cr = payment.json.items.find((e: any) => e.credit_cents > 0);
+  assert.equal(dr.account_code, "2000"); // AP relieved
+  assert.equal(cr.account_code, "1010"); // Bank Checking down
+  assert.equal(cr.credit_cents, 5000);
+
+  // Trial balance: total debits == total credits; GRNI nets to zero
+  // (received 5000 credit, relieved 5000 debit); AP nets to zero after payment.
+  const tb = await call(app, "GET", "/api/accounting/trial-balance");
+  assert.equal(tb.status, 200);
+  assert.equal(tb.json.total_debit_cents, tb.json.total_credit_cents);
+  const grni = tb.json.accounts.find((a: any) => a.account_code === "2050");
+  assert.equal(grni.balance_cents, 0);
+  const ap = tb.json.accounts.find((a: any) => a.account_code === "2000");
+  assert.equal(ap.balance_cents, 0);
+  const inventory = tb.json.accounts.find((a: any) => a.account_code === "1200");
+  assert.equal(inventory.balance_cents, 5000); // asset remains on the books
+});
+
+test("manual journal transactions must balance and use known accounts", async () => {
+  const app = await freshApp();
+
+  const unbalanced = await call(app, "POST", "/api/accounting/journal", {
+    legs: [
+      { accountCode: "1000", debitCents: 100 },
+      { accountCode: "4000", creditCents: 90 },
+    ],
+  });
+  assert.equal(unbalanced.status, 400);
+
+  const unknownAccount = await call(app, "POST", "/api/accounting/journal", {
+    legs: [
+      { accountCode: "9999", debitCents: 100 },
+      { accountCode: "4000", creditCents: 100 },
+    ],
+  });
+  assert.equal(unknownAccount.status, 400);
+
+  const ok = await call(app, "POST", "/api/accounting/journal", {
+    memo: "opening cash",
+    legs: [
+      { accountCode: "1000", debitCents: 100000 },
+      { accountCode: "4000", creditCents: 100000 },
+    ],
+  });
+  assert.equal(ok.status, 201);
+  assert.equal(ok.json.items.length, 2);
+  assert.equal(ok.json.items[0].doc_type, "manual");
+});
