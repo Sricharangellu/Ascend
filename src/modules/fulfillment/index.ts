@@ -1,6 +1,7 @@
 import type { PosModule } from "../types.js";
 import { FulfillmentService } from "./service.js";
 import { SalesService } from "../sales/service.js";
+import { ShippingService } from "../shipping/service.js";
 import { registerRoutes } from "./routes.js";
 
 const CREATE_LOCATIONS = `
@@ -62,9 +63,13 @@ export const fulfillmentModule: PosModule = {
   name: "fulfillment",
   migrations: [CREATE_LOCATIONS, CREATE_PRODUCT_LOCATIONS, CREATE_PICK_LISTS, CREATE_PICK_LINES, INDEXES, ADD_PICK_LIST_SOURCE],
   async register({ db, events, router }) {
-    // Compose SalesService so a sales-order pick list can advance the order's
-    // delivery status (mirrors how ecommerce composes sales).
-    registerRoutes(router, new FulfillmentService(db, new SalesService(db, events)));
+    // Compose SalesService + ShippingService so packing a sales-order pick list
+    // advances the order's delivery status and directly ensures its shipment
+    // (idempotent), instead of relying on a fire-once event that a re-pack can't
+    // re-trigger.
+    const sales = new SalesService(db, events);
+    const shipping = new ShippingService(db, sales);
+    registerRoutes(router, new FulfillmentService(db, sales, shipping));
   },
 };
 

@@ -79,7 +79,15 @@ CREATE INDEX IF NOT EXISTS so_lines_parent_idx ON sales_order_lines (tenant_id, 
 // rows valid.
 const ADD_SO_FULFILLMENT = `
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS fulfillment_status TEXT NOT NULL DEFAULT 'unfulfilled';
-CREATE INDEX IF NOT EXISTS sales_orders_fulfillment_idx ON sales_orders (tenant_id, fulfillment_status);`;
+CREATE INDEX IF NOT EXISTS sales_orders_fulfillment_idx ON sales_orders (tenant_id, fulfillment_status);
+DO $$
+BEGIN
+  ALTER TABLE sales_orders
+    ADD CONSTRAINT chk_sales_orders_fulfillment
+    CHECK (fulfillment_status IN ('unfulfilled','picking','packed','shipped','delivered'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END;
+$$;`;
 
 // Tier (1=best price .. 5=list) added here so the sales module can resolve
 // tier-aware pricing without a hard dependency on the customers module's DDL.

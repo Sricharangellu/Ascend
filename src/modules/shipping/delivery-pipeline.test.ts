@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import http from "node:http";
+import jwt from "jsonwebtoken";
 import { buildApp, type App } from "../../app.js";
+import { FulfillmentService } from "../fulfillment/service.js";
+import { ShippingService } from "./service.js";
+import { SalesService } from "../sales/service.js";
 
 /**
  * End-to-end delivery pipeline: a sales order (B2B / ecommerce) flows through
@@ -15,6 +20,31 @@ async function freshApp(): Promise<App> { return buildApp({ schema: __schema() }
 async function call(app: App, method: string, path: string, body?: unknown) {
   const { default: request } = await import("./test-request.js");
   return request(app.express, method, path, body);
+}
+
+// Issue an authenticated request as a specific role (the shared test-request helper
+// always signs `owner`); used to prove server-side role gating.
+function callAs(app: App, role: string, method: string, path: string, body?: unknown): Promise<{ status: number; json: any }> {
+  const secret = process.env.JWT_SECRET ?? "test-secret-finder-pos";
+  const token = jwt.sign({ sub: "usr_role_test", tenantId: "tnt_demo", role }, secret, { expiresIn: "1h" });
+  const p = path.startsWith("/api/") && !path.startsWith("/api/v1/") && !path.startsWith("/api/identity/") ? path.replace("/api/", "/api/v1/") : path;
+  return new Promise((resolve, reject) => {
+    const server = http.createServer(app.express);
+    server.listen(0, () => {
+      const addr = server.address();
+      if (addr === null || typeof addr === "string") { server.close(); reject(new Error("bind fail")); return; }
+      const payload = body === undefined ? undefined : JSON.stringify(body);
+      const headers: Record<string, string> = { authorization: `Bearer ${token}` };
+      if (payload) { headers["content-type"] = "application/json"; headers["content-length"] = String(Buffer.byteLength(payload)); }
+      const req = http.request({ host: "127.0.0.1", port: addr.port, method, path: p, headers }, (res) => {
+        let data = ""; res.setEncoding("utf8"); res.on("data", (c) => (data += c));
+        res.on("end", () => { server.close(); let json: any; try { json = data ? JSON.parse(data) : undefined; } catch { json = data; } resolve({ status: res.statusCode ?? 0, json }); });
+      });
+      req.on("error", (e) => { server.close(); reject(e); });
+      if (payload) req.write(payload);
+      req.end();
+    });
+  });
 }
 
 async function mkProduct(app: App, sku: string, priceCents: number) {
@@ -200,6 +230,37 @@ test("pick list / shipment creation 404s on a missing sales order", async () => 
   const ship = await call(app, "POST", "/api/shipping/from-sales-order", { salesOrderId: "sso_does_not_exist" });
   assert.equal(ship.status, 404);
   assert.equal(ship.json.error.code, "not_found");
+});
+
+test("pipeline mutations require manager role (cashier gets 403)", async () => {
+  const app = await freshApp();
+  const so = await mkSalesOrder(app);
+  const denied = await callAs(app, "cashier", "POST", "/api/fulfillment/pick-lists/from-sales-order", { salesOrderId: so.id });
+  assert.equal(denied.status, 403);
+  assert.equal(denied.json.error.code, "forbidden");
+  // Same call as a manager-or-above (the shared helper signs owner) succeeds.
+  const ok = await call(app, "POST", "/api/fulfillment/pick-lists/from-sales-order", { salesOrderId: so.id });
+  assert.equal(ok.status, 201);
+  // Shipping mutations are gated too.
+  assert.equal((await callAs(app, "cashier", "POST", "/api/shipping/from-sales-order", { salesOrderId: so.id })).status, 403);
+});
+
+test("re-packing recovers a shipment whose creation was skipped on a prior pack", async () => {
+  const app = await freshApp();
+  const so = await mkSalesOrder(app);
+  const pl = (await call(app, "POST", "/api/fulfillment/pick-lists/from-sales-order", { salesOrderId: so.id })).json as { id: string; lines: Array<{ id: string }> };
+  for (const line of pl.lines) await call(app, "POST", `/api/fulfillment/pick-lists/${pl.id}/lines/${line.id}/pick`, {});
+
+  const sales = new SalesService(app.db, app.events);
+  // Simulate a pack where the shipment did NOT get created (shipping not wired).
+  await new FulfillmentService(app.db, sales).pack(pl.id, "tnt_demo");
+  assert.equal((await call(app, "GET", `/api/shipping/?salesOrderId=${so.id}`)).json.items.length, 0, "no shipment after the skipped attempt");
+  assert.equal((await call(app, "GET", `/api/sales/sales-orders/${so.id}`)).json.fulfillment_status, "packed");
+
+  // Re-pack with shipping wired → the missing shipment is created (recovery), even
+  // though the order is already `packed` (so no status-change event would fire).
+  await new FulfillmentService(app.db, sales, new ShippingService(app.db, sales)).pack(pl.id, "tnt_demo");
+  assert.equal((await call(app, "GET", `/api/shipping/?salesOrderId=${so.id}`)).json.items.length, 1, "re-pack created the missing shipment");
 });
 
 test("sales orders are filterable by fulfillment_status", async () => {

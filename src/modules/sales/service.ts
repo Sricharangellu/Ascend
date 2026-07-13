@@ -456,7 +456,10 @@ export class SalesService {
     const so = await this.db.one<SalesOrder>("SELECT * FROM sales_orders WHERE id = @id AND tenant_id = @t", { id, t: tenantId });
     if (!so) throw notFound(`sales order '${id}' not found`);
     if (so.fulfillment_status === next) return so;
-    if (!FULFILLMENT_TRANSITIONS[so.fulfillment_status].includes(next)) {
+    // Guard the map lookup: an unexpected stored value (should be prevented by the
+    // CHECK constraint) yields a clean 409 rather than a TypeError.
+    const allowed = FULFILLMENT_TRANSITIONS[so.fulfillment_status] ?? [];
+    if (!allowed.includes(next)) {
       throw conflict(`cannot move fulfillment from ${so.fulfillment_status} to ${next}`);
     }
     await this.db.query(

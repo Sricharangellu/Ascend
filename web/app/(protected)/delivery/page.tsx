@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
@@ -87,9 +87,14 @@ export default function DeliveryPage() {
     }
   }, []);
 
+  // Monotonic id of the most recent loadDetail call; a slower earlier response is
+  // dropped so switching orders quickly can't paint stale pick list / shipment.
+  const detailReqId = useRef(0);
+
   // Load the pick list + shipment attached to the selected order so the panel
   // can show the right action for its current stage.
   const loadDetail = useCallback(async (order: SalesOrder) => {
+    const reqId = ++detailReqId.current;
     setPickList(null);
     setShipment(null);
     setInvoice(null);
@@ -102,11 +107,15 @@ export default function DeliveryPage() {
         apiGet<{ items: Invoice[] }>(`/api/v1/billing/invoices?salesOrderId=${order.id}`),
       ]);
       const pl = (pls.items ?? [])[0] ?? null;
-      if (pl) setPickList(await apiGet<PickList>(`/api/v1/fulfillment/pick-lists/${pl.id}`));
+      const fullPl = pl ? await apiGet<PickList>(`/api/v1/fulfillment/pick-lists/${pl.id}`) : null;
+      if (detailReqId.current !== reqId) return; // a newer selection superseded this load
+      setPickList(fullPl);
       setShipment((ships.items ?? [])[0] ?? null);
       setInvoice((invoices.items ?? [])[0] ?? null);
     } catch (err) {
-      setError(err instanceof ApiResponseError ? err.message : "Could not load pipeline detail.");
+      if (detailReqId.current === reqId) {
+        setError(err instanceof ApiResponseError ? err.message : "Could not load pipeline detail.");
+      }
     }
   }, []);
 
@@ -227,7 +236,9 @@ export default function DeliveryPage() {
                               {l.product_id} — {l.picked_qty}/{l.quantity}
                             </span>
                             {l.status === "picked" ? (
-                              <StageBadge status="delivered" />
+                              <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/40 dark:text-green-300">
+                                Picked
+                              </span>
                             ) : (
                               <Button size="sm" variant="secondary" onClick={() => pickLine(l.id)} disabled={busy || !canManage}>
                                 Pick

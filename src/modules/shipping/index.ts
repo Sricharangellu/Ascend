@@ -55,13 +55,10 @@ export const shippingModule: PosModule = {
   name: "shipping",
   migrations: [CREATE_SHIPPING_ORDERS, CREATE_SHIPPING_LINES, INDEXES, ADD_SHIPMENT_SALES_ORDER],
   register({ db, events, router }) {
-    const service = new ShippingService(db, new SalesService(db, events));
-    // A packed sales order auto-generates its shipment (idempotent per SO).
-    events.on("sales_order.packed", async (event) => {
-      const p = event.payload as { salesOrderId?: string; tenantId?: string };
-      if (p.salesOrderId && p.tenantId) await service.createFromSalesOrder(p.salesOrderId, {}, p.tenantId);
-    });
-    registerRoutes(router, service);
+    // The shipment for a packed sales order is created directly by the fulfillment
+    // module's pack() (idempotent + re-pack-recoverable) rather than via a
+    // fire-once `sales_order.packed` listener here.
+    registerRoutes(router, new ShippingService(db, new SalesService(db, events)));
   },
 };
 

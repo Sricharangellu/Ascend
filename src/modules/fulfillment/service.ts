@@ -2,6 +2,7 @@ import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import { HttpError } from "../../shared/http.js";
 import type { SalesService } from "../sales/service.js";
+import type { ShippingService } from "../shipping/service.js";
 
 /** Fulfillment / WMS — bin locations, product→location assignment, and
  *  pick/pack of orders. Tenant-scoped. Pick lists are sorted into a pick path
@@ -43,10 +44,15 @@ export interface PickList {
 }
 
 export class FulfillmentService {
-  /** `sales` is optional so retail-only callers (and unit tests) can construct
-   *  the service without wiring the sales module. When present, sales-order pick
-   *  lists advance the order's delivery status on create/pack. */
-  constructor(private readonly db: DB, private readonly sales?: SalesService) {}
+  /** `sales`/`shipping` are optional so retail-only callers (and unit tests) can
+   *  construct the service without wiring those modules. When present, packing a
+   *  sales-order pick list advances the order's delivery status and ensures its
+   *  shipment exists. */
+  constructor(
+    private readonly db: DB,
+    private readonly sales?: SalesService,
+    private readonly shipping?: ShippingService,
+  ) {}
 
   // ── Locations ────────────────────────────────────────────────────────────
   async createLocation(code: string, name: string | undefined, kind: LocationKind, tenantId: string): Promise<Location> {
@@ -186,14 +192,18 @@ export class FulfillmentService {
   }
 
   /** Pack a fully-picked list → ready to hand off / ship. For a sales-order pick
-   *  list this advances the order to `packed`, which emits `sales_order.packed`
-   *  and (via the shipping module's listener) auto-creates a shipment. */
+   *  list this advances the order to `packed` and ensures its shipment exists.
+   *  Both side effects are idempotent, so re-packing safely recovers a shipment
+   *  whose creation failed on an earlier attempt. */
   async pack(pickListId: string, tenantId: string): Promise<PickList & { lines: PickListLine[] }> {
     const pl = await this.getPickList(pickListId, tenantId);
     if (pl.lines.some((l) => l.status !== "picked")) throw new HttpError(409, "not_picked", "all lines must be picked before packing");
     await this.db.query("UPDATE pick_lists SET status = 'packed', updated_at = @now WHERE id = @id AND tenant_id = @t", { now: Date.now(), id: pickListId, t: tenantId });
-    if (pl.source_type === "sales_order" && this.sales) {
-      await this.sales.setFulfillmentStatus(pl.order_id, "packed", tenantId);
+    if (pl.source_type === "sales_order") {
+      if (this.sales) await this.sales.setFulfillmentStatus(pl.order_id, "packed", tenantId);
+      // Ensure the shipment directly (idempotent per sales order) rather than via a
+      // fire-once event — a re-pack then recovers a shipment that failed to create.
+      if (this.shipping) await this.shipping.createFromSalesOrder(pl.order_id, {}, tenantId);
     }
     return { ...pl, status: "packed" };
   }

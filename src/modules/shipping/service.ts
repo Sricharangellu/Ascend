@@ -82,26 +82,42 @@ export class ShippingService {
   }
 
   /** Insert a shipping order + its lines in one transaction. Shared by the
-   *  invoice and sales-order create paths. */
+   *  invoice and sales-order create paths. `ship_number` is derived from a
+   *  COUNT(*), so two concurrent creates can pick the same number; on that unique
+   *  violation we regenerate the number and retry (bounded) rather than 500. */
   private async persist(so: ShippingOrder, srcLines: Array<{ product_id: string; name: string; quantity: number }>, tenantId: string): Promise<ShippingOrder & { lines: ShippingLine[] }> {
-    const lines = await this.db.withTenant(tenantId).tx(async (tdb) => {
-      await tdb.query(
-        `INSERT INTO shipping_orders (id, tenant_id, ship_number, invoice_id, sales_order_id, customer_id, status, method, carrier, tracking_number, expected_date, shipped_date, delivered_date, notes, created_at, updated_at)
-         VALUES (@id,@tenant_id,@ship_number,@invoice_id,@sales_order_id,@customer_id,@status,@method,@carrier,@tracking_number,@expected_date,@shipped_date,@delivered_date,@notes,@created_at,@updated_at)`,
-        so as unknown as Record<string, unknown>,
-      );
-      const out: ShippingLine[] = [];
-      for (const l of srcLines) {
-        const line: ShippingLine = { id: `shl_${uuidv7()}`, tenant_id: tenantId, shipping_order_id: so.id, product_id: l.product_id, name: l.name, quantity: Number(l.quantity), packed: 0 };
-        await tdb.query(
-          "INSERT INTO shipping_order_lines (id, tenant_id, shipping_order_id, product_id, name, quantity, packed) VALUES (@id,@tenant_id,@shipping_order_id,@product_id,@name,@quantity,0)",
-          line as unknown as Record<string, unknown>,
-        );
-        out.push(line);
+    const MAX_ATTEMPTS = 5;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const lines = await this.db.withTenant(tenantId).tx(async (tdb) => {
+          await tdb.query(
+            `INSERT INTO shipping_orders (id, tenant_id, ship_number, invoice_id, sales_order_id, customer_id, status, method, carrier, tracking_number, expected_date, shipped_date, delivered_date, notes, created_at, updated_at)
+             VALUES (@id,@tenant_id,@ship_number,@invoice_id,@sales_order_id,@customer_id,@status,@method,@carrier,@tracking_number,@expected_date,@shipped_date,@delivered_date,@notes,@created_at,@updated_at)`,
+            so as unknown as Record<string, unknown>,
+          );
+          const out: ShippingLine[] = [];
+          for (const l of srcLines) {
+            const line: ShippingLine = { id: `shl_${uuidv7()}`, tenant_id: tenantId, shipping_order_id: so.id, product_id: l.product_id, name: l.name, quantity: Number(l.quantity), packed: 0 };
+            await tdb.query(
+              "INSERT INTO shipping_order_lines (id, tenant_id, shipping_order_id, product_id, name, quantity, packed) VALUES (@id,@tenant_id,@shipping_order_id,@product_id,@name,@quantity,0)",
+              line as unknown as Record<string, unknown>,
+            );
+            out.push(line);
+          }
+          return out;
+        });
+        return { ...so, lines };
+      } catch (err) {
+        // 23505 = unique_violation. A raced ship_number is recoverable by taking
+        // the next number; the invoice/sales-order idempotency indexes are guarded
+        // by an existence check upstream, so a genuine dup there still surfaces.
+        if ((err as { code?: string }).code === "23505" && attempt < MAX_ATTEMPTS) {
+          so.ship_number = await this.nextNumber(tenantId);
+          continue;
+        }
+        throw err;
       }
-      return out;
-    });
-    return { ...so, lines };
+    }
   }
 
   /** Create a shipping order from an invoice. Idempotent per invoice. Lines come

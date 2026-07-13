@@ -1,9 +1,18 @@
 # Ascend — Multi-Agent Work Lock
 
 Status: IDLE — no active claim
-<!-- test-coverage pass (Claude session A): delivery-pipeline.test.ts +5 focused tests
-     (refactor regression, pack-before-picked 409, deliver-before-ship 409, missing-SO 404s,
-     fulfillment_status filter) + fixed mkSalesOrder SKU collision. Test-only; released on commit. -->
+
+## Released Claim (Claude session A — fix reviewed findings 1–7)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, code-review remediation) |
+| Queue item | Fix the 7 delivery-pipeline review findings in severity order: (1) server-side manager gating on fulfillment/shipping mutations; (2) make pack→shipment robust/retriable (inject ShippingService, drop fire-once event); (3) "Delivered" badge on picked lines; (4) ship_number COUNT race → retry-on-conflict; (5) fulfillment_status CHECK constraint + guarded transition lookup; (6) /delivery loadDetail stale-render race; (7) web SalesOrderStatus type drift. |
+| Files/areas expected | `src/modules/{fulfillment,shipping,sales}/*`; `web/app/(protected)/delivery/page.tsx`; `web/api-client/types.ts`; tests; WORK audit + LOCK. |
+| Started | 2026-07-12 |
+| Last update | 2026-07-13 |
+| Status | RELEASED — all 7 findings fixed + 2 tests (authz 403, re-pack recovery). Gates: backend typecheck / test 396/396 / smoke 20/20 / hygiene 918; web typecheck / lint / build. Audit: WORK/audits/AUDIT_2026-07-13T000416Z-delivery-review-remediation.md. Committed on `feat/delivery-pipeline`. |
+| Blockers | none |
 
 ## Released Claim (Claude session A — behavior-preserving pipeline cleanup)
 

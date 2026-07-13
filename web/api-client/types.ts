@@ -913,7 +913,8 @@ export interface QuotationsResponse {
   items: Quotation[];
 }
 
-export type SalesOrderStatus = "pending_approve" | "approved" | "fulfilled" | "cancelled";
+// Mirrors the backend SOStatus (src/modules/sales/service.ts).
+export type SalesOrderStatus = "pending_approve" | "approved" | "invoiced" | "partially_invoiced" | "cancelled";
 
 /** Delivery-pipeline status, independent of the order-to-cash `status`. */
 export type SOFulfillmentStatus = "unfulfilled" | "picking" | "packed" | "shipped" | "delivered";

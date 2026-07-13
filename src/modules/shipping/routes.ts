@@ -2,6 +2,7 @@ import type { Router, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
+import { requireRole } from "../../gateway/auth.js";
 import type { ShippingService, ShipStatus } from "./service.js";
 
 function tenantId(res: Response): string {
@@ -28,10 +29,14 @@ const shipSchema = z.object({
 });
 
 export function registerRoutes(router: Router, service: ShippingService): void {
-  router.post("/", handler(async (req, res) => {
+  // Shipment creation and state transitions are manager-level; GETs stay open to
+  // any authenticated tenant user. Enforces server-side what the delivery UI gates.
+  const mgr = requireRole("manager");
+
+  router.post("/", mgr, handler(async (req, res) => {
     res.status(201).json(await service.createFromInvoice(parseBody(createSchema, req.body), tenantId(res)));
   }));
-  router.post("/from-sales-order", handler(async (req, res) => {
+  router.post("/from-sales-order", mgr, handler(async (req, res) => {
     const b = parseBody(fromSalesOrderSchema, req.body);
     res.status(201).json(await service.createFromSalesOrder(b.salesOrderId, { method: b.method, expectedDate: b.expectedDate, notes: b.notes }, tenantId(res)));
   }));
@@ -43,16 +48,16 @@ export function registerRoutes(router: Router, service: ShippingService): void {
   router.get("/:id", handler(async (req, res) => {
     res.json(await service.get(String(req.params.id), tenantId(res)));
   }));
-  router.post("/:id/lines/:lineId/pack", handler(async (req, res) => {
+  router.post("/:id/lines/:lineId/pack", mgr, handler(async (req, res) => {
     res.json(await service.packLine(String(req.params.id), String(req.params.lineId), tenantId(res)));
   }));
-  router.post("/:id/ship", handler(async (req, res) => {
+  router.post("/:id/ship", mgr, handler(async (req, res) => {
     res.json(await service.markShipped(String(req.params.id), parseBody(shipSchema, req.body ?? {}), tenantId(res)));
   }));
-  router.post("/:id/deliver", handler(async (req, res) => {
+  router.post("/:id/deliver", mgr, handler(async (req, res) => {
     res.json(await service.markDelivered(String(req.params.id), tenantId(res)));
   }));
-  router.post("/:id/cancel", handler(async (req, res) => {
+  router.post("/:id/cancel", mgr, handler(async (req, res) => {
     res.json(await service.cancel(String(req.params.id), tenantId(res)));
   }));
 }
