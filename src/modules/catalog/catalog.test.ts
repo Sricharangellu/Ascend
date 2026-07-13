@@ -740,6 +740,19 @@ test("re-generating with a changed attribute order does not duplicate (order-ind
   assert.equal(second.json.items[0].variant_label, "Red - S"); // name follows new order
 });
 
+test("a product's sku can be reassigned, and collisions are rejected (wizard step 1)", async () => {
+  const app = await freshApp();
+  const a = await call(app, "POST", "/api/catalog/", { sku: "SKU-OLD", name: "A", price_cents: 100 });
+  const b = await call(app, "POST", "/api/catalog/", { sku: "SKU-TAKEN", name: "B", price_cents: 100 });
+  const ok = await call(app, "PATCH", `/api/catalog/${a.json.id}`, { sku: "SKU-NEW" });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.json.sku, "SKU-NEW");
+  const clash = await call(app, "PATCH", `/api/catalog/${a.json.id}`, { sku: "SKU-TAKEN" });
+  assert.equal(clash.status, 409);
+  assert.equal(clash.json.error.code, "conflict");
+  assert.equal(b.json.sku, "SKU-TAKEN"); // untouched
+});
+
 test("generate honors an exclude list — removed combinations are not created (#7)", async () => {
   const app = await freshApp();
   const master = await call(app, "POST", "/api/catalog/", { sku: "EXC-M", name: "Tee", price_cents: 2000, category: "apparel" });

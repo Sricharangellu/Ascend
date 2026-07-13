@@ -238,8 +238,10 @@ export interface CreateProductInput {
   ecommerce?: boolean;
 }
 
-// UpdateProductInput mirrors CreateProductInput but all fields optional (sku is immutable).
-export type UpdateProductInput = Omit<Partial<CreateProductInput>, "sku">;
+// UpdateProductInput mirrors CreateProductInput, all fields optional. `sku` may be
+// changed (guarded by the tenant-unique constraint) — needed for the variant setup
+// wizard's SKU assignment step.
+export type UpdateProductInput = Partial<CreateProductInput>;
 
 export interface Category {
   id: string;
@@ -664,6 +666,18 @@ export class CatalogService {
     const next: Product = { ...current };
     const changed: Partial<Product> = {};
 
+    // SKU may be reassigned (e.g. the variant setup wizard). Guard against collisions
+    // with a pre-check; the (tenant_id, sku) UNIQUE constraint is the real backstop.
+    if (input.sku !== undefined && input.sku.trim() && input.sku !== current.sku) {
+      const clash = await this.db.one<{ id: string }>(
+        "SELECT id FROM products WHERE tenant_id = @t AND sku = @sku AND id <> @id",
+        { t: tenantId, sku: input.sku, id },
+      );
+      if (clash) throw conflict(`product with sku '${input.sku}' already exists`);
+      next.sku = input.sku;
+      changed.sku = input.sku;
+    }
+
     if (input.name !== undefined && input.name !== current.name) {
       next.name = input.name;
       changed.name = input.name;
@@ -783,8 +797,10 @@ export class CatalogService {
 
     next.updated_at = Date.now();
 
+    try {
     await this.db.query(
       `UPDATE products SET
+         sku = @sku,
          name = @name, price_cents = @price_cents, category = @category, tax_class = @tax_class,
          barcode = @barcode, status = @status,
          description = @description, short_description = @short_description, full_description = @full_description,
@@ -814,6 +830,11 @@ export class CatalogService {
        WHERE id = @id`,
       next as unknown as Record<string, unknown>,
     );
+    } catch (err) {
+      // Concurrent sku reassignment can still collide despite the pre-check.
+      if (isUniqueViolation(err)) throw conflict(`product with sku '${next.sku}' already exists`);
+      throw err;
+    }
 
     if (options.publishEvent !== false) {
       await this.publishProductUpdated(next, changed);

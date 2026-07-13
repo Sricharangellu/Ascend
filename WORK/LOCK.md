@@ -1,6 +1,6 @@
 # Ascend — Multi-Agent Work Lock
 
-Status: RELEASED — bulk price/cost engine (PRD #4) shipped; see AUDIT_2026-07-13T051053Z-bulk-price-engine.md
+Status: RELEASED — variant engine consolidation shipped (structured options, non-destructive regen, chip/drag UX, 3-step wizard); see AUDIT_2026-07-13T061454Z-variant-engine-consolidation.md
 
 ## Active Claim (Claude session A — catalog bulk-price)
 

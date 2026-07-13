@@ -114,6 +114,7 @@ const createSchema = z.object({
 });
 
 const updateFieldsSchema = z.object({
+  sku: z.string().min(1).optional(),
   name: z.string().min(1).optional(),
   price_cents: z.number().int().nonnegative().optional(),
   category: z.string().min(1).optional(),
