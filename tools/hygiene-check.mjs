@@ -15,7 +15,8 @@
  * problems before they are ever committed.
  */
 import { execSync } from "node:child_process";
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, statSync, existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 function gitList(cmd) {
   try {
@@ -90,6 +91,23 @@ for (const f of files) {
       if (re.test(content)) { violations.push(`possible secret (${label}) in: ${f}`); break; }
     }
   }
+
+  // 7. Stale references — broken relative Markdown links. Skips external URLs,
+  //    anchors, and mailto/tel; strips #fragments and ?queries before resolving
+  //    the target from the file's own directory.
+  if (f.endsWith(".md")) {
+    const linkRe = /\[[^\]]*\]\(([^)]+)\)/g;
+    let m;
+    while ((m = linkRe.exec(content))) {
+      let target = m[1].trim();
+      if (/^([a-z]+:|#|\/\/)/i.test(target)) continue; // url scheme, anchor, or protocol-relative
+      target = target.split("#")[0].split("?")[0].trim();
+      if (!target) continue;
+      if (!existsSync(resolve(dirname(f), target))) {
+        violations.push(`broken markdown link in ${f}: ${m[1]}`);
+      }
+    }
+  }
 }
 
 if (violations.length) {
@@ -102,4 +120,4 @@ if (violations.length) {
   process.exit(1);
 }
 
-console.log(`✓ repo-hygiene check passed (${files.length} files scanned; no junk, tracked env, conflict markers, or secrets).`);
+console.log(`✓ repo-hygiene check passed (${files.length} files scanned; no junk, tracked env, conflict markers, secrets, or broken doc links).`);

@@ -55,7 +55,7 @@ Ascend is a modular, multi-vertical point-of-sale platform: one codebase is desi
 - [Settings overview](admin/settings.md)
 - [Compliance & age verification](admin/compliance.md)
 - [Webhooks & integrations](admin/webhooks.md)
-- [Hardware setup](admin/hardware.md)
+- [Hardware setup](getting-started/02-hardware.md)
 
 ## API
 
