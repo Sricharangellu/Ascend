@@ -225,6 +225,12 @@ npm test
 npm run build
 ```
 
+Before release / for the full backend + web gate in one shot:
+
+```bash
+npm run verify   # hygiene + backend typecheck/test/smoke + web typecheck/lint/build
+```
+
 Full production confidence:
 
 ```bash
