@@ -487,6 +487,15 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     }),
   );
 
+  // Append-only price-change timeline (selling + cost), newest first.
+  router.get(
+    "/:id/price-history",
+    handler(async (req, res) => {
+      const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
+      res.json({ items: await service.listPriceHistory(String(req.params.id), tenantId(res), limit) });
+    }),
+  );
+
   // Master/child variants (BE-8).
   router.get(
     "/:id/variants",

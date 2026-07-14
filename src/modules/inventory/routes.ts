@@ -256,6 +256,15 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
     }),
   );
 
+  // Availability read-model: on-hand / reserved (approved unshipped SOs) /
+  // incoming (open approved PO remainder) / available.
+  router.get(
+    "/:productId/availability",
+    handler(async (req, res) => {
+      res.json(await service.availability(String(req.params.productId), tenantId(res)));
+    }),
+  );
+
   router.get(
     "/:productId",
     handler(async (req, res) => {

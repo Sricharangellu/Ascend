@@ -324,3 +324,41 @@ test("inventory.adjusted is emitted on the bus", async () => {
   assert.equal(p.reason, "receiving");
   assert.equal(p.stockQty, 6);
 });
+
+// ── Availability breakdown (retail product benchmark #2) ─────────────────────
+
+test("availability = on-hand / reserved (approved unshipped SO) / incoming (open PO remainder)", async () => {
+  const app = await freshApp();
+  const prod = (await call(app, "POST", "/api/catalog/", { sku: "AVL-1", name: "Avail Widget", price_cents: 2000, category: "general" })).json;
+  const sup = (await call(app, "POST", "/api/purchasing/suppliers", { name: "Avail Supply" })).json;
+
+  // PO for 20 units; receive 12 → on-hand 12, incoming 8.
+  const po = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId: sup.id,
+    lines: [{ productId: prod.id, quantity: 20, unitCostCents: 500 }],
+  })).json;
+  const recv = await call(app, "POST", `/api/purchasing/orders/${po.id}/receive`, {
+    lines: [{ lineId: po.lines[0].id, qty: 12 }],
+  });
+  assert.equal(recv.status, 200);
+
+  // Approved sales order for 5, not yet shipped → reserved 5.
+  const customer = (await call(app, "POST", "/api/customers/", { name: "Avail Buyer" })).json;
+  const so = (await call(app, "POST", "/api/sales/sales-orders", {
+    customerId: customer.id,
+    lines: [{ productId: prod.id, quantity: 5 }],
+  })).json;
+  const approved = await call(app, "POST", `/api/sales/sales-orders/${so.id}/approve`, {});
+  assert.equal(approved.status, 200);
+
+  const avail = await call(app, "GET", `/api/inventory/${prod.id}/availability`);
+  assert.equal(avail.status, 200);
+  assert.deepEqual(avail.json, { on_hand: 12, reserved: 5, incoming: 8, available: 7 });
+});
+
+test("availability is zeros for a product with no activity", async () => {
+  const app = await freshApp();
+  const prod = (await call(app, "POST", "/api/catalog/", { sku: "AVL-2", name: "Untouched", price_cents: 100 })).json;
+  const avail = await call(app, "GET", `/api/inventory/${prod.id}/availability`);
+  assert.deepEqual(avail.json, { on_hand: 0, reserved: 0, incoming: 0, available: 0 });
+});

@@ -118,6 +118,22 @@ const ALTER_PRODUCTS_VARIANT_OPTIONS = `
 ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_options TEXT;
 `;
 
+// Price-change history (retail product benchmark #1). Append-only: one row per
+// selling-price or cost change, written inside CatalogService.update() where
+// both the old and new values are known. Never updated or deleted.
+const CREATE_PRICE_HISTORY = `
+CREATE TABLE IF NOT EXISTS product_price_history (
+  id              TEXT PRIMARY KEY,
+  tenant_id       TEXT NOT NULL,
+  product_id      TEXT NOT NULL,
+  field           TEXT NOT NULL,
+  old_price_cents BIGINT,
+  new_price_cents BIGINT NOT NULL,
+  changed_at      BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS pph_tenant_product_idx ON product_price_history (tenant_id, product_id, changed_at DESC);
+`;
+
 // BE-16: age-restricted flag — must be verified at register before sale.
 const ALTER_PRODUCTS_AGE = `
 ALTER TABLE products ADD COLUMN IF NOT EXISTS age_restricted INTEGER NOT NULL DEFAULT 0;
@@ -205,6 +221,7 @@ export const catalogModule: PosModule = {
     ALTER_PRODUCTS_VARIANTS,
     ALTER_PRODUCTS_VARIANT_SORT,
     ALTER_PRODUCTS_VARIANT_OPTIONS,
+    CREATE_PRICE_HISTORY,
     ALTER_PRODUCTS_AGE,
     ALTER_PRODUCTS_COMPLIANCE,
     ALTER_PRODUCTS_EXPIRY,

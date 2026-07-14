@@ -277,6 +277,17 @@ export interface VariantAttributeInput {
   values: string[];
 }
 
+/** One price change (selling or cost), written by update(); append-only. */
+export interface PriceHistoryEntry {
+  id: string;
+  tenant_id: string;
+  product_id: string;
+  field: "selling" | "cost";
+  old_price_cents: number | null;
+  new_price_cents: number;
+  changed_at: number;
+}
+
 interface MutationOptions {
   publishEvent?: boolean;
 }
@@ -836,6 +847,24 @@ export class CatalogService {
       throw err;
     }
 
+    // Append-only price history — written here (not from events) because only
+    // update() knows both the old and new values. Covers every path that
+    // changes prices: direct PATCH, bulk-update, and bulkAdjustPrice.
+    const priceChanges: Array<{ field: string; oldVal: number | null; newVal: number }> = [];
+    if (changed.price_cents !== undefined) {
+      priceChanges.push({ field: "selling", oldVal: current.price_cents, newVal: next.price_cents });
+    }
+    if (changed.raw_cost_price_cents !== undefined && next.raw_cost_price_cents != null) {
+      priceChanges.push({ field: "cost", oldVal: current.raw_cost_price_cents, newVal: next.raw_cost_price_cents });
+    }
+    for (const pc of priceChanges) {
+      await this.db.query(
+        `INSERT INTO product_price_history (id, tenant_id, product_id, field, old_price_cents, new_price_cents, changed_at)
+         VALUES (@id, @t, @p, @field, @oldVal, @newVal, @now)`,
+        { id: `pph_${uuidv7()}`, t: tenantId, p: id, field: pc.field, oldVal: pc.oldVal, newVal: pc.newVal, now: next.updated_at },
+      );
+    }
+
     if (options.publishEvent !== false) {
       await this.publishProductUpdated(next, changed);
     }
@@ -963,6 +992,16 @@ export class CatalogService {
       updated.push(await this.update(id, { [field]: next }, tenantId));
     }
     return updated;
+  }
+
+  /** Append-only price-change timeline for a product, newest first. */
+  async listPriceHistory(productId: string, tenantId: string, limit = 100): Promise<PriceHistoryEntry[]> {
+    await this.getOrThrow(productId, tenantId);
+    return this.db.query<PriceHistoryEntry>(
+      `SELECT * FROM product_price_history WHERE tenant_id = @t AND product_id = @p
+       ORDER BY changed_at DESC, id DESC LIMIT @limit`,
+      { t: tenantId, p: productId, limit: Math.min(Math.max(limit, 1), 500) },
+    );
   }
 
   /** All products for a tenant, for CSV export. Unpaginated (catalogs are small per tenant). */

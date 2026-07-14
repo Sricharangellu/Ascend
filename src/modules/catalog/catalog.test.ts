@@ -779,3 +779,30 @@ test("editing a variant's options updates its name/label in place, preserving id
   assert.equal(patched.json.variant_label, "M");    // label recomputed
   assert.equal(patched.json.name, "Tee M");         // name recomputed
 });
+
+// ── Price-change history ──────────────────────────────────────────────────────
+
+test("price and cost changes append to the price history (all paths)", async () => {
+  const app = await freshApp();
+  const p = await call(app, "POST", "/api/catalog/", { sku: "PH-1", name: "Hist", price_cents: 1000 });
+
+  // Direct PATCH (selling), then cost, then a bulk-price op — all must log.
+  await call(app, "PATCH", `/api/catalog/${p.json.id}`, { price_cents: 1200 });
+  await call(app, "PATCH", `/api/catalog/${p.json.id}`, { raw_cost_price_cents: 700 });
+  await call(app, "POST", "/api/catalog/bulk-price", { ids: [p.json.id], target: "selling", op: "round_99" }); // 1200 -> 1299
+
+  const hist = await call(app, "GET", `/api/catalog/${p.json.id}/price-history`);
+  assert.equal(hist.status, 200);
+  const items = hist.json.items; // newest first
+  assert.equal(items.length, 3);
+  assert.deepEqual(items.map((e: any) => [e.field, e.old_price_cents, e.new_price_cents]), [
+    ["selling", 1200, 1299],
+    ["cost", null, 700],
+    ["selling", 1000, 1200],
+  ]);
+
+  // No-op update logs nothing.
+  await call(app, "PATCH", `/api/catalog/${p.json.id}`, { price_cents: 1299 });
+  const again = await call(app, "GET", `/api/catalog/${p.json.id}/price-history`);
+  assert.equal(again.json.items.length, 3);
+});
