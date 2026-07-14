@@ -13,6 +13,17 @@ import type { DB } from "./db.js";
  * Counters are seeded per adopting table from its current MAX suffix (see each
  * module's migration), so existing numbering continues without collision.
  */
+/** Allocate the next raw sequence value for (tenant, kind) — atomic upsert-increment. */
+export async function nextDocSeq(db: DB, tenantId: string, kind: string): Promise<number> {
+  const row = await db.one<{ val: string | number }>(
+    `INSERT INTO document_counters (tenant_id, kind, val) VALUES (@t, @k, 1)
+       ON CONFLICT (tenant_id, kind) DO UPDATE SET val = document_counters.val + 1
+     RETURNING val`,
+    { t: tenantId, k: kind },
+  );
+  return Number(row?.val ?? 1);
+}
+
 export async function nextDocNumber(
   db: DB,
   tenantId: string,
@@ -20,11 +31,6 @@ export async function nextDocNumber(
   prefix: string,
   pad = 5,
 ): Promise<string> {
-  const row = await db.one<{ val: string | number }>(
-    `INSERT INTO document_counters (tenant_id, kind, val) VALUES (@t, @k, 1)
-       ON CONFLICT (tenant_id, kind) DO UPDATE SET val = document_counters.val + 1
-     RETURNING val`,
-    { t: tenantId, k: kind },
-  );
-  return `${prefix}-${String(Number(row?.val ?? 1)).padStart(pad, "0")}`;
+  const val = await nextDocSeq(db, tenantId, kind);
+  return `${prefix}-${String(val).padStart(pad, "0")}`;
 }

@@ -340,3 +340,17 @@ test("approval config is owner-gated and validated", async () => {
   assert.equal(read.status, 200);
   assert.equal(read.json.config, null); // nothing stored yet
 });
+
+test("concurrent PO creates mint distinct po_numbers (race-free counter)", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app);
+  const productId = await makeProduct(app, "SEQ-PO");
+
+  // The legacy MAX(po_number)+1 pattern let these all pick the same number.
+  const results = await Promise.all(
+    [1, 2, 3, 4, 5].map(() => makePO(app, supplierId, productId, 1, 100)),
+  );
+  assert.ok(results.every((r) => r.status === 201));
+  const numbers = results.map((r) => r.json.po_number);
+  assert.equal(new Set(numbers).size, 5, `expected 5 distinct po_numbers, got ${numbers.join(",")}`);
+});

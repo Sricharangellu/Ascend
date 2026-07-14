@@ -169,3 +169,19 @@ test("receiving a PO auto-drafts a bill retrievable by supplier", async () => {
   assert.equal(bills.json.items[0].po_id, po.id, "auto-bill links back to the received PO");
   assert.equal(bills.json.items[0].supplier_name, "Gamma Foods");
 });
+
+test("concurrent bill creates mint distinct bill_numbers (race-free counter)", async () => {
+  const app = await freshApp();
+  const sup = await call(app, "POST", "/api/purchasing/suppliers", { name: "Seq Supply" });
+  assert.equal(sup.status, 201);
+
+  // The legacy COUNT(*)+1 pattern let these all pick the same number.
+  const results = await Promise.all(
+    [1, 2, 3, 4, 5].map(() =>
+      call(app, "POST", "/api/billing/bills", { supplierId: sup.json.id, totalCents: 1000 }),
+    ),
+  );
+  assert.ok(results.every((r) => r.status === 201), JSON.stringify(results.map((r) => r.status)));
+  const numbers = results.map((r) => r.json.bill_number);
+  assert.equal(new Set(numbers).size, 5, `expected 5 distinct bill_numbers, got ${numbers.join(",")}`);
+});

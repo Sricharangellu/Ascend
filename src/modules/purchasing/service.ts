@@ -2,6 +2,7 @@ import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import { HttpError } from "../../shared/http.js";
+import { nextDocSeq } from "../../shared/docnumber.js";
 
 export interface CursorPage<T> {
   items: T[];
@@ -676,12 +677,10 @@ export class PurchasingService {
     if (!supplier) throw new HttpError(404, "not_found", `supplier '${supplierId}' not found`);
     const now = Date.now();
     const poId = `po_${uuidv7()}`;
-    // Auto-increment po_number: max existing + 1 for this tenant.
-    const lastPo = await this.db.one<{ n: number }>(
-      "SELECT COALESCE(MAX(po_number), 0)::int AS n FROM purchase_orders WHERE tenant_id = @t",
-      { t: tenantId },
-    );
-    const poNumber = (lastPo?.n ?? 0) + 1;
+    // Race-free po_number via the shared atomic counter — MAX(po_number)+1 let
+    // two concurrent creates mint the same number. Seeded from existing MAX in
+    // the migration so numbering continues without collision.
+    const poNumber = await nextDocSeq(this.db, tenantId, "purchase_orders");
     const poLines: PurchaseOrderLine[] = lines.map((l) => ({
       id: `pol_${uuidv7()}`,
       tenant_id: tenantId,

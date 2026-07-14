@@ -2,6 +2,7 @@ import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import { HttpError } from "../../shared/http.js";
+import { nextDocNumber } from "../../shared/docnumber.js";
 
 /** Billing — supplier bills (AP) and customer invoices (AR). Tenant-scoped.
  *  Bills can be auto-drafted from a received PO; invoices from an order.
@@ -58,9 +59,11 @@ const DAY = 86_400_000;
 export class BillingService {
   constructor(private readonly db: DB, private readonly events?: EventBus) {}
 
+  /** Race-free document numbers via the shared atomic counter. The legacy
+   *  COUNT(*)+1 pattern let two concurrent creates mint the same bill/invoice
+   *  number; counters are seeded from existing MAX suffixes in the migration. */
   private async nextNumber(table: string, prefix: string, tenantId: string): Promise<string> {
-    const row = await this.db.one<{ c: number }>(`SELECT COUNT(*)::int AS c FROM ${table} WHERE tenant_id = @tenantId`, { tenantId });
-    return `${prefix}-${String(Number(row?.c ?? 0) + 1).padStart(5, "0")}`;
+    return nextDocNumber(this.db, tenantId, table, prefix);
   }
 
   private nextStatus(total: number, paid: number): DocStatus {

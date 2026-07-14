@@ -99,11 +99,25 @@ END;
 $$;
 `;
 
+// Seed the race-free document counters (shared/docnumber.ts) from the current
+// MAX numeric suffix so existing bill/invoice numbering continues without
+// collision. Replaces the COUNT(*)+1 pattern that minted duplicate numbers
+// under concurrent creates. Fresh databases seed nothing → first is 00001.
+const SEED_BILLING_COUNTERS = `
+INSERT INTO document_counters (tenant_id, kind, val)
+  SELECT tenant_id, 'bills', COALESCE(MAX(CAST(SUBSTRING(bill_number FROM '[0-9]+$') AS BIGINT)), 0)
+    FROM bills GROUP BY tenant_id
+  ON CONFLICT (tenant_id, kind) DO NOTHING;
+INSERT INTO document_counters (tenant_id, kind, val)
+  SELECT tenant_id, 'invoices', COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM '[0-9]+$') AS BIGINT)), 0)
+    FROM invoices GROUP BY tenant_id
+  ON CONFLICT (tenant_id, kind) DO NOTHING;`;
+
 /** Billing — supplier bills (AP) + customer invoices (AR). A received PO
  *  auto-drafts a bill (via the purchase_order.received event). */
 export const billingModule: PosModule = {
   name: "billing",
-  migrations: [CREATE_BILLS, CREATE_INVOICES, CREATE_PAYMENTS, INDEXES, ALTER_BILLS_VARIANCE, ALTER_INVOICES_DUNNING, ALTER_INVOICES_SALES_ORDER, ALTER_BILLS_DISCOUNT, ADD_BILLING_ENTERPRISE],
+  migrations: [CREATE_BILLS, CREATE_INVOICES, CREATE_PAYMENTS, INDEXES, ALTER_BILLS_VARIANCE, ALTER_INVOICES_DUNNING, ALTER_INVOICES_SALES_ORDER, ALTER_BILLS_DISCOUNT, ADD_BILLING_ENTERPRISE, SEED_BILLING_COUNTERS],
   async register({ db, events, router }) {
     const service = new BillingService(db, events);
     events.on("purchase_order.received", async (event) => {
