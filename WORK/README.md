@@ -39,6 +39,7 @@ created anywhere else in the repo.
 | `LOCK.md` | Multi-agent coordination lock: active queue item, owner, files/areas, status | Update at session start and end; never ignore an active overlapping lock |
 | `FORWARD_PLAN.md` | Authoritative phase-based plan + release gates + audit prompt | Override only when the plan genuinely changes |
 | `FOUNDATION_HARDENING.md` | Queued whole-repo cleanup/consolidation/wiring initiative (run exclusively) | Update its progress log as sections complete |
+| `FUNCTIONAL_REBRAND_PLAN.md` | Queued initiative: rename remaining functional `finder_*`/`finder-pos.*` identifiers (cookies, storage keys, live URLs, demo creds) to Ascend — phased, zero-downtime sequence | Planning only until claimed; update in place as phases execute, never fork a variant |
 | `audits/AUDIT_<UTC-ISO>-<slug>.md` | Immutable audit snapshots + readiness matrices, archived under `WORK/audits/` | Append-only during its session; never edited after. **Name with a UTC timestamp + slug — NOT the next-free letter** (letters collide between parallel sessions) |
 
 Session read order is: `README.md` → `RULES.md` → `WORK_STATE.md` → `FORWARD_PLAN.md` →
