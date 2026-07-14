@@ -1067,7 +1067,8 @@ export interface Product {
   // Pricing
   msrp_cents: number | null;
   raw_cost_price_cents: number | null;
-  wholesale_price_cents: number | null;
+  /** Wholesale-only; the API omits this for tenants without the wholesale capability. */
+  wholesale_price_cents?: number | null;
   // Dimensions
   weight_grams: number | null;
   // Vendor

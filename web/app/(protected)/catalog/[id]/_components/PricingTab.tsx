@@ -6,6 +6,7 @@ import { Badge } from "@/components/Badge";
 import { apiGet, apiPost, apiPatch, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type { CatalogProduct } from "@/api-client/types";
+import { useCapabilities } from "@/contexts/CapabilitiesContext";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -62,6 +63,14 @@ const INPUT = "w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function PricingTab({ product }: { product: CatalogProduct }) {
+  const { capabilities } = useCapabilities();
+  // Strict package separation: wholesale-only pricing UI (wholesale price,
+  // quantity-break tiers, price books) renders solely for wholesale/hybrid
+  // tenants. Unknown/loading counts as retail — contamination fails closed.
+  // The backend scrubs these fields regardless; this keeps the UI honest.
+  const businessType = capabilities?.business?.type;
+  const wholesaleTenant = businessType === "wholesale" || businessType === "hybrid";
+
   const [data, setData] = useState<PricingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,7 +100,11 @@ export function PricingTab({ product }: { product: CatalogProduct }) {
     setBusy(true);
     try {
       await apiPatch(`/api/v1/catalog/${product.id}/pricing`, {
-        wholesale_price_cents: wholesale ? Math.round(parseFloat(wholesale) * 100) : null,
+        // Wholesale price is only sent by wholesale/hybrid tenants; the server
+        // strips it for anyone else, so a retail save can never clobber it.
+        ...(wholesaleTenant
+          ? { wholesale_price_cents: wholesale ? Math.round(parseFloat(wholesale) * 100) : null }
+          : {}),
         map_price_cents: map ? Math.round(parseFloat(map) * 100) : null,
       });
       await load();
@@ -153,17 +166,19 @@ export function PricingTab({ product }: { product: CatalogProduct }) {
         </div>
       </Section>
 
-      {/* ── Wholesale & MAP ───────────────────────────────────────────────── */}
-      <Section title="Wholesale & MAP Pricing" action={
+      {/* ── Wholesale (wholesale/hybrid tenants only) & MAP ───────────────── */}
+      <Section title={wholesaleTenant ? "Wholesale & MAP Pricing" : "MAP Pricing"} action={
         <Button size="sm" variant="primary" onClick={saveMeta} disabled={busy}>Save</Button>
       }>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Wholesale Price" hint="Price shown to wholesale / B2B customers">
-            <div className="relative">
-              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-400">$</span>
-              <input className={`${INPUT} pl-6`} value={wholesale} onChange={(e) => setWholesale(e.target.value)} placeholder="0.00" />
-            </div>
-          </Field>
+          {wholesaleTenant && (
+            <Field label="Wholesale Price" hint="Price shown to wholesale / B2B customers">
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-400">$</span>
+                <input className={`${INPUT} pl-6`} value={wholesale} onChange={(e) => setWholesale(e.target.value)} placeholder="0.00" />
+              </div>
+            </Field>
+          )}
           <Field label="MAP Price" hint="Minimum advertised price (enforcement is manual)">
             <div className="relative">
               <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-400">$</span>
@@ -173,13 +188,16 @@ export function PricingTab({ product }: { product: CatalogProduct }) {
         </div>
         {data && (
           <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500 sm:grid-cols-4">
-            <span>Saved wholesale: <strong className="text-slate-700">{data.wholesale_price_cents != null ? formatMoney(data.wholesale_price_cents) : "—"}</strong></span>
+            {wholesaleTenant && (
+              <span>Saved wholesale: <strong className="text-slate-700">{data.wholesale_price_cents != null ? formatMoney(data.wholesale_price_cents) : "—"}</strong></span>
+            )}
             <span>Saved MAP: <strong className="text-slate-700">{data.map_price_cents != null ? formatMoney(data.map_price_cents) : "—"}</strong></span>
           </div>
         )}
       </Section>
 
-      {/* ── Tier / Quantity Break Pricing ─────────────────────────────────── */}
+      {/* ── Wholesale-only: quantity breaks + price books (WP-04 concepts) ── */}
+      {wholesaleTenant && (<>
       <Section title="Quantity Break Pricing" action={
         <Button size="sm" variant="secondary" onClick={() => setShowAddTier((v) => !v)}>
           {showAddTier ? "Cancel" : "+ Add tier"}
@@ -299,6 +317,7 @@ export function PricingTab({ product }: { product: CatalogProduct }) {
           </div>
         )}
       </Section>
+      </>)}
 
     </div>
   );
