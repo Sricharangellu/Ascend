@@ -806,3 +806,21 @@ test("price and cost changes append to the price history (all paths)", async () 
   const again = await call(app, "GET", `/api/catalog/${p.json.id}/price-history`);
   assert.equal(again.json.items.length, 3);
 });
+
+test("bulk-price is atomic: one foreign id fails the whole batch with no changes (#M2)", async () => {
+  const app = await freshApp();
+  const a = await call(app, "POST", "/api/catalog/", { sku: "ATM-1", name: "A", price_cents: 1000 });
+  const b = await call(app, "POST", "/api/catalog/", { sku: "ATM-2", name: "B", price_cents: 2000 });
+
+  const res = await call(app, "POST", "/api/catalog/bulk-price", {
+    ids: [a.json.id, b.json.id, "prod_does_not_exist"],
+    target: "selling", op: "inc_pct", value: 10,
+  });
+  assert.equal(res.status, 404);
+
+  // Neither product changed — the batch validates before writing.
+  assert.equal((await call(app, "GET", `/api/catalog/${a.json.id}`)).json.price_cents, 1000);
+  assert.equal((await call(app, "GET", `/api/catalog/${b.json.id}`)).json.price_cents, 2000);
+  const hist = await call(app, "GET", `/api/catalog/${a.json.id}/price-history`);
+  assert.equal(hist.json.items.length, 0);
+});

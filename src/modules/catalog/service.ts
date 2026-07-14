@@ -43,21 +43,8 @@ export type PriceTarget = "selling" | "cost";
 export type PriceOp = "inc_pct" | "dec_pct" | "inc_amount" | "dec_amount" | "set" | "round_99" | "round_95";
 export const PRICE_OPS: readonly PriceOp[] = ["inc_pct", "dec_pct", "inc_amount", "dec_amount", "set", "round_99", "round_95"];
 
-/** Compute a new price (cents), clamped to >= 0. Percent ops round to the nearest cent. */
-function adjustPrice(current: number, op: PriceOp, value: number): number {
-  let next: number;
-  switch (op) {
-    case "inc_pct": next = Math.round(current * (1 + value / 100)); break;
-    case "dec_pct": next = Math.round(current * (1 - value / 100)); break;
-    case "inc_amount": next = current + value; break;
-    case "dec_amount": next = current - value; break;
-    case "set": next = value; break;
-    case "round_99": next = Math.floor(current / 100) * 100 + 99; break;
-    case "round_95": next = Math.floor(current / 100) * 100 + 95; break;
-    default: next = current;
-  }
-  return Math.max(0, Math.round(next));
-}
+// Price-op math lives in SQL now (priceOpExpr) so bulk adjustments run as one
+// set-based UPDATE — semantics unchanged: round to nearest cent, clamp >= 0.
 
 /** SQL ORDER BY clause for each sort mode. `manual` uses the channel's sort_order column. */
 function variantOrderBy(mode: VariantSortMode, orderCol: string): string {
@@ -982,16 +969,89 @@ export class CatalogService {
   /** Bulk price/cost adjustment computed per product (bulkUpdate can only set one
    *  value for all). `target` is the selling price or the raw cost; each result is
    *  clamped to >= 0. Reuses update() so events/validation still fire. */
-  async bulkAdjustPrice(ids: string[], target: PriceTarget, op: PriceOp, value: number, tenantId: string): Promise<Product[]> {
-    const field = target === "cost" ? "raw_cost_price_cents" : "price_cents";
-    const updated: Product[] = [];
-    for (const id of [...new Set(ids)]) {
-      const p = await this.getOrThrow(id, tenantId);
-      const current = target === "cost" ? (p.raw_cost_price_cents ?? 0) : p.price_cents;
-      const next = adjustPrice(current, op, value);
-      updated.push(await this.update(id, { [field]: next }, tenantId));
+  /** SQL expression for one price op over the given column (cents). The SQL
+   *  comes ONLY from this hardcoded whitelist keyed by the PriceOp enum; the
+   *  user-supplied value is always bound as @value, never interpolated. */
+  private priceOpExpr(op: PriceOp, col: string): string {
+    const cur = `COALESCE(${col}, 0)`;
+    switch (op) {
+      case "inc_pct":    return `ROUND(${cur} * (1 + @value / 100.0))`;
+      case "dec_pct":    return `ROUND(${cur} * (1 - @value / 100.0))`;
+      case "inc_amount": return `${cur} + @value`;
+      case "dec_amount": return `${cur} - @value`;
+      case "set":        return `@value`;
+      case "round_99":   return `FLOOR(${cur} / 100.0) * 100 + 99`;
+      case "round_95":   return `FLOOR(${cur} / 100.0) * 100 + 95`;
     }
-    return updated;
+  }
+
+  /** Set-based bulk price/cost adjustment (ACPA M2 — batch bulk ops).
+   *  One UPDATE + one history INSERT regardless of selection size, replacing
+   *  the per-product SELECT/UPDATE/INSERT loop (~4 × N round-trips). Contract
+   *  preserved: 404 if any id is foreign/missing, append-only price history
+   *  for real changes, per-row product.updated events for consumers. */
+  async bulkAdjustPrice(ids: string[], target: PriceTarget, op: PriceOp, value: number, tenantId: string): Promise<Product[]> {
+    const unique = [...new Set(ids)];
+    const field = target === "cost" ? "raw_cost_price_cents" : "price_cents";
+    const historyField = target === "cost" ? "cost" : "selling";
+    // Contract: every id must exist and belong to the tenant (single round-trip).
+    const found = await this.db.query<{ id: string }>(
+      "SELECT id FROM products WHERE tenant_id = @t AND id = ANY(@ids)",
+      { t: tenantId, ids: unique },
+    );
+    if (found.length !== unique.length) {
+      const have = new Set(found.map((r) => r.id));
+      const missing = unique.find((id) => !have.has(id));
+      throw notFound(`product '${missing}' not found`);
+    }
+
+    const expr = this.priceOpExpr(op, `old.${field}`);
+    const now = Date.now();
+    const changed: Array<Product & { old_value: number | null }> = [];
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
+      // Self-join exposes the pre-update value so history + events see old→new.
+      const rows = await tdb.query<Product & { old_value: number | null }>(
+        `UPDATE products p
+            SET ${field} = GREATEST(0, ROUND((${expr}))::bigint),
+                updated_at = @now
+           FROM products old
+          WHERE p.tenant_id = @t AND p.id = ANY(@ids)
+            AND old.id = p.id AND old.tenant_id = p.tenant_id
+        RETURNING p.*, old.${field} AS old_value`,
+        { t: tenantId, ids: unique, value, now },
+      );
+      const realChanges = rows.filter((r) => (r.old_value ?? 0) !== (r as unknown as Record<string, number>)[field]);
+      changed.push(...realChanges);
+      if (realChanges.length > 0) {
+        // Batched append-only history — one INSERT for the whole selection.
+        const values = realChanges
+          .map((_, i) => `(@id${i}, @t, @p${i}, @f, @old${i}, @new${i}, @now)`)
+          .join(", ");
+        const params: Record<string, unknown> = { t: tenantId, f: historyField, now };
+        realChanges.forEach((r, i) => {
+          params[`id${i}`] = `pph_${uuidv7()}`;
+          params[`p${i}`] = r.id;
+          params[`old${i}`] = r.old_value;
+          params[`new${i}`] = (r as unknown as Record<string, number>)[field];
+        });
+        await tdb.query(
+          `INSERT INTO product_price_history (id, tenant_id, product_id, field, old_price_cents, new_price_cents, changed_at)
+           VALUES ${values}`,
+          params,
+        );
+      }
+    });
+
+    // Per-row events for changed products — sync/ecommerce consumers unchanged.
+    for (const r of changed) {
+      await this.publishProductUpdated(r, { [field]: (r as unknown as Record<string, number>)[field] } as Partial<Product>);
+    }
+
+    // Return the full selection in the caller's shape (updated rows).
+    return this.db.query<Product>(
+      "SELECT * FROM products WHERE tenant_id = @t AND id = ANY(@ids)",
+      { t: tenantId, ids: unique },
+    );
   }
 
   /** Append-only price-change timeline for a product, newest first. */
