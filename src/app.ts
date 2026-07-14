@@ -369,7 +369,50 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   });
 
   // ── Orchestration layer (workflows, sagas, command handlers, background jobs)
-  bootstrapOrchestration(db, events);
+  const orchestration = bootstrapOrchestration(db, events);
+
+  // ── M0: serverless-safe job execution — GET/POST /api/jobs/tick
+  // The in-process consumer's setInterval only runs while an instance stays warm,
+  // which serverless does not guarantee: without an external heartbeat, queued
+  // jobs (payment reconciliation, outbox relay, dunning) can silently sit idle.
+  // Vercel Cron (see vercel.json) calls this endpoint every minute; each call
+  // drains due jobs within a small time budget using the existing consumer,
+  // whose FOR UPDATE SKIP LOCKED claim makes concurrent ticks safe.
+  //
+  // Auth mirrors /metrics: CRON_SECRET required in production (503 when unset,
+  // fail closed on the endpoint rather than open); in dev/test an unset secret
+  // keeps local smoke checks simple. Vercel sends `Authorization: Bearer
+  // ${CRON_SECRET}` automatically for cron invocations when the env var is set.
+  const jobsTick = handler(async (req, res) => {
+    const expected = process.env["CRON_SECRET"];
+    if (!expected && process.env["NODE_ENV"] === "production") {
+      res.status(503).json({ error: { code: "cron_unconfigured", message: "CRON_SECRET is not set." } });
+      return;
+    }
+    if (expected) {
+      const provided = req.headers.authorization?.replace(/^Bearer\s+/i, "");
+      if (provided !== expected) { res.status(401).end(); return; }
+    }
+
+    const BUDGET_MS = 4_000; // stay well inside serverless execution limits
+    const BATCH = 10;
+    const started = Date.now();
+    let processed = 0;
+    // Drain until no due jobs remain or the budget is spent.
+    for (;;) {
+      const n = await orchestration.jobConsumer.poll(BATCH);
+      processed += n;
+      if (n === 0 || Date.now() - started >= BUDGET_MS) break;
+    }
+    // Dead-lettered = terminally failed (attempts exhausted; excluded from claims).
+    // Surfaced here so an uptime/cron monitor can alert on growth (C-4).
+    const dead = await db.one<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM job_queue WHERE status = 'failed' AND attempts >= max_attempts",
+    );
+    res.json({ processed, deadLettered: dead?.n ?? 0, tookMs: Date.now() - started, ts: Date.now() });
+  });
+  app.get("/api/jobs/tick", jobsTick);   // Vercel Cron invokes via GET
+  app.post("/api/jobs/tick", jobsTick);  // manual/ops trigger
 
   // ── Server-Sent Events stream — GET /api/v1/stream
   const sseBroker = new SseBroker();
