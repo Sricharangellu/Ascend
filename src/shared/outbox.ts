@@ -61,13 +61,15 @@ export class Outbox {
    *  relay claimed `dispatched = FALSE` rows and republished them to ALL bus
    *  subscribers (including non-idempotent ones). The relay was removed in
    *  M1.2; rows use the `status` state machine exclusively. */
-  async enqueue(event: DomainEvent): Promise<string> {
+  async enqueue(event: DomainEvent, db: DB = this.db): Promise<string> {
     // The row IS the event (M1.3): same id, same occurredAt. Redelivery then
     // reconstructs a byte-identical event, so idempotency keys derived from
     // id or occurredAt match the synchronous dispatch exactly.
+    // Passing a transaction handle (M1.4 staged publish) makes the row commit
+    // atomically with the caller's business writes.
     const id = event.id ?? `obx_${uuidv7()}`;
     const tenantId = (event.payload as { tenantId?: string })?.tenantId ?? null;
-    await this.db.query(
+    await db.query(
       `INSERT INTO event_outbox (id, tenant_id, type, payload, aggregate_id, occurred_at, dispatched, status, attempts, created_at)
        VALUES (@id, @t, @type, @payload, @agg, @occurredAt, TRUE, 'pending', 0, @now)`,
       {

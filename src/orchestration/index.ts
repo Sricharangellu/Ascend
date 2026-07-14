@@ -130,6 +130,7 @@ import { closeRegisterJob } from "./jobs/close-register.job.js";
 import { syncEcommerceJob } from "./jobs/sync-ecommerce.job.js";
 import { arDunningJob } from "./jobs/ar-dunning.job.js";
 import { idempotencyExpiryJob, IDEMPOTENCY_EXPIRY_INTERVAL_MS } from "./jobs/idempotency-expiry.job.js";
+import { outboxRetentionJob, OUTBOX_RETENTION_INTERVAL_MS } from "./jobs/outbox-retention.job.js";
 
 export interface OrchestrationBootstrap {
   runner: WorkflowRunner;
@@ -259,6 +260,28 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
   if (backgroundJobsEnabled) {
     void jobProducer.enqueueOnce({
       type: QueueNames.IDEMPOTENCY_EXPIRY,
+      tenantId: "system",
+      payload: {},
+      runAt: Date.now(),
+      maxAttempts: 3,
+    }).catch(() => {});
+  }
+
+  // ACPA M1.4: daily retention sweep — purges delivered event_outbox rows and
+  // event_consumptions claims past the 30-day window.
+  jobConsumer.register(QueueNames.OUTBOX_RETENTION, async (job) => {
+    await outboxRetentionJob(job, db);
+    await jobProducer.enqueueOnce({
+      type: QueueNames.OUTBOX_RETENTION,
+      tenantId: "system",
+      payload: {},
+      runAt: Date.now() + OUTBOX_RETENTION_INTERVAL_MS,
+      maxAttempts: 3,
+    });
+  });
+  if (backgroundJobsEnabled) {
+    void jobProducer.enqueueOnce({
+      type: QueueNames.OUTBOX_RETENTION,
       tenantId: "system",
       payload: {},
       runAt: Date.now(),

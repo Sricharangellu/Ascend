@@ -88,8 +88,25 @@ pre-outbox behavior; nothing regresses, double-apply becomes impossible.
 Exactly-once (claim inside the consumer's business transaction) is the M1.4
 refinement.
 
+## Migration 1.4 (shipped — payments; purchasing deferred) — Staged publish + retention
+
+**Objective:** close the last durability hole — a crash after the business
+transaction commits but before `events.publish()` runs loses the event
+entirely (no outbox row exists yet).
+**Change:** `EventBus.stage(tdb, …)` writes the outbox row INSIDE the
+publisher's transaction (atomic with the business writes; rolls back with
+them); `EventBus.dispatchStaged(event)` runs the normal synchronous path
+after commit. `publish()` is now composed of the same primitives, so staged
+and unstaged events behave identically after commit. A daily retention job
+purges delivered outbox rows and consumption claims older than 30 days
+(pending rows always kept; failed rows parked for review).
+**Migrated:** payments.capture (revenue posting / order completion / loyalty
+can no longer be lost). **Deferred:** purchasing.receive staging — the
+purchasing module is under an active session-A claim (requisitions, E2);
+queued as the first follow-up when that claim releases.
+
 ## Epic backlog (EM-owned, in order)
-1. **E1 Durable events** — M1 ✅ (81dba0d) → M1.2 ✅ (tick runtime + relay removal) → M1.3 ✅ (stable event identity + all-financial-consumer migration + `event_consumptions` claims) → M1.4 in-transaction enqueue (publisher side) + claim-inside-consumer-tx + operational stock-flow events (order.completed FEFO depletion, order.refunded restock, stock.written_off) + delivered-row retention sweep.
+1. **E1 Durable events** — M1 ✅ (81dba0d) → M1.2 ✅ (tick runtime + relay removal) → M1.3 ✅ (stable event identity + all-financial-consumer migration + `event_consumptions` claims) → M1.4 ✅ (staged publish: payments; retention sweep) → M1.5 purchasing.receive staging (after E2 claim releases) + claim-inside-consumer-tx (true exactly-once) + operational stock-flow events (order.completed FEFO depletion, order.refunded restock, stock.written_off).
 2. **E2 Procurement completion** — requisitions → GRN → 3-way match → GRNI (parked slices; also feeds workflow-engine generalization).
 3. **E3 Scale mechanics** — batch bulk ops (step 4), pooling + runtime (step 6), reporting read models.
 4. **E4 Workflow/rules generalization** — unify PO+requisition approvals; extract rule evaluation.
