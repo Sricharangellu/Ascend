@@ -61,8 +61,35 @@ and stale self-re-enqueueing `outbox_relay` rows are purged at bootstrap.
 **Ops note:** set `CRON_SECRET` in the Vercel project env — without it the
 endpoint 503s and background jobs still do not run on serverless.
 
+## Migration 1.3 (shipped) — Stable event identity + all financial consumers durable
+
+**Objective:** every consumer of a financial event survives crash redelivery
+without double-applying, and idempotency keys cannot drift between the
+synchronous dispatch and a redelivery.
+**Bug fixed en route:** the reconciler used to rebuild redelivered events with
+`occurredAt` derived from the row's `created_at` — a *different* timestamp
+than the original dispatch, which silently broke accounting's
+`${docId}:${occurredAt}` idempotency keys in exactly the crash window the
+outbox exists for (double-posting). Events now carry a stable `id`
+(`evt_…`, uuidv7, assigned once in `EventBus.publish`) and the outbox row IS
+the event — same id, same `occurredAt` — so redelivery is byte-identical.
+**Consumer migration (all bus consumers of durable financial events):**
+- accounting postings — already idempotent (`hasPosting`), keys now stable.
+- billing auto-bill — already idempotent (existing-bill check).
+- billing AR-invoice on `sales_order.invoiced` — NEW durable; idempotent by
+  natural key (one invoice per sales order).
+- orders `markCompleted` — NEW durable; naturally idempotent (open→completed).
+- inventory receiving — NEW durable; claims the event id first via the new
+  `event_consumptions` table (`claimEventOnce`, PK (consumer, event_id)).
+- customers loyalty points — NEW durable; same claim-first pattern.
+**Claim-first semantics:** at-most-once per (consumer, event) — a crash
+between claim and apply loses that consumer's effect, exactly like the
+pre-outbox behavior; nothing regresses, double-apply becomes impossible.
+Exactly-once (claim inside the consumer's business transaction) is the M1.4
+refinement.
+
 ## Epic backlog (EM-owned, in order)
-1. **E1 Durable events** — M1 ✅ (81dba0d) → M1.2 ✅ (tick runtime + relay removal) → M1.3 all-consumer migration + idempotency keys + in-transaction enqueue.
+1. **E1 Durable events** — M1 ✅ (81dba0d) → M1.2 ✅ (tick runtime + relay removal) → M1.3 ✅ (stable event identity + all-financial-consumer migration + `event_consumptions` claims) → M1.4 in-transaction enqueue (publisher side) + claim-inside-consumer-tx + operational stock-flow events (order.completed FEFO depletion, order.refunded restock, stock.written_off) + delivered-row retention sweep.
 2. **E2 Procurement completion** — requisitions → GRN → 3-way match → GRNI (parked slices; also feeds workflow-engine generalization).
 3. **E3 Scale mechanics** — batch bulk ops (step 4), pooling + runtime (step 6), reporting read models.
 4. **E4 Workflow/rules generalization** — unify PO+requisition approvals; extract rule evaluation.

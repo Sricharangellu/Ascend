@@ -24,6 +24,7 @@ export interface OutboxRow {
   type: string;
   payload: string; // JSON DomainEvent payload
   aggregate_id: string | null;
+  occurred_at: string; // the ORIGINAL event's ISO timestamp — stable across redelivery
   status: "pending" | "delivered" | "failed";
   attempts: number;
   last_error: string | null;
@@ -60,17 +61,20 @@ export class Outbox {
    *  relay claimed `dispatched = FALSE` rows and republished them to ALL bus
    *  subscribers (including non-idempotent ones). The relay was removed in
    *  M1.2; rows use the `status` state machine exclusively. */
-  async enqueue(type: string, payload: unknown, aggregateId?: string): Promise<string> {
-    const id = `obx_${uuidv7()}`;
-    const tenantId = (payload as { tenantId?: string })?.tenantId ?? null;
+  async enqueue(event: DomainEvent): Promise<string> {
+    // The row IS the event (M1.3): same id, same occurredAt. Redelivery then
+    // reconstructs a byte-identical event, so idempotency keys derived from
+    // id or occurredAt match the synchronous dispatch exactly.
+    const id = event.id ?? `obx_${uuidv7()}`;
+    const tenantId = (event.payload as { tenantId?: string })?.tenantId ?? null;
     await this.db.query(
       `INSERT INTO event_outbox (id, tenant_id, type, payload, aggregate_id, occurred_at, dispatched, status, attempts, created_at)
        VALUES (@id, @t, @type, @payload, @agg, @occurredAt, TRUE, 'pending', 0, @now)`,
       {
-        id, t: tenantId ?? "system", type,
-        payload: JSON.stringify(payload ?? {}),
-        agg: aggregateId ?? id, // column is NOT NULL in the legacy schema
-        occurredAt: new Date().toISOString(),
+        id, t: tenantId ?? "system", type: event.type,
+        payload: JSON.stringify(event.payload ?? {}),
+        agg: event.aggregateId ?? id, // column is NOT NULL in the legacy schema
+        occurredAt: event.occurredAt,
         now: Date.now(),
       },
     );
@@ -102,8 +106,9 @@ export class Outbox {
     for (const row of rows) {
       const handlers = this.durable.get(row.type) ?? [];
       const event: DomainEvent = {
+        id: row.id,
         type: row.type,
-        occurredAt: new Date(Number(row.created_at)).toISOString(),
+        occurredAt: row.occurred_at, // NOT created_at — must match the sync dispatch
         payload: JSON.parse(row.payload) as unknown,
         ...(row.aggregate_id ? { aggregateId: row.aggregate_id } : {}),
       };
@@ -126,6 +131,35 @@ export class Outbox {
   }
 }
 
+/**
+ * Consumer-side idempotency claim (ACPA M1.3). A consumer that is not
+ * naturally idempotent (inventory stock increments, loyalty points) claims the
+ * event id before applying it; the PRIMARY KEY makes the second claim a no-op,
+ * so sync dispatch + outbox redelivery can never double-apply.
+ *
+ * Semantics: claim-first gives at-most-once per (consumer, event) — a crash
+ * between claim and apply loses that consumer's effect, exactly like the
+ * pre-outbox behavior. Consumers that can claim inside their own business
+ * transaction get exactly-once. Events without an id (hand-built, pre-M1.3)
+ * are processed unguarded, matching their previous semantics.
+ */
+export async function claimEventOnce(
+  db: DB,
+  consumer: string,
+  event: DomainEvent,
+): Promise<boolean> {
+  if (!event.id) return true;
+  const tenantId = (event.payload as { tenantId?: string })?.tenantId ?? null;
+  const rows = await db.query<{ event_id: string }>(
+    `INSERT INTO event_consumptions (consumer, event_id, tenant_id, consumed_at)
+     VALUES (@consumer, @eventId, @t, @now)
+     ON CONFLICT (consumer, event_id) DO NOTHING
+     RETURNING event_id`,
+    { consumer, eventId: event.id, t: tenantId, now: Date.now() },
+  );
+  return rows.length > 0;
+}
+
 // The event_outbox TABLE already exists (identity migrations, DB-8) but had no
 // producers — dormant plumbing. Rather than a duplicate table, M1 extends it
 // with a proper delivery state machine. The legacy `dispatched` flag survives
@@ -137,4 +171,14 @@ ALTER TABLE event_outbox ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFA
 ALTER TABLE event_outbox ADD COLUMN IF NOT EXISTS last_error TEXT;
 ALTER TABLE event_outbox ADD COLUMN IF NOT EXISTS delivered_at BIGINT;
 CREATE INDEX IF NOT EXISTS event_outbox_status_pending_idx ON event_outbox (status, created_at) WHERE status = 'pending';
+`;
+
+export const CREATE_EVENT_CONSUMPTIONS = `
+CREATE TABLE IF NOT EXISTS event_consumptions (
+  consumer    TEXT NOT NULL,
+  event_id    TEXT NOT NULL,
+  tenant_id   TEXT,
+  consumed_at BIGINT NOT NULL,
+  PRIMARY KEY (consumer, event_id)
+);
 `;

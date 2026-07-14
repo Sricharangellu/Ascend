@@ -331,3 +331,22 @@ test("a failing durable consumer increments attempts and stays pending for retry
   assert.equal(Number(row!.attempts), 1);
   assert.match(row!.last_error, /boom/);
 });
+
+test("stable event identity: crash between dispatch and delivery-marking never double-posts (ACPA M1.3)", async () => {
+  const app = await freshApp();
+  await setupReceivedPO(app);
+  const before = await app.db.one<{ n: number }>("SELECT COUNT(*)::int AS n FROM journal_entries", {});
+
+  // Crash window: every delivered row goes back to pending, then the reconciler
+  // redelivers. Because redelivered events carry the ORIGINAL occurredAt (not a
+  // regenerated timestamp), every posting's idempotency key matches and no
+  // consumer double-applies.
+  await app.db.query(
+    "UPDATE event_outbox SET status = 'pending', created_at = @past WHERE status = 'delivered'",
+    { past: Date.now() - 60_000 },
+  );
+  const r = await app.outbox.reconcile();
+  assert.ok(r.delivered >= 2, "rows were redelivered");
+  const after = await app.db.one<{ n: number }>("SELECT COUNT(*)::int AS n FROM journal_entries", {});
+  assert.equal(after!.n, before!.n, "journal must not grow on redelivery");
+});

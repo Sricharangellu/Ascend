@@ -362,3 +362,48 @@ test("availability is zeros for a product with no activity", async () => {
   const avail = await call(app, "GET", `/api/inventory/${prod.id}/availability`);
   assert.deepEqual(avail.json, { on_hand: 0, reserved: 0, incoming: 0, available: 0 });
 });
+
+// ─── Durable receiving (ACPA M1.3) ────────────────────────────────────────────
+
+test("a redelivered purchase_order.received never double-counts stock", async () => {
+  const app = await freshApp();
+  const evt = await app.events.publish(
+    "purchase_order.received",
+    { tenantId: "tnt_demo", poId: "po_m13", lines: [{ productId: "prod_m13", quantity: 7 }] },
+    "po_m13",
+  );
+  let got = await call(app, "GET", "/api/inventory/prod_m13");
+  assert.equal(got.json.stockQty, 7);
+
+  // Crash window: dispatch completed but the row was never marked delivered.
+  await app.db.query(
+    "UPDATE event_outbox SET status = 'pending', created_at = @past WHERE id = @id",
+    { past: Date.now() - 60_000, id: evt.id },
+  );
+  const r = await app.outbox.reconcile();
+  assert.equal(r.delivered, 1); // redelivered to durable consumers…
+  got = await call(app, "GET", "/api/inventory/prod_m13");
+  assert.equal(got.json.stockQty, 7); // …but the consumption claim blocks a second apply
+});
+
+test("crash before dispatch: a pending receive is applied exactly once by the reconciler", async () => {
+  const app = await freshApp();
+  await app.db.query(
+    `INSERT INTO event_outbox (id, tenant_id, type, payload, aggregate_id, occurred_at, dispatched, status, attempts, created_at)
+     VALUES ('evt_m13_lost', 'tnt_demo', 'purchase_order.received', @payload, 'po_lost', @occ, TRUE, 'pending', 0, @past)`,
+    {
+      payload: JSON.stringify({ tenantId: "tnt_demo", poId: "po_lost", lines: [{ productId: "prod_lost", quantity: 3 }] }),
+      occ: new Date().toISOString(),
+      past: Date.now() - 60_000,
+    },
+  );
+  await app.outbox.reconcile();
+  let got = await call(app, "GET", "/api/inventory/prod_lost");
+  assert.equal(got.json.stockQty, 3);
+
+  // A second redelivery of the same row must be a no-op.
+  await app.db.query("UPDATE event_outbox SET status = 'pending', created_at = @past WHERE id = 'evt_m13_lost'", { past: Date.now() - 60_000 });
+  await app.outbox.reconcile();
+  got = await call(app, "GET", "/api/inventory/prod_lost");
+  assert.equal(got.json.stockQty, 3);
+});

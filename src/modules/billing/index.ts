@@ -131,12 +131,22 @@ export const billingModule: PosModule = {
     outbox?.onDurable("purchase_order.received", autoBill);
     // A sales order converted to an invoice raises the matching AR invoice,
     // linked back to the sales order so delivery/sales views can show it.
-    events.on("sales_order.invoiced", async (event) => {
+    // Durable (ACPA M1.3): idempotent by natural key — one AR invoice per
+    // sales order — so crash redelivery can never raise a duplicate.
+    const raiseArInvoice = async (event: { payload: unknown }) => {
       const p = event.payload as { tenantId?: string; customerId?: string; totalCents?: number; salesOrderId?: string };
-      if (p.tenantId && p.customerId && p.totalCents && p.totalCents > 0) {
-        await service.createInvoice({ customerId: p.customerId, totalCents: p.totalCents, salesOrderId: p.salesOrderId }, p.tenantId);
+      if (!p.tenantId || !p.customerId || !p.totalCents || p.totalCents <= 0) return;
+      if (p.salesOrderId) {
+        const existing = await db.one<{ id: string }>(
+          "SELECT id FROM invoices WHERE tenant_id = @t AND sales_order_id = @so LIMIT 1",
+          { t: p.tenantId, so: p.salesOrderId },
+        );
+        if (existing) return; // already invoiced (redelivery or retry)
       }
-    });
+      await service.createInvoice({ customerId: p.customerId, totalCents: p.totalCents, salesOrderId: p.salesOrderId }, p.tenantId);
+    };
+    events.on("sales_order.invoiced", raiseArInvoice);
+    outbox?.onDurable("sales_order.invoiced", raiseArInvoice);
     registerRoutes(router, service);
   },
 };

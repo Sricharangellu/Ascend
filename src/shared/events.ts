@@ -1,3 +1,4 @@
+import { v7 as uuidv7 } from "uuid";
 import type { Redis } from "./redis.js";
 import type { DomainEvent } from "./types.js";
 
@@ -6,7 +7,7 @@ type Handler = (event: DomainEvent) => void | Promise<void>;
 /** Structural interface so events.ts doesn't import the outbox implementation. */
 interface OutboxLike {
   hasDurable(type: string): boolean;
-  enqueue(type: string, payload: unknown, aggregateId?: string): Promise<string>;
+  enqueue(event: DomainEvent): Promise<string>;
   markDelivered(id: string): Promise<void>;
 }
 
@@ -66,6 +67,7 @@ export class EventBus {
    */
   async publish<T>(type: string, payload: T, aggregateId?: string): Promise<DomainEvent<T>> {
     const event: DomainEvent<T> = {
+      id: `evt_${uuidv7()}`,
       type,
       payload,
       aggregateId,
@@ -74,9 +76,11 @@ export class EventBus {
     // Durability first (ACPA M1): persist financially-critical events before
     // dispatch. If a handler (or the process) dies mid-dispatch, the pending
     // row is redelivered to idempotent durable consumers by the reconciler.
+    // The FULL event is persisted (M1.3) so redelivery carries the identical
+    // id/occurredAt — consumer idempotency keys stay stable across deliveries.
     let outboxId: string | null = null;
     if (this._outbox?.hasDurable(type)) {
-      outboxId = await this._outbox.enqueue(type, payload, aggregateId);
+      outboxId = await this._outbox.enqueue(event as DomainEvent);
     }
     await this._dispatch(event);
     if (outboxId && this._outbox) {
