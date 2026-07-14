@@ -54,12 +54,12 @@ export class Outbox {
 
   /** Persist the event before dispatch (called by EventBus.publish). v1 writes
    *  on its own connection immediately before dispatch; in-transaction enqueue
-   *  lands with M1.2 when publishers move inside the business tx.
+   *  lands with M1.3 when publishers move inside the business tx.
    *
-   *  `dispatched = TRUE` is deliberate: the legacy orchestration outbox-relay
-   *  claims `dispatched = FALSE` rows and republishes them to ALL bus
-   *  subscribers (including non-idempotent ones). Our rows use the `status`
-   *  state machine instead and must stay invisible to that relay. */
+   *  `dispatched = TRUE` is kept for schema compatibility: the retired DB-8
+   *  relay claimed `dispatched = FALSE` rows and republished them to ALL bus
+   *  subscribers (including non-idempotent ones). The relay was removed in
+   *  M1.2; rows use the `status` state machine exclusively. */
   async enqueue(type: string, payload: unknown, aggregateId?: string): Promise<string> {
     const id = `obx_${uuidv7()}`;
     const tenantId = (payload as { tenantId?: string })?.tenantId ?? null;
@@ -128,9 +128,9 @@ export class Outbox {
 
 // The event_outbox TABLE already exists (identity migrations, DB-8) but had no
 // producers — dormant plumbing. Rather than a duplicate table, M1 extends it
-// with a proper delivery state machine. The legacy `dispatched` flag is kept
-// for the old relay job's benefit (we always write TRUE so it never claims our
-// rows); the relay is scheduled for removal in M1.2.
+// with a proper delivery state machine. The legacy `dispatched` flag survives
+// only as a schema artifact: its relay job was removed in M1.2 (we still write
+// TRUE for compatibility with rows older deploys might inspect).
 export const CREATE_EVENT_OUTBOX = `
 ALTER TABLE event_outbox ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending';
 ALTER TABLE event_outbox ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0;

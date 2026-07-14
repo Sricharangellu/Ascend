@@ -44,8 +44,25 @@ attempts with backoff.
 inventory gains idempotency keys (movements.ref) → all consumers move behind
 the outbox → read models (reporting) feed from the same stream.
 
+## Migration 1.2 (shipped) — Serverless job runtime + relay retirement
+
+**Objective:** background work must actually run in prod (critical C-2 — the
+in-process `setInterval` pollers freeze between serverless invocations), and
+the double-dispatch hazard (DB-8 relay republishing to non-idempotent
+consumers) must be gone, not just fenced off.
+**Change:** `GET /jobs/tick` — an infra endpoint (CRON_SECRET bearer,
+`/metrics`-style guard: 503 when unconfigured in production) that drains due
+`job_queue` rows (bounded loop) and runs the outbox reconciler in one call.
+Vercel Cron (`vercel.json` crons, `*/5 * * * *`) drives it; Vercel injects the
+`Authorization: Bearer ${CRON_SECRET}` header automatically. Long-lived
+deploys keep their intervals — overlapping ticks are safe (FOR UPDATE SKIP
+LOCKED + idempotent durable consumers). The DB-8 outbox relay job is deleted
+and stale self-re-enqueueing `outbox_relay` rows are purged at bootstrap.
+**Ops note:** set `CRON_SECRET` in the Vercel project env — without it the
+endpoint 503s and background jobs still do not run on serverless.
+
 ## Epic backlog (EM-owned, in order)
-1. **E1 Durable events** — M1 (this commit) → M1.2 worker-driven dispatch (with runtime move) → M1.3 all-consumer migration + idempotency keys.
+1. **E1 Durable events** — M1 ✅ (81dba0d) → M1.2 ✅ (tick runtime + relay removal) → M1.3 all-consumer migration + idempotency keys + in-transaction enqueue.
 2. **E2 Procurement completion** — requisitions → GRN → 3-way match → GRNI (parked slices; also feeds workflow-engine generalization).
 3. **E3 Scale mechanics** — batch bulk ops (step 4), pooling + runtime (step 6), reporting read models.
 4. **E4 Workflow/rules generalization** — unify PO+requisition approvals; extract rule evaluation.
