@@ -3,6 +3,13 @@ import type { DomainEvent } from "./types.js";
 
 type Handler = (event: DomainEvent) => void | Promise<void>;
 
+/** Structural interface so events.ts doesn't import the outbox implementation. */
+interface OutboxLike {
+  hasDurable(type: string): boolean;
+  enqueue(type: string, payload: unknown, aggregateId?: string): Promise<string>;
+  markDelivered(id: string): Promise<void>;
+}
+
 const REDIS_CHANNEL = "finder:events";
 
 /**
@@ -24,6 +31,14 @@ export class EventBus {
   private readonly byType = new Map<string, Handler[]>();
   private readonly _id = Math.random().toString(36).slice(2, 10);
   private _pub: Redis | null = null;
+  private _outbox: OutboxLike | null = null;
+
+  /** Wire the transactional outbox (ACPA M1). Events whose type has a durable
+   *  consumer are persisted before dispatch and marked delivered after, so a
+   *  crash mid-dispatch leaves a pending row for the reconciler. */
+  setOutbox(outbox: OutboxLike): void {
+    this._outbox = outbox;
+  }
 
   /** Subscribe to all events. */
   onAny(handler: Handler): void {
@@ -56,7 +71,17 @@ export class EventBus {
       aggregateId,
       occurredAt: new Date().toISOString(),
     };
+    // Durability first (ACPA M1): persist financially-critical events before
+    // dispatch. If a handler (or the process) dies mid-dispatch, the pending
+    // row is redelivered to idempotent durable consumers by the reconciler.
+    let outboxId: string | null = null;
+    if (this._outbox?.hasDurable(type)) {
+      outboxId = await this._outbox.enqueue(type, payload, aggregateId);
+    }
     await this._dispatch(event);
+    if (outboxId && this._outbox) {
+      await this._outbox.markDelivered(outboxId);
+    }
     if (this._pub) {
       try {
         await this._pub.publish(

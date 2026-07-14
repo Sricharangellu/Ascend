@@ -118,12 +118,17 @@ INSERT INTO document_counters (tenant_id, kind, val)
 export const billingModule: PosModule = {
   name: "billing",
   migrations: [CREATE_BILLS, CREATE_INVOICES, CREATE_PAYMENTS, INDEXES, ALTER_BILLS_VARIANCE, ALTER_INVOICES_DUNNING, ALTER_INVOICES_SALES_ORDER, ALTER_BILLS_DISCOUNT, ADD_BILLING_ENTERPRISE, SEED_BILLING_COUNTERS],
-  async register({ db, events, router }) {
+  async register({ db, events, router, outbox }) {
     const service = new BillingService(db, events);
-    events.on("purchase_order.received", async (event) => {
+    // Auto-bill on receive. Registered on the bus AND as a durable outbox
+    // consumer (ACPA M1): billFromPO is idempotent (skips if a bill exists),
+    // so crash redelivery can never draft a duplicate bill.
+    const autoBill = async (event: { payload: unknown }) => {
       const p = event.payload as { tenantId?: string; poId?: string };
       if (p.tenantId && p.poId) await service.billFromPO(p.poId, p.tenantId);
-    });
+    };
+    events.on("purchase_order.received", autoBill);
+    outbox?.onDurable("purchase_order.received", autoBill);
     // A sales order converted to an invoice raises the matching AR invoice,
     // linked back to the sales order so delivery/sales views can show it.
     events.on("sales_order.invoiced", async (event) => {

@@ -82,7 +82,7 @@ CREATE INDEX IF NOT EXISTS deposit_items_batch_idx ON batch_deposit_items (tenan
 export const accountingModule: PosModule = {
   name: "accounting",
   migrations: [CREATE_ACCOUNTS, CREATE_BATCH_DEPOSITS, CREATE_DEPOSIT_ITEMS, CREATE_JOURNAL, INDEXES],
-  register({ db, events, router }) {
+  register({ db, events, router, outbox }) {
     const service = new AccountingService(db);
     registerRoutes(router, service);
 
@@ -99,8 +99,16 @@ export const accountingModule: PosModule = {
       }
     };
 
+    // Each posting handler registers TWICE: on the bus (normal synchronous
+    // path) and as a durable outbox consumer (crash redelivery, ACPA M1).
+    // All are idempotent via hasPosting(), so redelivery can never double-post.
+    const onBoth = (type: string, handler: (event: { occurredAt: string; payload: unknown }) => Promise<void>) => {
+      events.on(type, handler);
+      outbox?.onDurable(type, handler);
+    };
+
     // Goods received → inventory asset up, GRNI liability up.
-    events.on("purchase_order.received", async (event) => {
+    onBoth("purchase_order.received", async (event) => {
       const p = event.payload as { tenantId: string; poId: string; lines?: Array<{ quantity: number; unitCostCents: number }> };
       const goods = (p.lines ?? []).reduce((s, l) => s + l.quantity * l.unitCostCents, 0);
       if (goods <= 0) return;
@@ -114,7 +122,7 @@ export const accountingModule: PosModule = {
     });
 
     // Vendor bill posted → GRNI relieved, AP recognized.
-    events.on("bill.created", async (event) => {
+    onBoth("bill.created", async (event) => {
       const p = event.payload as { tenantId: string; billId: string; totalCents: number };
       if (!p.totalCents || p.totalCents <= 0) return;
       await post("bill", p.billId, p.tenantId, [
@@ -124,7 +132,7 @@ export const accountingModule: PosModule = {
     });
 
     // Vendor bill paid → AP relieved, bank down. One posting per payment.
-    events.on("bill.paid", async (event) => {
+    onBoth("bill.paid", async (event) => {
       const p = event.payload as { tenantId: string; billId: string; amountCents: number };
       if (!p.amountCents || p.amountCents <= 0) return;
       await post("bill_payment", `${p.billId}:${event.occurredAt}`, p.tenantId, [
@@ -134,7 +142,7 @@ export const accountingModule: PosModule = {
     });
 
     // POS payment captured → cash up, revenue recognized (net of change given).
-    events.on("payment.captured", async (event) => {
+    onBoth("payment.captured", async (event) => {
       const p = event.payload as { tenantId: string; id: string; orderId: string; amountCents: number; changeCents?: number };
       const net = p.amountCents - (p.changeCents ?? 0);
       if (net <= 0) return;

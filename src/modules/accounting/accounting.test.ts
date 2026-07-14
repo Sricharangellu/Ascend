@@ -259,3 +259,75 @@ test("manual journal transactions must balance and use known accounts", async ()
   assert.equal(ok.json.items.length, 2);
   assert.equal(ok.json.items[0].doc_type, "manual");
 });
+
+// ─── Transactional outbox (ACPA M1) ───────────────────────────────────────────
+
+test("normal flow: financial events are persisted and marked delivered", async () => {
+  const app = await freshApp();
+  await setupReceivedPO(app);
+
+  // receive publishes purchase_order.received (durable) and auto-bill publishes
+  // bill.created (durable) — both rows must exist and be delivered, none pending.
+  const rows = await app.db.query<{ type: string; status: string }>(
+    "SELECT type, status FROM event_outbox ORDER BY created_at", {},
+  );
+  const types = rows.map((r) => r.type);
+  assert.ok(types.includes("purchase_order.received"), `outbox rows: ${types.join(",")}`);
+  assert.ok(types.includes("bill.created"));
+  assert.ok(rows.every((r) => r.status === "delivered"), "no row may stay pending on the happy path");
+});
+
+test("crash recovery: a pending outbox row is redelivered to idempotent consumers exactly once", async () => {
+  const app = await freshApp();
+  const sup = await call(app, "POST", "/api/purchasing/suppliers", { name: "Crash Supply" });
+
+  // Simulate a crash after the business write but before dispatch: a bill.created
+  // event sits in the outbox as 'pending' with no ledger posting made.
+  const billId = "bil_crashsim_1";
+  await app.db.query(
+    `INSERT INTO event_outbox (id, tenant_id, type, payload, aggregate_id, occurred_at, dispatched, status, attempts, created_at)
+     VALUES ('obx_crash_1', 'tnt_demo', 'bill.created', @payload, @agg, @occ, TRUE, 'pending', 0, @past)`,
+    {
+      payload: JSON.stringify({ tenantId: "tnt_demo", billId, supplierId: sup.json.id, poId: null, totalCents: 7700 }),
+      agg: billId,
+      occ: new Date().toISOString(),
+      past: Date.now() - 60_000, // older than the reconciler's in-flight window
+    },
+  );
+
+  // First reconcile: posts Dr GRNI / Cr AP for the lost event.
+  const first = await app.outbox.reconcile();
+  assert.equal(first.delivered, 1);
+  const journal = await call(app, "GET", `/api/accounting/journal?docType=bill&docId=${billId}`);
+  assert.equal(journal.json.items.length, 2); // one balanced transaction
+  assert.equal(journal.json.items.reduce((s: number, e: any) => s + e.debit_cents, 0), 7700);
+
+  // Row is now delivered; a second reconcile must not double-post (idempotency).
+  const second = await app.outbox.reconcile();
+  assert.equal(second.delivered, 0);
+  const again = await call(app, "GET", `/api/accounting/journal?docType=bill&docId=${billId}`);
+  assert.equal(again.json.items.length, 2);
+});
+
+test("a failing durable consumer increments attempts and stays pending for retry", async () => {
+  const app = await freshApp();
+  // Malformed payload → JSON.parse succeeds but posting is skipped (totalCents 0
+  // → handler no-ops → delivered). Use a genuinely failing case: unparseable is
+  // impossible here, so register a one-shot failing consumer type instead.
+  let calls = 0;
+  app.outbox.onDurable("test.always_fails", async () => { calls++; throw new Error("boom"); });
+  await app.db.query(
+    `INSERT INTO event_outbox (id, tenant_id, type, payload, aggregate_id, occurred_at, dispatched, status, attempts, created_at)
+     VALUES ('obx_fail_1', 'tnt_demo', 'test.always_fails', '{}', 'obx_fail_1', @occ, TRUE, 'pending', 0, @past)`,
+    { occ: new Date().toISOString(), past: Date.now() - 60_000 },
+  );
+  const r = await app.outbox.reconcile();
+  assert.equal(r.failed, 1);
+  assert.equal(calls, 1);
+  const row = await app.db.one<{ status: string; attempts: number; last_error: string }>(
+    "SELECT status, attempts, last_error FROM event_outbox WHERE id = 'obx_fail_1'", {},
+  );
+  assert.equal(row!.status, "pending"); // retried on the next sweep
+  assert.equal(Number(row!.attempts), 1);
+  assert.match(row!.last_error, /boom/);
+});

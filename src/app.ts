@@ -4,6 +4,7 @@ import helmet from "helmet";
 import { openDb, type DB } from "./shared/db.js";
 import { openRedis } from "./shared/redis.js";
 import { EventBus } from "./shared/events.js";
+import { Outbox } from "./shared/outbox.js";
 import { logger } from "./shared/logger.js";
 import { buildInfo } from "./shared/version.js";
 import { errorMiddleware } from "./shared/http.js";
@@ -30,6 +31,8 @@ export interface App {
   express: Express;
   db: DB;
   events: EventBus;
+  /** Transactional outbox (ACPA M1) — exposed for crash-recovery tests. */
+  outbox: Outbox;
   /** Call on graceful shutdown to disconnect the Redis event-bus subscriber. */
   cleanup: () => Promise<void>;
 }
@@ -75,6 +78,10 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   const schema = options.schema ?? "public";
   const db = openDb({ connectionString: options.connectionString, schema });
   const events = new EventBus();
+  // ACPA M1: transactional outbox — financially-critical events are persisted
+  // before dispatch and redelivered to idempotent durable consumers on crash.
+  const outbox = new Outbox(db);
+  events.setOutbox(outbox);
   const redis = openRedis();
   const app = express();
 
@@ -339,8 +346,17 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   //    routes are already top-level resource names.)
   for (const mod of modules) {
     const router = Router();
-    await mod.register({ db, events, router });
+    await mod.register({ db, events, router, outbox });
     app.use(mod.mountPath ?? `/api/v1/${mod.name}`, router);
+  }
+
+  // Outbox crash recovery: deliver any events left pending by a previous
+  // process death, then sweep periodically when background jobs are enabled.
+  void outbox.reconcile().catch((err) => logger.warn({ err }, "outbox boot reconcile failed"));
+  if (process.env["FINDER_BACKGROUND_JOBS"] !== "false") {
+    setInterval(() => {
+      void outbox.reconcile().catch((err) => logger.warn({ err }, "outbox sweep failed"));
+    }, 60_000).unref();
   }
 
   // ── Root info
@@ -431,5 +447,5 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   app.use(errorMiddleware);
   app.use(errorEnvelopeMiddleware);
 
-  return { express: app, db, events, cleanup: cleanupEventBridge };
+  return { express: app, db, events, outbox, cleanup: cleanupEventBridge };
 }
