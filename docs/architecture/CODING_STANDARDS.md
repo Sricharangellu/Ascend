@@ -10,8 +10,12 @@ Match the surrounding code. These are the idioms the codebase actually uses.
 - IDs: `prefix_uuidv7()` (`prod_`, `po_`, `jre_`…).
 - Modules: `{ name, migrations[], register({db, events, router, outbox?}) }`;
   migrations idempotent (`IF NOT EXISTS`), appended never edited.
-- Errors: `HttpError(status, code, message)` → `{error:{code,message}}`
-  envelope. 404 not_found, 409 conflict, 400 bad_request, 403 by middleware.
+- Errors: `HttpError(status, code, message, details?)` →
+  `{error:{code,message,details?}}` envelope. Shared codes live in
+  `ERROR_CODES` (`shared/http.ts`) — one meaning, one status each; modules
+  mint their own stable snake_case codes for domain state conflicts.
+  Validation failures carry per-field `details`. Codes are additive-only API
+  contract: never remove or repurpose one.
 - Routes: zod `parseBody`, `requireRole("manager"|"owner")` for mutations,
   `tenantId(res)` from auth payload. Thin handlers — logic lives in services.
 - Events: publish AFTER the tx commits; payloads carry `tenantId` and cents
@@ -19,7 +23,15 @@ Match the surrounding code. These are the idioms the codebase actually uses.
 - Concurrency: unique constraints are the real guard (catch 23505 → 409);
   counters via `nextDocNumber/nextDocSeq`; never COUNT(*)+1 or MAX+1.
 - Lists: keyset pagination (`shared/pagination.ts`); no bare LIMIT-N lists on
-  unbounded tables.
+  unbounded tables. Policy: cursor pagination is REQUIRED for unbounded,
+  append-heavy lists (orders, inventory movements, audit log, ledger);
+  offset/limit remains acceptable for small tenant-bounded lists (categories,
+  outlets, taxes); new list endpoints default to cursor. Don't migrate
+  existing offset endpoints without a reason — it's a client-breaking change.
+- API versioning: everything lives under `/api/v1`; changes must be additive
+  (new fields/endpoints OK, never remove or repurpose). A breaking change
+  mints `/api/v2` side-by-side — no Accept-header negotiation, no silent
+  breaking changes under v1.
 - Append-only tables never get UPDATE/DELETE code paths.
 
 ## Frontend (web/)

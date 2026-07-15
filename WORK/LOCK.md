@@ -1,6 +1,28 @@
 # Ascend — Multi-Agent Work Lock
 
-Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B)
+Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); API-review fixes: login lockout + CONTRACTS truth + error registry (session D)
+
+## Active Claim (Claude session D — API-review fixes: login lockout, CONTRACTS.md, error registry)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, VSCode — Sri-directed API-review remediation) |
+| Queue item | Three fixes from the external API-endpoint review triage: (1) login brute-force protection — DB-backed failed-attempt lockout in identity (serverless-safe; global IP limiter alone leaves password spraying practical); (2) CONTRACTS.md truth-restore (still says SQLite; reality is Postgres+RLS) + pagination/versioning policy paragraphs; (3) error-code registry consolidating ad-hoc error code strings in shared/http. |
+| Files/areas expected | `src/identity/{routes,service,migrations,types}.ts` + new focused test; `CONTRACTS.md`; `src/shared/http.ts` (additive) or new `src/shared/error-codes.ts`; WORK audit + this LOCK. NO `src/gateway/auth.ts`, NO `src/identity/authorization.ts`, NO `src/modules/quotes/**`, NO vertical-module index.ts, NO `src/app.ts` (session C); NO `src/shared/{events,outbox}.ts`, NO `payments/*`, NO `src/orchestration/*` (session B). Working on `feat/delivery-pipeline` in the main checkout; staging only own files. |
+| Started | 2026-07-15 |
+| Status | RELEASED — lockout was already implemented (triage error, corrected); added missing lockout regression tests (3/3); CONTRACTS.md superseded-banner truth-restore; pagination/versioning policy in CODING_STANDARDS.md; ERROR_CODES registry + additive error.details in shared/http. Gates: typecheck PASS, identity+payments+lockout 40/40 isolated, smoke 20/20. Audit: AUDIT_2026-07-15T155332Z-api-review-fixes.md |
+| Blockers | none |
+
+## Active Claim (Claude session C — Clean Architecture pilot: quotes + gateway auth)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session C (Sonnet 5) |
+| Queue item | (1) Clean Architecture pilot: Repository + DTO extraction on `quotes` module, pure rule-evaluation extraction from `src/gateway/auth.ts` into `src/identity/authorization.ts` — see plan `~/.claude/plans/eager-splashing-hoare.md`. (2) Full API-endpoint audit (39+ route files, 12 dimensions) surfaced 3 critical bugs, now being fixed in this same claim: restaurant/workforce double-URL-prefix (routes 404 in prod), SSO login unreachable (blocked by global auth gate), and business-pack isolation never enforced server-side (`requireModule` middleware, reusing `SettingsService.getCapabilities`, applied to the 8 vertical modules). |
+| Files/areas expected | `src/modules/quotes/**`; `src/gateway/auth.ts`; `src/identity/authorization.ts`; `src/modules/restaurant/routes.ts`; `src/modules/workforce/routes.ts`; `src/app.ts` (SSO mount order only); `src/modules/sso/index.ts`; `src/modules/{appointments,entertainment,education,healthcare,hospitality,manufacturing,automotive,rental}/index.ts` (add requireModule guard only). Working in isolated worktree off `origin/master` at `/private/tmp/claude-501/-Users-sri-Desktop-Prj/00f2e7ff-1f2f-4b86-b5fd-4de2d0f8bd7e/scratchpad/ascend-clean-arch`, branch `feat/clean-arch-pilot-quotes`. NO `src/shared/{events,outbox}.ts`, NO `src/orchestration/*`, NO `payments/*` (session B's active claim). |
+| Started | 2026-07-15 |
+| Status | ACTIVE — implementing |
+| Blockers | none |
 
 ## Active Claim (Claude session B — ACPA M1.4 staged outbox publish)
 
