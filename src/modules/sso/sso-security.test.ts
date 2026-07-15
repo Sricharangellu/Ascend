@@ -19,6 +19,7 @@ import { generateKeyPairSync } from "node:crypto";
 import jwt from "jsonwebtoken";
 import { buildApp, type App } from "../../app.js";
 import { SsoService, assertSafeDiscoveryUrl, type IdentityProviderConfig } from "./service.js";
+import { IdentityService } from "../../identity/service.js";
 import { HttpError } from "../../shared/http.js";
 
 let __seq = 0;
@@ -147,6 +148,27 @@ test("callback verifies a properly signed id_token; state survives a new service
     400,
     "invalid_state",
   );
+
+  await app.db.close();
+});
+
+// ── 1b. SSO sessions can refresh (token persisted in refresh_tokens) ──────────
+
+test("SSO-issued refresh token round-trips through identity.refresh()", async () => {
+  process.env["JWT_SECRET"] = "test-jwt-secret-sso-sec";
+  const app = await buildApp({ schema: __schema() });
+  const { tenantId, svc } = await seedTenantWithSso(app);
+
+  const { state } = await svc.initiateLogin(tenantId, "https://app.example.com/cb");
+  nextIdToken = mintIdToken({ key: "good" });
+  const { refreshToken } = await svc.handleCallback(state, "auth-code", "https://app.example.com/cb");
+
+  // identity.refresh() verifies the JWT AND requires a matching non-revoked
+  // row in refresh_tokens — this used to 401 because SSO never stored one.
+  const identity = new IdentityService(app.db, app.events);
+  const rotated = await identity.refresh(refreshToken);
+  assert.ok(rotated.accessToken.length > 0, "refresh issues a new access token");
+  assert.ok(rotated.refreshToken !== refreshToken, "refresh token is rotated");
 
   await app.db.close();
 });

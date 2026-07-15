@@ -2,6 +2,17 @@
 
 Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
 
+## Active Claim (Claude session D — SSO refresh-token persistence)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, VSCode — follow-up flagged in the SSO-hardening audit) |
+| Queue item | SSO sessions cannot refresh: handleCallback signs a refresh JWT but never stores its hash in refresh_tokens, so identity.refresh() rejects it after the 15-min access token expires. Fix: persist the row on SSO login exactly as identity does (uuidv7 id, sha256 token_hash, 7d expiry). Test proves SSO login → identity refresh round-trip. |
+| Files/areas expected | `src/modules/sso/service.ts`; `src/modules/sso/sso-security.test.ts` (session D's own file); WORK audit + this LOCK. Same exclusions as the prior SSO claim (NOT routes.ts / sso.test.ts / index.ts — session C). |
+| Started | 2026-07-15 |
+| Status | RELEASED — SSO login now persists the refresh-token hash in refresh_tokens (uuidv7/sha256/7d, mirrors identity.issueLoginSession), so identity.refresh() accepts + rotates SSO tokens. Round-trip test added. Gates: typecheck PASS, sso-security 5/5 + sso 10/10 + identity 21/21 = 36/36 isolated, smoke 20/20. Audit: AUDIT_2026-07-15T163000Z-sso-refresh-persistence.md |
+| Blockers | none |
+
 ## Active Claim (Claude session D — SSO OIDC hardening: token verification + DB state + SSRF guard)
 
 | Field | Value |

@@ -1,4 +1,5 @@
 import { createHash, createPublicKey, randomBytes, type KeyObject } from "node:crypto";
+import { v7 as uuidv7 } from "uuid";
 import jwt from "jsonwebtoken";
 import type { DB } from "../../shared/db.js";
 import { HttpError } from "../../shared/http.js";
@@ -351,6 +352,22 @@ export class SsoService {
       { tenantId, role },
       secret + ":refresh",
       { subject: userId, expiresIn: "7d" },
+    );
+
+    // Persist the refresh token hash exactly as identity's login does —
+    // identity.refresh() looks tokens up by sha256 hash in refresh_tokens,
+    // so without this row an SSO session cannot refresh past 15 minutes.
+    const issuedAt = Date.now();
+    await this.db.query(
+      "INSERT INTO refresh_tokens (id, tenant_id, user_id, token_hash, expires_at, created_at) VALUES (@id, @tenantId, @userId, @hash, @exp, @now)",
+      {
+        id: uuidv7(),
+        tenantId,
+        userId,
+        hash: createHash("sha256").update(refreshToken).digest("hex"),
+        exp: issuedAt + 7 * 86_400_000,
+        now: issuedAt,
+      },
     );
 
     return { accessToken, refreshToken, expiresIn: 900 };
