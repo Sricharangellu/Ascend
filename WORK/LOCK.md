@@ -1,6 +1,18 @@
 # Ascend — Multi-Agent Work Lock
 
-Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); API-review fixes: login lockout + CONTRACTS truth + error registry (session D)
+Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
+
+## Active Claim (Claude session D — SSO OIDC hardening: token verification + DB state + SSRF guard)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, VSCode — tech-debt-report triage, the one surviving critical) |
+| Queue item | (1) Verify OIDC id_token signature via the provider's JWKS + iss/aud/exp validation (today: `jwt.decode` unverified — tenant-admin→any-user escalation via rogue IdP config); (2) move the OAuth2 state store from in-memory Map to settings_kv rows (in-memory breaks SSO on serverless when callback lands on a different instance); (3) SSRF guard on discoveryUrl (https-only, loopback allowed only outside production, private/link-local IPs rejected). No new dependency (Node crypto JWK + jsonwebtoken verify). |
+| Files/areas expected | `src/modules/sso/service.ts`; NEW `src/modules/sso/sso-security.test.ts`; WORK audit + this LOCK. Deliberately NOT `src/modules/sso/routes.ts`, NOT `src/modules/sso/sso.test.ts`, NOT `src/modules/sso/index.ts` (session C has uncommitted work in routes/test and claims index/mount order). Verified C's worktree has NOT touched service.ts. |
+| Started | 2026-07-15 |
+| Status | RELEASED — id_token now JWKS-verified (sig + iss/aud/exp, asymmetric algs only, 401 invalid_id_token); OAuth2 state moved to settings_kv rows (DELETE..RETURNING single-use — fixes SSO-broken-on-serverless); assertSafeDiscoveryUrl SSRF guard at save + use. No new dependency, no schema change. Gates: typecheck PASS, sso 14/14 isolated (4 new security + 10 existing unchanged), smoke 20/20. Audit: AUDIT_2026-07-15T161500Z-sso-oidc-hardening.md. FOLLOW-UP flagged (not taken): SSO refresh tokens never stored in refresh_tokens → SSO sessions can't refresh; near session C's area. |
+| Blockers | none |
+
 
 ## Active Claim (Claude session D — API-review fixes: login lockout, CONTRACTS.md, error registry)
 
