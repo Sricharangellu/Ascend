@@ -211,6 +211,11 @@ finder-pos/
 │   ├── app/(protected)/       # Authenticated pages
 │   ├── components/            # Design system components
 │   └── mocks/                 # MSW mock handlers for dev
+├── api/                       # Vercel serverless entry (wraps dist/src/app.js)
+├── db/                        # Migrations, seeds, RLS policies
+├── docs/                      # Architecture docs, ADRs, roadmaps
+├── orchestration/             # Project-process docs (agent playbooks, status) — not the engine in src/orchestration/
+├── WORK/                      # Multi-agent work packages + lock protocol
 ├── .github/workflows/ci.yml   # CI/CD pipeline
 ├── Dockerfile                 # Multi-stage production build
 ├── docker-compose.yml         # Local dev stack
