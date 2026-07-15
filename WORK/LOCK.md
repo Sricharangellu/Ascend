@@ -2,6 +2,17 @@
 
 Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
 
+## Active Claim (Claude session D — C-3: verified DB TLS)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, VSCode — standing critical C-3) |
+| Queue item | Production DB connections use TLS with `rejectUnauthorized:false` (MITM-able). Fix: verify certificates by default in production (managed PG providers use publicly-signed certs); `PG_CA_CERT`/`PG_CA_CERT_B64` for custom CAs; explicit `PG_SSL_NO_VERIFY=1` escape hatch that logs a loud warning. NOTE FOR SRI: merging flips prod TLS behavior — if the prod DB cert chain is not publicly verifiable, set the escape hatch or CA var before deploy; /readyz + post-deploy smoke will catch a failure. |
+| Files/areas expected | `src/shared/db.ts` (sslConfig only); NEW `src/shared/db-ssl.test.ts`; `.env.example`; WORK audit + this LOCK. NOT `src/shared/{events,outbox}.ts` (session B), NOT `src/app.ts` (session C). |
+| Started | 2026-07-15 |
+| Status | RELEASED — sslConfig now verifies certs whenever TLS is on (prod default); PG_CA_CERT/PG_CA_CERT_B64 for private CAs; PG_SSL_NO_VERIFY=1 explicit escape hatch with boot warning. 7/7 matrix tests, typecheck PASS, smoke 20/20. ⚠️ Merge flips prod TLS behavior — see deploy note in AUDIT_2026-07-15T164500Z-db-tls-verification.md before deploying. |
+| Blockers | none |
+
 ## Active Claim (Claude session D — SSO refresh-token persistence)
 
 | Field | Value |
