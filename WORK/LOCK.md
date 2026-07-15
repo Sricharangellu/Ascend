@@ -2,6 +2,17 @@
 
 Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
 
+## Active Claim (Claude session D — C-4 slice: scheduled uptime heartbeat)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, VSCode — standing critical C-4, code-addressable slice) |
+| Queue item | C-4 "no alerting between deploys": today an outage is invisible until the next deploy's smoke. Add a scheduled GitHub Actions heartbeat (every 15 min) probing prod /healthz, /readyz, the /api/v1/flags 401 auth boundary, and the frontend — mirroring ci.yml's post-deploy smoke. Failure → red workflow run → GitHub notification to watchers. Zero new accounts/secrets; richer channels (Slack/PagerDuty) remain Sri's decision, noted as follow-up. |
+| Files/areas expected | NEW `.github/workflows/uptime.yml`; WORK audit + this LOCK. NOT ci.yml, NOT deploy-prod.yml (no changes to existing pipelines). |
+| Started | 2026-07-15 |
+| Status | RELEASED — 15-min heartbeat (healthz, readyz, flags-401 auth boundary, frontend) mirroring the post-deploy smoke; red run → GitHub notification. YAML validated; all 4 probes executed live against prod from this session and PASSED. Cron activates when merged to master (GitHub runs schedules from default branch only). C-4 not fully closed: richer fan-out (Slack/Sentry) is Sri's call. Audit: AUDIT_2026-07-15T170000Z-uptime-heartbeat.md |
+| Blockers | none |
+
 ## Active Claim (Claude session D — C-3: verified DB TLS)
 
 | Field | Value |
