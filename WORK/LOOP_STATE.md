@@ -8,11 +8,12 @@ the backlog freely; the loop treats your edits as authoritative.
 | Field | Value |
 |---|---|
 | loop_status | RUNNING |
-| last_iteration_utc | 2026-07-16T04:25:00Z |
+| last_iteration_utc | 2026-07-16T05:20:00Z |
 | runner | session D (local, VSCode) |
-| branch | feat/delivery-pipeline (PR #66) |
+| branch | feat/delivery-pipeline (fast-forwarded to master after PR #66 merge; next batch needs a NEW PR) |
 | idle_streak | 0 |
-| loop_commits | 12 (since run start 2026-07-15; pause + notify at ≥15) |
+| loop_commits | 0 (reset — PR #66 merged & deployed 29a27d7; review debt cleared) |
+| last_merge | 2026-07-16 PR #66 → master 29a27d7; prod deploy healthy, /readyz db:connected under C-3 cert verification |
 | cloud_watchdog | trig_01VVXryUgSBHoy9mAqRdhfzz (notify-only, every 3h, emails on ≥3h stale heartbeat) |
 
 ## Iteration log
