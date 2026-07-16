@@ -2,7 +2,7 @@
 
 **Enterprise-grade Point of Sale platform** for retail, wholesale, and distribution businesses.
 
-Built for the tobacco, vapor, hemp, and specialty retail distribution industry — with full multi-tenant SaaS architecture, real-time inventory, and compliance reporting.
+Built for the  specialty retail distribution industry — with full multi-tenant SaaS architecture, real-time inventory, and compliance reporting.
 
 [![CI](https://github.com/Sricharangellu/Ascend/actions/workflows/ci.yml/badge.svg)](https://github.com/Sricharangellu/Ascend/actions/workflows/ci.yml)
 
