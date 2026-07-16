@@ -2,6 +2,17 @@
 
 Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
 
+## Active Claim (Claude session D — sync mutation authorization) — RELEASED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, autonomous loop iter 6) |
+| Queue item | sync module mutations (/online /push /pull /integrations) had NO role guard — any cashier could toggle company sync, drain the queue, or connect integrations. Added requireRole("manager") on ops controls + requireRole("owner") on /integrations (matches webhooks). webhooks verified already owner-guarded. |
+| Files/areas expected | `src/modules/sync/routes.ts` + sync.test.ts (1 new authz test). gateway/auth.ts imported only (NOT edited — session C's claim). NOT payments/shared (B). |
+| Started | 2026-07-16 |
+| Status | RELEASED — guards added, cashier 403 test. 9/9 sync isolated, typecheck CLEAN, smoke 20/20. Audit: AUDIT_2026-07-16T042500Z-sync-authz.md |
+| Blockers | none |
+
 ## Active Claim (Claude session D — journal-entry keyset pagination) — RELEASED
 
 | Field | Value |
