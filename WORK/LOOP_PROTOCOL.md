@@ -76,15 +76,25 @@ where the details are. Never notify per-iteration — signal, not noise.
 
 ## Cloud watchdog contract
 
-A scheduled cloud routine runs this check at its cadence:
+A scheduled cloud routine is the safety net for local-runner death (laptop
+sleep, session close, usage-limit stall). Default mode is **NOTIFY-ONLY** —
+deliberately NOT autonomous-commit, because unwatched commits to
+financial-software code violate the correctness-over-velocity doctrine.
 
-1. Pull the repo; read `WORK/LOOP_STATE.md` → `last_iteration_utc`.
-2. If the heartbeat is < 3 h old → the local loop is alive → exit silently.
-3. If stale → run EXACTLY ONE iteration of this protocol (own session letter
-   in LOCK claims, same PR branch), update the heartbeat, exit. One iteration
-   per firing keeps a wedged watchdog from stampeding.
-4. If the repo shows `loop_status: STOPPED` in LOOP_STATE.md → exit silently
-   (a stopped loop is deliberate; only Sri or a local session restarts it).
+Each firing:
+1. Read `WORK/LOOP_STATE.md` → `loop_status` + `last_iteration_utc`.
+2. `loop_status: STOPPED` → exit silently (a stopped loop is deliberate).
+3. Heartbeat < 3 h old → local loop alive → exit silently.
+4. Heartbeat stale (≥ 3 h) → the local loop is down → send ONE push
+   notification ("Ascend loop stalled since <ts> — restart with /loop, or the
+   backlog is in WORK/LOOP_STATE.md") and exit. Do not spam: if the last
+   firing already notified for this same stall, stay silent.
+
+**Optional upgrade (Sri decision, on NEEDS-SRI):** switch the watchdog to
+DO-WORK mode — on a stale heartbeat, run EXACTLY ONE protocol iteration in
+the cloud (own session letter, same PR branch, one iteration per firing to
+avoid stampede). Gives true unattended continuity at the cost of unreviewed
+cloud commits. Not enabled without Sri's explicit go.
 
 ## Amending this protocol
 

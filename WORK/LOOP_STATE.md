@@ -8,18 +8,20 @@ the backlog freely; the loop treats your edits as authoritative.
 | Field | Value |
 |---|---|
 | loop_status | RUNNING |
-| last_iteration_utc | 2026-07-15T17:40:00Z |
+| last_iteration_utc | 2026-07-16T03:28:00Z |
 | runner | session D (local, VSCode) |
 | branch | feat/delivery-pipeline (PR #66) |
 | idle_streak | 0 |
-| loop_commits | 8 (since run start 2026-07-15; pause + notify at ≥15) |
+| loop_commits | 9 (since run start 2026-07-15; pause + notify at ≥15) |
+| cloud_watchdog | trig_01VVXryUgSBHoy9mAqRdhfzz (notify-only, every 3h, emails on ≥3h stale heartbeat) |
 
 ## Iteration log
 
 | # | UTC | Commit | Summary |
 |---|---|---|---|
 | 1 | 2026-07-15T17:30Z | 3665437 | movements route drift (mock-only → real, prod panels were blank) + keyset pagination on inventory movements + audit_log cursor mode; 27/27, smoke 20/20 |
-| 2 | 2026-07-15T17:40Z | (this) | loop durability infra: LOOP_PROTOCOL.md (on-disk program, re-read each wake) + LOOP_STATE.md (heartbeat/backlog/counters) + cloud-watchdog contract + memory pointer |
+| 2 | 2026-07-15T17:40Z | c6eb35b | loop durability infra: LOOP_PROTOCOL.md (on-disk program, re-read each wake) + LOOP_STATE.md (heartbeat/backlog/counters) + cloud-watchdog contract + memory pointer |
+| 3 | 2026-07-16T03:28Z | (this) | cloud watchdog live (trig_01VVXryUgSBHoy9mAqRdhfzz, notify-only, Gmail); protocol watchdog contract revised do-work→notify-only for financial-repo safety |
 
 ## Backlog (loop-selectable, in priority order)
 
@@ -42,3 +44,4 @@ the backlog freely; the loop treats your edits as authoritative.
 | C-4 completion | Pick alert fan-out channel (Slack/PagerDuty/Sentry); heartbeat workflow is the floor |
 | OIDC PKCE + nonce | IdP-compatibility decision |
 | PR #66 merge | Review + merge (= production deploy) |
+| Cloud watchdog mode | Currently NOTIFY-ONLY (emails on stall). Optional upgrade to DO-WORK mode (cloud runs one iteration autonomously on stall) — true unattended continuity, but unreviewed cloud commits to financial code. Enable only if wanted. Routine: trig_01VVXryUgSBHoy9mAqRdhfzz |
