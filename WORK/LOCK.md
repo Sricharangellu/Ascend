@@ -2,6 +2,17 @@
 
 Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
 
+## Active Claim (Claude session D — inventory hardening: stock-adjust oversell race) — RELEASED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, autonomous loop — Sri-directed INVENTORY subsystem focus) |
+| Queue item | inventory.adjust() is read-modify-write: SELECT stock_qty (no lock) → compute nextQty in JS → write absolute value. Concurrent adjusts on one product lose updates → oversell. (The FEFO lot path already uses FOR UPDATE; the main stock path didn't.) Fix: SELECT ... FOR UPDATE to serialize, + ON CONFLICT on the new-row INSERT for the first-receive race. Concurrency regression test via a 2nd DB connection. |
+| Files/areas expected | `src/modules/inventory/service.ts` + NEW concurrency test. inventory unclaimed by B/C. NOT payments/shared/orchestration (B), NOT quotes/gateway/sso (C). |
+| Started | 2026-07-16 |
+| Status | ACTIVE — implementing |
+| Blockers | none |
+
 ## Active Claim (Claude session D — authz sweep: reports + ecommerce mutation guards) — RELEASED
 
 | Field | Value |

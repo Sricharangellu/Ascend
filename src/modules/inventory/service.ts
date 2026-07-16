@@ -503,8 +503,12 @@ export class InventoryService {
   ): Promise<InventoryRow> {
     const result = await this.db.withTenant(tenantId).tx(async (tdb) => {
       const now = Date.now();
+      // FOR UPDATE locks the stock row so concurrent adjusts on the same
+      // product serialize — without it this is a read-modify-write race and two
+      // simultaneous sales both read the same qty and the second write clobbers
+      // the first (lost update → oversell). Mirrors the FEFO lot path above.
       const existing = await tdb.one<InventoryRow>(
-        "SELECT * FROM inventory WHERE tenant_id = @tenantId AND product_id = @productId",
+        "SELECT * FROM inventory WHERE tenant_id = @tenantId AND product_id = @productId FOR UPDATE",
         { tenantId, productId },
       );
 
@@ -525,9 +529,15 @@ export class InventoryService {
         // Only create an inventory row when adding stock (receiving). Sales on
         // untracked products don't create a row — they pass through the
         // reservation check silently (untracked = unlimited).
+        // ON CONFLICT covers the first-receive race: if a concurrent tx created
+        // the row between our (unlocked, absent) read and this insert, add our
+        // delta to the committed value instead of failing on the PK.
         await tdb.query(
-          "INSERT INTO inventory (product_id, tenant_id, stock_qty, reorder_pt, updated_at) VALUES (@product_id, @tenant_id, @stock_qty, @reorder_pt, @updated_at)",
-          { product_id: productId, tenant_id: tenantId, stock_qty: nextQty, reorder_pt: reorderPt, updated_at: now },
+          `INSERT INTO inventory (product_id, tenant_id, stock_qty, reorder_pt, updated_at)
+           VALUES (@product_id, @tenant_id, @stock_qty, @reorder_pt, @updated_at)
+           ON CONFLICT (tenant_id, product_id)
+           DO UPDATE SET stock_qty = GREATEST(0, inventory.stock_qty + @delta), updated_at = @updated_at`,
+          { product_id: productId, tenant_id: tenantId, stock_qty: nextQty, reorder_pt: reorderPt, updated_at: now, delta },
         );
       } else {
         // Negative delta on untracked product: skip row creation, record movement only.
