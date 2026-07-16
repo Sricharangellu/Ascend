@@ -2,6 +2,17 @@
 
 Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
 
+## Active Claim (Claude session D — inventory hardening: race-free transfer numbering) — RELEASED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, autonomous loop — INVENTORY focus, iter 5; resumed after Sri feature) |
+| Queue item | createTransfer's transfer_number uses COUNT(*)+1 — the codebase's own banned pattern; concurrent transfers get duplicate numbers. Replace with the shared document_counters (nextDocNumber), seeded to the current transfer count on first use so numbering stays continuous. Deterministic barrier test (source-lock) proves duplicates without the fix. |
+| Files/areas expected | `src/modules/inventory/service.ts` + NEW/updated transfer test. inventory unclaimed by B/C. |
+| Started | 2026-07-16 |
+| Status | ACTIVE — implementing |
+| Blockers | none |
+
 ## Active Claim (Claude session D — FEATURE: receive per-line location + purchase cost-entry page) — RELEASED
 
 | Field | Value |

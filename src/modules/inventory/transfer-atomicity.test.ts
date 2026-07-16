@@ -14,6 +14,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildApp, type App } from "../../app.js";
+import { openDb, type DB } from "../../shared/db.js";
 import { InventoryService } from "./service.js";
 import { HttpError } from "../../shared/http.js";
 
@@ -100,5 +101,46 @@ test("transferring more than the source holds is rejected — no phantom stock c
   assert.equal(await locQty(svc, tenant, dst, product), 0, "destination unchanged (no phantom stock)");
   assert.equal((await svc.listTransfers(tenant)).length, 0, "no transfer recorded");
 
+  await app.db.close();
+});
+
+test("concurrent transfers get distinct transfer numbers (race-free counter)", async () => {
+  const schema = __schema();
+  const app: App = await buildApp({ schema });
+  const db2: DB = openDb({ schema }); // second transfer
+  const db3: DB = openDb({ schema }); // barrier: holds the source row lock
+  const svc1 = new InventoryService(app.db, app.events);
+  const svc2 = new InventoryService(db2, app.events);
+  const tenant = "tnt_demo";
+  const product = "prod_num";
+  const src = "loc_src";
+  const dst = "loc_dst";
+
+  await svc1.adjustStock(tenant, src, product, 100, "receiving"); // enough for both
+
+  // db3 locks the source stock row so both transfers reach the number-generation
+  // step before either commits — the exact window the COUNT(*)+1 race duplicated.
+  let lockHeld!: () => void;
+  const held = new Promise<void>((r) => { lockHeld = r; });
+  let release!: () => void;
+  const canRelease = new Promise<void>((r) => { release = r; });
+  const barrier = db3.withTenant(tenant).tx(async (tdb) => {
+    await tdb.one("SELECT quantity_on_hand FROM inventory_stock WHERE tenant_id = @t AND location_id = @loc AND product_id = @p FOR UPDATE", { t: tenant, loc: src, p: product });
+    lockHeld();
+    await canRelease;
+  });
+  await held;
+
+  const t1 = svc1.createTransfer(tenant, { fromLocationId: src, toLocationId: dst, productId: product, quantity: 5 });
+  const t2 = svc2.createTransfer(tenant, { fromLocationId: src, toLocationId: dst, productId: product, quantity: 5 });
+  await new Promise((r) => setTimeout(r, 300));
+  release();
+  await barrier;
+  const [a, b] = await Promise.all([t1, t2]);
+
+  assert.notEqual(a.transfer_number, b.transfer_number, `transfer numbers must be distinct, got ${a.transfer_number} and ${b.transfer_number}`);
+
+  await db3.close();
+  await db2.close();
   await app.db.close();
 });

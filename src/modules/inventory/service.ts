@@ -3,6 +3,7 @@ import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import { HttpError } from "../../shared/http.js";
 import { clampLimit as clampCursorLimit, decodeCursor, toPage, type CursorPage } from "../../shared/pagination.js";
+import { nextDocNumber } from "../../shared/docnumber.js";
 
 export type MovementReason = "receiving" | "sale" | "adjustment" | "return" | "cycle_count";
 
@@ -927,14 +928,17 @@ export class InventoryService {
     // stock (left the source, never arrived). FOR UPDATE (in adjustStockTx)
     // also serializes concurrent adjusts on each leg.
     return this.db.withTenant(tenantId).tx(async (tdb) => {
-      // NOTE: transfer_number still uses COUNT(*)+1 (racy — can duplicate under
-      // concurrency). transfer_number is non-unique so this is cosmetic; the
-      // race-free doc-counter swap needs max-seeding and is a tracked follow-up.
-      const countRow = await tdb.one<{ n: number }>(
-        "SELECT COUNT(*)::int AS n FROM inventory_transfers WHERE tenant_id = @tenantId",
-        { tenantId },
+      // Race-free transfer number via the shared document counter (was
+      // COUNT(*)+1, which duplicated numbers under concurrency — the banned
+      // pattern in CODING_STANDARDS). Seed the counter to the current transfer
+      // count on first use so numbering stays continuous with existing rows.
+      await tdb.query(
+        `INSERT INTO document_counters (tenant_id, kind, val)
+         VALUES (@t, 'inventory_transfers', (SELECT COUNT(*)::int FROM inventory_transfers WHERE tenant_id = @t))
+         ON CONFLICT (tenant_id, kind) DO NOTHING`,
+        { t: tenantId },
       );
-      const transferNumber = `TRF-${String((countRow?.n ?? 0) + 1).padStart(4, "0")}`;
+      const transferNumber = await nextDocNumber(tdb, tenantId, "inventory_transfers", "TRF", 4);
 
       // A transfer must not create phantom stock. adjustStockTx clamps the
       // source debit at 0, so without this check transferring more than the
