@@ -364,12 +364,54 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
         "/api/orders",
         "/api/payments",
         "/api/sync",
+        "/api/jobs/tick",
       ],
     });
   });
 
   // ── Orchestration layer (workflows, sagas, command handlers, background jobs)
-  bootstrapOrchestration(db, events);
+  const { jobConsumer } = bootstrapOrchestration(db, events);
+
+  // ── /api/jobs/tick — external job-scheduler trigger ─────────────────────────
+  // Background jobs normally self-perpetuate via an in-process poll interval
+  // (QueueConsumer.start(), started in bootstrapOrchestration when
+  // FINDER_BACKGROUND_JOBS !== "false"). On this Vercel serverless deploy
+  // target that in-process timer is NOT guaranteed to run continuously (cold
+  // starts, no always-on process) — see vercel.json's `crons` entry, which
+  // hits this endpoint daily so the trial-expiry sweep (and any other queued
+  // job) actually runs without a human triggering it. GET, because that's
+  // what Vercel Cron sends; POST also works for manual/other-scheduler use.
+  //
+  // Deliberately NOT mounted under /api/v1 (no tenant JWT exists for a
+  // scheduler) — gated instead by a shared secret, fail-closed like the
+  // Stripe webhook above: no secret configured means the endpoint refuses
+  // rather than running unauthenticated. Accepts either convention:
+  //   • Vercel Cron: set CRON_SECRET — Vercel auto-sends `Authorization: Bearer <secret>`.
+  //   • Any other scheduler: set JOBS_TICK_SECRET and send `X-Jobs-Tick-Secret: <secret>`.
+  const jobsTickHandler = handler(async (req, res) => {
+    const expected = process.env["JOBS_TICK_SECRET"] ?? process.env["CRON_SECRET"];
+    if (!expected) {
+      res.status(503).json({ error: { code: "jobs_tick_disabled", message: "Neither JOBS_TICK_SECRET nor CRON_SECRET is configured." } });
+      return;
+    }
+    const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, "");
+    const provided = bearer ?? req.headers["x-jobs-tick-secret"];
+    if (provided !== expected) {
+      res.status(401).json({ error: { code: "unauthenticated", message: "Invalid tick secret." } });
+      return;
+    }
+    // Drain due jobs in batches rather than a single poll(), so one cron
+    // tick can clear a backlog after downtime instead of trickling it out.
+    let processed = 0;
+    for (let i = 0; i < 20; i++) {
+      const n = await jobConsumer.poll(50);
+      processed += n;
+      if (n === 0) break;
+    }
+    res.json({ ok: true, processed });
+  });
+  app.get("/api/jobs/tick", jobsTickHandler);
+  app.post("/api/jobs/tick", jobsTickHandler);
 
   // ── Server-Sent Events stream — GET /api/v1/stream
   const sseBroker = new SseBroker();

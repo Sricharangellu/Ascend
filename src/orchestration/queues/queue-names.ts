@@ -20,6 +20,8 @@ export const QueueNames = {
   IDEMPOTENCY_EXPIRY: "idempotency_expiry",
   /** DB-8: Event outbox relay — dispatches un-delivered events every 5 seconds. */
   OUTBOX_RELAY: "outbox_relay",
+  /** DEMO-1: Trial lifecycle sweep — nurture emails + soft-expiry, once a day. */
+  TRIAL_EXPIRY: "trial_expiry",
 } as const;
 
 export type QueueName = typeof QueueNames[keyof typeof QueueNames];

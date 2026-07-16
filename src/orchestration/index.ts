@@ -82,6 +82,7 @@ export { expireReservationsJob } from "./jobs/expire-reservations.job.js";
 export { reconcilePaymentsJob } from "./jobs/reconcile-payments.job.js";
 export { closeRegisterJob } from "./jobs/close-register.job.js";
 export { syncEcommerceJob } from "./jobs/sync-ecommerce.job.js";
+export { trialExpiryJob, TRIAL_EXPIRY_INTERVAL_MS } from "./jobs/trial-expiry.job.js";
 
 // Compensations
 export { releaseInventoryCompensation } from "./compensations/release-inventory.compensation.js";
@@ -131,6 +132,7 @@ import { syncEcommerceJob } from "./jobs/sync-ecommerce.job.js";
 import { arDunningJob } from "./jobs/ar-dunning.job.js";
 import { idempotencyExpiryJob, IDEMPOTENCY_EXPIRY_INTERVAL_MS } from "./jobs/idempotency-expiry.job.js";
 import { outboxRelayJob, OUTBOX_RELAY_INTERVAL_MS } from "./jobs/outbox-relay.job.js";
+import { trialExpiryJob, TRIAL_EXPIRY_INTERVAL_MS } from "./jobs/trial-expiry.job.js";
 
 export interface OrchestrationBootstrap {
   runner: WorkflowRunner;
@@ -260,6 +262,31 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
   if (backgroundJobsEnabled) {
     void jobProducer.enqueueOnce({
       type: QueueNames.IDEMPOTENCY_EXPIRY,
+      tenantId: "system",
+      payload: {},
+      runAt: Date.now(),
+      maxAttempts: 3,
+    }).catch(() => {});
+  }
+
+  // DEMO-1: Trial lifecycle — global job (not per-tenant), runs once a day.
+  // Nurture emails at day 7 / day 13 of a trial, then soft-expires tenants
+  // whose trial_ends_at has passed without converting to a paid plan.
+  jobConsumer.register(QueueNames.TRIAL_EXPIRY, async (job) => {
+    await trialExpiryJob(job, db);
+    // Re-schedule for tomorrow — idempotent (skips if one is already pending).
+    await jobProducer.enqueueOnce({
+      type: QueueNames.TRIAL_EXPIRY,
+      tenantId: "system",
+      payload: {},
+      runAt: Date.now() + TRIAL_EXPIRY_INTERVAL_MS,
+      maxAttempts: 3,
+    });
+  });
+  // Seed on first startup.
+  if (backgroundJobsEnabled) {
+    void jobProducer.enqueueOnce({
+      type: QueueNames.TRIAL_EXPIRY,
       tenantId: "system",
       payload: {},
       runAt: Date.now(),
