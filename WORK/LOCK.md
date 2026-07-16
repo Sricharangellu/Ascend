@@ -2,6 +2,17 @@
 
 Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
 
+## Active Claim (Claude session D — inventory hardening: transfer over-draw creates phantom stock) — RELEASED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, autonomous loop — INVENTORY focus, iter 4) |
+| Queue item | createTransfer never validates source on-hand. adjustStockTx clamps the source debit at 0 but the destination gets the FULL credit, so transferring more than available creates phantom stock (100 from a loc with 10 → source 0, dest +100 = 90 conjured). Fix: lock + check source availability inside the tx; throw 409 insufficient_stock if quantity > on-hand. (Cross-transfer deadlock deferred — hard to test deterministically; noted.) |
+| Files/areas expected | `src/modules/inventory/service.ts` + NEW over-transfer test. inventory unclaimed by B/C. |
+| Started | 2026-07-16 |
+| Status | ACTIVE — implementing |
+| Blockers | none |
+
 ## Active Claim (Claude session D — inventory hardening: cycle-count double-close) — RELEASED
 
 | Field | Value |

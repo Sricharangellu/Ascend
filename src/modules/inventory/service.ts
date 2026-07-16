@@ -936,6 +936,23 @@ export class InventoryService {
       );
       const transferNumber = `TRF-${String((countRow?.n ?? 0) + 1).padStart(4, "0")}`;
 
+      // A transfer must not create phantom stock. adjustStockTx clamps the
+      // source debit at 0, so without this check transferring more than the
+      // source holds debits only what's there while crediting the FULL quantity
+      // to the destination (net stock creation). Lock + validate the source.
+      const src = await tdb.one<{ quantity_on_hand: number }>(
+        "SELECT quantity_on_hand FROM inventory_stock WHERE tenant_id = @t AND location_id = @loc AND product_id = @p FOR UPDATE",
+        { t: tenantId, loc: input.fromLocationId, p: input.productId },
+      );
+      const available = Number(src?.quantity_on_hand ?? 0);
+      if (available < input.quantity) {
+        throw new HttpError(
+          409,
+          "insufficient_stock",
+          `source location has ${available} on hand, cannot transfer ${input.quantity}`,
+        );
+      }
+
       // Move stock: out of the source location, into the destination. Both legs
       // land in the movement ledger with the transfer id as the reference.
       await this.adjustStockTx(tdb, tenantId, input.fromLocationId, input.productId, -input.quantity, "adjustment", id);

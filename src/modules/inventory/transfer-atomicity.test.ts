@@ -15,6 +15,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildApp, type App } from "../../app.js";
 import { InventoryService } from "./service.js";
+import { HttpError } from "../../shared/http.js";
 
 let __seq = 0;
 const __schema = () => `xferatom_${process.pid}_${Date.now().toString(36)}_${__seq++}`;
@@ -72,6 +73,32 @@ test("a successful transfer moves stock atomically and records it", async () => 
   assert.equal(await locQty(svc, tenant, src, product), 6, "source debited");
   assert.equal(await locQty(svc, tenant, dst, product), 4, "destination credited");
   assert.equal((await svc.listTransfers(tenant)).length, 1, "transfer recorded");
+
+  await app.db.close();
+});
+
+test("transferring more than the source holds is rejected — no phantom stock created", async () => {
+  const app: App = await buildApp({ schema: __schema() });
+  const svc = new InventoryService(app.db, app.events);
+  const tenant = "tnt_demo";
+  const product = "prod_over";
+  const src = "loc_src";
+  const dst = "loc_dst";
+
+  await svc.adjustStock(tenant, src, product, 10, "receiving"); // only 10 on hand
+
+  // Attempt to transfer 100 — the source clamps at 0 but (without the guard) the
+  // destination would be credited the full 100, conjuring 90 units of stock.
+  await assert.rejects(
+    () => svc.createTransfer(tenant, { fromLocationId: src, toLocationId: dst, productId: product, quantity: 100 }),
+    (e: unknown) => e instanceof HttpError && e.status === 409 && e.code === "insufficient_stock",
+    "over-transfer should 409 insufficient_stock",
+  );
+
+  // No stock moved or created: source still 10, destination still 0, no record.
+  assert.equal(await locQty(svc, tenant, src, product), 10, "source unchanged");
+  assert.equal(await locQty(svc, tenant, dst, product), 0, "destination unchanged (no phantom stock)");
+  assert.equal((await svc.listTransfers(tenant)).length, 0, "no transfer recorded");
 
   await app.db.close();
 });
