@@ -8,11 +8,11 @@ the backlog freely; the loop treats your edits as authoritative.
 | Field | Value |
 |---|---|
 | loop_status | RUNNING |
-| last_iteration_utc | 2026-07-16T05:20:00Z |
+| last_iteration_utc | 2026-07-16T05:45:00Z |
 | runner | session D (local, VSCode) |
-| branch | feat/delivery-pipeline (fast-forwarded to master after PR #66 merge; next batch needs a NEW PR) |
+| branch | feat/delivery-pipeline (new batch since PR #66 merge; needs a NEW PR before next merge) |
 | idle_streak | 0 |
-| loop_commits | 0 (reset — PR #66 merged & deployed 29a27d7; review debt cleared) |
+| loop_commits | 1 (new batch since PR #66 merge; pause + notify at ≥15) |
 | last_merge | 2026-07-16 PR #66 → master 29a27d7; prod deploy healthy, /readyz db:connected under C-3 cert verification |
 | cloud_watchdog | trig_01VVXryUgSBHoy9mAqRdhfzz (notify-only, every 3h, emails on ≥3h stale heartbeat) |
 
@@ -25,7 +25,9 @@ the backlog freely; the loop treats your edits as authoritative.
 | 3 | 2026-07-16T03:28Z | e535d7f | cloud watchdog live (trig_01VVXryUgSBHoy9mAqRdhfzz, notify-only, Gmail); protocol watchdog contract revised do-work→notify-only for financial-repo safety |
 | 4 | 2026-07-16T03:47Z | 867ead1 | route drift: customer-invoices/service-orders/product-batches mounted at underscore path → 404 in prod (mock-masked); added mountPath /api/v1 (store_locations convention) + mount test; removed 51 gitignored ` 2.` dupes blocking local tsc; 2/2 + smoke 20/20 |
 | 5 | 2026-07-16T04:05Z | 09a0083 | ledger pagination: accounting.listJournal was bare LIMIT 500 on journal_entries (most append-heavy table) → deep audit history unreachable; added keyset cursor (additive {items,nextCursor,limit}); reports verified already-bounded aggregations; 19/19 + smoke 20/20 |
-| 6 | 2026-07-16T04:25Z | (this) | sync authz gap: /online /push /pull /integrations had NO role guard (any cashier could toggle company sync / drain queue / connect integrations); added requireRole manager (ops) + owner (integrations, matches webhooks); webhooks verified already-guarded; 9/9 + smoke 20/20 |
+| 6 | 2026-07-16T04:25Z | 6ae6bb5 | sync authz gap: /online /push /pull /integrations had NO role guard (any cashier could toggle company sync / drain queue / connect integrations); added requireRole manager (ops) + owner (integrations, matches webhooks); webhooks verified already-guarded; 9/9 + smoke 20/20 |
+| — | 2026-07-16T05:16Z | 29a27d7 | **PR #66 MERGED to master + deployed to prod** — /readyz db:connected under C-3 cert verification; 6 loop fixes live |
+| 7 | 2026-07-16T05:45Z | (this) | module-wide authz sweep: reports POST /ar-aging/sweep (AR dunning mutation) + ecommerce PUT /products/:id/online (storefront publish) were unguarded → requireRole(manager); team verified guarded (in-handler requireManagement), orders/payments POS-by-design; 2 new 403 tests, reports 11/11 + ecommerce 9/9 + smoke 20/20 |
 
 ## Backlog (loop-selectable, in priority order)
 

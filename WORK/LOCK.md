@@ -2,6 +2,17 @@
 
 Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
 
+## Active Claim (Claude session D — authz sweep: reports + ecommerce mutation guards) — RELEASED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, autonomous loop iter 7) |
+| Queue item | Extended the iter-6 authz sweep across all modules. Real gaps (excluding POS-by-design orders/payments, and B/C-claimed payments/quotes; team verified guarded via in-handler requireManagement): reports POST /ar-aging/sweep (mutates AR/dunning state) + ecommerce PUT /products/:id/online (storefront publishing) were UNGUARDED. Added requireRole("manager") to both. |
+| Files/areas expected | `src/modules/reports/routes.ts` + reports.test.ts; `src/modules/ecommerce/routes.ts` + ecommerce.test.ts. gateway/auth imported only (NOT edited — C). NOT payments/quotes/shared/orchestration (B/C). |
+| Started | 2026-07-16 |
+| Status | ACTIVE — implementing |
+| Blockers | none |
+
 ## Active Claim (Claude session D — sync mutation authorization) — RELEASED
 
 | Field | Value |
