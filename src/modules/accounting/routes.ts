@@ -40,14 +40,17 @@ export function registerRoutes(router: Router, service: AccountingService): void
   // manual endpoint below); journal rows are never updated or deleted.
   router.get("/journal", handler(async (req, res) => {
     const q = req.query;
-    res.json({
-      items: await service.listJournal(tenantId(res), {
+    // Returns { items, nextCursor, limit } — additive to the prior { items }.
+    // Pass ?cursor=<nextCursor> to page deeper into ledger history.
+    res.json(
+      await service.listJournal(tenantId(res), {
         docType: typeof q.docType === "string" ? q.docType : undefined,
         docId: typeof q.docId === "string" ? q.docId : undefined,
         accountCode: typeof q.accountCode === "string" ? q.accountCode : undefined,
         limit: typeof q.limit === "string" ? Number(q.limit) : undefined,
+        cursor: typeof q.cursor === "string" && q.cursor !== "" ? q.cursor : undefined,
       }),
-    });
+    );
   }));
 
   router.get("/trial-balance", handler(async (_req, res) => {

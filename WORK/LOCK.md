@@ -2,6 +2,17 @@
 
 Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
 
+## Active Claim (Claude session D — journal-entry keyset pagination) — RELEASED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, autonomous loop iter 5) |
+| Queue item | accounting.listJournal was a bare LIMIT 500 on journal_entries (most append-heavy financial table) — deep ledger/audit history unreachable. Added keyset cursor (additive {items,nextCursor,limit}); reports verified already-bounded aggregations, no change. accounting not in any B/C claim. |
+| Files/areas expected | `src/modules/accounting/{service,routes}.ts` + accounting.test.ts (2 new tests). NOT payments/shared/orchestration (B), NOT quotes/gateway/sso (C). |
+| Started | 2026-07-16 |
+| Status | RELEASED — keyset cursor on listJournal, backward-compatible response. 19/19 accounting isolated, typecheck CLEAN, smoke 20/20. Audit: AUDIT_2026-07-16T040500Z-journal-keyset-pagination.md |
+| Blockers | none |
+
 ## Active Claim (Claude session D — route-mount drift sweep) — RELEASED
 
 | Field | Value |

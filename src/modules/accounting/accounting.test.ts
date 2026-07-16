@@ -350,3 +350,42 @@ test("stable event identity: crash between dispatch and delivery-marking never d
   const after = await app.db.one<{ n: number }>("SELECT COUNT(*)::int AS n FROM journal_entries", {});
   assert.equal(after!.n, before!.n, "journal must not grow on redelivery");
 });
+
+// ─── Journal keyset pagination (session D, loop iter 5) ───────────────────────
+// journal_entries is the most append-heavy financial table; listJournal used a
+// bare LIMIT 500 with no cursor, so ledger/audit history beyond the most recent
+// page was unreachable. These pin the additive cursor behavior.
+
+test("GET /accounting/journal keyset-pages the ledger without dup or gap", async () => {
+  const app = await freshApp();
+  // Seed 5 journal rows for the auth helper's tenant (tnt_demo), distinct times.
+  const base = Date.now();
+  for (let i = 0; i < 5; i++) {
+    await app.db.exec(`
+      INSERT INTO journal_entries (id, tenant_id, entry_group, doc_type, doc_id, account_code, account_name, debit_cents, credit_cents, memo, created_at)
+      VALUES ('jre_pg_${i}_${base}', 'tnt_demo', 'grp_${i}', 'manual', NULL, '1200', 'Inventory', ${100 * (i + 1)}, 0, 'seed ${i}', ${base + i})
+    `);
+  }
+
+  const p1 = await call(app, "GET", "/api/accounting/journal?accountCode=1200&limit=2");
+  assert.equal(p1.status, 200);
+  assert.equal(p1.json.items.length, 2, "first page holds the limit");
+  assert.ok(p1.json.nextCursor, "full page yields a cursor");
+
+  const p2 = await call(app, "GET", `/api/accounting/journal?accountCode=1200&limit=2&cursor=${encodeURIComponent(p1.json.nextCursor)}`);
+  const p3 = await call(app, "GET", `/api/accounting/journal?accountCode=1200&limit=2&cursor=${encodeURIComponent(p2.json.nextCursor)}`);
+  assert.equal(p3.json.items.length, 1, "last page holds the remainder");
+  assert.equal(p3.json.nextCursor, null, "short page ends the sequence");
+
+  const ids = [...p1.json.items, ...p2.json.items, ...p3.json.items].map((e: { id: string }) => e.id);
+  assert.equal(new Set(ids).size, 5, "no journal row duplicated or skipped across pages");
+  const times = [...p1.json.items, ...p2.json.items, ...p3.json.items].map((e: { created_at: number }) => e.created_at);
+  assert.deepEqual(times, [...times].sort((a, b) => b - a), "newest-first across pages");
+});
+
+test("GET /accounting/journal without cursor stays backward-compatible ({ items })", async () => {
+  const app = await freshApp();
+  const r = await call(app, "GET", "/api/accounting/journal");
+  assert.equal(r.status, 200);
+  assert.ok(Array.isArray(r.json.items), "items[] still present for existing clients");
+});

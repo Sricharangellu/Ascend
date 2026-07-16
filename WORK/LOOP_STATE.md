@@ -8,11 +8,11 @@ the backlog freely; the loop treats your edits as authoritative.
 | Field | Value |
 |---|---|
 | loop_status | RUNNING |
-| last_iteration_utc | 2026-07-16T03:47:00Z |
+| last_iteration_utc | 2026-07-16T04:05:00Z |
 | runner | session D (local, VSCode) |
 | branch | feat/delivery-pipeline (PR #66) |
 | idle_streak | 0 |
-| loop_commits | 10 (since run start 2026-07-15; pause + notify at ≥15) |
+| loop_commits | 11 (since run start 2026-07-15; pause + notify at ≥15) |
 | cloud_watchdog | trig_01VVXryUgSBHoy9mAqRdhfzz (notify-only, every 3h, emails on ≥3h stale heartbeat) |
 
 ## Iteration log
@@ -22,7 +22,8 @@ the backlog freely; the loop treats your edits as authoritative.
 | 1 | 2026-07-15T17:30Z | 3665437 | movements route drift (mock-only → real, prod panels were blank) + keyset pagination on inventory movements + audit_log cursor mode; 27/27, smoke 20/20 |
 | 2 | 2026-07-15T17:40Z | c6eb35b | loop durability infra: LOOP_PROTOCOL.md (on-disk program, re-read each wake) + LOOP_STATE.md (heartbeat/backlog/counters) + cloud-watchdog contract + memory pointer |
 | 3 | 2026-07-16T03:28Z | e535d7f | cloud watchdog live (trig_01VVXryUgSBHoy9mAqRdhfzz, notify-only, Gmail); protocol watchdog contract revised do-work→notify-only for financial-repo safety |
-| 4 | 2026-07-16T03:47Z | (this) | route drift: customer-invoices/service-orders/product-batches mounted at underscore path → 404 in prod (mock-masked); added mountPath /api/v1 (store_locations convention) + mount test; removed 51 gitignored ` 2.` dupes blocking local tsc; 2/2 + smoke 20/20 |
+| 4 | 2026-07-16T03:47Z | 867ead1 | route drift: customer-invoices/service-orders/product-batches mounted at underscore path → 404 in prod (mock-masked); added mountPath /api/v1 (store_locations convention) + mount test; removed 51 gitignored ` 2.` dupes blocking local tsc; 2/2 + smoke 20/20 |
+| 5 | 2026-07-16T04:05Z | (this) | ledger pagination: accounting.listJournal was bare LIMIT 500 on journal_entries (most append-heavy table) → deep audit history unreachable; added keyset cursor (additive {items,nextCursor,limit}); reports verified already-bounded aggregations; 19/19 + smoke 20/20 |
 
 ## Backlog (loop-selectable, in priority order)
 
@@ -30,7 +31,7 @@ the backlog freely; the loop treats your edits as authoritative.
 |---|---|---|
 | Mock-vs-real drift sweep | DONE (iter 4, AUDIT_2026-07-16T034500Z) | Fixed 3 real 404s (customer-invoices/service-orders/product-batches → mountPath /api/v1). Remaining 16-candidate mismatches all benign: golf/pricing/warehouse/documents/promotions are Preview verticals (UI-only by design, NOT bugs per ae79907); audit-log/custom-roles have hyphenated name fields; store/product-locations served by store_locations mountPath; `things` is a JSDoc example |
 | SSO/identity token-issuance consolidation (sso duplicates issueLoginSession insert) | BLOCKED — session C claim on sso/index.ts still ACTIVE | AUDIT_2026-07-15T163000Z note |
-| Ledger/accounting unbounded list check (journal entries, reports) — cursor policy compliance | CANDIDATE (verify first) | CODING_STANDARDS pagination policy |
+| Ledger/accounting unbounded list check | DONE (iter 5, AUDIT_2026-07-16T040500Z) | journal_entries listJournal → keyset cursor; reports verified already-bounded (GROUP BY/top-N aggregations, not row lists) |
 | requirePermission granularity on sync/webhook mutation routes | CANDIDATE (verify current guards first) | flagged in first API review triage |
 | Web client adoption of error.details for field-level form errors | CANDIDATE (low priority) | shared/http.ts details added fd2dd2a |
 | PROJECT_STATUS.md stale internal refs cleanup | CANDIDATE (low, docs-only) | orchestration/README.md notes the ROADMAP retirement |

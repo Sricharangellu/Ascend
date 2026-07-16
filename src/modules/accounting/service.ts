@@ -1,6 +1,7 @@
 import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import { notFound, badRequest, conflict } from "../../shared/http.js";
+import { clampLimit, decodeCursor, toPage, type CursorPage } from "../../shared/pagination.js";
 
 /**
  * Accounting module — Chart of Accounts + Batch Deposits (ERP benchmark #9).
@@ -327,19 +328,30 @@ export class AccountingService {
     return Boolean(row);
   }
 
+  /**
+   * List posted journal entries — keyset-paginated. journal_entries is the
+   * most append-heavy financial table; a bare LIMIT silently truncated the
+   * ledger at the most recent N rows, making deep/audit history unreachable
+   * (CODING_STANDARDS: cursor REQUIRED on unbounded append-heavy lists).
+   * The `(created_at, id)` cursor rides the existing DESC ordering.
+   */
   async listJournal(
     tenantId: string,
-    opts: { docType?: string; docId?: string; accountCode?: string; limit?: number } = {},
-  ): Promise<JournalEntry[]> {
+    opts: { docType?: string; docId?: string; accountCode?: string; limit?: number; cursor?: string } = {},
+  ): Promise<CursorPage<JournalEntry>> {
+    const limit = clampLimit(opts.limit, 200, 500);
+    const cur = decodeCursor(opts.cursor);
     const where = ["tenant_id = @t"];
-    const params: Record<string, unknown> = { t: tenantId, limit: Math.min(Math.max(opts.limit ?? 200, 1), 500) };
+    const params: Record<string, unknown> = { t: tenantId, limit };
     if (opts.docType) { where.push("doc_type = @dt"); params["dt"] = opts.docType; }
     if (opts.docId) { where.push("doc_id = @d"); params["d"] = opts.docId; }
     if (opts.accountCode) { where.push("account_code = @a"); params["a"] = opts.accountCode; }
-    return this.db.query<JournalEntry>(
+    if (cur) { where.push("(created_at, id) < (@curAt, @curId)"); params["curAt"] = cur.at; params["curId"] = cur.id; }
+    const rows = await this.db.query<JournalEntry>(
       `SELECT * FROM journal_entries WHERE ${where.join(" AND ")} ORDER BY created_at DESC, id DESC LIMIT @limit`,
       params,
     );
+    return toPage(rows as unknown as Array<JournalEntry & Record<string, unknown>>, limit, "created_at") as CursorPage<JournalEntry>;
   }
 
   /** Per-account debit/credit totals; total debits always equal total credits. */
