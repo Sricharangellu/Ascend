@@ -94,6 +94,26 @@ export const inventoryModule: PosModule = {
      );`,
     `CREATE INDEX IF NOT EXISTS inventory_lots_expiry_idx ON inventory_lots (tenant_id, expiry_date) WHERE qty_on_hand > 0;
      CREATE INDEX IF NOT EXISTS inventory_lots_product_idx ON inventory_lots (tenant_id, product_id);`,
+    // Expiry sheet: stock swept out of active inventory because it expired, held
+    // in a quarantined pool pending disposition (discard or return-to-vendor).
+    // loss_cents = qty × unit_cost = the total loss booked to the ledger.
+    `CREATE TABLE IF NOT EXISTS expiry_writeoffs (
+       id            TEXT PRIMARY KEY,
+       tenant_id     TEXT NOT NULL,
+       product_id    TEXT NOT NULL,
+       product_name  TEXT,
+       lot_id        TEXT,
+       lot_code      TEXT,
+       expiry_date   BIGINT,
+       qty           INTEGER NOT NULL,
+       unit_cost_cents BIGINT NOT NULL DEFAULT 0,
+       loss_cents    BIGINT NOT NULL DEFAULT 0,
+       status        TEXT NOT NULL DEFAULT 'pending',   -- pending | discarded | returned
+       disposition_ref TEXT,                            -- vendor_return id when returned
+       created_at    BIGINT NOT NULL,
+       resolved_at   BIGINT
+     );`,
+    `CREATE INDEX IF NOT EXISTS expiry_writeoffs_status_idx ON expiry_writeoffs (tenant_id, status, created_at DESC);`,
     CREATE_CYCLE_COUNT_TABLES,
     `
 CREATE TABLE IF NOT EXISTS inventory_locations (

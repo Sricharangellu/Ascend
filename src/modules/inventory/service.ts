@@ -105,6 +105,24 @@ export interface InventoryLot {
   received_at: number;
 }
 
+/** A batch of expired stock pulled from active inventory into the expiry pool. */
+export interface ExpiryWriteoff {
+  id: string;
+  tenant_id: string;
+  product_id: string;
+  product_name: string | null;
+  lot_id: string | null;
+  lot_code: string | null;
+  expiry_date: number | null;
+  qty: number;
+  unit_cost_cents: number;
+  loss_cents: number;
+  status: "pending" | "discarded" | "returned";
+  disposition_ref: string | null;
+  created_at: number;
+  resolved_at: number | null;
+}
+
 export interface CycleCountSession {
   id: string;
   tenant_id: string;
@@ -231,6 +249,69 @@ export class InventoryService {
       { tenantId, now },
     );
     return rows.map((r) => ({ ...r, days_overdue: Math.floor((now - Number(r.expiry_date)) / 86_400_000) }));
+  }
+
+  /**
+   * Sweep every expired lot out of active inventory into the expiry pool.
+   * For each past-expiry lot still on hand: zero the lot, reduce the product's
+   * active on-hand, and record an expiry write-off (loss = qty × unit cost).
+   * Emits `inventory.expiry_written_off` per item so accounting books the loss
+   * (Dr Spoilage / Cr Inventory). Idempotent-ish: already-swept lots are at 0,
+   * so re-running only picks up newly-expired stock.
+   */
+  async sweepExpired(tenantId: string): Promise<{ swept: number; loss_cents: number; items: ExpiryWriteoff[] }> {
+    const now = Date.now();
+    const items = await this.db.withTenant(tenantId).tx(async (tdb) => {
+      const lots = await tdb.query<{ id: string; product_id: string; product_name: string; lot_code: string | null; expiry_date: number; qty_on_hand: number; unit_cost_cents: number | null }>(
+        `SELECT l.id, l.product_id, p.name AS product_name, l.lot_code, l.expiry_date, l.qty_on_hand, l.unit_cost_cents
+           FROM inventory_lots l
+           JOIN products p ON p.id = l.product_id AND p.tenant_id = l.tenant_id
+          WHERE l.tenant_id = @t AND l.qty_on_hand > 0 AND l.expiry_date < @now
+          ORDER BY l.expiry_date ASC
+          FOR UPDATE`,
+        { t: tenantId, now },
+      );
+      const created: ExpiryWriteoff[] = [];
+      for (const lot of lots) {
+        const qty = Number(lot.qty_on_hand);
+        const unitCost = Number(lot.unit_cost_cents ?? 0);
+        const loss = qty * unitCost;
+        const id = `exp_${uuidv7()}`;
+        // Zero the lot and pull the qty from active product stock (same tx).
+        await tdb.query("UPDATE inventory_lots SET qty_on_hand = 0 WHERE id = @id AND tenant_id = @t", { id: lot.id, t: tenantId });
+        await this.adjustTx(tdb, lot.product_id, -qty, "adjustment", tenantId, `expiry:${id}`);
+        await tdb.query(
+          `INSERT INTO expiry_writeoffs (id, tenant_id, product_id, product_name, lot_id, lot_code, expiry_date, qty, unit_cost_cents, loss_cents, status, created_at)
+           VALUES (@id,@t,@pid,@pname,@lid,@lcode,@exp,@qty,@uc,@loss,'pending',@now)`,
+          { id, t: tenantId, pid: lot.product_id, pname: lot.product_name, lid: lot.id, lcode: lot.lot_code, exp: lot.expiry_date, qty, uc: unitCost, loss, now },
+        );
+        created.push({
+          id, tenant_id: tenantId, product_id: lot.product_id, product_name: lot.product_name,
+          lot_id: lot.id, lot_code: lot.lot_code, expiry_date: lot.expiry_date, qty,
+          unit_cost_cents: unitCost, loss_cents: loss, status: "pending", disposition_ref: null,
+          created_at: now, resolved_at: null,
+        });
+      }
+      return created;
+    });
+    // Post-commit: refresh each product's expiry cache and book the loss.
+    for (const w of items) {
+      await this.syncProductExpiry(w.product_id, tenantId);
+      await this.events.publish(
+        "inventory.expiry_written_off",
+        { tenantId, writeoffId: w.id, productId: w.product_id, qty: w.qty, lossCents: w.loss_cents },
+        w.id,
+      );
+    }
+    return { swept: items.length, loss_cents: items.reduce((s, w) => s + w.loss_cents, 0), items };
+  }
+
+  /** The expiry pool: written-off stock pending disposition. */
+  async listExpiryPool(tenantId: string): Promise<ExpiryWriteoff[]> {
+    return this.db.query<ExpiryWriteoff>(
+      "SELECT * FROM expiry_writeoffs WHERE tenant_id = @t AND status = 'pending' ORDER BY created_at DESC LIMIT 500",
+      { t: tenantId },
+    );
   }
 
   /** Expiry value-at-risk: counts + cost value of expired and soon-to-expire stock. */

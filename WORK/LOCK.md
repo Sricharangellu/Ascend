@@ -2,6 +2,17 @@
 
 Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
 
+## Active Claim (Claude session D — FEATURE: expiry management)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, Sri-directed feature — loop stopped) |
+| Queue item | Expiry management (full-stack): automated sweep moves past-expiry lots out of active inventory into an expiry pool (expiry_writeoffs), books the total loss (Dr 5300 Spoilage / Cr 1200 Inventory via event), Upcoming-Expiry + Expiry-Pool pages, dispositions (discard / return-to-vendor via purchasing vendor-returns). Slices: (1) backend sweep+pool+journal, (2) dispositions, (3) frontend pages. Decisions: real journal, reuse vendor-returns, automated sweep + manual button. |
+| Files/areas expected | `src/modules/inventory/{index,service,routes}.ts` (+ test); `src/modules/accounting/{service,index}.ts` (chart + subscription); `web/app/(protected)/inventory/expiry/**` or ecommerce nav; web mocks/types. NOT session B/C files. |
+| Started | 2026-07-16 |
+| Status | ACTIVE — implementing (slice 1: sweep+pool+journal) |
+| Blockers | none |
+
 ## Active Claim (Claude session D — inventory hardening: race-free transfer numbering) — RELEASED
 
 | Field | Value |

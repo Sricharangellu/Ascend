@@ -199,6 +199,17 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
     }),
   );
 
+  // ── Expiry pool ─────────────────────────────────────────────────────────────
+  // The expiry sheet: stock swept out of active inventory, pending disposition.
+  router.get("/expiry", handler(async (_req, res) => {
+    res.json({ items: await service.listExpiryPool(tenantId(res)) });
+  }));
+
+  // Sweep all past-expiry stock out of active inventory into the pool (manager+).
+  router.post("/expiry/sweep", mgr, handler(async (_req, res) => {
+    res.json(await service.sweepExpired(tenantId(res)));
+  }));
+
   // Location-to-location transfers — before /:productId so "transfers" isn't an id.
   router.get(
     "/transfers",
