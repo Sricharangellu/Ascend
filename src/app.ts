@@ -375,9 +375,12 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   // The in-process consumer's setInterval only runs while an instance stays warm,
   // which serverless does not guarantee: without an external heartbeat, queued
   // jobs (payment reconciliation, outbox relay, dunning) can silently sit idle.
-  // Vercel Cron (see vercel.json) calls this endpoint every minute; each call
-  // drains due jobs within a small time budget using the existing consumer,
-  // whose FOR UPDATE SKIP LOCKED claim makes concurrent ticks safe.
+  // Vercel Cron (see vercel.json) calls this endpoint daily — the Hobby plan's
+  // cron ceiling — as the guaranteed in-platform backstop. For minute-level
+  // cadence, point an external pinger (e.g. UptimeRobot) at this URL with the
+  // bearer header, or upgrade to Pro and tighten the cron. Each call drains due
+  // jobs within a small time budget using the existing consumer, whose
+  // FOR UPDATE SKIP LOCKED claim makes concurrent ticks safe.
   //
   // Auth mirrors /metrics: CRON_SECRET required in production (503 when unset,
   // fail closed on the endpoint rather than open); in dev/test an unset secret
