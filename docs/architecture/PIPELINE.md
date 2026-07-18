@@ -113,10 +113,33 @@ exact mechanism isn't confirmed (no backend log capture in CI to inspect the `/l
 the run). **Reverted** — a fix that isn't proven to help and correlates with a 3–4× worse outcome
 isn't a fix. Root cause of the *original* flake (documented above) is still open.
 
-`e2e` remains a **reported signal only** — not in the deploy `needs` nor the required merge checks —
-until someone re-investigates with backend log visibility. Next evidence needed: capture backend
-stdout/stderr during a CI e2e run (currently backgrounded with no log redirect) to see the actual
-`/login` request/response sequence during a failure cascade.
+**Diagnostics added and run (2026-07-18):** the backend was backgrounded with no log redirect, so its
+stdout/stderr were discarded — no past run ever had backend evidence. Added `LOG_LEVEL=debug` +
+redirect to a file, a 2s `/healthz` poll timeline, and always-on artifact upload. Result from a real
+failing run (16 failed / 3 flaky / 9 passed, 7.9 min):
+
+- **Backend health: zero gaps.** `/healthz` returned `200` at every 2s sample for the full ~10 min
+  run — rules out backend crash/stall/restart as the cause.
+- **`backend.log` is nearly empty** — 3 boot lines, then nothing until two `res.clearCookie`
+  deprecation warnings at the very end. The app has **no per-request or login-attempt logging** (no
+  `pino-http`/morgan middleware, no logger calls in `identity/service.ts`'s login/refresh paths), so
+  even debug level shows nothing about individual `/login` calls.
+- **Separately found and fixed:** the E2E job runs `playwright test --reporter=github`, which only
+  emits GH Actions annotations — it does **not** write an HTML report, so `web/playwright-report/`
+  (the artifact this workflow uploaded on failure) has been **empty on every past run**; that upload
+  step has never actually captured anything. Screenshots/video/trace are written to
+  `web/test-results/` regardless of reporter — the upload path was corrected to point there instead.
+
+Net effect: the backend is now cleared as a suspect (or the evidence to convict it doesn't exist).
+The failure is either in the Next.js proxy layer, the browser/Playwright side, or genuine CI-runner
+contention (run lengths have ranged 5.9–11.1 min across otherwise-identical runs). `e2e` remains a
+**reported signal only** — not in the deploy `needs` nor the required merge checks.
+
+**Next evidence needed** (now that `test-results/` actually uploads): pull the trace file
+(`trace: "on-first-retry"` is already configured) from the next failing run and open it in
+`npx playwright show-trace` to see the actual network calls and DOM state at the moment of failure —
+that's the first evidence that can distinguish "backend rejected the login" from "the browser/runner
+was just slow" or "the frontend proxy misbehaved."
 
 ## Local development
 
