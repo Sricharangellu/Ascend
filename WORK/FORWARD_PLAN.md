@@ -594,12 +594,34 @@ in the images tab that the gap-scanner can't catch (contract drift, not a
 missing path) — both caught by finally getting `npm test` running in the
 Cowork sandbox (see LOOP_STATE's NEEDS-SRI note on the esbuild fix).
 
+**Wave 3 (2026-07-18, 3rd follow-up):** inventory pipeline pending/history/
+reorder-alerts built as real joins (purchase_orders/lines/suppliers/products),
+reorder-alerts extending the tenant-wide reorder-suggestions signal with
+velocity/stockout/cost fields plus a working create-po action. Receiving,
+Issues, Errors, and the pipeline Overview funnel reclassified NEEDS-SRI —
+each implies an unbuilt subsystem (receiving sessions, an issue/error
+detection engine, a stage funnel that doesn't map onto the real POStatus
+enum), same call as catalog credits. Also found and fixed three unrelated
+live bugs while surveying this surface: (1) inventory's reorder-suggestions
+and serial_numbers both queried a nonexistent `catalog_products` table with
+nonexistent columns — 500'd on every call against real Postgres despite
+being wired to shipped pages; (2) a route-shadowing bug where GET
+/:productId (registered early in inventory/routes.ts) silently swallowed
+GET /counts, /locations, and /reorder-suggestions registered after it; (3)
+the inventory/serials page called the API with no /api/v1 prefix at all,
+and serial_numbers' module mount collided with inventory's own catch-all
+even after adding a mountPath — fixed by module registration order. The
+gap-scanner itself was hardened to catch bug class (3) going forward (it
+previously couldn't see a missing-prefix call at all). Full detail in the
+audit's addendum #3.
+
 Remaining mock-only surfaces (all allowlisted + tracked): catalog credits (1
 path — no backing concept anywhere in the schema, a design decision not
-plumbing), inventory pipeline/errors (13), notifications prefs/rules (4),
-purchasing EDI (6), workflows approval-chains (3), settings
-b2b/permissions/custom-roles (contract decision — NEEDS-SRI), plus the
-by-design Preview verticals (golf/pricing/warehouse/documents/promotions).
+plumbing), inventory pipeline receiving/issues/errors/summary (9 — needs a
+design decision, see above), notifications prefs/rules (4), purchasing EDI
+(6), workflows approval-chains (3), settings b2b/permissions/custom-roles
+(contract decision — NEEDS-SRI), plus the by-design Preview verticals
+(golf/pricing/warehouse/documents/promotions).
 174 backend paths remain unsurfaced by any page (map for future UI work).
 
 Needed:

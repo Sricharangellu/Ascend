@@ -176,6 +176,87 @@ all passing, 0 failures).
    platform limit — `npm install --no-save esbuild --force` fixed it. Worth
    knowing for any future Cowork session on this repo.
 
+## ADDENDUM #3 (same day, 3rd follow-up session) — inventory pipeline wave + 3 unrelated live bugs
+
+Status label: **Built and test-verified** (typecheck clean; 4 new pipeline
+tests + 2 new inventory/serial_numbers regression tests, all executed
+against real Postgres; full targeted regression across catalog, inventory,
+serial_numbers, purchasing, workforce, team, customers, orders, sso — 138+
+tests — passes clean; gap:scan clean, 34 allowlisted, down from 38).
+
+1. **Inventory pipeline: 4 of 13 paths built.** New
+   `src/modules/inventory/pipeline-views.ts` + `pipeline-routes.ts`:
+   `GET /pipeline/pending` (open PO lines, real join over
+   purchase_order_lines/purchase_orders/suppliers/products —
+   expected_date/outlet honestly approximated since no ETA or location-
+   assignment concept exists on purchase orders), `GET /pipeline/history`
+   (fully-received lines with a real lead_time_days from created_at/
+   received_at; cost_variance_cents/receiver honestly zero/empty — receive()
+   never revises unit cost or records an actor), and
+   `GET /pipeline/reorder-alerts` + `POST .../:id/create-po` (tenant-wide
+   version of inventory/reorder-suggestions, extended with avg_daily_sales/
+   days_until_stockout/estimated_cost_cents/urgency/open_po_qty; create-po
+   opens a real PO via PurchasingService.createOrder against the product's
+   preferred supplier, 400s with a clear message if none is linked).
+2. **Receiving, Issues, Errors, and the pipeline Overview funnel reclassified
+   NEEDS-SRI**, not built. Each implies a subsystem absent from the schema:
+   Receiving needs a stateful "receiving session" (start → progressively scan
+   → a receiver/batch_id) where today receive() is one atomic call; Issues
+   and Errors are GET+PATCH only in the FE with no POST anywhere, implying an
+   unbuilt *detection* engine (categories like sku_mapping, price_mismatch,
+   duplicate_doc, edi_parse that nothing computes); the Overview funnel's
+   9 stages don't map onto the real 4-value POStatus enum. Same call as
+   catalog `/credits` — a design decision, not plumbing.
+3. **Three unrelated live bugs found and fixed while surveying this
+   surface** (none introduced this session, all pre-existing):
+   - **`catalog_products` table/column typo**: `InventoryService.
+     getReorderSuggestions()` and three queries in `serial_numbers/
+     service.ts` joined a table called `catalog_products` with columns
+     (`reorder_quantity`, `preferred_vendor_id`, `preferred_vendor_name`)
+     that don't exist anywhere in the schema — the real catalog table is
+     `products`, with no reorder_quantity column, and preferred-vendor
+     tracked in catalog's `product_suppliers` table (added addendum #2).
+     This 500'd on every call against a real database despite being wired
+     to two live pages (purchasing's Reorder tab, `/inventory/reorder`) and
+     the inventory serials page. Fixed to join the real tables.
+   - **Route-shadowing in `inventory/routes.ts`**: `GET /:productId` was
+     registered (originally line 322) *before* `GET /counts`, `GET
+     /locations`, and `GET /reorder-suggestions` (originally lines
+     398-445). Express matches GET routes in registration order and
+     `/:productId` matches any single path segment literally — all three
+     were 100% dead code, silently handled by the per-product stock
+     handler instead (wrong shape, no error; invisible to typecheck and to
+     gap-scan since the paths themselves existed). Moved all three ahead
+     of the catch-all.
+   - **Missing-prefix + mount-collision on `/inventory/serials`**: the FE
+     page called `apiPost`/`apiGet`/`apiPatch` with paths missing the
+     `/api/v1` prefix entirely — invisible to gap-scan, whose FE regex only
+     matches literals that already contain the prefix. Separately,
+     `serial_numbers` module had no `mountPath` override, so its routes
+     registered at `/api/v1/serial_numbers/inventory/serials` instead of
+     `/api/v1/inventory/serials`. Adding `mountPath: "/api/v1"` alone
+     wasn't sufficient: `inventoryModule` (mounted at `/api/v1/inventory`,
+     registered earlier in `src/modules/index.ts`) would still intercept
+     the request via its own `/:productId` catch-all before
+     `serial_numbers`' router was ever reached, since Express tries
+     `app.use` middleware in registration order. Fixed by reordering
+     `serialNumbersModule` to register (and thus mount) before
+     `inventoryModule`.
+4. **Also fixed, carried over from addendum #2's uncommitted state**: the
+   `'partial'`/`billed_qty` bug in catalog's `reorderSuggestions()` —
+   `po.status IN ('ordered', 'partial')` should have read
+   `'partially_received'`, and the incoming-qty formula used `billed_qty`
+   (vendor-invoice reconciliation, stays NULL until invoiced) instead of
+   `received_qty` (physical receipt progress), so incoming stock reported
+   the full original order quantity even after partial receiving. Fixed,
+   with a regression test proving a 20-unit PO partially received 8 now
+   reads 12 incoming, not 20 or 0.
+5. **gap:scan hardened**: now also flags any `apiGet`/`apiPost`/`apiPatch`/
+   `apiPut`/`apiDelete` call site whose literal path doesn't start with
+   `/api/` — a distinct blind spot from the existing missing-route check,
+   since the original scanner's FE regex only matched literals that already
+   contained `/api/v1` or `/api/identity`.
+
 ## Recommended order of attack
 
 1. Merge/cherry-pick `29831bd` (unblocks 10 modules + SSO + pack isolation) — one PR.
