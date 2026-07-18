@@ -1,15 +1,17 @@
 name: CI
 
-# ─── Trigger rules ─────────────────────────────────────────────────────────────
-# master  → full CI + deploy to PRODUCTION  (finder-pos-frontend.vercel.app)
-# staging → full CI + deploy to STAGING     (Vercel preview URL, isolated DB)
+# ─── Trigger rules (3-tier promotion pipeline) ────────────────────────────────
+# develop → full CI + deploy to DEV      (Vercel preview, TESTING Supabase — shared)
+# staging → full CI + deploy to TESTING  (Vercel preview alias, TESTING Supabase)
+# master  → full CI + deploy to PROD      (Vercel --prod, PROD Supabase)
 # PRs     → full CI, no deploy
-# feature → no CI (local dev + pre-push hook)
+# feature → no CI (local dev + pre-push hook); PR into develop to run CI
+# Promotion is forward-only: feature/* → develop → staging → master.
 on:
   push:
-    branches: [master, staging]
+    branches: [develop, staging, master]
   pull_request:
-    branches: [master, staging]
+    branches: [develop, staging, master]
 
 # ─── Shared test jobs (run on every trigger) ──────────────────────────────────
 jobs:
@@ -237,59 +239,81 @@ jobs:
           path: web/playwright-report/
           retention-days: 7
 
-  # ─── Staging deploy (push to staging branch only) ──────────────────────────
-  # Deploys to a Vercel PREVIEW URL (no --prod flag).
-  # Uses STAGING_DATABASE_URL and STAGING_JWT_SECRET secrets (isolated DB).
-  # Preview URL is unique per deployment — check Vercel dashboard for the URL.
-  deploy-staging:
-    name: Deploy → Staging (Vercel preview)
-    needs: [guard, backend, frontend]
+  # ─── DEV deploy (push to develop only) ─────────────────────────────────────
+  # Deploys BOTH projects as Vercel previews pointing at the TESTING backend
+  # (shared Supabase B). Repo variables carry the non-secret staging origins.
+  deploy-dev:
+    name: Deploy → Dev (Vercel preview)
+    needs: [guard, backend, frontend, e2e]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/staging' && github.event_name == 'push'
-    defaults:
-      run:
-        working-directory: web
+    # Skips (does not fail) until the testing tier is configured — set the repo
+    # variable STAGING_BACKEND_URL + Vercel Preview env vars to activate.
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push' && vars.STAGING_BACKEND_URL != ''
     environment:
-      name: staging
-      url: ${{ steps.deploy.outputs.url }}
+      name: Preview
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: web/package-lock.json
       - run: npm ci
-      # Deploy as Vercel preview (no --prod flag) → unique preview URL.
-      # Set STAGING env vars in Vercel dashboard under the staging environment.
-      - name: Deploy to Vercel staging
-        id: deploy
-        run: |
-          url=$(npx vercel --yes --token "$VERCEL_TOKEN" 2>&1 | tail -1)
-          echo "url=$url" >> "$GITHUB_OUTPUT"
-          echo "Staging URL: $url"
+      - name: Deploy dev (backend + frontend) → Vercel preview
+        run: ./scripts/deploy.sh both
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      - name: Staging smoke test
+          DEPLOY_ENV: dev
+          NEXT_PUBLIC_MOCK: "false"
+          # Dev shares the TESTING backend/DB (Supabase B). Set as repo variable.
+          BACKEND_URL: ${{ vars.STAGING_BACKEND_URL }}
+
+  # ─── TESTING deploy (push to staging only) ─────────────────────────────────
+  # Deploys BOTH projects as Vercel previews aliased to stable staging domains,
+  # pointing at the TESTING backend/DB (Supabase B). Then smoke-tests the alias.
+  deploy-staging:
+    name: Deploy → Testing (Vercel preview alias)
+    needs: [guard, backend, frontend, e2e]
+    runs-on: ubuntu-latest
+    # Skips (does not fail) until the testing tier is configured — set the repo
+    # variables STAGING_BACKEND_URL/_ALIAS/_FRONTEND_ALIAS + Vercel Preview env.
+    if: github.ref == 'refs/heads/staging' && github.event_name == 'push' && vars.STAGING_BACKEND_URL != ''
+    environment:
+      name: staging
+      url: https://${{ vars.STAGING_FRONTEND_ALIAS }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Deploy testing (backend + frontend) → Vercel preview alias
+        run: ./scripts/deploy.sh both
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DEPLOY_ENV: testing
+          NEXT_PUBLIC_MOCK: "false"
+          BACKEND_URL: ${{ vars.STAGING_BACKEND_URL }}
+          BACKEND_ALIAS: ${{ vars.STAGING_BACKEND_ALIAS }}
+          FRONTEND_ALIAS: ${{ vars.STAGING_FRONTEND_ALIAS }}
+      - name: Testing smoke test
         run: |
           sleep 10
-          BACKEND_URL="${{ secrets.STAGING_BACKEND_URL }}"
-          curl -f --retry 3 --retry-delay 5 "${BACKEND_URL}/healthz" \
-            || echo "⚠️  Staging backend not reachable — check STAGING_BACKEND_URL secret"
+          curl -fsS --retry 3 --retry-delay 5 "${{ vars.STAGING_BACKEND_URL }}/healthz" \
+            || (echo "❌ testing backend /healthz failed — check STAGING_BACKEND_URL var + Vercel Preview env" && exit 1)
+          curl -fsS --retry 3 --retry-delay 5 "${{ vars.STAGING_BACKEND_URL }}/readyz" \
+            || (echo "❌ testing backend /readyz failed (DB not reachable — check Supabase B)" && exit 1)
 
-  # ─── Production deploy (push to master branch only) ────────────────────────
-  # Deploys to the PRODUCTION Vercel URL with --prod flag.
-  # Only runs after all test jobs pass AND only on master.
+  # ─── PROD deploy (push to master only) ─────────────────────────────────────
+  # Deploys BOTH projects to Vercel Production (--prod) against the PROD Supabase.
+  # Single deploy authority (deploy-prod.yml was removed to avoid double-deploys).
   deploy-production:
     name: Deploy → Production (Vercel --prod)
-    needs: [guard, backend, frontend]
+    needs: [guard, backend, frontend, e2e]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-    defaults:
-      run:
-        working-directory: web
     environment:
-      name: production
+      name: Production
       url: https://finder-pos-frontend.vercel.app
     steps:
       - uses: actions/checkout@v4
@@ -297,11 +321,13 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: web/package-lock.json
       - run: npm ci
-      - run: npx vercel --prod --yes --token "$VERCEL_TOKEN"
+      - name: Deploy production (backend + frontend) → Vercel --prod
+        run: ./scripts/deploy.sh both
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DEPLOY_ENV: prod
+          NEXT_PUBLIC_MOCK: "false"
 
   # ─── Production smoke test ─────────────────────────────────────────────────
   smoke-test:
