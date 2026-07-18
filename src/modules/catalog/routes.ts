@@ -240,6 +240,10 @@ function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
 
+function actorId(res: Response): string {
+  return (res.locals["auth"] as AuthPayload).userId;
+}
+
 const importSchema = z.object({
   items: z
     .array(
@@ -357,6 +361,7 @@ export function registerRoutes(router: Router, service: CatalogService): void {
           status: body.status as ProductStatus | undefined,
         },
         tenantId(res),
+        { actorId: actorId(res) },
       );
       res.status(201).json(product);
     }),
@@ -581,7 +586,7 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     requireRole("manager"),
     handler(async (req, res) => {
       const body = parseBody(updateSchema, req.body);
-      const product = await service.update(String(req.params.id), body, tenantId(res));
+      const product = await service.update(String(req.params.id), body, tenantId(res), { actorId: actorId(res) });
       res.json(product);
     }),
   );
@@ -590,7 +595,7 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     "/:id",
     requireRole("manager"),
     handler(async (req, res) => {
-      const product = await service.archive(String(req.params.id), tenantId(res));
+      const product = await service.archive(String(req.params.id), tenantId(res), actorId(res));
       res.json(product);
     }),
   );
@@ -609,7 +614,7 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     requireRole("manager"),
     handler(async (req, res) => {
       const body = parseBody(complianceSchema, req.body);
-      const product = await service.updateCompliance(String(req.params.id), body, tenantId(res));
+      const product = await service.updateCompliance(String(req.params.id), body, tenantId(res), actorId(res));
       res.json(product);
     }),
   );

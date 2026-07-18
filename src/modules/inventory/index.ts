@@ -94,6 +94,16 @@ export const inventoryModule: PosModule = {
      );`,
     `CREATE INDEX IF NOT EXISTS inventory_lots_expiry_idx ON inventory_lots (tenant_id, expiry_date) WHERE qty_on_hand > 0;
      CREATE INDEX IF NOT EXISTS inventory_lots_product_idx ON inventory_lots (tenant_id, product_id);`,
+    // Fields for the product-detail Expiry tab's manual lot entry (catalog
+    // module, see AUDIT_2026-07-18T005030Z): a human batch number distinct
+    // from lot_code, which location holds it, free-text notes, and updated_at
+    // for edits. Extending this table (rather than a parallel one) means
+    // manual entries are automatically visible to the Expiry Pool sweep above
+    // once they pass expiry_date — one source of truth for per-lot expiry.
+    `ALTER TABLE inventory_lots ADD COLUMN IF NOT EXISTS batch_number TEXT;
+     ALTER TABLE inventory_lots ADD COLUMN IF NOT EXISTS location_id TEXT;
+     ALTER TABLE inventory_lots ADD COLUMN IF NOT EXISTS notes TEXT;
+     ALTER TABLE inventory_lots ADD COLUMN IF NOT EXISTS updated_at BIGINT;`,
     // Expiry sheet: stock swept out of active inventory because it expired, held
     // in a quarantined pool pending disposition (discard or return-to-vendor).
     // loss_cents = qty × unit_cost = the total loss booked to the ledger.
