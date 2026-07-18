@@ -64,6 +64,13 @@ jobs:
       - name: Prevention agent — no dirty drift or stray modules
         run: npm run prevent:drift
 
+      - name: API gap scan — every frontend call has a backend route
+        # Guards against pages shipping on MSW mocks while the real API 404s
+        # (the AUDIT_2026-07-18T005030Z incident class). Deliberate Preview
+        # surfaces live in tools/api-gap-allowlist.json, each tied to a board
+        # entry. No deps; plain ESM on the runner's Node.
+        run: npm run gap:scan
+
       - name: One canonical agent-instruction file
         run: |
           # "1 file for all agents": exactly one root AGENTS.md; CLAUDE.md may
