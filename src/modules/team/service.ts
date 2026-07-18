@@ -87,10 +87,10 @@ export class TeamService {
     const now = Date.now();
     const id = `tme_${uuidv7()}`;
     const inserted = await this.db.query<{ id: string }>(
-      `INSERT INTO time_entries (id, tenant_id, user_id, clock_in, clock_out, duration_mins, notes, created_at)
+      `INSERT INTO team_time_entries (id, tenant_id, user_id, clock_in, clock_out, duration_mins, notes, created_at)
        SELECT @id, @tenantId, @userId, @now, NULL, NULL, NULL, @now
        WHERE NOT EXISTS (
-         SELECT 1 FROM time_entries
+         SELECT 1 FROM team_time_entries
          WHERE tenant_id = @tenantId AND user_id = @userId AND clock_out IS NULL
        )
        RETURNING id`,
@@ -100,7 +100,7 @@ export class TeamService {
       throw new HttpError(409, "already_clocked_in", "This member already has an open time entry.");
     }
     return (await this.db.one<TimeEntry>(
-      `SELECT ${TIME_ENTRY_COLUMNS} FROM time_entries WHERE id = @id AND tenant_id = @tenantId`,
+      `SELECT ${TIME_ENTRY_COLUMNS} FROM team_time_entries WHERE id = @id AND tenant_id = @tenantId`,
       { id, tenantId },
     ))!;
   }
@@ -111,7 +111,7 @@ export class TeamService {
     await this.get(userId, tenantId);
     const now = Date.now();
     const closed = await this.db.query<TimeEntry>(
-      `UPDATE time_entries
+      `UPDATE team_time_entries
        SET clock_out = @now, duration_mins = (@now - clock_in) / 60000
        WHERE tenant_id = @tenantId AND user_id = @userId AND clock_out IS NULL
        RETURNING ${TIME_ENTRY_COLUMNS}`,
@@ -128,7 +128,7 @@ export class TeamService {
   async listTimeEntries(tenantId: string, userId: string, limit = 100): Promise<TimeEntry[]> {
     const capped = Math.min(Math.max(1, limit), 200);
     return this.db.query<TimeEntry>(
-      `SELECT ${TIME_ENTRY_COLUMNS} FROM time_entries
+      `SELECT ${TIME_ENTRY_COLUMNS} FROM team_time_entries
        WHERE tenant_id = @tenantId AND user_id = @userId
        ORDER BY clock_in DESC
        LIMIT ${capped}`,

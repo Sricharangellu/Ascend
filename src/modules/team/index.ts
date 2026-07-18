@@ -7,8 +7,18 @@ import { registerRoutes } from "./routes.js";
 // like every other timestamp in the schema. The partial unique index is the
 // database-level backstop for the "one open entry per member" invariant that
 // the service also enforces atomically (defense in depth).
+//
+// Named team_time_entries (NOT time_entries) — the workforce module already
+// owns a table literally called time_entries (BE-40, employee_id-keyed, for
+// its own scheduling/payroll roster). A same-name CREATE TABLE IF NOT EXISTS
+// here previously won the race (team registers before workforce in
+// modules/index.ts), silently creating the table WITHOUT workforce's
+// employee_id column and breaking every workforce time-clock query on a
+// fresh schema. Caught by this module's own test suite failing with
+// "column employee_id does not exist" — fixed same-day, no data migration
+// needed since nothing had shipped against the collided name.
 const CREATE_TIME_ENTRIES = `
-CREATE TABLE IF NOT EXISTS time_entries (
+CREATE TABLE IF NOT EXISTS team_time_entries (
   id            TEXT PRIMARY KEY,
   tenant_id     TEXT NOT NULL,
   user_id       TEXT NOT NULL,
@@ -21,15 +31,15 @@ CREATE TABLE IF NOT EXISTS time_entries (
 `;
 
 const CREATE_TIME_ENTRIES_INDEXES = `
-CREATE INDEX IF NOT EXISTS time_entries_tenant_user_idx
-  ON time_entries (tenant_id, user_id, clock_in DESC);
-CREATE UNIQUE INDEX IF NOT EXISTS time_entries_one_open_idx
-  ON time_entries (tenant_id, user_id) WHERE clock_out IS NULL;
+CREATE INDEX IF NOT EXISTS team_time_entries_tenant_user_idx
+  ON team_time_entries (tenant_id, user_id, clock_in DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS team_time_entries_one_open_idx
+  ON team_time_entries (tenant_id, user_id) WHERE clock_out IS NULL;
 `;
 
 /** Team directory (Settings → Users) + time clock. Directory reads the shared
- *  users table; the time clock owns time_entries. Per-member permission views
- *  delegate to the permission_requests module, which owns those tables. */
+ *  users table; the time clock owns team_time_entries. Per-member permission
+ *  views delegate to the permission_requests module, which owns those tables. */
 export const teamModule: PosModule = {
   name: "team",
   migrations: [CREATE_TIME_ENTRIES, CREATE_TIME_ENTRIES_INDEXES],
