@@ -579,13 +579,25 @@ Needed:
 ### 4. Frontend integration
 
 **Gap scan done 2026-07-18** (`AUDIT_2026-07-18T005030Z-fe-be-gap-audit.md`), and
-the first remediation wave shipped same-day (see the audit's addendum): the
-double-prefix/SSO/requireModule fixes are ported, team time-tracking + customers
-search/merge + orders timeline are real endpoints now, storefront auth is gated
-Preview, and `npm run gap:scan` enforces parity in CI from here on. Remaining
-mock-only surfaces (all allowlisted + tracked): catalog product-detail tabs (16
-paths, next biggest win), inventory pipeline/errors (13), notifications
-prefs/rules (4), purchasing EDI (6), workflows approval-chains (3), settings
+two remediation waves shipped same-day (see the audit's addendum): wave 1 —
+the double-prefix/SSO/requireModule fixes ported, team time-tracking + customers
+search/merge + orders timeline built, storefront auth gated Preview, and
+`npm run gap:scan` enforcing parity in CI from here on. Wave 2 — the catalog
+product-detail page (17 of 18 mock-only paths: stock/sales/purchases/invoices/
+returns/duplicate as real joins, reorder-suggestions/analytics/supplier-price-
+comparison as documented-approximation derived metrics, new CRUD for suppliers/
+pricing+tiers/expiry/images, and a real audit trail via GET /:id/audit-log —
+CatalogService didn't write to audit_log at all before this). In the process,
+also fixed a genuine table-name collision from wave 1 (team's time_entries vs
+workforce's pre-existing time_entries) and a pre-existing FE/BE field-name bug
+in the images tab that the gap-scanner can't catch (contract drift, not a
+missing path) — both caught by finally getting `npm test` running in the
+Cowork sandbox (see LOOP_STATE's NEEDS-SRI note on the esbuild fix).
+
+Remaining mock-only surfaces (all allowlisted + tracked): catalog credits (1
+path — no backing concept anywhere in the schema, a design decision not
+plumbing), inventory pipeline/errors (13), notifications prefs/rules (4),
+purchasing EDI (6), workflows approval-chains (3), settings
 b2b/permissions/custom-roles (contract decision — NEEDS-SRI), plus the
 by-design Preview verticals (golf/pricing/warehouse/documents/promotions).
 174 backend paths remain unsurfaced by any page (map for future UI work).

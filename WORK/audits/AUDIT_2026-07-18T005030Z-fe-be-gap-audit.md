@@ -120,6 +120,62 @@ mismatch — run `npm test` locally / rely on CI).
    fixed vocabulary, no color. Merging two permission vocabularies is a design
    decision → NEEDS-SRI.
 
+## ADDENDUM #2 (same day, 2nd follow-up session) — catalog product-detail wave
+
+Status label: **Built and test-verified** (typecheck clean both sides; 19 new
+tests in `src/modules/catalog/detail-views.test.ts` executed against real
+Postgres in this session — see note below on how — plus regression runs of
+customers/team/sso/orders-timeline/workforce/catalog's original 26-test suite,
+all passing, 0 failures).
+
+1. **17 of 18 catalog product-detail paths built.** New
+   `src/modules/catalog/detail-views.ts` (+`detail-routes.ts`): stock, sales,
+   sales-by-customer, purchases, invoices, returns, duplicate are real joins
+   over existing tables; reorder-suggestions, analytics (live ABC/Pareto
+   classification), and supplier-price-comparison are derived metrics with
+   the approximations documented in-code (no forecasting model, no per-line
+   return record, no landed-cost/freight tracking — all pre-existing schema
+   gaps, not hidden). New CRUD: suppliers (`product_suppliers`, find-or-create
+   by name, upsert-on-conflict), pricing + quantity-break tiers
+   (`product_price_tiers`, distinct from sales' customer-tier
+   `product_tier_prices`), expiry lots (extends `inventory_lots` rather than
+   duplicating it, so manual entries feed the existing Expiry Pool sweep),
+   and images (PATCH is_primary + a properly product-scoped nested DELETE).
+2. **Catalog never wrote to audit_log before this.** `CatalogService.create/
+   update/updateCompliance` now call `writeAudit`; `archive()` inherits it
+   for free (it's just `update({status:'archived'})`) and is classified as
+   an "archive" action at read time. New `GET /:id/audit-log` flattens
+   audit_log rows into one entry per changed field.
+3. **`/catalog/:id/credits` deliberately NOT built** — no backing concept
+   (AR credit memo, or otherwise) exists anywhere in the schema. Left
+   allowlisted; needs a Sri decision on what a product-level "credit" even
+   means before it's plumbing work.
+4. **Two real bugs caught only by running tests, not by typecheck or the
+   gap-scanner:**
+   - **Table-name collision**: wave-1's team time-clock table was named
+     `time_entries` — the pre-existing `workforce` module already owns a
+     table by that exact name (BE-40, `employee_id`-keyed). Team registers
+     first in `modules/index.ts`, so its `CREATE TABLE IF NOT EXISTS` won
+     the race on a fresh schema, silently omitting workforce's
+     `employee_id` column. Fixed by renaming to `team_time_entries`
+     (separate fix commit; no data migration needed, nothing had shipped
+     against the collided name).
+   - **Suppliers upsert**: re-adding the same vendor name to a product hit
+     the `(tenant,product,supplier)` UNIQUE constraint as a raw 500. Fixed
+     with `INSERT ... ON CONFLICT DO UPDATE`.
+   - **ImagesTab contract drift** (pre-existing, not from this session):
+     the GET/POST routes already existed but the frontend used `url`/`alt`
+     against a backend that returns `image_url`/`alt_text`, and its DELETE
+     called a bare unauthenticated `fetch()` against an unscoped path. This
+     class of bug is invisible to `gap:scan` (paths existed; the *shapes*
+     didn't match) — fixed in `ImagesTab.tsx` and by adding the missing
+     product-scoped nested DELETE route.
+5. **Local test execution was possible all along.** The earlier note that
+   "the sandbox can't run tests" was an environment artifact (a
+   platform-mismatched `esbuild` binary in `node_modules`), not a hard
+   platform limit — `npm install --no-save esbuild --force` fixed it. Worth
+   knowing for any future Cowork session on this repo.
+
 ## Recommended order of attack
 
 1. Merge/cherry-pick `29831bd` (unblocks 10 modules + SSO + pack isolation) — one PR.
