@@ -84,6 +84,21 @@ is never touched by pipeline work.
   dashboard for an instant rollback.
 - **Bad pipeline change:** revert the CI commit on `master`.
 
+## Known issue — E2E is a non-blocking signal (for now)
+
+The Playwright golden-path suite (`web/e2e`) has a pre-existing timing flake: the backend rotates
+refresh tokens strict single-use, and Playwright starts a fresh worker after any test failure, so the
+shared authenticated `storageState` cookie can already be revoked → the affected tests redirect to
+`/login` and the inline re-login's `waitForURL` occasionally exceeds 15 s under CI contention (a run
+typically shows a handful of "flaky" plus 1–2 hard failures, all at the same login helper). It fails
+on `master` too — it is **not** caused by the pipeline.
+
+Because of this, `e2e` runs as a **reported signal** and is **not** in the deploy `needs` nor the
+required merge checks — otherwise the flake would block every promotion. Fix path (then re-gate):
+add a test-only flag that disables single-use refresh rotation for the E2E backend (removes the root
+cause), or make the shared-session self-heal fully deterministic. Track before adding `e2e` back to
+the deploy `needs`.
+
 ## Local development
 
 Point a local clone at whichever tier's DB you're working against (see `.env.staging.example` for the
