@@ -103,6 +103,41 @@ test("analytics: fresh product has zeroed summary and empty trend", async () => 
   assert.equal(r.json.summary.abc_class, "C");
 });
 
+test("reorder-suggestions: incoming_stock reflects true remaining after a partial receive (regression for received_qty vs billed_qty bug)", async () => {
+  const app = await freshApp();
+  const id = await makeProduct(app, "DV-REORDER-INCOMING-1");
+
+  const supplier = await call(app, "POST", "/api/purchasing/suppliers", { name: "Regression Supplier" });
+  assert.equal(supplier.status, 201, `supplier create failed: ${JSON.stringify(supplier.json)}`);
+
+  const po = await call(app, "POST", "/api/purchasing/orders", {
+    supplierId: supplier.json.id,
+    lines: [{ productId: id, quantity: 20, unitCostCents: 100 }],
+  });
+  assert.equal(po.status, 201, `PO create failed: ${JSON.stringify(po.json)}`);
+  assert.equal(po.json.status, "ordered");
+  const lineId = po.json.lines[0].id;
+
+  // Before any receiving: all 20 units are incoming.
+  const before = await call(app, "GET", `/api/catalog/${id}/reorder-suggestions`);
+  assert.equal(before.status, 200);
+  assert.equal(before.json.incoming_stock, 20);
+
+  // Partially receive 8 of 20 — PO moves to 'partially_received', 12 remain incoming.
+  const receive = await call(app, "POST", `/api/purchasing/orders/${po.json.id}/receive`, {
+    lines: [{ lineId, qty: 8 }],
+  });
+  assert.equal(receive.status, 200, `receive failed: ${JSON.stringify(receive.json)}`);
+  assert.equal(receive.json.status, "partially_received");
+
+  const after = await call(app, "GET", `/api/catalog/${id}/reorder-suggestions`);
+  assert.equal(after.status, 200);
+  // Must be 12 (20 - 8 received), not 20 — proves incoming_stock is driven by
+  // received_qty (physical receipt progress), not billed_qty (invoice reconciliation,
+  // which stays NULL here and would wrongly report the full original 20).
+  assert.equal(after.json.incoming_stock, 12);
+});
+
 test("supplier-price-comparison: empty when no suppliers are linked", async () => {
   const app = await freshApp();
   const id = await makeProduct(app, "DV-SPC-1");

@@ -84,7 +84,7 @@ export interface PurchaseLine {
   qty_received: number;
   unit_cost_cents: number;
   total_cost_cents: number;
-  status: "ordered" | "partial" | "received" | "cancelled";
+  status: "ordered" | "partially_received" | "received" | "cancelled"; // matches purchasing's POStatus exactly
 }
 
 export interface ProductInvoiceLine {
@@ -98,7 +98,7 @@ export interface ProductInvoiceLine {
   unit_cost_cents: number;
   total_cost_cents: number;
   supplier_name: string;
-  status: "pending" | "partial" | "received" | "invoiced" | "cancelled";
+  status: "ordered" | "partially_received" | "received" | "cancelled"; // matches purchasing's POStatus exactly
   expiry_date: number | null;
   lot_code: string | null;
 }
@@ -647,10 +647,16 @@ export class CatalogDetailViewsService {
        FROM inventory_stock WHERE tenant_id = @t AND product_id = @p`,
       { t: tenantId, p: productId },
     );
+    // "Incoming" = still on order and not yet physically arrived. Must use
+    // received_qty (progress toward physical receipt), not billed_qty — billed_qty
+    // tracks vendor-invoice reconciliation (short/over-shipment vs what was billed)
+    // and stays NULL until a PO is invoiced, which is unrelated to whether the
+    // goods have shown up at the dock. Using billed_qty here previously reported
+    // the full original order quantity as "incoming" even after partial receiving.
     const incoming = await this.db.one<{ qty: number }>(
-      `SELECT COALESCE(SUM(pol.quantity - COALESCE(pol.billed_qty, 0)), 0) AS qty
+      `SELECT COALESCE(SUM(pol.quantity - COALESCE(pol.received_qty, 0)), 0) AS qty
        FROM purchase_order_lines pol JOIN purchase_orders po ON po.tenant_id = pol.tenant_id AND po.id = pol.po_id
-       WHERE pol.tenant_id = @t AND pol.product_id = @p AND po.status IN ('ordered', 'partial')`,
+       WHERE pol.tenant_id = @t AND pol.product_id = @p AND po.status IN ('ordered', 'partially_received')`,
       { t: tenantId, p: productId },
     );
     const velocity = await this.db.one<{ units: number }>(
