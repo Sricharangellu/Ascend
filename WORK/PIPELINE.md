@@ -29,17 +29,14 @@ push/merge/deploy operations — they need your machine or a browser.
 
 ## The pipeline (run in order)
 
-### Step 1 — Commit boards + push (your terminal, 30 seconds)
+### Step 1 — Push (your terminal, 10 seconds)
 
 ```bash
-cd /Users/sri/Desktop/Prj/Ascend
-rm -f .git/index.lock   # stale lock from a crashed git process; sandbox can't remove it
-git add WORK/PIPELINE.md WORK/LOOP_STATE.md
-git commit -m "docs(work): full-stack connectivity audit — delivery-tail gaps + Chrome verification pipeline"
-git push origin feat/delivery-pipeline
+cd /Users/sri/Desktop/Prj/Ascend && git push origin feat/delivery-pipeline
 ```
 
-(The Cowork sandbox has no GitHub credentials and can't clear the lock — this must run on your machine.)
+(Stale index.lock cleared + boards committed by session G on 2026-07-19; only
+the push remains — the Cowork sandbox has no GitHub credentials.)
 
 ### Step 2 — Merge PR #70 (Claude in Chrome — Prompt A below)
 
