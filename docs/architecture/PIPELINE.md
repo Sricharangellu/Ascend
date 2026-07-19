@@ -84,14 +84,43 @@ is never touched by pipeline work.
   dashboard for an instant rollback.
 - **Bad pipeline change:** revert the CI commit on `master`.
 
-## Known issue — E2E is a non-blocking signal (for now)
+## Known issue — E2E login flake: ROOT CAUSE CONFIRMED (2026-07-18)
 
-The Playwright golden-path suite (`web/e2e`) has a pre-existing timing flake: the backend rotates
-refresh tokens strict single-use, and Playwright starts a fresh worker after any test failure, so the
-shared authenticated `storageState` cookie can already be revoked → the affected tests redirect to
-`/login` and the inline re-login's `waitForURL` occasionally exceeds 15 s under CI contention (a run
-typically shows a handful of "flaky" plus 1–2 hard failures, all at the same login helper). It fails
-on `master` too — it is **not** caused by the pipeline.
+**Confirmed via direct evidence** (a Playwright trace DOM snapshot at the moment of failure — not
+inference): `/api/identity` (login, refresh, register, me) is rate-limited per-IP at
+`capacity: 10, refillRate: 0.33` (src/app.ts) — a correct brute-force guard for production. The
+entire E2E suite runs from **one CI runner IP** and needs dozens of `/api/identity` requests (global
+setup's login, every worker-restart self-heal probe login, `login.spec.ts`'s 3 dedicated login tests,
+every retry of every test). That exhausts the 10-token bucket quickly; refill is slow (1 token per
+3s), so once tripped, **every spec that needs auth fails at once** — exactly matching the observed
+cross-spec cascade (checkout, delivery, invoice-pay, inventory-receive, verticals all failing
+together) and the run-to-run variance (5.9–11.1 min, 2–22 failures — depends on how many login
+attempts pile up before the window resets). It is pre-existing on `master`, unrelated to the pipeline.
+
+**The proof:** the trace for `login.spec.ts`'s "valid credentials redirect to the app" test — a
+*completely fresh, unauthenticated context*, no shared session, first login attempt — timed out with
+this literal alert visible on the page: `Too many requests — slow down.` (the exact message
+`rateLimitMiddleware` returns on a 429). This ruled out every session/cookie/rotation theory below in
+one shot: a brand-new login with zero prior state was rejected by the rate limiter, not by auth logic.
+
+**Fix:** made the limiter's thresholds env-overridable in `src/app.ts`
+(`IDENTITY_RATE_LIMIT_CAPACITY` / `_REFILL`, `IDENTITY_REGISTER_RATE_CAPACITY` / `_REFILL`) — defaults
+unchanged (10/0.33 and 5/0.05), so **production behavior is byte-identical** unless explicitly
+overridden. Set to generous values (`1000` / `100`) in the `e2e` CI job env only. No prod security
+posture change; local dev and unit tests keep the strict defaults too.
+
+Once this is confirmed green across a few runs, re-add `e2e` to the deploy `needs` and the
+branch-protection required checks to make it a hard gate again.
+
+<details>
+<summary>Investigation history (superseded by the confirmed root cause above — kept for the record)</summary>
+
+The suite was originally suspected to have a session-rotation timing flake: the backend rotates
+refresh tokens strict single-use, and Playwright starts a fresh worker after any test failure, so a
+shared authenticated `storageState` cookie could already be revoked → affected tests redirect to
+`/login` and the inline re-login's `waitForURL` occasionally exceeds 15 s. This looked plausible from
+the failure location (all failures at the same helper line) but turned out to be the wrong layer
+entirely — see below.
 
 **Attempted fix (reverted):** tried setting `REFRESH_REUSE_GRACE_MS=900000` in the `e2e` job env
 (widening the backend's existing reuse-grace window so a replayed cookie from a restarted worker
@@ -130,16 +159,13 @@ failing run (16 failed / 3 flaky / 9 passed, 7.9 min):
   step has never actually captured anything. Screenshots/video/trace are written to
   `web/test-results/` regardless of reporter — the upload path was corrected to point there instead.
 
-Net effect: the backend is now cleared as a suspect (or the evidence to convict it doesn't exist).
-The failure is either in the Next.js proxy layer, the browser/Playwright side, or genuine CI-runner
-contention (run lengths have ranged 5.9–11.1 min across otherwise-identical runs). `e2e` remains a
-**reported signal only** — not in the deploy `needs` nor the required merge checks.
+Net effect of the backend-log + health-poll diagnostics: the backend process itself was cleared
+(zero `/healthz` gaps across two full runs) before the trace evidence above pinned the actual cause —
+the rate limiter, not a crash/stall/restart. The `playwright-report` upload fix (empty on every past
+run — `--reporter=github` never wrote an HTML report) was what made pulling the trace above possible
+at all.
 
-**Next evidence needed** (now that `test-results/` actually uploads): pull the trace file
-(`trace: "on-first-retry"` is already configured) from the next failing run and open it in
-`npx playwright show-trace` to see the actual network calls and DOM state at the moment of failure —
-that's the first evidence that can distinguish "backend rejected the login" from "the browser/runner
-was just slow" or "the frontend proxy misbehaved."
+</details>
 
 ## Local development
 

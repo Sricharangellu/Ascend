@@ -160,6 +160,19 @@ jobs:
       NODE_ENV: test
       FINDER_BACKGROUND_JOBS: "false"
       PORT: 3001
+      # Root cause of the login flake (confirmed via a Playwright trace DOM
+      # snapshot showing "Too many requests — slow down." on the login page):
+      # /api/identity is rate-limited per-IP (10 burst, 0.33/s refill — a
+      # brute-force guard, correct for prod). The whole suite runs from ONE CI
+      # runner IP and needs dozens of login/probe requests (global setup, every
+      # worker-restart self-heal login, login.spec.ts's 3 tests, every retry),
+      # which exhausts the bucket fast; once tripped, every spec needing auth
+      # fails simultaneously (matches the observed cross-spec cascade) until it
+      # slowly refills. See docs/architecture/PIPELINE.md. Defaults (10, 0.33)
+      # are unchanged everywhere this isn't explicitly set — prod security is
+      # untouched.
+      IDENTITY_RATE_LIMIT_CAPACITY: "1000"
+      IDENTITY_RATE_LIMIT_REFILL: "100"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
