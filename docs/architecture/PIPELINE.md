@@ -47,32 +47,35 @@ Every branch requires the CI status checks (`Production guard`, `Backend — typ
 
 ## Configuration (GitHub + Vercel + Supabase)
 
+**Status (2026-07-19): fully configured.** All items below are live, not aspirational.
+
 ### GitHub repo **secrets**
 | Name | Value |
 |---|---|
-| `VERCEL_TOKEN` | Vercel token with team-scope access (already set) |
+| `VERCEL_TOKEN` | Vercel token with team-scope access |
 
 ### GitHub repo **variables** (non-secret — Settings → Secrets and variables → Actions → Variables)
-| Name | Example | Used by |
+| Name | Value | Used by |
 |---|---|---|
-| `STAGING_BACKEND_URL` | `https://ascend-api-staging.vercel.app` | dev + testing frontend build target; testing smoke |
-| `STAGING_BACKEND_ALIAS` | `ascend-api-staging.vercel.app` | testing backend alias |
-| `STAGING_FRONTEND_ALIAS` | `ascend-staging.vercel.app` | testing frontend alias + environment URL |
+| `STAGING_BACKEND_URL` | `https://finder-pos-backend-staging.vercel.app` | dev + testing frontend build target; testing smoke |
+| `STAGING_BACKEND_ALIAS` | `finder-pos-backend-staging.vercel.app` | testing backend alias |
+| `STAGING_FRONTEND_ALIAS` | `finder-pos-frontend-staging.vercel.app` | testing frontend alias + environment URL |
 
 ### Vercel — `finder-pos-backend` → Environment Variables
 - **Production:** `DATABASE_URL`=Supabase **A** pooler, `JWT_SECRET`=prod, `NODE_ENV=production`,
   `PG_SSL=require`, `CRON_SECRET`, `WEBHOOK_SECRET_KEY` (already configured).
-- **Preview:** `DATABASE_URL`=Supabase **B** pooler, `JWT_SECRET`=staging, `NODE_ENV=production`,
-  `PG_SSL=require`, `CRON_SECRET`.
+- **Preview:** `DATABASE_URL`=Supabase **B** Session pooler, `JWT_SECRET`=staging-specific (distinct
+  from prod), `NODE_ENV=production`, `PG_SSL=require`, `CRON_SECRET`=staging-specific — configured.
 
 ### Vercel — `finder-pos-frontend` → Environment Variables
-- **Preview:** `NEXT_PUBLIC_MOCK=false` (build target already passes `BACKEND_URL` via deploy.sh).
+- **Preview:** `NEXT_PUBLIC_MOCK=false` — configured (build target passes `BACKEND_URL` via deploy.sh).
 
 ### Supabase
-- **A** = production project (existing). **B** = testing project (`ascend-testing`).
-- Schema self-provisions on first backend boot (`buildApp` runs every module's migration). No manual
-  migration step.
-- Seed demo data into B once: `DATABASE_URL=<B-pooler> npm run seed:demo`.
+- **A** = production project (existing). **B** = testing project (ref `lqaicxibgrlxwkvxsaji`), region
+  us-west-2.
+- Schema self-provisions on first backend boot (`buildApp` runs every module's migration) — confirmed:
+  B already has all 172 tables and the standard `tnt_demo` / `owner@finder-pos.dev` demo login,
+  created automatically the first time a backend connected to it. No manual seed step was needed.
 
 ## Rollback
 
