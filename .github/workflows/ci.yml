@@ -303,7 +303,7 @@ jobs:
     # e2e runs in parallel as a reported signal but does NOT gate deploys — the
     # golden-path suite has a known auth-rotation timing flake (see PIPELINE.md).
     # Re-add `e2e` here once that flake is fixed to make it a hard deploy gate.
-    needs: [guard, backend, frontend]
+    needs: [guard, backend, frontend, e2e]
     runs-on: ubuntu-latest
     # Skips (does not fail) until the testing tier is configured — set the repo
     # variable STAGING_BACKEND_URL + Vercel Preview env vars to activate.
@@ -334,7 +334,7 @@ jobs:
     # e2e runs in parallel as a reported signal but does NOT gate deploys — the
     # golden-path suite has a known auth-rotation timing flake (see PIPELINE.md).
     # Re-add `e2e` here once that flake is fixed to make it a hard deploy gate.
-    needs: [guard, backend, frontend]
+    needs: [guard, backend, frontend, e2e]
     runs-on: ubuntu-latest
     # Skips (does not fail) until the testing tier is configured — set the repo
     # variables STAGING_BACKEND_URL/_ALIAS/_FRONTEND_ALIAS + Vercel Preview env.
@@ -374,7 +374,7 @@ jobs:
     # e2e runs in parallel as a reported signal but does NOT gate deploys — the
     # golden-path suite has a known auth-rotation timing flake (see PIPELINE.md).
     # Re-add `e2e` here once that flake is fixed to make it a hard deploy gate.
-    needs: [guard, backend, frontend]
+    needs: [guard, backend, frontend, e2e]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     environment:

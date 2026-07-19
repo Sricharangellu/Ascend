@@ -109,8 +109,10 @@ unchanged (10/0.33 and 5/0.05), so **production behavior is byte-identical** unl
 overridden. Set to generous values (`1000` / `100`) in the `e2e` CI job env only. No prod security
 posture change; local dev and unit tests keep the strict defaults too.
 
-Once this is confirmed green across a few runs, re-add `e2e` to the deploy `needs` and the
-branch-protection required checks to make it a hard gate again.
+**Verified fixed:** a `develop` run with the fix landed **27 passed / 0 failed / 0 flaky in 32.1 s**
+— down from 5.9–11.1 minutes with 2–22 failures per run beforehand. `e2e` is back in the deploy
+`needs` for all three tiers and added to the branch-protection required checks on `master`/`staging`/
+`develop` — it is a hard gate again.
 
 <details>
 <summary>Investigation history (superseded by the confirmed root cause above — kept for the record)</summary>
