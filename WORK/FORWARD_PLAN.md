@@ -702,9 +702,24 @@ between here and "customers can actually use this in production":
    decision, not plumbing — do not build these without Sri's call). Ecommerce
    storefront auth is correctly gated Preview until a real backend is built.
 2. **Security hardening that's code-addressable from this environment.**
-   MFA/device verification pages are currently mocked — either build them for
-   real or remove them from production UI so the app doesn't claim a security
-   control it doesn't have. Frontend auth has demo/mock refresh-token
+   **CORRECTED 2026-07-19**: the earlier blanket claim "MFA/device
+   verification pages are mocked" was overbroad. MFA itself
+   (`src/identity/service.ts`) is a real implementation — genuine TOTP via
+   `OTPAuth`, a real `user_mfa` table, real backup codes, and the login flow
+   genuinely requires the challenge when enabled; not a mock. The actual gap
+   is narrower and smaller: `/login/device-verification` and
+   `/login/security-alert` are self-documented mocks (their own code
+   comments already said so) showing hardcoded fake device data, and neither
+   is reachable from the real login flow today (nothing navigates to them) —
+   so they weren't silently masquerading as real to any actual user, but
+   they had no visible in-UI signal either. Fixed by adding a visible
+   "Preview" banner to both, matching the ecommerce-storefront treatment,
+   so they can't start masquerading if ever wired in later. Building a real
+   new-device-detection/security-event pipeline is a genuine new feature
+   (needs decisions on what triggers it, whether it blocks login, and what
+   notification/session-revocation behavior it should have) — NEEDS-SRI,
+   not built here, same class of decision as catalog's `/credits` gap.
+   Frontend auth otherwise has some demo/mock refresh-token
    behavior that needs auditing against the real identity module. RLS
    enforcement (added 2026-07-04, AsyncLocalStorage tenant context) needs a
    fresh cross-tenant regression sweep across every module touched since,
