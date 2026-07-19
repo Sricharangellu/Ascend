@@ -10,6 +10,12 @@ Scope reviewed: `/Users/sri/Desktop/Desk/Finder/finder-pos`
 > with no backend route (see AUDIT_2026-07-18T005030Z addendum). Still open for
 > Sri: merge session C's quotes pilot branch, and merge PR #70 to deploy all of it.
 
+> **STANDING TOP PRIORITY (Sri directive, 2026-07-18 evening):** "finish the
+> end-to-end application, make it priority, create loops, use existing agents,
+> do not stop until done." See **Phase 0** below — it supersedes every other
+> initiative in this document. `WORK/LOOP_STATE.md` loop_status is ACTIVE
+> against Phase 0's backlog.
+
 > Sequencing is **phase-based, not time-based**. A phase is complete when its exit
 > criteria pass — never by calendar. Point-in-time verification results live in the
 > dated `WORK/AUDIT_*.md` files, not in this document.
@@ -672,6 +678,71 @@ Needed:
 - Payment/webhook replay procedure.
 
 ## Recommended forward plan
+
+### Phase 0: Finish end-to-end, close the gap to deployment-ready — TOP PRIORITY (Sri directive 2026-07-18)
+
+**This phase supersedes every other initiative in this document until its exit
+criteria pass.** `WORK/LOOP_STATE.md` loop_status is ACTIVE against this phase;
+`FOUNDATION_HARDENING.md` and `FUNCTIONAL_REBRAND_PLAN.md` stay queued/paused
+unless a session explicitly claims them instead.
+
+Direct answer this phase exists to make true: as of 2026-07-18 the app is
+**not** working end-to-end for a real customer and is **not** deployment-ready
+(see the assessment folded into this section). The retail core (catalog,
+inventory, POS checkout, payments, orders, customers) is the most solid part
+and has real database-backed logic with test coverage, but three things stand
+between here and "customers can actually use this in production":
+
+1. **Remaining mock-only FE↔BE gaps.** Not yet built, tracked in
+   `tools/api-gap-allowlist.json`: notifications digest/preferences/rules (4
+   paths), purchasing EDI-imports + vendor-history (6 paths), workflows
+   approval-chains + run-history (3 paths). Catalog credits, inventory
+   pipeline receiving/issues/errors/summary (9 paths), and settings
+   custom-roles are correctly deferred to NEEDS-SRI (each needs a product
+   decision, not plumbing — do not build these without Sri's call). Ecommerce
+   storefront auth is correctly gated Preview until a real backend is built.
+2. **Security hardening that's code-addressable from this environment.**
+   MFA/device verification pages are currently mocked — either build them for
+   real or remove them from production UI so the app doesn't claim a security
+   control it doesn't have. Frontend auth has demo/mock refresh-token
+   behavior that needs auditing against the real identity module. RLS
+   enforcement (added 2026-07-04, AsyncLocalStorage tenant context) needs a
+   fresh cross-tenant regression sweep across every module touched since,
+   not just the modules it originally covered.
+3. **A fresh, honest audit before calling this phase done.** Every module
+   gets one of the required status labels (`Built and verified` /
+   `Built but not verified` / `UI-only` / `Mocked` / `Partial` / `Planned` /
+   `Not production-ready`) — no module may be called "done" without one.
+
+**Explicitly out of scope for this phase** (real infrastructure, not code —
+stays on the NEEDS-SRI list in LOOP_STATE.md): Redis provisioning for
+shared-instance rate limiting, a real backup/restore drill against production
+infra, Vercel environment variable configuration, production DB certificate
+chain verification, secret rotation. These require Sri's access to real
+infra/accounts and cannot be completed from a sandboxed coding session —
+flagging them honestly is the job here, not pretending to close them.
+
+Working method for this phase: one queue item per `WORK/LOCK.md` claim
+(never two sessions/agents on overlapping files); independent, non-
+overlapping items (e.g. notifications vs. purchasing EDI vs. workflows) may
+run as separate worktree-isolated agents in parallel and get merged back
+sequentially with full gates (`typecheck`, real-Postgres tests, `gap:scan`)
+run after each merge — never merged unverified, never merged concurrently.
+
+Exit criteria for Phase 0:
+
+- Every path in `tools/api-gap-allowlist.json` is either implemented and
+  removed from the allowlist, or has an explicit NEEDS-SRI entry in
+  `WORK/LOOP_STATE.md` explaining the product decision blocking it.
+- MFA/device-verification UI either works against a real backend or is
+  removed/clearly labeled non-functional — no silent mock masquerading as a
+  security control.
+- A fresh cross-tenant RLS regression test passes against every module
+  registered in `src/modules/index.ts` as of the audit date.
+- `npm run verify` (hygiene + gap:scan + typecheck + test + smoke + frontend
+  typecheck/lint/build) passes clean in one run.
+- A new dated audit in `WORK/audits/` states, module by module, which of the
+  seven honest status labels applies — replacing optimism with evidence.
 
 ### Phase 1: Truth and cleanup
 

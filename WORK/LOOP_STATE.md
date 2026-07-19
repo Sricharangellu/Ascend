@@ -7,13 +7,13 @@ the backlog freely; the loop treats your edits as authoritative.
 
 | Field | Value |
 |---|---|
-| loop_status | STOPPED (inventory hardening exhausted 2026-07-16 — 5 fixes shipped; remaining items are Sri-policy / defense-in-depth / untestable) |
-| last_iteration_utc | 2026-07-16T14:20:00Z |
-| runner | session D (local, VSCode) |
+| loop_status | ACTIVE — RESTARTED 2026-07-18 by Sri's explicit directive: "finish the end-to-end application, make it priority, create loops, use existing agents, do not stop until done." Supersedes the 2026-07-16 STOPPED state. |
+| last_iteration_utc | 2026-07-18T233000Z |
+| runner | session G (Cowork/Claude, Fable 5) — coordinating session; dispatches worktree-isolated subagents for non-overlapping backlog items and merges their branches back sequentially (see iteration log) |
 | branch | feat/delivery-pipeline (PR #70) |
-| idle_streak | 1 (inventory queue below bar — stopped cleanly) |
-| loop_commits | 11 (batch since PR #66 merge; pause + notify at ≥15) |
-| focus | Inventory hardening. DONE: (1) oversell race, (2) transfer atomicity, (3) cycle-count double-close, (4) transfer over-draw phantom stock (source availability guard). NEXT: transfer-number doc-counter (max-seeding), cross-transfer lock ordering (hard to test), FEFO edges. INTERRUPT (done): Sri feature — Purchase cost-entry page + Receive Stock per-line location (3 slices 52643c2/d55e719/cfb28e7). |
+| idle_streak | 0 (reset — new priority, backlog non-empty) |
+| loop_commits | 0 (reset — new counting window starts from this restart; prior 11 were reviewed via this session's own gates, not Sri merge, so resetting rather than compounding toward the 15 cap) |
+| focus | **TOP PRIORITY (Sri directive 2026-07-18): finish the application end-to-end and reach deployment readiness — this supersedes all other initiatives (FOUNDATION_HARDENING, FUNCTIONAL_REBRAND_PLAN stay queued/paused unless independently claimed).** Order of attack, per FORWARD_PLAN.md's new "Phase 0": (1) close every remaining mock-only FE↔BE gap — notifications digest/preferences/rules, purchasing EDI-imports/vendor-history, workflows approval-chains/run-history [IN FLIGHT — 3 worktree agents dispatched this iteration]; (2) code-level security hardening that doesn't require infra decisions (MFA real-vs-explicitly-disabled, verify RLS enforcement end-to-end, secret-handling code paths); (3) full-suite verification + a fresh dated audit before declaring Phase 0 done. Ops items requiring real infra (Redis provisioning, backup/restore drills, Vercel env, cert chains) stay NEEDS-SRI — not code-addressable from this sandbox. |
 
 ### Why stopped
 Four systematic verification sweeps complete, all retail-core modules:
