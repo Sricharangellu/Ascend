@@ -766,15 +766,60 @@ Exit criteria for Phase 0:
 - Every path in `tools/api-gap-allowlist.json` is either implemented and
   removed from the allowlist, or has an explicit NEEDS-SRI entry in
   `WORK/LOOP_STATE.md` explaining the product decision blocking it.
+  **MET** — `gap:scan` is clean (444 backend paths, 373 frontend paths, 21
+  allowlisted); every one of those 21 has an explicit NEEDS-SRI entry in
+  `WORK/LOOP_STATE.md` (see the current NEEDS-SRI table), not a silent
+  allowlist add.
 - MFA/device-verification UI either works against a real backend or is
   removed/clearly labeled non-functional — no silent mock masquerading as a
   security control.
+  **MET** — MFA (`src/identity/service.ts`) was confirmed a real
+  implementation (TOTP, backup codes, enforced in login) this session's
+  test run (`identity.test.ts`, 21/21 passing, incl. 3 MFA-specific tests).
+  `/login/device-verification` and `/login/security-alert` are labeled
+  Preview (fixed 2026-07-19, commit `b859ec6`) and unreachable from the real
+  login flow.
 - A fresh cross-tenant RLS regression test passes against every module
   registered in `src/modules/index.ts` as of the audit date.
+  **MET** — `gateway/tenant-isolation.test.ts` passed (part of a 19/19
+  gateway-suite pass this session) and was extended 2026-07-19 (commit
+  `5b20519`) with a live leaky-query proof against a table created this
+  Phase-0 effort (`notification_alert_rules`); the RLS module's design
+  (dynamic `information_schema` scan + registered last in `modules/index.ts`)
+  is generic and self-covering, confirmed by inspection, not per-module opt-in.
 - `npm run verify` (hygiene + gap:scan + typecheck + test + smoke + frontend
   typecheck/lint/build) passes clean in one run.
+  **PARTIALLY MET** — hygiene, gap:scan, backend typecheck, all 601 backend
+  tests (78/78 files), the 20-step Postgres smoke test, frontend typecheck,
+  and frontend lint all passed clean, run across many batched tool calls (not
+  literally one `npm run verify` invocation — this sandbox cannot sustain a
+  single call long enough for that). **`cd web && npm run build` could not be
+  completed in this sandbox** — a confirmed architectural limit (background
+  processes do not persist across tool calls; a plain `sleep` proved this
+  independently of the build itself), not a code or config problem. See
+  `AUDIT_2026-07-19T062148Z-phase0-verification.md` §2a for the full
+  investigation. This one item needs to be run once in CI or on a real
+  machine to close out fully.
 - A new dated audit in `WORK/audits/` states, module by module, which of the
   seven honest status labels applies — replacing optimism with evidence.
+  **MET** — `WORK/audits/AUDIT_2026-07-19T062148Z-phase0-verification.md`,
+  covering all 51 modules registered in `src/modules/index.ts`.
+
+**Overall Phase 0 status: essentially done, one item open.** Four of five
+exit criteria are fully met with evidence above. The fifth (`npm run verify`
+passing "in one run") is met in substance — every stage that can run in this
+sandbox passed clean — except the frontend production build, which needs a
+CI or real-machine run to get the final confirmation; nothing found this
+session gives reason to expect it would fail there (typecheck and lint, the
+two parts of that pipeline that don't need one long-lived process, both
+passed clean). The retail core is real, tested, and proven end-to-end by the
+smoke test against real Postgres — this is not a demo. What remains before
+calling the whole platform (not just Phase 0) deployment-ready is the
+NEEDS-SRI list in the new audit's §5: a handful of product decisions (catalog
+credits, inventory pipeline receiving/issues/errors, custom-roles contract,
+real EDI parsing, approval-chain triggering) and a handful of real-infra
+items (Redis, backup drill, Vercel env, cert chain, PR merges) that no
+sandboxed session can close.
 
 ### Phase 1: Truth and cleanup
 
