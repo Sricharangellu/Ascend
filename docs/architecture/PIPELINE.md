@@ -35,6 +35,30 @@ staging    ──PR──▶  master    → CI + deploy PROD    (--prod, prod DB
 Every branch requires the CI status checks (`Production guard`, `Backend — typecheck + test`,
 `Frontend — typecheck + lint + build`) to pass before merge. Force-push is blocked.
 
+## Release policy (standing rule, confirmed 2026-07-19)
+
+**Nothing reaches `master`/production without Sri's explicit command.** This isn't a convention —
+it's structurally enforced, not just followed:
+
+- `master` branch protection requires all 4 CI checks green **and** is admin-enforced (no bypass,
+  including for repo admins).
+- No workflow anywhere auto-merges a PR — confirmed no `gh pr merge`, `--auto`, or equivalent exists
+  in any `.github/workflows/*.yml`. A human (or an agent acting on Sri's explicit instruction) must
+  click merge every time.
+- `deploy-production` triggers **only** on a `push` event to `master` — which only happens as the
+  direct result of that merge. There is no scheduled, automatic, or conditional path to production
+  that bypasses a human decision.
+
+Practical shape from Vercel's side: there are really only **two** live deploy destinations —
+**Production** (`master` only) and **Preview** (`develop` and `staging` both land here, distinguished
+by alias). Git's 3-tier branch model exists to gate what reaches Production, not to create a third
+Vercel environment. The moment a PR is merged into `master`, the pipeline runs end-to-end
+automatically and production reflects the change — that merge is the one and only trigger.
+
+Any agent/session working on this repo: treat a merge into `master` as requiring the same standing
+explicit authorization as any other hard-to-reverse, production-affecting action — ask first, every
+time, even if CI is green.
+
 ## What CI does per branch (`.github/workflows/ci.yml`)
 
 - **Every push & PR** on `develop`/`staging`/`master`: `guard`, `backend` (typecheck + test + smoke
