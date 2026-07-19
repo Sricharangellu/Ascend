@@ -8,11 +8,11 @@ the backlog freely; the loop treats your edits as authoritative.
 | Field | Value |
 |---|---|
 | loop_status | ACTIVE — RESTARTED 2026-07-18 by Sri's explicit directive: "finish the end-to-end application, make it priority, create loops, use existing agents, do not stop until done." Supersedes the 2026-07-16 STOPPED state. |
-| last_iteration_utc | 2026-07-18T233000Z |
-| runner | session G (Cowork/Claude, Fable 5) — coordinating session; dispatches worktree-isolated subagents for non-overlapping backlog items and merges their branches back sequentially (see iteration log) |
+| last_iteration_utc | 2026-07-19T013000Z |
+| runner | session G (Cowork/Claude, Fable 5) — coordinating session; dispatches subagents for non-overlapping backlog items directly onto the shared branch (worktree isolation is unavailable in this sandbox — no VCS hooks configured — so subagents work sequentially, one at a time, each gated by the coordinator re-running typecheck/tests/gap:scan before the next starts) |
 | branch | feat/delivery-pipeline (PR #70) |
-| idle_streak | 0 (reset — new priority, backlog non-empty) |
-| loop_commits | 0 (reset — new counting window starts from this restart; prior 11 were reviewed via this session's own gates, not Sri merge, so resetting rather than compounding toward the 15 cap) |
+| idle_streak | 0 (backlog non-empty — moving to security hardening next) |
+| loop_commits | 4 (aaddd67 board update + 3 subagent feature commits since restart; pause + notify at ≥15) |
 | focus | **TOP PRIORITY (Sri directive 2026-07-18): finish the application end-to-end and reach deployment readiness — this supersedes all other initiatives (FOUNDATION_HARDENING, FUNCTIONAL_REBRAND_PLAN stay queued/paused unless independently claimed).** Order of attack, per FORWARD_PLAN.md's new "Phase 0": (1) close every remaining mock-only FE↔BE gap — notifications digest/preferences/rules, purchasing EDI-imports/vendor-history, workflows approval-chains/run-history [IN FLIGHT — 3 worktree agents dispatched this iteration]; (2) code-level security hardening that doesn't require infra decisions (MFA real-vs-explicitly-disabled, verify RLS enforcement end-to-end, secret-handling code paths); (3) full-suite verification + a fresh dated audit before declaring Phase 0 done. Ops items requiring real infra (Redis provisioning, backup/restore drills, Vercel env, cert chains) stay NEEDS-SRI — not code-addressable from this sandbox. |
 
 ### Why stopped
@@ -49,6 +49,10 @@ No autonomous high-value work remains. Further progress = feature development
 | 11 | 2026-07-16T11:50Z | caedd71 | INVENTORY: transfer atomicity — createTransfer moved stock via 3 independent statements (2 separate adjustStock txns + INSERT); failure between legs lost stock. Extracted adjustStockTx(tdb) (+FOR UPDATE), wrapped whole transfer in ONE tx. Atomicity test (INT_MAX overflow forces 2nd-leg failure) — VERIFIED fails without fix (source lost 5). 27/27 + smoke 20/20 |
 | 12 | 2026-07-16T12:10Z | e6fe4f4 | INVENTORY: cycle-count double-close — closeCycleCount checked open→applied variances→closed non-atomically; 2 concurrent closes double-posted variance (−3 → −6). Extracted adjustTx(tdb) from adjust(), wrapped close in ONE tx with session FOR UPDATE (2nd close 409s). Deterministic barrier test (3rd conn holds inventory lock) — VERIFIED fails without fix (double-posted → 4). 29/29 + smoke 20/20 |
 | 13 | 2026-07-16T12:40Z | (this) | INVENTORY: transfer over-draw phantom stock — createTransfer never checked source on-hand; adjustStockTx clamps source debit at 0 but dest gets full credit → 100 from a loc with 10 conjures 90 units. Added source FOR UPDATE + availability check (409 insufficient_stock). Over-transfer test VERIFIED fails without guard. 30/30 + smoke 20/20 |
+| — | 2026-07-18T233000Z | aaddd67 | LOOP RESTARTED (Sri directive): Phase 0 added to FORWARD_PLAN.md as top priority, loop_status ACTIVE, counters reset. Session G claims Phase 0 coordinator role in LOCK.md |
+| 14 | 2026-07-19T003000Z | 0e83ce9 | Phase 0 wave 1a: notifications digest/preferences/rules built as real backend (dispatched to a subagent, verified by coordinator before/after: typecheck clean, 12/12 new tests + 2/2 pre-existing regression, gap:scan 30 allowlisted (was 34)) |
+| 15 | 2026-07-19T010000Z | 6db150d | Phase 0 wave 1b: purchasing EDI-imports + vendor-history built (subagent). vendor-history is a real join (zero blockers); EDI validate/process are honest state-machine transitions, not real parsing — frontend never uploads file bytes (NEEDS-SRI added). 16/16 new tests + 19+/22 pre-existing purchasing regression, gap:scan 24 allowlisted (was 30) |
+| 16 | 2026-07-19T013000Z | c65df4d | Phase 0 wave 1c: workflows approval-chains + run-history built (subagent), new tables distinct from workflow_definitions. runs is a real COUNT over a real invocation log; nothing invokes it yet (NEEDS-SRI added — no POS/refund/discount action checks a chain today). 13/13 new tests + 11/11 pre-existing workflows regression, gap:scan 21 allowlisted (was 24) |
 
 ## Backlog (loop-selectable, in priority order)
 
