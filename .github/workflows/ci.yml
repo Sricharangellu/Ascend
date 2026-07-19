@@ -92,7 +92,12 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: finder_test
         ports: ["5432:5432"]
+        # --shm-size: Docker's default /dev/shm is 64MB; the backend suite is now
+        # 700+ tests and Postgres exhausts it mid-run ("could not resize shared
+        # memory segment ... No space left on device"), cascading into mass
+        # failures. 1g gives ample headroom (first hit: PR #81, 2026-07-19).
         options: >-
+          --shm-size=1g
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
@@ -149,7 +154,9 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: finder_e2e
         ports: ["5432:5432"]
+        # --shm-size=1g: same shared-memory headroom as the backend job above.
         options: >-
+          --shm-size=1g
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s

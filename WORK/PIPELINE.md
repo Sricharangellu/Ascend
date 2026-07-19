@@ -31,8 +31,9 @@ Merge test: `feat/delivery-pipeline` → `staging` is **conflict-free**
 | Backend PROD → DB | ✅ readyz ok, db:connected |
 | Phase-0 fixes → staging | ❌ not there — needs new PR (below) |
 | staging → master/PROD | ❌ master last moved 2026-07-16; **prod still has the invoice-500 / dead-quotes / clockIn-orphan bugs** |
-| Frontend PROD (finder-pos-frontend.vercel.app) | ❌ empty body on every path incl. bogus URLs — broken build, paused deploy, or Deployment Protection. Predates Phase 0. Deploys are GitHub-Actions-driven (`scripts/deploy.sh`), not git-connected. |
-| web build proof | ⏳ CI's "Frontend — typecheck + lint + build" check on the next PR closes this |
+| Frontend PROD | ✅ **RESOLVED — was a phantom.** The rebrand (PRs #76/#80) renamed the Vercel projects: backend → `ascend-backend` (ascendhq-api.vercel.app), frontend → `ascend-frontend` (ascendhq-app.vercel.app); project IDs unchanged (see scripts/deploy.sh). ascendhq-app serves real HTML (redirects to /login); the dead finder-pos-frontend.vercel.app is just the old domain unbound by the rename. The git-connected `finder-pos` Vercel project is legacy cruft — candidate for deletion (NEEDS-SRI). |
+| web build proof | ✅ CI "Frontend — typecheck + lint + build" PASSED on PR #81 (2026-07-19) — the long-outstanding sandbox limitation is closed |
+| CI backend job | ❌→fix queued: PR #81 failed 177/706 tests from Postgres service-container /dev/shm exhaustion (Docker 64MB default; suite now 700+ tests). Fixed by `--shm-size=1g` in ci.yml (both jobs), this commit. NOT an application bug — first failure is a resource error, and the whole suite passes locally/pre-push. |
 
 ## Runbook (in order)
 
