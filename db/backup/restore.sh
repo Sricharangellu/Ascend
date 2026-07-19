@@ -220,6 +220,18 @@ run_restore() {
     # --clean --if-exists: drops existing objects before recreating
     # --no-owner:          skip ownership commands (app role differs from backup role)
     # --no-acl:            skip GRANT/REVOKE (re-applied by provisioning)
+    #
+    # pg_restore's own exit code is captured independently of the filtered
+    # display below — piping straight into `grep | head` and trailing that
+    # with `|| true` (the previous form of this) meant grep's own "zero
+    # matches" exit code (1, entirely possible on a clean restore with no
+    # error/warning lines) got conflated with, and then unconditionally
+    # masked, any REAL pg_restore failure. A failed restore would still print
+    # "RESTORE COMPLETE" and a passing RTO — false confidence in exactly the
+    # script whose own docstring says it's for a real incident or a DR drill.
+    local restore_log
+    restore_log="$(mktemp)"
+    set +e
     pg_restore \
         --dbname="$DATABASE_URL" \
         --jobs="$RESTORE_JOBS" \
@@ -228,7 +240,17 @@ run_restore() {
         --no-owner \
         --no-acl \
         --verbose \
-        "$backup_file" 2>&1 | grep -E "(restoring|error|warning)" | head -50 || true
+        "$backup_file" > "$restore_log" 2>&1
+    local restore_status=$?
+    set -e
+    grep -E "(restoring|error|warning)" "$restore_log" | head -50 || true
+
+    if [[ "$restore_status" -ne 0 ]]; then
+        echo "${LOG_PREFIX} ━━━ RESTORE FAILED (pg_restore exit ${restore_status}) ━━━" >&2
+        echo "${LOG_PREFIX} Full log: $restore_log" >&2
+        exit 1
+    fi
+    rm -f "$restore_log"
 
     local t_end
     t_end=$(date +%s)
