@@ -761,11 +761,15 @@ export class IdentityService {
       "INSERT INTO password_reset_tokens (id, tenant_id, user_id, token_hash, expires_at, created_at) VALUES (@id, @t, @uid, @hash, @exp, @now)",
       { id: `prt_${uuidv7()}`, t: user.tenant_id, uid: user.id, hash, exp: now + 3_600_000, now }
     );
-    const appUrl = process.env["APP_URL"] ?? "https://finder-pos.vercel.app";
+    // NOTE: APP_URL is documented (.env.example) as this backend's own public
+    // URL, but this link's path (/login/reset-password) is a frontend route —
+    // a pre-existing inconsistency, not introduced or fixed by this rebrand
+    // change. Preserving exact prior behavior; only the domain string changes.
+    const appUrl = process.env["APP_URL"] ?? "https://ascendhq-api.vercel.app";
     const resetLink = `${appUrl}/login/reset-password?token=${encodeURIComponent(token)}`;
     await sendEmail({
       to: email,
-      from: process.env["EMAIL_FROM"] ?? "noreply@finder-pos.app",
+      from: process.env["EMAIL_FROM"] ?? "noreply@ascend.dev",
       subject: "Reset your Ascend password",
       text: `You requested a password reset.\n\nClick the link below to set a new password (expires in 1 hour):\n${resetLink}\n\nIf you did not request this, you can safely ignore this email.`,
       html: `<p>You requested a password reset.</p><p><a href="${resetLink}">Reset my password</a></p><p>This link expires in 1 hour. If you did not request this, ignore this email.</p>`,

@@ -18,9 +18,9 @@ case "$DEPLOY_ENV" in
   *) echo "DEPLOY_ENV must be prod|testing|dev"; exit 1 ;;
 esac
 TEAM="team_WNp8vBq1RmWTEH8WSnenP7jM"             # gellusricharan-4715s-projects
-BACKEND_PID="prj_krZ34CIFjzQrMvZ08PWqqbxzBf7d"    # finder-pos-backend
-FRONTEND_PID="prj_TiPX9UYctGKJbQr4Lb1WFwSsKiN1"   # finder-pos-frontend
-BACKEND_URL="https://finder-pos-backend.vercel.app"
+BACKEND_PID="prj_krZ34CIFjzQrMvZ08PWqqbxzBf7d"    # ascend-backend (rebrand Phase 3; formerly finder-pos-backend — project ID is immutable, never changed)
+FRONTEND_PID="prj_TiPX9UYctGKJbQr4Lb1WFwSsKiN1"   # ascend-frontend (formerly finder-pos-frontend — project ID unchanged)
+BACKEND_URL="https://ascendhq-api.vercel.app"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 : "${VERCEL_TOKEN:?Set VERCEL_TOKEN (a Vercel token with access to the team scope)}"
 

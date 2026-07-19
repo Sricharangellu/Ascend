@@ -61,7 +61,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     }
 
     const WARNED_VARS: [string, string][] = [
-      ["APP_URL", "public URL of this service — email reset links will fall back to finder-pos.vercel.app"],
+      ["APP_URL", "public URL of this service — email reset links will fall back to ascendhq-api.vercel.app"],
       ["SENDGRID_API_KEY", "password reset and transactional emails will silently fail"],
       ["STRIPE_SECRET_KEY", "card payments will return 503 — configure Stripe or disable card tender"],
       ["REDIS_URL", "rate limiting uses in-memory state and will NOT be shared across instances — all replicas will have separate limits"],
@@ -151,9 +151,14 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     rawOrigins.trim()
       ? new Set(rawOrigins.split(",").map((o) => o.trim()).filter(Boolean))
       : new Set([
+        // Rebrand Phase 3 (additive, not a cutover — see WORK/FUNCTIONAL_REBRAND_PLAN.md):
+        // both old and new frontend origins must accept CORS during the transition,
+        // since either could be the one the browser is actually loaded from.
         "https://finder-pos.vercel.app",
         "https://finder-pos-web.vercel.app",
         "https://finder-pos-frontend.vercel.app",
+        "https://ascend-pos-frontend.vercel.app",
+        "https://ascendhq-app.vercel.app",
       ]);
 
   app.use((req, res, next) => {
@@ -363,7 +368,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   // ── Root info
   app.get("/", (_req, res) => {
     res.json({
-      service: "finder-pos",
+      service: "ascend",
       status: "ok",
       storage: "postgres",
       modules: ["identity", ...modules.map((m) => m.name)],
