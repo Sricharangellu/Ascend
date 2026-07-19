@@ -173,6 +173,22 @@ jobs:
       - run: npm run lint
       - run: npm run build
 
+  # ─── Docker build sanity check ─────────────────────────────────────────────
+  # Nothing previously exercised the Dockerfile at all — the node:20-alpine vs
+  # .nvmrc's node:24 drift found this session sat undetected indefinitely.
+  # Vercel (not Docker) is the actual deploy path, so this is deliberately a
+  # build-only sanity check (no push, no run/boot) — cheap, and it would have
+  # caught that exact drift automatically. NOT yet in any deploy `needs` or
+  # branch-protection required checks: this is its first-ever run in CI, and
+  # nothing should hard-gate on an unproven check (same reasoning applied to
+  # e2e earlier in this pipeline's history — prove it green first).
+  docker-build:
+    name: Docker build (sanity check, non-blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --target runtime -t ascend-backend:ci .
+
   # ─── E2E tests (master + staging pushes only, after backend + frontend pass) ─
   e2e:
     name: E2E tests (Playwright — golden paths)
