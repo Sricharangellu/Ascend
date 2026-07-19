@@ -13,6 +13,16 @@ on:
   pull_request:
     branches: [develop, staging, master]
 
+# Least-privilege default for GITHUB_TOKEN: no job here needs to write to the
+# repo or comment on PRs (Vercel deploys use VERCEL_TOKEN, not GITHUB_TOKEN).
+# actions/checkout only needs read. deployments:write is kept because
+# deploy-dev/staging/production declare `environment:` blocks, which GitHub
+# uses to record deployment status/history against that token permission.
+# Matches uptime.yml / backup.yml, which already scope permissions down.
+permissions:
+  contents: read
+  deployments: write
+
 # ─── Shared test jobs (run on every trigger) ──────────────────────────────────
 jobs:
   guard:
@@ -30,6 +40,7 @@ jobs:
             || echo "All mutation routes have role guards ✓"
       - name: No console.log/error in production source (modules + gateway)
         run: |
+          # shellcheck disable=SC2126 # grep|wc -l keeps this symmetric with the identical pattern below (AGENTS.md count)
           count=$(grep -rn --include="*.ts" "console\.\(log\|error\|warn\)" src/modules/ src/gateway/ \
             | grep -v "\.test\.ts" | wc -l | tr -d ' ')
           echo "Remaining console.* calls in modules/gateway: $count"
@@ -70,11 +81,43 @@ jobs:
         run: |
           # "1 file for all agents": exactly one root AGENTS.md; CLAUDE.md may
           # only exist as a short pointer to it. Guards against doc sprawl.
+          # shellcheck disable=SC2126 # grep|wc -l keeps this symmetric with the identical pattern above (console.* count)
           count=$(git ls-files | grep -E '(^|/)AGENTS\.md$' | wc -l | tr -d ' ')
           if [ "$count" != "1" ]; then
             echo "❌ Expected exactly one AGENTS.md, found $count:"; git ls-files | grep -E 'AGENTS\.md$'; exit 1
           fi
           echo "One canonical AGENTS.md ✓"
+
+      # Nothing previously validated workflow YAML itself — a typo in an `if:`
+      # expression or a job name drift in `needs:` fails silently (skipped, not
+      # red) until someone notices a deploy never ran. actionlint catches that
+      # class of mistake (and shell bugs inside `run:` blocks, via its bundled
+      # shellcheck integration) before merge.
+      - name: Lint workflow YAML (actionlint)
+        run: |
+          # Pinned to an immutable release tag, not `main` — piping a curl'd
+          # script from a mutable ref straight into bash is a supply-chain
+          # risk (a compromised or force-pushed main would run arbitrary code
+          # in CI on every PR). Bump ACTIONLINT_VERSION deliberately to update.
+          ACTIONLINT_VERSION=1.7.12
+          bash <(curl -fsSL "https://raw.githubusercontent.com/rhysd/actionlint/v${ACTIONLINT_VERSION}/scripts/download-actionlint.bash") "$ACTIONLINT_VERSION"
+          ./actionlint -color
+
+      # Shellcheck the standalone ops scripts (deploy/backup/restore/migration
+      # runner) — these run unattended in CI and, for restore.sh, by hand
+      # during an incident, so a quoting bug is exactly the kind of thing that
+      # should fail fast in review instead of at 2am during a restore.
+      # --severity=error only (not warning/style): two pre-existing warnings
+      # (scripts/deploy.sh:84 redundant env prefix, db/backup/restore.sh:168
+      # unused $pg_flags) are harmless and left as follow-up cleanup rather
+      # than gating CI on style-level findings.
+      - name: Shellcheck — deploy/backup/restore/migration scripts
+        run: |
+          shellcheck --severity=error \
+            scripts/deploy.sh \
+            db/backup/backup.sh \
+            db/backup/restore.sh \
+            db/migrations/run.sh
 
   backend:
     name: Backend — typecheck + test
@@ -194,7 +237,7 @@ jobs:
         run: LOG_LEVEL=debug node dist/src/server.js > /tmp/backend.log 2>&1 &
       - name: Wait for backend
         run: |
-          for i in $(seq 1 20); do
+          for _ in $(seq 1 20); do
             curl -sf http://localhost:3001/healthz && exit 0
             sleep 2
           done
@@ -242,7 +285,7 @@ jobs:
         working-directory: web
       - name: Wait for frontend
         run: |
-          for i in $(seq 1 20); do
+          for _ in $(seq 1 20); do
             curl -sf http://localhost:3000/login >/dev/null && exit 0
             sleep 3
           done

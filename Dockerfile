@@ -20,5 +20,11 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
 COPY api ./api
+# Run as the non-root `node` user (built into the official image, uid 1000)
+# instead of the default root — limits blast radius if the process is ever
+# compromised (e.g. via a dependency RCE) to a non-privileged account with no
+# write access outside /app.
+RUN chown -R node:node /app
+USER node
 EXPOSE 3001
 CMD ["node", "dist/src/server.js"]
