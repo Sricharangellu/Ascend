@@ -821,6 +821,55 @@ real EDI parsing, approval-chain triggering) and a handful of real-infra
 items (Redis, backup drill, Vercel env, cert chain, PR merges) that no
 sandboxed session can close.
 
+#### Phase 0 continuation (2026-07-19, Sri: "continue on the phase0-verification audit")
+
+The verification audit's §3/§4 named seven real, mounted, gap-scan-clean
+modules as "Built but not verified" — thin-to-zero dedicated test coverage
+(quotes, loyalty, store_locations, product_batches, service_orders,
+customer_invoices, workforce). All seven now have real integration test
+coverage against embedded Postgres, each written by a dispatched subagent and
+independently re-verified by the coordinator (re-ran typecheck, gap:scan, and
+the actual test files myself — not just trusting agent self-reports).
+
+**This wave surfaced 4 more real production bugs**, all found purely by
+writing tests for code that had none — bringing the total for the whole
+Phase 0 effort to 8:
+
+- `quotes`' `quotations` table collided with `sales`' pre-existing,
+  incompatible `quotations` table (sales registers first in
+  `modules/index.ts`, so its schema always won) — **the quotes module was
+  100% non-functional**, every insert 500'd. Renamed to
+  `customer_quotations`/`customer_quotation_lines`. Also fixed a dead
+  `already_converted` guard reading a column nothing populates.
+- `store_locations`' `product_locations` table collided with `fulfillment`'s
+  pre-existing, incompatible table of the same name — same bug class, 3rd
+  occurrence this effort (1st: `team`/`workforce` on `time_entries`, fixed
+  2026-07-18). Renamed to `store_location_products`.
+- `customer_invoices`' `create()` used SQL placeholders that didn't match its
+  own params object's actual keys — `shared/db.ts` silently binds NULL for an
+  unmatched `@name` placeholder, so **every invoice creation with any lines
+  500'd** on a NOT NULL violation. Also fixed a status-update route bypassing
+  `parseBody()` and leaking raw 500s instead of 400s.
+- `workforce`'s `clockIn()` never validated `employeeId` against the
+  employees table (its sibling creators do) — a bogus id returned 201 and
+  created a permanently-invisible orphaned `time_entries` row while
+  permanently occupying that id's "already clocked in" slot, an unrecoverable
+  stuck state.
+
+`product_batches` and `service_orders` had no bugs — genuinely working as
+built, confirmed by 11 and 12 new tests respectively.
+
+Net: 113 new tests written across the 7 modules (26 + 61 + 27, per the
+iteration log in `WORK/LOOP_STATE.md` iterations 18-20), typecheck and
+gap:scan clean throughout, no regressions in any sibling module touched by
+the table renames. The recurring table-collision bug class (now found 3
+times) confirms module registration order in `src/modules/index.ts` remains
+a live footgun for any *new* module — worth a lint/CI check (grep every
+module's `CREATE TABLE IF NOT EXISTS` name for uniqueness across the whole
+`src/modules/` tree) rather than relying on manual test-writing to keep
+catching it after the fact. Not built this wave (would need its own
+scoping); flagged here as a candidate for the backlog.
+
 ### Phase 1: Truth and cleanup
 
 Goal: know exactly what is live, mocked, partial, and broken.
