@@ -15,9 +15,15 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 
+// NEXT_PUBLIC_MOCK is the explicit switch (see web/next.config.mjs):
+//   "true"  → mocks on everywhere.
+//   "false" → mocks off everywhere, including local dev, so the app talks to
+//             the real backend (Supabase-backed). Required for real-backend runs.
+//   unset   → default on in development only.
 const ENV_MOCKS =
-  process.env.NODE_ENV === "development" ||
-  process.env.NEXT_PUBLIC_MOCK === "true";
+  process.env.NEXT_PUBLIC_MOCK === "true" ||
+  (process.env.NEXT_PUBLIC_MOCK !== "false" &&
+    process.env.NODE_ENV === "development");
 
 export default function MockWorkerInit({ children }: { children: ReactNode }) {
   // Production non-demo starts as ready; env mocks and demo mode block until worker registers.

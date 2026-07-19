@@ -130,7 +130,7 @@ apply_up() {
         files+=("$f")
     done < <(find "$SCRIPT_DIR" -maxdepth 1 -name "*.sql" \
                 ! -name "*.down.sql" \
-                | sort -z)
+                -print0 | sort -z)
 
     if [[ ${#files[@]} -eq 0 ]]; then
         echo "  No migration files found in $SCRIPT_DIR"
