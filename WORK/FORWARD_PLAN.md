@@ -720,10 +720,27 @@ between here and "customers can actually use this in production":
    notification/session-revocation behavior it should have) — NEEDS-SRI,
    not built here, same class of decision as catalog's `/credits` gap.
    Frontend auth otherwise has some demo/mock refresh-token
-   behavior that needs auditing against the real identity module. RLS
-   enforcement (added 2026-07-04, AsyncLocalStorage tenant context) needs a
-   fresh cross-tenant regression sweep across every module touched since,
-   not just the modules it originally covered.
+   behavior that needs auditing against the real identity module.
+   **RLS SWEEP DONE 2026-07-19**: verified the design is generic and
+   self-covering, not something each new module has to wire up — src/
+   modules/rls/index.ts's migration dynamically scans
+   `information_schema.columns` for ANY table with a `tenant_id` column and
+   applies `ENABLE`/`FORCE ROW LEVEL SECURITY` + a tenant_isolation policy to
+   it, and that module is registered LAST in src/modules/index.ts
+   specifically so it runs after every other module's tables exist. The
+   backstop itself (shared/db.ts's `db.query()` auto-wrapping in a
+   transaction that sets `app.tenant_id` whenever an AsyncLocalStorage tenant
+   context is present, set globally by `tenantResolver` on every `/api/v1`
+   request) is also request-scoped, not per-module — no new module has to
+   opt in. Confirmed every table added this session (notification_
+   preferences/alert_rules/digest_config, edi_imports, approval_chains/
+   approval_chain_runs, workflow_run_history, product_suppliers/
+   price_tiers, and the rest from the catalog/inventory waves) has a
+   tenant_id column, and extended src/gateway/tenant-isolation.test.ts with
+   a live leaky-query proof against `notification_alert_rules` (a table that
+   didn't exist when that test was first written) — RLS still blocks a
+   cross-tenant read with no WHERE tenant_id clause. No fix was needed; this
+   confirms the defense-in-depth design holds without per-feature RLS work.
 3. **A fresh, honest audit before calling this phase done.** Every module
    gets one of the required status labels (`Built and verified` /
    `Built but not verified` / `UI-only` / `Mocked` / `Partial` / `Planned` /
