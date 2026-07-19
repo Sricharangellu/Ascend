@@ -77,6 +77,13 @@ jobs:
       - name: Prevention agent — no dirty drift or stray modules
         run: npm run prevent:drift
 
+      - name: API gap scan — every frontend call has a backend route
+        # Guards against pages shipping on MSW mocks while the real API 404s
+        # (the AUDIT_2026-07-18T005030Z incident class). Deliberate Preview
+        # surfaces live in tools/api-gap-allowlist.json, each tied to a board
+        # entry. No deps; plain ESM on the runner's Node.
+        run: npm run gap:scan
+
       - name: One canonical agent-instruction file
         run: |
           # "1 file for all agents": exactly one root AGENTS.md; CLAUDE.md may
@@ -130,7 +137,12 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: finder_test
         ports: ["5432:5432"]
+        # --shm-size: Docker's default /dev/shm is 64MB; the backend suite is now
+        # 700+ tests and Postgres exhausts it mid-run ("could not resize shared
+        # memory segment ... No space left on device"), cascading into mass
+        # failures. 1g gives ample headroom (first hit: PR #81, 2026-07-19).
         options: >-
+          --shm-size=1g
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
@@ -203,7 +215,9 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: finder_e2e
         ports: ["5432:5432"]
+        # --shm-size=1g: same shared-memory headroom as the backend job above.
         options: >-
+          --shm-size=1g
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s

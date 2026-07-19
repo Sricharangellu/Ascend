@@ -1,6 +1,28 @@
 # Ascend — Multi-Agent Work Lock
 
-Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
+Status: ACTIVE — session G (Cowork/Claude, Fable 5) coordinating Phase 0 (finish end-to-end + deployment readiness, Sri directive 2026-07-18). See claim below. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
+
+## Active Claim (Claude session G — Phase 0 coordinator: finish end-to-end + deployment readiness)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session G (Cowork, Fable 5) — Sri directive 2026-07-18: "finish the end-to-end application, make it priority, create loops, use existing agents, do not stop until done" |
+| Queue item | Coordinating claim for FORWARD_PLAN.md Phase 0. This session dispatches independent, non-overlapping worktree-isolated subagents for the remaining mock-only FE↔BE gaps (notifications, purchasing EDI, workflows approval-chains) and merges each branch back sequentially — full gates (typecheck, real-Postgres tests, gap:scan) run after each merge before the next begins, never two merged concurrently. This claim covers the coordination + merge + board-update work; each subagent's own file scope is recorded as a nested note below when dispatched. |
+| Files/areas expected | `WORK/**` (this coordination), plus whatever files each merged subagent branch touches (recorded per-merge below). No two subagents touch overlapping module directories in the same wave. |
+| Started | 2026-07-18 |
+| Status | ACTIVE — dispatching wave 1 (notifications / purchasing EDI / workflows approval-chains) |
+| Blockers | none |
+
+## Reconciliation note (session G, 2026-07-18)
+
+The claim immediately below (session D — expiry management) has no RELEASED
+status line, unlike every other entry in this file, but the feature it
+describes (expiry sweep/pool/dispositions) is confirmed shipped and in active
+use — this session's own work in `src/modules/inventory/detail-views.ts`
+references and extends the existing Expiry Pool sweep. Treating this as a
+stale/unclosed entry from a completed feature, not an active overlapping
+claim. Not editing the entry itself (README.md rule: never silently clobber
+another session's state) — appending this note instead.
 
 ## Active Claim (Claude session D — FEATURE: expiry management)
 
