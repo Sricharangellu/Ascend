@@ -1,7 +1,7 @@
 # Ascend — Desktop App
 
 A minimal desktop wrapper around the live Ascend web app
-(`https://finder-pos-frontend.vercel.app`). It's a standard Electron app —
+(`https://ascendhq-app.vercel.app`). It's a standard Electron app —
 opening it gives you the same product in its own window (no browser tabs/UI
 chrome), with your data stored on the live backend exactly as it is on the
 web.

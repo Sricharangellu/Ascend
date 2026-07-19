@@ -12,8 +12,8 @@ Built for the tobacco, vapor, hemp, and specialty retail distribution industry �
 
 | Service | URL |
 |---------|-----|
-| Frontend | https://finder-pos-frontend.vercel.app |
-| Backend API | https://finder-pos-backend.vercel.app |
+| Frontend | https://ascendhq-app.vercel.app |
+| Backend API | https://ascendhq-api.vercel.app |
 
 **Demo credentials:**
 - Owner: `owner@ascend.dev` / `AscendDemo!2026`
@@ -180,7 +180,7 @@ See `.env.example` for all backend variables and `web/.env.example` for frontend
 ## Project Structure
 
 ```
-finder-pos/
+ascend/
 ├── src/
 │   ├── app.ts                 # Express app factory
 │   ├── server.ts              # HTTP server entry point
@@ -232,7 +232,7 @@ Read those packages before changing module schemas, route contracts, permissions
 
 ## API Reference
 
-Base URL: `https://finder-pos-backend.vercel.app/api/v1/`
+Base URL: `https://ascendhq-api.vercel.app/api/v1/`
 
 All endpoints require `Authorization: Bearer <access_token>` except `/api/identity/login` and `/api/identity/register`.
 
