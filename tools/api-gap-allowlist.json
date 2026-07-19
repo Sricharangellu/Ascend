@@ -37,9 +37,6 @@
     "/api/v1/settings/custom-roles",
     "/api/v1/settings/custom-roles/:p",
     "/api/v1/settings/permissions",
-    "/api/v1/things",
-    "/api/v1/workflows/approval-chains",
-    "/api/v1/workflows/approval-chains/:p",
-    "/api/v1/workflows/run-history"
+    "/api/v1/things"
   ]
 }
