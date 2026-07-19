@@ -317,8 +317,8 @@ jobs:
         working-directory: web
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
-          E2E_EMAIL: owner@finder-pos.dev
-          E2E_PASSWORD: FinderDemo!2026
+          E2E_EMAIL: owner@ascend.dev
+          E2E_PASSWORD: AscendDemo!2026
       # `--reporter=github` (above) only emits GH Actions annotations — it does
       # NOT write an HTML report, so web/playwright-report/ has been empty on
       # every past run and this upload was silently capturing nothing (found
