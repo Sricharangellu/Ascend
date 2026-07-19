@@ -15,9 +15,10 @@
     "ops:check": "tsx scripts/ops-check.ts",
     "prevent:drift": "node tools/prevention-agent.mjs",
     "gap:scan": "node tools/api-gap-scan.mjs",
+    "table:scan": "node tools/table-collision-scan.mjs",
     "seed:e2e": "tsx scripts/seed-e2e.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
-    "verify": "npm run hygiene && npm run gap:scan && npm run typecheck && npm test && npm run smoke && npm --prefix web run typecheck && npm --prefix web run lint && npm --prefix web run build"
+    "verify": "npm run hygiene && npm run gap:scan && npm run table:scan && npm run typecheck && npm test && npm run smoke && npm --prefix web run typecheck && npm --prefix web run lint && npm --prefix web run build"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
