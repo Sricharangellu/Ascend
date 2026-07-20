@@ -46,7 +46,13 @@ export function signPayload(secret: string, body: string): string {
  *
  * Stored format: "v1:<iv_hex>:<authTag_hex>:<ciphertext_hex>"
  * Key: WEBHOOK_SECRET_KEY env var (32 random bytes, hex-encoded = 64 chars).
- * If the env var is not set, secrets are stored plaintext (backwards-compat).
+ * If the env var is not set, secrets are stored plaintext (dev/test backwards-compat).
+ *
+ * Production hardening: storing a customer's webhook secret in plaintext is a
+ * real credential exposure, so when NODE_ENV=production and no key is configured
+ * `encryptSecret` fails closed (503 webhook_encryption_unconfigured) rather than
+ * silently persisting plaintext — mirroring the /metrics fail-closed behaviour.
+ * This closes the specific insecure operation without blocking server boot.
  */
 const ALGO = "aes-256-gcm" as const;
 
@@ -58,7 +64,17 @@ function getEncryptionKey(): Buffer | null {
 
 export function encryptSecret(plain: string): string {
   const key = getEncryptionKey();
-  if (!key) return plain; // no key configured — store plaintext (dev only)
+  if (!key) {
+    // Never store a plaintext customer secret in production.
+    if (process.env["NODE_ENV"] === "production") {
+      throw new HttpError(
+        503,
+        "webhook_encryption_unconfigured",
+        "Webhook secrets cannot be stored: set WEBHOOK_SECRET_KEY (32 random bytes, hex-encoded) to enable encryption at rest.",
+      );
+    }
+    return plain; // no key configured — store plaintext (dev/test only)
+  }
   const iv = randomBytes(12);
   const cipher = createCipheriv(ALGO, key, iv);
   const ct = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
