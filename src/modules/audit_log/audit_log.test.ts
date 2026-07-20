@@ -53,7 +53,17 @@ test("audit-log: a huge ?limit is capped server-side instead of being passed thr
 
   const huge = await makeRequest(app, "GET", "/api/audit-log/?limit=99999", "owner");
   assert.equal(huge.status, 200, `unexpectedly failed: ${JSON.stringify(huge.json)}`);
-  assert.equal(huge.json.total, 3);
-  assert.equal(huge.json.items.length, 3, "capped limit still returns every matching row for a small dataset");
+  // Boot-time demo-tenant seeding also writes its own audit entries, so the
+  // total isn't necessarily just this test's 3 — assert the seeded rows are
+  // present and the response isn't truncated below the actual total (the
+  // behavior actually under test: a huge limit isn't passed through raw).
+  assert.ok(huge.json.total >= 3, `expected at least 3 entries, got ${huge.json.total}`);
+  assert.equal(huge.json.items.length, huge.json.total, "capped limit still returns every matching row for a small dataset");
+  for (let i = 0; i < 3; i++) {
+    assert.ok(
+      huge.json.items.some((it: any) => it.resource_id === `ent_${i}`),
+      `expected seeded entity ent_${i} to appear in the results`,
+    );
+  }
   assert.equal(huge.json.limit, 200, "the effective limit reported back is capped at the service ceiling, not 99999");
 });
