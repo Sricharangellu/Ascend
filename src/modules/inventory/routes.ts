@@ -244,8 +244,10 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
   // Location-to-location transfers — before /:productId so "transfers" isn't an id.
   router.get(
     "/transfers",
-    handler(async (_req, res) => {
-      res.json({ items: await service.listTransfers(tenantId(res)) });
+    handler(async (req, res) => {
+      const cursor = typeof req.query.cursor === "string" && req.query.cursor !== "" ? req.query.cursor : undefined;
+      const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
+      res.json(await service.listTransfers(tenantId(res), { cursor, limit }));
     }),
   );
 
