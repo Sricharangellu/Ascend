@@ -574,7 +574,17 @@ test("cashier can deduct stock for a completed sale (unguarded — see NOTE abov
 
 test("manager can create a location transfer", async () => {
   const app = await freshApp();
-  await call(app, "POST", "/api/inventory/prod_role_xfr/receive", { quantity: 10 }, "manager");
+  // /receive writes the GLOBAL `inventory` table; /transfers reads the
+  // location-scoped `inventory_stock` table — seed stock at iloc_a via the
+  // location-aware /adjustments endpoint, not /receive, or the source
+  // location genuinely has 0 on hand regardless of global stock.
+  await call(app, "POST", "/api/inventory/adjustments", {
+    product_id: "prod_role_xfr",
+    location_id: "iloc_a",
+    delta: 10,
+    mode: "add",
+    reason: "cycle_count",
+  }, "manager");
   const { status, json } = await call(app, "POST", "/api/inventory/transfers", {
     from_location_id: "iloc_a",
     to_location_id: "iloc_b",
