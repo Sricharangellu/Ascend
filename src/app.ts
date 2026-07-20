@@ -310,6 +310,22 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
       redis,
     }),
   );
+  // The doc comment above (and identity/routes.ts's own per-route comments)
+  // says /me, /devices, /mfa/*, /api-keys/* "require auth middleware mounted
+  // upstream" — but nothing ever actually mounted it here, so res.locals.auth
+  // was never populated for any of them: /me/mfa/* 401 unconditionally
+  // (explicit `if (!auth)` check), /devices threw (tenantId() reads
+  // res.locals.auth non-null), and /api-keys 403'd via requireRole's
+  // safe-fallback-to-"cashier" default. Found live: a valid Bearer token that
+  // worked fine against /api/v1/capabilities got 401 from /api/identity/me.
+  // Fail-safe in every case (no cross-tenant/role leak), but fully broken.
+  // Scoped per-path (not the whole /api/identity prefix) since
+  // /register|/login|/login/mfa|/refresh|/logout|/forgot-password|
+  // /reset-password must keep working with no token at all.
+  app.use("/api/identity/me", makeAuthMiddleware(db));
+  app.use("/api/identity/devices", makeAuthMiddleware(db));
+  app.use("/api/identity/mfa", makeAuthMiddleware(db));
+  app.use("/api/identity/api-keys", makeAuthMiddleware(db));
   app.use(
     "/api/identity",
     rateLimitMiddleware({
