@@ -1,4 +1,11 @@
-<!-- Ascend PR checklist — aligned with WORK/RULES.md. Delete lines that don't apply. -->
+<!-- Ascend PR checklist — aligned with AGENTS.md (canonical rules) + WORK/FORWARD_PLAN.md. Delete lines that don't apply. -->
+
+## Promotion target (forward-only: feature/* → develop → staging → master)
+
+<!-- Tick the base branch this PR targets. See docs/architecture/PIPELINE.md. -->
+- [ ] `develop` — feature/fix work → deploys DEV
+- [ ] `staging` — promoting develop → deploys TESTING
+- [ ] `master` — promoting staging (release) / hotfix → deploys PROD
 
 ## What & why
 
@@ -8,7 +15,7 @@
 
 - WORK/LOCK.md claim: <!-- item name; link the WORK/AUDIT_*.md if one was produced -->
 
-## Status label (required — RULES.md vocabulary)
+## Status label (required — WORK/FORWARD_PLAN.md vocabulary)
 
 <!-- Built and verified / Built but not verified / UI-only / Mocked / Partial / Planned -->
 

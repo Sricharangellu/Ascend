@@ -18,7 +18,6 @@ export { CheckoutWorkflow } from "./workflows/checkout.workflow.js";
 export { OrderFulfillmentWorkflow } from "./workflows/order-fulfillment.workflow.js";
 export { PurchaseReceivingWorkflow } from "./workflows/purchasing-receiving.workflow.js";
 export { PaymentReconciliationWorkflow } from "./workflows/payment-reconciliation.workflow.js";
-export { AccountingPostingWorkflow } from "./workflows/accounting-posting.workflow.js";
 export { InventoryTransferWorkflow } from "./workflows/inventory-transfer.workflow.js";
 export { StockAdjustmentWorkflow } from "./workflows/stock-adjustment.workflow.js";
 export { RefundWorkflow } from "./workflows/refund.workflow.js";
@@ -82,11 +81,11 @@ export { expireReservationsJob } from "./jobs/expire-reservations.job.js";
 export { reconcilePaymentsJob } from "./jobs/reconcile-payments.job.js";
 export { closeRegisterJob } from "./jobs/close-register.job.js";
 export { syncEcommerceJob } from "./jobs/sync-ecommerce.job.js";
+export { trialExpiryJob, TRIAL_EXPIRY_INTERVAL_MS } from "./jobs/trial-expiry.job.js";
 
 // Compensations
 export { releaseInventoryCompensation } from "./compensations/release-inventory.compensation.js";
 export { voidPaymentCompensation } from "./compensations/void-payment.compensation.js";
-export { reverseLedgerEntryCompensation } from "./compensations/reverse-ledger-entry.compensation.js";
 export { cancelShipmentCompensation } from "./compensations/cancel-shipment.compensation.js";
 
 // Types
@@ -99,7 +98,6 @@ import { CheckoutWorkflow } from "./workflows/checkout.workflow.js";
 import { OrderFulfillmentWorkflow } from "./workflows/order-fulfillment.workflow.js";
 import { PurchaseReceivingWorkflow } from "./workflows/purchasing-receiving.workflow.js";
 import { PaymentReconciliationWorkflow } from "./workflows/payment-reconciliation.workflow.js";
-import { AccountingPostingWorkflow } from "./workflows/accounting-posting.workflow.js";
 import { InventoryTransferWorkflow } from "./workflows/inventory-transfer.workflow.js";
 import { StockAdjustmentWorkflow } from "./workflows/stock-adjustment.workflow.js";
 import { RefundWorkflow } from "./workflows/refund.workflow.js";
@@ -130,7 +128,8 @@ import { closeRegisterJob } from "./jobs/close-register.job.js";
 import { syncEcommerceJob } from "./jobs/sync-ecommerce.job.js";
 import { arDunningJob } from "./jobs/ar-dunning.job.js";
 import { idempotencyExpiryJob, IDEMPOTENCY_EXPIRY_INTERVAL_MS } from "./jobs/idempotency-expiry.job.js";
-import { outboxRelayJob, OUTBOX_RELAY_INTERVAL_MS } from "./jobs/outbox-relay.job.js";
+import { outboxRetentionJob, OUTBOX_RETENTION_INTERVAL_MS } from "./jobs/outbox-retention.job.js";
+import { trialExpiryJob, TRIAL_EXPIRY_INTERVAL_MS } from "./jobs/trial-expiry.job.js";
 
 export interface OrchestrationBootstrap {
   runner: WorkflowRunner;
@@ -149,7 +148,13 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
   const runner = new WorkflowRunner(db, events);
 
   // ── 2. Register all workflows ───────────────────────────────────────────────
-  runner.register(AccountingPostingWorkflow);  // Must come first — others publish to its trigger
+  // NOTE: the double-entry ledger is posted by the accounting MODULE's event
+  // handlers (payment.captured, bill.*, purchase_order.received, order.refunded)
+  // writing the canonical journal_entries schema — NOT by a workflow. The former
+  // AccountingPostingWorkflow (trigger accounting.entry_requested) was retired:
+  // it wrote a journal_entries(reference_id)/journal_entry_lines schema no
+  // migration ever created, so every posting threw and was swallowed. See
+  // WORK/audits/AUDIT_2026-07-18T024400Z-accounting-posting-drift.md.
   runner.register(CheckoutWorkflow);
   runner.register(OrderFulfillmentWorkflow);
   runner.register(PurchaseReceivingWorkflow);
@@ -267,26 +272,62 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
     }).catch(() => {});
   }
 
-  // DB-8: Outbox relay — dispatches pending event_outbox rows every 5 seconds.
-  jobConsumer.register(QueueNames.OUTBOX_RELAY, async (job) => {
-    await outboxRelayJob(job, db, events);
-    // Re-schedule immediately for fast at-least-once delivery.
+  // ACPA M1.4: daily retention sweep — purges delivered event_outbox rows and
+  // event_consumptions claims past the 30-day window.
+  jobConsumer.register(QueueNames.OUTBOX_RETENTION, async (job) => {
+    await outboxRetentionJob(job, db);
     await jobProducer.enqueueOnce({
-      type: QueueNames.OUTBOX_RELAY,
+      type: QueueNames.OUTBOX_RETENTION,
       tenantId: "system",
       payload: {},
-      runAt: Date.now() + OUTBOX_RELAY_INTERVAL_MS,
+      runAt: Date.now() + OUTBOX_RETENTION_INTERVAL_MS,
       maxAttempts: 3,
     });
   });
   if (backgroundJobsEnabled) {
     void jobProducer.enqueueOnce({
-      type: QueueNames.OUTBOX_RELAY,
+      type: QueueNames.OUTBOX_RETENTION,
       tenantId: "system",
       payload: {},
       runAt: Date.now(),
       maxAttempts: 3,
     }).catch(() => {});
+  }
+
+  // DEMO-1: Trial lifecycle — global job (not per-tenant), runs once a day.
+  // Nurture emails at day 7 / day 13 of a trial, then soft-expires tenants
+  // whose trial_ends_at has passed without converting to a paid plan.
+  jobConsumer.register(QueueNames.TRIAL_EXPIRY, async (job) => {
+    await trialExpiryJob(job, db);
+    // Re-schedule for tomorrow — idempotent (skips if one is already pending).
+    await jobProducer.enqueueOnce({
+      type: QueueNames.TRIAL_EXPIRY,
+      tenantId: "system",
+      payload: {},
+      runAt: Date.now() + TRIAL_EXPIRY_INTERVAL_MS,
+      maxAttempts: 3,
+    });
+  });
+  // Seed on first startup.
+  if (backgroundJobsEnabled) {
+    void jobProducer.enqueueOnce({
+      type: QueueNames.TRIAL_EXPIRY,
+      tenantId: "system",
+      payload: {},
+      runAt: Date.now(),
+      maxAttempts: 3,
+    }).catch(() => {});
+  }
+
+  // ACPA M1.2: the DB-8 outbox relay is retired. It republished
+  // dispatched=FALSE event_outbox rows to ALL bus subscribers — a
+  // double-dispatch hazard for non-idempotent consumers — and has had no
+  // producers since M1 (rows are written dispatched=TRUE with a status state
+  // machine; the shared Outbox reconciler owns redelivery). Purge the
+  // self-re-enqueueing relay jobs left behind by older deploys so they don't
+  // park as "No handler registered" failures.
+  if (backgroundJobsEnabled) {
+    void db.query("DELETE FROM job_queue WHERE type = 'outbox_relay'").catch(() => {});
   }
 
   // Start polling background jobs.

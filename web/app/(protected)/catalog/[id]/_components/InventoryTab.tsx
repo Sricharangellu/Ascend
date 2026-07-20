@@ -34,7 +34,7 @@ interface Movement {
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
-const FLD = "w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-[#111] outline-none focus:border-[#5D5FEF] focus:ring-1 focus:ring-[#5D5FEF]";
+const FLD = "w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600";
 
 function Lbl({ children }: { children: React.ReactNode }) {
   return <label className="mb-1 block text-xs font-medium text-slate-500">{children}</label>;
@@ -271,7 +271,7 @@ function QuickAdjust({
                   type="button"
                   onClick={() => setMode(m)}
                   className={`flex-1 rounded-md py-2 text-xs font-semibold capitalize transition-colors ${
-                    mode === m ? "bg-[#5D5FEF] text-white shadow-sm" : "text-slate-500 hover:text-[#111]"
+                    mode === m ? "bg-brand-600 text-white shadow-sm" : "text-slate-500 hover:text-[#111]"
                   }`}
                 >
                   {m === "add" ? "+ Add" : m === "remove" ? "− Remove" : "= Set to"}
@@ -310,7 +310,7 @@ function QuickAdjust({
           <button
             type="submit"
             disabled={saving || !qty}
-            className="rounded-xl bg-[#5D5FEF] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors"
+            className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors"
           >
             {saving ? "Adjusting…" : "Apply Adjustment"}
           </button>
@@ -439,7 +439,7 @@ function PhysicalAttributes({ product, onSaved }: { product: CatalogProduct; onS
           type="button"
           onClick={() => void handleSave()}
           disabled={saving}
-          className="rounded-xl bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors"
+          className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors"
         >
           {saving ? "Saving…" : "Save dimensions"}
         </button>
@@ -483,7 +483,7 @@ function SupplierSection({ product, onSaved }: { product: CatalogProduct; onSave
         <button
           type="button"
           onClick={() => setRows((r) => [...r, { id: String(Date.now()), name: "", code: "", price: "" }])}
-          className="text-xs font-medium text-[#5D5FEF] hover:underline"
+          className="text-xs font-medium text-brand-600 hover:underline"
         >
           + Add supplier
         </button>
@@ -517,7 +517,7 @@ function SupplierSection({ product, onSaved }: { product: CatalogProduct; onSave
       <div className="mt-4 flex items-center justify-end gap-3">
         {saved && <span className="text-sm font-medium text-emerald-600">Saved</span>}
         <button type="button" onClick={() => void handleSave()} disabled={saving}
-          className="rounded-xl bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors">
+          className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors">
           {saving ? "Saving…" : "Save supplier"}
         </button>
       </div>
@@ -565,7 +565,7 @@ function ReplenishmentSection({ product, onSaved }: { product: CatalogProduct; o
       <label className="mb-4 flex cursor-pointer items-center gap-2.5">
         <input
           type="checkbox"
-          className="h-4 w-4 rounded border-slate-300 text-[#5D5FEF] focus:ring-[#5D5FEF]"
+          className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600"
           checked={track}
           onChange={(e) => setTrack(e.target.checked)}
         />
@@ -578,7 +578,7 @@ function ReplenishmentSection({ product, onSaved }: { product: CatalogProduct; o
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Replenishment method</p>
 
             <label className="flex cursor-pointer items-start gap-3">
-              <input type="radio" className="mt-0.5 h-4 w-4 border-slate-300 text-[#5D5FEF]"
+              <input type="radio" className="mt-0.5 h-4 w-4 border-slate-300 text-brand-600"
                 checked={method === "min_max"} onChange={() => setMethod("min_max")} />
               <div className="flex-1">
                 <p className="text-sm font-medium text-[#111]">Min / Max quantity</p>
@@ -597,7 +597,7 @@ function ReplenishmentSection({ product, onSaved }: { product: CatalogProduct; o
             </label>
 
             <label className="flex cursor-pointer items-start gap-3">
-              <input type="radio" className="mt-0.5 h-4 w-4 border-slate-300 text-[#5D5FEF]"
+              <input type="radio" className="mt-0.5 h-4 w-4 border-slate-300 text-brand-600"
                 checked={method === "reorder_point"} onChange={() => setMethod("reorder_point")} />
               <div className="flex-1">
                 <p className="text-sm font-medium text-[#111]">Reorder point + quantity</p>
@@ -619,7 +619,7 @@ function ReplenishmentSection({ product, onSaved }: { product: CatalogProduct; o
           <div className="flex items-center justify-end gap-3">
             {saved && <span className="text-sm font-medium text-emerald-600">Saved</span>}
             <button type="button" onClick={() => void handleSave()} disabled={saving}
-              className="rounded-xl bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors">
+              className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors">
               {saving ? "Saving…" : "Save settings"}
             </button>
           </div>
@@ -630,6 +630,38 @@ function ReplenishmentSection({ product, onSaved }: { product: CatalogProduct; o
 }
 
 // ── InventoryTab ──────────────────────────────────────────────────────────────
+
+// ── Availability breakdown ────────────────────────────────────────────────────
+// Read-model over existing state: on-hand (inventory), reserved (approved
+// unshipped sales orders), incoming (open approved PO remainder), available.
+
+function AvailabilityCard({ productId, refreshKey }: { productId: string; refreshKey: number }) {
+  const [avail, setAvail] = useState<{ on_hand: number; reserved: number; incoming: number; available: number } | null>(null);
+
+  useEffect(() => {
+    apiGet<{ on_hand: number; reserved: number; incoming: number; available: number }>(`/api/v1/inventory/${productId}/availability`)
+      .then(setAvail)
+      .catch(() => setAvail(null));
+  }, [productId, refreshKey]);
+
+  if (!avail) return null;
+  const tiles = [
+    { label: "On Hand", value: avail.on_hand, cls: "text-slate-900" },
+    { label: "Reserved", value: avail.reserved, cls: avail.reserved > 0 ? "text-amber-600" : "text-slate-400", hint: "On approved orders awaiting fulfillment" },
+    { label: "Incoming", value: avail.incoming, cls: avail.incoming > 0 ? "text-[#5D5FEF]" : "text-slate-400", hint: "On open purchase orders" },
+    { label: "Available", value: avail.available, cls: avail.available > 0 ? "text-emerald-600" : "text-red-600", hint: "On hand minus reserved" },
+  ];
+  return (
+    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-100 sm:grid-cols-4">
+      {tiles.map((t) => (
+        <div key={t.label} className="bg-white px-4 py-3" title={t.hint}>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{t.label}</p>
+          <p className={`mt-0.5 text-xl font-semibold tabular-nums ${t.cls}`}>{t.value}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function InventoryTab({
   product,
@@ -676,6 +708,9 @@ export function InventoryTab({
           </div>
         </div>
       )}
+
+      {/* Availability breakdown */}
+      <AvailabilityCard productId={product.id} refreshKey={stockRefreshKey} />
 
       {/* Stock by location */}
       <StockByLocation productId={product.id} refreshKey={stockRefreshKey} />

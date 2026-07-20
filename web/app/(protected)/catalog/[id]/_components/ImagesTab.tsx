@@ -3,15 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
-import { apiGet, apiPost, apiPatch, ApiResponseError } from "@/api-client/client";
+import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+// Field names match the backend's ProductImage shape (src/modules/catalog/
+// service.ts) — image_url/alt_text, not url/alt.
 
 interface ProductImage {
   id: string;
   product_id: string;
-  url: string;
-  alt: string | null;
+  image_url: string;
+  alt_text: string | null;
   sort_order: number;
   is_primary: boolean;
   created_at: number;
@@ -54,7 +56,7 @@ export function ImagesTab({ productId }: { productId: string }) {
     try { new URL(urlInput.trim()); } catch { setUrlError("Enter a valid URL (e.g. https://…)"); return; }
     setBusy(true);
     try {
-      await apiPost(`/api/v1/catalog/${productId}/images`, { url: urlInput.trim(), alt: altInput.trim() || null });
+      await apiPost(`/api/v1/catalog/${productId}/images`, { imageUrl: urlInput.trim(), altText: altInput.trim() || null });
       setShowAdd(false); setUrlInput(""); setAltInput("");
       await load();
     } catch (e) {
@@ -75,7 +77,7 @@ export function ImagesTab({ productId }: { productId: string }) {
     if (!confirm("Remove this image from the product?")) return;
     setBusy(true);
     try {
-      await fetch(`/api/v1/catalog/${productId}/images/${img.id}`, { method: "DELETE" });
+      await apiDelete(`/api/v1/catalog/${productId}/images/${img.id}`);
       await load();
     } finally { setBusy(false); }
   };
@@ -109,7 +111,7 @@ export function ImagesTab({ productId }: { productId: string }) {
               <label className="mb-1 block text-xs font-medium text-slate-500">Image URL *</label>
               <input
                 ref={urlRef}
-                className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#5D5FEF] focus:ring-1 focus:ring-[#5D5FEF]"
+                className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                 value={urlInput}
                 onChange={(e) => { setUrlInput(e.target.value); setUrlError(""); }}
                 placeholder="https://example.com/image.jpg"
@@ -119,7 +121,7 @@ export function ImagesTab({ productId }: { productId: string }) {
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-500">Alt text</label>
               <input
-                className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#5D5FEF] focus:ring-1 focus:ring-[#5D5FEF]"
+                className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                 value={altInput}
                 onChange={(e) => setAltInput(e.target.value)}
                 placeholder="Describe the image"
@@ -153,13 +155,13 @@ export function ImagesTab({ productId }: { productId: string }) {
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {images.map((img) => (
-            <div key={img.id} className={`group relative overflow-hidden rounded-xl border-2 bg-white shadow-sm transition-all ${img.is_primary ? "border-[#5D5FEF]" : "border-slate-200 hover:border-slate-300"}`}>
+            <div key={img.id} className={`group relative overflow-hidden rounded-xl border-2 bg-white shadow-sm transition-all ${img.is_primary ? "border-brand-600" : "border-slate-200 hover:border-slate-300"}`}>
               {/* Image */}
               <div className="aspect-square overflow-hidden bg-slate-50">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={img.url}
-                  alt={img.alt ?? "Product image"}
+                  src={img.image_url}
+                  alt={img.alt_text ?? "Product image"}
                   className="h-full w-full object-cover transition-transform group-hover:scale-105"
                   onError={(e) => {
                     const el = e.target as HTMLImageElement;
@@ -177,14 +179,14 @@ export function ImagesTab({ productId }: { productId: string }) {
 
               {/* Actions overlay on hover */}
               <div className="absolute inset-x-0 bottom-0 flex translate-y-full flex-col gap-1 bg-white/95 p-2 shadow-md transition-transform group-hover:translate-y-0">
-                {img.alt && <p className="truncate text-[11px] text-slate-400">"{img.alt}"</p>}
+                {img.alt_text && <p className="truncate text-[11px] text-slate-400">"{img.alt_text}"</p>}
                 <div className="flex gap-1">
                   {!img.is_primary && (
                     <button
                       type="button"
                       onClick={() => void setPrimary(img)}
                       disabled={busy}
-                      className="flex-1 rounded border border-[#5D5FEF]/30 py-1 text-[11px] font-medium text-[#5D5FEF] hover:bg-[#5D5FEF]/5 disabled:opacity-40"
+                      className="flex-1 rounded border border-brand-600/30 py-1 text-[11px] font-medium text-brand-600 hover:bg-brand-600/5 disabled:opacity-40"
                     >
                       Set primary
                     </button>
@@ -206,7 +208,7 @@ export function ImagesTab({ productId }: { productId: string }) {
           <button
             type="button"
             onClick={openAdd}
-            className="flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-white text-slate-400 transition-colors hover:border-[#5D5FEF] hover:text-[#5D5FEF]"
+            className="flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-white text-slate-400 transition-colors hover:border-brand-600 hover:text-brand-600"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>

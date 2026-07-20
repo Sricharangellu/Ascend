@@ -4,12 +4,15 @@ import helmet from "helmet";
 import { openDb, type DB } from "./shared/db.js";
 import { openRedis } from "./shared/redis.js";
 import { EventBus } from "./shared/events.js";
+import { Outbox } from "./shared/outbox.js";
 import { logger } from "./shared/logger.js";
 import { buildInfo } from "./shared/version.js";
 import { errorMiddleware } from "./shared/http.js";
 import { modules } from "./modules/index.js";
 import { parseCapabilitiesImpactQuery, SettingsService } from "./modules/settings/service.js";
 import { identityModule } from "./identity/index.js";
+import { SsoService } from "./modules/sso/service.js";
+import { registerPublicRoutes as registerSsoPublicRoutes } from "./modules/sso/routes.js";
 import {
   requestIdMiddleware,
   rateLimitMiddleware,
@@ -30,6 +33,8 @@ export interface App {
   express: Express;
   db: DB;
   events: EventBus;
+  /** Transactional outbox (ACPA M1) — exposed for crash-recovery tests. */
+  outbox: Outbox;
   /** Call on graceful shutdown to disconnect the Redis event-bus subscriber. */
   cleanup: () => Promise<void>;
 }
@@ -58,11 +63,12 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     }
 
     const WARNED_VARS: [string, string][] = [
-      ["APP_URL", "public URL of this service — email reset links will fall back to finder-pos.vercel.app"],
+      ["APP_URL", "public URL of this service — email reset links will fall back to ascendhq-api.vercel.app"],
       ["SENDGRID_API_KEY", "password reset and transactional emails will silently fail"],
       ["STRIPE_SECRET_KEY", "card payments will return 503 — configure Stripe or disable card tender"],
       ["REDIS_URL", "rate limiting uses in-memory state and will NOT be shared across instances — all replicas will have separate limits"],
       ["METRICS_TOKEN", "Prometheus metrics scraping will be disabled until a bearer token is configured"],
+      ["CRON_SECRET", "the /jobs/tick cron endpoint will return 503 — background jobs will NOT run on serverless deploys"],
       ["WEBHOOK_SECRET_KEY", "webhook secret encryption is unconfigured — creating/rotating a webhook subscription will fail closed with 503 until this is set"],
     ];
     for (const [name, reason] of WARNED_VARS) {
@@ -75,6 +81,10 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   const schema = options.schema ?? "public";
   const db = openDb({ connectionString: options.connectionString, schema });
   const events = new EventBus();
+  // ACPA M1: transactional outbox — financially-critical events are persisted
+  // before dispatch and redelivered to idempotent durable consumers on crash.
+  const outbox = new Outbox(db);
+  events.setOutbox(outbox);
   const redis = openRedis();
   const app = express();
 
@@ -143,9 +153,14 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     rawOrigins.trim()
       ? new Set(rawOrigins.split(",").map((o) => o.trim()).filter(Boolean))
       : new Set([
+        // Rebrand Phase 3 (additive, not a cutover — see WORK/FUNCTIONAL_REBRAND_PLAN.md):
+        // both old and new frontend origins must accept CORS during the transition,
+        // since either could be the one the browser is actually loaded from.
         "https://finder-pos.vercel.app",
         "https://finder-pos-web.vercel.app",
         "https://finder-pos-frontend.vercel.app",
+        "https://ascend-pos-frontend.vercel.app",
+        "https://ascendhq-app.vercel.app",
       ]);
 
   app.use((req, res, next) => {
@@ -281,13 +296,55 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   // per-IP limiter (≈20/min sustained, small burst) in front of the router.
   // Registration gets an extra-tight limiter (5 burst, ~3/min) to prevent
   // automated account creation.
+  // Thresholds are env-overridable (defaults below = unchanged behavior) so a
+  // single-IP test suite (e.g. CI's Playwright runner, which needs dozens of
+  // login/probe requests) can be configured without touching this security
+  // posture anywhere it isn't explicitly opted into.
   const identityRouter = Router();
   await identityModule.register({ db, events, router: identityRouter });
   app.use(
     "/api/identity/register",
-    rateLimitMiddleware({ capacity: 5, refillRate: 0.05, redis }),
+    rateLimitMiddleware({
+      capacity: Number(process.env["IDENTITY_REGISTER_RATE_CAPACITY"] ?? 5),
+      refillRate: Number(process.env["IDENTITY_REGISTER_RATE_REFILL"] ?? 0.05),
+      redis,
+    }),
   );
-  app.use("/api/identity", rateLimitMiddleware({ capacity: 10, refillRate: 0.33, redis }), identityRouter);
+  // The doc comment above (and identity/routes.ts's own per-route comments)
+  // says /me, /devices, /mfa/*, /api-keys/* "require auth middleware mounted
+  // upstream" — but nothing ever actually mounted it here, so res.locals.auth
+  // was never populated for any of them: /me/mfa/* 401 unconditionally
+  // (explicit `if (!auth)` check), /devices threw (tenantId() reads
+  // res.locals.auth non-null), and /api-keys 403'd via requireRole's
+  // safe-fallback-to-"cashier" default. Found live: a valid Bearer token that
+  // worked fine against /api/v1/capabilities got 401 from /api/identity/me.
+  // Fail-safe in every case (no cross-tenant/role leak), but fully broken.
+  // Scoped per-path (not the whole /api/identity prefix) since
+  // /register|/login|/login/mfa|/refresh|/logout|/forgot-password|
+  // /reset-password must keep working with no token at all.
+  app.use("/api/identity/me", makeAuthMiddleware(db));
+  app.use("/api/identity/devices", makeAuthMiddleware(db));
+  app.use("/api/identity/mfa", makeAuthMiddleware(db));
+  app.use("/api/identity/api-keys", makeAuthMiddleware(db));
+  app.use(
+    "/api/identity",
+    rateLimitMiddleware({
+      capacity: Number(process.env["IDENTITY_RATE_LIMIT_CAPACITY"] ?? 10),
+      refillRate: Number(process.env["IDENTITY_RATE_LIMIT_REFILL"] ?? 0.33),
+      redis,
+    }),
+    identityRouter,
+  );
+
+  // ── SSO pre-login handshake — must be reachable BEFORE a token exists, so it
+  // cannot go through the auth-gated /api/v1 router below (that would make SSO
+  // login impossible: no token yet -> 401 -> can never get a token). Mounted
+  // at the same /api/v1/sso path the frontend already calls; Express matches
+  // this registration first, so /config (auth-gated, registered later via the
+  // domain-modules loop) is unaffected. Same brute-force posture as identity login.
+  const ssoPublicRouter = Router();
+  registerSsoPublicRoutes(ssoPublicRouter, new SsoService(db));
+  app.use("/api/v1/sso", rateLimitMiddleware({ capacity: 10, refillRate: 0.33, redis }), ssoPublicRouter);
 
   // ── Auth + per-tenant tiered rate limit applied to all /api/v1/* routes.
   // makeAuthMiddleware handles both JWT sessions and API key tokens (fpk_ prefix).
@@ -339,14 +396,23 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   //    routes are already top-level resource names.)
   for (const mod of modules) {
     const router = Router();
-    await mod.register({ db, events, router });
+    await mod.register({ db, events, router, outbox });
     app.use(mod.mountPath ?? `/api/v1/${mod.name}`, router);
+  }
+
+  // Outbox crash recovery: deliver any events left pending by a previous
+  // process death, then sweep periodically when background jobs are enabled.
+  void outbox.reconcile().catch((err) => logger.warn({ err }, "outbox boot reconcile failed"));
+  if (process.env["FINDER_BACKGROUND_JOBS"] !== "false") {
+    setInterval(() => {
+      void outbox.reconcile().catch((err) => logger.warn({ err }, "outbox sweep failed"));
+    }, 60_000).unref();
   }
 
   // ── Root info
   app.get("/", (_req, res) => {
     res.json({
-      service: "finder-pos",
+      service: "ascend",
       status: "ok",
       storage: "postgres",
       modules: ["identity", ...modules.map((m) => m.name)],
@@ -369,7 +435,40 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   });
 
   // ── Orchestration layer (workflows, sagas, command handlers, background jobs)
-  bootstrapOrchestration(db, events);
+  const orchestration = bootstrapOrchestration(db, events);
+
+  // ── Background-job tick — GET /jobs/tick (ACPA M1.2, closes C-2)
+  // The in-process setInterval pollers freeze between serverless invocations,
+  // so on Vercel a cron (vercel.json "crons") hits this endpoint instead.
+  // Vercel sends `Authorization: Bearer ${CRON_SECRET}` automatically when the
+  // env var is set. Each tick drains due jobs (bounded) and reconciles the
+  // outbox; FOR UPDATE SKIP LOCKED + consumer idempotency make concurrent
+  // ticks and long-lived-deploy intervals safe to overlap.
+  //
+  // This is also what runs the DEMO-1 trial-expiry sweep (job type
+  // "trial_expiry", registered in bootstrapOrchestration) — a prospect's
+  // trial signup enqueues/reschedules itself into the same job_queue this
+  // endpoint drains, so no separate scheduler entry point is needed for it.
+  app.get("/jobs/tick", handler(async (req, res) => {
+    const expected = process.env["CRON_SECRET"];
+    if (!expected && process.env["NODE_ENV"] === "production") {
+      res.status(503).json({ error: "cron_unconfigured" });
+      return;
+    }
+    if (expected) {
+      const provided = req.headers.authorization?.replace(/^Bearer\s+/i, "");
+      if (provided !== expected) { res.status(401).end(); return; }
+    }
+    const deadline = Date.now() + 10_000;
+    let jobsProcessed = 0;
+    for (let i = 0; i < 20 && Date.now() < deadline; i++) {
+      const n = await orchestration.jobConsumer.poll();
+      jobsProcessed += n;
+      if (n === 0) break;
+    }
+    const reconciled = await outbox.reconcile();
+    res.json({ status: "ok", jobsProcessed, outbox: reconciled, ts: Date.now() });
+  }));
 
   // ── Server-Sent Events stream — GET /api/v1/stream
   const sseBroker = new SseBroker();
@@ -431,5 +530,5 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   app.use(errorMiddleware);
   app.use(errorEnvelopeMiddleware);
 
-  return { express: app, db, events, cleanup: cleanupEventBridge };
+  return { express: app, db, events, outbox, cleanup: cleanupEventBridge };
 }

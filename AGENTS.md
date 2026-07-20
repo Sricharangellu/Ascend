@@ -15,14 +15,66 @@ contract, the contract wins.
 
 You are working on Ascend, a retail-first POS and business operating platform.
 
-## Source Of Truth
+## Source Of Truth — the single entry point (Sri directive, 2026-07-19)
 
-Before making changes, read these files in order:
+This file is the ONE entry point for agents, skills, orchestration, design
+principles, and pipelines. Everything hangs off the map below — do NOT create
+new instruction/status/pipeline/design files; update the mapped file instead.
+
+| Concern | The one file |
+|---|---|
+| Agent instructions & skills | `AGENTS.md` (this file) |
+| Orchestration: workflows, plans, agents, skills | `docs/architecture/ORCHESTRATION.md` |
+| Design principles | `docs/architecture/DESIGN_PRINCIPLES.md` |
+| Architecture | `docs/architecture/ARCHITECTURE.md` (+ ADRs under `docs/architecture/ADR/`) |
+| Gaps (what's actually still missing, code-verified) | `docs/architecture/GAPS.md` |
+| CI/CD & release pipeline | `docs/architecture/PIPELINE.md` (feature → develop → staging → master; master merges are Sri-only) |
+(2026-07-20 consolidation: `ENGINEERING_CONSTITUTION.md`, `CODING_STANDARDS.md`,
+`ENGINEERING_ORG.md`, `ACPA_ROADMAP.md`, `DOMAIN_MODEL.md`,
+`PLATFORM_ROADMAP.md`, `CTO_CHARTER.md`, and `orchestration/gaps/*.md` were
+folded into the four files above per Sri's directive — archived under
+`docs/architecture/_archive/` and `orchestration/_archive/`, not deleted.)
+
+**Branch rules (Sri directive, 2026-07-19, refined same day — binding, not optional):**
+
+- **NEVER branch from `master`.** Every new branch starts from `develop`
+  (`git checkout -b feature/<name> develop`). `master` is a release target,
+  not a starting point — branching from it re-creates the exact
+  skip-the-flow mistake this repo has already been corrected for twice.
+- **Feature branches correctly cut from `develop` do not have to be deleted
+  the instant they merge** — it's fine for a few to stay alive if work is
+  ongoing. What is NOT optional: **the production tree must always be
+  clean.** "Production tree" means `master` and the pipeline that feeds it
+  (`staging`, `develop`) — these three follow a strict, structural
+  merge/push process (PR only, never an ad-hoc push) and nothing else
+  accumulates on them.
+- **Keep `develop` ≥ `staging` ≥ `master` in sync at all times.** The moment
+  anything merges to `master`, back-merge it into `staging` and `develop` in
+  the same session — don't let the tiers drift apart. Before ending any
+  session that touched git, verify this invariant holds
+  (`git rev-list --count origin/master..origin/staging` and
+  `origin/master..origin/develop` should both be 0 right after a release).
+- Stale, fully-merged branches (already absorbed into `staging`) should
+  still be cleared out periodically so `git branch -r` stays legible — just
+  not treated as an immediate per-merge requirement for active `develop`
+  branches.
+| Orchestration: loop program | `WORK/LOOP_PROTOCOL.md` |
+| Orchestration: session lock | `WORK/LOCK.md` |
+| Project plan | `WORK/FORWARD_PLAN.md` |
+| **Work updates (ALL of them)** | `WORK/LOOP_STATE.md` — heartbeat, iteration log, backlog, NEEDS-SRI, delivery/release status. One file, updated in place. |
+| Point-in-time audits | `WORK/audits/AUDIT_<UTC>-<slug>.md` (append-only snapshots — the only sanctioned new files) |
+
+Before making changes, read in order:
 
 1. `AGENTS.md`
-2. `WORK/FORWARD_PLAN.md`
-3. `WORK/LOCK.md`
-4. Latest relevant file in `WORK/audits/`
+2. `docs/architecture/DESIGN_PRINCIPLES.md` and `docs/architecture/ARCHITECTURE.md` —
+   the engineering constitution + as-built architecture (rules, ADRs,
+   roadmap). Mandatory for any architectural or cross-module work; update
+   them (and add an ADR) whenever you make a significant architectural or
+   domain change.
+3. `WORK/LOOP_STATE.md` (current work state) and `WORK/FORWARD_PLAN.md` (plan)
+4. `WORK/LOCK.md`
+5. Latest relevant file in `WORK/audits/`
 
 There is only one active agent instruction file:
 
@@ -39,6 +91,9 @@ Do not create or revive duplicate planning files such as:
 - `RULES.md`
 - `WORK_STATE.md`
 - `PROJECT_PLAN.md`
+- `WORK/PIPELINE.md`, `STATUS.md`, `RELEASE_STATUS.md`, or any other ad-hoc
+  status/pipeline file — delivery status lives in `WORK/LOOP_STATE.md`, the
+  pipeline rulebook is `docs/architecture/PIPELINE.md`
 - `* 2.*` duplicate copies
 
 If duplicate or obsolete files appear, remove them only when they are clearly redundant and not user-created work.
@@ -156,6 +211,33 @@ Every frontend change must follow these rules:
 - Keep the UI practical, dense, and operational. Ascend is not a marketing site.
 - Do not add decorative complexity that distracts from POS, inventory, reporting, and workflow tasks.
 
+## Design System Rules
+
+Ascend has ONE design system: the tokens in `web/tailwind.config.ts`, the primitives in
+`web/components/`, and the authoritative spec `docs/ENTERPRISE_UX_SPEC.md`. Every new or edited
+page/component MUST conform. These are hard requirements, not preferences — treat a violation the
+same as a failing gate.
+
+- **Colors: tokens only.** Use the `brand`, `erp`, and semantic (`success`/`warning`/`danger`)
+  tokens. Do NOT hard-code hex colors (`#0137FC`, `bg-[#1890FF]`) in pages/components, and do NOT
+  reach for raw Tailwind default-palette classes (`text-slate-500`, `bg-red-50`, `border-gray-200`) —
+  map them to `erp`/semantic tokens (e.g. `text-erp-text-secondary`, `border-erp-table-border`,
+  `text-danger-700`). A genuinely new color is added to `tailwind.config.ts` as a named token first.
+- **Primitives are mandatory.** Build with the design-system components — `Button`, `Input`,
+  `Select`, `Card`, `Table`, `Modal`, `ConfirmDialog`, `Badge`, `EmptyState`, `Skeleton`, `KpiCard`.
+  Do NOT use raw `<button>`, `<input>`, or `<select>` in feature pages. If a primitive lacks a
+  variant you need, extend the primitive — never bypass it with bespoke markup.
+- **Spacing:** 8px base system (`gap-2`/`gap-4`/`p-4`…). No arbitrary pixel margins.
+- **Accessibility: WCAG 2.1 AA (non-negotiable).** Every interactive element needs a visible focus
+  state (`focus-visible:ring-*`), an accessible name/label, a ≥44px touch target, and keyboard
+  operability; text/background pairs must meet AA contrast (token comments record the ratios).
+- **States:** every async view wires loading (`Skeleton`), empty (`EmptyState`), error, and success —
+  this restates the Frontend Rules and is enforced here too.
+- **Branding:** never hard-code an old/other product name (e.g. `SalesGent`, `Finder`) into new
+  styles, tokens, or copy — the product is Ascend (see the Hard rule on brand names).
+- When unsure, read `docs/ENTERPRISE_UX_SPEC.md` first — it is authoritative; never reinvent a
+  primitive that already exists.
+
 ## AI / Recommendations Rules
 
 - Do not make AI the source of truth.
@@ -223,6 +305,12 @@ npm run typecheck
 npm run lint
 npm test
 npm run build
+```
+
+Before release / for the full backend + web gate in one shot:
+
+```bash
+npm run verify   # hygiene + backend typecheck/test/smoke + web typecheck/lint/build
 ```
 
 Full production confidence:

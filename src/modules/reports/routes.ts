@@ -1,11 +1,17 @@
 import type { Router, Request, Response } from "express";
 import { handler } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
-import { requirePlan } from "../../gateway/auth.js";
+import { requirePlan, requireRole } from "../../gateway/auth.js";
 import type { ReportsService } from "./service.js";
 
 function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
+}
+
+/** Parse+cap a `limit` query param; falls back to `fallback` on missing/invalid (NaN) input. */
+function cappedLimit(raw: unknown, fallback: number, max = 500): number {
+  const n = typeof raw === "string" ? Number(raw) : NaN;
+  return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), max) : fallback;
 }
 
 /** Map a `range` query param (today | 7d | 30d | all) to an epoch-ms lower bound. */
@@ -38,7 +44,7 @@ export function registerRoutes(router: Router, service: ReportsService): void {
   router.get(
     "/top-products",
     handler(async (req, res) => {
-      const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 10;
+      const limit = cappedLimit(req.query.limit, 10);
       res.json({ items: await service.topProducts(tenantId(res), sinceFromRange(req), limit) });
     }),
   );
@@ -84,7 +90,9 @@ export function registerRoutes(router: Router, service: ReportsService): void {
   }));
 
   // POST /api/v1/reports/ar-aging/sweep — flag overdue invoices with dunning_level.
-  router.post("/ar-aging/sweep", handler(async (_req, res) => {
+  // Mutates AR/dunning state, so manager+ only (was unguarded — any cashier could
+  // trigger a dunning sweep).
+  router.post("/ar-aging/sweep", requireRole("manager"), handler(async (_req, res) => {
     res.json(await service.sweepArAging(tenantId(res)));
   }));
 
@@ -132,7 +140,7 @@ export function registerRoutes(router: Router, service: ReportsService): void {
 
   // GET /api/v1/reports/sales-by-product?range=…&limit=…
   router.get("/sales-by-product", handler(async (req, res) => {
-    const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 20;
+    const limit = cappedLimit(req.query.limit, 20);
     const items = await service.salesByProduct(tenantId(res), sinceFromRange(req), limit);
     res.json({ items });
   }));

@@ -2,17 +2,11 @@ import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import { HttpError } from "../../shared/http.js";
+import { nextDocSeq, nextDocNumber } from "../../shared/docnumber.js";
 
-export interface CursorPage<T> {
-  items: T[];
-  nextCursor: string | null;
-  limit: number;
-}
-
-function clampLimit(limit?: number): number {
-  if (!limit || limit <= 0) return 50;
-  return Math.min(Math.floor(limit), 200);
-}
+import { clampLimit, decodeCursor, toPage } from "../../shared/pagination.js";
+export type { CursorPage } from "../../shared/pagination.js";
+import type { CursorPage } from "../../shared/pagination.js";
 
 /** Purchasing — suppliers + purchase orders + receiving. Tenant-scoped.
  *  Receiving publishes `purchase_order.received`; the inventory module listens
@@ -23,6 +17,24 @@ export type POStatus = "ordered" | "partially_received" | "received" | "cancelle
 export type VendorCreditType = "chargeback" | "credit_memo";
 export type ReturnReason = "damaged" | "expired" | "other";
 
+/** A received PO line awaiting cost confirmation on the Purchase page, with the
+ *  reference prices that inform the cost decision. */
+export interface CostEntryItem {
+  line_id: string;
+  product_id: string;
+  sku: string | null;
+  product_name: string;
+  received_qty: number;
+  po_cost_cents: number;                    // cost carried on the PO line (default)
+  po_id: string;
+  supplier_id: string;
+  supplier_name: string | null;
+  received_at: number | null;
+  selling_price_cents: number;              // our current selling price
+  last_purchase_cost_cents: number | null;  // last confirmed cost (any vendor)
+  prev_vendor_cost_cents: number | null;    // most recent cost from THIS vendor
+}
+
 /** One line being received. `qty` is required; the rest are the receive-time
  *  actuals captured at the desk (only known when goods physically arrive). */
 export interface ReceiveLineInput {
@@ -31,6 +43,7 @@ export interface ReceiveLineInput {
   expiryDate?: number;      // epoch ms — drives the inventory lot's shelf-life
   lotCode?: string;
   unitCostCents?: number;   // actual cost on the invoice, if it differs from PO
+  locationId?: string;      // stock location the goods are received into
 }
 
 export interface VendorReturn {
@@ -158,12 +171,42 @@ export interface PurchaseOrder {
   po_number: number | null;
   status: POStatus;
   receive_status: string;
+  approval_status: POApprovalStatus;
+  approved_at: number | null;
   total_cost_cents: number;
   freight_cost_cents: number;
   other_charges_cents: number;
   notes: string | null;
   created_at: number;
   received_at: number | null;
+}
+
+/** Approval state, orthogonal to the fulfillment status. Legacy rows default to 'approved'. */
+export type POApprovalStatus = "approved" | "pending" | "rejected";
+
+/** Who acted — passed from the route's auth payload into approval methods. */
+export interface Actor {
+  id: string | null;
+  role: string;
+}
+
+/** Per-tenant approval tiers. Absent config = approvals disabled (auto-approve all). */
+export interface POApprovalConfig {
+  auto_limit_cents: number;    // total <  this → auto-approved
+  manager_limit_cents: number; // total <  this → manager may approve; >= → owner only
+  enabled: boolean;
+}
+
+export interface POApprovalEntry {
+  id: string;
+  tenant_id: string;
+  po_id: string;
+  action: "auto_approved" | "submitted" | "approved" | "rejected";
+  actor_id: string | null;
+  actor_role: string | null;
+  amount_cents: number;
+  note: string | null;
+  created_at: number;
 }
 
 export interface PurchaseOrderWithLines extends PurchaseOrder {
@@ -483,14 +526,24 @@ export class PurchasingService {
     return vc;
   }
 
-  async listVendorCredits(tenantId: string, supplierId?: string): Promise<VendorCredit[]> {
-    if (supplierId) {
-      return this.db.query<VendorCredit>(
-        "SELECT * FROM vendor_credits WHERE tenant_id = @t AND supplier_id = @s ORDER BY created_at DESC",
-        { t: tenantId, s: supplierId },
-      );
-    }
-    return this.db.query<VendorCredit>("SELECT * FROM vendor_credits WHERE tenant_id = @t ORDER BY created_at DESC LIMIT 500", { t: tenantId });
+  /** Cursor-paginated (keyset) — the old LIMIT 500 silently hid older credits,
+   *  and the by-supplier branch had no LIMIT at all. */
+  async listVendorCredits(
+    tenantId: string,
+    supplierId?: string,
+    query: { cursor?: string; limit?: number } = {},
+  ): Promise<CursorPage<VendorCredit>> {
+    const limit = clampLimit(query.limit, 500, 500);
+    const cur = decodeCursor(query.cursor);
+    const where = ["tenant_id = @t"];
+    const params: Record<string, unknown> = { t: tenantId, limit };
+    if (supplierId) { where.push("supplier_id = @s"); params["s"] = supplierId; }
+    if (cur) { where.push("(created_at, id) < (@curAt, @curId)"); params["curAt"] = cur.at; params["curId"] = cur.id; }
+    const items = await this.db.query<VendorCredit>(
+      `SELECT * FROM vendor_credits WHERE ${where.join(" AND ")} ORDER BY created_at DESC, id DESC LIMIT @limit`,
+      params,
+    );
+    return toPage(items as unknown as Array<VendorCredit & Record<string, unknown>>, limit, "created_at") as CursorPage<VendorCredit>;
   }
 
   async voidVendorCredit(id: string, tenantId: string): Promise<VendorCredit> {
@@ -551,22 +604,115 @@ export class PurchasingService {
     return { id, tenant_id: tenantId, supplier_id: input.supplierId ?? null, reason: input.reason, total_cost_cents: total, credit_id: creditId, status: "recorded", created_at: now };
   }
 
-  async listReturns(tenantId: string): Promise<VendorReturn[]> {
-    return this.db.query<VendorReturn>("SELECT * FROM vendor_returns WHERE tenant_id = @t ORDER BY created_at DESC LIMIT 500", { t: tenantId });
+  /** Cursor-paginated (keyset) — replaces the silent LIMIT 500 cap. */
+  async listReturns(tenantId: string, query: { cursor?: string; limit?: number } = {}): Promise<CursorPage<VendorReturn>> {
+    const limit = clampLimit(query.limit, 500, 500);
+    const cur = decodeCursor(query.cursor);
+    const where = ["tenant_id = @t"];
+    const params: Record<string, unknown> = { t: tenantId, limit };
+    if (cur) { where.push("(created_at, id) < (@curAt, @curId)"); params["curAt"] = cur.at; params["curId"] = cur.id; }
+    const items = await this.db.query<VendorReturn>(
+      `SELECT * FROM vendor_returns WHERE ${where.join(" AND ")} ORDER BY created_at DESC, id DESC LIMIT @limit`,
+      params,
+    );
+    return toPage(items as unknown as Array<VendorReturn & Record<string, unknown>>, limit, "created_at") as CursorPage<VendorReturn>;
   }
 
-  async createOrder(supplierId: string, lines: POLineInput[], tenantId: string): Promise<PurchaseOrderWithLines> {
+  // ── PO approval workflow ─────────────────────────────────────────────────────
+
+  async getApprovalConfig(tenantId: string): Promise<POApprovalConfig | null> {
+    const row = await this.db.one<POApprovalConfig & { enabled: boolean }>(
+      "SELECT auto_limit_cents::bigint::int8 AS auto_limit_cents, manager_limit_cents, enabled FROM po_approval_config WHERE tenant_id = @t",
+      { t: tenantId },
+    );
+    if (!row) return null;
+    return { auto_limit_cents: Number(row.auto_limit_cents), manager_limit_cents: Number(row.manager_limit_cents), enabled: row.enabled };
+  }
+
+  async setApprovalConfig(cfg: { autoLimitCents: number; managerLimitCents: number; enabled?: boolean }, tenantId: string): Promise<POApprovalConfig> {
+    if (cfg.autoLimitCents < 0 || cfg.managerLimitCents < cfg.autoLimitCents) {
+      throw new HttpError(400, "bad_request", "managerLimitCents must be >= autoLimitCents >= 0");
+    }
+    await this.db.query(
+      `INSERT INTO po_approval_config (tenant_id, auto_limit_cents, manager_limit_cents, enabled, updated_at)
+       VALUES (@t, @auto, @mgr, @enabled, @now)
+       ON CONFLICT (tenant_id) DO UPDATE SET auto_limit_cents = @auto, manager_limit_cents = @mgr, enabled = @enabled, updated_at = @now`,
+      { t: tenantId, auto: cfg.autoLimitCents, mgr: cfg.managerLimitCents, enabled: cfg.enabled ?? true, now: Date.now() },
+    );
+    return { auto_limit_cents: cfg.autoLimitCents, manager_limit_cents: cfg.managerLimitCents, enabled: cfg.enabled ?? true };
+  }
+
+  /** The role tier required to approve a PO of this amount under the given config. */
+  private requiredTier(totalCents: number, cfg: POApprovalConfig | null): "auto" | "manager" | "owner" {
+    if (!cfg || !cfg.enabled || totalCents < cfg.auto_limit_cents) return "auto";
+    return totalCents < cfg.manager_limit_cents ? "manager" : "owner";
+  }
+
+  /** Append-only audit write. Nothing in the codebase updates or deletes these rows. */
+  private async logApproval(
+    poId: string, tenantId: string,
+    action: POApprovalEntry["action"], actor: Actor | null, amountCents: number, note?: string | null,
+  ): Promise<void> {
+    await this.db.query(
+      `INSERT INTO po_approvals (id, tenant_id, po_id, action, actor_id, actor_role, amount_cents, note, created_at)
+       VALUES (@id, @t, @po, @action, @actorId, @actorRole, @amount, @note, @now)`,
+      { id: `poa_${uuidv7()}`, t: tenantId, po: poId, action, actorId: actor?.id ?? null, actorRole: actor?.role ?? null, amount: amountCents, note: note ?? null, now: Date.now() },
+    );
+  }
+
+  async listApprovals(poId: string, tenantId: string): Promise<POApprovalEntry[]> {
+    await this.getOrder(poId, tenantId); // 404 if the PO doesn't exist
+    return this.db.query<POApprovalEntry>(
+      "SELECT * FROM po_approvals WHERE tenant_id = @t AND po_id = @po ORDER BY created_at ASC, id ASC",
+      { t: tenantId, po: poId },
+    );
+  }
+
+  async approveOrder(poId: string, actor: Actor, tenantId: string): Promise<PurchaseOrderWithLines> {
+    const po = await this.getOrder(poId, tenantId);
+    if (po.approval_status === "approved") throw new HttpError(409, "already_approved", "purchase order is already approved");
+    if (po.approval_status === "rejected") throw new HttpError(409, "rejected", "a rejected purchase order cannot be approved; create a new PO");
+    const cfg = await this.getApprovalConfig(tenantId);
+    const tier = this.requiredTier(po.total_cost_cents, cfg);
+    if (tier === "owner" && actor.role !== "owner") {
+      throw new HttpError(403, "approval_tier", "this purchase order amount requires owner approval");
+    }
+    const now = Date.now();
+    await this.db.query(
+      "UPDATE purchase_orders SET approval_status = 'approved', approved_at = @now WHERE id = @id AND tenant_id = @t",
+      { now, id: poId, t: tenantId },
+    );
+    await this.logApproval(poId, tenantId, "approved", actor, po.total_cost_cents);
+    return this.getOrder(poId, tenantId);
+  }
+
+  async rejectOrder(poId: string, actor: Actor, tenantId: string, note?: string): Promise<PurchaseOrderWithLines> {
+    const po = await this.getOrder(poId, tenantId);
+    if (po.approval_status !== "pending") throw new HttpError(409, "not_pending", "only a pending purchase order can be rejected");
+    await this.db.query(
+      "UPDATE purchase_orders SET approval_status = 'rejected' WHERE id = @id AND tenant_id = @t",
+      { id: poId, t: tenantId },
+    );
+    await this.logApproval(poId, tenantId, "rejected", actor, po.total_cost_cents, note);
+    return this.getOrder(poId, tenantId);
+  }
+
+  /** Guard used by receiving: goods cannot be received against an unapproved PO. */
+  private assertApproved(po: PurchaseOrder): void {
+    if (po.approval_status === "pending") throw new HttpError(409, "approval_pending", "purchase order is awaiting approval and cannot be received");
+    if (po.approval_status === "rejected") throw new HttpError(409, "rejected", "a rejected purchase order cannot be received");
+  }
+
+  async createOrder(supplierId: string, lines: POLineInput[], tenantId: string, actor?: Actor): Promise<PurchaseOrderWithLines> {
     if (lines.length === 0) throw new HttpError(400, "bad_request", "at least one line is required");
     const supplier = await this.db.one("SELECT id FROM suppliers WHERE id = @supplierId AND tenant_id = @tenantId", { supplierId, tenantId });
     if (!supplier) throw new HttpError(404, "not_found", `supplier '${supplierId}' not found`);
     const now = Date.now();
     const poId = `po_${uuidv7()}`;
-    // Auto-increment po_number: max existing + 1 for this tenant.
-    const lastPo = await this.db.one<{ n: number }>(
-      "SELECT COALESCE(MAX(po_number), 0)::int AS n FROM purchase_orders WHERE tenant_id = @t",
-      { t: tenantId },
-    );
-    const poNumber = (lastPo?.n ?? 0) + 1;
+    // Race-free po_number via the shared atomic counter — MAX(po_number)+1 let
+    // two concurrent creates mint the same number. Seeded from existing MAX in
+    // the migration so numbering continues without collision.
+    const poNumber = await nextDocSeq(this.db, tenantId, "purchase_orders");
     const poLines: PurchaseOrderLine[] = lines.map((l) => ({
       id: `pol_${uuidv7()}`,
       tenant_id: tenantId,
@@ -587,11 +733,16 @@ export class PurchasingService {
       billed_qty: null,
     }));
     const total = poLines.reduce((s, l) => s + l.line_cost_cents, 0);
+    // Amount-tier approval gate. No config (or below the auto limit) → auto-approved,
+    // preserving the pre-workflow behavior; otherwise the PO waits in 'pending'.
+    const cfg = await this.getApprovalConfig(tenantId);
+    const tier = this.requiredTier(total, cfg);
+    const approvalStatus: POApprovalStatus = tier === "auto" ? "approved" : "pending";
     await this.db.withTenant(tenantId).tx(async (tdb) => {
       await tdb.query(
-        `INSERT INTO purchase_orders (id, tenant_id, supplier_id, status, total_cost_cents, po_number, created_at, received_at)
-         VALUES (@id,@tenant_id,@supplier_id,'ordered',@total,@po_number,@created_at,NULL)`,
-        { id: poId, tenant_id: tenantId, supplier_id: supplierId, total, po_number: poNumber, created_at: now },
+        `INSERT INTO purchase_orders (id, tenant_id, supplier_id, status, approval_status, approved_at, total_cost_cents, po_number, created_at, received_at)
+         VALUES (@id,@tenant_id,@supplier_id,'ordered',@approval_status,@approved_at,@total,@po_number,@created_at,NULL)`,
+        { id: poId, tenant_id: tenantId, supplier_id: supplierId, approval_status: approvalStatus, approved_at: approvalStatus === "approved" ? now : null, total, po_number: poNumber, created_at: now },
       );
       for (const l of poLines) {
         await tdb.query(
@@ -607,9 +758,12 @@ export class PurchasingService {
         );
       }
     });
+    await this.logApproval(poId, tenantId, approvalStatus === "approved" ? "auto_approved" : "submitted", actor ?? null, total);
     return {
       id: poId, tenant_id: tenantId, supplier_id: supplierId, po_number: poNumber,
-      status: "ordered", receive_status: "pending", total_cost_cents: total,
+      status: "ordered", receive_status: "pending",
+      approval_status: approvalStatus, approved_at: approvalStatus === "approved" ? now : null,
+      total_cost_cents: total,
       freight_cost_cents: 0, other_charges_cents: 0, notes: null,
       created_at: now, received_at: null, lines: poLines,
     };
@@ -709,6 +863,7 @@ export class PurchasingService {
     const po = await this.getOrder(id, tenantId);
     if (po.status === "received") throw new HttpError(409, "already_received", "purchase order already fully received");
     if (po.status === "cancelled") throw new HttpError(409, "cancelled", "purchase order is cancelled");
+    this.assertApproved(po);
     if (receiveLines.length === 0) throw new HttpError(400, "bad_request", "at least one line is required");
 
     // Validate each line: must belong to this PO, qty must be ≤ remaining.
@@ -776,6 +931,7 @@ export class PurchasingService {
         unitCostCents: rl.unitCostCents ?? line.unit_cost_cents,
         expiryDate: rl.expiryDate ?? line.expiry_date ?? undefined,
         lotCode: rl.lotCode ?? line.lot_code ?? undefined,
+        locationId: rl.locationId ?? undefined,
       };
     });
 
@@ -876,36 +1032,386 @@ export class PurchasingService {
     return { id, po_id: poId, line_id: input.lineId ?? null, reason: input.reason, amount_cents: input.amountCents, created_at: now };
   }
 
+  // ── Vendor bills · 3-way match (#42) ─────────────────────────────────────────
+
+  /** Create a draft vendor bill (invoice) against a PO from structured line
+   *  entry. OCR auto-extract is stubbed for later — lines are entered/confirmed
+   *  by the user. The bill starts in `draft`; it must be approved before it can
+   *  be posted. */
+  async createBill(
+    poId: string,
+    tenantId: string,
+    input: {
+      invoiceNumber: string;
+      invoiceDate?: number | null;
+      documentId?: string | null;
+      taxCents?: number;
+      lines: Array<{ lineId?: string | null; productId: string; productName?: string | null; invoicedQty: number; invoicedUnitCostCents: number }>;
+    },
+  ) {
+    const po = await this.db.one<{ id: string }>(
+      "SELECT id FROM purchase_orders WHERE id = @poId AND tenant_id = @t",
+      { poId, t: tenantId },
+    );
+    if (!po) throw new HttpError(404, "not_found", `purchase order '${poId}' not found`);
+    if (!input.invoiceNumber?.trim()) throw new HttpError(400, "bad_request", "invoiceNumber is required");
+    if (!input.lines?.length) throw new HttpError(400, "bad_request", "at least one line is required");
+
+    const id = `bill_${uuidv7()}`;
+    const now = Date.now();
+    const subtotal = input.lines.reduce((s, l) => s + l.invoicedQty * l.invoicedUnitCostCents, 0);
+    const tax = input.taxCents ?? 0;
+    const total = subtotal + tax;
+
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
+      await tdb.query(
+        `INSERT INTO po_bills (id, tenant_id, po_id, invoice_number, invoice_date, document_id, subtotal_cents, tax_cents, total_cents, status, created_at, updated_at)
+         VALUES (@id, @t, @poId, @num, @date, @docId, @subtotal, @tax, @total, 'draft', @now, @now)`,
+        { id, t: tenantId, poId, num: input.invoiceNumber.trim(), date: input.invoiceDate ?? null, docId: input.documentId ?? null, subtotal, tax, total, now },
+      );
+      for (const l of input.lines) {
+        await tdb.query(
+          `INSERT INTO po_bill_lines (id, tenant_id, bill_id, line_id, product_id, product_name, invoiced_qty, invoiced_unit_cost_cents)
+           VALUES (@id, @t, @billId, @lineId, @productId, @productName, @qty, @cost)`,
+          { id: `bln_${uuidv7()}`, t: tenantId, billId: id, lineId: l.lineId ?? null, productId: l.productId, productName: l.productName ?? null, qty: l.invoicedQty, cost: l.invoicedUnitCostCents },
+        );
+      }
+    });
+    return this.getBill(id, tenantId);
+  }
+
+  async listBills(poId: string, tenantId: string) {
+    return this.db.query<{ id: string; po_id: string; invoice_number: string; invoice_date: number | null; total_cents: number; status: string; created_at: number }>(
+      "SELECT id, po_id, invoice_number, invoice_date, total_cents, status, created_at FROM po_bills WHERE po_id = @poId AND tenant_id = @t ORDER BY created_at DESC",
+      { poId, t: tenantId },
+    );
+  }
+
+  /** Return a bill with its 3-way match: for every PO line, ordered vs received
+   *  vs invoiced quantities and PO vs invoiced unit cost, with per-line and
+   *  total variance flags. Bill lines that don't map to a PO line surface as
+   *  `unexpected` rows. `match_status` is `variance` if anything is flagged. */
+  async getBill(billId: string, tenantId: string) {
+    const bill = await this.db.one<{ id: string; po_id: string; invoice_number: string; invoice_date: number | null; document_id: string | null; subtotal_cents: number; tax_cents: number; total_cents: number; status: string; created_at: number; updated_at: number }>(
+      "SELECT * FROM po_bills WHERE id = @id AND tenant_id = @t",
+      { id: billId, t: tenantId },
+    );
+    if (!bill) throw new HttpError(404, "not_found", `bill '${billId}' not found`);
+
+    const billLines = await this.db.query<{ id: string; line_id: string | null; product_id: string; product_name: string | null; invoiced_qty: number; invoiced_unit_cost_cents: number }>(
+      "SELECT id, line_id, product_id, product_name, invoiced_qty, invoiced_unit_cost_cents FROM po_bill_lines WHERE bill_id = @id AND tenant_id = @t",
+      { id: billId, t: tenantId },
+    );
+    const poLines = await this.db.query<{ id: string; product_id: string; product_name: string | null; quantity: number; received_qty: number; unit_cost_cents: number }>(
+      "SELECT id, product_id, product_name, quantity, COALESCE(received_qty, 0) AS received_qty, unit_cost_cents FROM purchase_order_lines WHERE po_id = @poId AND tenant_id = @t",
+      { poId: bill.po_id, t: tenantId },
+    );
+
+    const usedBillLineIds = new Set<string>();
+    const matchLines = poLines.map((pol) => {
+      const bl = billLines.find(
+        (b) => (b.line_id ? b.line_id === pol.id : b.product_id === pol.product_id) && !usedBillLineIds.has(b.id),
+      );
+      if (bl) usedBillLineIds.add(bl.id);
+      const invoicedQty = bl?.invoiced_qty ?? 0;
+      const invoicedUnit = bl?.invoiced_unit_cost_cents ?? 0;
+      const flags: string[] = [];
+      if (pol.received_qty < pol.quantity) flags.push("short_received");
+      if (bl && invoicedQty !== pol.received_qty) flags.push("qty_variance");
+      if (bl && invoicedUnit !== pol.unit_cost_cents) flags.push("price_variance");
+      if (!bl) flags.push("not_invoiced");
+      // What we should pay (received × PO price) vs what was invoiced.
+      const expectedCents = pol.received_qty * pol.unit_cost_cents;
+      const invoicedCents = invoicedQty * invoicedUnit;
+      return {
+        line_id: pol.id,
+        product_id: pol.product_id,
+        product_name: pol.product_name ?? pol.product_id,
+        ordered_qty: pol.quantity,
+        received_qty: pol.received_qty,
+        invoiced_qty: invoicedQty,
+        po_unit_cost_cents: pol.unit_cost_cents,
+        invoiced_unit_cost_cents: invoicedUnit,
+        expected_cents: expectedCents,
+        invoiced_cents: invoicedCents,
+        variance_cents: invoicedCents - expectedCents,
+        flags,
+        matched: flags.length === 0,
+      };
+    });
+
+    // Invoiced lines with no matching PO line are unexpected charges.
+    const unexpected = billLines
+      .filter((b) => !usedBillLineIds.has(b.id))
+      .map((b) => ({
+        line_id: null as string | null,
+        product_id: b.product_id,
+        product_name: b.product_name ?? b.product_id,
+        ordered_qty: 0,
+        received_qty: 0,
+        invoiced_qty: b.invoiced_qty,
+        po_unit_cost_cents: 0,
+        invoiced_unit_cost_cents: b.invoiced_unit_cost_cents,
+        expected_cents: 0,
+        invoiced_cents: b.invoiced_qty * b.invoiced_unit_cost_cents,
+        variance_cents: b.invoiced_qty * b.invoiced_unit_cost_cents,
+        flags: ["unexpected"],
+        matched: false,
+      }));
+
+    const lines = [...matchLines, ...unexpected];
+    const expectedTotal = matchLines.reduce((s, l) => s + l.expected_cents, 0);
+    const invoicedSubtotal = lines.reduce((s, l) => s + l.invoiced_cents, 0);
+    const totalVariance = bill.total_cents - expectedTotal; // includes tax + unexpected
+    const matchStatus = lines.every((l) => l.matched) && bill.subtotal_cents === expectedTotal ? "matched" : "variance";
+
+    return {
+      id: bill.id,
+      po_id: bill.po_id,
+      invoice_number: bill.invoice_number,
+      invoice_date: bill.invoice_date,
+      document_id: bill.document_id,
+      subtotal_cents: bill.subtotal_cents,
+      tax_cents: bill.tax_cents,
+      total_cents: bill.total_cents,
+      status: bill.status,
+      created_at: bill.created_at,
+      updated_at: bill.updated_at,
+      match: {
+        match_status: matchStatus,
+        expected_cents: expectedTotal,
+        invoiced_subtotal_cents: invoicedSubtotal,
+        total_variance_cents: totalVariance,
+        lines,
+      },
+    };
+  }
+
+  /** Approve or hold a draft bill. A held bill cannot be posted until it is
+   *  approved again; a posted bill is immutable. */
+  async setBillStatus(billId: string, tenantId: string, status: "approved" | "held") {
+    const bill = await this.db.one<{ status: string }>(
+      "SELECT status FROM po_bills WHERE id = @id AND tenant_id = @t",
+      { id: billId, t: tenantId },
+    );
+    if (!bill) throw new HttpError(404, "not_found", `bill '${billId}' not found`);
+    if (bill.status === "posted") throw new HttpError(409, "already_posted", "a posted bill cannot be changed");
+    await this.db.query(
+      "UPDATE po_bills SET status = @status, updated_at = @now WHERE id = @id AND tenant_id = @t",
+      { status, now: Date.now(), id: billId, t: tenantId },
+    );
+    return this.getBill(billId, tenantId);
+  }
+
+  /** Post an approved bill. This is the gate: only an `approved` bill can post,
+   *  and posting also records the invoiced quantities onto the PO lines. */
+  async postBill(billId: string, tenantId: string) {
+    const bill = await this.db.one<{ status: string; po_id: string }>(
+      "SELECT status, po_id FROM po_bills WHERE id = @id AND tenant_id = @t",
+      { id: billId, t: tenantId },
+    );
+    if (!bill) throw new HttpError(404, "not_found", `bill '${billId}' not found`);
+    if (bill.status === "posted") throw new HttpError(409, "already_posted", "bill is already posted");
+    if (bill.status !== "approved") throw new HttpError(409, "not_approved", "bill must be approved before it can be posted");
+
+    const now = Date.now();
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
+      await tdb.query(
+        "UPDATE po_bills SET status = 'posted', updated_at = @now WHERE id = @id AND tenant_id = @t",
+        { now, id: billId, t: tenantId },
+      );
+      const billLines = await tdb.query<{ line_id: string | null; invoiced_qty: number }>(
+        "SELECT line_id, invoiced_qty FROM po_bill_lines WHERE bill_id = @id AND tenant_id = @t",
+        { id: billId, t: tenantId },
+      );
+      for (const bl of billLines) {
+        if (!bl.line_id) continue;
+        await tdb.query(
+          "UPDATE purchase_order_lines SET billed_qty = @qty WHERE id = @lid AND tenant_id = @t",
+          { qty: bl.invoiced_qty, lid: bl.line_id, t: tenantId },
+        );
+      }
+    });
+    return this.getBill(billId, tenantId);
+  }
+
   // ── Vendor price history ─────────────────────────────────────────────────────
   // Returns the last 5 unit costs for each product on the given PO, sourced
   // from product_costs (which is updated on every receive).
 
-  async priceHistory(poId: string, tenantId: string) {
-    const lines = await this.db.query<{ product_id: string; product_name: string | null; unit_cost_cents: number }>(
-      "SELECT product_id, product_name, unit_cost_cents FROM purchase_order_lines WHERE po_id = @poId AND tenant_id = @t",
+  /**
+   * Per-line purchasing price intelligence for a PO. For each line it surfaces
+   * three reference prices — the current invoiced cost, the last cost paid to
+   * *this* supplier, and the best (lowest) cost across *all* suppliers — each
+   * with the date it applied, plus a suggested purchase quantity derived from
+   * the product's reorder point and recent sales velocity.
+   *
+   * History is drawn from received (or partially-received) POs and can be
+   * narrowed with `from`/`to` (received-at epoch ms) and `qtyBreak` (only count
+   * historical lines whose quantity ≥ the break, so per-case pricing isn't
+   * skewed by odd-lot buys). The `history` array is preserved for the existing
+   * sparkline UI. Part 2 of 3 (purchasing price intelligence).
+   */
+  async priceHistory(
+    poId: string,
+    tenantId: string,
+    opts: { from?: number; to?: number; qtyBreak?: number } = {},
+  ) {
+    const po = await this.db.one<{ supplier_id: string }>(
+      "SELECT supplier_id FROM purchase_orders WHERE id = @poId AND tenant_id = @t",
       { poId, t: tenantId },
     );
-    const history = await Promise.all(
+    if (!po) return [];
+
+    const lines = await this.db.query<{ product_id: string; product_name: string | null; unit_cost_cents: number; quantity: number }>(
+      "SELECT product_id, product_name, unit_cost_cents, quantity FROM purchase_order_lines WHERE po_id = @poId AND tenant_id = @t",
+      { poId, t: tenantId },
+    );
+
+    const from = opts.from ?? 0;
+    const to = opts.to ?? Number.MAX_SAFE_INTEGER;
+    const qtyBreak = opts.qtyBreak ?? 0;
+    const lookbackDays = 90;
+    const since = Date.now() - lookbackDays * 86_400_000;
+
+    const items = await Promise.all(
       lines.map(async (l) => {
-        const hist = await this.db.query<{ unit_cost_cents: number; received_at: number; po_id: string }>(
-          `SELECT pol.unit_cost_cents, po.received_at, po.id AS po_id
+        // All received prices for this product, newest first, within filters.
+        const hist = await this.db.query<{ unit_cost_cents: number; received_at: number; po_id: string; supplier_id: string | null; supplier_name: string | null }>(
+          `SELECT pol.unit_cost_cents, po.received_at, po.id AS po_id,
+                  po.supplier_id, s.name AS supplier_name
            FROM purchase_order_lines pol
-           JOIN purchase_orders po ON po.id = pol.po_id
+           JOIN purchase_orders po ON po.id = pol.po_id AND po.tenant_id = pol.tenant_id
+           LEFT JOIN suppliers s ON s.id = po.supplier_id AND s.tenant_id = po.tenant_id
            WHERE pol.product_id = @productId AND pol.tenant_id = @t
              AND po.status IN ('received','partially_received')
-           ORDER BY po.received_at DESC NULLS LAST
-           LIMIT 5`,
-          { productId: l.product_id, t: tenantId },
+             AND po.received_at IS NOT NULL
+             AND po.received_at >= @from AND po.received_at <= @to
+             AND pol.quantity >= @qtyBreak
+           ORDER BY po.received_at DESC`,
+          { productId: l.product_id, t: tenantId, from, to, qtyBreak },
         );
+
+        const lastFromSupplierRow = hist.find((h) => h.supplier_id === po.supplier_id) ?? null;
+        // Best = lowest unit cost; tie broken by most recent (hist is DESC by date).
+        const bestRow = hist.reduce<typeof hist[number] | null>((best, h) => {
+          if (!best || h.unit_cost_cents < best.unit_cost_cents) return h;
+          return best;
+        }, null);
+
+        // Suggested purchase qty from reorder point + recent sales velocity.
+        const stats = await this.db.one<{ current_stock: number; reorder_point: number; reorder_quantity: number; lead_time_days: number; units_sold: number }>(
+          `SELECT COALESCE(inv.stock_qty, 0)        AS current_stock,
+                  COALESCE(p.reorder_point, 0)      AS reorder_point,
+                  COALESCE(p.reorder_quantity, 0)   AS reorder_quantity,
+                  COALESCE(p.lead_time_days, 7)     AS lead_time_days,
+                  COALESCE((
+                    SELECT SUM(ol.quantity)
+                    FROM order_lines ol
+                    JOIN orders o ON o.id = ol.order_id
+                    WHERE ol.product_id = p.id AND ol.tenant_id = p.tenant_id
+                      AND o.created_at >= @since
+                  ), 0)                             AS units_sold
+           FROM products p
+           LEFT JOIN inventory inv ON inv.product_id = p.id AND inv.tenant_id = p.tenant_id
+           WHERE p.id = @productId AND p.tenant_id = @t`,
+          { productId: l.product_id, t: tenantId, since },
+        );
+
+        const velocityPerDay = stats ? stats.units_sold / lookbackDays : 0;
+        // Target on-hand = reorder point + expected demand over the lead time.
+        let suggestedQty = 0;
+        if (stats) {
+          const target = stats.reorder_point + velocityPerDay * stats.lead_time_days;
+          suggestedQty = Math.max(0, Math.ceil(target - stats.current_stock));
+          // Respect a configured reorder lot size as a floor when we do reorder.
+          if (suggestedQty > 0 && stats.reorder_quantity > 0) {
+            suggestedQty = Math.max(suggestedQty, stats.reorder_quantity);
+          }
+        }
+
         return {
           product_id: l.product_id,
           product_name: l.product_name ?? l.product_id,
           sku: l.product_id,
-          history: hist,
+          ordered_qty: l.quantity,
+          invoiced_cents: l.unit_cost_cents,
+          last_from_supplier: lastFromSupplierRow
+            ? { unit_cost_cents: lastFromSupplierRow.unit_cost_cents, received_at: lastFromSupplierRow.received_at }
+            : null,
+          best_across_suppliers: bestRow
+            ? {
+                unit_cost_cents: bestRow.unit_cost_cents,
+                received_at: bestRow.received_at,
+                supplier_id: bestRow.supplier_id,
+                supplier_name: bestRow.supplier_name,
+              }
+            : null,
+          suggested_qty: suggestedQty,
+          velocity_per_day: Math.round(velocityPerDay * 100) / 100,
+          current_stock: stats?.current_stock ?? 0,
+          history: hist.slice(0, 5).map((h) => ({ unit_cost_cents: h.unit_cost_cents, received_at: h.received_at, po_id: h.po_id })),
         };
       }),
     );
-    return history.filter((h) => h.history.length > 0);
+    return items;
+  }
+
+  // ── Purchase cost entry ──────────────────────────────────────────────────────
+  // Received PO lines flow into a costing worksheet: enter the true cost per
+  // product, with reference prices (previous cost from the SAME vendor, last
+  // purchase cost from any vendor, our selling price) to inform the decision.
+
+  async getCostEntryQueue(tenantId: string): Promise<CostEntryItem[]> {
+    return this.db.query<CostEntryItem>(
+      `SELECT pol.id                                   AS line_id,
+              pol.product_id                           AS product_id,
+              p.sku                                    AS sku,
+              COALESCE(p.name, pol.product_name)       AS product_name,
+              pol.received_qty                         AS received_qty,
+              pol.unit_cost_cents                      AS po_cost_cents,
+              po.id                                    AS po_id,
+              po.supplier_id                           AS supplier_id,
+              s.name                                   AS supplier_name,
+              po.received_at                           AS received_at,
+              COALESCE(p.price_cents, 0)               AS selling_price_cents,
+              pc.cost_cents                            AS last_purchase_cost_cents,
+              (SELECT pol2.unit_cost_cents
+                 FROM purchase_order_lines pol2
+                 JOIN purchase_orders po2 ON po2.id = pol2.po_id AND po2.tenant_id = pol2.tenant_id
+                WHERE pol2.product_id = pol.product_id AND pol2.tenant_id = pol.tenant_id
+                  AND po2.supplier_id = po.supplier_id AND po2.id <> po.id
+                  AND po2.status IN ('received','partially_received')
+                ORDER BY po2.received_at DESC NULLS LAST
+                LIMIT 1)                               AS prev_vendor_cost_cents
+         FROM purchase_order_lines pol
+         JOIN purchase_orders po ON po.id = pol.po_id AND po.tenant_id = pol.tenant_id
+         LEFT JOIN suppliers s   ON s.id = po.supplier_id AND s.tenant_id = po.tenant_id
+         LEFT JOIN products p    ON p.id = pol.product_id AND p.tenant_id = pol.tenant_id
+         LEFT JOIN product_costs pc ON pc.product_id = pol.product_id AND pc.tenant_id = pol.tenant_id
+        WHERE pol.tenant_id = @t
+          AND po.status IN ('received','partially_received')
+          AND pol.received_qty > 0
+        ORDER BY po.received_at DESC NULLS LAST, pol.id
+        LIMIT 200`,
+      { t: tenantId },
+    );
+  }
+
+  /** Set a product's confirmed cost (updates product_costs — the cost the
+   *  inventory grid & COGS read — and notifies inventory to revalue). */
+  async submitProductCost(tenantId: string, productId: string, costCents: number): Promise<{ product_id: string; cost_cents: number }> {
+    if (!Number.isInteger(costCents) || costCents < 0) {
+      throw new HttpError(400, "bad_request", "cost must be a non-negative integer (cents)");
+    }
+    const now = Date.now();
+    await this.db.query(
+      `INSERT INTO product_costs (tenant_id, product_id, cost_cents, updated_at) VALUES (@t,@p,@c,@now)
+       ON CONFLICT (tenant_id, product_id) DO UPDATE SET cost_cents = EXCLUDED.cost_cents, updated_at = EXCLUDED.updated_at`,
+      { t: tenantId, p: productId, c: costCents, now },
+    );
+    await this.events.publish("product.cost_updated", { tenantId, productId, costCents }, productId);
+    return { product_id: productId, cost_cents: costCents };
   }
 
   // ── Vendor quotes ────────────────────────────────────────────────────────────
@@ -978,4 +1484,206 @@ export class PurchasingService {
       { t: tenantId },
     );
   }
+
+  // ── Purchase requisitions (procurement PRD module 1 / ACPA E2) ─────────────
+  // draft → submitted → approved | rejected → converted (to a PO).
+  // Only drafts are editable; conversion requires approval and goes through
+  // createOrder, so the resulting PO is still subject to PO approval tiers.
+
+  private async getRequisitionOrThrow(id: string, tenantId: string): Promise<Requisition> {
+    const row = await this.db.one<Requisition>(
+      "SELECT * FROM purchase_requisitions WHERE id = @id AND tenant_id = @t",
+      { id, t: tenantId },
+    );
+    if (!row) throw new HttpError(404, "not_found", `requisition '${id}' not found`);
+    return row;
+  }
+
+  async getRequisition(id: string, tenantId: string): Promise<RequisitionWithLines> {
+    const req = await this.getRequisitionOrThrow(id, tenantId);
+    const lines = await this.db.query<RequisitionLine>(
+      "SELECT * FROM purchase_requisition_lines WHERE requisition_id = @id AND tenant_id = @t",
+      { id, t: tenantId },
+    );
+    return { ...req, lines };
+  }
+
+  async createRequisition(
+    input: {
+      department?: string | null;
+      requiredDate?: number | null;
+      priority?: "low" | "normal" | "high";
+      notes?: string | null;
+      lines: Array<{ productId: string; quantity: number; estCostCents?: number; productName?: string | null }>;
+    },
+    actor: Actor,
+    tenantId: string,
+  ): Promise<RequisitionWithLines> {
+    if (input.lines.length === 0) throw new HttpError(400, "bad_request", "at least one line is required");
+    const now = Date.now();
+    const id = `preq_${uuidv7()}`;
+    const reqNumber = await nextDocNumber(this.db, tenantId, "purchase_requisitions", "PR");
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
+      await tdb.query(
+        `INSERT INTO purchase_requisitions (id, tenant_id, req_number, status, department, requested_by, required_date, priority, notes, created_at, updated_at)
+         VALUES (@id, @t, @num, 'draft', @dept, @by, @reqDate, @prio, @notes, @now, @now)`,
+        { id, t: tenantId, num: reqNumber, dept: input.department ?? null, by: actor.id, reqDate: input.requiredDate ?? null, prio: input.priority ?? "normal", notes: input.notes ?? null, now },
+      );
+      for (const l of input.lines) {
+        await tdb.query(
+          `INSERT INTO purchase_requisition_lines (id, tenant_id, requisition_id, product_id, product_name, quantity, est_cost_cents)
+           VALUES (@id, @t, @req, @pid, @pname, @qty, @est)`,
+          { id: `preql_${uuidv7()}`, t: tenantId, req: id, pid: l.productId, pname: l.productName ?? null, qty: l.quantity, est: l.estCostCents ?? 0 },
+        );
+      }
+    });
+    return this.getRequisition(id, tenantId);
+  }
+
+  /** Draft-only edits: header fields and full line replacement. */
+  async updateRequisition(
+    id: string,
+    input: {
+      department?: string | null;
+      requiredDate?: number | null;
+      priority?: "low" | "normal" | "high";
+      notes?: string | null;
+      lines?: Array<{ productId: string; quantity: number; estCostCents?: number; productName?: string | null }>;
+    },
+    tenantId: string,
+  ): Promise<RequisitionWithLines> {
+    const req = await this.getRequisitionOrThrow(id, tenantId);
+    if (req.status !== "draft") throw new HttpError(409, "not_draft", "only a draft requisition can be edited");
+    if (input.lines && input.lines.length === 0) throw new HttpError(400, "bad_request", "at least one line is required");
+    const now = Date.now();
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
+      await tdb.query(
+        `UPDATE purchase_requisitions SET
+           department = COALESCE(@dept, department),
+           required_date = COALESCE(@reqDate, required_date),
+           priority = COALESCE(@prio, priority),
+           notes = COALESCE(@notes, notes),
+           updated_at = @now
+         WHERE id = @id AND tenant_id = @t`,
+        { dept: input.department ?? null, reqDate: input.requiredDate ?? null, prio: input.priority ?? null, notes: input.notes ?? null, now, id, t: tenantId },
+      );
+      if (input.lines) {
+        await tdb.query("DELETE FROM purchase_requisition_lines WHERE requisition_id = @id AND tenant_id = @t", { id, t: tenantId });
+        for (const l of input.lines) {
+          await tdb.query(
+            `INSERT INTO purchase_requisition_lines (id, tenant_id, requisition_id, product_id, product_name, quantity, est_cost_cents)
+             VALUES (@id, @t, @req, @pid, @pname, @qty, @est)`,
+            { id: `preql_${uuidv7()}`, t: tenantId, req: id, pid: l.productId, pname: l.productName ?? null, qty: l.quantity, est: l.estCostCents ?? 0 },
+          );
+        }
+      }
+    });
+    return this.getRequisition(id, tenantId);
+  }
+
+  private async transitionRequisition(
+    id: string, tenantId: string,
+    from: RequisitionStatus[], to: RequisitionStatus,
+    actor?: Actor, note?: string,
+  ): Promise<RequisitionWithLines> {
+    const req = await this.getRequisitionOrThrow(id, tenantId);
+    if (!from.includes(req.status)) {
+      throw new HttpError(409, "invalid_transition", `requisition is '${req.status}'; expected ${from.join("/")}`);
+    }
+    await this.db.query(
+      `UPDATE purchase_requisitions SET status = @to, decided_by = COALESCE(@by, decided_by),
+         decided_at = CASE WHEN @by IS NULL THEN decided_at ELSE @now END,
+         decision_note = COALESCE(@note, decision_note), updated_at = @now
+       WHERE id = @id AND tenant_id = @t`,
+      { to, by: actor?.id ?? null, note: note ?? null, now: Date.now(), id, t: tenantId },
+    );
+    return this.getRequisition(id, tenantId);
+  }
+
+  async submitRequisition(id: string, tenantId: string): Promise<RequisitionWithLines> {
+    return this.transitionRequisition(id, tenantId, ["draft"], "submitted");
+  }
+
+  async approveRequisition(id: string, actor: Actor, tenantId: string): Promise<RequisitionWithLines> {
+    return this.transitionRequisition(id, tenantId, ["submitted"], "approved", actor);
+  }
+
+  async rejectRequisition(id: string, actor: Actor, tenantId: string, note?: string): Promise<RequisitionWithLines> {
+    return this.transitionRequisition(id, tenantId, ["submitted"], "rejected", actor, note);
+  }
+
+  /** Convert an approved requisition into a PO for the given supplier. The PO
+   *  is created through createOrder, so PO approval tiers still apply. */
+  async convertRequisition(id: string, supplierId: string, actor: Actor, tenantId: string): Promise<{ requisition: RequisitionWithLines; po: PurchaseOrderWithLines }> {
+    const req = await this.getRequisition(id, tenantId);
+    if (req.status !== "approved") throw new HttpError(409, "not_approved", "only an approved requisition can be converted");
+    const po = await this.createOrder(
+      supplierId,
+      req.lines.map((l) => ({
+        productId: l.product_id,
+        quantity: l.quantity,
+        unitCostCents: Number(l.est_cost_cents ?? 0),
+        productName: l.product_name ?? null,
+      })),
+      tenantId,
+      actor,
+    );
+    await this.db.query(
+      "UPDATE purchase_requisitions SET status = 'converted', po_id = @po, updated_at = @now WHERE id = @id AND tenant_id = @t",
+      { po: po.id, now: Date.now(), id, t: tenantId },
+    );
+    return { requisition: await this.getRequisition(id, tenantId), po };
+  }
+
+  /** Cursor-paginated requisition list, optionally filtered by status. */
+  async listRequisitions(
+    tenantId: string,
+    opts: { status?: RequisitionStatus; cursor?: string; limit?: number } = {},
+  ): Promise<CursorPage<Requisition>> {
+    const limit = clampLimit(opts.limit, 100, 500);
+    const cur = decodeCursor(opts.cursor);
+    const where = ["tenant_id = @t"];
+    const params: Record<string, unknown> = { t: tenantId, limit };
+    if (opts.status) { where.push("status = @s"); params["s"] = opts.status; }
+    if (cur) { where.push("(created_at, id) < (@curAt, @curId)"); params["curAt"] = cur.at; params["curId"] = cur.id; }
+    const items = await this.db.query<Requisition>(
+      `SELECT * FROM purchase_requisitions WHERE ${where.join(" AND ")} ORDER BY created_at DESC, id DESC LIMIT @limit`,
+      params,
+    );
+    return toPage(items as unknown as Array<Requisition & Record<string, unknown>>, limit, "created_at") as CursorPage<Requisition>;
+  }
+}
+
+export type RequisitionStatus = "draft" | "submitted" | "approved" | "rejected" | "converted";
+
+export interface Requisition {
+  id: string;
+  tenant_id: string;
+  req_number: string;
+  status: RequisitionStatus;
+  department: string | null;
+  requested_by: string | null;
+  required_date: number | null;
+  priority: "low" | "normal" | "high";
+  notes: string | null;
+  decided_by: string | null;
+  decided_at: number | null;
+  decision_note: string | null;
+  po_id: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface RequisitionLine {
+  id: string;
+  tenant_id: string;
+  requisition_id: string;
+  product_id: string;
+  product_name: string | null;
+  quantity: number;
+  est_cost_cents: number;
+}
+
+export interface RequisitionWithLines extends Requisition {
+  lines: RequisitionLine[];
 }

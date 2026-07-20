@@ -29,7 +29,7 @@ export type NavKey =
   | "restaurant-dashboard" | "restaurant-floor-plan" | "restaurant-tabs"
   | "permissions" | "modes" | "kiosk-settings" | "b2b-settings"
   | "warehouse" | "pricing" | "edi-imports" | "promotions" | "documents"
-  | "inventory-errors" | "bills";
+  | "inventory-errors" | "bills" | "delivery";
 
 // ── Section / nav tree ────────────────────────────────────────────────────────
 
@@ -50,7 +50,7 @@ const SECTION_MAP: Record<NavKey, RailSection> = {
   vendors: "inventory", shipping: "inventory", "inventory-locations": "inventory",
   "inventory-expiry": "inventory", "inventory-serials": "inventory",
   "inventory-reorder": "inventory", "inventory-counts": "inventory", "inventory-pipeline": "inventory", "inventory-errors": "inventory", workforce: "inventory",
-  warehouse: "inventory",
+  warehouse: "inventory", delivery: "inventory",
   customers: "customers", appointments: "customers", healthcare: "customers",
   finance: "finance", accounting: "finance", invoicing: "finance", bills: "finance",
   settings: "setup", team: "setup", workflows: "setup", integrations: "setup",
@@ -146,8 +146,8 @@ const NAV_TREE: NavSection[] = [
     label: "Catalog",
     icon: <CatalogIcon />,
     children: [
-      { label: "Products",    href: "/catalog",             featureGate: "catalog" },
-      { label: "Pricing",     href: "/pricing",             featureGate: "catalog", partial: true },
+      { label: "Products",       href: "/catalog",             featureGate: "catalog" },
+      { label: "Pricing",        href: "/pricing",             featureGate: "catalog", partial: true },
       { label: "Promotions",  href: "/catalog/promotions",  featureGate: "catalog", partial: true },
       { label: "Discounts",   href: "/discounts",           featureGate: "discounts" },
       { label: "Gift Cards",  href: "/gift-cards",          featureGate: "gift-cards" },
@@ -162,7 +162,10 @@ const NAV_TREE: NavSection[] = [
       { label: "Overview",      href: "/inventory",               featureGate: "inventory" },
       { label: "Pipeline",      href: "/inventory/pipeline",      featureGate: "inventory" },
       { label: "Receive Stock", href: "/inventory/receive-stock", featureGate: "inventory" },
+      { label: "Purchase",      href: "/purchase",                featureGate: "purchasing" },
+      { label: "Expiry",        href: "/inventory/expiry-pool",   featureGate: "inventory" },
       { label: "Warehouse",     href: "/warehouse",               featureGate: "inventory", partial: true },
+      { label: "Delivery",      href: "/delivery",                featureGate: "shipping" },
       { label: "Purchasing",    href: "/purchasing",              featureGate: "purchasing" },
       { label: "EDI Imports",   href: "/purchasing/edi-imports",  featureGate: "purchasing" },
       { label: "Error Center",  href: "/inventory/errors",        featureGate: "inventory" },
@@ -231,7 +234,10 @@ export function EnterpriseShell({
   contentClassName,
 }: EnterpriseShellProps) {
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [sidebarExpanded, setSidebarExpanded] = useState(true);
+  const [compactViewport, setCompactViewport] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(() =>
+    typeof window === "undefined" ? true : window.innerWidth >= 768
+  );
 
   const handleGlobalKey = useCallback((e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "/")) {
@@ -245,6 +251,17 @@ export function EnterpriseShell({
     return () => window.removeEventListener("keydown", handleGlobalKey);
   }, [handleGlobalKey]);
 
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const sync = () => {
+      setCompactViewport(media.matches);
+      setSidebarExpanded((expanded) => (media.matches ? false : expanded || true));
+    };
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
   const sidebarW = sidebarExpanded ? 220 : 52;
 
   return (
@@ -257,19 +274,28 @@ export function EnterpriseShell({
       />
 
       <div className="flex flex-1 pt-12">
+        {compactViewport && sidebarExpanded && (
+          <button
+            type="button"
+            aria-label="Close navigation"
+            className="fixed inset-x-0 bottom-0 top-12 z-30 bg-black/30"
+            onClick={() => setSidebarExpanded(false)}
+          />
+        )}
         <LeftRail
           active={active}
           expanded={sidebarExpanded}
+          compact={compactViewport}
           onCollapseToggle={() => setSidebarExpanded((e) => !e)}
         />
 
         <main
           id="main-content"
           className={[
-            "flex flex-1 flex-col min-w-0 transition-[margin-left] duration-200 ease-in-out",
+            "flex flex-1 flex-col min-w-0 transition-[margin-left] duration-200 ease-in-out md:ml-[var(--sidebar-w)]",
             contentClassName ?? "overflow-y-auto",
           ].join(" ")}
-          style={{ marginLeft: sidebarW }}
+          style={{ "--sidebar-w": `${sidebarW}px` } as React.CSSProperties}
         >
           {/* Visually hidden page heading — gives every page an accessible
               h1 (screen readers, tests) without altering the visual design. */}
@@ -360,7 +386,7 @@ function TopBar({
             onClick={() => setUserMenuOpen((o) => !o)}
             className="flex items-center gap-1.5 text-sm text-white/80 hover:text-white transition-colors"
           >
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#5D5FEF] text-[11px] font-bold text-white">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-600 text-[11px] font-bold text-white">
               {user?.name?.charAt(0)?.toUpperCase() ?? "U"}
             </div>
             <span className="hidden sm:block max-w-[120px] truncate">{user?.name ?? "User"}</span>
@@ -398,10 +424,12 @@ function TopBar({
 function LeftRail({
   active,
   expanded,
+  compact,
   onCollapseToggle,
 }: {
   active: NavKey;
   expanded: boolean;
+  compact: boolean;
   onCollapseToggle: () => void;
 }) {
   const pathname = usePathname();
@@ -454,7 +482,7 @@ function LeftRail({
       aria-label="Primary navigation"
       className="fixed left-0 top-12 bottom-0 z-40 flex flex-col overflow-hidden transition-[width] duration-200 ease-in-out"
       style={{
-        width: expanded ? 220 : 52,
+        width: compact && !expanded ? 0 : expanded ? 220 : 52,
         backgroundColor: "var(--color-sidebar-bg)",
       }}
     >
@@ -501,7 +529,7 @@ function LeftRail({
                 >
                   {/* Active indicator (expanded mode) */}
                   {expanded && isActive && (
-                    <span className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-[#5D5FEF]" />
+                    <span className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-brand-600" />
                   )}
 
                   {/* Icon */}
@@ -544,7 +572,7 @@ function LeftRail({
                   }}
                 >
                   {expanded && isActive && (
-                    <span className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-[#5D5FEF]" />
+                    <span className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-brand-600" />
                   )}
                   <span className="shrink-0">{item.icon}</span>
                   {expanded && (
@@ -596,7 +624,7 @@ function LeftRail({
                         }`}
                       >
                         {isCurrent && (
-                          <span className="h-1 w-1 shrink-0 rounded-full bg-[#5D5FEF]" />
+                          <span className="h-1 w-1 shrink-0 rounded-full bg-brand-600" />
                         )}
                         <span className={isCurrent ? "" : "ml-3"}>{child.label}</span>
                       </Link>

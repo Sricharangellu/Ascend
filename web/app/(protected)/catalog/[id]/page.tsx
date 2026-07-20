@@ -26,11 +26,12 @@ import { AnalyticsTab }  from "./_components/AnalyticsTab";
 import { AuditLogTab }   from "./_components/AuditLogTab";
 import { ImagesTab }     from "./_components/ImagesTab";
 import { LabelsTab }     from "./_components/LabelsTab";
+import { CategoriesTab } from "./_components/CategoriesTab";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Tab =
-  | "overview" | "general" | "variants" | "pricing"
+  | "overview" | "general" | "variants" | "pricing" | "categories"
   | "inventory" | "purchasing" | "transactions" | "expiry"
   | "media" | "ecommerce" | "compliance" | "labels"
   | "analytics" | "audit-log";
@@ -40,10 +41,11 @@ const STATUS_BADGE = { active: "green", draft: "yellow", archived: "gray" } as c
 // 14 tabs (down from 21). Grouped logically:
 // Core → Inventory → Activity → Content/Compliance → Insights
 const TABS: { key: Tab; label: string; group: string }[] = [
+  { key: "general",       label: "Product Details",  group: "core" },
+  { key: "variants",      label: "Master & Variants", group: "core" },
   { key: "overview",      label: "Overview",         group: "core" },
-  { key: "general",       label: "Details",          group: "core" },
-  { key: "variants",      label: "Variants",         group: "core" },
   { key: "pricing",       label: "Pricing",          group: "core" },
+  { key: "categories",    label: "Categories",       group: "core" },
   { key: "inventory",     label: "Inventory",        group: "inventory" },
   { key: "purchasing",    label: "Purchasing",       group: "inventory" },
   { key: "expiry",        label: "Expiry",           group: "inventory" },
@@ -79,6 +81,24 @@ function StockBadge({ total, reorderPoint }: { total: number; reorderPoint: numb
   );
 }
 
+function ProductTypeBadge({
+  product,
+  variantCount,
+}: {
+  product: CatalogProduct;
+  variantCount: number | null;
+}) {
+  if (product.parent_product_id) {
+    return <Badge variant="blue">Variant</Badge>;
+  }
+
+  if (variantCount !== null && variantCount > 0) {
+    return <Badge variant="purple">Master · {variantCount}</Badge>;
+  }
+
+  return <Badge variant="gray">Standalone</Badge>;
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ProductDetailPage() {
@@ -88,21 +108,23 @@ export default function ProductDetailPage() {
   const [product, setProduct]       = useState<CatalogProduct | null>(null);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState<string | null>(null);
-  const [activeTab, setActiveTab]   = useState<Tab>("overview");
+  const [activeTab, setActiveTab]   = useState<Tab>("general");
   const [duplicating, setDuplicating] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [barcodeResult, setBarcodeResult] = useState<"ok" | "not_found" | null>(null);
   const [expiryAlertCount, setExpiryAlertCount] = useState(0);
   const [stockTotal, setStockTotal] = useState<number | null>(null);
+  const [variantCount, setVariantCount] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
       const prod = await apiGet<CatalogProduct>(`/api/v1/catalog/${id}`);
       setProduct(prod);
+      setVariantCount(prod.parent_product_id ? null : 0);
 
       // Parallel: expiry alert count + stock total for header badge
-      Promise.allSettled([
+      const headerRequests = [
         apiGet<{ items: Array<{ expiry_status: string }> }>(`/api/v1/catalog/${id}/expiry`).then((r) => {
           const alerts = (r.items ?? []).filter(
             (b) => b.expiry_status === "expired" || b.expiry_status === "critical"
@@ -113,7 +135,17 @@ export default function ProductDetailPage() {
           const total = (r.locations ?? []).reduce((s, l) => s + l.quantity_on_hand, 0);
           setStockTotal(total);
         }),
-      ]);
+      ];
+
+      if (!prod.parent_product_id) {
+        headerRequests.push(
+          apiGet<{ items: CatalogProduct[] }>(`/api/v1/catalog/${id}/variants`).then((r) => {
+            setVariantCount((r.items ?? []).length);
+          }),
+        );
+      }
+
+      Promise.allSettled(headerRequests);
     } catch (e) {
       setError(e instanceof ApiResponseError ? e.message : "Failed to load product.");
     } finally { setLoading(false); }
@@ -192,6 +224,7 @@ export default function ProductDetailPage() {
               <h1 className="text-base font-bold text-slate-900 leading-tight">{product.name}</h1>
               <Badge variant={STATUS_BADGE[product.status]}>{product.status}</Badge>
               <Badge variant="gray">{product.sku}</Badge>
+              <ProductTypeBadge product={product} variantCount={variantCount} />
               {product.tax_class === "exempt" && <Badge variant="yellow">Tax exempt</Badge>}
               {product.variant_label && <Badge variant="gray">Variant: {product.variant_label}</Badge>}
             </div>
@@ -227,7 +260,7 @@ export default function ProductDetailPage() {
               <button
                 type="button"
                 onClick={() => router.push(`/catalog/${product.parent_product_id}`)}
-                className="flex items-center gap-1 text-xs font-medium text-[#5D5FEF] hover:underline"
+                className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline"
               >
                 ↑ Part of master product
               </button>
@@ -254,13 +287,6 @@ export default function ProductDetailPage() {
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setShowActions(false)} />
                   <div className="absolute right-0 top-full z-40 mt-1 w-52 rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
-                    {[
-                      {
-                        label: "Quick Sell",
-                        icon: <rect x="2" y="3" width="20" height="14" rx="2"/>,
-                        action: () => { setShowActions(false); router.push(`/register?product=${product.id}`); },
-                      },
-                    ].map(() => null) /* using inline below for clarity */}
                     <button type="button"
                       onClick={() => { setShowActions(false); router.push(`/register?product=${product.id}`); }}
                       className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
@@ -344,7 +370,7 @@ export default function ProductDetailPage() {
                     onClick={() => setActiveTab(key)}
                     className={`relative flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
                       activeTab === key
-                        ? "border-b-2 border-[#5D5FEF] text-[#5D5FEF]"
+                        ? "border-b-2 border-brand-600 text-brand-600"
                         : "border-b-2 border-transparent text-slate-500 hover:text-[#111]"
                     }`}
                   >
@@ -366,6 +392,7 @@ export default function ProductDetailPage() {
         {activeTab === "general"      && <GeneralTab product={product} onSaved={setProduct} />}
         {activeTab === "variants"     && <VariantsTab product={product} />}
         {activeTab === "pricing"      && <PricingTab product={product} />}
+        {activeTab === "categories"   && <CategoriesTab productId={product.id} />}
         {activeTab === "inventory"    && <InventoryTab product={product} onSaved={setProduct} />}
         {activeTab === "purchasing"   && <PurchasingTab productId={product.id} />}
         {activeTab === "transactions" && <TransactionsTab productId={product.id} />}

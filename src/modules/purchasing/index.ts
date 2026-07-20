@@ -1,6 +1,8 @@
 import type { PosModule } from "../types.js";
 import { PurchasingService } from "./service.js";
 import { registerRoutes } from "./routes.js";
+import { EdiImportsService } from "./edi-imports.js";
+import { registerEdiRoutes } from "./edi-routes.js";
 
 const CREATE_SUPPLIERS = `
 CREATE TABLE IF NOT EXISTS suppliers (
@@ -267,6 +269,38 @@ CREATE TABLE IF NOT EXISTS vendor_quote_lines (
 CREATE INDEX IF NOT EXISTS vql_quote_idx ON vendor_quote_lines (tenant_id, quote_id);
 `;
 
+// Vendor bills: an invoice entered against a PO, validated via 3-way match
+// (ordered vs received vs invoiced) before it is approved and posted.
+const CREATE_PO_BILLS = `
+CREATE TABLE IF NOT EXISTS po_bills (
+  id              TEXT PRIMARY KEY,
+  tenant_id       TEXT NOT NULL,
+  po_id           TEXT NOT NULL,
+  invoice_number  TEXT NOT NULL,
+  invoice_date    BIGINT,
+  document_id     TEXT,
+  subtotal_cents  BIGINT NOT NULL DEFAULT 0,
+  tax_cents       BIGINT NOT NULL DEFAULT 0,
+  total_cents     BIGINT NOT NULL DEFAULT 0,
+  status          TEXT NOT NULL DEFAULT 'draft',
+  created_at      BIGINT NOT NULL,
+  updated_at      BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS po_bills_po_idx ON po_bills (tenant_id, po_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS po_bill_lines (
+  id                     TEXT PRIMARY KEY,
+  tenant_id              TEXT NOT NULL,
+  bill_id                TEXT NOT NULL REFERENCES po_bills(id) ON DELETE CASCADE,
+  line_id                TEXT,
+  product_id             TEXT NOT NULL,
+  product_name           TEXT,
+  invoiced_qty           INTEGER NOT NULL DEFAULT 0,
+  invoiced_unit_cost_cents BIGINT NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS po_bill_lines_bill_idx ON po_bill_lines (tenant_id, bill_id);
+`;
+
 // PROD-8: FK — purchase_order_lines must reference a real purchase_order row.
 const ADD_PO_LINE_FK = `
 DO $$
@@ -306,16 +340,127 @@ END;
 $$;
 `;
 
+// PO approval workflow (enterprise procurement). `approval_status` is orthogonal
+// to the fulfillment `status` so existing lifecycle queries are unaffected:
+//   approved (default — legacy rows and auto-approved POs) | pending | rejected.
+// po_approvals is an APPEND-ONLY audit trail — no code path may update or delete
+// rows. po_approval_config holds per-tenant amount tiers; absent row = approvals
+// disabled (every PO auto-approves), so enabling the workflow is an explicit act.
+const CREATE_PO_APPROVALS = `
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'approved';
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS approved_at BIGINT;
+
+CREATE TABLE IF NOT EXISTS po_approvals (
+  id           TEXT PRIMARY KEY,
+  tenant_id    TEXT NOT NULL,
+  po_id        TEXT NOT NULL,
+  action       TEXT NOT NULL,
+  actor_id     TEXT,
+  actor_role   TEXT,
+  amount_cents BIGINT NOT NULL DEFAULT 0,
+  note         TEXT,
+  created_at   BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS po_approvals_po_idx ON po_approvals (tenant_id, po_id, created_at);
+
+CREATE TABLE IF NOT EXISTS po_approval_config (
+  tenant_id           TEXT PRIMARY KEY,
+  auto_limit_cents    BIGINT NOT NULL,
+  manager_limit_cents BIGINT NOT NULL,
+  enabled             BOOLEAN NOT NULL DEFAULT true,
+  updated_at          BIGINT NOT NULL
+);
+`;
+
+// Purchase requisitions (procurement PRD module 1 / ACPA E2): departments
+// request inventory; a requisition moves draft → submitted → approved/rejected
+// → converted (to a PO). Approval snapshot lives on the row (decided_by/at,
+// note); unification with the po_approvals pattern is the E4 workflow story.
+const CREATE_REQUISITIONS = `
+CREATE TABLE IF NOT EXISTS purchase_requisitions (
+  id             TEXT PRIMARY KEY,
+  tenant_id      TEXT NOT NULL,
+  req_number     TEXT NOT NULL,
+  status         TEXT NOT NULL DEFAULT 'draft',
+  department     TEXT,
+  requested_by   TEXT,
+  required_date  BIGINT,
+  priority       TEXT NOT NULL DEFAULT 'normal',
+  notes          TEXT,
+  decided_by     TEXT,
+  decided_at     BIGINT,
+  decision_note  TEXT,
+  po_id          TEXT,
+  created_at     BIGINT NOT NULL,
+  updated_at     BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS preq_tenant_status_idx ON purchase_requisitions (tenant_id, status, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS purchase_requisition_lines (
+  id             TEXT PRIMARY KEY,
+  tenant_id      TEXT NOT NULL,
+  requisition_id TEXT NOT NULL REFERENCES purchase_requisitions(id) ON DELETE CASCADE,
+  product_id     TEXT NOT NULL,
+  product_name   TEXT,
+  quantity       INTEGER NOT NULL,
+  est_cost_cents BIGINT NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS preq_lines_req_idx ON purchase_requisition_lines (tenant_id, requisition_id);
+`;
+
+// Seed the race-free po_number counter from the current MAX so existing
+// numbering continues without collision (replaces MAX(po_number)+1, which
+// minted duplicate numbers under concurrent creates).
+const SEED_PO_COUNTER = `
+INSERT INTO document_counters (tenant_id, kind, val)
+  SELECT tenant_id, 'purchase_orders', COALESCE(MAX(po_number), 0)
+    FROM purchase_orders GROUP BY tenant_id
+  ON CONFLICT (tenant_id, kind) DO NOTHING;`;
+
+// EDI imports (2026-07-18, Phase 0 gap-closure): status-tracked upload
+// records for the Purchasing > EDI Imports page. See edi-imports.ts for the
+// scope note on why validate/process are honest state-machine transitions
+// rather than real EDI parsing — the frontend never uploads file content.
+const CREATE_EDI_IMPORTS = `
+CREATE TABLE IF NOT EXISTS edi_imports (
+  id               TEXT PRIMARY KEY,
+  tenant_id        TEXT NOT NULL,
+  filename         TEXT NOT NULL,
+  format           TEXT NOT NULL,
+  supplier_id      TEXT,
+  supplier_name    TEXT NOT NULL,
+  file_size_bytes  BIGINT NOT NULL DEFAULT 0,
+  record_count     INTEGER NOT NULL DEFAULT 0,
+  status           TEXT NOT NULL DEFAULT 'queued',
+  uploaded_at      BIGINT NOT NULL,
+  processed_at     BIGINT,
+  po_count         INTEGER NOT NULL DEFAULT 0,
+  line_count       INTEGER NOT NULL DEFAULT 0,
+  error_count      INTEGER NOT NULL DEFAULT 0,
+  warnings         TEXT NOT NULL DEFAULT '[]',
+  errors           TEXT NOT NULL DEFAULT '[]',
+  created_po_ids   TEXT NOT NULL DEFAULT '[]'
+);
+CREATE INDEX IF NOT EXISTS edi_imports_tenant_idx ON edi_imports (tenant_id, uploaded_at DESC);
+CREATE INDEX IF NOT EXISTS edi_imports_tenant_status_idx ON edi_imports (tenant_id, status);
+`;
+
 /** Purchasing — suppliers, purchase orders, receiving. Receiving emits
  *  `purchase_order.received`; inventory listens and increments stock. */
 export const purchasingModule: PosModule = {
   name: "purchasing",
-  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_SUPPLIERS_VENDOR_360, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES, ADD_PO_LINE_FK, ADD_PURCHASING_UPDATED_AT_TRIGGERS, CREATE_PO_DOCUMENTS],
+  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_SUPPLIERS_VENDOR_360, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES, ADD_PO_LINE_FK, ADD_PURCHASING_UPDATED_AT_TRIGGERS, CREATE_PO_DOCUMENTS, CREATE_PO_APPROVALS, SEED_PO_COUNTER, CREATE_REQUISITIONS, CREATE_EDI_IMPORTS, CREATE_PO_BILLS],
   async register({ db, events, router }) {
     const service = new PurchasingService(db, events);
+    const ediService = new EdiImportsService(db);
     registerRoutes(router, service);
+    registerEdiRoutes(router, ediService, db);
   },
 };
 
 export { PurchasingService } from "./service.js";
 export type { Supplier, PurchaseOrder, PurchaseOrderWithLines } from "./service.js";
+export { EdiImportsService } from "./edi-imports.js";
+export type { EdiImport, EdiStatus, EdiFormatDef } from "./edi-imports.js";
+export { getVendorHistory } from "./vendor-history.js";
+export type { VendorPOSummary } from "./vendor-history.js";

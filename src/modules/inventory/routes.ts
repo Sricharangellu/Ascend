@@ -1,6 +1,6 @@
 import type { Router, Request, Response } from "express";
 import { z } from "zod";
-import { handler, parseBody } from "../../shared/http.js";
+import { handler, parseBody, badRequest } from "../../shared/http.js";
 import { requireRole } from "../../gateway/auth.js";
 import type { InventoryService, MovementReason } from "./service.js";
 import type { AuthPayload } from "../../gateway/auth.js";
@@ -99,6 +99,11 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
 
   // POST /deduct — decrement stock for multiple products after a completed sale.
   // Registered before /:productId routes so "deduct" isn't treated as a product id.
+  // Deliberately NOT manager-gated: web/app/(protected)/terminal/_components/
+  // TerminalInner.tsx calls this automatically after every cashier-completed
+  // sale (handleTenderSuccess), with the response silently swallowed
+  // (.catch(() => {})). Gating it would not fail loudly — it would silently
+  // stop inventory from decrementing after routine cashier sales.
   router.post(
     "/deduct",
     handler(async (req, res) => {
@@ -157,6 +162,22 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
     }),
   );
 
+  // Movement history by query param — the shape the web client actually calls
+  // (GET /inventory/movements?product_id=…&limit=…). Previously mock-only: the
+  // real backend bound productId="movements" and returned [], leaving the
+  // movements panels silently empty in production. Registered before
+  // /:productId routes so "movements" isn't captured as a product id.
+  router.get(
+    "/movements",
+    handler(async (req, res) => {
+      const productId = typeof req.query.product_id === "string" ? req.query.product_id : "";
+      if (!productId) throw badRequest("product_id is required");
+      const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
+      const cursor = typeof req.query.cursor === "string" && req.query.cursor !== "" ? req.query.cursor : undefined;
+      res.json(await service.movements(productId, tenantId(res), { limit, cursor }));
+    }),
+  );
+
   // Near-expiry report — registered before /:productId so "expiring" isn't an id.
   router.get(
     "/expiring",
@@ -183,6 +204,43 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
     }),
   );
 
+  // ── Expiry pool ─────────────────────────────────────────────────────────────
+  // The expiry sheet: stock swept out of active inventory, pending disposition.
+  router.get("/expiry", handler(async (_req, res) => {
+    res.json({ items: await service.listExpiryPool(tenantId(res)) });
+  }));
+
+  // Sweep all past-expiry stock out of active inventory into the pool (manager+).
+  router.post("/expiry/sweep", mgr, handler(async (_req, res) => {
+    res.json(await service.sweepExpired(tenantId(res)));
+  }));
+
+  // Discard an expiry item — the loss (booked on sweep) stands (manager+).
+  router.post("/expiry/:id/discard", mgr, handler(async (req, res) => {
+    res.json(await service.disposeExpiry(String(req.params.id), tenantId(res), "discarded"));
+  }));
+
+  // Return an expiry item to the vendor — creates a purchasing vendor return
+  // (optionally a vendor credit) and resolves the pool item (manager+).
+  const returnSchema = z.object({ supplierId: z.string().min(1).optional(), createCredit: z.boolean().optional() });
+  router.post("/expiry/:id/return-to-vendor", mgr, handler(async (req, res) => {
+    const t = tenantId(res);
+    const body = parseBody(returnSchema, req.body ?? {});
+    const item = await service.getExpiry(String(req.params.id), t);
+    if (item.status !== "pending") throw badRequest("this expiry item has already been disposed");
+    const vendorReturn = await purchasing.createReturn(
+      {
+        supplierId: body.supplierId,
+        reason: "expired",
+        lines: [{ productId: item.product_id, quantity: item.qty, unitCostCents: item.unit_cost_cents, ...(item.lot_id ? { lotId: item.lot_id } : {}) }],
+        createCredit: body.createCredit ?? Boolean(body.supplierId),
+      },
+      t,
+    );
+    const writeoff = await service.disposeExpiry(String(req.params.id), t, "returned", vendorReturn.id);
+    res.json({ writeoff, vendorReturn });
+  }));
+
   // Location-to-location transfers — before /:productId so "transfers" isn't an id.
   router.get(
     "/transfers",
@@ -201,6 +259,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
 
   router.post(
     "/transfers",
+    mgr,
     handler(async (req, res) => {
       const body = parseBody(transferSchema, req.body);
       const row = await service.createTransfer(tenantId(res), {
@@ -236,6 +295,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
 
   router.post(
     "/adjustments",
+    mgr,
     handler(async (req, res) => {
       const body = parseBody(locationAdjustSchema, req.body);
       const { actualDelta } = await service.adjustAtLocation(tenantId(res), {
@@ -256,6 +316,38 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
     }),
   );
 
+  // Availability read-model: on-hand / reserved (approved unshipped SOs) /
+  // incoming (open approved PO remainder) / available.
+  router.get(
+    "/:productId/availability",
+    handler(async (req, res) => {
+      res.json(await service.availability(String(req.params.productId), tenantId(res)));
+    }),
+  );
+
+  // Single-segment GET routes below MUST be registered before the /:productId
+  // catch-all — Express matches GET routes in registration order, and
+  // "/:productId" matches any single path segment literally, so a route like
+  // GET /counts registered after it is unreachable (silently shadowed; the
+  // request hits the :productId handler with productId="counts" instead).
+  // Found 2026-07-18: GET /counts, GET /locations, and GET /reorder-suggestions
+  // were all previously registered after this handler and were 100% dead code
+  // — every request to any of the three real, shipped pages that call them
+  // (cycle counts, inventory locations, purchasing/inventory reorder alerts)
+  // silently got back a per-product stock row instead of the intended list.
+  router.get("/counts", handler(async (_req, res) => {
+    res.json({ items: await service.listCycleCounts(tenantId(res)) });
+  }));
+
+  router.get("/locations", handler(async (_req, res) => {
+    res.json({ items: await service.listLocations(tenantId(res)) });
+  }));
+
+  // BE-27: Reorder suggestions.
+  router.get("/reorder-suggestions", handler(async (_req, res) => {
+    res.json({ items: await service.getReorderSuggestions(tenantId(res)) });
+  }));
+
   router.get(
     "/:productId",
     handler(async (req, res) => {
@@ -271,15 +363,19 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
     }),
   );
 
+  // Legacy path-param shape — kept for compatibility; returns the bare array
+  // (now bounded to the max page) rather than the cursor envelope.
   router.get(
     "/:productId/movements",
     handler(async (req, res) => {
-      res.json(await service.movements(String(req.params.productId), tenantId(res)));
+      const page = await service.movements(String(req.params.productId), tenantId(res), { limit: 200 });
+      res.json(page.items);
     }),
   );
 
   router.post(
     "/:productId/receive",
+    mgr,
     handler(async (req, res) => {
       const body = parseBody(receiveSchema, req.body);
       const productId = String(req.params.productId);
@@ -312,6 +408,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
 
   router.post(
     "/:productId/adjust",
+    mgr,
     handler(async (req, res) => {
       const body = parseBody(adjustSchema, req.body);
       const reason: MovementReason = body.reason ?? "adjustment";
@@ -322,6 +419,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
 
   router.put(
     "/:productId/reorder-point",
+    mgr,
     handler(async (req, res) => {
       const body = parseBody(reorderSchema, req.body);
       const row = await service.setReorderPoint(String(req.params.productId), body.reorderPt, tenantId(res));
@@ -330,10 +428,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
   );
 
   // BE-10: Cycle count sessions ─────────────────────────────────────────────
-  router.get("/counts", handler(async (_req, res) => {
-    res.json({ items: await service.listCycleCounts(tenantId(res)) });
-  }));
-
+  // (GET /counts is registered earlier, ahead of the /:productId catch-all.)
   router.post("/counts", mgr, handler(async (req, res) => {
     const body = parseBody(openCycleCountSchema, req.body);
     res.status(201).json(await service.openCycleCount(userId(res), tenantId(res), body.note));
@@ -360,10 +455,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
     locationType: z.string().min(1).optional(),
   });
 
-  router.get("/locations", handler(async (_req, res) => {
-    res.json({ items: await service.listLocations(tenantId(res)) });
-  }));
-
+  // (GET /locations is registered earlier, ahead of the /:productId catch-all.)
   router.post("/locations", mgr, handler(async (req, res) => {
     const body = parseBody(createLocationSchema, req.body);
     res.status(201).json(await service.createLocation(tenantId(res), body));
@@ -373,12 +465,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
     res.json({ items: await service.getStockByLocation(tenantId(res), String(req.params.id)) });
   }));
 
-  // BE-27: Reorder suggestions ─────────────────────────────────────────────
-  // Sub-path must be before any /:productId routes — already satisfied here.
-  router.get("/reorder-suggestions", handler(async (_req, res) => {
-    res.json({ items: await service.getReorderSuggestions(tenantId(res)) });
-  }));
-
+  // (GET /reorder-suggestions is registered earlier, ahead of /:productId.)
   const createPOSchema = z.object({
     lines: z.array(z.object({
       productId: z.string().min(1),

@@ -5,9 +5,9 @@ import { buildApp, type App } from "../../app.js";
 let __seq = 0;
 const __schema = () => `test_${process.pid}_${Date.now().toString(36)}_${__seq++}`;
 async function freshApp(): Promise<App> { return buildApp({ schema: __schema() }); }
-async function call(app: App, method: string, path: string, body?: unknown) {
+async function call(app: App, method: string, path: string, body?: unknown, role?: string) {
   const { default: request } = await import("./test-request.js");
-  return request(app.express, method, path, body);
+  return request(app.express, method, path, body, role);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -73,6 +73,25 @@ test("paying more than outstanding is rejected", async () => {
   assert.equal(r.status, 400);
 });
 
+test("manager can pay a bill", async () => {
+  const app = await freshApp();
+  const supplier = await mkSupplier(app);
+  const bill = (await call(app, "POST", "/api/billing/bills", { supplierId: supplier.id, totalCents: 5000 })).json;
+
+  const r = await call(app, "POST", `/api/billing/bills/${bill.id}/pay`, { amountCents: 5000, method: "cash" }, "manager");
+  assert.equal(r.status, 200);
+  assert.equal(r.json.status, "paid");
+});
+
+test("cashier cannot pay a bill (403)", async () => {
+  const app = await freshApp();
+  const supplier = await mkSupplier(app);
+  const bill = (await call(app, "POST", "/api/billing/bills", { supplierId: supplier.id, totalCents: 5000 })).json;
+
+  const r = await call(app, "POST", `/api/billing/bills/${bill.id}/pay`, { amountCents: 5000, method: "cash" }, "cashier");
+  assert.equal(r.status, 403);
+});
+
 // ─── Invoices (AR) ────────────────────────────────────────────────────────────
 
 test("create an invoice and pay it in full", async () => {
@@ -96,6 +115,25 @@ test("create an invoice and pay it in full", async () => {
   assert.equal(paid.status, 200);
   assert.equal(paid.json.status, "paid");
   assert.equal(paid.json.paid_cents, 25000);
+});
+
+test("manager can pay an invoice", async () => {
+  const app = await freshApp();
+  const customer = await mkCustomer(app);
+  const inv = (await call(app, "POST", "/api/billing/invoices", { customerId: customer.id, totalCents: 10000 })).json;
+
+  const paid = await call(app, "POST", `/api/billing/invoices/${inv.id}/pay`, { amountCents: 10000, method: "card" }, "manager");
+  assert.equal(paid.status, 200);
+  assert.equal(paid.json.status, "paid");
+});
+
+test("cashier cannot pay an invoice (403)", async () => {
+  const app = await freshApp();
+  const customer = await mkCustomer(app);
+  const inv = (await call(app, "POST", "/api/billing/invoices", { customerId: customer.id, totalCents: 10000 })).json;
+
+  const paid = await call(app, "POST", `/api/billing/invoices/${inv.id}/pay`, { amountCents: 10000, method: "card" }, "cashier");
+  assert.equal(paid.status, 403);
 });
 
 test("invoice auto-derives total from linked order", async () => {
@@ -168,4 +206,64 @@ test("receiving a PO auto-drafts a bill retrievable by supplier", async () => {
   assert.equal(bills.json.items.length, 1, `expected one auto-drafted bill: ${JSON.stringify(bills.json.items)}`);
   assert.equal(bills.json.items[0].po_id, po.id, "auto-bill links back to the received PO");
   assert.equal(bills.json.items[0].supplier_name, "Gamma Foods");
+});
+
+test("concurrent bill creates mint distinct bill_numbers (race-free counter)", async () => {
+  const app = await freshApp();
+  const sup = await call(app, "POST", "/api/purchasing/suppliers", { name: "Seq Supply" });
+  assert.equal(sup.status, 201);
+
+  // The legacy COUNT(*)+1 pattern let these all pick the same number.
+  const results = await Promise.all(
+    [1, 2, 3, 4, 5].map(() =>
+      call(app, "POST", "/api/billing/bills", { supplierId: sup.json.id, totalCents: 1000 }),
+    ),
+  );
+  assert.ok(results.every((r) => r.status === 201), JSON.stringify(results.map((r) => r.status)));
+  const numbers = results.map((r) => r.json.bill_number);
+  assert.equal(new Set(numbers).size, 5, `expected 5 distinct bill_numbers, got ${numbers.join(",")}`);
+});
+
+test("bills cursor pagination walks all pages with no overlap or loss", async () => {
+  const app = await freshApp();
+  const sup = await call(app, "POST", "/api/purchasing/suppliers", { name: "Pager Supply" });
+
+  // 5 bills; page size 2 → pages of 2/2/1. The old flat LIMIT hid nothing at
+  // this size, but the cursor walk proves ordering + completeness.
+  for (let i = 0; i < 5; i++) {
+    const r = await call(app, "POST", "/api/billing/bills", { supplierId: sup.json.id, totalCents: 1000 + i });
+    assert.equal(r.status, 201);
+  }
+
+  const seen = new Set<string>();
+  let cursor: string | undefined;
+  let pages = 0;
+  do {
+    const url = `/api/billing/bills?limit=2${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+    const page = await call(app, "GET", url);
+    assert.equal(page.status, 200);
+    assert.ok(page.json.items.length <= 2);
+    for (const b of page.json.items) {
+      assert.ok(!seen.has(b.id), `bill ${b.id} appeared on two pages`);
+      seen.add(b.id);
+    }
+    cursor = page.json.nextCursor ?? undefined;
+    pages++;
+    assert.ok(pages < 10, "cursor loop did not terminate");
+  } while (cursor);
+
+  assert.equal(seen.size, 5, "cursor walk must reach every bill");
+});
+
+test("bills list keeps the supplier filter working with pagination fields present", async () => {
+  const app = await freshApp();
+  const a = await call(app, "POST", "/api/purchasing/suppliers", { name: "Filter A" });
+  const b = await call(app, "POST", "/api/purchasing/suppliers", { name: "Filter B" });
+  await call(app, "POST", "/api/billing/bills", { supplierId: a.json.id, totalCents: 100 });
+  await call(app, "POST", "/api/billing/bills", { supplierId: b.json.id, totalCents: 200 });
+
+  const filtered = await call(app, "GET", `/api/billing/bills?supplierId=${a.json.id}`);
+  assert.equal(filtered.json.items.length, 1);
+  assert.equal(filtered.json.items[0].supplier_id, a.json.id);
+  assert.equal(filtered.json.nextCursor, null); // page not full
 });

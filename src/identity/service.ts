@@ -18,6 +18,18 @@ const MFA_BACKUP_CODE_COUNT = 8;
 const MAX_FAILED_ATTEMPTS = 10;           // lock after 10 consecutive failures
 const LOCKOUT_DURATION_MS = 30 * 60_000; // 30 minutes
 
+// DEMO-1: Self-serve trial length. New tenants created via the plain signup
+// flow (register()) get a `subscriptions` row with trial_ends_at = now + this.
+// The daily trial-expiry job (src/orchestration/jobs/trial-expiry.job.ts)
+// soft-expires tenants that never converted to a paid plan before this lapses.
+export const TRIAL_DURATION_MS = 14 * 24 * 60 * 60 * 1000;
+
+// Fixed bcrypt hash (cost 10) used only to equalize login response time when the
+// email is unknown: without a dummy compare, a missing email returns before any
+// bcrypt work while a real email pays for bcrypt.compare, letting an attacker
+// enumerate accounts by timing. This value never matches any real password.
+const DUMMY_PASSWORD_HASH = "$2a$10$cKdFg3vuImkr2kidVqPeyOnlY/HYqGRLN3VbmuJkbEpZ1FVFpIFEW";
+
 export interface LoginInput {
   email: string;
   password: string;
@@ -53,12 +65,21 @@ export interface AuthUser {
 
 /** Demo tenant + credentials seeded on first boot (idempotent). */
 export const DEMO_TENANT_ID = "tnt_demo";
-export const DEMO_PASSWORD = "FinderDemo!2026";
+export const DEMO_PASSWORD = "AscendDemo!2026";
 
 export interface RegisterInput {
   storeName: string;
   email: string;
   password: string;
+  /**
+   * Escape hatch for callers of this same endpoint that are NOT a plain
+   * self-serve trial signup (e.g. a future sales-assisted or paid-plan
+   * signup flow reusing /api/identity/register). When true, no trial
+   * subscription row is created. Defaults to false — today register() is
+   * only ever called by the self-serve signup form, so trials are the
+   * default behavior.
+   */
+  skipTrial?: boolean;
 }
 
 export interface AuditWriteInput {
@@ -140,6 +161,9 @@ export class IdentityService {
     );
 
     if (!user) {
+      // Burn an equivalent bcrypt compare so a missing email is not distinguishable
+      // from a wrong password by response time (user-enumeration side-channel).
+      await this.verifyPassword(input.password, DUMMY_PASSWORD_HASH);
       await this.logLoginAttempt({ email: input.email, success: false, reason: "invalid_credentials", userId: null, tenantId: null, ip });
       throw new HttpError(401, "invalid_credentials", "Invalid email or password.");
     }
@@ -222,6 +246,19 @@ export class IdentityService {
   }
 
   private async issueLoginSession(user: UserRow, ip: string | null): Promise<TokenPair & { user: AuthUser }> {
+    // DEMO-1: reject login for tenants the trial-expiry sweep has soft-expired.
+    // Checked here (shared by password + MFA login) rather than in
+    // authMiddleware so it only affects new logins, not the DB cost of every
+    // authenticated request; tenant data itself is never touched.
+    const sub = await this.db.one<{ status: string }>(
+      "SELECT status FROM subscriptions WHERE tenant_id = @tenantId LIMIT 1",
+      { tenantId: user.tenant_id },
+    );
+    if (sub?.status === "expired") {
+      await this.logLoginAttempt({ email: user.email, success: false, reason: "trial_expired", userId: user.id, tenantId: user.tenant_id, ip });
+      throw new HttpError(403, "trial_expired", "Your trial has expired. Upgrade your plan to continue.");
+    }
+
     await this.logLoginAttempt({ email: user.email, success: true, reason: null, userId: user.id, tenantId: user.tenant_id, ip });
 
     const permissions = user.custom_role_id
@@ -377,6 +414,19 @@ export class IdentityService {
       { id: uuidv7(), tenantId, userId, hash: this.hashToken(pair.refreshToken), exp: now + 7 * 86_400_000, now },
     );
 
+    // DEMO-1: plain self-serve signups start a 14-day trial. `subscriptions`
+    // already models this (status can be 'trialing', trial_ends_at column
+    // exists) — nothing read it or wrote it before this. ON CONFLICT DO
+    // NOTHING keeps this idempotent against the (tenant_id) unique index.
+    if (!input.skipTrial) {
+      await this.db.query(
+        `INSERT INTO subscriptions (id, tenant_id, plan, status, trial_ends_at, created_at, updated_at)
+         VALUES (@id, @tenantId, 'starter', 'trialing', @trialEndsAt, @now, @now)
+         ON CONFLICT (tenant_id) DO NOTHING`,
+        { id: `sub_${uuidv7()}`, tenantId, trialEndsAt: now + TRIAL_DURATION_MS, now },
+      );
+    }
+
     const name = (input.email.split("@")[0] ?? input.email).replace(/[._-]/g, " ");
     const user: AuthUser = { id: userId, email: input.email.toLowerCase().trim(), name, role: "owner", tenantId };
     await this.events.publish("tenant.registered", { tenantId, userId, storeName: input.storeName }, tenantId);
@@ -407,8 +457,8 @@ export class IdentityService {
     const { default: bcrypt } = await import("bcryptjs");
     const hash = await bcrypt.hash(DEMO_PASSWORD, 10);
     const demoUsers: Array<{ id: string; email: string; role: Role }> = [
-      { id: "usr_demo_owner", email: "owner@finder-pos.dev", role: "owner" },
-      { id: "usr_demo_cashier", email: "cashier@finder-pos.dev", role: "cashier" },
+      { id: "usr_demo_owner", email: "owner@ascend.dev", role: "owner" },
+      { id: "usr_demo_cashier", email: "cashier@ascend.dev", role: "cashier" },
     ];
     for (const u of demoUsers) {
       await this.db.query(
@@ -433,7 +483,7 @@ export class IdentityService {
     if (process.env["NODE_ENV"] !== "production") return;
     const { default: bcrypt } = await import("bcryptjs");
     const { randomBytes } = await import("node:crypto");
-    const demoEmails = ["owner@finder-pos.dev", "cashier@finder-pos.dev"];
+    const demoEmails = ["owner@ascend.dev", "cashier@ascend.dev"];
     for (const email of demoEmails) {
       try {
         const row = await this.db.one<{ id: string; password_hash: string }>(
@@ -462,7 +512,7 @@ export class IdentityService {
     const secret = this.getSecret();
     let claims: TokenClaims;
     try {
-      claims = jwt.verify(refreshToken, secret + ":refresh") as TokenClaims;
+      claims = jwt.verify(refreshToken, secret + ":refresh", { algorithms: ["HS256"] }) as TokenClaims;
     } catch (err) {
       if (err instanceof jwt.TokenExpiredError) {
         throw new HttpError(401, "token_expired", "Refresh token has expired.");
@@ -552,7 +602,7 @@ export class IdentityService {
   verifyAccessToken(token: string): TokenClaims {
     const secret = this.getSecret();
     try {
-      return jwt.verify(token, secret) as TokenClaims;
+      return jwt.verify(token, secret, { algorithms: ["HS256"] }) as TokenClaims;
     } catch (err) {
       if (err instanceof jwt.TokenExpiredError) {
         throw new HttpError(401, "token_expired", "Access token has expired.");
@@ -752,11 +802,15 @@ export class IdentityService {
       "INSERT INTO password_reset_tokens (id, tenant_id, user_id, token_hash, expires_at, created_at) VALUES (@id, @t, @uid, @hash, @exp, @now)",
       { id: `prt_${uuidv7()}`, t: user.tenant_id, uid: user.id, hash, exp: now + 3_600_000, now }
     );
-    const appUrl = process.env["APP_URL"] ?? "https://finder-pos.vercel.app";
+    // NOTE: APP_URL is documented (.env.example) as this backend's own public
+    // URL, but this link's path (/login/reset-password) is a frontend route —
+    // a pre-existing inconsistency, not introduced or fixed by this rebrand
+    // change. Preserving exact prior behavior; only the domain string changes.
+    const appUrl = process.env["APP_URL"] ?? "https://ascendhq-api.vercel.app";
     const resetLink = `${appUrl}/login/reset-password?token=${encodeURIComponent(token)}`;
     await sendEmail({
       to: email,
-      from: process.env["EMAIL_FROM"] ?? "noreply@finder-pos.app",
+      from: process.env["EMAIL_FROM"] ?? "noreply@ascend.dev",
       subject: "Reset your Ascend password",
       text: `You requested a password reset.\n\nClick the link below to set a new password (expires in 1 hour):\n${resetLink}\n\nIf you did not request this, you can safely ignore this email.`,
       html: `<p>You requested a password reset.</p><p><a href="${resetLink}">Reset my password</a></p><p>This link expires in 1 hour. If you did not request this, ignore this email.</p>`,
@@ -796,7 +850,7 @@ export class IdentityService {
 
   private verifyMfaPendingToken(token: string): TokenClaims & { purpose: string } {
     try {
-      const claims = jwt.verify(token, this.getSecret() + ":mfa") as TokenClaims & { purpose?: string };
+      const claims = jwt.verify(token, this.getSecret() + ":mfa", { algorithms: ["HS256"] }) as TokenClaims & { purpose?: string };
       if (claims.purpose !== "mfa_login") {
         throw new HttpError(401, "invalid_mfa_token", "The MFA challenge is invalid.");
       }

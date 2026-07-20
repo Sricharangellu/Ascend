@@ -385,3 +385,55 @@ test("recommendations: raises a thin-margin pricing rec when gross margin is low
   assert.equal(thin.signalCode, null, "derived from metrics, not a signal");
   assert.ok(!rec.json.recommendations.some((r: any) => r.id === "rec_negative_net_profit"), "not negative net profit");
 });
+
+// ─── Authorization: AR-aging dunning sweep is manager+ (loop iter 7) ──────────
+import http from "node:http";
+import jwt from "jsonwebtoken";
+function callAsRep(app: App, role: string, method: string, path: string): Promise<{ status: number }> {
+  const secret = process.env.JWT_SECRET ?? "test-secret-finder-pos";
+  const token = jwt.sign({ sub: "usr_role_test", tenantId: "tnt_demo", role }, secret, { expiresIn: "1h" });
+  const p = path.replace("/api/", "/api/v1/");
+  return new Promise((resolve, reject) => {
+    const server = http.createServer(app.express);
+    server.listen(0, () => {
+      const addr = server.address();
+      if (addr === null || typeof addr === "string") { server.close(); reject(new Error("bind fail")); return; }
+      const req = http.request({ host: "127.0.0.1", port: addr.port, method, path: p, headers: { authorization: `Bearer ${token}` } }, (res) => {
+        res.on("data", () => {}); res.on("end", () => { server.close(); resolve({ status: res.statusCode ?? 0 }); });
+      });
+      req.on("error", (e) => { server.close(); reject(e); }); req.end();
+    });
+  });
+}
+
+test("cashier cannot trigger the AR-aging dunning sweep (403); manager can", async () => {
+  const app = await freshApp();
+  assert.equal((await callAsRep(app, "cashier", "POST", "/api/reports/ar-aging/sweep")).status, 403);
+  assert.equal((await callAsRep(app, "manager", "POST", "/api/reports/ar-aging/sweep")).status, 200);
+});
+
+test("top-products: a non-numeric limit falls back to the default instead of producing NaN, and a huge limit is capped", async () => {
+  const app = await freshApp();
+
+  // Non-numeric limit must not reach the SQL layer as NaN (would previously 500).
+  const bad = await call(app, "GET", "/api/reports/top-products?limit=not-a-number");
+  assert.equal(bad.status, 200, `unexpectedly failed: ${JSON.stringify(bad.json)}`);
+  assert.ok(Array.isArray(bad.json.items));
+
+  // A huge limit must be capped server-side rather than passed through raw.
+  const huge = await call(app, "GET", "/api/reports/top-products?limit=99999");
+  assert.equal(huge.status, 200, `unexpectedly failed: ${JSON.stringify(huge.json)}`);
+  assert.ok(Array.isArray(huge.json.items));
+});
+
+test("sales-by-product: a non-numeric limit falls back to the default instead of producing NaN, and a huge limit is capped", async () => {
+  const app = await freshApp();
+
+  const bad = await call(app, "GET", "/api/reports/sales-by-product?limit=abc");
+  assert.equal(bad.status, 200, `unexpectedly failed: ${JSON.stringify(bad.json)}`);
+  assert.ok(Array.isArray(bad.json.items));
+
+  const huge = await call(app, "GET", "/api/reports/sales-by-product?limit=99999");
+  assert.equal(huge.status, 200, `unexpectedly failed: ${JSON.stringify(huge.json)}`);
+  assert.ok(Array.isArray(huge.json.items));
+});
