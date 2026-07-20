@@ -463,7 +463,7 @@ jobs:
       - name: Deploy production (backend + frontend) → Vercel --prod
         run: ./scripts/deploy.sh both
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN_PROD }}
           DEPLOY_ENV: prod
           NEXT_PUBLIC_MOCK: "false"
 
