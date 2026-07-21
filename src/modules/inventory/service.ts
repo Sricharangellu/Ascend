@@ -1043,8 +1043,15 @@ export class InventoryService {
 
   // ── Location-to-location transfers ─────────────────────────────────────────
 
-  async listTransfers(tenantId: string): Promise<InventoryTransferView[]> {
-    return this.db.query<InventoryTransferView>(
+  /** Keyset-paginated — transfers accumulate unbounded like movements/orders;
+   *  this used to be a flat LIMIT 200 with no way to reach older transfers. */
+  async listTransfers(
+    tenantId: string,
+    opts: { limit?: number; cursor?: string } = {},
+  ): Promise<CursorPage<InventoryTransferView>> {
+    const limit = clampCursorLimit(opts.limit, 50, 200);
+    const cur = decodeCursor(opts.cursor);
+    const items = await this.db.query<InventoryTransferView>(
       `SELECT t.id, t.transfer_number, t.status, t.quantity AS qty, t.note, t.created_at, t.due_date,
               t.product_id,
               COALESCE(fl.name, t.from_location_id) AS from_location,
@@ -1053,10 +1060,12 @@ export class InventoryService {
          LEFT JOIN inventory_locations fl ON fl.tenant_id = t.tenant_id AND fl.id = t.from_location_id
          LEFT JOIN inventory_locations tl ON tl.tenant_id = t.tenant_id AND tl.id = t.to_location_id
         WHERE t.tenant_id = @tenantId
-        ORDER BY t.created_at DESC
-        LIMIT 200`,
-      { tenantId },
+        ${cur ? "AND (t.created_at, t.id) < (@curAt, @curId)" : ""}
+        ORDER BY t.created_at DESC, t.id DESC
+        LIMIT @limit`,
+      { tenantId, limit, ...(cur ? { curAt: cur.at, curId: cur.id } : {}) },
     );
+    return toPage(items as unknown as Array<InventoryTransferView & Record<string, unknown>>, limit, "created_at") as CursorPage<InventoryTransferView>;
   }
 
   async createTransfer(
