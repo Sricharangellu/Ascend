@@ -973,6 +973,62 @@ Exit criteria:
 - Security checklist passes.
 - Restore from backup is tested.
 
+### Phase 4a: Reliability / failure-resilience hardening (added 2026-07-22)
+
+Source: Sri supplied a general enterprise failure-architecture checklist
+(infra outage, network/API failure, DB/data corruption, integration failure,
+hardware failure, backup/DR, monitoring, offline-first) and asked for it to
+become part of the plan. Full gap scan against the actual codebase:
+`WORK/audits/AUDIT_2026-07-22T013025Z-reliability-gap-scan.md`.
+
+Ascend already covers a meaningful share of this checklist in code, not just
+docs — see that audit's §0 for what's verified built (offline-first
+transactional outbox, immutable inventory ledger, retry-with-backoff +
+idempotency, saga/compensation workflow runner, immutable audit log,
+Redis rolling-window rate limiting, verified tenant isolation, RPO/RTO-targeted
+backups with a documented DR drill, structured monitoring, rollback-on-deploy).
+Do not re-build any of that.
+
+Real, code-addressable gaps found, in priority order:
+
+1. **Circuit breaker around external calls** — retry-with-backoff exists
+   (`src/orchestration/policies/retry.policy.ts`) but nothing trips open after
+   N consecutive failures to fail fast instead of paying full retry/timeout
+   cost on every request during a sustained outage. Start with the Stripe
+   client in `src/modules/payments/service.ts` / `stripe.ts`, generalize so
+   webhooks and future integrations reuse the same primitive.
+2. **Inventory reconciliation detector** — `inventory.stock_qty` is a
+   maintained cache next to the immutable `inventory_movements` ledger, not
+   purely derived. Prior real bugs in this exact area
+   (`AUDIT_2026-07-16T063000Z-inventory-oversell-race.md`,
+   `..._134500Z-transfer-number-race.md`) argue for a scheduled job that
+   diffs `stock_qty` against `SUM(inventory_movements.delta)` per
+   tenant/product and alerts on mismatch — a standing detector, not another
+   one-off race fix.
+3. **Verify backup/restore cron/CI wiring is actually live in production** —
+   `db/backup/backup.sh` / `restore.sh` already target RPO ≤5min/RTO ≤30min
+   with a quarterly DR-drill checklist; this scan only confirmed the scripts
+   exist, not that they're scheduled and running against prod today.
+4. **Document the second-payment-gateway seam** — no second live gateway
+   (not recommending building one speculatively), but the Stripe adapter
+   boundary should be explicit so adding Adyen/Authorize.net later is
+   contained, not a rewrite.
+
+Named for completeness but not queued (see audit for reasoning): tax-rate
+caching (no dedicated tax module found — may be a non-issue), object storage
+for receipts/images (no evidence anything is blocked on it),
+printer/scanner/cash-drawer hardware retry queues (Ascend's terminal is
+browser `window.print()`, not real thermal-printer hardware, today), DB
+read-replica failover (likely covered at the managed-Postgres-provider level
+already), staged/canary deploys beyond rollback (feature flags already give
+staged *feature* rollout even without staged *deployment* rollout).
+
+Infra sections of the source checklist that assume self-managed
+infrastructure Ascend doesn't run (multi-region active-active, Kubernetes,
+dedicated DNS/CDN failover, PagerDuty) are kept as DR notes in the audit
+appendix only — not backlog items — since Vercel + managed Postgres already
+provides the platform-level equivalent for the current deployment model.
+
 ### Phase 5: Business expansion
 
 Goal: expand business packs without duplicating the core.

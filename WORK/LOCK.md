@@ -992,6 +992,17 @@ another session's state) — appending this note instead.
 | Status | RELEASED — non-overlapping work complete; targeted Vitest 12/12, full frontend Vitest 83/83, frontend typecheck/lint/build PASS |
 | Blockers | none |
 
+## Parallel Non-Overlapping Claim (Claude, Cowork/Sonnet 5 — reliability gap scan follow-up)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude (Cowork, Sonnet 5) — Sri supplied an enterprise failure-architecture checklist and asked for a gap scan + top-priority fix; see `WORK/audits/AUDIT_2026-07-22T013025Z-reliability-gap-scan.md` and FORWARD_PLAN.md Phase 4a. |
+| Queue item | Phase 4a #1 — circuit breaker around external calls, starting with the Stripe client (payments), so a sustained gateway outage fails fast instead of paying full retry/timeout cost per request. |
+| Files/areas expected | `src/shared/circuit-breaker.ts` (new), `src/shared/circuit-breaker.test.ts` (new), `src/modules/payments/stripe.ts`, `src/modules/payments/service.ts`. No `WORK/LOOP_STATE.md` edits (that file is session G's machine-managed coordinator state — not touching it), no files under session G's/D's active claims above. |
+| Started | 2026-07-22 |
+| Status | Code complete, gates GREEN, NOT YET COMMITTED — see blocker. `src/shared/circuit-breaker.ts` (+ test, 7/7 pass) and the Stripe call sites in `stripe.ts`/`service.ts` are written and saved on disk; `npm run typecheck` clean; `npm run gap:scan` clean; targeted real-Postgres run of `circuit-breaker.test.ts` + `payments.test.ts` together: 24/24 pass. This LOCK claim + the FORWARD_PLAN Phase 4a edit + the audit file are also saved on disk but likewise uncommitted. |
+| Blockers | This sandbox's mount of the repo has a stale, unremovable `.git/index.lock` (`rm`/`mv`/Python `os.remove` all fail with EPERM on this FUSE-style mount; a `mv` appeared to succeed but the original path reappeared moments later, suggesting the mount's delete/rename isn't propagating reliably) — every `git add`/`commit` fails with "Unable to create index.lock: File exists." Did not force further filesystem surgery once that inconsistency showed up, to avoid corrupting state if another session's real git process is also touching this repo. Whoever picks this up next: `rm -f .git/index.lock` from a normal (non-sandboxed) shell on this machine, confirm no other git process is actually running against this repo, then `git add` the files listed above and commit/push. Reassess this claim's Status only after that succeeds. |
+
 ## Rules
 
 - Claim one queue item before editing code.

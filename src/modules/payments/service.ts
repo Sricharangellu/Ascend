@@ -5,7 +5,7 @@ import type { EventBus } from "../../shared/events.js";
 import { Money, type Cents } from "../../shared/money.js";
 import { notFound, badRequest, conflict, HttpError } from "../../shared/http.js";
 import { writeAudit } from "../../shared/audit.js";
-import { getStripe, isStripeConfigured, resolveChargeDetails } from "./stripe.js";
+import { getStripe, isStripeConfigured, resolveChargeDetails, withStripeBreaker } from "./stripe.js";
 import { moduleLogger } from "../../shared/logger.js";
 
 const log = moduleLogger("payments");
@@ -76,9 +76,11 @@ async function resolveCardFromStripe(
       );
     }
     const stripe = getStripe();
-    const intent = await stripe.paymentIntents.retrieve(stripePaymentIntentId, {
-      expand: ["latest_charge"],
-    });
+    const intent = await withStripeBreaker(() =>
+      stripe.paymentIntents.retrieve(stripePaymentIntentId, {
+        expand: ["latest_charge"],
+      }),
+    );
     if (intent.status !== "succeeded") {
       throw badRequest(
         `Stripe PaymentIntent ${stripePaymentIntentId} has status '${intent.status}' — only 'succeeded' intents can be recorded.`,
@@ -398,17 +400,21 @@ export class PaymentsService {
     const owed = await this.loadOrderOwed(orderId, tenantId);
     const stripe = getStripe();
 
-    const intent = await stripe.paymentIntents.create({
-      amount: owed,
-      currency: "usd",
-      payment_method_types: ["card_present"],
-      capture_method: "automatic",
-    });
+    const intent = await withStripeBreaker(() =>
+      stripe.paymentIntents.create({
+        amount: owed,
+        currency: "usd",
+        payment_method_types: ["card_present"],
+        capture_method: "automatic",
+      }),
+    );
 
     // Present the intent to the physical reader.
-    await stripe.terminal.readers.processPaymentIntent(readerId, {
-      payment_intent: intent.id,
-    });
+    await withStripeBreaker(() =>
+      stripe.terminal.readers.processPaymentIntent(readerId, {
+        payment_intent: intent.id,
+      }),
+    );
 
     return { intentId: intent.id, status: intent.status, readerId };
   }
@@ -426,9 +432,11 @@ export class PaymentsService {
       throw new HttpError(503, "payment_unconfigured", "Card payments require STRIPE_SECRET_KEY.");
     }
     const stripe = getStripe();
-    const intent = await stripe.paymentIntents.retrieve(intentId, {
-      expand: ["latest_charge"],
-    });
+    const intent = await withStripeBreaker(() =>
+      stripe.paymentIntents.retrieve(intentId, {
+        expand: ["latest_charge"],
+      }),
+    );
     const { last4, authCode } = resolveChargeDetails(intent);
     return { status: intent.status, last4, authCode };
   }
@@ -441,9 +449,10 @@ export class PaymentsService {
     if (!isStripeConfigured()) return;
     const stripe = getStripe();
     try {
-      await stripe.paymentIntents.cancel(intentId);
+      await withStripeBreaker(() => stripe.paymentIntents.cancel(intentId));
     } catch {
-      // If already succeeded/cancelled, ignore.
+      // If already succeeded/cancelled (or the gateway is down), ignore —
+      // this is a best-effort cleanup call.
     }
   }
 }
