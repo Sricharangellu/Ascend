@@ -6,9 +6,8 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { formatMoney, parseToCents } from "@/lib/money";
 import { hasRole } from "@/lib/auth";
-import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
-import type { AgingReport, Bill, Invoice, BillingStatus } from "@/api-client/types";
+import type { Bill, Invoice, BillingStatus } from "@/api-client/types";
 import { usePathname, useRouter } from "next/navigation";
 import { fmtDate } from "@/lib/date";
 import ExpensesPanel from "./_components/ExpensesPanel";
@@ -128,75 +127,6 @@ function PayControl({
   );
 }
 
-// ─── Aging table ──────────────────────────────────────────────────────────────
-
-const AGING_COLS: Array<{ key: keyof Omit<AgingReport["totals"], "total">; label: string }> = [
-  { key: "current", label: "Current" },
-  { key: "d1_30", label: "1-30d" },
-  { key: "d31_60", label: "31-60d" },
-  { key: "d61_90", label: "61-90d" },
-  { key: "d90_plus", label: "90d+" },
-];
-
-function AgingTable({ report, title }: { report: AgingReport; title: string }) {
-  return (
-    <div className="overflow-x-auto">
-      <p className="mb-2 text-sm font-semibold text-slate-700">{title}</p>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-            <th className="py-2 pr-4">Party</th>
-            {AGING_COLS.map((c) => (
-              <th key={c.key} className="py-2 pr-3 text-right">
-                {c.label}
-              </th>
-            ))}
-            <th className="py-2 text-right">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {report.parties.length === 0 && (
-            <tr>
-              <td colSpan={7} className="py-6 text-center text-slate-400">
-                No data
-              </td>
-            </tr>
-          )}
-          {report.parties.map((row) => (
-            <tr key={row.partyId} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-              <td className="px-4 py-3 font-mono text-xs text-slate-700">{row.partyId}</td>
-              {AGING_COLS.map((c) => (
-                <td
-                  key={c.key}
-                  className={`px-4 py-3 text-right text-xs tabular-nums ${c.key === "d90_plus" && row.buckets[c.key] > 0 ? "font-semibold text-red-600" : "text-slate-700"}`}
-                >
-                  {formatMoney(row.buckets[c.key])}
-                </td>
-              ))}
-              <td className="px-4 py-3 text-right text-xs font-semibold tabular-nums">{formatMoney(row.buckets.total)}</td>
-            </tr>
-          ))}
-          {/* Totals row */}
-          {report.parties.length > 0 && (
-            <tr className="border-t bg-slate-50 font-semibold">
-              <td className="py-2 pr-4 text-xs text-slate-600">Total</td>
-              {AGING_COLS.map((c) => (
-                <td
-                  key={c.key}
-                  className={`py-2 pr-3 text-right text-xs ${c.key === "d90_plus" && report.totals[c.key] > 0 ? "text-red-600" : "text-slate-950"}`}
-                >
-                  {formatMoney(report.totals[c.key])}
-                </td>
-              ))}
-              <td className="py-2 text-right text-xs text-slate-950">{formatMoney(report.totals.total)}</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
 function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
@@ -223,8 +153,6 @@ export default function FinancePage() {
   const [tab, setTab] = useState<TabId>(() => financeTabFromPath(pathname));
   const [invoices, setInvoices] = useState<FinanceInvoice[]>([]);
   const [bills, setBills] = useState<FinanceBill[]>([]);
-  const [arAging, setArAging] = useState<AgingReport | null>(null);
-  const [apAging, setApAging] = useState<AgingReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -235,16 +163,12 @@ export default function FinancePage() {
   const load = useCallback(async () => {
     try {
       setError(null);
-      const [inv, bil, ar, ap] = await Promise.all([
+      const [inv, bil] = await Promise.all([
         apiGet<{ items: FinanceInvoice[] }>("/api/v1/billing/invoices"),
         apiGet<{ items: FinanceBill[] }>("/api/v1/billing/bills"),
-        apiGet<AgingReport>("/api/v1/reports/ar-aging"),
-        apiGet<AgingReport>("/api/v1/reports/ap-aging"),
       ]);
       setInvoices(inv.items ?? []);
       setBills(bil.items ?? []);
-      setArAging(ar);
-      setApAging(ap);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load finance data");
     }
@@ -477,28 +401,14 @@ export default function FinancePage() {
           </>
         )}
 
-        {/* ── Tab: Aging ────────────────────────────────────────────────── */}
         {tab === "expenses" && <ExpensesPanel />}
 
-        {tab === "aging" && (
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <Card title="AR Aging" description="Receivables broken down by days outstanding.">
-              {arAging ? (
-                <AgingTable report={arAging} title="Accounts Receivable" />
-              ) : (
-                <TableSkeleton headers={["Party", "Current", "1-30d", "31-60d", "61-90d", "90d+", "Total"]} rows={5} />
-              )}
-            </Card>
-
-            <Card title="AP Aging" description="Payables broken down by days outstanding.">
-              {apAging ? (
-                <AgingTable report={apAging} title="Accounts Payable" />
-              ) : (
-                <TableSkeleton headers={["Party", "Current", "1-30d", "31-60d", "61-90d", "90d+", "Total"]} rows={5} />
-              )}
-            </Card>
-          </div>
-        )}
+        {/* "Aging" isn't rendered here — clicking it navigates straight to
+            /reporting/ar-aging (see the tab bar's onClick above). It used to
+            also set local tab state and render an inline AR+AP block, but
+            the router.replace in the same click handler always fired first,
+            so that block could never actually be seen by a user — removed
+            rather than left as unreachable dead code. */}
       </div>
 
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
