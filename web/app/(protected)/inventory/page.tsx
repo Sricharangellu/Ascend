@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { apiGet, apiPost } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
@@ -20,6 +21,11 @@ import { useToast } from "@/components/Toast";
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type TabKey = "orders" | "transfers" | "returns";
+
+const TAB_KEYS: TabKey[] = ["orders", "transfers", "returns"];
+function isTabKey(v: string | null): v is TabKey {
+  return v !== null && (TAB_KEYS as string[]).includes(v);
+}
 
 interface StockMovement {
   id: string;
@@ -227,9 +233,13 @@ function NewMovementModal({ tab, onClose, onCreated }: { tab: TabKey; onClose: (
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function InventoryPage() {
-  const [activeTab, setActiveTab] = useState<TabKey>("orders");
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<TabKey>(isTabKey(initialTab) ? initialTab : "orders");
   const [data, setData]           = useState<StockMovement[]>([]);
   const [loading, setLoading]     = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor]   = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [sortDir, setSortDir]     = useState<"asc" | "desc">("desc");
 
@@ -241,20 +251,34 @@ export default function InventoryPage() {
 
   function clearFilters() { setFilterShow("all"); setFilterSearch(""); setFilterOutlet("all"); }
 
+  function normalize(raw: unknown[]): StockMovement[] {
+    if (activeTab === "orders")    return normOrders(raw as RawOrder[]);
+    if (activeTab === "transfers") return normTransfers(raw as RawTransfer[]);
+    return normReturns(raw as RawReturn[]);
+  }
+
   const load = useCallback(() => {
     setLoading(true);
     const ep = TAB_ENDPOINT[activeTab];
-    apiGet<{ items: unknown[] }>(ep).then(r => {
-      const raw = r.items ?? [];
-      let norm: StockMovement[] = [];
-      if (activeTab === "orders")    norm = normOrders(raw as RawOrder[]);
-      if (activeTab === "transfers") norm = normTransfers(raw as RawTransfer[]);
-      if (activeTab === "returns")   norm = normReturns(raw as RawReturn[]);
-      setData(norm);
-    }).catch(() => setData([])).finally(() => setLoading(false));
+    apiGet<{ items: unknown[]; nextCursor: string | null }>(ep).then(r => {
+      setData(normalize(r.items ?? []));
+      setNextCursor(r.nextCursor ?? null);
+    }).catch(() => { setData([]); setNextCursor(null); }).finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   useEffect(() => { load(); }, [load]);
+
+  const loadMore = useCallback(() => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    const ep = `${TAB_ENDPOINT[activeTab]}?cursor=${encodeURIComponent(nextCursor)}`;
+    apiGet<{ items: unknown[]; nextCursor: string | null }>(ep).then(r => {
+      setData(prev => [...prev, ...normalize(r.items ?? [])]);
+      setNextCursor(r.nextCursor ?? null);
+    }).finally(() => setLoadingMore(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, nextCursor, loadingMore]);
 
   const visible = useMemo(() => {
     let rows = data;
@@ -442,6 +466,15 @@ export default function InventoryPage() {
           </tbody>
         </table>
       </div>
+
+      {nextCursor && !loading && (
+        <div className="flex justify-center border-t border-[#F0F0F0] bg-[#FAFAFA] py-3">
+          <button type="button" onClick={loadMore} disabled={loadingMore}
+            className="h-8 rounded border border-[#D9D9D9] bg-white px-4 text-sm text-[#555] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
+            {loadingMore ? "Loading…" : "Load more"}
+          </button>
+        </div>
+      )}
 
       {showModal && <NewMovementModal tab={activeTab} onClose={() => setShowModal(false)} onCreated={load} />}
     </EnterpriseShell>

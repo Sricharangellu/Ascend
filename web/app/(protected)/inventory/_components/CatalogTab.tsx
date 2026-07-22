@@ -10,7 +10,7 @@ import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type {
   CatalogProduct,
-  CatalogProductsResponse,
+  ProductsResponse,
   CatalogCategoriesResponse,
 } from "@/api-client/types";
 import { StatusBadge, DropdownItem, buildCategoryName } from "./ui";
@@ -27,7 +27,7 @@ export function CatalogTab() {
   const actionsRef = useRef<HTMLDivElement>(null);
 
   const { data: productsData, loading: catalogProductsLoading, error: catalogProductsError } =
-    useQuery("inventory:catalog-products", () => apiGet<CatalogProductsResponse>("/api/v1/catalog?limit=200&excludeMasters=true"), {
+    useQuery("inventory:catalog-products", () => apiGet<ProductsResponse>("/api/v1/catalog?limit=200&excludeMasters=true"), {
       staleMs: 60_000,
     });
   const { data: categoriesData, loading: catalogCategoriesLoading } =

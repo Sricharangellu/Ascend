@@ -54,7 +54,7 @@ test("a transfer whose destination leg fails leaves the source untouched (atomic
 
   // No partial transfer record.
   const transfers = await svc.listTransfers(tenant);
-  assert.equal(transfers.length, 0, "no transfer record should persist for a failed transfer");
+  assert.equal(transfers.items.length, 0, "no transfer record should persist for a failed transfer");
 
   await app.db.close();
 });
@@ -73,7 +73,7 @@ test("a successful transfer moves stock atomically and records it", async () => 
   assert.equal(xfer.quantity, 4);
   assert.equal(await locQty(svc, tenant, src, product), 6, "source debited");
   assert.equal(await locQty(svc, tenant, dst, product), 4, "destination credited");
-  assert.equal((await svc.listTransfers(tenant)).length, 1, "transfer recorded");
+  assert.equal((await svc.listTransfers(tenant)).items.length, 1, "transfer recorded");
 
   await app.db.close();
 });
@@ -99,7 +99,7 @@ test("transferring more than the source holds is rejected — no phantom stock c
   // No stock moved or created: source still 10, destination still 0, no record.
   assert.equal(await locQty(svc, tenant, src, product), 10, "source unchanged");
   assert.equal(await locQty(svc, tenant, dst, product), 0, "destination unchanged (no phantom stock)");
-  assert.equal((await svc.listTransfers(tenant)).length, 0, "no transfer recorded");
+  assert.equal((await svc.listTransfers(tenant)).items.length, 0, "no transfer recorded");
 
   await app.db.close();
 });
@@ -142,5 +142,30 @@ test("concurrent transfers get distinct transfer numbers (race-free counter)", a
 
   await db3.close();
   await db2.close();
+  await app.db.close();
+});
+
+test("listTransfers is keyset-paginated (regression: used to be a flat LIMIT 200 with no way to page)", async () => {
+  const app: App = await buildApp({ schema: __schema() });
+  const svc = new InventoryService(app.db, app.events);
+  const tenant = "tnt_demo";
+  const src = "loc_src";
+  const dst = "loc_dst";
+
+  for (let i = 0; i < 5; i++) {
+    const product = `prod_page_${i}`;
+    await svc.adjustStock(tenant, src, product, 10, "receiving");
+    await svc.createTransfer(tenant, { fromLocationId: src, toLocationId: dst, productId: product, quantity: 1 });
+  }
+
+  const firstPage = await svc.listTransfers(tenant, { limit: 2 });
+  assert.equal(firstPage.items.length, 2, "respects limit");
+  assert.ok(firstPage.nextCursor, "a full page returns a cursor for more");
+
+  const secondPage = await svc.listTransfers(tenant, { limit: 2, cursor: firstPage.nextCursor! });
+  assert.equal(secondPage.items.length, 2, "second page also respects limit");
+  const firstIds = new Set(firstPage.items.map((t) => t.id));
+  assert.ok(secondPage.items.every((t) => !firstIds.has(t.id)), "second page doesn't repeat the first page's rows");
+
   await app.db.close();
 });

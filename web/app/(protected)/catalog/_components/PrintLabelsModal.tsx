@@ -1,7 +1,7 @@
 "use client";
 
 import { formatMoney } from "@/lib/money";
-import type { Product } from "@/api-client/types";
+import type { CatalogProduct } from "@/api-client/types";
 
 function appendLabelStyles(doc: Document) {
   const style = doc.createElement("style");
@@ -25,7 +25,7 @@ function appendText(doc: Document, parent: HTMLElement, className: string, text:
   parent.appendChild(node);
 }
 
-function printLabels(products: Product[]) {
+function printLabels(products: CatalogProduct[]) {
   const win = window.open("", "_blank");
   if (!win) return;
 
@@ -58,7 +58,7 @@ export function PrintLabelsModal({
   selected,
   onClose,
 }: {
-  selected: Product[];
+  selected: CatalogProduct[];
   onClose: () => void;
 }) {
   return (

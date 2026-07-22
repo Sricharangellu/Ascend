@@ -47,6 +47,45 @@ test("custom secret is accepted and stored", async () => {
   assert.equal(r.json.secret, "my-known-secret-value");
 });
 
+test("encryptSecret round-trips through decryptSecret when a key is configured", async () => {
+  const { encryptSecret, decryptSecret } = await import("./service.js");
+  const prev = process.env["WEBHOOK_SECRET_KEY"];
+  // 32 bytes hex-encoded = 64 chars.
+  process.env["WEBHOOK_SECRET_KEY"] = "a".repeat(64);
+  try {
+    const stored = encryptSecret("super-secret-value");
+    assert.ok(stored.startsWith("v1:"), "encrypted payload is versioned");
+    assert.notEqual(stored, "super-secret-value", "plaintext is not stored verbatim");
+    assert.equal(decryptSecret(stored), "super-secret-value");
+  } finally {
+    if (prev === undefined) delete process.env["WEBHOOK_SECRET_KEY"];
+    else process.env["WEBHOOK_SECRET_KEY"] = prev;
+  }
+});
+
+test("encryptSecret fails closed in production when WEBHOOK_SECRET_KEY is unset", async () => {
+  const { encryptSecret } = await import("./service.js");
+  const prevEnv = process.env["NODE_ENV"];
+  const prevKey = process.env["WEBHOOK_SECRET_KEY"];
+  process.env["NODE_ENV"] = "production";
+  delete process.env["WEBHOOK_SECRET_KEY"];
+  try {
+    assert.throws(
+      () => encryptSecret("would-be-plaintext"),
+      (err: unknown) => {
+        const e = err as { status?: number; code?: string };
+        return e.status === 503 && e.code === "webhook_encryption_unconfigured";
+      },
+      "must refuse to store a plaintext webhook secret in production",
+    );
+  } finally {
+    if (prevEnv === undefined) delete process.env["NODE_ENV"];
+    else process.env["NODE_ENV"] = prevEnv;
+    if (prevKey === undefined) delete process.env["WEBHOOK_SECRET_KEY"];
+    else process.env["WEBHOOK_SECRET_KEY"] = prevKey;
+  }
+});
+
 test("invalid URL is rejected with 400", async () => {
   const app = await freshApp();
   const r = await call(app, "POST", "/api/webhooks/", { url: "not-a-url" });

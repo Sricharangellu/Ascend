@@ -8,9 +8,10 @@ import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/TableSkeleton";
+import { Pagination, usePersistedPageSize } from "@/components/Pagination";
 import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
-import type { Product, Category, ProductStatus, ProductsResponse } from "@/api-client/types";
+import type { CatalogProduct, Category, ProductStatus, ProductsResponse } from "@/api-client/types";
 import { ProductFormModal } from "./ProductFormModal";
 import { PrintLabelsModal } from "./PrintLabelsModal";
 import { ImportCSVModal } from "./ImportCSVModal";
@@ -66,7 +67,7 @@ function CatalogMetric({ label, value, helper, tone = "neutral", active = false 
 }
 
 function ProductListCard({ product, productType, onEdit, onArchive }: {
-  product: Product; productType: string; onEdit: () => void; onArchive: () => void;
+  product: CatalogProduct; productType: string; onEdit: () => void; onArchive: () => void;
 }) {
   const style = productStatusStyle(product.status);
   return (
@@ -105,7 +106,7 @@ function ProductListCard({ product, productType, onEdit, onArchive }: {
 export function ProductsTab({ categories }: { categories: Category[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [products, setProducts]     = useState<Product[]>([]);
+  const [products, setProducts]     = useState<CatalogProduct[]>([]);
   const [total, setTotal]           = useState(0);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState<string | null>(null);
@@ -126,6 +127,9 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   const [sortCol, setSortCol] = useState("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = usePersistedPageSize("catalog-products-page-size", 50);
+
   const [selectedIds, setSelectedIds]     = useState<Set<string>>(new Set());
   const [showPrintLabels, setShowPrintLabels] = useState(false);
 
@@ -140,7 +144,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   const [showCreate, setShowCreate]       = useState(
     () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("new") === "1",
   );
-  const [archiveTarget, setArchiveTarget] = useState<Product | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<CatalogProduct | null>(null);
   const [archiving, setArchiving]         = useState(false);
   const [actionError, setActionError]     = useState<string | null>(null);
 
@@ -150,7 +154,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   const restrictedCount = products.filter(p => p.age_restricted === 1).length;
 
   const masterIds = useMemo(() => new Set(products.map((p) => p.parent_product_id).filter(Boolean) as string[]), [products]);
-  const getProductType = useCallback((product: Product): "Standalone" | "Master" | "Variant" => {
+  const getProductType = useCallback((product: CatalogProduct): "Standalone" | "Master" | "Variant" => {
     if (product.parent_product_id) return "Variant";
     if (masterIds.has(product.id)) return "Master";
     return "Standalone";
@@ -200,7 +204,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
     return () => clearTimeout(t);
   }, [search]);
 
-  const visibleProducts = useMemo<Product[]>(() => {
+  const visibleProducts = useMemo<CatalogProduct[]>(() => {
     let result = products;
     if (filterTaxClass)      result = result.filter(p => p.tax_class === filterTaxClass);
     if (filterBrand)         result = result.filter(p => (p.brand ?? "").toLowerCase().includes(filterBrand.toLowerCase()));
@@ -243,7 +247,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const params = new URLSearchParams({ limit: "50", offset: "0" });
+      const params = new URLSearchParams({ limit: String(pageSize), offset: String(page * pageSize) });
       if (filterStatus)   params.set("status",   filterStatus);
       if (filterCategory) params.set("category", filterCategory);
       if (debouncedQ)     params.set("q",        debouncedQ);
@@ -253,9 +257,13 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
     } catch (err) {
       setError(err instanceof ApiResponseError ? err.message : "Failed to load products.");
     } finally { setLoading(false); }
-  }, [filterStatus, filterCategory, debouncedQ]);
+  }, [filterStatus, filterCategory, debouncedQ, page, pageSize]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // A filter/page-size change can leave `page` pointing past the end of the
+  // new result set — reset to the first page rather than fetching an empty one.
+  useEffect(() => { setPage(0); }, [filterStatus, filterCategory, debouncedQ, pageSize]);
 
   useEffect(() => {
     if (searchParams.get("new") === "product") {
@@ -264,7 +272,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   }, [searchParams]);
 
   const handleCreate = async (body: Record<string, unknown>) => {
-    const created = await apiPost<Product>("/api/v1/catalog", body);
+    const created = await apiPost<CatalogProduct>("/api/v1/catalog", body);
     router.push(`/catalog/${created.id}`);
   };
 
@@ -627,6 +635,9 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
               ))}
             </div>
           </>
+        )}
+        {!loading && !error && total > 0 && (
+          <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} onPageSizeChange={setPageSize} />
         )}
       </Card>
 
