@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ApiResponseError } from "@/api-client/client";
 import { Button } from "@/components/Button";
 import { useCapabilities } from "@/contexts/CapabilitiesContext";
-import type { Product, Category, ProductStatus, TaxClass } from "@/api-client/types";
+import type { CatalogProduct, Category, ProductStatus, TaxClass } from "@/api-client/types";
 import {
   buildProductCreateBody,
   createInitialProductForm,
@@ -17,7 +17,7 @@ export function emptyForm(): ProductFormState {
   return createInitialProductForm();
 }
 
-export function productToForm(p: Product): ProductFormState {
+export function productToForm(p: CatalogProduct): ProductFormState {
   return {
     ...createInitialProductForm(p.parent_product_id ?? "", p.variant_label ?? ""),
     productKind: p.parent_product_id ? "variant" : "standalone",
@@ -76,7 +76,7 @@ export function ProductFormModal({
   onSave,
   onClose,
 }: {
-  initial?: Product;
+  initial?: CatalogProduct;
   categories: Category[];
   onSave: (body: Record<string, unknown>) => Promise<void>;
   onClose: () => void;

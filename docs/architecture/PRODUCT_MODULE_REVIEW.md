@@ -34,7 +34,7 @@ routes (`/inventory`, `/inventory/pipeline` [6 tabs], `/inventory/receive-stock`
 | 4 | **No pagination UI on the two most-used list pages**, despite the backend supporting it. `ProductsTab.tsx` hardcodes `limit=50&offset=0` — there is no button to reach product 51 in a catalog of thousands. `inventory/page.tsx`'s movements table has the same gap. | `catalog/_components/ProductsTab.tsx:246` |
 | 5 | **No shared enterprise data-table component.** `web/components/Table.tsx` (the only generic table primitive) has no sort, no filter, no pagination, no column resize/pin, no saved views, no row selection. Every page (`ProductsTab`, `inventory/page.tsx`, `promotions/page.tsx`, `pricing/page.tsx`) hand-rolls its own `<table>`, filter bar, and sort logic — visually consistent (copy-pasted Tailwind) but functionally duplicated 4+ times. | `web/components/Table.tsx` (109 lines, read in full) |
 | 6 | **5+ pages exist but are not linked from primary nav** — reachable only by typing the URL: `/inventory/locations`, `/inventory/counts`, `/inventory/reorder`, `/inventory/serials`, `/catalog/categories/:id`. | `EnterpriseShell.tsx:144-175` |
-| 7 | **Two frontend TypeScript interfaces model the same `products` row** (`Product` and `CatalogProduct`, overlapping but non-identical fields) — a maintenance hazard, not yet a bug. | `web/api-client/types.ts:638+, 1079+` |
+| 7 | **Two frontend TypeScript interfaces model the same `products` row** (`Product` and `CatalogProduct`, overlapping but non-identical fields) — a maintenance hazard, not yet a bug. **Fixed** — merged into one `CatalogProduct` (18 call sites updated), widening nullability rather than narrowing so no caller could break; dropped 2 confirmed-dead camelCase fields (`createdAt`/`updatedAt`, zero reads anywhere). | `web/api-client/types.ts:638+, 1079+` |
 | 8 | **`/catalog/:id/credits` tab has no backend at all** (already tracked in GAPS.md) — no schema concept of a product-level credit exists anywhere. | confirmed via grep, no route |
 | 9 | Inventory Pipeline's **Receiving / Issues / Errors / Summary-funnel tabs are UI-only** — GET+PATCH only, no detection engine, no receiving-session concept in the schema (already tracked in GAPS.md as NEEDS-SRI). | `docs/architecture/GAPS.md` |
 
@@ -263,7 +263,7 @@ etc.) — none of them are being rewritten, only re-grouped in the parent tab ba
 | 3 | Group labels on `catalog/[id]/page.tsx`'s existing tab-divider mechanism (corrected scope, see §7/8) | Nothing — **shipped** |
 | 4 | Keyset cursor pagination added to `inventory.listTransfers` (was a flat `LIMIT 200`, worse than catalog's gap — no pagination mechanism at all); shared "Load more" button wired across `/inventory`'s Orders/Transfers/Returns tabs, all three now the same envelope shape | Nothing — **shipped** (PR #108) |
 | 5 | ~~Batch/expiry data migration~~ → **retired `/inventory/expiry`, no migration** (corrected 2026-07-21, see §3.1): investigation before writing the migration found `product_batches` has zero connection to real stock — merging it into `inventory_lots` would have injected phantom sellable quantity into the live FEFO engine. Redirected the page instead; `product_batches` table/data untouched | Nothing — **shipped** |
-| — | Consolidate `Product`/`CatalogProduct` types | Can happen any time; touches both list and detail views. Only remaining item from this review with no fixed priority yet |
+| — | Consolidate `Product`/`CatalogProduct` types | Nothing — **shipped**, last item in this review |
 
 ---
 
@@ -277,7 +277,7 @@ etc.) — none of them are being rewritten, only re-grouped in the parent tab ba
 | **Medium** | Tab-bar group labels (Phase 3) — real cognitive-load win, no correctness risk — **done** |
 | **Medium** | Nav visibility fixes for orphaned pages (Phase 1) — **done** |
 | **Medium** | Keyset pagination for `inventory` transfers/returns + shared Load-more (Phase 4) — **done** |
-| **Low** | `Product`/`CatalogProduct` type consolidation — maintenance hygiene, no user-facing effect |
+| **Low** | `Product`/`CatalogProduct` type consolidation — maintenance hygiene, no user-facing effect — **done** |
 | **Deferred (NEEDS-SRI)** | Everything in §5's table — no build without a business decision first |
 
 ---
@@ -292,7 +292,7 @@ etc.) — none of them are being rewritten, only re-grouped in the parent tab ba
 | Tab-bar group labels | **Trivial** (under an hour, smaller than originally estimated) | Once the code was read, a full two-level bar wasn't justified — the existing divider mechanism just needed a label, not a rewrite — **done** |
 | Keyset pagination for `inventory` transfers | **Small** (much smaller than originally estimated) | `listTransfers` just needed the same `shared/pagination.ts` pattern already used by `listMovements`/`listOrders`/`listReturns` — a few lines, not a redesign — **done** |
 | Retire `/inventory/expiry` | **Trivial** (much smaller than the original "Large" migration estimate) | Investigation revealed the "migration" would have been actively dangerous (phantom stock), not just large — the real fix was a redirect, zero data movement — **done** |
-| Type consolidation | **Small** | Mechanical, but touches many call sites — needs a full typecheck pass |
+| Type consolidation | **Small** | Mechanical, but touched 18 call sites across list/detail/POS-terminal-adjacent files — needs a full typecheck pass — **done** |
 
 ---
 

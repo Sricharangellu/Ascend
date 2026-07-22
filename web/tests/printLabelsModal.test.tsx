@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PrintLabelsModal } from "@/app/(protected)/catalog/_components/PrintLabelsModal";
-import type { Product } from "@/api-client/types";
+import type { CatalogProduct } from "@/api-client/types";
 
 const maliciousProduct = {
   id: "prod_xss",
@@ -10,7 +10,7 @@ const maliciousProduct = {
   sku: `SKU<script>alert("sku")</script>`,
   barcode: `<svg onload=alert("barcode")>`,
   price_cents: 1299,
-} as Product;
+} as CatalogProduct;
 
 describe("PrintLabelsModal", () => {
   afterEach(() => {
