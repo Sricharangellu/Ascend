@@ -635,52 +635,71 @@ export interface RecordPaymentRequest {
 }
 
 // ─── Catalog (BE-6/BE-7/BE-8) ────────────────────────────────────────────────
+// CatalogProduct (2026-07-21): merged from two previously-separate interfaces
+// (a "CatalogProduct" used by the detail view, a "Product" used by the list
+// view) that modeled the same `products` table row with different field
+// subsets, naming conventions, and nullability. Merged as the union of both
+// — every field either side read is still here, under its original name, so
+// this is a type-only change with no runtime behavior difference. Where the
+// two sides disagreed on optional-vs-nullable, widened to accept both rather
+// than narrowing (never breaks an existing caller). Two dead fields
+// (`createdAt`/`updatedAt`, camelCase — confirmed zero reads anywhere in the
+// frontend, real column names are `created_at`/`updated_at`) were dropped
+// rather than carried forward.
 export interface CatalogProduct {
   id: string;
+  tenant_id?: string;
   sku: string;
   name: string;
   /** integer cents */
   price_cents: number;
   /** legacy single category string */
   category: string;
-  tax_class: "standard" | "exempt";
-  barcode?: string;
-  status: "active" | "draft" | "archived";
-  description?: string;
-  brand?: string;
+  tax_class: TaxClass;
+  barcode?: string | null;
+  status: ProductStatus;
+  created_at?: number;
+  updated_at?: number;
+  description?: string | null;
+  brand?: string | null;
+  manufacturer?: string | null;
   length_mm?: number;
   width_mm?: number;
   height_mm?: number;
-  weight_grams?: number;
-  image_url?: string;
-  preferred_vendor_id?: string;
-  vendor_upc?: string;
-  min_qty_to_sell?: number;
-  max_qty_to_sell?: number;
-  qty_increment?: number;
-  parent_product_id?: string;
-  variant_label?: string;
+  weight_grams?: number | null;
+  image_url?: string | null;
+  preferred_vendor_id?: string | null;
+  preferred_vendor_name?: string | null;
+  vendor_upc?: string | null;
+  min_qty_to_sell?: number | null;
+  max_qty_to_sell?: number | null;
+  qty_increment?: number | null;
+  parent_product_id?: string | null;
+  variant_label?: string | null;
   // Pricing extras
   msrp_cents?: number | null;
   raw_cost_price_cents?: number | null;
+  /** Wholesale-only; the API omits this for tenants without the wholesale capability. */
   wholesale_price_cents?: number | null;
   // Commerce flags
   ecommerce?: number;
   track_inventory?: number;
-  // Inventory replenishment
+  age_restricted?: number;
+  returnable?: number;
+  // Inventory replenishment — reorder_point/reorder_qty (detail-view derived
+  // stock fields) and reorder_quantity (the real products.reorder_quantity
+  // column) are kept as distinct properties; they are not proven equivalent.
   reorder_point?: number | null;
   reorder_qty?: number | null;
+  reorder_quantity?: number | null;
   // Metadata
   tags?: string | null;
-  preferred_vendor_name?: string;
   // Compliance
   tobacco_type?: string | null;
   flavored?: number;
   menthol?: number;
   msa_reportable?: number;
   restricted_states?: string[];
-  createdAt: number;
-  updatedAt: number;
 }
 
 export interface CatalogCategory {
@@ -688,13 +707,6 @@ export interface CatalogCategory {
   name: string;
   parent_id: string | null;
   tenant_id: string;
-}
-
-export interface CatalogProductsResponse {
-  items: CatalogProduct[];
-  total: number;
-  page: number;
-  pageSize: number;
 }
 
 export interface CatalogCategoriesResponse {
@@ -1076,52 +1088,8 @@ export interface OnlineOrdersResponse {
 export type ProductStatus = "active" | "draft" | "archived";
 export type TaxClass = "standard" | "exempt";
 
-export interface Product {
-  id: string;
-  tenant_id: string;
-  sku: string;
-  name: string;
-  price_cents: number;
-  category: string;
-  tax_class: TaxClass;
-  barcode: string | null;
-  status: ProductStatus;
-  created_at: number;
-  updated_at: number;
-  // Descriptive
-  description: string | null;
-  brand: string | null;
-  manufacturer: string | null;
-  tags: string | null;
-  image_url: string | null;
-  // Pricing
-  msrp_cents: number | null;
-  raw_cost_price_cents: number | null;
-  /** Wholesale-only; the API omits this for tenants without the wholesale capability. */
-  wholesale_price_cents?: number | null;
-  // Dimensions
-  weight_grams: number | null;
-  // Vendor
-  preferred_vendor_id: string | null;
-  preferred_vendor_name: string | null;
-  vendor_upc: string | null;
-  reorder_quantity: number | null;
-  // Qty limits
-  min_qty_to_sell: number | null;
-  max_qty_to_sell: number | null;
-  qty_increment: number;
-  // Variant
-  parent_product_id: string | null;
-  variant_label: string | null;
-  // Flags (1|0)
-  age_restricted: number;
-  returnable: number;
-  track_inventory: number;
-  ecommerce: number;
-}
-
 export interface ProductsResponse {
-  items: Product[];
+  items: CatalogProduct[];
   total: number;
   limit: number;
   offset: number;
