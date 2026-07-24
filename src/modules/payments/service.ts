@@ -5,10 +5,17 @@ import type { EventBus } from "../../shared/events.js";
 import { Money, type Cents } from "../../shared/money.js";
 import { notFound, badRequest, conflict, HttpError } from "../../shared/http.js";
 import { writeAudit } from "../../shared/audit.js";
-import { getStripe, isStripeConfigured, resolveChargeDetails, withStripeBreaker } from "./stripe.js";
+import { stripeGatewayAdapter } from "./stripe.js";
+import type { PaymentGatewayAdapter } from "./gateway.js";
 import { moduleLogger } from "../../shared/logger.js";
 
 const log = moduleLogger("payments");
+
+// Reliability Phase 4a #4: this module talks to `gateway`, the seam
+// interface (see gateway.ts) — never to the Stripe SDK directly. Swapping or
+// adding a payment gateway means changing this one line, not this file's
+// checkout logic.
+const gateway: PaymentGatewayAdapter = stripeGatewayAdapter;
 
 export type PaymentMethod = "cash" | "card" | "split" | "store_credit";
 export type PaymentStatus = "captured" | "declined" | "queued_offline";
@@ -69,25 +76,19 @@ async function resolveCardFromStripe(
   stripePaymentIntentId: string | undefined,
   amountCents: Cents,
 ): Promise<{ cardCents: Cents; last4: string | null; authCode: string | null }> {
-  if (isStripeConfigured()) {
+  if (gateway.isConfigured()) {
     if (!stripePaymentIntentId) {
       throw badRequest(
         "stripePaymentIntentId is required for card payments when Stripe is configured.",
       );
     }
-    const stripe = getStripe();
-    const intent = await withStripeBreaker(() =>
-      stripe.paymentIntents.retrieve(stripePaymentIntentId, {
-        expand: ["latest_charge"],
-      }),
-    );
+    const intent = await gateway.retrieveIntent(stripePaymentIntentId);
     if (intent.status !== "succeeded") {
       throw badRequest(
         `Stripe PaymentIntent ${stripePaymentIntentId} has status '${intent.status}' — only 'succeeded' intents can be recorded.`,
       );
     }
-    const { last4, authCode } = resolveChargeDetails(intent);
-    return { cardCents: amountCents, last4, authCode };
+    return { cardCents: amountCents, last4: intent.last4, authCode: intent.authCode };
   }
 
   if (process.env["NODE_ENV"] === "production") {
@@ -380,7 +381,7 @@ export class PaymentsService {
     status: string;
     readerId: string;
   }> {
-    if (!isStripeConfigured()) {
+    if (!gateway.isConfigured()) {
       throw new HttpError(
         503,
         "payment_unconfigured",
@@ -398,25 +399,7 @@ export class PaymentsService {
     }
 
     const owed = await this.loadOrderOwed(orderId, tenantId);
-    const stripe = getStripe();
-
-    const intent = await withStripeBreaker(() =>
-      stripe.paymentIntents.create({
-        amount: owed,
-        currency: "usd",
-        payment_method_types: ["card_present"],
-        capture_method: "automatic",
-      }),
-    );
-
-    // Present the intent to the physical reader.
-    await withStripeBreaker(() =>
-      stripe.terminal.readers.processPaymentIntent(readerId, {
-        payment_intent: intent.id,
-      }),
-    );
-
-    return { intentId: intent.id, status: intent.status, readerId };
+    return gateway.createTerminalIntent(owed, readerId);
   }
 
   /**
@@ -428,17 +411,10 @@ export class PaymentsService {
     last4: string | null;
     authCode: string | null;
   }> {
-    if (!isStripeConfigured()) {
+    if (!gateway.isConfigured()) {
       throw new HttpError(503, "payment_unconfigured", "Card payments require STRIPE_SECRET_KEY.");
     }
-    const stripe = getStripe();
-    const intent = await withStripeBreaker(() =>
-      stripe.paymentIntents.retrieve(intentId, {
-        expand: ["latest_charge"],
-      }),
-    );
-    const { last4, authCode } = resolveChargeDetails(intent);
-    return { status: intent.status, last4, authCode };
+    return gateway.retrieveIntent(intentId);
   }
 
   /**
@@ -446,13 +422,7 @@ export class PaymentsService {
    * Called when the customer presses Cancel on the frontend.
    */
   async cancelTerminalIntent(intentId: string): Promise<void> {
-    if (!isStripeConfigured()) return;
-    const stripe = getStripe();
-    try {
-      await withStripeBreaker(() => stripe.paymentIntents.cancel(intentId));
-    } catch {
-      // If already succeeded/cancelled (or the gateway is down), ignore —
-      // this is a best-effort cleanup call.
-    }
+    if (!gateway.isConfigured()) return;
+    await gateway.cancelIntent(intentId);
   }
 }

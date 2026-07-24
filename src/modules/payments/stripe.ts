@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { getCircuitBreaker, CircuitOpenError } from "../../shared/circuit-breaker.js";
 import { HttpError } from "../../shared/http.js";
+import type { PaymentGatewayAdapter } from "./gateway.js";
 
 let _stripe: Stripe | null = null;
 
@@ -97,3 +98,50 @@ export function resolveChargeDetails(intent: Stripe.PaymentIntent): {
         ?.receipt?.authorization_code ?? null,
   };
 }
+
+/**
+ * Stripe's implementation of the payment-gateway seam (see `gateway.ts`).
+ * `service.ts` calls through this object for the operations that are
+ * genuinely gateway-specific; a second adapter would be a new file exporting
+ * the same shape, wired in wherever `stripeGatewayAdapter` is imported today.
+ */
+export const stripeGatewayAdapter: PaymentGatewayAdapter = {
+  name: "stripe",
+
+  isConfigured: isStripeConfigured,
+
+  async createTerminalIntent(amountCents, readerId) {
+    const stripe = getStripe();
+    const intent = await withStripeBreaker(() =>
+      stripe.paymentIntents.create({
+        amount: amountCents,
+        currency: "usd",
+        payment_method_types: ["card_present"],
+        capture_method: "automatic",
+      }),
+    );
+    await withStripeBreaker(() =>
+      stripe.terminal.readers.processPaymentIntent(readerId, { payment_intent: intent.id }),
+    );
+    return { intentId: intent.id, status: intent.status, readerId };
+  },
+
+  async retrieveIntent(intentId) {
+    const stripe = getStripe();
+    const intent = await withStripeBreaker(() =>
+      stripe.paymentIntents.retrieve(intentId, { expand: ["latest_charge"] }),
+    );
+    const { last4, authCode } = resolveChargeDetails(intent);
+    return { status: intent.status, last4, authCode };
+  },
+
+  async cancelIntent(intentId) {
+    const stripe = getStripe();
+    try {
+      await withStripeBreaker(() => stripe.paymentIntents.cancel(intentId));
+    } catch {
+      // If already succeeded/cancelled (or the gateway is down), ignore —
+      // this is a best-effort cleanup call.
+    }
+  },
+};
