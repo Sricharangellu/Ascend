@@ -18,6 +18,7 @@
     "table:scan": "node tools/table-collision-scan.mjs",
     "seed:e2e": "tsx scripts/seed-e2e.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
+    "business:matrix": "tsx scripts/generate-business-pack-matrix.ts",
     "verify": "npm run hygiene && npm run gap:scan && npm run table:scan && npm run typecheck && npm test && npm run smoke && npm --prefix web run typecheck && npm --prefix web run lint && npm --prefix web run build"
   },
   "dependencies": {
