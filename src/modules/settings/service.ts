@@ -76,7 +76,7 @@ const COMMON_PROFILE: BusinessCapabilityProfile = {
   workflows: ["setup_business_profile", "create_product", "receive_inventory", "sell_or_invoice", "settle_payment", "report_day_end"],
 };
 
-const BUSINESS_CAPABILITY_PROFILES: Record<string, BusinessCapabilityProfile> = {
+export const BUSINESS_CAPABILITY_PROFILES: Record<string, BusinessCapabilityProfile> = {
   retail: {
     requiredFields: {
       business: ["businessName", "taxProfile", "defaultOutlet", "defaultRegister", "receiptTemplate"],
@@ -122,7 +122,7 @@ const DEFAULT_PLAN_LIMITS = {
   maxOutlets: 1,
 };
 
-const BUSINESS_SETUP_TASKS: Record<string, SetupTask[]> = {
+export const BUSINESS_SETUP_TASKS: Record<string, SetupTask[]> = {
   retail: [
     { key: "configure_outlet", label: "Configure outlet", reason: "Retail sales need a selling location." },
     { key: "configure_register", label: "Configure register", reason: "POS checkout needs a register and cash drawer.", moduleKeys: ["pos_terminal"] },
@@ -149,7 +149,7 @@ const BUSINESS_SETUP_TASKS: Record<string, SetupTask[]> = {
   ],
 };
 
-const MODULE_PERMISSIONS: Record<string, string[]> = {
+export const MODULE_PERMISSIONS: Record<string, string[]> = {
   catalog: ["catalog:read", "catalog:write"],
   inventory: ["inventory:read", "inventory:write"],
   customers: ["customers:read", "customers:write"],
@@ -168,7 +168,7 @@ const MODULE_PERMISSIONS: Record<string, string[]> = {
   price_book: ["catalog:read", "catalog:write"],
 };
 
-const MODULE_REPORTS: Record<string, string[]> = {
+export const MODULE_REPORTS: Record<string, string[]> = {
   pos_terminal: ["end_of_day", "register_closures", "sales"],
   discounts: ["promotion_performance"],
   loyalty: ["loyalty_activity"],
