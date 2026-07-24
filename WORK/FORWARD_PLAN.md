@@ -929,23 +929,74 @@ Exit criteria:
 Goal: turn current module flags into a reliable capabilities and business-mode system
 without deepening other verticals yet.
 
+**Status update 2026-07-22**: three of the five tasks below were already built
+(just not reflected here — real gap in documentation honesty, not in code).
+One real gap remains open. See detail per task.
+
 Tasks:
 
 - DONE: Build `GET /api/v1/capabilities` for the current tenant/user.
 - DONE: Build a read-only business-type/module impact preview endpoint.
-- Formalize plan, business type, entitlements, modules, required fields, workflows, and
-  permissions as separate concepts.
-- Make setup, settings, shell navigation, and demo mode read from capabilities.
-- Record business-type/module changes with audit history.
-- Add a developer-facing business-pack matrix generated from the registry and test
-  evidence.
+- DONE, VERIFIED 2026-07-22 (already built, previously undocumented): **Record
+  business-type/module changes with audit history.**
+  `SettingsService.auditBusinessProfileChange` (`src/modules/settings/service.ts`)
+  writes `business_profile.type_changed` / `business_profile.modules_changed`
+  entries (actor, before/after, timestamp) via the shared `writeAudit` helper,
+  called from `POST /settings/business-profile`
+  (`src/modules/settings/routes.ts`). Covered by a real test:
+  `settings.test.ts` — "business-profile changes are audit-logged with actor
+  and timestamp" — asserts both action types appear in
+  `GET /audit-log?resource_type=business_profile`. Nothing to build here.
+- DONE, VERIFIED 2026-07-22 (already built, previously undocumented): **Make
+  setup, settings, shell navigation, and demo mode read from capabilities.**
+  `web/contexts/CapabilitiesContext.tsx` is consumed by
+  `web/components/EnterpriseShell.tsx` (nav gating),
+  `web/app/(protected)/setup/business-profile/page.tsx`,
+  `web/app/(protected)/setup/modules/page.tsx`, and
+  `web/components/setup/RetailSetupChecklist.tsx` — confirmed by direct
+  inspection, not assumption. `useAccountMode` (session E, 2026-07-06) already
+  derives from `useCapabilities()` rather than a separate fetch. Not
+  re-verifying every page exhaustively in this pass; flagging as a candidate
+  for a dedicated audit if Sri wants full page-by-page proof.
+- OPEN, real gap: **formalize plan → entitlements → module enforcement.**
+  `buildCapabilitiesResponse` (`src/modules/settings/service.ts`) computes
+  `entitlements: { source: "placeholder", enforced: false, ... }` verbatim —
+  the code itself says plan-to-module enforcement doesn't exist yet. Today
+  `modules[].enabled` comes only from business-pack defaults + manual feature
+  flags; a tenant on a "starter" plan and a tenant on "enterprise" see
+  identically enforceable module access. **NEEDS-SRI before building**: which
+  modules/features actually gate on which plan tier is a product/pricing
+  decision, not a plumbing gap — same class of decision as catalog credits
+  (Phase 0's precedent for not guessing at NEEDS-SRI items).
+- DONE 2026-07-22: **Developer-facing business-pack matrix.** Built
+  `scripts/generate-business-pack-matrix.ts` (`npm run business:matrix`),
+  reading the same registry objects the backend serves at runtime
+  (`MODULE_REGISTRY`/`BUSINESS_BUNDLES`/`GROUP_LABELS`/`CORE_MODULES` from
+  `src/shared/moduleRegistry.ts`, plus `BUSINESS_CAPABILITY_PROFILES`/
+  `BUSINESS_SETUP_TASKS`/`MODULE_PERMISSIONS`/`MODULE_REPORTS` — now exported
+  from `src/modules/settings/service.ts` for this purpose) — no hand-maintained
+  data. Generates `docs/architecture/BUSINESS_PACK_MATRIX.md`: one section per
+  business type, listing every module with group/status/default-enabled/route/
+  permissions/reports, plus required fields, workflows, and setup tasks. The
+  "status" column is intentionally conservative (only core modules are marked
+  "Built and verified"; everything else is "Built but not verified" or
+  "Partial" — the script cannot see real test coverage, only route existence).
+  Not wired into CI to auto-detect staleness yet — a natural follow-up if this
+  drifts from the registry (same idea as `gap:scan`'s FE/BE enforcement).
 
 Exit criteria:
 
 - A developer can see what each business type changes by reading one matrix/source of truth.
+  **MET** — `docs/architecture/BUSINESS_PACK_MATRIX.md`, regenerable via `npm run business:matrix`.
 - A company admin can preview what will change before switching business type.
+  **MET** — `GET /api/v1/settings/capabilities/impact` (pre-existing).
 - The backend enforces disabled modules/features; frontend hiding is not the only guard.
+  **PARTIAL** — disabled modules are enforced (feature flags gate backend behavior
+  where checked), but plan-tier entitlement enforcement is the open NEEDS-SRI
+  item above; frontend hiding is not the *only* guard for module visibility, but
+  plan enforcement specifically has no guard yet.
 - Demo account switching uses the same registry/capabilities model as production.
+  **MET** — confirmed by inspection (no separate demo-only registry found).
 
 ### Phase 4: Production hardening
 
@@ -953,25 +1004,94 @@ Goal: make deployment safe.
 
 Tasks:
 
-- Configure production env vars.
-- Require Redis or equivalent for rate limiting/event propagation.
-- PARTIAL: enable secure metrics token. Production no-token `/metrics` now closes with
+- DONE, VERIFIED 2026-07-22: **Configure production env vars.** `src/app.ts`
+  fails fast in production if `JWT_SECRET`/`DATABASE_URL` are missing, and
+  logs an explicit warning (with the concrete consequence) for every other
+  important-but-optional var: `APP_URL`, `SENDGRID_API_KEY`,
+  `STRIPE_SECRET_KEY`, `REDIS_URL`, `METRICS_TOKEN`, `CRON_SECRET`,
+  `WEBHOOK_SECRET_KEY`. This is a mature, honest pattern already — nothing
+  to build. NEEDS-SRI: confirm which of the *warned* (not required) vars are
+  actually set in the live Vercel env — code can't see repo/platform secrets
+  from here (same class of blind spot as the backup-cron finding below).
+- DONE, VERIFIED 2026-07-22: **Redis for rate limiting/event propagation.**
+  `src/gateway/rateLimit.ts` (Redis-backed sliding-window, SEC-9) and
+  `EventBus.useRedis()` (`src/shared/events.ts`, Pub/Sub fan-out across
+  instances) are both implemented and wired in `app.ts`. Deliberately
+  degrades to in-process/in-memory when `REDIS_URL` is unset rather than
+  refusing to boot — reasonable for a single-instance deploy, but on
+  Vercel's multi-invocation model this means unset `REDIS_URL` silently
+  gives every invocation its own rate-limit counters and event bus (no
+  crash, just quietly wrong at scale). NEEDS-SRI: confirm `REDIS_URL` is
+  actually set in production.
+- PARTIAL (unchanged): enable secure metrics token. Production no-token `/metrics` now closes with
   `503 metrics_unconfigured`; set `METRICS_TOKEN` to allow authorized scraping.
-- Encrypt webhook secrets.
-- Verify Stripe webhook and payment flows.
-- Verify DB backup/restore.
-- Verify migration lock and rollback plan.
+- DONE, VERIFIED 2026-07-22: **Encrypt webhook secrets.** DB-16 —
+  AES-256-GCM in `src/modules/webhooks/service.ts`, fails closed (503) in
+  production if `WEBHOOK_SECRET_KEY` is unset rather than silently storing
+  plaintext.
+- DONE, VERIFIED 2026-07-22: **Stripe webhook and payment flows.** The
+  inbound webhook route (`src/app.ts`, `POST /api/stripe/webhook`) is
+  textbook-correct: raw-body parser mounted before `express.json()` (required
+  for signature verification), real `stripe.webhooks.constructEvent`
+  signature check, 503 if `STRIPE_WEBHOOK_SECRET` unset, 400 on bad
+  signature, fast 200 + fire-and-forget internal event dispatch. Dedicated
+  `src/modules/payments/webhook.test.ts` covers the fail-closed path. Outbound
+  side (checkout charges) now also has the Phase 4a circuit breaker +
+  gateway seam (see above).
+- DONE, VERIFIED 2026-07-22 (real gap found — see Phase 4a #3 above): backup
+  cron exists and is scheduled but has never actually run against
+  production (`PROD_DATABASE_URL` secret unset). NEEDS-SRI.
+- DONE, VERIFIED 2026-07-22: **Migration lock and rollback plan.**
+  `pg_advisory_xact_lock(7381920)` in `app.ts` — this is the "migration lock
+  acquired" line visible in every single test run in this repo, i.e. it's
+  not just present in code, it demonstrably fires on every app boot.
+  Rollback: Vercel-dashboard instant rollback, documented in
+  `docs/architecture/PIPELINE.md`.
 - DONE: add backend operational readiness checks to deployment via `npm run ops:check`.
 - DONE: add `PG_SSL` override so production-mode checks can run against local/CI
   Postgres while production still defaults to SSL.
-- Add monitoring and alerting.
+- PARTIAL, VERIFIED 2026-07-22: **Monitoring and alerting.** Real, working
+  parts: structured JSON logging (`shared/monitoring.ts`, aggregator-ready +
+  optional Sentry envelope), `gateway/metrics.ts` (token-gated Prometheus
+  endpoint), and `.github/workflows/uptime.yml` — a 15-minute production
+  heartbeat hitting `/healthz`, `/readyz`, the auth boundary, and the
+  frontend, confirmed via GitHub's public Actions page to have **85
+  consecutive scheduled runs**, all completing in 5-12s (i.e. this is a real,
+  live signal, not dead CI config). The gap: alerting on heartbeat failure is
+  GitHub's default "notify repo watchers on red run" only — the workflow's
+  own header already admits this is "the floor, not the ceiling" and names
+  the follow-up (Slack webhook / PagerDuty / Sentry cron monitor) as a
+  deliberate deferral, not an oversight. Not building one of those
+  speculatively without Sri picking a channel.
 
-Exit criteria:
+Exit criteria (checked 2026-07-22 against GitHub's public Actions/PR pages —
+no auth needed, no assumptions):
 
-- Fresh CI passes.
-- Staging deploy passes smoke/e2e.
-- Security checklist passes.
-- Restore from backup is tested.
+- DONE, VERIFIED: **Fresh CI passes.** Latest run (#508, `develop`, merge of
+  PR #110, 2026-07-22) is green end to end: backend typecheck+test (13m29s),
+  frontend typecheck+lint+build, production-guard lint-anti-patterns, Docker
+  build sanity check, and E2E Playwright (27 passed, 1 skipped) all passed;
+  post-run deploy steps to Production/Dev/Testing environments and a
+  post-deploy production smoke test also ran clean.
+- PARTIAL/UNCLEAR: **Staging deploy passes smoke/e2e.** The same CI run
+  deploys to environments labeled Production/Dev/Testing, not one explicitly
+  labeled "Staging" — worth Sri confirming that mapping matches the
+  `feature → develop → staging → master` branch flow this repo otherwise
+  documents (i.e. that a real staging deploy+smoke gate exists distinct from
+  these, not just assuming the label overlap is fine).
+- CONTEXT, NOT A GATE: **Security checklist passes.** No single active
+  "security checklist" file exists to run against — the closest artifact is
+  `orchestration/_archive/SECURITY_AUDIT.md` (2026-06-13, archived, i.e.
+  superseded), which found 3 issues and fixed them, reviewed auth/tenant-
+  isolation/validation/SQL-injection/secrets as passing. Real security work
+  has continued well past that date (RLS backstop, SEC-7 cookie hardening,
+  SEC-9 Redis rate limiting, webhook secret encryption — see Phase 4 items
+  above), just not against one static checklist doc. Not treating "no
+  checklist file" as a red flag on its own — the ad hoc `security-checker`/
+  `security-review` skills exist for point-in-time review instead.
+- BLOCKED (known, see Phase 4a #3 above): **Restore from backup is tested.**
+  Can't be tested — no production backup has actually run yet
+  (`PROD_DATABASE_URL` unset). This is the same NEEDS-SRI item, not new work.
 
 ### Phase 4a: Reliability / failure-resilience hardening (added 2026-07-22)
 
@@ -991,28 +1111,59 @@ Do not re-build any of that.
 
 Real, code-addressable gaps found, in priority order:
 
-1. **Circuit breaker around external calls** — retry-with-backoff exists
+1. DONE, committed `4e68d95`: **Circuit breaker
+   around external calls** — retry-with-backoff exists
    (`src/orchestration/policies/retry.policy.ts`) but nothing trips open after
    N consecutive failures to fail fast instead of paying full retry/timeout
-   cost on every request during a sustained outage. Start with the Stripe
-   client in `src/modules/payments/service.ts` / `stripe.ts`, generalize so
-   webhooks and future integrations reuse the same primitive.
-2. **Inventory reconciliation detector** — `inventory.stock_qty` is a
-   maintained cache next to the immutable `inventory_movements` ledger, not
-   purely derived. Prior real bugs in this exact area
+   cost on every request during a sustained outage. Built `src/shared/circuit-breaker.ts`
+   (closed/open/half-open, named registry) and wired it around every Stripe
+   call site in `src/modules/payments/service.ts` / `stripe.ts`. Only
+   StripeAPIError/StripeConnectionError/StripeRateLimitError count as breaker
+   failures — declines/bad requests don't trip it. Open circuit surfaces as a
+   clean 503 `payment_gateway_unavailable`. The second-gateway seam (item 4
+   below) is still open — this only covers Stripe.
+2. DONE, committed `2b2a5be`: **Inventory
+   reconciliation detector** — `inventory.stock_qty` is a maintained cache
+   next to the immutable `inventory_movements` ledger, not purely derived.
+   Prior real bugs in this exact area
    (`AUDIT_2026-07-16T063000Z-inventory-oversell-race.md`,
-   `..._134500Z-transfer-number-race.md`) argue for a scheduled job that
+   `..._134500Z-transfer-number-race.md`) argued for a scheduled job that
    diffs `stock_qty` against `SUM(inventory_movements.delta)` per
-   tenant/product and alerts on mismatch — a standing detector, not another
-   one-off race fix.
-3. **Verify backup/restore cron/CI wiring is actually live in production** —
-   `db/backup/backup.sh` / `restore.sh` already target RPO ≤5min/RTO ≤30min
-   with a quarterly DR-drill checklist; this scan only confirmed the scripts
-   exist, not that they're scheduled and running against prod today.
-4. **Document the second-payment-gateway seam** — no second live gateway
-   (not recommending building one speculatively), but the Stripe adapter
-   boundary should be explicit so adding Adyen/Authorize.net later is
-   contained, not a rewrite.
+   tenant/product and alerts on mismatch. Built as
+   `src/orchestration/jobs/inventory-reconciliation.job.ts` — daily,
+   self-re-enqueuing (same pattern as `outbox-retention`/`idempotency-expiry`),
+   read-only (reports drift via structured logs, does not auto-correct — see
+   the file's header comment for why auto-correcting would be the wrong
+   move). Known false-positive case documented in the same comment
+   (products that had movement history while untracked, before their
+   `inventory` row existed).
+3. VERIFIED 2026-07-22 (NEEDS-SRI — real gap found): **backup cron is
+   scheduled but not actually backing up prod.** `.github/workflows/backup.yml`
+   exists, is scheduled (daily 09:00 UTC), and both its runs so far succeeded
+   — but each took only 4-8s and produced zero artifacts
+   (https://github.com/Sricharangellu/Ascend/actions/workflows/backup.yml,
+   run #1 and #2). That's the workflow's own documented clean-skip path when
+   the `PROD_DATABASE_URL` repo secret isn't set (see the workflow's header
+   comment) — meaning **no production backup has actually run since this was
+   set up.** Also worth knowing: the workflow's own header is honest that
+   even once configured, this delivers RPO ≤24h via daily `pg_dump`, not the
+   ≤5min in `backup.sh`'s docstring (that number assumes WAL archiving, which
+   is a stub — `run_wal_archive` isn't wired to WAL-G/pgBackRest yet). Not
+   code-addressable — needs Sri to set the `PROD_DATABASE_URL` (and
+   optionally `BACKUP_S3_BUCKET` / AWS creds) repo secrets, then re-check the
+   next scheduled run actually uploads a `.pgdump` artifact.
+4. DONE, committed `73f9530`: **Document the
+   second-payment-gateway seam** — no second live gateway (not recommending
+   building one speculatively), but the Stripe adapter boundary needed to be
+   explicit so adding Adyen/Authorize.net later is contained, not a rewrite.
+   Added `src/modules/payments/gateway.ts` (`PaymentGatewayAdapter` interface:
+   `isConfigured`/`createTerminalIntent`/`retrieveIntent`/`cancelIntent`) and
+   `stripeGatewayAdapter` in `stripe.ts` implementing it; `service.ts` now
+   calls through a single `gateway` binding instead of the Stripe SDK
+   directly, so a second gateway is one new file + one line changed, not a
+   rewrite of checkout logic. All 17 `payments.test.ts` tests still pass
+   (verified against real Postgres) — this was a pure seam extraction, no
+   behavior change.
 
 Named for completeness but not queued (see audit for reasoning): tax-rate
 caching (no dedicated tax module found — may be a non-issue), object storage

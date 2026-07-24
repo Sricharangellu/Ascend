@@ -1003,6 +1003,124 @@ another session's state) — appending this note instead.
 | Status | RELEASED — committed `4e68d95` on `feature/retire-inventory-expiry-page` (parent `769c4c7`). Gates: `npm run typecheck` clean, `npm run gap:scan` clean, targeted real-Postgres run of `circuit-breaker.test.ts` + `payments.test.ts` together: 24/24 pass. **NOT pushed** — this sandbox has no GitHub credentials (`git push` fails with "could not read Username for 'https://github.com'"). Sri: push `feature/retire-inventory-expiry-page` from your own machine. |
 | Blockers | Worked around a stale, unremovable `.git/index.lock` in this sandbox's FUSE mount (rm/mv/`os.remove` all EPERM) by committing via plumbing with `GIT_INDEX_FILE` pointed at a scratch path outside the mount (`read-tree` → `add` → `write-tree` → `commit-tree` → `update-ref`), which doesn't need the stuck lock. That leaves the **primary `.git/index` stale** relative to the new HEAD (a normal `git status` right after this will look confusing — spurious `D`/`MM` lines) — harmless for pushing (push only needs the ref + objects, both correct), but run `rm -f .git/index.lock && git reset` on your own machine before doing any further `git add`/`commit` in this repo, to get the working index back in sync. |
 
+## Parallel Non-Overlapping Claim (Claude, Cowork/Sonnet 5 — inventory reconciliation detector)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude (Cowork, Sonnet 5) — continuing Phase 4a per Sri's "NEXT" after the circuit-breaker item shipped. |
+| Queue item | Phase 4a #2 — daily read-only detector: `inventory.stock_qty` vs `SUM(inventory_movements.delta)` per (tenant_id, product_id), logs structured warnings on drift. Does not auto-correct (see job file comment for why). |
+| Files/areas expected | `src/orchestration/jobs/inventory-reconciliation.job.ts` (new), `src/orchestration/jobs/inventory-reconciliation.test.ts` (new), `src/orchestration/queues/queue-names.ts`, `src/orchestration/index.ts` (registration only — same pattern as `outbox-retention`/`idempotency-expiry`). No inventory module files touched. |
+| Started | 2026-07-22 |
+| Status | RELEASED — committed `2b2a5be` on `feature/retire-inventory-expiry-page`. Gates re-verified on 2026-07-24 (Sri's own machine, not the sandbox): `npm run typecheck` clean, `npm run gap:scan` clean, targeted real-Postgres run of `inventory-reconciliation.test.ts`: 3/3 pass (including a test that corrupts `stock_qty` by 999 outside the normal write path and confirms the detector catches it). |
+| Blockers | none — the sandbox's `.git/index.lock`/`HEAD.lock` were stale (no live git process holding them) and removed from Sri's own machine; `git reset` resynced the index. See the reconciliation note below for the fuller git-state fix. |
+
+## Parallel Non-Overlapping Claim (Claude, Cowork/Sonnet 5 — payment gateway seam)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude (Cowork, Sonnet 5) — continuing Phase 4a per Sri's "CONTINUE" after choosing to handle the git push locally. |
+| Queue item | Phase 4a #4 — extract `PaymentGatewayAdapter` interface so Stripe is one implementation of a seam, not baked into `service.ts` directly. Pure refactor, no new gateway added. |
+| Files/areas expected | `src/modules/payments/gateway.ts` (new — interface only), `src/modules/payments/stripe.ts` (add `stripeGatewayAdapter` implementing it, keep existing named exports), `src/modules/payments/service.ts` (call through `gateway` binding instead of Stripe SDK directly). |
+| Started | 2026-07-22 |
+| Status | RELEASED — committed `73f9530` on `feature/retire-inventory-expiry-page`. Gates re-verified on 2026-07-24: `npm run typecheck` clean, `npm run gap:scan` clean, full `payments.test.ts` re-run against real Postgres after the refactor: **17/17 pass**, including the card-payment path — confirms this was behavior-preserving. |
+| Blockers | none |
+
+## URGENT — production heartbeat has been failing for 2+ days (found 2026-07-22, read-only via GitHub Actions page)
+
+`.github/workflows/uptime.yml` ("Production heartbeat") has been reporting
+**Status: Failure** on every run checked going back to run #61 (2026-07-19
+23:58, commit `29a27d7`) through the latest, run #85 (2026-07-22 00:08,
+commit `ed448ed`) — spans multiple deploys, not one bad release. Checked
+runs #61, #76, #81, #83, #84, #85, all red, "Process completed with exit
+code 1" on the "Probe production endpoints" job. Each failing run completes
+in 3-12s total — too fast for the curl `--retry 3 --retry-delay 5` logic to
+have actually exhausted retries, meaning the failing check almost certainly
+gets a fast, non-retryable bad response (e.g. an immediate 4xx) rather than
+a hung/timed-out connection. Could not see which of the 4 probed endpoints
+(`/healthz`, `/readyz`, `/api/v1/flags` 401-check, frontend `/`) is failing,
+or the actual response — GitHub hides step logs from signed-out viewers, and
+my own `web_fetch` GET to `/healthz`/`/readyz`/the frontend root returned
+empty bodies (ambiguous — could be the same failure, could be a fetch-tool
+quirk with tiny responses, not confirmed either way). This directly explains
+why the "alerting is GitHub-default-only" gap (Phase 4 above) matters in
+practice — this has apparently gone unactioned for 2+ days. NEEDS-SRI,
+urgently: check the actual failing step's output (sign into GitHub Actions),
+and check whether ascendhq-api.vercel.app is actually degraded or if the
+heartbeat check itself needs updating (e.g. if `/api/v1/flags`'s expected
+401 behavior changed).
+
+## Update 2026-07-22: `feature/reliability-phase4a` pushed by Sri
+
+Pushed to origin (confirmed via `git fetch`): contains 2 commits — `4e68d95`
+(circuit breaker) + `feda9de` (LOCK.md update) — branched off the old, already-
+merged `769c4c7` point (no rebase onto current `develop` was done, which is
+fine here: `769c4c7` is a strict ancestor of `develop`, so the eventual PR
+diff will be clean, just 2 commits). **Not yet included**: the inventory-
+reconciliation job (Phase 4a #2) and payment-gateway-seam extraction (Phase
+4a #4) — those are still uncommitted in the working tree, need a follow-up
+commit+push the same way. No PR opened yet (still just #101 open); no CI run
+exists for this branch yet — `ci.yml` doesn't appear to trigger on a plain
+branch push, only on PR/develop/staging/master. Next: open the PR via
+https://github.com/Sricharangellu/Ascend/pull/new/feature/reliability-phase4a
+targeting `develop` to get CI running.
+
+## URGENT note for Sri before pushing (found 2026-07-22, via `git fetch` + GitHub Actions page — read-only, no push attempted)
+
+The local branch all three claims above sit on (`feature/retire-inventory-expiry-page`)
+has a base commit (`769c4c7`) that is **already merged into `develop`** via PR #109,
+and **`develop` has moved on since** (PR #110, catalog Product/CatalogProduct
+merge, `8a22e71`, latest CI green). The remote branch
+`feature/retire-inventory-expiry-page` **no longer exists on origin** (deleted
+after merge, normal GitHub hygiene) — confirmed via `git ls-remote`.
+
+So this session's 2 commits (`4e68d95` circuit breaker + audit, `feda9de` LOCK.md
+update) plus the still-uncommitted inventory-reconciliation/gateway-seam work sit
+on top of a stale, already-merged base — not on top of current `develop`. Pushing
+this branch name as-is will just create a *new* remote branch from an old point;
+it will need its own fresh PR into `develop` (the old PR #109 is closed/merged,
+it won't reopen), and should ideally be rebased onto current `develop` first to
+pick up the catalog refactor from PR #110 and avoid divergence. Recommend: rebase
+onto `origin/develop` (or cherry-pick these commits onto a fresh branch off
+`develop`) before opening the new PR, rather than pushing straight from here.
+
+## Parallel Non-Overlapping Claim (Claude, Cowork/Sonnet 5 — Phase 3 business-pack control-plane audit + matrix)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude (Cowork, Sonnet 5) — Sri picked "Phase 3: business-pack control plane" from a menu of next-task options after Phase 4a went code-complete (pending Sri's git push). |
+| Queue item | Phase 3 had 4 remaining tasks listed in FORWARD_PLAN.md. Investigation found 2 were already built and just undocumented (audit history on business-profile changes; setup/settings/nav reading from capabilities) — corrected the doc rather than re-building. Built the one genuinely missing, code-addressable piece: the developer-facing business-pack matrix generator. Left the 4th (plan→entitlement enforcement) as NEEDS-SRI — it's a pricing/product decision (which modules gate on which plan tier), not a plumbing gap; `entitlements.enforced: false` is an honest placeholder already in the code, not silently broken. |
+| Files/areas expected | `src/modules/settings/service.ts` (added `export` to 3 already-existing consts, no logic change), NEW `scripts/generate-business-pack-matrix.ts`, NEW `docs/architecture/BUSINESS_PACK_MATRIX.md` (generated, not hand-edited), `package.json` (new `business:matrix` script), `WORK/FORWARD_PLAN.md`. No files under Phase 4a's active claims above (payments/gateway.ts, stripe.ts, service.ts, circuit-breaker.ts, inventory-reconciliation, orchestration/index.ts, queue-names.ts) — this is a genuinely separate module (settings/business-pack), safe to land independently once git access exists. |
+| Started | 2026-07-22 |
+| Status | RELEASED — committed `1221215` on `feature/retire-inventory-expiry-page`. `npm run typecheck` clean; `npm run business:matrix` re-run on 2026-07-24 produces a byte-identical `BUSINESS_PACK_MATRIX.md` (no drift from the committed copy). |
+| Blockers | none |
+
+## Update 2026-07-24: git state repaired, all three pending Phase 4a/3 claims committed
+
+Resumed on Sri's own machine (not a sandbox). The `.git/index.lock`, `.git/HEAD.lock`,
+and a stray `refs/heads/feature/retire-inventory-expiry-page.lock` were all stale
+(0 bytes, 3 days old, no live git process holding them per `ps aux`) — removed, then
+`git reset` resynced the primary index to HEAD as the earlier blocker note prescribed.
+`circuit-breaker.ts`/`circuit-breaker.test.ts` are confirmed correctly tracked again
+(no more spurious `D`/`??`).
+
+Re-verified all three "code complete, NOT YET COMMITTED" claims above still gate
+green (typecheck, gap:scan, targeted real-Postgres tests — same pass counts as
+originally recorded) before committing each as its own commit:
+`2b2a5be` (inventory reconciliation), `73f9530` (payment gateway seam), `1221215`
+(business-pack matrix). Also found and committed `91045af`
+(`docs/architecture/REPORTS_MODULE_REVIEW.md`) — a complete, orphaned sibling to
+`PRODUCT_MODULE_REVIEW.md` sitting untracked in the working tree; its findings 1-4
+are already shipped via PRs #111-114, only the review artifact itself was never
+checked in.
+
+**Not done in this pass, left for Sri:** rebasing onto current `origin/develop`
+(this branch's base `769c4c7` is still a real, unrewritten ancestor of `develop`,
+now 17 commits behind — see the "URGENT note for Sri before pushing" section above)
+and force-pushing the already-public `feature/reliability-phase4a` history to do so.
+Pushed the new commits as a plain fast-forward (`feda9de..91045af`, no history
+rewrite) to `origin/feature/reliability-phase4a`, and opened the PR the earlier
+note recommended: **PR #120** into `develop`. CI not yet observed on this PR.
+
 ## Rules
 
 - Claim one queue item before editing code.
