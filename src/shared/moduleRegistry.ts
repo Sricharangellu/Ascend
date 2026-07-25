@@ -156,6 +156,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
   { key: "sso",            name: "Single Sign-On",        description: "OIDC/SAML SSO for enterprise identity providers",         group: "enterprise" },
   { key: "multi_currency", name: "Multi-Currency",        description: "Accept and report in multiple currencies with FX rates",  group: "enterprise" },
   { key: "advanced_analytics", name: "Advanced Analytics", description: "BI dashboards, custom reports, data export, forecasting", group: "enterprise" },
+  { key: "ai_assistant", name: "AI Assistant", description: "Conversational menu & inventory recommendations grounded in your real data — reorder alerts, low stock, expiring inventory, best/slow sellers", group: "enterprise", route: "/ai-assistant" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -180,7 +181,7 @@ export const BUSINESS_BUNDLES: Record<string, {
     icon: "🍽️",
     description: "Restaurants, cafes, bars, fast food, food trucks, bakeries, coffee shops",
     modules: ["catalog","inventory","customers","payments","reports","settings","team","notifications",
-              "pos_terminal","tables","kitchen","bar_tabs","reservations","menu_modifiers"],
+              "pos_terminal","tables","kitchen","bar_tabs","reservations","menu_modifiers","ai_assistant"],
   },
   wholesale: {
     name: "B2B / Wholesale",

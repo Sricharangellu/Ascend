@@ -116,3 +116,18 @@ Rulebook: `docs/architecture/PIPELINE.md` (feature → develop → staging → m
 | Prod URLs | ascendhq-app.vercel.app (frontend) / ascendhq-api.vercel.app (backend) — post-rebrand names, both verified live. Legacy git-connected Vercel project `finder-pos` is cruft → NEEDS-SRI deletion. |
 | Branch cleanup | Delete (fully merged into staging): feat/delivery-pipeline, backend-cycle3, feat/enterprise-pipeline, fix/deploy-sh-independent-targets, fix/prod-token-separation, rebrand/{client-storage-keys,cookie-dual-write,demo-credentials,live-urls}. Sri-triage before deleting (unmerged diffs): 12× worktree-agent-*, 11× wt/issue-*, Sricharangellu-patch-1/2, chore/retire-phantom-accounting-workflow, claude/finder-pos-assessment, feat/clean-arch-pilot-{expenses,quotes}, feat/demo-tenant-lifecycle, feat/m1-b2b-accounts, fix/{api-pagination-and-delete-consistency,gate-money-movement-mutations,retail-package-isolation,sso-oidc-verification}, harden/{money-path-coverage,webhook-secret-fail-closed}, merge/pr78-refund-ledger. |
 | CI fix shipped | Postgres service containers now get --shm-size=1g (e0d0035) — 64MB Docker default was killing the 700-test suite mid-run. |
+
+**Note (2026-07-25):** the table above is stale (last touched 2026-07-19/20) —
+current reality per `WORK/LOCK.md`'s later entries: work moved to
+`feature/retire-inventory-expiry-page` (local) / `feature/reliability-phase4a`
+(origin), which is now several commits ahead of what this table describes
+(circuit breaker, inventory reconciliation, payment gateway seam, business-pack
+matrix, reports module review, and PR #120 opened into `develop` — see LOCK.md
+for the full trail). This session added one more commit on the same branch:
+finished + verified an in-progress, previously-uncommitted `ai_assistant`
+module (ADR-005) that was sitting in the working tree with no LOCK claim and
+no tests — fixed Design System Rules violations in its page, added 13 new
+backend tests (43/43 incl. regression), all gates clean. See `WORK/LOCK.md`'s
+"finish + verify AI Assistant module" claim for detail. Not rewriting this
+whole table in scope of that task — flagging for a proper refresh next time
+someone owns the delivery-status section end to end.

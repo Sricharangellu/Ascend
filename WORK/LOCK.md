@@ -1121,6 +1121,17 @@ Pushed the new commits as a plain fast-forward (`feda9de..91045af`, no history
 rewrite) to `origin/feature/reliability-phase4a`, and opened the PR the earlier
 note recommended: **PR #120** into `develop`. CI not yet observed on this PR.
 
+## Parallel Non-Overlapping Claim (Claude, Cowork/Sonnet 5 — finish + verify AI Assistant module)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude (Cowork, Sonnet 5) — resumed an in-progress, uncommitted `ai_assistant` feature (ADR-005, explain-only AI assistant for reorder/low-stock/expiry/best-and-slow-sellers) found sitting in the working tree with no LOCK claim and no tests. Continuing it to a verified, committed state rather than discarding the work. |
+| Queue item | Finish + verify the AI Assistant module: fix Design System Rules violations in the new page (raw hex colors + raw `<button>`/`<input>` instead of tokens/primitives), add backend tests for the new module (none existed), run full gates, commit. |
+| Files/areas expected | `src/modules/ai_assistant/**` (+ new test file), `src/shared/ai/anthropic-client.ts`, `src/orchestration/jobs/ai-assistant-answer.job.ts`, `src/orchestration/{index,queues/queue-names}.ts` (already-integrated, read-only unless a bug is found), `web/app/(protected)/ai-assistant/page.tsx`, `web/components/EnterpriseShell.tsx`, `web/lib/features.ts`, `src/shared/moduleRegistry.ts`, `docs/architecture/ADR/ADR-005-ai-assistant-explain-only.md`. No files under any other active claim. |
+| Started | 2026-07-25 |
+| Status | RELEASED — committed on `feature/retire-inventory-expiry-page` (same branch the three Phase 4a/3 claims above already sit on; this is a genuinely separate module, no file overlap). Rewrote `web/app/(protected)/ai-assistant/page.tsx` to use design-system primitives (`Button`/`Input`/`Card`/`Badge`/`EmptyState`/`Skeleton`) and `erp-*`/semantic tokens instead of raw hex colors and bare `<button>`/`<input>` — the original draft violated AGENTS.md's Design System Rules. Added `src/modules/ai_assistant/ai-assistant.test.ts` (13 tests) + `test-request.ts` — none existed before. Also added `.omc/` to `.gitignore` (untracked local tool-state dir, not repo content) — no other file changes beyond that. Gates: backend + web typecheck clean, `gap:scan` clean (454/379 paths, 21 allowlisted, unchanged), `table:scan` clean (161 names, no collision — `ai_conversations`/`ai_recommendations` are new, unique), `hygiene` clean, web lint clean (0 new warnings). Real-Postgres run: 13/13 new tests + 30/30 regression (`settings.test.ts` for the business-profile switch these tests rely on, `circuit-breaker.test.ts` for the shared breaker `explainSignal` reuses) — 43/43, all passing. No ANTHROPIC_API_KEY is set anywhere in this test harness (first module using the Anthropic SDK), so every test exercises the module's own documented honest-failure narration path — this is intentional per ADR-005, not a gap: the deterministic recommendation is proven to stand on its own, and no test needed to mock the LLM. No real bugs found this pass — the module was already solid; this was a finish-and-verify job, not a fix session. Push status: see below. |
+| Blockers | none |
+
 ## Rules
 
 - Claim one queue item before editing code.

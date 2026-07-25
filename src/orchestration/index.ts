@@ -132,6 +132,7 @@ import { idempotencyExpiryJob, IDEMPOTENCY_EXPIRY_INTERVAL_MS } from "./jobs/ide
 import { outboxRetentionJob, OUTBOX_RETENTION_INTERVAL_MS } from "./jobs/outbox-retention.job.js";
 import { trialExpiryJob, TRIAL_EXPIRY_INTERVAL_MS } from "./jobs/trial-expiry.job.js";
 import { inventoryReconciliationJob, INVENTORY_RECONCILIATION_INTERVAL_MS } from "./jobs/inventory-reconciliation.job.js";
+import { aiAssistantAnswerJob } from "./jobs/ai-assistant-answer.job.js";
 
 export interface OrchestrationBootstrap {
   runner: WorkflowRunner;
@@ -213,6 +214,9 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
   });
   jobConsumer.register(QueueNames.ECOMMERCE_SYNC, async (job) => {
     await syncEcommerceJob(job, db, events);
+  });
+  jobConsumer.register(QueueNames.AI_ASSISTANT_ANSWER, async (job) => {
+    await aiAssistantAnswerJob(job, db, events);
   });
 
   // INF-6: AR dunning — runs once per tenant per day. The handler re-enqueues

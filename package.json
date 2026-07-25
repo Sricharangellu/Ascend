@@ -22,6 +22,7 @@
     "verify": "npm run hygiene && npm run gap:scan && npm run table:scan && npm run typecheck && npm test && npm run smoke && npm --prefix web run typecheck && npm --prefix web run lint && npm --prefix web run build"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "bcryptjs": "^2.4.3",
     "express": "^4.21.2",
     "helmet": "^8.2.0",

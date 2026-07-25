@@ -24,6 +24,8 @@ export const QueueNames = {
   TRIAL_EXPIRY: "trial_expiry",
   /** Reliability Phase 4a #2: daily drift check — inventory.stock_qty vs SUM(inventory_movements.delta). */
   INVENTORY_RECONCILIATION: "inventory_reconciliation",
+  /** AI Assistant: async signal-gathering + LLM narration for one chat question (DESIGN_PRINCIPLES.md: AI processing is async-by-default). */
+  AI_ASSISTANT_ANSWER: "ai_assistant_answer",
 } as const;
 // "outbox_relay" (DB-8) retired in ACPA M1.2 — the shared Outbox reconciler
 // owns redelivery; stale relay jobs are purged at bootstrap.
