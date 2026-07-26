@@ -102,6 +102,8 @@ No autonomous high-value work remains. Further progress = feature development
 | OIDC PKCE + nonce | IdP-compatibility decision |
 | PR #66 merge | Review + merge (= production deploy) |
 | Cloud watchdog mode | Currently NOTIFY-ONLY (emails on stall). Optional upgrade to DO-WORK mode (cloud runs one iteration autonomously on stall) — true unattended continuity, but unreviewed cloud commits to financial code. Enable only if wanted. Routine: trig_01VVXryUgSBHoy9mAqRdhfzz |
+| **NEW 2026-07-26 — Production heartbeat has gone silent, not just red** | `.github/workflows/uptime.yml` last ran #85 on 2026-07-22T00:08 (still Failure) and has not fired once since despite a 15-min cron and continuous repo activity through today — strongly suggests the workflow got disabled (manually, most likely) rather than just staying red. Needs GitHub Settings access to confirm/re-enable, plus the original 07-22 ask (which of `/healthz`/`/readyz`/`/api/v1/flags`/frontend-root is actually failing). See `WORK/audits/AUDIT_2026-07-26T052958Z-fresh-gap-audit.md` §4. Currently there is no automated production-up signal at all. |
+| **NEW 2026-07-26 — `master` six days stale vs. `develop`** | Production's last deploy-triggering merge was `ed448ed` (PR #105, ~2026-07-20/21); PR #106-110 (product cleanup, transfer pagination, inventory/expiry retirement, Product/CatalogProduct consolidation) plus the unpushed Phase 4a/3 work and this session's `ai_assistant` commits are all still only on `develop`. Not a bug (master merges are Sri-only by policy), just flagging the growing gap against the "develop ≥ staging ≥ master, kept in sync" invariant. See same audit §5. |
 
 ## Delivery / release status (single live copy — consolidated here 2026-07-19 per Sri's one-work-file directive)
 
