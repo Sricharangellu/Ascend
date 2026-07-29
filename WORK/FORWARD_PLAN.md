@@ -1193,6 +1193,130 @@ Priority order:
 5. Grocery/food inventory pack: lot/batch/expiry, scale labels, traceability.
 6. Enterprise pack: approvals, SSO, audit depth, workflow automation, advanced analytics.
 
+### Phase 6: Procurement intelligence (approved scope, 2026-07-28)
+
+Source: Sri supplied a generic "ASSCEND Enterprise Demand Planning &
+Procurement Engine" master prompt (SAP/Oracle/Dynamics/NetSuite-scale spec).
+Full gap analysis against the actual codebase:
+`WORK/audits/AUDIT_2026-07-28T184729Z-erp-procurement-demand-planning-gap.md`.
+Verdict, confirmed by Sri: **treat the master prompt as target architecture,
+not this iteration's scope.** The repo's phased, verification-first discipline
+takes precedence over the prompt's "don't simplify, build the whole thing"
+framing. This phase is intentionally narrow.
+
+**Explicitly out of scope for this phase** (do not build without a separate,
+explicit Sri decision — these are standing NEEDS-SRI items in
+`WORK/LOOP_STATE.md`, not newly discovered here): real EDI parsing, a
+stateful receiving session, approval-chain triggering, any redesign of the
+existing purchasing/receiving/approval/accounting/inventory-ledger
+functionality. This phase only adds to what exists.
+
+Approved items, in strict order — each complete, tested, and regression-clean
+before the next starts:
+
+1. **Supplier MOQ and pack-size aware reorder calculations.** Round
+   `suggested_qty` in the existing reorder-suggestion surfaces up to the
+   supplier's MOQ and the product's pack size, using data that already exists
+   (`product_suppliers.moq`, `product_barcodes.pack_size`) but is currently
+   unread by that logic. No new tables. Preserves existing purchasing APIs.
+2. **Explicit safety stock.** A dedicated safety-stock concept, separate
+   from `reorder_point` (today `reorderAlerts()` literally sets
+   `safety_stock = reorder_pt` — not a real distinct value anywhere).
+   Migration + validation + regression coverage; reorder-quantity formula
+   updated without changing existing response shapes for callers that don't
+   opt in.
+3. **Promised delivery date.** Compute an expected arrival date from
+   supplier `lead_time_days` and surface it on purchase recommendations/
+   planning views. No PO workflow/state-machine changes.
+
+Deferred to future phases, in order, only after all three items above are
+complete and merged: projected inventory by date; demand coverage / days of
+supply; a real demand-forecasting engine (replacing the trailing-30-day
+velocity proxy used in `catalog/detail-views.ts`, `inventory/pipeline-
+views.ts`, and `ai_assistant`); buyer workspace; forecast analytics/reports.
+
+Exit criteria for Phase 6 (this slice):
+
+- Items 1–3 shipped as separate, independently gated changes (typecheck,
+  `gap:scan`, `table:scan`, real-Postgres tests) — no big-bang commit.
+- No regression in `purchasing`, `inventory`, `catalog`, `accounting` test
+  suites.
+- No change to existing API response shapes beyond additive fields.
+- A dated completion audit in `WORK/audits/` records what shipped, matching
+  this repo's evidence-over-optimism convention.
+
+### Phase 7: Demand planning foundation (approved scope, 2026-07-28)
+
+Source: after Phase 6 shipped, Sri asked for a Phase 7 gap analysis mirroring
+how Phase 6 started. Full gap analysis:
+`WORK/audits/AUDIT_2026-07-28T203748Z-phase7-demand-planning-foundation-gap.md`.
+That audit found the same "reorder suggestion" signal computed independently
+in five places (three unified by Phase 6, two not:
+`insights/service.ts`'s `reorderRecommendations()` and `purchasing/
+service.ts`'s `priceHistory()` suggested-qty calc — both on a 90-day window
+vs. the other three's 30-day), and, separately, a live bug: the Insights →
+Forecasting tab's "Create Draft POs" button calls `insights.
+createReorderPOs()`, which inserts into a table that does not exist
+(`po_lines` — the real table is `purchase_order_lines`) and bypasses
+`purchasing.createOrder()` entirely (own PO numbering, hardcoded
+`unit_cost_cents = 0`, no approval gating). Sri's explicit framing: **do not
+start Phase 7 by adding forecasting — first remove the duplicated demand
+logic and build a trustworthy foundation.** No ML, no forecasting models in
+this phase.
+
+**The `insights.createReorderPOs()` bug fix is a separate, standalone task —
+explicitly NOT part of Phase 7.** It is a production-correctness fix (route
+through `purchasing.createOrder()`, reuse the existing PO-numbering
+primitive/approval workflow/audit trail, remove the hardcoded
+`unit_cost_cents = 0`), tracked and gated on its own, not bundled with any
+Phase 7 item below.
+
+Approved items, in strict order — each complete, tested, and regression-clean
+before the next starts:
+
+1. **Consolidate sales-velocity logic into one shared service.** Single
+   source of truth for reorder suggestions, purchasing recommendations,
+   inventory insights, and future forecasting inputs. Supports daily/weekly/
+   monthly buckets, configurable lookback windows, location-level filtering,
+   product-level filtering, and category-level aggregation where the schema
+   supports it. Migrate every existing consumer onto it — the three surfaces
+   Phase 6 already touched (`catalog/detail-views.ts`'s
+   `reorderSuggestions()`, `inventory/pipeline-views.ts`'s
+   `reorderAlerts()`, `inventory/service.ts`'s `getReorderSuggestions()`)
+   plus the two Phase 6 left alone (`insights/service.ts`'s
+   `reorderRecommendations()`, `purchasing/service.ts`'s `priceHistory()`
+   suggested-qty calc). No formula is left running in parallel once this
+   item is done.
+2. **Demand snapshot foundation.** Minimum schema for historical demand
+   snapshots, forecast periods, actual-sales comparison, and location/
+   product demand history — built to support future moving-average/
+   weighted-average/seasonal/AI models, but no model is built in this item.
+3. **Forecast accuracy framework.** The measurement layer, built before any
+   prediction logic: forecast quantity, actual quantity sold, variance,
+   accuracy %, forecast period, product, location. The system must be able
+   to answer "was our forecast correct" before it can answer "what should we
+   forecast."
+4. **Replace the reorder placeholder** (deferred until 1–3 are complete).
+   Only after velocity consolidation, snapshots, and the accuracy framework
+   all exist does replacing the trailing-window velocity proxy with a real
+   forecast engine get evaluated.
+
+Explicitly out of scope for this phase: AI/ML forecasting models, EDI, new
+receiving workflows, buyer workspace, supplier-scoring redesign, procurement
+optimization algorithms. Those remain future phases, same as Phase 6's
+NEEDS-SRI exclusions.
+
+Exit criteria for Phase 7 (this slice):
+
+- One sales-velocity implementation exists; every reorder/purchasing/
+  insights calculation uses it (no parallel formulas).
+- Demand snapshots exist; forecast accuracy can be measured.
+- Existing purchasing flows remain unchanged (no regression in
+  `purchasing`, `inventory`, `catalog`, `insights` test suites).
+- The broken draft-PO-creation bug is fixed separately (own commit/claim) or
+  explicitly still tracked if not yet done.
+- A dated completion audit in `WORK/audits/` records what shipped.
+
 ## Suggested better architecture decisions moving forward
 
 Keep:

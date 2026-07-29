@@ -255,6 +255,17 @@ CREATE TABLE IF NOT EXISTS inventory_transfers (
 );
 CREATE INDEX IF NOT EXISTS inventory_transfers_tenant_idx ON inventory_transfers (tenant_id, created_at DESC);
 `,
+    // Phase 6 item 2 (WORK/FORWARD_PLAN.md, AUDIT_2026-07-28T184729Z-erp-
+    // procurement-demand-planning-gap.md §13): a dedicated safety-stock
+    // buffer, distinct from `reorder_pt`. Before this, every reorder-
+    // suggestion surface's `safety_stock` JSON field was a fake mirror of
+    // `reorder_pt` (see the code comments this replaces in service.ts /
+    // pipeline-views.ts / catalog/detail-views.ts) — there was no real,
+    // independently configurable concept anywhere in the schema. Defaults to
+    // 0 (no buffer configured), which is additive to the existing reorder
+    // formulas — a product with no safety_stock set behaves exactly as
+    // before this migration.
+    `ALTER TABLE inventory ADD COLUMN IF NOT EXISTS safety_stock INTEGER NOT NULL DEFAULT 0;`,
   ],
   register({ db, events, router, outbox }) {
     const service = new InventoryService(db, events);
