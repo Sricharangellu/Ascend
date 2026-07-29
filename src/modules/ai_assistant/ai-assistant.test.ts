@@ -28,7 +28,14 @@ async function call(app: App, method: string, path: string, body?: unknown, role
 }
 
 async function enableAiAssistant(app: App): Promise<void> {
-  const r = await call(app, "POST", "/api/v1/settings/business-profile", { businessType: "restaurant" });
+  // ai_assistant ships default-OFF even in the restaurant bundle (ADR-006 /
+  // ADR-004 precedent) — opt in explicitly via moduleFlags, the same
+  // mechanism a real tenant (e.g. EcoBrew) uses, rather than relying on the
+  // bundle default.
+  const r = await call(app, "POST", "/api/v1/settings/business-profile", {
+    businessType: "restaurant",
+    moduleFlags: { ai_assistant: true },
+  });
   assert.equal(r.status, 200, `business-profile switch to restaurant failed: ${JSON.stringify(r.json)}`);
 }
 

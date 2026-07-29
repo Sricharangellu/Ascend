@@ -181,7 +181,7 @@ export const BUSINESS_BUNDLES: Record<string, {
     icon: "🍽️",
     description: "Restaurants, cafes, bars, fast food, food trucks, bakeries, coffee shops",
     modules: ["catalog","inventory","customers","payments","reports","settings","team","notifications",
-              "pos_terminal","tables","kitchen","bar_tabs","reservations","menu_modifiers","ai_assistant"],
+              "pos_terminal","tables","kitchen","bar_tabs","reservations","menu_modifiers"],
   },
   wholesale: {
     name: "B2B / Wholesale",

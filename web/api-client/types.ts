@@ -138,6 +138,13 @@ export interface TerminalProduct {
   lotTracked?: boolean;
   createdAt: number;
   updatedAt: number;
+  /** Purchasing/selling unit this scan resolved to ("each" by default, or a
+   *  configured unit like "case"/"box"). Set only when scanned via the POS
+   *  barcode-resolution endpoint; absent elsewhere (e.g. tapped from the grid). */
+  unitKind?: string;
+  unitDisplayName?: string;
+  /** How many base (each) units make up one of unitKind — 1 for "each". */
+  packSize?: number;
 }
 
 export interface RegisterSession {
@@ -171,6 +178,11 @@ export interface OrderLine {
   /** integer cents */
   lineCents: number;
   taxable: boolean;
+  /** Business unit this line was sold as ("case", "box"), or absent for a
+   *  plain each sale. Display-only — quantity above is always base units. */
+  unitKind?: string | null;
+  /** Human-entered count in unitKind (e.g. 1 for "1 Case"). */
+  unitQty?: number | null;
 }
 
 export interface Order {
@@ -438,6 +450,7 @@ export interface PurchaseOrder {
   created_at: number;
   received_at: number | null;
   lines?: PurchaseOrderLine[];
+  unitConversions?: UnitConversionNote[];
 }
 
 export interface PurchaseOrdersResponse {
@@ -450,6 +463,18 @@ export interface CreatePurchaseOrderLineRequest {
   unitCostCents: number;
   expiryDate?: number;
   lotCode?: string;
+  /** Purchasing unit this line was entered in ("case", "box", ...). When
+   *  present and not "each", the backend converts quantity/unitCostCents to
+   *  base (each) units via the product's matching barcode pack size. */
+  unitKind?: string;
+}
+
+export interface UnitConversionNote {
+  productId: string;
+  unitKind: string;
+  enteredQty: number;
+  packSize: number;
+  baseQty: number;
 }
 
 export interface CreatePurchaseOrderRequest {

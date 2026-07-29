@@ -449,6 +449,20 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     }),
   );
 
+  // POS scan resolution (POS-v1): fully resolved payload (product + packaging
+  // + price + stock) so the terminal does zero conversion/pricing math itself.
+  // A separate route from /barcode/:code above — that one's flat Product
+  // shape stays untouched for any other caller; this is POS-specific.
+  router.get(
+    "/barcode/:code/pos",
+    handler(async (req, res) => {
+      const code = String(req.params.code);
+      const info = await service.resolvePosBarcode(code, tenantId(res));
+      if (!info) throw notFound(`no active product with barcode '${code}'`);
+      res.json(info);
+    }),
+  );
+
   router.get(
     "/:id/barcodes",
     handler(async (req, res) => {

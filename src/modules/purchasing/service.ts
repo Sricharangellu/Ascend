@@ -8,6 +8,7 @@ import { computeSalesVelocityForProduct } from "../../shared/sales-velocity.js";
 import { clampLimit, decodeCursor, toPage } from "../../shared/pagination.js";
 export type { CursorPage } from "../../shared/pagination.js";
 import type { CursorPage } from "../../shared/pagination.js";
+import { recordUomUnitNotConfigured } from "../../gateway/metrics.js";
 
 /** Purchasing — suppliers + purchase orders + receiving. Tenant-scoped.
  *  Receiving publishes `purchase_order.received`; the inventory module listens
@@ -219,6 +220,28 @@ export class PurchasingService {
     private readonly db: DB,
     private readonly events: EventBus,
   ) {}
+
+  /** Resolves a purchasing/receiving unit ("case", "box", ...) to its pack size
+   *  via the product's matching `product_barcodes` row, so PO creation and
+   *  receiving can convert a human-entered quantity/cost into the base (each)
+   *  units `purchase_order_lines` always stores. Reads catalog's
+   *  product_barcodes directly — an accepted cross-domain SQL read (ADR-002),
+   *  not a service import. */
+  async resolveUnitPackSize(productId: string, kind: string, tenantId: string): Promise<number> {
+    const row = await this.db.one<{ pack_size: number }>(
+      `SELECT pack_size FROM product_barcodes WHERE tenant_id = @tenantId AND product_id = @productId AND kind = @kind LIMIT 1`,
+      { tenantId, productId, kind },
+    );
+    if (!row) {
+      recordUomUnitNotConfigured(kind);
+      throw new HttpError(
+        400,
+        "unit_not_configured",
+        `No '${kind}' unit is configured for this product — add a '${kind}' barcode with a pack size first.`,
+      );
+    }
+    return Number(row.pack_size);
+  }
 
   async createSupplier(
     name: string,

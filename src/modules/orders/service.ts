@@ -54,6 +54,13 @@ export interface OrderLineRow {
   tax_cents: Cents;
   line_cents: Cents;
   taxable: number; // 1|0
+  /** Purchasing/selling unit this line was scanned/entered as ("case", "box"),
+   *  or null for a plain each sale. Display-only — quantity above is always
+   *  base (each) units regardless of this field (POS-v1 / ADR-006). */
+  unit_kind?: string | null;
+  /** The human-entered count in unit_kind (e.g. 2 for "2 Case"). Null when
+   *  unit_kind is null. */
+  unit_qty?: number | null;
 }
 
 export interface OrderWithLines extends OrderRow {
@@ -62,8 +69,16 @@ export interface OrderWithLines extends OrderRow {
 
 export interface CreateOrderLineInput {
   productId: string;
+  /** Base (each) units by the time this reaches create()/update() — the route
+   *  layer has already converted a scanned unit ("1 case") into base units
+   *  before calling either method, exactly like purchasing's pattern. Neither
+   *  method has any unit-awareness; they only ever see base-unit quantities. */
   quantity: number;
   ageVerified?: boolean; // required true when product.age_restricted (BE-16)
+  /** Display-only — see OrderLineRow.unit_kind. Never used in quantity/price/tax math. */
+  unitKind?: string;
+  /** Display-only — the human-entered count in unitKind (e.g. 1 for "1 Case"). */
+  unitQty?: number;
 }
 
 export interface CreateOrderInput {
@@ -233,6 +248,8 @@ export class OrdersService {
       tax_cents: computed.lines[i].taxCents,
       line_cents: computed.lines[i].lineCents,
       taxable: r.taxable ? 1 : 0,
+      unit_kind: r.input.unitKind ?? null,
+      unit_qty: r.input.unitQty ?? null,
     }));
 
     await this.db.withTenant(tenantId).tx(async (tdb) => {
@@ -251,10 +268,10 @@ export class OrdersService {
         await tdb.query(
           `INSERT INTO order_lines
              (id, tenant_id, order_id, product_id, name, quantity, unit_cents,
-              tax_cents, line_cents, taxable)
+              tax_cents, line_cents, taxable, unit_kind, unit_qty)
            VALUES
              (@id, @tenant_id, @order_id, @product_id, @name, @quantity, @unit_cents,
-              @tax_cents, @line_cents, @taxable)`,
+              @tax_cents, @line_cents, @taxable, @unit_kind, @unit_qty)`,
           line as unknown as Record<string, unknown>,
         );
       }
@@ -325,6 +342,7 @@ export class OrdersService {
         product_id: r.product.id, name: r.product.name,
         quantity: r.input.quantity, unit_cents: r.product.price_cents,
         tax_cents: tax, line_cents: r.lineGross + tax, taxable: r.taxable ? 1 : 0,
+        unit_kind: r.input.unitKind ?? null, unit_qty: r.input.unitQty ?? null,
       };
     });
 
@@ -333,8 +351,8 @@ export class OrdersService {
       await tdb.query("DELETE FROM order_lines WHERE order_id = @id AND tenant_id = @t", { id, t: tenantId });
       for (const l of newLines) {
         await tdb.query(
-          `INSERT INTO order_lines (id, tenant_id, order_id, product_id, name, quantity, unit_cents, tax_cents, line_cents, taxable)
-           VALUES (@id,@tenant_id,@order_id,@product_id,@name,@quantity,@unit_cents,@tax_cents,@line_cents,@taxable)`,
+          `INSERT INTO order_lines (id, tenant_id, order_id, product_id, name, quantity, unit_cents, tax_cents, line_cents, taxable, unit_kind, unit_qty)
+           VALUES (@id,@tenant_id,@order_id,@product_id,@name,@quantity,@unit_cents,@tax_cents,@line_cents,@taxable,@unit_kind,@unit_qty)`,
           l as unknown as Record<string, unknown>,
         );
       }
@@ -615,10 +633,10 @@ export class OrdersService {
           const newLine: OrderLineRow = { ...line, id: `oln_${uuidv7()}`, order_id: childId };
           await tdb.query(
             `INSERT INTO order_lines
-               (id, tenant_id, order_id, product_id, name, quantity, unit_cents, tax_cents, line_cents, taxable)
+               (id, tenant_id, order_id, product_id, name, quantity, unit_cents, tax_cents, line_cents, taxable, unit_kind, unit_qty)
              VALUES
-               (@id, @tenant_id, @order_id, @product_id, @name, @quantity, @unit_cents, @tax_cents, @line_cents, @taxable)`,
-            newLine as unknown as Record<string, unknown>,
+               (@id, @tenant_id, @order_id, @product_id, @name, @quantity, @unit_cents, @tax_cents, @line_cents, @taxable, @unit_kind, @unit_qty)`,
+            { ...newLine, unit_kind: newLine.unit_kind ?? null, unit_qty: newLine.unit_qty ?? null } as unknown as Record<string, unknown>,
           );
           childLines.push(newLine);
         }

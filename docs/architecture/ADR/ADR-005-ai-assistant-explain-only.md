@@ -29,8 +29,16 @@ with a clear error instead of fabricating pseudo-AI text.
 rule/table the query came from, in the `reason` field. Module boundary
 respected: `ai_assistant` never imports purchasing/inventory service code,
 only reads shared tables and calls one already-permission-checked HTTP
-endpoint. Gated via the existing business-pack module system
-(`ai_assistant` added to the `restaurant` bundle in `moduleRegistry.ts`),
-fail-closed like all `requireModule` checks. This is a scoped precursor to
-E6, not E6 itself — full roadmap-scale AI (proactive suggestions, broader
-domain coverage, RAG over a real knowledge base) remains gated behind E4.
+endpoint. Gated via the existing business-pack module system, but per
+ADR-004's precedent for new capabilities it ships **default-off** — `ai_assistant`
+is listed in `MODULE_REGISTRY` but deliberately left out of the `restaurant`
+bundle's default module list in `moduleRegistry.ts`. Each tenant opts in
+explicitly via the existing per-module flag toggle (`POST
+/settings/business-profile { moduleFlags: { ai_assistant: true } }`) —
+EcoBrew (the tenant this was built and tested against) is opted in this way,
+not via the bundle default. Fail-closed like all `requireModule` checks:
+confirmed a fresh restaurant-bundle tenant does NOT get it automatically, and
+that toggling it on/off is exactly the existing per-tenant mechanism, no new
+code. This is a scoped precursor to E6, not E6 itself — full roadmap-scale AI
+(proactive suggestions, broader domain coverage, RAG over a real knowledge
+base) remains gated behind E4.
