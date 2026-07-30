@@ -22,6 +22,8 @@ export const QueueNames = {
   OUTBOX_RETENTION: "outbox_retention",
   /** DEMO-1: Trial lifecycle sweep — nurture emails + soft-expiry, once a day. */
   TRIAL_EXPIRY: "trial_expiry",
+  /** DB-BKP: Daily pg_dump snapshot — writes a .sql file to backups/ and prunes old dumps. */
+  DB_BACKUP: "db_backup",
 } as const;
 // "outbox_relay" (DB-8) retired in ACPA M1.2 — the shared Outbox reconciler
 // owns redelivery; stale relay jobs are purged at bootstrap.

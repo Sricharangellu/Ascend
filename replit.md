@@ -54,6 +54,82 @@ Navigate to `/login?demo=1` and click Sign In, or set `VITE_MOCK=true` (the defa
 
 ---
 
+## Database Backup & Restore
+
+### How backups work
+
+The API server runs a **daily background job** (`db_backup`) that calls `pg_dump` and writes a timestamped `.sql` file to `backups/` at the repo root.  Dumps older than 7 days are pruned automatically.  The job is self-rescheduling — it re-enqueues itself 24 hours ahead, so no cron daemon is required.
+
+Environment variables:
+| Variable | Default | Purpose |
+|---|---|---|
+| `BACKUP_DIR` | `./backups` | Directory where dump files are written |
+| `BACKUP_RETAIN_DAYS` | `7` | Days of dumps to keep before pruning |
+| `BACKUP_ENABLED` | `true` | Set to `"false"` to disable automated dumps |
+
+### On-demand backup (CLI)
+
+```bash
+# From the repo root (DATABASE_URL must be set):
+pnpm --filter @workspace/api-server db:backup
+
+# Or directly:
+DATABASE_URL=<your-connection-string> bash artifacts/api-server/scripts/backup.sh
+```
+
+### On-demand export (HTTP)
+
+Any authenticated **owner** can download a full SQL dump via the API:
+
+```
+GET /api/v1/admin/db/export
+Authorization: Bearer <owner-jwt>
+```
+
+The response streams a `ascend-backup-<timestamp>.sql` file attachment directly from `pg_dump`.
+
+### Restore procedure
+
+> ⚠️ Restore **replaces all data** in the target database. Back up the current state first if in doubt.
+
+**Step 1 — identify the dump file to restore:**
+```bash
+ls -lh backups/
+```
+
+**Step 2 — run the restore script:**
+```bash
+# From the repo root:
+DATABASE_URL=<your-connection-string> bash artifacts/api-server/scripts/restore.sh backups/ascend-backup-<timestamp>.sql
+```
+The script asks for confirmation before making any changes.
+
+**Step 3 — restart the API server:**
+```bash
+# In Replit, use the "Restart" button on the API Server workflow,
+# or from the shell:
+pnpm --filter @workspace/api-server run dev
+```
+The server will re-apply any pending migrations automatically on startup.
+
+**What the restore covers:**
+- All tables in the `public` schema (customers, orders, products, tenants, users, …)
+- Schema structure (DDL) + data rows
+
+**What it does NOT cover:**
+- Database users / roles (excluded via `--no-owner --no-acl`)
+- Other schemas (only `public` is dumped)
+
+### Recovery from a full database reset
+
+If the Replit PostgreSQL database is wiped (e.g. via the Replit dashboard):
+
+1. Obtain the new `DATABASE_URL` from the Replit database panel and update the secret.
+2. Run the restore script against the most recent backup in `backups/`.
+3. Restart the API server — migrations will run and any new tables will be created automatically.
+
+---
+
 ## User Preferences
 
 - Keep Tailwind v3 (not v4) — original design tokens depend on it.

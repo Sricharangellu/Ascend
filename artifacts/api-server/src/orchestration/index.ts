@@ -82,6 +82,7 @@ export { reconcilePaymentsJob } from "./jobs/reconcile-payments.job.js";
 export { closeRegisterJob } from "./jobs/close-register.job.js";
 export { syncEcommerceJob } from "./jobs/sync-ecommerce.job.js";
 export { trialExpiryJob, TRIAL_EXPIRY_INTERVAL_MS } from "./jobs/trial-expiry.job.js";
+export { dbBackupJob, DB_BACKUP_INTERVAL_MS } from "./jobs/db-backup.job.js";
 
 // Compensations
 export { releaseInventoryCompensation } from "./compensations/release-inventory.compensation.js";
@@ -130,6 +131,7 @@ import { arDunningJob } from "./jobs/ar-dunning.job.js";
 import { idempotencyExpiryJob, IDEMPOTENCY_EXPIRY_INTERVAL_MS } from "./jobs/idempotency-expiry.job.js";
 import { outboxRetentionJob, OUTBOX_RETENTION_INTERVAL_MS } from "./jobs/outbox-retention.job.js";
 import { trialExpiryJob, TRIAL_EXPIRY_INTERVAL_MS } from "./jobs/trial-expiry.job.js";
+import { dbBackupJob, DB_BACKUP_INTERVAL_MS } from "./jobs/db-backup.job.js";
 
 export interface OrchestrationBootstrap {
   runner: WorkflowRunner;
@@ -315,6 +317,30 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
       tenantId: "system",
       payload: {},
       runAt: Date.now(),
+      maxAttempts: 3,
+    }).catch(() => {});
+  }
+
+  // DB-BKP: Daily pg_dump snapshot — writes to backups/ at the repo root,
+  // prunes dumps older than BACKUP_RETAIN_DAYS (default 7). Self-re-enqueues
+  // so the schedule continues without a cron daemon. Only runs when
+  // DATABASE_URL is set and BACKUP_ENABLED !== "false".
+  jobConsumer.register(QueueNames.DB_BACKUP, async (job) => {
+    await dbBackupJob(job);
+    await jobProducer.enqueueOnce({
+      type: QueueNames.DB_BACKUP,
+      tenantId: "system",
+      payload: {},
+      runAt: Date.now() + DB_BACKUP_INTERVAL_MS,
+      maxAttempts: 3,
+    });
+  });
+  if (backgroundJobsEnabled) {
+    void jobProducer.enqueueOnce({
+      type: QueueNames.DB_BACKUP,
+      tenantId: "system",
+      payload: {},
+      runAt: Date.now() + DB_BACKUP_INTERVAL_MS, // first run in 24 h (not immediately on startup)
       maxAttempts: 3,
     }).catch(() => {});
   }

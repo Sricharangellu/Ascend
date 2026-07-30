@@ -526,6 +526,55 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     }),
   );
 
+  // ── Admin: on-demand database export (owner-only) ──────────────────────────
+  // GET /api/v1/admin/db/export — streams a pg_dump SQL file as a download.
+  // Owner role required; bearer token from the normal JWT flow.
+  // Useful for manual backups or when the automated daily job hasn't run yet.
+  app.get(
+    "/api/v1/admin/db/export",
+    requireRole("owner"),
+    handler(async (_req, res) => {
+      const dbUrl = process.env["DATABASE_URL"];
+      if (!dbUrl) {
+        res.status(503).json({ error: "DATABASE_URL not configured" });
+        return;
+      }
+
+      const { spawn } = await import("node:child_process");
+      const ts = new Date().toISOString().replace(/[:.]/g, "-").replace("T", "T").slice(0, 19) + "Z";
+      const filename = `ascend-backup-${ts}.sql`;
+
+      res.setHeader("Content-Type", "application/sql");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+      const proc = spawn(
+        "pg_dump",
+        ["--no-owner", "--no-acl", "--schema=public", "--clean", "--if-exists", dbUrl],
+        { stdio: ["ignore", "pipe", "pipe"] },
+      );
+
+      proc.stdout.pipe(res);
+
+      const errChunks: Buffer[] = [];
+      proc.stderr.on("data", (chunk: Buffer) => errChunks.push(chunk));
+
+      proc.on("error", (err: Error) => {
+        logger.error({ err }, "db export: pg_dump spawn failed");
+        if (!res.headersSent) res.status(500).json({ error: "pg_dump failed to start" });
+        else res.destroy();
+      });
+
+      proc.on("close", (code: number | null) => {
+        if (code !== 0) {
+          const stderr = Buffer.concat(errChunks).toString("utf8").slice(0, 300);
+          logger.error({ code, stderr }, "db export: pg_dump exited non-zero");
+          // Headers already sent (stream started) — just end the response.
+          res.end();
+        }
+      });
+    }),
+  );
+
   // ── Error handling (errorEnvelope must be last)
   app.use(errorMiddleware);
   app.use(errorEnvelopeMiddleware);
