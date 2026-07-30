@@ -94,6 +94,12 @@ function getDeployState() {
 }
 
 // --- Ownership: WORK/LOCK.md active claims (lightweight parse) ----------
+// STALE_AFTER_HOURS matches the two-tier claim model documented in
+// tools/AGENT_PROMPT.md / WORK/README.md 2026-07-30: a LOCK.md entry is a
+// short-lived, single-session file-edit lock, not a task tracker — it
+// should never legitimately sit ACTIVE past roughly one working session.
+const STALE_AFTER_HOURS = 24;
+
 function getActiveLockClaims() {
   let text;
   try {
@@ -108,6 +114,7 @@ function getActiveLockClaims() {
   while ((match = headerRe.exec(text))) {
     headers.push({ title: match[1].trim(), index: match.index });
   }
+  const now = Date.now();
   for (let i = 0; i < headers.length; i++) {
     const start = headers[i].index;
     const end = i + 1 < headers.length ? headers[i + 1].index : text.length;
@@ -115,7 +122,17 @@ function getActiveLockClaims() {
     const statusMatch = block.match(/\|\s*Status\s*\|\s*([^|]+)\|/);
     const status = statusMatch ? statusMatch[1].trim() : "unknown";
     if (/^ACTIVE/i.test(status) && !/RELEASED/i.test(headers[i].title)) {
-      claims.push({ title: headers[i].title, status });
+      const startedMatch = block.match(/\|\s*Started\s*\|\s*([^|]+)\|/);
+      const startedRaw = startedMatch ? startedMatch[1].trim() : null;
+      const startedDate = startedRaw ? new Date(startedRaw) : null;
+      const ageHours = startedDate && !isNaN(startedDate) ? (now - startedDate.getTime()) / 3_600_000 : null;
+      claims.push({
+        title: headers[i].title,
+        status,
+        started: startedRaw,
+        ageHours,
+        stale: ageHours !== null && ageHours > STALE_AFTER_HOURS,
+      });
     }
   }
   return claims;
@@ -194,7 +211,13 @@ function renderMarkdown(d) {
   lines.push(`## Ownership (active WORK/LOCK.md claims)`, ``);
   if (d.lockClaims === null) lines.push(`_WORK/LOCK.md not found_`);
   else if (d.lockClaims.length === 0) lines.push(`_no active claims_`);
-  else for (const c of d.lockClaims) lines.push(`- ${c.title} — ${c.status}`);
+  else for (const c of d.lockClaims) {
+    const age = c.ageHours !== null ? `${(c.ageHours / 24).toFixed(1)}d old` : "age unknown";
+    const flag = c.stale ? ` — **STALE** (${age}, started ${c.started})` : ` (${age})`;
+    lines.push(`- ${c.title} — ${c.status}${flag}`);
+  }
+  const staleCount = d.lockClaims?.filter((c) => c.stale).length ?? 0;
+  if (staleCount > 0) lines.push(``, `⚠ ${staleCount} claim(s) exceed the ${STALE_AFTER_HOURS}h staleness threshold — review and release or confirm still valid.`);
   lines.push(``);
 
   lines.push(`## Decisions (ADRs)`, ``);
@@ -238,11 +261,16 @@ function renderHtml(d) {
     `<tr><td>${t.label}</td><td><code>${t.branch}</code></td><td><code>${esc(t.sha)}</code></td><td>${esc(t.subject)}</td></tr>`
   ).join("");
 
+  const staleCount = d.lockClaims?.filter((c) => c.stale).length ?? 0;
   const lockRows = d.lockClaims === null
     ? `<p class="muted">WORK/LOCK.md not found</p>`
     : d.lockClaims.length === 0
     ? `<p class="muted">no active claims</p>`
-    : `<ul>${d.lockClaims.map((c) => `<li>${esc(c.title)} <span class="pill">${esc(c.status)}</span></li>`).join("")}</ul>`;
+    : `<ul>${d.lockClaims.map((c) => {
+        const age = c.ageHours !== null ? `${(c.ageHours / 24).toFixed(1)}d` : "age unknown";
+        const pill = c.stale ? `<span class="pill bad">STALE · ${age}</span>` : `<span class="pill">${age}</span>`;
+        return `<li>${esc(c.title)}${pill}</li>`;
+      }).join("")}</ul>${staleCount > 0 ? `<p class="bad">⚠ ${staleCount} claim(s) exceed the ${STALE_AFTER_HOURS}h staleness threshold</p>` : ""}`;
 
   const adrRows = d.adrs === null
     ? `<p class="muted">docs/architecture/ADR not found</p>`
