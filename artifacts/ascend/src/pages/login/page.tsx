@@ -223,11 +223,20 @@ function LoginContent() {
                 Caps Lock is on.
               </p>
             )}
-            {import.meta.env.DEV && (
-              <p className="text-xs text-slate-400 dark:text-slate-500">
-                Dev mode: any password works (use &quot;wrong&quot; to test an error).
-              </p>
-            )}
+            {import.meta.env.DEV && (() => {
+              const isMock =
+                import.meta.env.VITE_MOCK === "true" ||
+                (import.meta.env.VITE_MOCK !== "false" && import.meta.env.DEV);
+              return isMock ? (
+                <p className="text-xs text-slate-400 dark:text-slate-500">
+                  Dev mode: any password works (use &quot;wrong&quot; to test an error).
+                </p>
+              ) : (
+                <p className="text-xs text-slate-400 dark:text-slate-500">
+                  Demo credentials: <span className="font-medium text-slate-600 dark:text-slate-400">owner@ascend.dev</span> / <span className="font-medium text-slate-600 dark:text-slate-400">AscendDemo!2026</span>
+                </p>
+              );
+            })()}
           </div>
 
           {/* Remember me */}
