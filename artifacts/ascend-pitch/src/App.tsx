@@ -12,10 +12,11 @@
  * check" if this file has been hand-edited and needs repair.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { slides } from '@/slideLoader';
 import type { Action } from '@/.sdm/core/schema';
 import { useLocation } from 'wouter';
+import type { ExportProgress } from '@/lib/exportPdf';
 
 function getSlideIndex(pathname: string): number {
   const match = pathname.match(/^\/slide(\d+)$/);
@@ -229,6 +230,8 @@ function SlideViewer() {
     width: Math.min(window.innerWidth, window.innerHeight * (16 / 9)),
     height: Math.min(window.innerHeight, window.innerWidth * (9 / 16)),
   }));
+  const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     const update = () => {
@@ -264,6 +267,20 @@ function SlideViewer() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  const handleExport = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (exporting) return;
+    setExporting(true);
+    setExportProgress({ current: 0, total: slides.length, label: 'Preparing…' });
+    try {
+      const { exportToPdf } = await import('@/lib/exportPdf');
+      await exportToPdf((progress) => setExportProgress(progress));
+    } finally {
+      setExporting(false);
+      setExportProgress(null);
+    }
+  }, [exporting]);
+
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   const firstPosition = slides.length > 0 ? slides[0].position : 1;
 
@@ -279,6 +296,57 @@ function SlideViewer() {
         onLoad={() => iframeRef.current?.focus()}
         title="Slide viewer"
       />
+
+      {/* Download PDF button — top-right corner overlay */}
+      <button
+        onClick={handleExport}
+        disabled={exporting}
+        title="Download PDF"
+        style={{
+          position: 'fixed',
+          top: '16px',
+          right: '16px',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '8px 14px',
+          borderRadius: '8px',
+          border: '1px solid rgba(93,95,239,0.4)',
+          background: exporting ? 'rgba(10,13,23,0.95)' : 'rgba(93,95,239,0.15)',
+          color: exporting ? 'rgba(255,255,255,0.6)' : '#fff',
+          fontSize: '13px',
+          fontWeight: 600,
+          fontFamily: 'Inter, system-ui, sans-serif',
+          cursor: exporting ? 'default' : 'pointer',
+          backdropFilter: 'blur(8px)',
+          transition: 'background 0.15s, color 0.15s',
+          whiteSpace: 'nowrap',
+          minWidth: '140px',
+          justifyContent: 'center',
+        }}
+      >
+        {exporting ? (
+          <>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, animation: 'spin 1s linear infinite' }}>
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+            <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+            {exportProgress
+              ? `${exportProgress.current}/${exportProgress.total} slides`
+              : 'Starting…'}
+          </>
+        ) : (
+          <>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Download PDF
+          </>
+        )}
+      </button>
     </div>
   );
 }
