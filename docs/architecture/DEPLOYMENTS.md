@@ -8,6 +8,79 @@ this document exists specifically because two prior docs (`PIPELINE.md` 2026-07-
 that worse, not better. See `WORK/audits/AUDIT_2026-07-29T*-production-heartbeat-*.md` and commit
 `978c154` for the investigation history this builds on.
 
+## Executive summary
+
+1. **Is production currently down?** UNKNOWN — pending Sri's manual browser check of
+   `https://ascend-prod.onrender.com/healthz`. This is the single fact everything else forks on.
+2. **Where does production actually run?** UNCONFIRMED. Docs claim Render; zero deploy automation
+   in this repo supports that claim, and the URL doesn't respond from two independent networks
+   (this sandbox, and a GitHub Actions runner via `workflow_dispatch` — run `30565267888`).
+3. **What deployment path is authoritative?** None, currently. `ci.yml`/`scripts/deploy.sh` deploy
+   backend to Vercel project IDs that are either dead (`DEPLOYMENT_NOT_FOUND`) or serving an
+   unrelated app. Render is claimed as the real target but has no representation in this repo's
+   CI/CD at all — no workflow, no deploy hook, no `render.yaml`.
+4. **What database does production use?** UNCONFIRMED. Docs claim an isolated `ca-central-1`
+   Supabase project created 2026-07-20, never confirmed to have received a live connection. The
+   project that's actually been populated and in use (172 tables, demo login, `us-west-2`) is the
+   one documented as *testing*'s.
+5. **What's broken?** Confirmed broken: the heartbeat monitor (probing dead URLs) and the CI/CD
+   deploy automation (disconnected from whatever's actually real, if anything, in production).
+   Possibly broken: production itself — unconfirmed pending item 1.
+
+## Evidence table
+
+| Finding | Evidence | Impact |
+|---|---|---|
+| `ci.yml`/`scripts/deploy.sh` have zero Render logic | `grep -n "backend" scripts/deploy.sh` — every tier (`prod`/`testing`/`dev`) uses `npx vercel deploy` against hardcoded `BACKEND_PID`/`FRONTEND_PID` | CI/CD cannot be deploying to Render under any circumstance; if Render is real, it shipped entirely outside this repo's automation |
+| `ascendhq-api.vercel.app` (heartbeat's current probe target) is dead | `x-vercel-error: DEPLOYMENT_NOT_FOUND` (verified 2026-07-23 per commit `978c154`, re-confirmed this session) | Every heartbeat failure since ~2026-07-22 is noise from a dead URL, not evidence of an outage |
+| `ascend-backend-staging.vercel.app` is dead | Same error, same commit; re-confirmed via the PR #116 staging-deploy failure log this session | Staging/dev backend deploy has been broken since at least 2026-07-23 |
+| `ascend-backend.vercel.app` resolves but serves a bare, unrelated Express app | Commit `978c154`'s direct check | Contradicts the 2026-07-20 doc's claim that this project was deleted — one of the two is wrong |
+| `ascend-prod.onrender.com` DNS resolves to genuine Render→Cloudflare infrastructure | `nslookup` → `gcp-us-west1-1.origin.onrender.com.cdn.cloudflare.net`, real IPs | The hostname/service registration is real, not a typo |
+| But the same URL times out completely (0 bytes) from 2 independent networks | This sandbox (60s × 3 retries) and a GitHub Actions runner via `workflow_dispatch`, run `30565267888`, job "Probe production endpoints" | Rules out "sandbox network restriction"; consistent with the service never having come up live, or being a private (non-public) Render service |
+| `src/server.ts` binds correctly for Render (`process.env.PORT`, no host restriction) | Direct code read | Rules out an obvious app-level binding bug as the cause |
+| Frontend "git-connected" (PIPELINE.md, 2026-07-20) contradicts "NOT git-connected, manual CLI" (`scripts/deploy.sh` header comment) | Direct text of both files | One of this repo's own docs is wrong about its own deploy mechanism |
+| "Testing" Supabase project (`us-west-2`) has ~172 tables + demo login; "production" project (`ca-central-1`) has no confirmed connection ever | `PIPELINE.md`'s own Supabase section + this session's own backend connection matches `us-west-2` | The database actually in use may not be the one labeled production |
+| Two Vercel secrets exist (`VERCEL_TOKEN`, `VERCEL_TOKEN_PROD`); the non-prod one was dead since 2026-07-20 (commit `c8185d9`, never merged/actioned) until rotated this session | `gh secret list` timestamps; git history | A previously-diagnosed fix sat unactioned for 10 days because the finding was made on a branch that never merged |
+
+## Architecture reality map
+
+**Documented (claimed, 2026-07-20):**
+```
+Users → Vercel (frontend, git-connected to master)
+      → Render (backend, git-integration auto-deploy on push to master)
+                → Supabase "production" (ca-central-1, isolated)
+      → uptime.yml (monitors the above)
+```
+
+**Confirmed-working, this repo's own CI/CD (`ci.yml`/`scripts/deploy.sh`):**
+```
+Users → Vercel (frontend, manual-CLI deploy per scripts/deploy.sh's own header comment)
+      → Vercel (backend — but the project this targets is dead or serves the wrong app)
+                → Supabase "testing" (us-west-2 — the one actually populated and in use)
+      → uptime.yml (monitors neither of the above — probes a third, also-dead Vercel URL)
+```
+
+Three different pictures of "where production is" exist simultaneously in this repo right now,
+and none of them has a confirmed, responding endpoint behind it. That gap — not the red heartbeat
+run — is the actual finding.
+
+## Recommended fix plan
+
+- **P0 — Production availability.** Confirm via Sri's browser check whether `ascend-prod.onrender.com/healthz`
+  responds at all. If it's a real outage: restore before anything else below. If it's blocked for
+  automated/non-browser requests specifically: that's a Render networking/WAF question, still P0,
+  because a monitor that can't reach a healthy service is as broken as a monitor pointed at a dead one.
+- **P1 — Deployment ownership correction.** Get Render dashboard/API-confirmed answers to: is this
+  the real backend, git-integration or manual, which branch, build/start commands, public or private
+  service, currently running or not. Then execute Option A or B (see below) — do not leave both
+  paths half-configured, which is the current state.
+- **P2 — Documentation reconciliation.** Once P1 answers exist, every doc that mentions hosting
+  (`ARCHITECTURE.md`, `ORCHESTRATION.md`, `PIPELINE.md`, this file) must agree with each other and
+  with `scripts/deploy.sh`/`ci.yml`. Resolve the two direct contradictions this document lists above.
+- **P3 — Monitoring correction.** Only after P1/P2: merge `fix/uptime-heartbeat-stale-endpoints`
+  (currently held) with the confirmed-real URL, and fix the frontend probe the same way once its
+  real URL is known too.
+
 ## Timeline of claims (each contradicts or narrows the last)
 
 | Date | Claim | Source | Status |
