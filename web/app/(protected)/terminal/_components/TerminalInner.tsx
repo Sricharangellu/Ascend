@@ -113,6 +113,7 @@ export function TerminalInner() {
         productId: l.product.id,
         quantity: l.quantity,
         ...(l.product.ageRestricted ? { ageVerified } : {}),
+        ...(l.product.unitKind ? { unitKind: l.product.unitKind } : {}),
       })),
       ...(discountCents > 0 ? { discountCents } : {}),
     };
@@ -159,10 +160,12 @@ export function TerminalInner() {
   const handleBarcodeScan = useCallback(async (code: string) => {
     if (screen !== "terminal") return;
     try {
-      const raw = await apiGet<Product>(`/api/v1/catalog/barcode/${encodeURIComponent(code)}`);
+      // POS-v1: fully resolved (product + packaging + price + stock) — the
+      // terminal does no conversion/pricing math, it only renders this.
+      const raw = await apiGet<Product>(`/api/v1/catalog/barcode/${encodeURIComponent(code)}/pos`);
       const product = normalizeTerminalProduct(raw); // real backend returns snake_case
       cart.addProduct(product);
-      setScannedName(product.name);
+      setScannedName(product.unitKind ? `${product.name} (${product.unitDisplayName})` : product.name);
     } catch {
       addToast({ title: `Barcode not found: ${code}`, variant: "error" });
     }

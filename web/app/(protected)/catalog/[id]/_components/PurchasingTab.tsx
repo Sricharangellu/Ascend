@@ -10,13 +10,15 @@ import { useState } from "react";
 import { SuppliersTab } from "./SuppliersTab";
 import { PurchasesTab } from "./PurchasesTab";
 import { SupplierPriceComparisonTab } from "./SupplierPriceComparisonTab";
+import { UnitsTab } from "./UnitsTab";
 
-type PTab = "purchase-orders" | "suppliers" | "price-comparison";
+type PTab = "purchase-orders" | "suppliers" | "price-comparison" | "units";
 
 const PTABS: { key: PTab; label: string; description: string }[] = [
   { key: "purchase-orders",   label: "Purchase Orders",    description: "All POs for this product, status, and receiving history" },
   { key: "suppliers",         label: "Suppliers",          description: "Approved suppliers and vendor SKU mappings for this product" },
   { key: "price-comparison",  label: "Price Comparison",   description: "Compare supplier quoted prices and find the best landed cost" },
+  { key: "units",             label: "Units & Packaging",  description: "Purchasing/selling units beyond Each — case/box barcodes and pack sizes" },
 ];
 
 export function PurchasingTab({ productId }: { productId: string }) {
@@ -52,6 +54,7 @@ export function PurchasingTab({ productId }: { productId: string }) {
       {tab === "purchase-orders"  && <PurchasesTab productId={productId} />}
       {tab === "suppliers"        && <SuppliersTab productId={productId} />}
       {tab === "price-comparison" && <SupplierPriceComparisonTab productId={productId} />}
+      {tab === "units"            && <UnitsTab productId={productId} />}
     </div>
   );
 }

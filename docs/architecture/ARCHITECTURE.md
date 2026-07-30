@@ -53,7 +53,7 @@ creating a duplicate concept is a constitution violation (see
 | Team | Modules |
 |---|---|
 | **Commerce** | orders (POS), sales (quotes/SOs), returns, discounts, promotions (in catalog), customers, loyalty, giftcards, quotes, service_orders |
-| **Supply Chain** | inventory, purchasing (POs/suppliers/receiving/bills/3-way match), product_batches, serial_numbers, store_locations, outlets, fulfillment, shipping, warehouse pages |
+| **Supply Chain** | inventory, purchasing (POs/suppliers/receiving/bills/3-way match; case/box purchasing units via `product_barcodes`, converted to base-unit `stock_qty` at the API edge — ADR-006), product_batches, serial_numbers, store_locations, outlets, fulfillment, shipping, warehouse pages, ai_assistant (explain-only, reads inventory/orders, delegates writes — ADR-005) |
 | **Finance** | accounting (COA/ledger/deposits), billing (AP bills/AR invoices), payments, expenses, customer_invoices, tax (settings tax rates) |
 | **Platform** | identity (src/identity), gateway (src/gateway), custom_roles, permission_requests, sso, sync, webhooks, sequences (+outbox infra), monitoring, notifications, audit_log, rls, workflows, search, settings |
 | **Experience** | web/ (EnterpriseShell, components, pages), reports UI, storefront (/store) |
@@ -102,7 +102,11 @@ manager · runtime move off serverless + pooled connections (✅ prod, ⬜ dev/s
    extract rule evaluation. Not started.
 5. **E5 Extension platform** — connector registry over webhooks. Not started.
 6. **E6 AI foundation** — permissioned action layer over modules; only after
-   E1/E4. Not started.
+   E1/E4. Not started. A scoped precursor shipped 2026-07-25: `ai_assistant`
+   module narrates existing rule-based signals (reorder/low-stock/expiry/
+   best-sellers/slow-movers) via Anthropic, gated behind human approval for
+   any write — see ADR-005. This is not E6 itself; proactive/broader-domain
+   AI still waits on E4.
 
 **Standing rejections (re-affirmed, do not re-litigate):** microservices,
 Kafka, K8s, multi-DB, schema-per-domain rename, low-code engine v1.

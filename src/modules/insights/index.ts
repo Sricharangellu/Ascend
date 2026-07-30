@@ -1,6 +1,7 @@
 import type { PosModule } from "../types.js";
 import { InsightsService } from "./service.js";
 import { registerRoutes } from "./routes.js";
+import { PurchasingService } from "../purchasing/index.js";
 
 const CREATE_SCHEDULED_REPORTS = `
 CREATE TABLE IF NOT EXISTS scheduled_reports (
@@ -29,8 +30,9 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS lead_time_days INTEGER;
 export const insightsModule: PosModule = {
   name: "insights",
   migrations: [CREATE_SCHEDULED_REPORTS, ADD_PRODUCT_FORECAST_COLUMNS],
-  register({ db, router }) {
-    registerRoutes(router, new InsightsService(db));
+  register({ db, router, events }) {
+    const purchasing = new PurchasingService(db, events);
+    registerRoutes(router, new InsightsService(db, purchasing));
   },
 };
 
