@@ -1,6 +1,6 @@
 # Ascend — Multi-Agent Work Lock
 
-Status: ACTIVE — session G (Cowork/Claude, Fable 5) coordinating Phase 0 (finish end-to-end + deployment readiness, Sri directive 2026-07-18). See claim below. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
+Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0 wave-dispatch coordination claim (started 2026-07-18) was closed 2026-07-30 as superseded — see its entry below; work since has shipped as independent claims rather than through that coordinator. Latest substantive work: Phase 7 items 1-2 (sales-velocity consolidation, demand-snapshot foundation) RELEASED; four-environment AI coordination workflow (Claude Code/Cursor/Replit) adopted 2026-07-30, see `docs/architecture/ORCHESTRATION.md` "Environment routing" + `tools/AGENT_PROMPT.md`. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B, RELEASED); Clean Architecture pilot (quotes + gateway auth) (session C, ABANDONED — see entry); SSO OIDC hardening (session D)
 
 ## Active Claim (Claude session G — Phase 0 coordinator: finish end-to-end + deployment readiness)
 
@@ -10,7 +10,7 @@ Status: ACTIVE — session G (Cowork/Claude, Fable 5) coordinating Phase 0 (fini
 | Queue item | Coordinating claim for FORWARD_PLAN.md Phase 0. This session dispatches independent, non-overlapping worktree-isolated subagents for the remaining mock-only FE↔BE gaps (notifications, purchasing EDI, workflows approval-chains) and merges each branch back sequentially — full gates (typecheck, real-Postgres tests, gap:scan) run after each merge before the next begins, never two merged concurrently. This claim covers the coordination + merge + board-update work; each subagent's own file scope is recorded as a nested note below when dispatched. |
 | Files/areas expected | `WORK/**` (this coordination), plus whatever files each merged subagent branch touches (recorded per-merge below). No two subagents touch overlapping module directories in the same wave. |
 | Started | 2026-07-18 |
-| Status | ACTIVE — dispatching wave 1 (notifications / purchasing EDI / workflows approval-chains) |
+| Status | RELEASED — SUPERSEDED (closed 2026-07-30, dashboard staleness review, 12.7 days stale). The wave-dispatch coordinator model this claim describes was never carried out as written — no subagent claims referencing this coordination ever appeared, and all work since (Phase 6, Phase 7 items 1-2, UOM/POS, ai-assistant, etc.) shipped as independent, self-contained claims instead. Treating this as an approach that was superseded in practice, not completed; closing rather than leaving it ACTIVE indefinitely. |
 | Blockers | none |
 
 ## Reconciliation note (session G, 2026-07-18)
@@ -32,7 +32,7 @@ another session's state) — appending this note instead.
 | Queue item | Expiry management (full-stack): automated sweep moves past-expiry lots out of active inventory into an expiry pool (expiry_writeoffs), books the total loss (Dr 5300 Spoilage / Cr 1200 Inventory via event), Upcoming-Expiry + Expiry-Pool pages, dispositions (discard / return-to-vendor via purchasing vendor-returns). Slices: (1) backend sweep+pool+journal, (2) dispositions, (3) frontend pages. Decisions: real journal, reuse vendor-returns, automated sweep + manual button. |
 | Files/areas expected | `src/modules/inventory/{index,service,routes}.ts` (+ test); `src/modules/accounting/{service,index}.ts` (chart + subscription); `web/app/(protected)/inventory/expiry/**` or ecommerce nav; web mocks/types. NOT session B/C files. |
 | Started | 2026-07-16 |
-| Status | ACTIVE — implementing (slice 1: sweep+pool+journal) |
+| Status | RELEASED (closed 2026-07-30, dashboard staleness review, 14.7 days stale). Confirms the 2026-07-18 reconciliation note above: independently re-verified via code inspection — `expiry_writeoffs` is a real table referenced in `src/modules/inventory/{index,service}.ts`, the sweep/pool feature is shipped and in active use. Closing the entry itself now rather than leaving it ACTIVE indefinitely (Sri's 2026-07-30 direction to clean up stale claims once verified, not just annotate). |
 | Blockers | none |
 
 ## Active Claim (Claude session D — inventory hardening: race-free transfer numbering) — RELEASED
@@ -220,7 +220,7 @@ another session's state) — appending this note instead.
 | Queue item | (1) Clean Architecture pilot: Repository + DTO extraction on `quotes` module, pure rule-evaluation extraction from `src/gateway/auth.ts` into `src/identity/authorization.ts` — see plan `~/.claude/plans/eager-splashing-hoare.md`. (2) Full API-endpoint audit (39+ route files, 12 dimensions) surfaced 3 critical bugs, now being fixed in this same claim: restaurant/workforce double-URL-prefix (routes 404 in prod), SSO login unreachable (blocked by global auth gate), and business-pack isolation never enforced server-side (`requireModule` middleware, reusing `SettingsService.getCapabilities`, applied to the 8 vertical modules). |
 | Files/areas expected | `src/modules/quotes/**`; `src/gateway/auth.ts`; `src/identity/authorization.ts`; `src/modules/restaurant/routes.ts`; `src/modules/workforce/routes.ts`; `src/app.ts` (SSO mount order only); `src/modules/sso/index.ts`; `src/modules/{appointments,entertainment,education,healthcare,hospitality,manufacturing,automotive,rental}/index.ts` (add requireModule guard only). Working in isolated worktree off `origin/master` at `/private/tmp/claude-501/-Users-sri-Desktop-Prj/00f2e7ff-1f2f-4b86-b5fd-4de2d0f8bd7e/scratchpad/ascend-clean-arch`, branch `feat/clean-arch-pilot-quotes`. NO `src/shared/{events,outbox}.ts`, NO `src/orchestration/*`, NO `payments/*` (session B's active claim). |
 | Started | 2026-07-15 |
-| Status | ACTIVE — implementing |
+| Status | ABANDONED (closed 2026-07-30, dashboard staleness review, 15.7 days stale). Verified via code inspection: branch `feat/clean-arch-pilot-quotes` no longer exists on origin, and its core deliverable, `src/identity/authorization.ts`, was never created — the Clean Architecture extraction (Repository+DTO on `quotes`, rule-evaluation extraction from `gateway/auth.ts`) never merged and appears lost with the branch. The 3 critical bugs bundled into this same claim did NOT share that fate — independently re-verified as fixed: `requireModule` middleware exists and is applied across the vertical modules (business-pack isolation), and SSO's public routes are mounted in `src/app.ts` (login reachable). Those fixes landed through other work, not this claim. |
 | Blockers | none |
 
 ## Active Claim (Claude session B — ACPA M1.4 staged outbox publish)
@@ -231,8 +231,8 @@ another session's state) — appending this note instead.
 | Queue item | M1.4: EventBus.stage()/dispatchStaged() — outbox row commits inside the publisher's business tx (closes crash-after-commit-before-publish loss); payments.capture migrated; daily retention sweep (delivered outbox rows + old consumption claims). |
 | Files/areas expected | `src/shared/{events,outbox}.ts`; `src/modules/payments/service.ts`; `src/orchestration/{index.ts,queues/queue-names.ts,jobs/outbox-retention.job.ts}`; `src/app.staging.test.ts`; ACPA_ROADMAP. NO purchasing (deferred: receive() staging queued until session A's requisition claim releases), NO catalog, NO web. |
 | Started | 2026-07-14 |
-| Status | ACTIVE — implementing |
-| Blockers | purchasing.receive staged-publish deferred to respect session A's purchasing claim |
+| Status | RELEASED (closed 2026-07-30, dashboard staleness review, 16.7 days stale). Verified via code inspection: `EventBus.stage()`/`dispatchStaged()` exist in `src/shared/events.ts`, `payments/service.ts`'s capture path calls both (line 323/340), and `outbox-retention.job.ts` is registered in `src/orchestration/index.ts`. All three described deliverables confirmed shipped. |
+| Blockers | none — purchasing.receive staged-publish deferral is now moot; session A's purchasing claim released long ago and multiple purchasing phases have shipped since |
 
 
 ## Active Claim (Claude session A — purchase requisitions)
