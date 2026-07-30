@@ -36,6 +36,19 @@ function SlideEditor() {
   const navigationDisabledRef = useRef(PARENT_OWNS_NAVIGATION);
   const touchHandledRefStable = useRef(false);
 
+  // Track navigation direction for animated transitions
+  const prevIndexRef = useRef(currentIndex);
+  const [enterDir, setEnterDir] = useState<'right' | 'left' | null>(null);
+  const [animKey, setAnimKey] = useState(0);
+
+  useEffect(() => {
+    if (currentIndex !== prevIndexRef.current) {
+      setEnterDir(currentIndex > prevIndexRef.current ? 'right' : 'left');
+      setAnimKey((k) => k + 1);
+      prevIndexRef.current = currentIndex;
+    }
+  }, [currentIndex]);
+
   useEffect(() => {
     if (currentIndex === -1) return;
 
@@ -187,13 +200,19 @@ function SlideEditor() {
   }, [currentIndex, navigate]);
 
   return (
-    <div className="select-none">
+    <div className="select-none" style={{ overflow: 'hidden' }}>
       {slides.map((slide, index) => (
         <div
           key={slide.id}
           style={{ display: index === currentIndex ? 'block' : 'none' }}
         >
-          <slide.Component />
+          {index === currentIndex ? (
+            <div key={animKey} className={enterDir ? `slide-enter-${enterDir}` : ''}>
+              <slide.Component />
+            </div>
+          ) : (
+            <slide.Component />
+          )}
         </div>
       ))}
     </div>
