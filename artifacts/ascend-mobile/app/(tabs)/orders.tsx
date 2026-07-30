@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useLocalSearchParams } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { apiFetch } from '@/lib/api';
 import type { Order, OrdersListResponse } from '@/lib/api';
@@ -59,7 +60,13 @@ function chipColors(
   }
 }
 
-function OrderRow({ order }: { order: Order }) {
+function OrderRow({
+  order,
+  highlighted,
+}: {
+  order: Order;
+  highlighted?: boolean;
+}) {
   const colors = useColors();
   const chip = chipColors(order.status, colors);
   return (
@@ -67,9 +74,10 @@ function OrderRow({ order }: { order: Order }) {
       style={[
         rowStyles.row,
         {
-          backgroundColor: colors.card,
-          borderColor: colors.border,
+          backgroundColor: highlighted ? colors.primaryMuted : colors.card,
+          borderColor: highlighted ? colors.primary : colors.border,
           borderRadius: colors.radius,
+          borderWidth: highlighted ? 2 : 1,
         },
       ]}
     >
@@ -102,7 +110,6 @@ const rowStyles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 14,
     paddingVertical: 12,
-    borderWidth: 1,
     marginBottom: 6,
   },
   left: { flex: 1, marginRight: 12 },
@@ -138,6 +145,13 @@ export default function OrdersScreen() {
   const [activeFilter, setActiveFilter] = useState<StatusFilter>('all');
   const [refreshing, setRefreshing] = useState(false);
 
+  // Deep-link highlight: tapping a push notification passes highlightId
+  const { highlightId } = useLocalSearchParams<{ highlightId?: string }>();
+  const [localHighlight, setLocalHighlight] = useState<string | undefined>(
+    highlightId,
+  );
+  const flatListRef = useRef<FlatList<Order>>(null);
+
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['orders'],
     queryFn: () => apiFetch<OrdersListResponse>('/api/v1/orders?limit=50&offset=0'),
@@ -148,6 +162,35 @@ export default function OrdersScreen() {
   const displayed = (data?.items ?? []).filter(
     (o) => activeFilter === 'all' || o.status === activeFilter,
   );
+
+  // When we arrive with a highlightId from a notification tap:
+  // 1. Switch to "all" so the order is visible regardless of status
+  // 2. Scroll the list to the target item
+  // 3. Auto-clear the highlight after 4 s
+  useEffect(() => {
+    if (!highlightId) return;
+    setLocalHighlight(highlightId);
+    setActiveFilter('all');
+  }, [highlightId]);
+
+  useEffect(() => {
+    if (!localHighlight || !data?.items.length) return;
+    const idx = displayed.findIndex((o) => o.id === localHighlight);
+    if (idx < 0) return;
+    // Give the FlatList a tick to render before scrolling
+    const t = setTimeout(() => {
+      flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.3 });
+    }, 200);
+
+    // Clear highlight after 4 seconds
+    const clear = setTimeout(() => setLocalHighlight(undefined), 4000);
+
+    return () => {
+      clearTimeout(t);
+      clearTimeout(clear);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localHighlight, data?.items.length]);
 
   async function onRefresh() {
     setRefreshing(true);
@@ -225,11 +268,19 @@ export default function OrdersScreen() {
         </View>
       ) : (
         <FlatList
+          ref={flatListRef}
           data={displayed}
           keyExtractor={(o) => o.id}
-          renderItem={({ item }) => <OrderRow order={item} />}
+          renderItem={({ item }) => (
+            <OrderRow order={item} highlighted={item.id === localHighlight} />
+          )}
           contentContainerStyle={[s.list, { paddingBottom: botPad + 90 }]}
           showsVerticalScrollIndicator={false}
+          onScrollToIndexFailed={() => {
+            // If the index is out of range (e.g. list not fully rendered yet),
+            // scroll to end as a graceful fallback
+            flatListRef.current?.scrollToEnd({ animated: true });
+          }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

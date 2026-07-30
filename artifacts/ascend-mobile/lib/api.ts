@@ -188,3 +188,21 @@ export interface OrdersListResponse {
   limit: number;
   offset: number;
 }
+
+// ─── Push notifications ───────────────────────────────────────────────────────
+export async function registerPushToken(
+  token: string,
+  platform: 'ios' | 'android' | 'web',
+): Promise<void> {
+  await apiFetch('/api/v1/push-tokens', {
+    method: 'POST',
+    body: JSON.stringify({ token, platform }),
+  });
+}
+
+export async function unregisterPushToken(token: string): Promise<void> {
+  await apiFetch('/api/v1/push-tokens', {
+    method: 'DELETE',
+    body: JSON.stringify({ token }),
+  });
+}

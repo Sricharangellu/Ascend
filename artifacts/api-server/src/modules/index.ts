@@ -50,6 +50,7 @@ import { educationModule } from "./education/index.js";
 import { expensesModule } from "./expenses/index.js";
 import { progressModule } from "./progress/index.js";
 import { businessModule } from "./business/index.js";
+import { pushTokensModule } from "./push_tokens/index.js";
 
 /**
  * Registration order = migration order. Keep dependencies earlier:
@@ -116,5 +117,6 @@ export const modules: PosModule[] = [
   expensesModule,
   progressModule,
   businessModule,
+  pushTokensModule,
   rlsModule,  // must be last — runs after all tenant tables exist
 ];
