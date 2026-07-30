@@ -17,6 +17,7 @@ import { slides } from '@/slideLoader';
 import type { Action } from '@/.sdm/core/schema';
 import { useLocation } from 'wouter';
 import type { ExportProgress } from '@/lib/exportPdf';
+import PresenterView from '@/pages/PresenterView';
 
 function getSlideIndex(pathname: string): number {
   const match = pathname.match(/^\/slide(\d+)$/);
@@ -199,6 +200,30 @@ function SlideEditor() {
     };
   }, [currentIndex, navigate]);
 
+  // Listen for presenter-mode navigation via BroadcastChannel.
+  // Only the explicit audience popup (audienceMode=1) participates —
+  // preview iframes inside the presenter view must NOT join this channel.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('audienceMode') !== '1') return;
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('ascend-pitch-sync');
+      bc.postMessage({ type: 'audienceReady' });
+      bc.onmessage = (e) => {
+        if (
+          e.data?.type === 'navigateToSlide' &&
+          typeof e.data.position === 'number'
+        ) {
+          const target = slides.find((s) => s.position === e.data.position);
+          if (target) navigate(`/slide${target.position}`);
+        }
+      };
+    } catch {}
+    return () => {
+      bc?.close();
+    };
+  }, [navigate]);
+
   return (
     <div className="select-none" style={{ overflow: 'hidden' }}>
       {slides.map((slide, index) => (
@@ -244,6 +269,7 @@ function AllSlides() {
 
 // This component is used for the deployed view at `/`
 function SlideViewer() {
+  const [, navigate] = useLocation();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [dims, setDims] = useState(() => ({
     width: Math.min(window.innerWidth, window.innerHeight * (16 / 9)),
@@ -316,6 +342,38 @@ function SlideViewer() {
         title="Slide viewer"
       />
 
+      {/* Presenter mode button — top-right corner overlay */}
+      <button
+        onClick={(e) => { e.stopPropagation(); navigate('/present'); }}
+        title="Open presenter mode"
+        style={{
+          position: 'fixed',
+          top: '16px',
+          right: '176px',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '8px 14px',
+          borderRadius: '8px',
+          border: '1px solid rgba(255,255,255,0.15)',
+          background: 'rgba(255,255,255,0.08)',
+          color: '#fff',
+          fontSize: '13px',
+          fontWeight: 600,
+          fontFamily: 'Inter, system-ui, sans-serif',
+          cursor: 'pointer',
+          backdropFilter: 'blur(8px)',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+          <rect x="2" y="3" width="20" height="14" rx="2" />
+          <path d="M8 21h8M12 17v4" />
+        </svg>
+        Present
+      </button>
+
       {/* Download PDF button — top-right corner overlay */}
       <button
         onClick={handleExport}
@@ -374,11 +432,12 @@ export default function App() {
   const [location, navigate] = useLocation();
 
   // DO NOT edit this useEffect - redirects unknown routes to the first slide.
-  // The "/" and "/allslides" routes are handled separately below.
+  // The "/", "/allslides", and "/present" routes are handled separately below.
   useEffect(() => {
     if (
       location !== '/' &&
       location !== '/allslides' &&
+      location !== '/present' &&
       getSlideIndex(location) === -1
     ) {
       if (slides.length > 0) {
@@ -458,5 +517,6 @@ export default function App() {
 
   if (location === '/') return <SlideViewer />;
   if (location === '/allslides') return <AllSlides />;
+  if (location === '/present') return <PresenterView />;
   return <SlideEditor />;
 }
