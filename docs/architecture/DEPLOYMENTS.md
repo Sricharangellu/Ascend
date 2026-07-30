@@ -20,8 +20,9 @@ This document's baseline is current as of that merge, not before it.
 1. **Is production currently down?** UNKNOWN — pending Sri's manual browser check of
    `https://ascend-prod.onrender.com/healthz`. This is the single fact everything else forks on.
 2. **Where does production actually run?** UNCONFIRMED. Docs claim Render; zero deploy automation
-   in this repo supports that claim, and the URL doesn't respond from two independent networks
-   (this sandbox, and a GitHub Actions runner via `workflow_dispatch` — run `30565267888`).
+   in this repo supports that claim, and the URL doesn't respond from three independent networks
+   (this sandbox, a GitHub Actions runner via `workflow_dispatch` — run `30565267888` — and Cursor
+   Cloud, all three getting an identical complete-timeout/zero-bytes result).
 3. **What deployment path is authoritative?** None, currently. `ci.yml`/`scripts/deploy.sh` deploy
    backend to Vercel project IDs that are either dead (`DEPLOYMENT_NOT_FOUND`) or serving an
    unrelated app. Render is claimed as the real target but has no representation in this repo's
@@ -43,7 +44,7 @@ This document's baseline is current as of that merge, not before it.
 | `ascend-backend-staging.vercel.app` is dead | Same error, same commit; re-confirmed via the PR #116 staging-deploy failure log this session | Staging/dev backend deploy has been broken since at least 2026-07-23 |
 | `ascend-backend.vercel.app` resolves but serves a bare, unrelated Express app | Commit `978c154`'s direct check | Contradicts the 2026-07-20 doc's claim that this project was deleted — one of the two is wrong |
 | `ascend-prod.onrender.com` DNS resolves to genuine Render→Cloudflare infrastructure | `nslookup` → `gcp-us-west1-1.origin.onrender.com.cdn.cloudflare.net`, real IPs | The hostname/service registration is real, not a typo |
-| But the same URL times out completely (0 bytes) from 2 independent networks | This sandbox (60s × 3 retries) and a GitHub Actions runner via `workflow_dispatch`, run `30565267888`, job "Probe production endpoints" | Rules out "sandbox network restriction"; consistent with the service never having come up live, or being a private (non-public) Render service |
+| But the same URL times out completely (0 bytes) from 3 independent networks | This sandbox (60s × 3 retries), a GitHub Actions runner via `workflow_dispatch` (run `30565267888`, job "Probe production endpoints"), and Cursor Cloud (`curl: (28) Operation timed out after 20002 milliseconds with 0 bytes received`) | Rules out "sandbox network restriction" even more strongly with a third, differently-hosted network; consistent with the service never having come up live, or being a private (non-public) Render service |
 | `src/server.ts` binds correctly for Render (`process.env.PORT`, no host restriction) | Direct code read | Rules out an obvious app-level binding bug as the cause |
 | Frontend "git-connected" (PIPELINE.md, 2026-07-20) contradicts "NOT git-connected, manual CLI" (`scripts/deploy.sh` header comment) | Direct text of both files | One of this repo's own docs is wrong about its own deploy mechanism |
 | "Testing" Supabase project (`us-west-2`) has ~172 tables + demo login; "production" project (`ca-central-1`) has no confirmed connection ever | `PIPELINE.md`'s own Supabase section + this session's own backend connection matches `us-west-2` | The database actually in use may not be the one labeled production |
@@ -96,9 +97,10 @@ run — is the actual finding.
 | 2026-07-22 | Production heartbeat starts failing (`ascendhq-api.vercel.app/healthz`) | GitHub Actions run history | Confirmed — first observed red run |
 | 2026-07-23 | Re-verification: `scripts/deploy.sh` has zero Render logic (still targets Vercel for every tier); 3 candidate backend URLs (`ascendhq-api.vercel.app`, `ascend-backend-staging.vercel.app`, `ascend-backend.vercel.app`) checked — first two `DEPLOYMENT_NOT_FOUND`, third resolves but serves a bare unrelated Express app; "the real Render URL, if one exists, is not recorded anywhere in this repository" | Commit `978c154` | Confirmed by direct HTTP checks at the time |
 | 2026-07-23 | **Contradicts the 2026-07-20 "project deleted" claim**: `ascend-backend.vercel.app` (the same project `deploy.sh`'s `BACKEND_PID` still targets) resolves and serves *something* — not consistent with "deleted this session" | Commit `978c154` | **Unresolved contradiction** — not adjudicated here |
-| 2026-07-30 | Sri supplies `https://ascend-prod.onrender.com` as the current prod backend URL | This conversation | DNS resolves cleanly (real Render→Cloudflare chain: `gcp-us-west1-1.origin.onrender.com.cdn.cloudflare.net`) — but **times out completely** (zero bytes) from two independent networks: this sandbox AND a GitHub Actions runner via `workflow_dispatch` (run `30565267888`) |
+| 2026-07-30 | Sri supplies `https://ascend-prod.onrender.com` as the current prod backend URL | This conversation | DNS resolves cleanly (real Render→Cloudflare chain: `gcp-us-west1-1.origin.onrender.com.cdn.cloudflare.net`) — but **times out completely** (zero bytes) from three independent networks: this sandbox, a GitHub Actions runner via `workflow_dispatch` (run `30565267888`), and Cursor Cloud |
 | 2026-07-30 | Sri manually verifying `/healthz` in a browser | This conversation | **Pending** — result determines whether this is an app-down incident or an automated-request-blocking issue (WAF/private networking/bot protection) |
 | 2026-07-30 | PR #117 (the 2026-07-23 correction, commit `978c154`) merged to `develop` | This conversation | Closes the "correction existed but never merged" gap — restores the missing audit signal so this document and `develop` agree |
+| 2026-07-30 | Cursor (a third, independent environment/network) curls `/healthz` directly, unprompted for this specific check beyond a general ask | Cursor's own status report, this conversation | `curl: (28) Operation timed out after 20002 milliseconds with 0 bytes received` — identical failure mode to the other two networks. Three-for-three on complete timeout meaningfully weakens the "one network's fluke" explanation |
 
 ## What this means (working hypothesis, not confirmed)
 
@@ -115,7 +117,7 @@ conclusion, since no one on this investigation has had that access.
 |---|---|---|
 | Backend provider | Claimed: Render. **Not independently confirmed** — no working endpoint found yet. | UNCONFIRMED |
 | Backend service name | UNKNOWN | Needs Render dashboard |
-| Backend URL | `https://ascend-prod.onrender.com` (supplied 2026-07-30) — unresponsive from 2 independent networks as of this writing | UNCONFIRMED LIVE |
+| Backend URL | `https://ascend-prod.onrender.com` (supplied 2026-07-30) — unresponsive from 3 independent networks as of this writing | UNCONFIRMED LIVE |
 | Deploy trigger | Claimed: Render git-integration, auto-deploy on push to `master` (per 2026-07-20 doc). **Not verified** — could also be manual dashboard deploys; `scripts/deploy.sh`/`ci.yml` have no Render deploy step either way, so the repo's own CI/CD does not drive this regardless of which is true. | UNCONFIRMED |
 | Repository / branch | If git-integration: presumably this repo, `master`. UNKNOWN whether Render's dashboard actually has this configured, or to what branch. | UNKNOWN |
 | Build command | UNKNOWN | Needs Render dashboard |
