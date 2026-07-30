@@ -194,7 +194,13 @@ export function TerminalInner() {
   const handleTenderSuccess = useCallback(
     (payment: Payment) => {
       setCompletedPayment(payment);
-      setCompletedOrder(cart.state.order);
+      // A successful tender completes the order, but cart.state.order still
+      // carries the "open" status it was created with. Stamp it "completed" so
+      // the receipt renders correctly — otherwise ReceiptView's status fallback
+      // mistitles the success screen "Order Voided" and hides refund/void.
+      setCompletedOrder(
+        cart.state.order ? { ...cart.state.order, status: "completed" } : null,
+      );
       setScreen("receipt");
       const lines = cart.state.lines;
       if (lines.length > 0 && activeOutletId) {
