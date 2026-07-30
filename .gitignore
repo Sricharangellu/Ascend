@@ -1,49 +1,49 @@
-node_modules/
-dist/
-*.db
-*.db-shm
-*.db-wal
-.env
-.DS_Store
-web/node_modules/
-web/.next/
-web/tsconfig.tsbuildinfo
-.vercel
-.claude/worktrees/
-desktop/release/
-*.dmg
-*.dmg.blockmap
-builder-debug.yml
-# Playwright
-web/playwright-report/
-web/test-results/
-web/e2e/.auth/*.json
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
-# Generated deploy metadata (written by scripts/deploy.sh; read by /healthz)
-version.json
-
-# ── Duplicate / copy junk ──────────────────────────────────────────────────────
-# macOS Finder / editor / chat-export flows create "<name> 2.<ext>" copies and
-# merge-recovery leaves "<name>.collision-backup.md". These caused real damage:
-# untracked copies blocked rebases/merges and diverged the working tree. Ignore
-# them so they can never be tracked, committed, or clutter `git status`.
-# (Delete the originals-of-value, not these — these are always throwaway copies.)
-* [0-9].md
-* [0-9].ts
-* [0-9].tsx
-* [0-9].js
-* [0-9].jsx
-* [0-9].json
-* [0-9].yml
-* [0-9].yaml
-* [0-9].sh
-* [0-9].tsbuildinfo
-*.collision-backup.md
-
-# TypeScript incremental build info (backend + any stray copies)
+# compiled output
+dist
+tmp
+out-tsc
 *.tsbuildinfo
-# Orphaned / stuck Next.js build output (root or web)
-.next
-.next.stuck-*
-web/.next.stuck-*
-.env*
+.expo
+.expo-shared
+
+# dependencies
+node_modules
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# misc
+/.sass-cache
+/connect.lock
+/coverage
+/libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+/typings
+
+# System Files
+.DS_Store
+Thumbs.db
+
+.cursor/rules/nx-rules.mdc
+.github/instructions/nx.instructions.md
+
+# Replit
+.cache/
+.local/
