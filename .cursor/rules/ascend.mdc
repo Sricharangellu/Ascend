@@ -1,0 +1,19 @@
+---
+description: Ascend repo entry point — read AGENTS.md before any work
+globs:
+alwaysApply: true
+---
+
+Read `AGENTS.md` at the repo root first, every session. It is the ONE agent instruction file
+for this repo (Claude Code, Cursor, Replit, any other tool) — operating contract, mandatory
+read order, git-flow rules, the two-tier work-claim model (GitHub Issues for durable task
+ownership, `WORK/LOCK.md` for short-lived file-edit locks), gates, and PR flow.
+
+Do not duplicate its content here. This file is only a pointer so Cursor bootstraps from the
+same source of truth as every other environment working this repo — if `AGENTS.md` changes,
+follow the new version, not any assumption baked into this file.
+
+Before editing code: read `AGENTS.md`, then `WORK/LOOP_STATE.md` and `WORK/FORWARD_PLAN.md`,
+then `WORK/LOCK.md`. Work in an isolated worktree for anything you intend to commit
+(`tools/new-worktree.sh <task-slug>`) — never a second clone. Never merge to `master`;
+that requires Sri's explicit sign-off.
