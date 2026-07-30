@@ -26,6 +26,8 @@ export const QueueNames = {
   INVENTORY_RECONCILIATION: "inventory_reconciliation",
   /** AI Assistant: async signal-gathering + LLM narration for one chat question (DESIGN_PRINCIPLES.md: AI processing is async-by-default). */
   AI_ASSISTANT_ANSWER: "ai_assistant_answer",
+  /** Phase 7 item 2: daily demand-snapshot sweep — persists yesterday's completed sales into demand_snapshots. */
+  DEMAND_SNAPSHOT: "demand_snapshot",
 } as const;
 // "outbox_relay" (DB-8) retired in ACPA M1.2 — the shared Outbox reconciler
 // owns redelivery; stale relay jobs are purged at bootstrap.
