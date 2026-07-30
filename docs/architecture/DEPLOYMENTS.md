@@ -8,6 +8,13 @@ this document exists specifically because two prior docs (`PIPELINE.md` 2026-07-
 that worse, not better. See `WORK/audits/AUDIT_2026-07-29T*-production-heartbeat-*.md` and commit
 `978c154` for the investigation history this builds on.
 
+**Prerequisite correction, merged 2026-07-30 (PR #117):** the 2026-07-23 re-verification (commit
+`978c154`) that this document builds on had itself been sitting unmerged for a full week — the
+correction existed, but `develop` never had it, so every session reading `ARCHITECTURE.md`/
+`ORCHESTRATION.md`/`PIPELINE.md` in that window saw the original unqualified "prod moved to
+Render" claim with no caveat attached. PR #117 is now merged; `develop` carries the correction.
+This document's baseline is current as of that merge, not before it.
+
 ## Executive summary
 
 1. **Is production currently down?** UNKNOWN — pending Sri's manual browser check of
@@ -91,6 +98,7 @@ run — is the actual finding.
 | 2026-07-23 | **Contradicts the 2026-07-20 "project deleted" claim**: `ascend-backend.vercel.app` (the same project `deploy.sh`'s `BACKEND_PID` still targets) resolves and serves *something* — not consistent with "deleted this session" | Commit `978c154` | **Unresolved contradiction** — not adjudicated here |
 | 2026-07-30 | Sri supplies `https://ascend-prod.onrender.com` as the current prod backend URL | This conversation | DNS resolves cleanly (real Render→Cloudflare chain: `gcp-us-west1-1.origin.onrender.com.cdn.cloudflare.net`) — but **times out completely** (zero bytes) from two independent networks: this sandbox AND a GitHub Actions runner via `workflow_dispatch` (run `30565267888`) |
 | 2026-07-30 | Sri manually verifying `/healthz` in a browser | This conversation | **Pending** — result determines whether this is an app-down incident or an automated-request-blocking issue (WAF/private networking/bot protection) |
+| 2026-07-30 | PR #117 (the 2026-07-23 correction, commit `978c154`) merged to `develop` | This conversation | Closes the "correction existed but never merged" gap — restores the missing audit signal so this document and `develop` agree |
 
 ## What this means (working hypothesis, not confirmed)
 
