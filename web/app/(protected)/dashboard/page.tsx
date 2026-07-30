@@ -106,13 +106,22 @@ function dateRangeForPreset(preset: FinderDateRange["preset"]): FinderDateRange 
 export default function DashboardPage() {
   const { storeId, outletId, dateRange, granularity, setDateRange, setGranularity } = useFinderContext();
   const range: Range = dateRange.preset === "today" ? "today" : dateRange.preset === "current_month" ? "30d" : "7d";
-  const scope = new URLSearchParams({ store_id: storeId, outlet_id: outletId }).toString();
 
   const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
   const [recentNotifs, setRecentNotifs] = useState<DashNotification[]>([]);
   const [outlets, setOutlets] = useState<OutletItem[]>([]);
+  // Local outlet filter used to drive report fetches. Falls back to context
+  // outletId until the user changes the select (was decorative before — UI
+  // updated selectedOutletId but every query still used context outletId).
   const [selectedOutletId, setSelectedOutletId] = useState<string>(outletId);
   const [progressRefresh, setProgressRefresh] = useState(0);
+
+  // Empty selectedOutletId = "All Outlets" (omit outlet_id). Do not fall back
+  // to context outletId here — that made the All Outlets option a no-op.
+  const scope = new URLSearchParams({
+    store_id: storeId,
+    ...(selectedOutletId ? { outlet_id: selectedOutletId } : {}),
+  }).toString();
 
   useEffect(() => {
     apiGet<{ items: LowStockItem[] }>("/api/v1/inventory/levels?pageSize=200")

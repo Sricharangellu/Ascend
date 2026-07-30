@@ -1,6 +1,17 @@
 # Ascend — Multi-Agent Work Lock
 
-Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0 wave-dispatch coordination claim (started 2026-07-18) was closed 2026-07-30 as superseded — see its entry below; work since has shipped as independent claims rather than through that coordinator. Latest substantive work: Phase 7 items 1-2 (sales-velocity consolidation, demand-snapshot foundation) RELEASED; four-environment AI coordination workflow (Claude Code/Cursor/Replit) adopted 2026-07-30, see `docs/architecture/ORCHESTRATION.md` "Environment routing" + `tools/AGENT_PROMPT.md`. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B, RELEASED); Clean Architecture pilot (quotes + gateway auth) (session C, ABANDONED — see entry); SSO OIDC hardening (session D)
+Status: no single active coordinator claim as of 2026-07-30 (Cursor Cloud product-experience claim RELEASED — see entry below). Prior: Session G's Phase 0 wave-dispatch coordination claim (started 2026-07-18) was closed 2026-07-30 as superseded — see its entry below; work since has shipped as independent claims rather than through that coordinator. Latest substantive work: Phase 7 items 1-2 (sales-velocity consolidation, demand-snapshot foundation) RELEASED; four-environment AI coordination workflow (Claude Code/Cursor/Replit) adopted 2026-07-30, see `docs/architecture/ORCHESTRATION.md` "Environment routing" + `tools/AGENT_PROMPT.md`. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B, RELEASED); Clean Architecture pilot (quotes + gateway auth) (session C, ABANDONED — see entry); SSO OIDC hardening (session D)
+
+## Active Claim (Cursor Cloud — product experience review + Critical FE contract fixes)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud agent (`cursor/product-experience-review-4fe7`) |
+| Queue item | Holistic product-experience audit (Principal PD / ESA / Senior UX) + ship Critical correctness fixes found during review: `/reports/ar-aging` and `/reports/inventory` read wrong response shapes (permanently empty); catalog Quick Sell → nonexistent `/register`; dashboard outlet filter decorative. |
+| Files/areas expected | `WORK/audits/AUDIT_*product-experience*.md`, `web/app/(protected)/reports/{ar-aging,inventory}/page.tsx`, `web/app/(protected)/catalog/[id]/page.tsx`, `web/app/(protected)/dashboard/page.tsx`, `WORK/LOCK.md`. NOT: full DataGrid rewrite, deploy/Render, NEEDS-SRI items. |
+| Started | 2026-07-30 |
+| Status | RELEASED — holistic UX audit landed; Critical FE contract + dead-chrome fixes shipped (AR aging / inventory valuation shapes, Quick Sell→terminal, dashboard outlet filter, Help/Switch/Import/checkbox/Finance AP cleanup). Audit: `WORK/audits/AUDIT_2026-07-30T222326Z-product-experience-review.md`. |
+| Blockers | none |
 
 ## Active Claim (Claude session G — Phase 0 coordinator: finish end-to-end + deployment readiness)
 

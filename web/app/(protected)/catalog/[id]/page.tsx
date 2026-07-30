@@ -296,7 +296,7 @@ export default function ProductDetailPage() {
                   <div className="fixed inset-0 z-30" onClick={() => setShowActions(false)} />
                   <div className="absolute right-0 top-full z-40 mt-1 w-52 rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
                     <button type="button"
-                      onClick={() => { setShowActions(false); router.push(`/register?product=${product.id}`); }}
+                      onClick={() => { setShowActions(false); router.push(`/terminal?product=${product.id}`); }}
                       className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>

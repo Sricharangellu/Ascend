@@ -7,7 +7,7 @@ import { Button } from "@/components/Button";
 import { formatMoney, parseToCents } from "@/lib/money";
 import { hasRole } from "@/lib/auth";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
-import type { Bill, Invoice, BillingStatus } from "@/api-client/types";
+import type { Invoice, BillingStatus } from "@/api-client/types";
 import { usePathname, useRouter } from "next/navigation";
 import { fmtDate } from "@/lib/date";
 import ExpensesPanel from "./_components/ExpensesPanel";
@@ -15,10 +15,6 @@ import ExpensesPanel from "./_components/ExpensesPanel";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FinanceInvoice extends Invoice {
-  due_amount_cents?: number;
-}
-
-interface FinanceBill extends Bill {
   due_amount_cents?: number;
 }
 
@@ -152,7 +148,6 @@ export default function FinancePage() {
   const router = useRouter();
   const [tab, setTab] = useState<TabId>(() => financeTabFromPath(pathname));
   const [invoices, setInvoices] = useState<FinanceInvoice[]>([]);
-  const [bills, setBills] = useState<FinanceBill[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -163,12 +158,8 @@ export default function FinancePage() {
   const load = useCallback(async () => {
     try {
       setError(null);
-      const [inv, bil] = await Promise.all([
-        apiGet<{ items: FinanceInvoice[] }>("/api/v1/billing/invoices"),
-        apiGet<{ items: FinanceBill[] }>("/api/v1/billing/bills"),
-      ]);
+      const inv = await apiGet<{ items: FinanceInvoice[] }>("/api/v1/billing/invoices");
       setInvoices(inv.items ?? []);
-      setBills(bil.items ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load finance data");
     }
@@ -197,39 +188,15 @@ export default function FinancePage() {
     }
   };
 
-  const payBill = async (id: string, amountCents: number) => {
-    setBusy(true);
-    try {
-      await apiPost(`/api/v1/billing/bills/${id}/pay`, { amountCents, mode: "bank_transfer" });
-      await load();
-      setToast("Bill payment recorded");
-    } catch (e) {
-      setError(
-        e instanceof ApiResponseError
-          ? e.message
-          : e instanceof Error
-            ? e.message
-            : "Payment failed"
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
   // AR summary metrics
   const arOutstanding = invoices.reduce((s, inv) => s + dueAmount(inv), 0);
   const arOverdue = invoices
     .filter(isOverdue)
     .reduce((s, inv) => s + dueAmount(inv), 0);
-  const now = Date.now();
   const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
   const arCollectedThisMonth = invoices
     .filter((inv) => inv.status === "paid" && inv.due_date !== null && inv.due_date >= startOfMonth)
     .reduce((s, inv) => s + inv.total_cents, 0);
-
-  // AP summary metrics
-  const apOwed = bills.reduce((s, b) => s + dueAmount(b), 0);
-  const apOverdue = bills.filter(isOverdue).reduce((s, b) => s + dueAmount(b), 0);
 
   return (
     <EnterpriseShell
@@ -247,17 +214,28 @@ export default function FinancePage() {
           <div className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>
         )}
 
-        {/* Tab bar */}
+        {/* Tab bar — Payables and Aging navigate to their real destinations
+            (same pattern as the Aging dead-code cleanup). Inline AP was never
+            visible because router.replace always won the click. */}
         <div className="flex gap-1 border-b border-slate-200">
           {TABS.map((t) => (
             <button
               key={t.id}
-                onClick={() => {
-                  setTab(t.id);
-                  router.replace(t.id === "ap" ? "/finance/bills" : t.id === "aging" ? "/reporting/ar-aging" : "/finance", { scroll: false });
-                }}
-                aria-current={tab === t.id ? "page" : undefined}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
+              type="button"
+              onClick={() => {
+                if (t.id === "ap") {
+                  router.push("/bills");
+                  return;
+                }
+                if (t.id === "aging") {
+                  router.push("/reports/ar-aging");
+                  return;
+                }
+                setTab(t.id);
+                router.replace("/finance", { scroll: false });
+              }}
+              aria-current={tab === t.id ? "page" : undefined}
+              className={`min-h-touch px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
                 tab === t.id
                   ? "border-b-2 border-slate-950 text-slate-950"
                   : "text-slate-500 hover:text-slate-700"
@@ -335,80 +313,10 @@ export default function FinancePage() {
           </>
         )}
 
-        {/* ── Tab: Payables (AP) ────────────────────────────────────────── */}
-        {tab === "ap" && (
-          <>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <SummaryCard label="Total Owed" value={formatMoney(apOwed)} />
-              <SummaryCard label="Overdue Bills" value={formatMoney(apOverdue)} highlight={apOverdue > 0} />
-            </div>
-
-            <Card title="Bills" description="Supplier bills awaiting payment." noPadding>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                      <th className="py-2 pr-4">Bill #</th>
-                      <th className="py-2 pr-4">Supplier</th>
-                      <th className="py-2 pr-4">Status</th>
-                      <th className="py-2 pr-4 text-right">Total</th>
-                      <th className="py-2 pr-4">Due Date</th>
-                      <th className="py-2 pr-4 text-right">Due Amount</th>
-                      {canPay && <th className="py-2 text-right">Actions</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {bills.length === 0 && (
-                      <tr>
-                        <td colSpan={canPay ? 7 : 6} className="py-6 text-center text-slate-400">
-                          No bills found
-                        </td>
-                      </tr>
-                    )}
-                    {bills.map((bill) => (
-                      <tr key={bill.id} className="border-b last:border-0">
-                        <td className="py-2 pr-4 font-medium">{bill.bill_number}</td>
-                        <td className="py-2 pr-4 text-slate-600">{bill.supplier_id}</td>
-                        <td className="py-2 pr-4">
-                          <span
-                            className={`rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${BILLING_STYLE[bill.status]}`}
-                          >
-                            {bill.status}
-                          </span>
-                        </td>
-                        <td className="py-2 pr-4 text-right">{formatMoney(bill.total_cents)}</td>
-                        <td className={`py-2 pr-4 ${isOverdue(bill) ? "font-medium text-red-600" : "text-slate-500"}`}>
-                          {fmtDate(bill.due_date)}
-                        </td>
-                        <td className="py-2 pr-4 text-right">{formatMoney(dueAmount(bill))}</td>
-                        {canPay && (
-                          <td className="py-2 text-right">
-                            {bill.status !== "paid" && bill.status !== "void" && (
-                              <PayControl
-                                busy={busy}
-                                max={dueAmount(bill)}
-                                onPay={(cents) => void payBill(bill.id, cents)}
-                              />
-                            )}
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          </>
-        )}
-
         {tab === "expenses" && <ExpensesPanel />}
 
-        {/* "Aging" isn't rendered here — clicking it navigates straight to
-            /reporting/ar-aging (see the tab bar's onClick above). It used to
-            also set local tab state and render an inline AR+AP block, but
-            the router.replace in the same click handler always fired first,
-            so that block could never actually be seen by a user — removed
-            rather than left as unreachable dead code. */}
+        {/* Payables → /bills and Aging → /reports/ar-aging navigate away
+            (see tab bar). No inline panels — those were unreachable dead code. */}
       </div>
 
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
