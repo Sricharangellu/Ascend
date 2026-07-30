@@ -59,3 +59,15 @@ Navigate to `/login?demo=1` and click Sign In, or set `VITE_MOCK=true` (the defa
 - Keep Tailwind v3 (not v4) — original design tokens depend on it.
 - Keep MSW mock mode on by default for demos.
 - Wouter shims should stay API-compatible with Next.js `useRouter`, `usePathname`, `useSearchParams`.
+
+---
+
+## Operating Boundary — Sandbox Only
+
+**This workspace is a sandbox/prototype environment. It is NOT a deploy target for the main Ascend repo.**
+
+- **Never touch `master`, `staging`, or production config or secrets.** This workspace has no connection to the real Ascend GitHub repo (`Sricharangellu/Ascend`) and must not be used to push, deploy, or modify anything in that repo's production or staging tiers.
+- **Never connect to or rely on the prod or staging Supabase projects.** All database work in this workspace uses the Replit-managed PostgreSQL instance only.
+- **`JWT_SECRET` and all other secrets are sandbox-local.** They must be freshly generated and stored only in Replit's Secrets manager — never reused from the production or staging environments, and never committed to files.
+- **Stop and flag to Sri any request that would deploy, touch prod config, or touch prod/staging secrets.** Do not execute such requests. This follows the environment-routing rules in the original repo's `docs/architecture/ORCHESTRATION.md` (that file exists in the Ascend GitHub repo, not in this workspace).
+- **Open decision (Sri's):** Whether this workspace will eventually be reconciled back to the real Ascend repo, or remain a separate standalone copy, has not been decided. Do not assume either outcome.
