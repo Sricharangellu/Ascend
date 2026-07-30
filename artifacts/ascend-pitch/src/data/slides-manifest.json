@@ -1,0 +1,82 @@
+[
+  {
+    "id": "c7a83b1e-0001-4f2d-b8e9-a12345678901",
+    "position": 1,
+    "filepath": "src/pages/slides/Slide01Cover.tsx",
+    "title": "Ascend",
+    "description": "Cover slide — hero wordmark with feature pills",
+    "speakerNotes": ""
+  },
+  {
+    "id": "c7a83b1e-0002-4f2d-b8e9-a12345678902",
+    "position": 2,
+    "filepath": "src/pages/slides/Slide02Problem.tsx",
+    "title": "The Retail Operations Problem",
+    "description": "Three pain points for specialty retail operators",
+    "speakerNotes": ""
+  },
+  {
+    "id": "c7a83b1e-0003-4f2d-b8e9-a12345678903",
+    "position": 3,
+    "filepath": "src/pages/slides/Slide03Platform.tsx",
+    "title": "The Ascend Platform",
+    "description": "Three-column overview: POS, Inventory, Wholesale",
+    "speakerNotes": ""
+  },
+  {
+    "id": "c7a83b1e-0004-4f2d-b8e9-a12345678904",
+    "position": 4,
+    "filepath": "src/pages/slides/Slide04Terminal.tsx",
+    "title": "POS Terminal",
+    "description": "Terminal features with checkout UI mockup",
+    "speakerNotes": ""
+  },
+  {
+    "id": "c7a83b1e-0005-4f2d-b8e9-a12345678905",
+    "position": 5,
+    "filepath": "src/pages/slides/Slide05Inventory.tsx",
+    "title": "Inventory Control",
+    "description": "Inventory table mockup with multi-location features",
+    "speakerNotes": ""
+  },
+  {
+    "id": "c7a83b1e-0006-4f2d-b8e9-a12345678906",
+    "position": 6,
+    "filepath": "src/pages/slides/Slide06Wholesale.tsx",
+    "title": "Wholesale & B2B",
+    "description": "2x2 grid of B2B feature blocks",
+    "speakerNotes": ""
+  },
+  {
+    "id": "c7a83b1e-0007-4f2d-b8e9-a12345678907",
+    "position": 7,
+    "filepath": "src/pages/slides/Slide07Market.tsx",
+    "title": "Market Opportunity",
+    "description": "Regulated vertical with three market characteristics",
+    "speakerNotes": ""
+  },
+  {
+    "id": "c7a83b1e-0008-4f2d-b8e9-a12345678908",
+    "position": 8,
+    "filepath": "src/pages/slides/Slide08Metrics.tsx",
+    "title": "Platform Metrics",
+    "description": "Three hero stats: 2400+ orgs, 50M+ txn/mo, 99.99% uptime",
+    "speakerNotes": ""
+  },
+  {
+    "id": "c7a83b1e-0009-4f2d-b8e9-a12345678909",
+    "position": 9,
+    "filepath": "src/pages/slides/Slide09Pricing.tsx",
+    "title": "Pricing",
+    "description": "Three-tier pricing: Starter, Growth, Enterprise",
+    "speakerNotes": ""
+  },
+  {
+    "id": "c7a83b1e-0010-4f2d-b8e9-a12345678910",
+    "position": 10,
+    "filepath": "src/pages/slides/Slide10Closing.tsx",
+    "title": "Get Started",
+    "description": "Closing slide with wordmark, tagline, and contact",
+    "speakerNotes": ""
+  }
+]
