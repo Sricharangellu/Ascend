@@ -25,3 +25,29 @@ documents it as **sandbox/prototyping only** until an explicit decision says oth
 
 Everything else — git-flow, gates, claim model, PR flow — is identical to every other
 environment working this repo. Follow `AGENTS.md`.
+
+## Git-safety rule (added 2026-07-30, discovered mid-investigation)
+
+This Replit workspace's local git repo has `origin` configured as the real
+`Sricharangellu/Ascend` GitHub remote, works directly on a local branch named `master`
+(no feature-branch workflow for Build-mode edits — Replit checkpoints are the undo
+mechanism), and merges approved task-agent work (from `subrepl-*` remotes) back into
+that local `master` automatically. None of that is a problem by itself — it only
+becomes one at the point of pushing to `origin`.
+
+**Hard rule: never push this workspace's `master` (or any branch here) to `origin`
+without Sri explicitly asking for that specific push, in that moment.** `master` on
+the real repo is the production-deploying branch. This workspace's commits are built
+against a different directory layout (`artifacts/ascend` / `artifacts/api-server`
+instead of the real repo's `web/` / `src/`) and a self-contained mocked stack (Replit
+Postgres + MSW) — even setting aside the sandbox-scope rules above, a push here would
+either fail the real repo's CI or, in the worst case, land an incompatible tree on
+the one branch nothing should risk. `master`'s branch protection provides a partial
+backstop (required status checks, `enforce_admins`, no force-push) but should not be
+relied on as the only one.
+
+If a renamed local branch (e.g. `replit-sandbox` instead of `master`) doesn't break
+this workspace's own task-agent auto-merge automation, renaming removes the
+"push master" muscle-memory risk entirely and is worth doing. If that automation is
+hardcoded to a branch literally named `master`, leave it as-is and treat the rule
+above as the actual boundary — don't guess on this one.
