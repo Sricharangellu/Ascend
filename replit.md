@@ -147,3 +147,10 @@ If the Replit PostgreSQL database is wiped (e.g. via the Replit dashboard):
 - **`JWT_SECRET` and all other secrets are sandbox-local.** They must be freshly generated and stored only in Replit's Secrets manager — never reused from the production or staging environments, and never committed to files.
 - **Stop and flag to Sri any request that would deploy, touch prod config, or touch prod/staging secrets.** Do not execute such requests. This follows the environment-routing rules in the original repo's `docs/architecture/ORCHESTRATION.md` (that file exists in the Ascend GitHub repo, not in this workspace).
 - **Open decision (Sri's):** Whether this workspace will eventually be reconciled back to the real Ascend repo, or remain a separate standalone copy, has not been decided. Do not assume either outcome.
+
+### Git-safety rule (2026-07-30)
+
+- **NEVER push this workspace's local `master` (or any branch) to the `origin` remote (`Sricharangellu/Ascend`) unless Sri explicitly asks for that specific push, in that moment.** Not "this looks ready" — an explicit, direct ask. This applies to the agent, to any task agent's work merged locally, and to any automation run on the agent's behalf.
+- Local `master` commits, task-agent merges via the `subrepl-*` remotes, and Replit checkpoints are all fine and expected — only the push to `origin` is restricted.
+- If work here ever seems genuinely ready for the real repo: **don't push it.** Tell Sri what it is and let a human decide whether and how it gets ported (directory layouts differ — this workspace's `artifacts/*` vs the real repo's `web/` + `src/` — so it needs rework and re-verification against real gates anyway).
+- The local branch stays named `master`: renaming could break Replit's platform-managed task-agent auto-merge tooling, whose branch targeting cannot be safely verified, so the no-push rule above is held as the boundary instead of a rename.
