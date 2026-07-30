@@ -55,6 +55,50 @@ test("sales summary aggregates orders, revenue, and captured payments for the te
   assert.equal(r.json.payments.byMethod.cash, 2165);
 });
 
+test("summary sparklines come from live orders (not the never-written daily_sales_summary)", async () => {
+  const app = await freshApp();
+
+  // Empty tenant: dense 8-day zero series so the FE sparkline (≥2 points) can render.
+  let r = await call(app, "GET", "/api/reports/summary");
+  assert.equal(r.status, 200);
+  assert.equal(r.json.sparklines.revenue.length, 8);
+  assert.equal(r.json.sparklines.saleCount.length, 8);
+  assert.ok(r.json.sparklines.revenue.every((v: number) => v === 0));
+  assert.ok(r.json.sparklines.saleCount.every((v: number) => v === 0));
+
+  const p = await call(app, "POST", "/api/catalog/", {
+    sku: "SPARK-001", name: "Spark Widget", price_cents: 1000, category: "general",
+  });
+  assert.equal(p.status, 201);
+  await call(app, "POST", `/api/inventory/${p.json.id}/receive`, { quantity: 5 });
+  const o = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: p.json.id, quantity: 1 }],
+  });
+  assert.equal(o.status, 201);
+  await call(app, "POST", "/api/payments/", {
+    orderId: o.json.id, method: "cash", tenderedCents: o.json.total_cents,
+  });
+
+  r = await call(app, "GET", "/api/reports/summary");
+  assert.equal(r.status, 200);
+  assert.equal(r.json.sparklines.revenue.length, 8, "dense 8-day revenue series");
+  assert.equal(r.json.sparklines.saleCount.length, 8, "dense 8-day sale-count series");
+  // Today's bucket carries the completed sale; prior days stay 0.
+  assert.equal(r.json.sparklines.revenue[7], o.json.total_cents, "today's revenue matches the sale");
+  assert.equal(r.json.sparklines.saleCount[7], 1, "today's sale count is 1");
+  assert.equal(
+    r.json.sparklines.revenue.reduce((a: number, b: number) => a + b, 0),
+    o.json.total_cents,
+    "window sum equals the single completed order",
+  );
+  // Prove we are NOT reading the empty CQRS table: nothing wrote to it.
+  const anyRows = await app.db.query<{ n: number }>(
+    "SELECT COUNT(*)::int AS n FROM daily_sales_summary",
+  );
+  assert.equal(Number(anyRows[0]?.n ?? 0), 0, "daily_sales_summary still empty — sparkline used live orders");
+});
+
 test("summary kpi: gross profit is real COGS-based, or null when sold units have no known cost", async () => {
   const app = await freshApp();
 

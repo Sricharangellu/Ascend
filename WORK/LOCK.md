@@ -1,6 +1,17 @@
 # Ascend — Multi-Agent Work Lock
 
-Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0 wave-dispatch coordination claim (started 2026-07-18) was closed 2026-07-30 as superseded — see its entry below; work since has shipped as independent claims rather than through that coordinator. Latest substantive work: Phase 7 items 1-2 (sales-velocity consolidation, demand-snapshot foundation) RELEASED; four-environment AI coordination workflow (Claude Code/Cursor/Replit) adopted 2026-07-30, see `docs/architecture/ORCHESTRATION.md` "Environment routing" + `tools/AGENT_PROMPT.md`. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B, RELEASED); Clean Architecture pilot (quotes + gateway auth) (session C, ABANDONED — see entry); SSO OIDC hardening (session D)
+Status: no single active coordinator claim as of 2026-07-30 (Cursor Cloud dashboard-sparklines claim RELEASED — see entry below). Prior: Session G's Phase 0 wave-dispatch coordination claim (started 2026-07-18) was closed 2026-07-30 as superseded — see its entry below; work since has shipped as independent claims rather than through that coordinator. Latest substantive work: Phase 7 items 1-2 (sales-velocity consolidation, demand-snapshot foundation) RELEASED; four-environment AI coordination workflow (Claude Code/Cursor/Replit) adopted 2026-07-30, see `docs/architecture/ORCHESTRATION.md` "Environment routing" + `tools/AGENT_PROMPT.md`. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B, RELEASED); Clean Architecture pilot (quotes + gateway auth) (session C, ABANDONED — see entry); SSO OIDC hardening (session D)
+
+## Active Claim (Cursor Cloud — fix dashboard sparklines from live orders)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud agent (cursor/fix-dashboard-sparklines-4fe7) |
+| Queue item | Dashboard KPI sparklines permanently empty: `ReportsService.salesSummary` reads `daily_sales_summary`, which is never written (`aggregateDailySales` computes but does not persist). Fix: compute last-8-day sparklines from live `orders` (same grain as `aggregateDailySales`), dense-fill missing days with zeros so the FE sparkline (≥2 points) actually renders after real sales. Leave `daily_sales_summary` table in place (future CQRS; no drop). Also correct stale GAPS.md product-module row (Phases 1–5 already shipped). |
+| Files/areas expected | `src/modules/reports/service.ts`, `src/modules/reports/reports.test.ts`, `docs/architecture/GAPS.md`, `docs/architecture/REPORTS_MODULE_REVIEW.md`, `WORK/LOCK.md`, new audit under `WORK/audits/`. NOT: deploy/uptime, Phase 7 demand-snapshot (PR #121), AR/AP aging rewrite. |
+| Started | 2026-07-30 |
+| Status | RELEASED — sparklines now dense-fill last 8 UTC days from live completed `orders`; regression test proves `daily_sales_summary` stays empty while sparkline carries today's sale. Gates: typecheck PASS, reports.test.ts 16/16. Audit: `WORK/audits/AUDIT_2026-07-30T221340Z-dashboard-sparklines-live-orders.md`. |
+| Blockers | none |
 
 ## Active Claim (Claude session G — Phase 0 coordinator: finish end-to-end + deployment readiness)
 
