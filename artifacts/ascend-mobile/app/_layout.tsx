@@ -11,9 +11,10 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -33,27 +34,11 @@ const queryClient = new QueryClient({
  * Placed inside AuthProvider so it can call useAuth() safely.
  */
 function RootLayoutNav() {
-  const { user, isLoading } = useAuth();
-  const segments = useSegments();
-  const router = useRouter();
+  // Redirect logic lives in useAuthRedirect – tested independently.
+  useAuthRedirect();
 
   // Register for push notifications and wire up deep-link handling
   usePushNotifications();
-
-  useEffect(() => {
-    if (isLoading) return;
-
-    const inTabsGroup = segments[0] === '(tabs)';
-    const onLogin = segments[0] === 'login';
-
-    if (!user && !onLogin) {
-      // Not authenticated – send to login
-      router.replace('/login');
-    } else if (user && !inTabsGroup) {
-      // Authenticated – send to app root (resolves to (tabs)/index)
-      router.replace('/');
-    }
-  }, [user, isLoading, segments]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
