@@ -382,6 +382,49 @@ export class OrdersService {
     );
   }
 
+  /**
+   * Manager-initiated completion.
+   *
+   * Atomically transitions 'open' → 'completed' using a conditional UPDATE
+   * (WHERE status = 'open') so concurrent void/refund/duplicate-complete
+   * requests cannot corrupt state. Audit + event are only written when the
+   * transition actually succeeds.
+   */
+  async completeByManager(orderId: string, tenantId: string, actorId = "system"): Promise<OrderWithLines> {
+    const updatedAt = Date.now();
+
+    // Atomic conditional transition: only succeeds if current status is 'open'.
+    const affected = await this.db.query<{ id: string }>(
+      `UPDATE orders SET status = 'completed', updated_at = @updated_at
+       WHERE id = @id AND tenant_id = @tenantId AND status = 'open'
+       RETURNING id`,
+      { updated_at: updatedAt, id: orderId, tenantId },
+    );
+
+    if (affected.length === 0) {
+      // Either the order doesn't exist or it's already in a non-open state.
+      const existing = await this.db.one<{ status: OrderStatus }>(
+        "SELECT status FROM orders WHERE id = @id AND tenant_id = @tenantId",
+        { id: orderId, tenantId },
+      );
+      if (!existing) throw notFound(`order '${orderId}' not found`);
+      throw conflict(`order '${orderId}' is ${existing.status} and cannot be completed`);
+    }
+
+    await writeAudit(this.db, {
+      tenantId,
+      actorId,
+      action: "order.completed",
+      entityType: "order",
+      entityId: orderId,
+      after: { status: "completed" },
+    });
+
+    void this.events.publish("order.completed", { id: orderId, tenantId }, orderId);
+
+    return this.getOrThrow(orderId, tenantId);
+  }
+
   async get(id: string, tenantId: string): Promise<OrderWithLines | undefined> {
     const order = await this.db.one<OrderRow>(
       "SELECT * FROM orders WHERE id = @id AND tenant_id = @tenantId",

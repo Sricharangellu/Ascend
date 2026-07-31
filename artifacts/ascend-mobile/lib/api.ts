@@ -206,3 +206,16 @@ export async function unregisterPushToken(token: string): Promise<void> {
     body: JSON.stringify({ token }),
   });
 }
+
+// ─── Order mutations ──────────────────────────────────────────────────────────
+export async function completeOrder(orderId: string): Promise<Order> {
+  return apiFetch<Order>(`/api/v1/orders/${orderId}/complete`, {
+    method: 'POST',
+  });
+}
+
+export async function voidOrder(orderId: string): Promise<Order> {
+  return apiFetch<Order>(`/api/v1/orders/${orderId}/void`, {
+    method: 'POST',
+  });
+}

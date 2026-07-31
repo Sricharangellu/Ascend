@@ -144,6 +144,15 @@ export function registerRoutes(router: Router, service: OrdersService): void {
     }),
   );
 
+  // POST /:id/complete — manager-initiated order completion (e.g. cash payment or manual close).
+  router.post(
+    "/:id/complete",
+    mgr,
+    handler(async (req: Request, res: Response) => {
+      res.json(await service.completeByManager(String(req.params.id), tenantId(res), auth(res).userId));
+    }),
+  );
+
   // POST /:id/email-receipt — send (or preview) an order receipt via email.
   const emailReceiptSchema = z.object({
     email: z.string().email().optional(),

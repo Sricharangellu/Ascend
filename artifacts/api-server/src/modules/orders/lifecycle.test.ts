@@ -41,6 +41,71 @@ async function makeOrder(app: App, productId: string): Promise<any> {
   return json;
 }
 
+// ─── POST /:id/complete ───────────────────────────────────────────────────────
+
+test("manager completing an open order transitions it to completed", async () => {
+  const app = await freshApp();
+  const widget = await makeProduct(app, { sku: "MAN-COMPLETE-1", name: "Widget", price_cents: 1000 });
+  const order = await makeOrder(app, widget);
+
+  const res = await call(app, "POST", `/api/orders/${order.id}/complete`);
+  assert.equal(res.status, 200, `expected 200, got ${res.status}: ${JSON.stringify(res.json)}`);
+  assert.equal(res.json.status, "completed");
+  assert.equal(res.json.id, order.id);
+
+  // Persisted — verify via GET
+  const after = await call(app, "GET", `/api/orders/${order.id}`);
+  assert.equal(after.json.status, "completed");
+});
+
+test("completing an already-completed order returns 409", async () => {
+  const app = await freshApp();
+  const widget = await makeProduct(app, { sku: "MAN-COMPLETE-2", name: "Widget", price_cents: 1000 });
+  const order = await makeOrder(app, widget);
+
+  // First completion succeeds
+  const first = await call(app, "POST", `/api/orders/${order.id}/complete`);
+  assert.equal(first.status, 200);
+
+  // Second must conflict
+  const second = await call(app, "POST", `/api/orders/${order.id}/complete`);
+  assert.equal(second.status, 409, `expected 409, got ${second.status}: ${JSON.stringify(second.json)}`);
+});
+
+test("completing a voided order returns 409", async () => {
+  const app = await freshApp();
+  const widget = await makeProduct(app, { sku: "MAN-COMPLETE-3", name: "Widget", price_cents: 1000 });
+  const order = await makeOrder(app, widget);
+
+  const voided = await call(app, "POST", `/api/orders/${order.id}/void`);
+  assert.equal(voided.status, 200);
+
+  const res = await call(app, "POST", `/api/orders/${order.id}/complete`);
+  assert.equal(res.status, 409, `expected 409, got ${res.status}: ${JSON.stringify(res.json)}`);
+});
+
+test("completing a non-existent order returns 404", async () => {
+  const app = await freshApp();
+  const res = await call(app, "POST", "/api/orders/ord_doesnotexist/complete");
+  assert.equal(res.status, 404);
+});
+
+test("non-manager role cannot complete an order (403)", async () => {
+  const app = await freshApp();
+  const { default: request } = await import("./test-request.js");
+  const widget = await makeProduct(app, { sku: "MAN-COMPLETE-4", name: "Widget", price_cents: 1000 });
+  const order = await makeOrder(app, widget);
+
+  // Cashier role (below manager) should be rejected
+  const res = await request(app.express, "POST", `/api/orders/${order.id}/complete`, undefined, "cashier");
+  assert.equal(res.status, 403, `expected 403, got ${res.status}: ${JSON.stringify(res.json)}`);
+  // Order must be unchanged
+  const after = await call(app, "GET", `/api/orders/${order.id}`);
+  assert.equal(after.json.status, "open");
+});
+
+// ─── Payment lifecycle ────────────────────────────────────────────────────────
+
 test("capturing a payment transitions the order open -> completed", async () => {
   const app = await freshApp();
   const widget = await makeProduct(app, {
