@@ -82,7 +82,7 @@ export { reconcilePaymentsJob } from "./jobs/reconcile-payments.job.js";
 export { closeRegisterJob } from "./jobs/close-register.job.js";
 export { syncEcommerceJob } from "./jobs/sync-ecommerce.job.js";
 export { trialExpiryJob, TRIAL_EXPIRY_INTERVAL_MS } from "./jobs/trial-expiry.job.js";
-export { dbBackupJob, DB_BACKUP_INTERVAL_MS } from "./jobs/db-backup.job.js";
+export { dbBackupJob, sendBackupFailureAlert, DB_BACKUP_INTERVAL_MS } from "./jobs/db-backup.job.js";
 
 // Compensations
 export { releaseInventoryCompensation } from "./compensations/release-inventory.compensation.js";
@@ -131,7 +131,7 @@ import { arDunningJob } from "./jobs/ar-dunning.job.js";
 import { idempotencyExpiryJob, IDEMPOTENCY_EXPIRY_INTERVAL_MS } from "./jobs/idempotency-expiry.job.js";
 import { outboxRetentionJob, OUTBOX_RETENTION_INTERVAL_MS } from "./jobs/outbox-retention.job.js";
 import { trialExpiryJob, TRIAL_EXPIRY_INTERVAL_MS } from "./jobs/trial-expiry.job.js";
-import { dbBackupJob, DB_BACKUP_INTERVAL_MS } from "./jobs/db-backup.job.js";
+import { dbBackupJob, sendBackupFailureAlert, DB_BACKUP_INTERVAL_MS } from "./jobs/db-backup.job.js";
 
 export interface OrchestrationBootstrap {
   runner: WorkflowRunner;
@@ -325,15 +325,54 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
   // prunes dumps older than BACKUP_RETAIN_DAYS (default 7). Self-re-enqueues
   // so the schedule continues without a cron daemon. Only runs when
   // DATABASE_URL is set and BACKUP_ENABLED !== "false".
+  // On terminal failure (all attempts exhausted), an alert is sent to the
+  // BACKUP_ALERT_EMAIL address (must be configured explicitly — no DB owner
+  // lookup to avoid cross-tenant disclosure in multi-tenant deployments).
   jobConsumer.register(QueueNames.DB_BACKUP, async (job) => {
-    await dbBackupJob(job);
-    await jobProducer.enqueueOnce({
-      type: QueueNames.DB_BACKUP,
-      tenantId: "system",
-      payload: {},
-      runAt: Date.now() + DB_BACKUP_INTERVAL_MS,
-      maxAttempts: 3,
-    });
+    let jobFailed = false;
+    let jobError: Error | null = null;
+    try {
+      await dbBackupJob(job);
+    } catch (err) {
+      jobFailed = true;
+      jobError = err instanceof Error ? err : new Error(String(err));
+      // Only alert when this was the final attempt — the consumer already
+      // incremented job.attempts before calling this handler, so
+      // attempts >= max_attempts means no more retries will be scheduled.
+      if (job.attempts >= job.max_attempts) {
+        await sendBackupFailureAlert(jobError);
+      }
+      throw jobError;
+    } finally {
+      // Schedule the next daily backup only if there is not already a future
+      // pending one. We cannot use enqueueOnce here because the current job is
+      // still in status='running' when this block executes — enqueueOnce's
+      // check for pending|running would match the running job and return null,
+      // permanently stopping the schedule. Instead we check explicitly for a
+      // future-pending job (run_at > now), which cannot match the current job
+      // (whose run_at was in the past when it was claimed).
+      const nextRunAt = Date.now() + DB_BACKUP_INTERVAL_MS;
+      const futurePending = await db.one<{ id: string }>(
+        `SELECT id FROM job_queue
+         WHERE type = @type AND tenant_id = 'system'
+           AND status = 'pending' AND run_at > @now
+         LIMIT 1`,
+        { type: QueueNames.DB_BACKUP, now: Date.now() },
+      ).catch(() => null);
+
+      if (!futurePending) {
+        await jobProducer.enqueue({
+          type: QueueNames.DB_BACKUP,
+          tenantId: "system",
+          payload: {},
+          runAt: nextRunAt,
+          maxAttempts: 3,
+        }).catch((schedErr) => {
+          // Non-fatal: the startup seed will re-create the job on next restart.
+          if (!jobFailed) throw schedErr; // surface on success path
+        });
+      }
+    }
   });
   if (backgroundJobsEnabled) {
     void jobProducer.enqueueOnce({

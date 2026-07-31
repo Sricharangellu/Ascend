@@ -510,8 +510,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
       const rows = await db.query<{
         id: string; type: string; status: string; run_at: number;
         attempts: number; max_attempts: number; created_at: number;
+        error: string | null;
       }>(
-        `SELECT id, type, status, run_at, attempts, max_attempts, created_at
+        `SELECT id, type, status, run_at, attempts, max_attempts, created_at, error
          FROM job_queue
          WHERE tenant_id IN (@t, 'system')
          ORDER BY created_at DESC LIMIT 100`,
@@ -522,7 +523,81 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
         const key = r.status === "completed" ? "done" : r.status;
         if (key in counts) (counts as Record<string, number>)[key]++;
       }
-      res.json({ items: rows, summary: counts });
+
+      // Surface the most recent db_backup job prominently so owners can see
+      // backup health without digging through the full list.
+      const lastBackup = rows.find((r) => r.type === "db_backup") ?? null;
+
+      res.json({ items: rows, summary: counts, lastBackup });
+    }),
+  );
+
+  // ── Admin: backup status (owner-only) ─────────────────────────────────────
+  // GET /api/v1/admin/db/backup-status — returns the last successful backup
+  // time, file name, and size. Combines on-disk file scanning with the
+  // job_queue record so the caller gets both storage proof and scheduler state.
+  app.get(
+    "/api/v1/admin/db/backup-status",
+    requireRole("owner"),
+    handler(async (_req, res) => {
+      // ── 1. Scan the backups/ directory for the most recent .sql file.
+      const { resolve: pathResolve, join: pathJoin } = await import("node:path");
+      const { fileURLToPath: fu } = await import("node:url");
+      const { readdir: rd, stat: st } = await import("node:fs/promises");
+
+      const backupDirPath = (() => {
+        const custom = process.env["BACKUP_DIR"];
+        if (custom) return pathResolve(custom);
+        // app.ts lives at src/ — go up two levels to reach the repo root.
+        return pathResolve(fu(import.meta.url), "../../..", "backups");
+      })();
+
+      let lastFile: { name: string; bytes: number; mtime: number } | null = null;
+      try {
+        const entries = await rd(backupDirPath);
+        const dumps = entries.filter((e) => e.startsWith("ascend-backup-") && e.endsWith(".sql"));
+        // Sort descending by filename (ISO timestamp embedded) to find the newest.
+        dumps.sort((a, b) => b.localeCompare(a));
+        if (dumps.length > 0) {
+          const newest = dumps[0]!;
+          const info = await st(pathJoin(backupDirPath, newest));
+          lastFile = { name: newest, bytes: info.size, mtime: info.mtimeMs };
+        }
+      } catch {
+        // backups/ not yet created (first run before any backup succeeds).
+      }
+
+      // ── 2. Fetch the most recent db_backup job row from the scheduler.
+      const jobRows = await db.query<{
+        id: string; status: string; run_at: number;
+        attempts: number; created_at: number; error: string | null;
+      }>(
+        `SELECT id, status, run_at, attempts, created_at, error
+         FROM job_queue
+         WHERE type = 'db_backup'
+         ORDER BY created_at DESC LIMIT 1`,
+        {},
+      );
+      const lastJob = jobRows[0] ?? null;
+
+      const backupEnabled =
+        !!process.env["DATABASE_URL"] && process.env["BACKUP_ENABLED"] !== "false";
+
+      res.json({
+        backupEnabled,
+        lastSuccessfulBackup: lastFile
+          ? { file: lastFile.name, bytes: lastFile.bytes, at: new Date(lastFile.mtime).toISOString() }
+          : null,
+        schedulerJob: lastJob
+          ? {
+              id: lastJob.id,
+              status: lastJob.status,
+              attempts: lastJob.attempts,
+              scheduledAt: new Date(lastJob.run_at).toISOString(),
+              lastError: lastJob.error ?? null,
+            }
+          : null,
+      });
     }),
   );
 

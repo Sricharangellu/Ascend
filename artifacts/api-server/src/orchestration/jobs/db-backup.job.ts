@@ -21,6 +21,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { JobRow } from "../types.js";
 import { moduleLogger } from "../../shared/logger.js";
+import { sendEmail } from "../../shared/email.js";
 
 const log = moduleLogger("db-backup");
 
@@ -98,6 +99,59 @@ async function pruneOldDumps(dir: string): Promise<number> {
     // Non-fatal — a missing or unreadable directory is fine on first run.
   }
   return pruned;
+}
+
+/**
+ * Send an alert email when a backup job permanently fails (all retries exhausted).
+ *
+ * Recipient: BACKUP_ALERT_EMAIL env var (must be configured explicitly).
+ * No DB owner lookup is performed — the backup is a system-level concern and
+ * querying an arbitrary owner from the users table would risk cross-tenant
+ * disclosure in multi-tenant deployments.
+ *
+ * If BACKUP_ALERT_EMAIL is not set, the failure is logged but no email is sent.
+ * Operators should always configure this env var in production.
+ */
+export async function sendBackupFailureAlert(error: Error): Promise<void> {
+  const recipient = process.env["BACKUP_ALERT_EMAIL"];
+  if (!recipient) {
+    // No recipient configured — log the failure prominently so it surfaces in
+    // monitoring, but don't crash or swallow the backup error.
+    log.error({ err: error }, "backup failed and BACKUP_ALERT_EMAIL is not configured — set it to receive failure alerts");
+    return;
+  }
+
+  const from = process.env["EMAIL_FROM"] ?? "noreply@ascendhq.com";
+  const hostname = process.env["APP_URL"] ?? "ascend-api";
+  const subject = `[Ascend] ⚠️ Database backup FAILED — ${new Date().toUTCString()}`;
+  const text = [
+    "The scheduled daily database backup has FAILED after all retry attempts.",
+    "",
+    `Server: ${hostname}`,
+    `Time:   ${new Date().toUTCString()}`,
+    `Error:  ${error.message}`,
+    "",
+    "Action required: investigate immediately to avoid data loss.",
+    "Check your DATABASE_URL, pg_dump binary availability, and disk space.",
+  ].join("\n");
+  const html = `
+    <p><strong>The scheduled daily database backup has FAILED after all retry attempts.</strong></p>
+    <table>
+      <tr><td><strong>Server</strong></td><td>${hostname}</td></tr>
+      <tr><td><strong>Time</strong></td><td>${new Date().toUTCString()}</td></tr>
+      <tr><td><strong>Error</strong></td><td><code>${error.message.replace(/</g, "&lt;")}</code></td></tr>
+    </table>
+    <p>Action required: investigate immediately to avoid data loss.
+    Check your DATABASE_URL, pg_dump binary availability, and disk space.</p>
+  `.trim();
+
+  try {
+    await sendEmail({ to: recipient, from, subject, text, html });
+    log.warn({ recipient }, "backup failure alert sent");
+  } catch (emailErr) {
+    // Non-fatal — the original backup error is what matters; log and move on.
+    log.error({ err: emailErr }, "failed to send backup failure alert email");
+  }
 }
 
 export async function dbBackupJob(_job: JobRow): Promise<{ file: string; bytes: number; pruned: number }> {
