@@ -116,6 +116,10 @@ export function TerminalInner() {
         ...(l.product.unitKind ? { unitKind: l.product.unitKind } : {}),
       })),
       ...(discountCents > 0 ? { discountCents } : {}),
+      // Sales History real-data fix: orders.store_id is otherwise always NULL
+      // for POS-created orders, since the inventory/deduct call below carries
+      // the outlet separately and this create/update payload never did.
+      ...(activeOutletId ? { storeId: activeOutletId } : {}),
     };
 
     if (isOffline) {
@@ -140,7 +144,7 @@ export function TerminalInner() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cart.state.lines, isOffline, ageVerified, discountCents]);
+  }, [cart.state.lines, isOffline, ageVerified, discountCents, activeOutletId]);
 
   const handleAddProduct = useCallback(
     (product: Product) => {
