@@ -47,7 +47,7 @@ function LoginContent() {
   const [email, setEmail] = useState(
     isDemo || import.meta.env.DEV ? "owner@ascend.dev" : ""
   );
-  const [password, setPassword] = useState(isDemo ? "demo" : "");
+  const [password, setPassword] = useState(isDemo ? "AscendDemo!2026" : "");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [capsLockOn, setCapsLockOn] = useState(false);
