@@ -43,7 +43,6 @@ export function CheckoutStatusStrip({
     <div className="flex flex-none flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-3 py-2 text-xs sm:px-4">
       <StatusPill label="Store"   value={outletName}                              tone="neutral" />
       <StatusPill label="Cashier" value={cashier}                                 tone="neutral" />
-      <StatusPill label="Shift"   value="Open"                                    tone="success" />
       <StatusPill label="Network" value={isOffline ? "Offline queue" : "Online"}  tone={isOffline ? "warning" : "success"} />
       <StatusPill label="Cart"    value={`${itemCount} item${itemCount === 1 ? "" : "s"}`} tone={itemCount > 0 ? "brand" : "neutral"} />
       {returnMode && <StatusPill label="Mode" value="Return" tone="warning" />}
