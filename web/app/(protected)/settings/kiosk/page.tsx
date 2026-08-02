@@ -1,10 +1,16 @@
 "use client";
 
+/**
+ * Kiosk Mode settings — Preview only.
+ *
+ * There is no backend persistence for these toggles today. Save must not pretend
+ * to succeed (Ponytail Wave 0 honesty). Nav marks this page `partial: true`.
+ */
+
 import { useState } from "react";
 import Link from "next/link";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
+import { Button } from "@/components/Button";
 
 type PaymentMethod = "card" | "cash" | "loyalty" | "gift_card";
 
@@ -16,17 +22,15 @@ const METHOD_LABELS: Record<PaymentMethod, string> = {
 };
 
 const TIMEOUT_OPTIONS = [
-  { value: "30",  label: "30 seconds" },
-  { value: "60",  label: "1 minute" },
+  { value: "30", label: "30 seconds" },
+  { value: "60", label: "1 minute" },
   { value: "120", label: "2 minutes" },
   { value: "300", label: "5 minutes" },
 ];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function SectionCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+    <div className="rounded-xl border border-erp-table-border bg-white px-4 py-4 shadow-sm">
       {children}
     </div>
   );
@@ -37,25 +41,29 @@ function ToggleRow({
   description,
   checked,
   onChange,
+  disabled,
 }: {
   label: string;
   description?: string;
   checked: boolean;
   onChange: (v: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between gap-4">
       <div>
-        <p className="text-sm font-medium text-[#111]">{label}</p>
-        {description && <p className="text-xs text-slate-400">{description}</p>}
+        <p className="text-sm font-medium text-erp-text-primary">{label}</p>
+        {description && <p className="text-xs text-erp-text-secondary">{description}</p>}
       </div>
       <button
         type="button"
         role="switch"
         aria-checked={checked}
+        aria-disabled={disabled || undefined}
+        disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 ${
-          checked ? "bg-brand-600" : "bg-slate-200"
+        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+          checked ? "bg-brand-600" : "bg-erp-table-border"
         }`}
       >
         <span
@@ -68,8 +76,6 @@ function ToggleRow({
   );
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
-
 export default function KioskSettingsPage() {
   const [enabled, setEnabled] = useState(false);
   const [pin, setPin] = useState("1234");
@@ -79,8 +85,6 @@ export default function KioskSettingsPage() {
   const [allowedMethods, setAllowedMethods] = useState<Set<PaymentMethod>>(
     new Set(["card", "cash"]),
   );
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   const toggleMethod = (m: PaymentMethod) => {
     setAllowedMethods((prev) => {
@@ -91,15 +95,8 @@ export default function KioskSettingsPage() {
     });
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    await new Promise((r) => window.setTimeout(r, 700));
-    setSaving(false);
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 3000);
-  };
-
-  const KIOSK_URL = "https://finder-pos.app/kiosk";
+  // Relative path only — never hard-code a legacy product host.
+  const KIOSK_URL = "/kiosk";
 
   return (
     <EnterpriseShell
@@ -109,17 +106,23 @@ export default function KioskSettingsPage() {
       contentClassName="overflow-y-auto"
     >
       <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">
+        <div
+          className="mb-4 rounded-lg border border-warning-100 bg-warning-50 px-3 py-2 text-xs text-warning-700"
+          role="status"
+        >
+          <span className="font-semibold">Preview:</span> kiosk settings are not
+          saved yet — there is no backend for these toggles. Changes stay in this
+          browser session only and are discarded on reload.
+        </div>
 
-        {/* ── Header ──────────────────────────────────────────────────── */}
         <div className="mb-6">
-          <h1 className="text-lg font-semibold text-[#111]">Kiosk Mode</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-lg font-semibold text-erp-text-primary">Kiosk Mode</h1>
+          <p className="mt-1 text-sm text-erp-text-secondary">
             Configure a customer-facing self-checkout terminal on a dedicated tablet or touchscreen.
             Staff use a PIN to exit kiosk mode and return to the back office.
           </p>
         </div>
 
-        {/* ── Master enable ─────────────────────────────────────────────── */}
         <SectionCard>
           <ToggleRow
             label="Enable Kiosk Mode"
@@ -131,38 +134,33 @@ export default function KioskSettingsPage() {
 
         {enabled && (
           <div className="mt-4 space-y-4">
-
-            {/* ── Kiosk URL ──────────────────────────────────────────── */}
             <SectionCard>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-erp-text-secondary">
                 Kiosk URL
               </p>
-              <div className="mt-2 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2.5">
-                <span className="flex-1 select-all font-mono text-sm text-slate-700">
+              <div className="mt-2 flex items-center gap-2 rounded-lg bg-erp-page px-3 py-2.5">
+                <span className="flex-1 select-all font-mono text-sm text-erp-text-primary">
                   {KIOSK_URL}
                 </span>
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
+                  size="sm"
                   onClick={() => void navigator.clipboard.writeText(KIOSK_URL)}
-                  className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50"
                 >
                   Copy
-                </button>
+                </Button>
               </div>
-              <p className="mt-2 text-xs text-slate-400">
-                Open this URL on a dedicated tablet or customer-facing display.
+              <p className="mt-2 text-xs text-erp-text-secondary">
+                Open this path on a dedicated tablet once kiosk mode ships end-to-end.
               </p>
             </SectionCard>
 
-            {/* ── Exit PIN ───────────────────────────────────────────── */}
             <SectionCard>
-              <label
-                className="block text-sm font-medium text-[#111]"
-                htmlFor="kiosk-pin"
-              >
+              <label className="block text-sm font-medium text-erp-text-primary" htmlFor="kiosk-pin">
                 Exit PIN
               </label>
-              <p className="mt-0.5 text-xs text-slate-400">
+              <p className="mt-0.5 text-xs text-erp-text-secondary">
                 Staff enter this PIN to exit kiosk mode and return to the back office.
               </p>
               <div className="mt-2 flex items-center gap-2">
@@ -173,34 +171,26 @@ export default function KioskSettingsPage() {
                   maxLength={8}
                   value={pin}
                   onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-                  className="w-32 rounded-lg border border-slate-200 px-3 py-2 font-mono text-lg tracking-widest focus:border-brand-600 focus:outline-none"
+                  className="w-32 rounded-lg border border-erp-table-border px-3 py-2 font-mono text-lg tracking-widest focus:border-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPin((v) => !v)}
-                  className="text-xs text-slate-400 hover:text-slate-600"
-                >
+                <Button type="button" variant="ghost" size="sm" onClick={() => setShowPin((v) => !v)}>
                   {showPin ? "Hide" : "Show"}
-                </button>
+                </Button>
               </div>
             </SectionCard>
 
-            {/* ── Idle timeout ────────────────────────────────────────── */}
             <SectionCard>
-              <label
-                className="block text-sm font-medium text-[#111]"
-                htmlFor="kiosk-timeout"
-              >
+              <label className="block text-sm font-medium text-erp-text-primary" htmlFor="kiosk-timeout">
                 Idle Timeout
               </label>
-              <p className="mt-0.5 text-xs text-slate-400">
+              <p className="mt-0.5 text-xs text-erp-text-secondary">
                 Return to the welcome screen after this period of inactivity.
               </p>
               <select
                 id="kiosk-timeout"
                 value={idleTimeout}
                 onChange={(e) => setIdleTimeout(e.target.value)}
-                className="mt-2 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
+                className="mt-2 rounded-lg border border-erp-table-border px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
               >
                 {TIMEOUT_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -210,7 +200,6 @@ export default function KioskSettingsPage() {
               </select>
             </SectionCard>
 
-            {/* ── Show prices ─────────────────────────────────────────── */}
             <SectionCard>
               <ToggleRow
                 label="Show Product Prices"
@@ -220,10 +209,9 @@ export default function KioskSettingsPage() {
               />
             </SectionCard>
 
-            {/* ── Payment methods ─────────────────────────────────────── */}
             <SectionCard>
-              <p className="text-sm font-medium text-[#111]">Allowed Payment Methods</p>
-              <p className="mt-0.5 text-xs text-slate-400">
+              <p className="text-sm font-medium text-erp-text-primary">Allowed Payment Methods</p>
+              <p className="mt-0.5 text-xs text-erp-text-secondary">
                 Only selected methods will be offered to customers at checkout.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -234,10 +222,10 @@ export default function KioskSettingsPage() {
                       key={m}
                       type="button"
                       onClick={() => toggleMethod(m)}
-                      className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                      className={`min-h-touch rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 ${
                         active
                           ? "bg-brand-600 text-white"
-                          : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+                          : "border border-erp-table-border text-erp-text-secondary hover:bg-erp-page"
                       }`}
                     >
                       {METHOD_LABELS[m]}
@@ -247,39 +235,23 @@ export default function KioskSettingsPage() {
               </div>
             </SectionCard>
 
-            {/* ── Enable mode notice ──────────────────────────────────── */}
-            <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-500">
-              <svg className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+            <div className="flex items-start gap-2 rounded-lg border border-erp-table-border bg-erp-page px-3 py-2.5 text-xs text-erp-text-secondary">
               <p>
-                Kiosk mode must also be enabled in{" "}
+                When a real kiosk backend ships, enablement will also require{" "}
                 <Link href="/settings/modes" className="font-medium text-brand-600 hover:underline">
                   Business Modes
-                </Link>{" "}
-                for it to appear in the navigation.
+                </Link>
+                .
               </p>
             </div>
           </div>
         )}
 
-        {/* ── Save ──────────────────────────────────────────────────────── */}
         <div className="mt-6 flex items-center justify-end gap-3">
-          {saved && (
-            <span className="text-sm font-medium text-emerald-600">
-              Saved successfully
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={saving}
-            className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0] disabled:opacity-40"
-          >
-            {saving ? "Saving…" : "Save settings"}
-          </button>
+          <Button type="button" variant="primary" disabled title="No kiosk settings API yet">
+            Save unavailable
+          </Button>
         </div>
-
       </div>
     </EnterpriseShell>
   );
