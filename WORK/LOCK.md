@@ -1181,6 +1181,18 @@ note recommended: **PR #120** into `develop`. CI not yet observed on this PR.
 | Coordination note | As of this session, **four other branches independently touch overlapping retail-core files** without having merged into `develop` yet: `chore/reporting-reports-dedup` (a4799d1/5aed9e1 — `/reporting` dedup + the two Ponytail audit docs), `cursor/ui-wave-a-trust-leftovers-604f`, and `cursor/ui-wave-b-cashier-trust-604f` (both touch `sales/page.tsx`, `returns/page.tsx`, `terminal/**`, `EnterpriseShell.tsx`, and duplicate an identical-looking `src/modules/orders/{index,service}.ts` + `src/modules/sales/routes.ts` diff between themselves — worth Sri diffing those two branches against each other before merging either, they may be near-duplicates or one may supersede the other). None of those four files/branches were touched by this claim. Recommend reconciling/merging the already-complete branches (Phase D+E here, the reporting dedup, and whichever of Wave A/B is not redundant) in the order AGENTS.md prescribes — one at a time, gates re-run after each — rather than letting more branches accumulate on top of increasingly stale bases. |
 | Blockers | git push needs to happen from a machine with GitHub credentials (see above) |
 
+## Parallel Non-Overlapping Claim (Claude, Cowork/Sonnet 5 — UI Ponytail fix sequence, Phase F)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude (Cowork, Sonnet 5) — continuing directly from the Phase D+E claim above on the same branch. |
+| Queue item | Retail-core finding #2: `setup/loyalty/page.tsx` re-exported the wrong page (the top-level `/loyalty` app instead of `../../settings/page`, the pattern all 7 sibling `setup/*` shims use) — a real navigation bug, not just clutter. Fixed the one-line re-export. Retail-core finding #12 (partial): deleted the two truly orphaned `finance/*` shims (`payment-made`, `settings` — zero inbound references anywhere in `web/`) and the now-dead path-matcher branch in `finance/page.tsx` referencing the deleted route. Left `finance/bills` alone — it's still wired up via the AP tab's redirect, and removing that redirect-hop is finding #8's job (a bigger, separate refactor), not bundled here. |
+| Files/areas expected | `web/app/(protected)/setup/loyalty/page.tsx`, `web/app/(protected)/finance/page.tsx`, deletions of `web/app/(protected)/finance/{payment-made,settings}/page.tsx`. Zero overlap with `chore/reporting-reports-dedup` or either Cursor wave branch — none of them touch `setup/loyalty` or any `finance/*` file. |
+| Started | 2026-08-02 |
+| Status | Committed locally on `feature/pos-shared-metric-cleanup`. **NOT pushed** — same missing-GitHub-credentials limitation as every other entry here. Verification: `npx eslint` clean on all touched files; repo-wide grep (via the Grep tool — raw recursive `grep -r` over `web/` timed out choking on `.next`/`node_modules`, worth remembering for next time) confirmed zero remaining references to the deleted routes before deleting; no existing test covers any of these three files. Full `web` typecheck/lint/build still not run — same 45s-per-call sandbox ceiling documented on the Phase D+E claim above. Full detail: `WORK/audits/AUDIT_2026-08-02T230650Z-loyalty-nav-bug-finance-dead-shims.md`. |
+| File-deletion note | Deleting under the connected `Ascend` folder initially failed with `Operation not permitted` (the mount blocks unlink by default) — resolved by calling `allow_cowork_file_delete` for both target files, which enabled deletion for the rest of this session. |
+| Blockers | git push needs to happen from a machine with GitHub credentials (see above) |
+
 ## Rules
 
 - Claim one queue item before editing code.

@@ -1,1 +1,1 @@
-export { default } from "../../loyalty/page";
+export { default } from "../../settings/page";
