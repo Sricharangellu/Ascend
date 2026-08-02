@@ -2,6 +2,17 @@
 
 Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0 wave-dispatch coordination claim (started 2026-07-18) was closed 2026-07-30 as superseded — see its entry below; work since has shipped as independent claims rather than through that coordinator. Latest substantive work: Phase 7 items 1-2 (sales-velocity consolidation, demand-snapshot foundation) RELEASED; four-environment AI coordination workflow (Claude Code/Cursor/Replit) adopted 2026-07-30, see `docs/architecture/ORCHESTRATION.md` "Environment routing" + `tools/AGENT_PROMPT.md`. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B, RELEASED); Clean Architecture pilot (quotes + gateway auth) (session C, ABANDONED — see entry); SSO OIDC hardening (session D)
 
+## Active Claim (Cursor Cloud — Ascend UI ponytail audit / Wave B cashier trust)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud `bc-c564feef` — Ascend UI ponytail audit (Wave B from AUDIT_2026-07-30T222326Z) |
+| Queue item | Wave B (S-scope): (1) hide POS Hold/Drawer/Print/Return stubs that toast "coming soon"; (2) command palette `hrefForHit` → entity detail URLs; (3) rename nav Purchase → Cost Entry to distinguish from Purchasing hub. |
+| Files/areas expected | `web/app/(protected)/terminal/**`; `web/components/CommandPalette.tsx`; `web/components/EnterpriseShell.tsx`; `web/components/terminal/ShortcutsOverlay.tsx`; tests; `WORK/**` |
+| Started | 2026-08-02T160518Z |
+| Status | RELEASED — Wave B S-scope shipped on `cursor/ui-wave-b-cashier-trust-604f`; see AUDIT_2026-08-02T160518Z-ui-wave-b-cashier-trust.md |
+| Blockers | none |
+
 ## Active Claim (Claude session G — Phase 0 coordinator: finish end-to-end + deployment readiness)
 
 | Field | Value |

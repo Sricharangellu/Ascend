@@ -127,7 +127,7 @@ export default function ReturnsPage() {
           <Metric label="Refunded orders" value={summary.refundedCount} helper={formatMoney(summary.refundedCents)} tone="warning" />
           <Metric label="Vendor returns" value={vendorReturns.length} helper={formatMoney(summary.vendorReturnCents)} tone="brand" />
           <Metric label="Credit memos" value={summary.vendorCreditCount} helper="Linked vendor credits" tone="neutral" />
-          <Metric label="Return mode" value="Ready" helper="POS action bar enabled" tone="neutral" />
+          <Metric label="Returns desk" value="Ready" helper="Process refunds from completed sales" tone="neutral" />
         </section>
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">

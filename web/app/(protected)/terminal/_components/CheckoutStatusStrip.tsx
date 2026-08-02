@@ -20,7 +20,6 @@ function StatusPill({ label, value, tone }: { label: string; value: string; tone
 export function CheckoutStatusStrip({
   cashier,
   isOffline,
-  returnMode,
   itemCount,
   onShortcuts,
   activeOutletId,
@@ -29,7 +28,6 @@ export function CheckoutStatusStrip({
 }: {
   cashier: string;
   isOffline: boolean;
-  returnMode: boolean;
   itemCount: number;
   onShortcuts: () => void;
   activeOutletId: string;
@@ -46,7 +44,6 @@ export function CheckoutStatusStrip({
       <StatusPill label="Shift"   value="Open"                                    tone="success" />
       <StatusPill label="Network" value={isOffline ? "Offline queue" : "Online"}  tone={isOffline ? "warning" : "success"} />
       <StatusPill label="Cart"    value={`${itemCount} item${itemCount === 1 ? "" : "s"}`} tone={itemCount > 0 ? "brand" : "neutral"} />
-      {returnMode && <StatusPill label="Mode" value="Return" tone="warning" />}
       {outlets.length > 0 && (
         <select
           value={activeOutletId}

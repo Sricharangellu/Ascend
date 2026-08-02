@@ -1,4 +1,11 @@
 "use client";
+
+/**
+ * Keyboard shortcuts help — only lists shortcuts that are actually wired in
+ * the terminal today. Aspirational F-keys / Ctrl+P print / gift-card tender
+ * were removed so cashiers aren't trained on dead controls (Wave B trust).
+ */
+
 import { Modal } from "@/components/Modal";
 
 interface ShortcutsOverlayProps {
@@ -26,19 +33,14 @@ const SHORTCUTS = [
   {
     category: "Payment",
     items: [
-      { key: "F1", description: "Cash tender" },
-      { key: "F2", description: "Card tender" },
-      { key: "F3", description: "Gift card tender" },
-      { key: "F4", description: "Split tender" },
       { key: "Enter", description: "Confirm payment (when in payment mode)" },
+      { key: "Esc", description: "Cancel tender and return to cart" },
     ],
   },
   {
     category: "General",
     items: [
       { key: "?", description: "Show this shortcuts guide" },
-      { key: "Ctrl+P", description: "Print last receipt" },
-      { key: "Ctrl+Z", description: "Void last transaction" },
     ],
   },
 ];
@@ -49,14 +51,14 @@ export function ShortcutsOverlay({ open, onClose }: ShortcutsOverlayProps) {
       <div className="space-y-5">
         {SHORTCUTS.map((section) => (
           <div key={section.category}>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-erp-text-secondary">
               {section.category}
             </h3>
             <div className="space-y-1.5">
               {section.items.map((item) => (
                 <div key={item.key} className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-slate-600">{item.description}</span>
-                  <kbd className="shrink-0 rounded border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-xs text-slate-700 shadow-sm">
+                  <span className="text-sm text-erp-text-secondary">{item.description}</span>
+                  <kbd className="shrink-0 rounded border border-erp-table-border bg-erp-page px-2 py-0.5 font-mono text-xs text-erp-text-primary shadow-sm">
                     {item.key}
                   </kbd>
                 </div>

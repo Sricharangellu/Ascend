@@ -37,7 +37,6 @@ export function TerminalInner() {
   const [completedPayment, setCompletedPayment] = useState<Payment | null>(null);
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
   const [ageVerified, setAgeVerified] = useState(false);
-  const [returnMode, setReturnMode] = useState(false);
   const [discountCents, setDiscountCents] = useState(0);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [scannedName, setScannedName] = useState<string | null>(null);
@@ -178,18 +177,9 @@ export function TerminalInner() {
     setScreen("tender");
   }, [cart.state.order]);
 
-  const handleAction = useCallback((action: string) => {
-    if (action === "Discount") { setShowDiscountModal(true); return; }
-    addToast({ title: action, description: "Feature coming soon.", variant: "info" });
-  }, [addToast]);
-
-  const handleReturnMode = useCallback(() => {
-    setReturnMode((current) => {
-      const next = !current;
-      addToast({ title: next ? "Return mode enabled" : "Return mode disabled", variant: next ? "warning" : "info" });
-      return next;
-    });
-  }, [addToast]);
+  const handleDiscount = useCallback(() => {
+    setShowDiscountModal(true);
+  }, []);
 
   const handleTenderSuccess = useCallback(
     (payment: Payment) => {
@@ -223,7 +213,6 @@ export function TerminalInner() {
     setCompletedOrder(null);
     setScreen("terminal");
     setAgeVerified(false);
-    setReturnMode(false);
     setDiscountCents(0);
     addToast({ title: "New sale started", variant: "info" });
   }, [cart, addToast]);
@@ -232,7 +221,6 @@ export function TerminalInner() {
     cart.clearCart();
     orderIdRef.current = null;
     setAgeVerified(false);
-    setReturnMode(false);
     setDiscountCents(0);
   }, [cart]);
 
@@ -257,7 +245,6 @@ export function TerminalInner() {
           <CheckoutStatusStrip
             cashier={user?.name ?? "Cashier"}
             isOffline={isOffline}
-            returnMode={returnMode}
             itemCount={cart.itemCount}
             onShortcuts={() => setShortcutsOpen(true)}
             activeOutletId={activeOutletId}
@@ -282,14 +269,9 @@ export function TerminalInner() {
           <TerminalActionBar
             canCharge={canCharge}
             totalCents={totalCents}
-            returnMode={returnMode}
             hasCart={cart.state.lines.length > 0}
             discountActive={discountCents > 0}
-            onHoldSale={() => handleAction("Hold sale")}
-            onDiscount={() => handleAction("Discount")}
-            onReturnMode={handleReturnMode}
-            onCashDrawer={() => handleAction("Cash drawer")}
-            onPrintReceipt={() => handleAction("Print receipt")}
+            onDiscount={handleDiscount}
             onCharge={handleCharge}
           />
         </div>
