@@ -139,3 +139,124 @@ test("cannot convert a cancelled quotation", async () => {
   const r = await call(app, "POST", `/api/sales/quotations/${qt.id}/convert`, {});
   assert.equal(r.status, 409);
 });
+
+// ─── POS sales history (GET /history) ──────────────────────────────────────
+// Real customer/sold-by/outlet/lines/payments + keyset pagination — before
+// this pass /history hardcoded sold_by="Staff"/outlet="Main Outlet", returned
+// no lines/payments at all (the frontend fabricated them), and had zero test
+// coverage of any kind.
+
+async function mkLocation(app: App, code: string, name: string) {
+  const r = await call(app, "POST", "/api/inventory/locations", { code, name });
+  assert.equal(r.status, 201, `location create failed: ${JSON.stringify(r.json)}`);
+  return r.json as { id: string; name: string };
+}
+
+async function mkOrder(app: App, productId: string, opts: { customerId?: string; storeId?: string } = {}) {
+  const r = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId, quantity: 1 }],
+    ...opts,
+  });
+  assert.equal(r.status, 201, `order create failed: ${JSON.stringify(r.json)}`);
+  return r.json as { id: string; total_cents: number };
+}
+
+test("/history: real customer name, real outlet, no fabricated sold_by, real lines/payments", async () => {
+  const app = await freshApp();
+  const customer = await mkCustomer(app, "Jane Smith");
+  const location = await mkLocation(app, "HIST-1", "Downtown Outlet");
+  const prod = await mkProduct(app, "HIST-A", 4200);
+
+  const order = await mkOrder(app, prod.id, { customerId: customer.id, storeId: location.id });
+  const pay = await call(app, "POST", "/api/payments/", {
+    orderId: order.id, method: "cash", tenderedCents: order.total_cents,
+  });
+  assert.equal(pay.status, 201);
+
+  const history = await call(app, "GET", "/api/sales/history");
+  assert.equal(history.status, 200);
+  const item = history.json.items.find((i: { id: string }) => i.id === order.id);
+  assert.ok(item, "created order should appear in sales history");
+
+  // Real customer name via LEFT JOIN customers — not the raw customer_id.
+  assert.equal(item.customer_name, "Jane Smith");
+
+  // Real outlet via LEFT JOIN inventory_locations — not the hardcoded "Main Outlet".
+  assert.equal(item.outlet, "Downtown Outlet");
+
+  // sold_by must no longer be the hardcoded literal "Staff".
+  assert.notEqual(item.sold_by, "Staff");
+
+  // Real line items — not the fabricated "Item (demo)" fallback.
+  assert.equal(item.lines.length, 1);
+  assert.equal(item.lines[0].name, "Product HIST-A"); // mkProduct's real name, not a placeholder
+  // line_cents is pre-tax; order.total_cents includes CA sales tax on top of it.
+  assert.equal(item.lines[0].total_cents + item.lines[0].tax_cents, order.total_cents);
+
+  // Real payment — not the fabricated "Cash" fallback for the full total by coincidence;
+  // assert the actual method/amount came from the real payment row.
+  assert.equal(item.payments.length, 1);
+  assert.equal(item.payments[0].method, "cash");
+  assert.equal(item.payments[0].amount_cents, order.total_cents);
+  assert.equal(item.status, "completed");
+});
+
+test("/history: order with no customer/store shows null/fallback, not fabricated values", async () => {
+  const app = await freshApp();
+  const prod = await mkProduct(app, "HIST-B", 1000);
+  const order = await mkOrder(app, prod.id);
+
+  const history = await call(app, "GET", "/api/sales/history");
+  const item = history.json.items.find((i: { id: string }) => i.id === order.id);
+  assert.ok(item);
+  assert.equal(item.customer_name, null);
+  assert.equal(item.outlet, "Unassigned");
+});
+
+test("/history: status filter narrows results server-side", async () => {
+  const app = await freshApp();
+  const prod = await mkProduct(app, "HIST-C", 500);
+  const order = await mkOrder(app, prod.id);
+  // Order stays "open" (no payment captured).
+
+  const completedOnly = await call(app, "GET", "/api/sales/history?status=completed");
+  assert.ok(!completedOnly.json.items.some((i: { id: string }) => i.id === order.id));
+
+  const openOnly = await call(app, "GET", "/api/sales/history?status=open");
+  assert.ok(openOnly.json.items.some((i: { id: string }) => i.id === order.id));
+});
+
+test("/history: q searches both receipt number and customer name", async () => {
+  const app = await freshApp();
+  const customer = await mkCustomer(app, "Unique Customer Zzz");
+  const prod = await mkProduct(app, "HIST-D", 700);
+  const order = await mkOrder(app, prod.id, { customerId: customer.id });
+
+  const byCustomer = await call(app, "GET", "/api/sales/history?q=unique%20customer%20zzz");
+  assert.ok(byCustomer.json.items.some((i: { id: string }) => i.id === order.id));
+
+  const noMatch = await call(app, "GET", "/api/sales/history?q=definitely-not-a-match-xyz");
+  assert.ok(!noMatch.json.items.some((i: { id: string }) => i.id === order.id));
+});
+
+test("/history: keyset pagination returns a nextCursor and the next page via it", async () => {
+  const app = await freshApp();
+  const prod = await mkProduct(app, "HIST-E", 300);
+  const orderIds: string[] = [];
+  for (let i = 0; i < 3; i++) {
+    const order = await mkOrder(app, prod.id);
+    orderIds.push(order.id);
+  }
+
+  const page1 = await call(app, "GET", "/api/sales/history?limit=2");
+  assert.equal(page1.json.items.length, 2);
+  assert.ok(page1.json.nextCursor, "first page should carry a cursor when more rows exist");
+
+  const page2 = await call(app, "GET", `/api/sales/history?limit=2&cursor=${encodeURIComponent(page1.json.nextCursor)}`);
+  assert.ok(page2.json.items.length >= 1);
+  // No overlap between pages.
+  const page1Ids = page1.json.items.map((i: { id: string }) => i.id);
+  const page2Ids = page2.json.items.map((i: { id: string }) => i.id);
+  assert.ok(page1Ids.every((id: string) => !page2Ids.includes(id)));
+});

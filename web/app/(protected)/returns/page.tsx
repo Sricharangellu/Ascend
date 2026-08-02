@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { KpiCard } from "@/components/KpiCard";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { TableSkeleton } from "@/components/TableSkeleton";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import { fmtDate } from "@/lib/date";
@@ -39,14 +41,17 @@ const STATUS_BADGE: Record<OrderStatus, "green" | "blue" | "yellow" | "gray"> = 
 
 
 export default function ReturnsPage() {
+  const searchParams = useSearchParams();
+  const preselectOrderId = searchParams.get("orderId");
   const [orders, setOrders] = useState<Order[]>([]);
   const [vendorReturns, setVendorReturns] = useState<VendorReturn[]>([]);
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<ReturnFilter>("eligible");
-  const [selectedOrderId, setSelectedOrderId] = useState("");
+  const [filter, setFilter] = useState<ReturnFilter>(preselectOrderId ? "all" : "eligible");
+  const [selectedOrderId, setSelectedOrderId] = useState(preselectOrderId ?? "");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refundTarget, setRefundTarget] = useState<Order | null>(null);
 
   const canManage = hasRole("manager");
 
@@ -80,7 +85,10 @@ export default function ReturnsPage() {
       if (filter === "eligible" && order.status !== "completed") return false;
       if (filter === "refunded" && order.status !== "refunded") return false;
       if (!q) return true;
-      return [order.orderNumber, order.id, order.customerId, order.stateCode]
+      // Deliberately not matching customerId here — it's a raw UUID a human would
+      // never type, so it isn't real "customer search" despite once being listed
+      // as if it were. Fix that properly (a real customer-name join) if wanted.
+      return [order.orderNumber, order.id, order.stateCode]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(q));
     });
@@ -100,12 +108,18 @@ export default function ReturnsPage() {
     };
   }, [orders, vendorReturns]);
 
-  const refundOrder = async (order: Order) => {
+  const requestRefund = (order: Order) => {
     if (!canManage || order.status !== "completed") return;
+    setRefundTarget(order);
+  };
+
+  const confirmRefund = async () => {
+    if (!refundTarget) return;
     setBusy(true);
     setError(null);
     try {
-      await apiPost(`/api/v1/orders/${order.id}/refund`, {});
+      await apiPost(`/api/v1/orders/${refundTarget.id}/refund`, {});
+      setRefundTarget(null);
       await load();
     } catch (err) {
       setError(err instanceof ApiResponseError ? err.message : "Could not refund order.");
@@ -128,7 +142,6 @@ export default function ReturnsPage() {
           <KpiCard title="Refunded orders" value={summary.refundedCount} helper={formatMoney(summary.refundedCents)} tone="amber" />
           <KpiCard title="Vendor returns" value={vendorReturns.length} helper={formatMoney(summary.vendorReturnCents)} tone="blue" />
           <KpiCard title="Credit memos" value={summary.vendorCreditCount} helper="Linked vendor credits" tone="neutral" />
-          <KpiCard title="Return mode" value="Ready" helper="POS action bar enabled" tone="neutral" />
         </section>
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
@@ -140,7 +153,7 @@ export default function ReturnsPage() {
                   type="search"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search receipt, order ID, customer, state..."
+                  placeholder="Search receipt #, order ID, or state..."
                   className="min-h-[40px] w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
                 />
               </label>
@@ -177,7 +190,7 @@ export default function ReturnsPage() {
                     canRefund={canManage && order.status === "completed"}
                     busy={busy}
                     onSelect={() => setSelectedOrderId(order.id)}
-                    onRefund={() => void refundOrder(order)}
+                    onRefund={() => requestRefund(order)}
                   />
                 ))}
               </div>
@@ -207,7 +220,7 @@ export default function ReturnsPage() {
                     ))}
                   </div>
                   {canManage && selectedOrder.status === "completed" && (
-                    <Button variant="danger" size="sm" fullWidth disabled={busy} onClick={() => void refundOrder(selectedOrder)}>
+                    <Button variant="danger" size="sm" fullWidth disabled={busy} onClick={() => requestRefund(selectedOrder)}>
                       Refund receipt
                     </Button>
                   )}
@@ -239,6 +252,16 @@ export default function ReturnsPage() {
           </div>
         </section>
       </div>
+
+      <ConfirmDialog
+        open={!!refundTarget}
+        title="Refund receipt"
+        message={`Refund "${refundTarget?.orderNumber}" for ${refundTarget ? formatMoney(refundTarget.totalCents) : ""}? This cannot be undone.`}
+        confirmLabel={busy ? "Refunding…" : "Refund"}
+        destructive
+        onConfirm={() => void confirmRefund()}
+        onCancel={() => setRefundTarget(null)}
+      />
     </EnterpriseShell>
   );
 }
