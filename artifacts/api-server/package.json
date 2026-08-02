@@ -9,9 +9,12 @@
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "db:backup": "bash scripts/backup.sh",
-    "db:restore": "bash scripts/restore.sh"
+    "db:restore": "bash scripts/restore.sh",
+    "db:backup:remote-list": "tsx src/scripts/remote-backups.ts list",
+    "db:backup:remote-pull": "tsx src/scripts/remote-backups.ts pull"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1101.0",
     "bcryptjs": "^2.4.3",
     "express": "^4.21.2",
     "helmet": "^8.2.0",

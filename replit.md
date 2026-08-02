@@ -67,6 +67,33 @@ Environment variables:
 | `BACKUP_RETAIN_DAYS` | `7` | Days of dumps to keep before pruning |
 | `BACKUP_ENABLED` | `true` | Set to `"false"` to disable automated dumps |
 
+### Remote backup storage (survives a workspace reset)
+
+When `BACKUP_S3_BUCKET` is set, every successful `pg_dump` is **also uploaded to an
+S3-compatible bucket** (AWS S3, Cloudflare R2, Backblaze B2, MinIO, …). Local copies
+are still kept for `BACKUP_RETAIN_DAYS` for fast restores. If the upload fails, the
+backup job fails (and retries / alerts via `BACKUP_ALERT_EMAIL`) — a dump that only
+exists on the workspace disk is not treated as a successful backup.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `BACKUP_S3_BUCKET` | — | Bucket name. Setting this enables remote uploads |
+| `BACKUP_S3_KEY` | `backups/` | Key prefix inside the bucket |
+| `BACKUP_S3_ENDPOINT` | — | Custom endpoint URL for R2/B2/MinIO (omit for AWS S3) |
+| `BACKUP_S3_REGION` | `us-east-1` | Bucket region (`auto` for R2) |
+| `BACKUP_S3_ACCESS_KEY_ID` | `AWS_ACCESS_KEY_ID` | Access key (store as a Replit Secret) |
+| `BACKUP_S3_SECRET_ACCESS_KEY` | `AWS_SECRET_ACCESS_KEY` | Secret key (store as a Replit Secret) |
+
+List and pull remote dumps:
+
+```bash
+# List all dumps in the bucket (newest first):
+pnpm --filter @workspace/api-server db:backup:remote-list
+
+# Download one into ./backups/ ready for restore.sh:
+pnpm --filter @workspace/api-server db:backup:remote-pull ascend-backup-<timestamp>.sql
+```
+
 ### On-demand backup (CLI)
 
 ```bash
@@ -127,6 +154,15 @@ If the Replit PostgreSQL database is wiped (e.g. via the Replit dashboard):
 1. Obtain the new `DATABASE_URL` from the Replit database panel and update the secret.
 2. Run the restore script against the most recent backup in `backups/`.
 3. Restart the API server — migrations will run and any new tables will be created automatically.
+
+If the **entire workspace** was reset (local `backups/` gone too), pull the latest
+dump from remote storage first:
+
+```bash
+pnpm --filter @workspace/api-server db:backup:remote-list
+pnpm --filter @workspace/api-server db:backup:remote-pull ascend-backup-<timestamp>.sql
+DATABASE_URL=<connection-string> bash artifacts/api-server/scripts/restore.sh backups/ascend-backup-<timestamp>.sql
+```
 
 ---
 

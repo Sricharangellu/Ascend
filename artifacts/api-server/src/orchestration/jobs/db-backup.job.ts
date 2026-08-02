@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 import type { JobRow } from "../types.js";
 import { moduleLogger } from "../../shared/logger.js";
 import { sendEmail } from "../../shared/email.js";
+import { remoteBackupConfig, uploadBackup } from "../../shared/backup-storage.js";
 
 const log = moduleLogger("db-backup");
 
@@ -190,15 +191,15 @@ export async function runDbBackupWithAlert(
   }
 }
 
-export async function dbBackupJob(_job: JobRow): Promise<{ file: string; bytes: number; pruned: number }> {
+export async function dbBackupJob(_job: JobRow): Promise<{ file: string; bytes: number; pruned: number; remoteKey: string | null }> {
   const dbUrl = process.env["DATABASE_URL"];
   if (!dbUrl) {
     log.warn("DATABASE_URL not set — skipping backup");
-    return { file: "", bytes: 0, pruned: 0 };
+    return { file: "", bytes: 0, pruned: 0, remoteKey: null };
   }
   if (process.env["BACKUP_ENABLED"] === "false") {
     log.info("BACKUP_ENABLED=false — skipping backup");
-    return { file: "", bytes: 0, pruned: 0 };
+    return { file: "", bytes: 0, pruned: 0, remoteKey: null };
   }
 
   const dir = backupDir();
@@ -212,7 +213,30 @@ export async function dbBackupJob(_job: JobRow): Promise<{ file: string; bytes: 
   const bytes = await runPgDump(dbUrl, outFile);
   log.info({ file: filename, bytes }, "pg_dump complete");
 
+  // Ship the dump to S3-compatible remote storage when configured.
+  // An upload failure fails the job (and therefore triggers retries and the
+  // failure alert) — a backup that only exists on the workspace disk does not
+  // satisfy the recovery goal. The local dump is kept either way.
+  let remoteKey: string | null = null;
+  const remote = remoteBackupConfig();
+  if (remote) {
+    try {
+      const { key } = await uploadBackup(outFile, filename, remote);
+      remoteKey = key;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `Backup dump succeeded locally (${filename}) but the upload to ` +
+          `s3://${remote.bucket}/${remote.prefix} failed: ${message}`,
+      );
+    }
+  } else {
+    log.warn(
+      "BACKUP_S3_BUCKET not configured — dump kept on local disk only and will NOT survive a workspace reset",
+    );
+  }
+
   const pruned = await pruneOldDumps(dir);
 
-  return { file: filename, bytes, pruned };
+  return { file: filename, bytes, pruned, remoteKey };
 }

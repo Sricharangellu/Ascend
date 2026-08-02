@@ -22,6 +22,10 @@ if [[ $# -lt 1 ]]; then
   echo ""
   echo "Available dumps in ./backups/:"
   ls -lh backups/ascend-backup-*.sql 2>/dev/null || echo "  (none found)"
+  echo ""
+  echo "Dumps in remote storage (if BACKUP_S3_BUCKET is configured):"
+  echo "  pnpm --filter @workspace/api-server db:backup:remote-list"
+  echo "  pnpm --filter @workspace/api-server db:backup:remote-pull <filename>"
   exit 1
 fi
 
