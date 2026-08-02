@@ -2,6 +2,17 @@
 
 Status: ACTIVE — session G (Cowork/Claude, Fable 5) coordinating Phase 0 (finish end-to-end + deployment readiness, Sri directive 2026-07-18). See claim below. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
 
+## Active Claim (Cursor cloud — Ponytail enterprise UI page audit)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor cloud agent (Ponytail UI Audit Protocol) |
+| Queue item | Documentation-only: systematic Ponytail page-by-page enterprise UI audit of every `web/app/**/page.tsx`. Deliverable: `WORK/audits/AUDIT_<UTC>-ponytail-enterprise-ui-audit.md`. No product code changes. |
+| Files/areas expected | `WORK/audits/**` (new audit only); `WORK/LOCK.md` (this claim). NO `src/**`, NO `web/**` product edits. |
+| Started | 2026-08-02 |
+| Status | RELEASED — audit written: WORK/audits/AUDIT_2026-08-02T230500Z-ponytail-enterprise-ui.md (142 pages). Docs only. |
+| Blockers | none |
+
 ## Active Claim (Claude session G — Phase 0 coordinator: finish end-to-end + deployment readiness)
 
 | Field | Value |
