@@ -35,6 +35,7 @@ No autonomous high-value work remains. Further progress = feature development
 
 | # | UTC | Commit | Summary |
 |---|---|---|---|
+| — | 2026-08-02T230500Z | (docs) | Ponytail enterprise UI page-by-page audit: WORK/audits/AUDIT_2026-08-02T230500Z-ponytail-enterprise-ui.md — all 142 routes decided (KEEP/REFACTOR/CONSOLIDATE/REDESIGN/REWRITE/HIDE); Wave 0 honesty + Wave 1 IA consolidation recommended next. Docs only, no product code. |
 | 1 | 2026-07-15T17:30Z | 3665437 | movements route drift (mock-only → real, prod panels were blank) + keyset pagination on inventory movements + audit_log cursor mode; 27/27, smoke 20/20 |
 | 2 | 2026-07-15T17:40Z | c6eb35b | loop durability infra: LOOP_PROTOCOL.md (on-disk program, re-read each wake) + LOOP_STATE.md (heartbeat/backlog/counters) + cloud-watchdog contract + memory pointer |
 | 3 | 2026-07-16T03:28Z | e535d7f | cloud watchdog live (trig_01VVXryUgSBHoy9mAqRdhfzz, notify-only, Gmail); protocol watchdog contract revised do-work→notify-only for financial-repo safety |
