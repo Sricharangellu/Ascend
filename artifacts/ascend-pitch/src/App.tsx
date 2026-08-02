@@ -271,6 +271,7 @@ function AllSlides() {
 function SlideViewer() {
   const [, navigate] = useLocation();
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const currentIndexRef = useRef(0);
   const [dims, setDims] = useState(() => ({
     width: Math.min(window.innerWidth, window.innerHeight * (16 / 9)),
     height: Math.min(window.innerHeight, window.innerWidth * (9 / 16)),
@@ -287,6 +288,57 @@ function SlideViewer() {
     };
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
+  }, []);
+
+  // Route all navigation through the inner iframe via postMessage so the
+  // slide transition animation in SlideEditor plays. Handles:
+  // - navigateToSlide from a host page embedding this viewer
+  // - advanceSlide / retreatSlide bubbled up from the inner iframe
+  //   (clicks, taps, and key presses inside the deck)
+  useEffect(() => {
+    const goToIndex = (index: number) => {
+      const target = slides[index];
+      if (!target) return;
+      currentIndexRef.current = index;
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'navigateToSlide', position: target.position },
+        '*',
+      );
+    };
+
+    const onMessage = (event: MessageEvent) => {
+      const type = event.data?.type;
+      if (
+        type === 'navigateToSlide' &&
+        typeof event.data.position === 'number'
+      ) {
+        const index = slides.findIndex(
+          (s) => s.position === event.data.position,
+        );
+        if (index !== -1 && event.source !== iframeRef.current?.contentWindow) {
+          goToIndex(index);
+        }
+        return;
+      }
+      // Messages from the inner deck iframe asking to move relative to
+      // the current slide.
+      if (event.source !== iframeRef.current?.contentWindow) return;
+      if (type === 'advanceSlide') {
+        // Keep an embedding host informed, if any.
+        if (window.parent !== window) {
+          window.parent.postMessage(event.data, '*');
+        }
+        goToIndex(Math.min(currentIndexRef.current + 1, slides.length - 1));
+      } else if (type === 'retreatSlide') {
+        if (window.parent !== window) {
+          window.parent.postMessage(event.data, '*');
+        }
+        goToIndex(Math.max(currentIndexRef.current - 1, 0));
+      }
+    };
+
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
   }, []);
 
   useEffect(() => {
@@ -430,6 +482,8 @@ function SlideViewer() {
 
 export default function App() {
   const [location, navigate] = useLocation();
+  const locationRef = useRef(location);
+  locationRef.current = location;
 
   // DO NOT edit this useEffect - redirects unknown routes to the first slide.
   // The "/", "/allslides", and "/present" routes are handled separately below.
@@ -456,6 +510,10 @@ export default function App() {
         typeof event.data.position === 'number' &&
         slides.some((s) => s.position === event.data.position)
       ) {
+        // When the SlideViewer ("/") is active, it forwards navigation into
+        // its inner iframe so the slide transition animation plays; navigating
+        // the outer route here would unmount the viewer and cause a hard cut.
+        if (locationRef.current === '/') return;
         navigate(`/slide${event.data.position}`);
       }
     };
