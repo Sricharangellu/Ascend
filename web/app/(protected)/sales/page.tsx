@@ -1,12 +1,11 @@
-"use client";
+import { redirect } from "next/navigation";
 
 /**
- * Sales History — retail POS transactions.
- *
- * Pattern per reference spec:
- *   Filter bar (Date · Time · Customer · Receipt/Note) → Clear / More filters / Search
- *   Expandable table rows → inline sale detail with actions
+ * Retired (2026-08-02, Ponytail Wave 0): this page called MSW-only
+ * `/api/v1/sales/history` (no backend route) — blank/broken in production.
+ * Canonical retail sales history is `/orders` → real `/api/v1/orders`.
  */
+<<<<<<< HEAD
 
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -479,4 +478,8 @@ function ActionBtn({
       {children}
     </button>
   );
+=======
+export default function LegacySalesHistoryRedirect() {
+  redirect("/orders");
+>>>>>>> 1e2931b (fix(web): Ponytail Wave 0 — nav honesty, sales redirect, brand cleanup)
 }
