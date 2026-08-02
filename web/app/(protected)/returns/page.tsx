@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
@@ -38,11 +39,13 @@ const STATUS_BADGE: Record<OrderStatus, "green" | "blue" | "yellow" | "gray"> = 
 
 
 export default function ReturnsPage() {
+  const searchParams = useSearchParams();
+  const preselectOrderId = searchParams.get("orderId");
   const [orders, setOrders] = useState<Order[]>([]);
   const [vendorReturns, setVendorReturns] = useState<VendorReturn[]>([]);
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<ReturnFilter>("eligible");
-  const [selectedOrderId, setSelectedOrderId] = useState("");
+  const [filter, setFilter] = useState<ReturnFilter>(preselectOrderId ? "all" : "eligible");
+  const [selectedOrderId, setSelectedOrderId] = useState(preselectOrderId ?? "");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
