@@ -82,7 +82,7 @@ export { reconcilePaymentsJob } from "./jobs/reconcile-payments.job.js";
 export { closeRegisterJob } from "./jobs/close-register.job.js";
 export { syncEcommerceJob } from "./jobs/sync-ecommerce.job.js";
 export { trialExpiryJob, TRIAL_EXPIRY_INTERVAL_MS } from "./jobs/trial-expiry.job.js";
-export { dbBackupJob, sendBackupFailureAlert, DB_BACKUP_INTERVAL_MS } from "./jobs/db-backup.job.js";
+export { dbBackupJob, sendBackupFailureAlert, runDbBackupWithAlert, DB_BACKUP_INTERVAL_MS } from "./jobs/db-backup.job.js";
 
 // Compensations
 export { releaseInventoryCompensation } from "./compensations/release-inventory.compensation.js";
@@ -131,7 +131,7 @@ import { arDunningJob } from "./jobs/ar-dunning.job.js";
 import { idempotencyExpiryJob, IDEMPOTENCY_EXPIRY_INTERVAL_MS } from "./jobs/idempotency-expiry.job.js";
 import { outboxRetentionJob, OUTBOX_RETENTION_INTERVAL_MS } from "./jobs/outbox-retention.job.js";
 import { trialExpiryJob, TRIAL_EXPIRY_INTERVAL_MS } from "./jobs/trial-expiry.job.js";
-import { dbBackupJob, sendBackupFailureAlert, DB_BACKUP_INTERVAL_MS } from "./jobs/db-backup.job.js";
+import { runDbBackupWithAlert, DB_BACKUP_INTERVAL_MS } from "./jobs/db-backup.job.js";
 
 export interface OrchestrationBootstrap {
   runner: WorkflowRunner;
@@ -330,19 +330,13 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
   // lookup to avoid cross-tenant disclosure in multi-tenant deployments).
   jobConsumer.register(QueueNames.DB_BACKUP, async (job) => {
     let jobFailed = false;
-    let jobError: Error | null = null;
     try {
-      await dbBackupJob(job);
+      // Runs the backup, alerts on the final failed attempt, and re-throws
+      // the original error so the consumer marks the job as failed.
+      await runDbBackupWithAlert(job);
     } catch (err) {
       jobFailed = true;
-      jobError = err instanceof Error ? err : new Error(String(err));
-      // Only alert when this was the final attempt — the consumer already
-      // incremented job.attempts before calling this handler, so
-      // attempts >= max_attempts means no more retries will be scheduled.
-      if (job.attempts >= job.max_attempts) {
-        await sendBackupFailureAlert(jobError);
-      }
-      throw jobError;
+      throw err;
     } finally {
       // Schedule the next daily backup only if there is not already a future
       // pending one. We cannot use enqueueOnce here because the current job is

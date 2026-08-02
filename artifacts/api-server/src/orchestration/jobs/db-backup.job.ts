@@ -154,6 +154,42 @@ export async function sendBackupFailureAlert(error: Error): Promise<void> {
   }
 }
 
+/**
+ * Run the backup for a queue job, sending a failure alert on the final
+ * attempt and always re-throwing the original error so the job consumer
+ * marks the job as failed.
+ *
+ * Dependencies are injectable for testing; defaults are the real
+ * implementations.
+ */
+export async function runDbBackupWithAlert(
+  job: JobRow,
+  deps: {
+    backup?: (job: JobRow) => Promise<unknown>;
+    alert?: (error: Error) => Promise<void>;
+  } = {},
+): Promise<void> {
+  const backup = deps.backup ?? dbBackupJob;
+  const alert = deps.alert ?? sendBackupFailureAlert;
+  try {
+    await backup(job);
+  } catch (err) {
+    const jobError = err instanceof Error ? err : new Error(String(err));
+    // Only alert when this was the final attempt — the consumer already
+    // incremented job.attempts before calling this handler, so
+    // attempts >= max_attempts means no more retries will be scheduled.
+    if (job.attempts >= job.max_attempts) {
+      try {
+        await alert(jobError);
+      } catch (alertErr) {
+        // The alert must never mask the original backup error — log and move on.
+        log.error({ err: alertErr }, "backup failure alert threw — original backup error still propagates");
+      }
+    }
+    throw jobError;
+  }
+}
+
 export async function dbBackupJob(_job: JobRow): Promise<{ file: string; bytes: number; pruned: number }> {
   const dbUrl = process.env["DATABASE_URL"];
   if (!dbUrl) {
