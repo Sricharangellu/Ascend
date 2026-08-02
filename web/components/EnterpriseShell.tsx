@@ -175,6 +175,7 @@ const NAV_TREE: NavSection[] = [
       { label: "Locations",     href: "/inventory/locations",     featureGate: "inventory" },
       { label: "Vendors",       href: "/vendors",                 featureGate: "vendors" },
       { label: "Operations",    href: "/operations",              featureGate: "operations" },
+      { label: "Workforce",     href: "/workforce",               featureGate: "workforce" },
     ],
   },
   {
@@ -222,6 +223,7 @@ const NAV_TREE: NavSection[] = [
       { label: "Imports/Exports", href: "/imports-exports",      featureGate: "imports-exports" },
       { label: "Document Center", href: "/documents",            featureGate: "documents", partial: true },
       { label: "Audit Log",       href: "/audit-log",            featureGate: "audit-log" },
+      { label: "Notifications",   href: "/notifications",        featureGate: "notifications" },
     ],
   },
 ];

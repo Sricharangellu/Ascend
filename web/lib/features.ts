@@ -8,7 +8,7 @@ export type FeatureId =
   | "customers" | "appointments"
   | "reports" | "insights" | "ai-assistant" | "tax-compliance" | "finance" | "accounting" | "invoicing"
   | "ecommerce" | "workforce"
-  | "team" | "settings" | "workflows" | "integrations" | "imports-exports" | "audit-log";
+  | "team" | "settings" | "workflows" | "integrations" | "imports-exports" | "audit-log" | "notifications";
 
 export interface FeatureDef {
   id: string;
@@ -91,6 +91,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       { id: "integrations",    label: "Integrations",    description: "Third-party app connections and API keys" },
       { id: "imports-exports", label: "Import / Export", description: "Bulk data import, export, and migration" },
       { id: "audit-log",       label: "Audit Log",       description: "Full system event log with actor tracking" },
+      { id: "notifications",   label: "Notifications",  description: "Low-stock alerts, overdue invoices, and system notification preferences" },
     ],
   },
 ];

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useNotifications, type Notification } from "@/lib/useNotifications";
 
 const LEVEL_STYLES: Record<string, string> = {
@@ -130,6 +131,20 @@ export function NotificationBell() {
                 <NotifItem key={n.id} n={n} onDismiss={dismiss} />
               ))
             )}
+          </div>
+
+          {/* Footer — this panel is an ephemeral, session-only stream (SSE, no
+              persistence); the Notifications page is the backend-persisted
+              inbox with channel preferences, alert rules, and digest
+              scheduling, so it's linked here rather than duplicated. */}
+          <div className="border-t border-slate-100 px-3 py-2">
+            <Link
+              href="/notifications"
+              onClick={() => setOpen(false)}
+              className="text-[11px] font-medium text-slate-500 hover:text-slate-700"
+            >
+              Manage notifications →
+            </Link>
           </div>
         </div>
       )}
