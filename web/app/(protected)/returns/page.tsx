@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
+import { KpiCard } from "@/components/KpiCard";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
@@ -137,10 +138,10 @@ export default function ReturnsPage() {
         )}
 
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <Metric label="Eligible receipts" value={summary.eligibleCount} helper={formatMoney(summary.eligibleCents)} tone="success" />
-          <Metric label="Refunded orders" value={summary.refundedCount} helper={formatMoney(summary.refundedCents)} tone="warning" />
-          <Metric label="Vendor returns" value={vendorReturns.length} helper={formatMoney(summary.vendorReturnCents)} tone="brand" />
-          <Metric label="Credit memos" value={summary.vendorCreditCount} helper="Linked vendor credits" tone="neutral" />
+          <KpiCard title="Eligible receipts" value={summary.eligibleCount} helper={formatMoney(summary.eligibleCents)} tone="green" />
+          <KpiCard title="Refunded orders" value={summary.refundedCount} helper={formatMoney(summary.refundedCents)} tone="amber" />
+          <KpiCard title="Vendor returns" value={vendorReturns.length} helper={formatMoney(summary.vendorReturnCents)} tone="blue" />
+          <KpiCard title="Credit memos" value={summary.vendorCreditCount} helper="Linked vendor credits" tone="neutral" />
         </section>
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
@@ -300,32 +301,6 @@ function ReturnOrderRow({
           Refund
         </Button>
       </div>
-    </div>
-  );
-}
-
-function Metric({
-  label,
-  value,
-  helper,
-  tone,
-}: {
-  label: string;
-  value: string | number;
-  helper: string;
-  tone: "neutral" | "success" | "warning" | "brand";
-}) {
-  const toneClass = {
-    neutral: "border-slate-200 bg-white",
-    success: "border-success-200 bg-success-50",
-    warning: "border-warning-200 bg-warning-50",
-    brand: "border-brand-200 bg-brand-50",
-  }[tone];
-  return (
-    <div className={`rounded-md border p-4 shadow-sm ${toneClass}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-slate-950">{value}</p>
-      <p className="mt-1 text-xs text-slate-500">{helper}</p>
     </div>
   );
 }

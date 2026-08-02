@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
+import { KpiCard } from "@/components/KpiCard";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { TableSkeleton } from "@/components/TableSkeleton";
@@ -104,11 +105,11 @@ export default function PaymentsPage() {
         )}
 
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <Metric label="Order total" value={formatMoney(selectedOrder?.totalCents ?? 0)} helper={selectedOrder?.orderNumber ?? "No order selected"} tone="neutral" />
-          <Metric label="Captured" value={formatMoney(summary.captured)} helper={`${payments.length} tender record${payments.length === 1 ? "" : "s"}`} tone="success" />
-          <Metric label="Balance due" value={formatMoney(balanceCents)} helper={balanceCents === 0 ? "Paid in full" : "Still open"} tone={balanceCents > 0 ? "warning" : "success"} />
-          <Metric label="Cash / change" value={formatMoney(summary.cash)} helper={`${formatMoney(summary.change)} change`} tone="brand" />
-          <Metric label="Card captured" value={formatMoney(summary.card)} helper={`${summary.declined} declined`} tone={summary.declined > 0 ? "warning" : "neutral"} />
+          <KpiCard title="Order total" value={formatMoney(selectedOrder?.totalCents ?? 0)} helper={selectedOrder?.orderNumber ?? "No order selected"} tone="neutral" />
+          <KpiCard title="Captured" value={formatMoney(summary.captured)} helper={`${payments.length} tender record${payments.length === 1 ? "" : "s"}`} tone="green" />
+          <KpiCard title="Balance due" value={formatMoney(balanceCents)} helper={balanceCents === 0 ? "Paid in full" : "Still open"} tone={balanceCents > 0 ? "amber" : "green"} />
+          <KpiCard title="Cash / change" value={formatMoney(summary.cash)} helper={`${formatMoney(summary.change)} change`} tone="blue" />
+          <KpiCard title="Card captured" value={formatMoney(summary.card)} helper={`${summary.declined} declined`} tone={summary.declined > 0 ? "amber" : "neutral"} />
         </section>
 
         <section className="grid gap-5 xl:grid-cols-[23rem_minmax(0,1fr)]">
@@ -146,7 +147,7 @@ export default function PaymentsPage() {
                 </p>
               </div>
               <div className="flex gap-1 overflow-x-auto" role="group" aria-label="Payment method filter">
-                {(["all", "cash", "card", "split"] as const).map((item) => (
+                {(["all", "cash", "card", "split", "store_credit"] as const).map((item) => (
                   <button
                     key={item}
                     type="button"
@@ -156,7 +157,7 @@ export default function PaymentsPage() {
                       filter === item ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
                   >
-                    {item}
+                    {item.replace(/_/g, " ")}
                   </button>
                 ))}
               </div>
@@ -253,28 +254,3 @@ function MoneyCell({ cents, muted = false }: { cents: number; muted?: boolean })
   );
 }
 
-function Metric({
-  label,
-  value,
-  helper,
-  tone,
-}: {
-  label: string;
-  value: string;
-  helper: string;
-  tone: "neutral" | "success" | "warning" | "brand";
-}) {
-  const toneClass = {
-    neutral: "border-slate-200 bg-white",
-    success: "border-success-200 bg-success-50",
-    warning: "border-warning-200 bg-warning-50",
-    brand: "border-brand-200 bg-brand-50",
-  }[tone];
-  return (
-    <div className={`rounded-md border p-4 shadow-sm ${toneClass}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-slate-950">{value}</p>
-      <p className="mt-1 text-xs text-slate-500">{helper}</p>
-    </div>
-  );
-}
