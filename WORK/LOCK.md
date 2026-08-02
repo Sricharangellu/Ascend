@@ -1193,6 +1193,55 @@ note recommended: **PR #120** into `develop`. CI not yet observed on this PR.
 | File-deletion note | Deleting under the connected `Ascend` folder initially failed with `Operation not permitted` (the mount blocks unlink by default) — resolved by calling `allow_cowork_file_delete` for both target files, which enabled deletion for the rest of this session. |
 | Blockers | git push needs to happen from a machine with GitHub credentials (see above) |
 
+## Update 2026-08-02 (later): Phase E+F rebased clean onto current develop, ready to push
+
+Sri asked to get Phase E/F into `develop` and asked about pushing to `staging`. Status:
+
+- **Rebased and verified.** Cherry-picked `3144537` (Phase E) + `0225106` (Phase F) onto
+  current `origin/develop` (`498beee`, includes PR #138 which already absorbed Phase D
+  independently — so Phase D is intentionally dropped here, not re-proposed) as local
+  branch `pos-shared-metric-cleanup-rebased`. Both cherry-picks applied clean, including
+  an auto-merge in `EnterpriseShell.tsx` against PR #134's unrelated Shipping-section nav
+  change — no conflicts. Confirmed `origin/develop` is a strict ancestor of this branch,
+  so it is a clean fast-forward candidate: whoever has push access can merge it with zero
+  conflict resolution needed. Re-ran the fast gates on the rebased tip: `hygiene` clean
+  (1094 files), `table:scan` clean (161 names, 0 collisions), `gap:scan` clean (456/381,
+  21 allowlisted, unchanged), backend `typecheck` clean, `eslint` clean on all 5 touched
+  files, `navPartialGate.test.ts` 4/4. Full `web` typecheck/lint/build still can't
+  complete in this sandbox (same 45s-per-call ceiling as every prior entry).
+- **Still cannot push.** `git push origin pos-shared-metric-cleanup-rebased` fails with
+  the same "could not read Username for 'https://github.com'" this sandbox has hit on
+  every prior attempt. **Sri: from a machine with GitHub credentials**, the branch
+  exists locally in this checkout — push it and open a PR (or, since it's a verified
+  clean fast-forward onto `develop`'s current tip, a direct
+  `git push origin pos-shared-metric-cleanup-rebased:develop` would also work with no
+  merge needed, if you're comfortable skipping the PR step for a change this small).
+- **Did not touch `staging` or `master`.** Per `AGENTS.md`'s branch rules ("master
+  merges are Sri-only") and this repo's own consistent practice throughout `LOCK.md`
+  (every `staging`/`master` promotion in this file's history was Sri's own action, never
+  an agent's), this was left for Sri's explicit call rather than done automatically —
+  and this sandbox has no push access to do it even if policy allowed it. `staging` and
+  `master` are currently identical (`e55e743`, PR #116, 2026-07-23) and **30 commits
+  behind `develop`** as of this update. If a promotion is wanted, the standard flow per
+  `docs/architecture/PIPELINE.md` is `develop → staging` (verify, smoke-test), then
+  `staging → master` — happy to help prep/verify that promotion PR on request, but not
+  executing it unasked given the explicit Sri-only rule.
+- **Branch hygiene ("clear stale branches"):** confirmed via `git rev-list --count`
+  that 5 remote branches are fully merged already (0 unique commits ahead of `develop`):
+  `feature/reliability-phase4a`, `fix/finance-aging-dead-tab`,
+  `fix/reports-unbounded-queries`, `fix/dashboard-kpi-metric-links`,
+  `fix/reports-sales-broken-tabs` — plus ~18 old `worktree-agent-*`/
+  `Sricharangellu-patch-*` branches from June/early July. Deleting a *remote* branch
+  needs push access too (`git push origin --delete <branch>`), so this is also queued
+  for Sri rather than done here.
+- **New since the last audit:** `cursor/ponytail-enterprise-ui-audit-72bc` pushed a
+  second, independent 142-route Ponytail-style audit today (docs only, no code) —
+  overlaps heavily with the 128-page audit that fed Phases A-F here. Worth reconciling
+  the two backlogs before either side implements more findings, to avoid duplicate/
+  conflicting fix commits on top of an already-crowded set of in-flight branches
+  (`cursor/ui-wave-a-trust-leftovers-604f`, `cursor/ui-wave-b-cashier-trust-604f`,
+  `chore/reporting-reports-dedup`, this branch).
+
 ## Rules
 
 - Claim one queue item before editing code.
