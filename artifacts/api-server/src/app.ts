@@ -26,6 +26,7 @@ import {
 } from "./gateway/index.js";
 import { handler } from "./shared/http.js";
 import { bootstrapOrchestration, ORCHESTRATION_MIGRATIONS } from "./orchestration/index.js";
+import { PG_DUMP_FLAGS } from "./orchestration/jobs/db-backup.job.js";
 import { SseBroker } from "./shared/sse.js";
 import type { AuthPayload } from "./gateway/auth.js";
 
@@ -624,7 +625,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
 
       const proc = spawn(
         "pg_dump",
-        ["--no-owner", "--no-acl", "--schema=public", "--clean", "--if-exists", dbUrl],
+        [...PG_DUMP_FLAGS, dbUrl],
         { stdio: ["ignore", "pipe", "pipe"] },
       );
 

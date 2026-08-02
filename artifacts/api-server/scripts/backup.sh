@@ -34,13 +34,14 @@ echo "[backup] Starting dump → ${OUTFILE}"
 # ── Run pg_dump ───────────────────────────────────────────────────────────────
 # --no-owner / --no-acl: dump is portable — owner and GRANT/REVOKE statements
 #   are excluded so the dump can be restored into any database user.
-# --schema=public: only dump the public schema (where all app tables live).
 # --if-exists: makes DROP statements safe during restore even on a fresh DB.
 # --clean: prepend DROP statements so restore is idempotent.
+# NOTE: do NOT add --schema=public — it omits CREATE EXTENSION statements
+#   (e.g. pg_trgm), which makes the dump unrestorable into a fresh database.
+#   Flags must stay in sync with dbBackupJob; verified by restore-verify tests.
 pg_dump \
   --no-owner \
   --no-acl \
-  --schema=public \
   --clean \
   --if-exists \
   "${DB_URL}" \

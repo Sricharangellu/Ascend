@@ -42,13 +42,24 @@ function backupDir(): string {
   return resolve(thisFile, "../../../../..", "backups");
 }
 
+/**
+ * Canonical pg_dump flags for ALL backup producers (this job, the owner
+ * download endpoint in app.ts, and scripts/backup.sh — a test asserts the
+ * shell script stays in sync).
+ *
+ * No --schema=public: restricting to a schema omits CREATE EXTENSION
+ * statements (e.g. pg_trgm), which makes the dump unrestorable into a fresh
+ * database — trigram index creation fails. Caught by db:verify-restore.
+ */
+export const PG_DUMP_FLAGS = ["--no-owner", "--no-acl", "--clean", "--if-exists"] as const;
+
 /** Run pg_dump, writing output to outFile. Resolves with bytes written. */
 function runPgDump(dbUrl: string, outFile: string): Promise<number> {
   return new Promise((resolve, reject) => {
     const ws = createWriteStream(outFile);
     const proc = spawn(
       "pg_dump",
-      ["--no-owner", "--no-acl", "--schema=public", "--clean", "--if-exists", dbUrl],
+      [...PG_DUMP_FLAGS, dbUrl],
       { stdio: ["ignore", "pipe", "pipe"] },
     );
 

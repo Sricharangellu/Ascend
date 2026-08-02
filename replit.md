@@ -94,6 +94,18 @@ pnpm --filter @workspace/api-server db:backup:remote-list
 pnpm --filter @workspace/api-server db:backup:remote-pull ascend-backup-<timestamp>.sql
 ```
 
+### Restore verification (smoke test)
+
+`db:verify-restore` proves backups are actually restorable: it runs the real backup
+job, restores the dump into a temporary scratch database (the live database is never
+touched), verifies every table is present and critical row counts match, then drops
+the scratch database. It is registered as a `restore-verify` validation check so
+regressions in the pg_dump/restore flags are caught automatically.
+
+```bash
+pnpm --filter @workspace/api-server db:verify-restore
+```
+
 ### On-demand backup (CLI)
 
 ```bash

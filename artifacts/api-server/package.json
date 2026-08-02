@@ -11,7 +11,8 @@
     "db:backup": "bash scripts/backup.sh",
     "db:restore": "bash scripts/restore.sh",
     "db:backup:remote-list": "tsx src/scripts/remote-backups.ts list",
-    "db:backup:remote-pull": "tsx src/scripts/remote-backups.ts pull"
+    "db:backup:remote-pull": "tsx src/scripts/remote-backups.ts pull",
+    "db:verify-restore": "tsx src/scripts/verify-restore.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1101.0",
