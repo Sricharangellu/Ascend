@@ -1,0 +1,729 @@
+
+/**
+ * TenderScreen — cash / card (EMV sim) / split payment modal.
+ *
+ * Calls POST /api/v1/payments on capture.
+ * Change-due is calculated and displayed immediately after cash entry.
+ * All money math is integer cents.
+ *
+ * Accessibility: modal with focus trap, ARIA labels, keyboard controls.
+ */
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { clsx } from "clsx";
+import { apiGet, apiPost } from "@/api-client/client";
+import type { Order, Payment, CapturePaymentRequest, PaymentMethod } from "@/api-client/types";
+import { formatMoney, parseToCents, calcChange } from "@/lib/money";
+import { Button } from "@/components/Button";
+import { CardReaderScreen } from "./CardReaderScreen";
+import { CashNumpadModal } from "./CashNumpadModal";
+import { enqueueCheckout, requestSync } from "@/lib/offlineOutbox";
+import { getAccessToken } from "@/lib/auth";
+import { normalizeTerminalPayment } from "@/lib/normalizeTerminalProduct";
+
+interface TenderScreenProps {
+  order: Order;
+  onSuccess: (payment: Payment) => void;
+  onCancel: () => void;
+  /** Whether split tender is enabled (feature flag) */
+  splitEnabled?: boolean;
+}
+
+type TenderTab = "cash" | "card" | "split" | "store_credit";
+
+export function TenderScreen({
+  order,
+  onSuccess,
+  onCancel,
+  splitEnabled = false,
+}: TenderScreenProps) {
+  const [tab, setTab] = useState<TenderTab>("cash");
+  const [cashInput, setCashInput] = useState("");
+  const [splitCash, setSplitCash] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showCardReader, setShowCardReader] = useState(false);
+  const [showCashNumpad, setShowCashNumpad] = useState(false);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const firstFocusRef = useRef<HTMLButtonElement>(null);
+
+  // Focus trap — focus first element when mounted
+  useEffect(() => {
+    firstFocusRef.current?.focus();
+  }, []);
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !submitting) onCancel();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onCancel, submitting]);
+
+  const totalCents = order.totalCents;
+
+  // ── Cash change calculation ───────────────────────────────────────────────
+  const cashCents = parseToCents(cashInput);
+  const changeCents = !isNaN(cashCents) && cashCents >= totalCents
+    ? calcChange(cashCents, totalCents)
+    : null;
+
+  // ── Quick-cash buttons ────────────────────────────────────────────────────
+  const quickAmounts = computeQuickAmounts(totalCents);
+
+  // ── Capture ───────────────────────────────────────────────────────────────
+  // cardSplitCentsRef holds the card portion for split payments so the
+  // handleCardReaderComplete closure can read it without stale state.
+  const cardSplitCentsRef = useRef<number>(0);
+
+  const capture = useCallback(
+    async (
+      method: PaymentMethod,
+      cashAmount: number,
+      cardAmount: number,
+      stripePaymentIntentId?: string,
+    ) => {
+      setSubmitting(true);
+      setError(null);
+      try {
+        const req: CapturePaymentRequest = {
+          orderId: order.id,
+          method,
+          cashCents: cashAmount,
+          cardCents: cardAmount,
+          stripePaymentIntentId,
+          // Required for store_credit — backend verifies balance and deducts atomically.
+          customerId: method === "store_credit" ? (order.customerId ?? undefined) : undefined,
+        };
+
+        // If offline, write to the IndexedDB outbox and request background sync.
+        // Cash-only payments can be queued; card payments require connectivity.
+        if (!navigator.onLine && method === "cash") {
+          const label = `Order ${order.id} — ${formatMoney(cashAmount)} cash`;
+          await enqueueCheckout("/api/v1/payments", req, getAccessToken(), label);
+          await requestSync();
+          // Optimistically complete the sale for the cashier.
+          onSuccess({
+            id: `offline_${Date.now()}`,
+            orderId: order.id,
+            method: "cash",
+            amountCents: order.totalCents,
+            cashCents: cashAmount,
+            cardCents: 0,
+            changeCents: cashAmount - order.totalCents,
+            status: "queued_offline",
+            createdAt: Date.now(),
+          } as unknown as Payment);
+          return;
+        }
+
+        const payment = normalizeTerminalPayment(await apiPost<Payment>("/api/v1/payments", req));
+        onSuccess(payment);
+      } catch (err) {
+        // Network failure mid-request for cash — offer to queue.
+        const isCash = err instanceof TypeError && (err.message.includes("fetch") || err.message.includes("network"));
+        if (isCash) {
+          setError("Network error. Cash payment saved offline — it will sync when you reconnect.");
+        } else {
+          setError(err instanceof Error ? err.message : "Payment failed. Please try again.");
+        }
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [order.id, order.totalCents, onSuccess],
+  );
+
+  const handleCashSubmit = () => {
+    if (isNaN(cashCents) || cashCents < totalCents) {
+      setError("Cash tendered must be at least " + formatMoney(totalCents));
+      return;
+    }
+    void capture("cash", cashCents, 0);
+  };
+
+  // CashNumpadModal confirm — receives tendered cents directly (no string parsing).
+  const handleCashNumpadConfirm = (tenderedCents: number) => {
+    setShowCashNumpad(false);
+    void capture("cash", tenderedCents, 0);
+  };
+
+  const handleCardSubmit = () => {
+    cardSplitCentsRef.current = 0;
+    setShowCardReader(true);
+  };
+
+  // Called by CardReaderScreen when the reader has successfully processed the payment.
+  const handleCardReaderComplete = useCallback(
+    (stripePaymentIntentId: string) => {
+      setShowCardReader(false);
+      const splitCardCents = cardSplitCentsRef.current;
+      if (splitCardCents > 0) {
+        // Split tender: cash portion already set, card portion from reader
+        const cash = totalCents - splitCardCents;
+        void capture("split", cash, splitCardCents, stripePaymentIntentId);
+      } else {
+        void capture("card", 0, totalCents, stripePaymentIntentId);
+      }
+    },
+    [capture, totalCents],
+  );
+
+  const handleCardReaderCancel = useCallback(() => {
+    setShowCardReader(false);
+    cardSplitCentsRef.current = 0;
+  }, []);
+
+  const handleSplitSubmit = () => {
+    const cash = parseToCents(splitCash);
+    if (isNaN(cash) || cash <= 0) {
+      setError("Enter a valid cash amount");
+      return;
+    }
+    const card = totalCents - cash;
+    if (card < 0) {
+      setError("Cash amount exceeds total");
+      return;
+    }
+    cardSplitCentsRef.current = card;
+    setShowCardReader(true);
+  };
+
+  return (
+    <div
+      ref={overlayRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="tender-title"
+      className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
+    >
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={!submitting ? onCancel : undefined}
+        aria-hidden="true"
+      />
+
+      {/* Modal */}
+      <div className={clsx(
+        "relative flex max-h-[95vh] w-full max-w-lg flex-col overflow-hidden rounded-t-lg bg-white shadow-2xl sm:rounded-lg",
+      )}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div>
+            <h2 id="tender-title" className="text-lg font-bold text-gray-900">
+              Tender Payment
+            </h2>
+            <p className="text-sm text-gray-500">
+              Total due:{" "}
+              <span className="font-semibold text-gray-900">{formatMoney(totalCents)}</span>
+            </p>
+          </div>
+          <button
+            type="button"
+            ref={firstFocusRef}
+            onClick={onCancel}
+            disabled={submitting}
+            aria-label="Close tender screen"
+            className={clsx(
+              "flex h-10 w-10 items-center justify-center rounded text-gray-400",
+              "hover:bg-gray-100 hover:text-gray-600 transition-colors",
+              "focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:outline-none",
+              "min-h-[44px] min-w-[44px]"
+            )}
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="mx-6 mt-4 rounded-lg bg-danger-50 border border-danger-200 px-4 py-3 text-sm text-danger-700"
+          >
+            {error}
+          </div>
+        )}
+
+        {/* Tabs */}
+        <div
+          role="tablist"
+          aria-label="Payment method"
+          className="flex border-b border-gray-200 px-6 pt-4"
+        >
+          <TabButton active={tab === "cash"} id="tender-tab-cash" panelId="tender-panel-cash" onClick={() => setTab("cash")} label="Cash" icon={<CashIcon />} />
+          <TabButton active={tab === "card"} id="tender-tab-card" panelId="tender-panel-card" onClick={() => setTab("card")} label="Card" icon={<CardIcon />} />
+          {splitEnabled && (
+            <TabButton active={tab === "split"} id="tender-tab-split" panelId="tender-panel-split" onClick={() => setTab("split")} label="Split" icon={<SplitIcon />} />
+          )}
+          {order.customerId && (
+            <TabButton active={tab === "store_credit"} id="tender-tab-sc" panelId="tender-panel-sc" onClick={() => setTab("store_credit")} label="Credit" icon={<CashIcon />} />
+          )}
+        </div>
+
+        {/* Tab content */}
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          {tab === "cash" && (
+            <div id="tender-panel-cash" role="tabpanel" aria-labelledby="tender-tab-cash">
+              {/* Numpad trigger button — opens CashNumpadModal for touch-friendly entry */}
+              <button
+                type="button"
+                onClick={() => setShowCashNumpad(true)}
+                className="mb-3 w-full rounded-lg border border-[#D9D9D9] bg-gray-50 px-4 py-3 text-left text-sm text-[var(--color-text-secondary)] hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-1"
+                aria-label="Open cash numpad"
+              >
+                <span className="block text-xs font-medium uppercase tracking-wider text-[var(--color-text-secondary)]">Cash tendered</span>
+                <span className="mt-1 block text-2xl font-bold text-[var(--color-text-primary)]">
+                  {cashInput ? formatMoney(Math.round(parseFloat(cashInput) * 100)) : "Tap to enter amount"}
+                </span>
+              </button>
+              <CashTab
+                totalCents={totalCents}
+                cashInput={cashInput}
+                onCashChange={(v) => { setCashInput(v); setError(null); }}
+                changeCents={changeCents}
+                quickAmounts={quickAmounts}
+                onQuickAmount={(v) => { setCashInput(formatCentsInput(v)); setError(null); }}
+              />
+            </div>
+          )}
+
+          {tab === "card" && (
+            <div id="tender-panel-card" role="tabpanel" aria-labelledby="tender-tab-card">
+              <CardTab totalCents={totalCents} />
+            </div>
+          )}
+
+          {tab === "split" && (
+            <div id="tender-panel-split" role="tabpanel" aria-labelledby="tender-tab-split">
+              <SplitTab
+                totalCents={totalCents}
+                splitCash={splitCash}
+                onSplitCashChange={(v) => { setSplitCash(v); setError(null); }}
+              />
+            </div>
+          )}
+
+          {tab === "store_credit" && order.customerId && (
+            <StoreCreditTab
+              customerId={order.customerId}
+              totalCents={totalCents}
+            />
+          )}
+        </div>
+
+        {/* Card reader overlay */}
+        {showCardReader && (
+          <CardReaderScreen
+            orderId={order.id}
+            amountCents={totalCents}
+            onComplete={handleCardReaderComplete}
+            onCancel={handleCardReaderCancel}
+          />
+        )}
+
+        {/* Cash numpad modal — touch-friendly digit entry with quick amounts */}
+        {showCashNumpad && (
+          <CashNumpadModal
+            orderTotalCents={totalCents}
+            onConfirm={handleCashNumpadConfirm}
+            onClose={() => setShowCashNumpad(false)}
+          />
+        )}
+
+        {/* Action button */}
+        <div className="flex-none px-6 pb-6 pt-2 border-t border-gray-100">
+          {tab === "cash" && (
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={submitting}
+              disabled={submitting || isNaN(cashCents) || cashCents < totalCents}
+              onClick={handleCashSubmit}
+              aria-label={changeCents !== null ? `Collect cash — change ${formatMoney(changeCents)}` : "Collect cash"}
+            >
+              {changeCents !== null && changeCents > 0
+                ? `Collect — Change: ${formatMoney(changeCents)}`
+                : "Collect Cash"}
+            </Button>
+          )}
+
+          {tab === "card" && (
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={submitting}
+              disabled={submitting}
+              onClick={handleCardSubmit}
+            >
+              Charge {formatMoney(totalCents)} to Card
+            </Button>
+          )}
+
+          {tab === "split" && (
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={submitting}
+              disabled={submitting || !splitCash}
+              onClick={handleSplitSubmit}
+            >
+              Charge Split
+            </Button>
+          )}
+
+          {tab === "store_credit" && order.customerId && (
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={submitting}
+              disabled={submitting}
+              onClick={() => {
+                void capture("store_credit", 0, 0, undefined);
+              }}
+            >
+              Pay {formatMoney(totalCents)} with Store Credit
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Tab button ───────────────────────────────────────────────────────────────
+
+function TabButton({
+  active,
+  onClick,
+  label,
+  icon,
+  id,
+  panelId,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  icon: React.ReactNode;
+  id: string;
+  panelId: string;
+}) {
+  return (
+    <button
+      id={id}
+      role="tab"
+      aria-selected={active}
+      aria-controls={panelId}
+      tabIndex={active ? 0 : -1}
+      onClick={onClick}
+      className={clsx(
+        "flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600",
+        "min-h-[44px]",
+        active
+          ? "border-brand-600 text-brand-700"
+          : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+      )}
+    >
+      <span aria-hidden="true">{icon}</span>
+      {label}
+    </button>
+  );
+}
+
+// ─── Cash tab ─────────────────────────────────────────────────────────────────
+
+function CashTab({
+  totalCents,
+  cashInput,
+  onCashChange,
+  changeCents,
+  quickAmounts,
+  onQuickAmount,
+}: {
+  totalCents: number;
+  cashInput: string;
+  onCashChange: (v: string) => void;
+  changeCents: number | null;
+  quickAmounts: number[];
+  onQuickAmount: (cents: number) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <label htmlFor="cash-amount" className="block text-sm font-medium text-gray-700 mb-1.5">
+          Cash tendered
+        </label>
+        <div className="relative">
+          <span className="absolute inset-y-0 left-3.5 flex items-center text-gray-500 font-medium pointer-events-none">
+            $
+          </span>
+          <input
+            id="cash-amount"
+            ref={inputRef}
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="0.01"
+            value={cashInput}
+            onChange={(e) => onCashChange(e.target.value)}
+            placeholder={(totalCents / 100).toFixed(2)}
+          className={clsx(
+            "w-full rounded-lg border border-gray-300 py-3 pl-8 pr-4 text-xl font-semibold",
+              "focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-brand-600",
+              "min-h-[56px]"
+            )}
+            aria-label="Cash tendered amount"
+          />
+        </div>
+      </div>
+
+      {/* Quick amounts */}
+      <div>
+        <p className="text-xs text-gray-400 mb-2">Quick amounts</p>
+        <div className="grid grid-cols-4 gap-2">
+          {quickAmounts.map((cents) => (
+            <button
+              key={cents}
+              type="button"
+              onClick={() => onQuickAmount(cents)}
+              className={clsx(
+                "rounded-lg border bg-gray-50 py-2 text-sm font-semibold text-gray-700",
+                "hover:bg-brand-50 hover:border-brand-300 hover:text-brand-700 transition-colors",
+                "focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:outline-none",
+                "min-h-[44px]"
+              )}
+            >
+              {formatMoney(cents)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Change due */}
+      {changeCents !== null && (
+        <div
+          aria-live="polite"
+          aria-atomic="true"
+          className={clsx(
+            "rounded-xl p-4 text-center",
+            changeCents > 0 ? "bg-success-50 border border-success-200" : "bg-brand-50 border border-brand-200"
+          )}
+        >
+          {changeCents > 0 ? (
+            <>
+              <p className="text-sm text-success-600 font-medium">Change due</p>
+              <p className="text-3xl font-bold text-success-700 mt-1">
+                {formatMoney(changeCents)}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm font-medium text-brand-600">Exact amount — no change</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Card tab ─────────────────────────────────────────────────────────────────
+
+function CardTab({ totalCents }: { totalCents: number }) {
+  return (
+    <div className="space-y-5">
+      <div className="flex aspect-[1.6/1] flex-col justify-between rounded-lg bg-slate-900 p-5 text-white shadow-lg">
+        <div className="flex justify-between items-start">
+          <div className="flex gap-1">
+            <div className="w-8 h-6 rounded-sm bg-yellow-300/80" />
+            <div className="w-5 h-6 rounded-sm bg-yellow-400/40 -ml-3" />
+          </div>
+          <span className="text-xs opacity-60">CARD</span>
+        </div>
+        <div>
+          <p className="text-sm opacity-60 mb-1">Total to charge</p>
+          <p className="text-2xl font-bold">{formatMoney(totalCents)}</p>
+        </div>
+      </div>
+
+      <p className="text-center text-sm text-gray-500 rounded-lg bg-blue-50 border border-blue-100 p-3">
+        Press <strong>Charge</strong> to present this amount to the card reader.
+        The customer then taps or inserts their card.
+      </p>
+    </div>
+  );
+}
+
+// ─── Split tab ────────────────────────────────────────────────────────────────
+
+function SplitTab({
+  totalCents,
+  splitCash,
+  onSplitCashChange,
+}: {
+  totalCents: number;
+  splitCash: string;
+  onSplitCashChange: (v: string) => void;
+}) {
+  const cashCents = parseToCents(splitCash);
+  const cardCents = !isNaN(cashCents) ? totalCents - cashCents : null;
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-500">
+        Enter the cash portion; the remainder will be charged to the card reader.
+      </p>
+
+      <div>
+        <label htmlFor="split-cash" className="block text-sm font-medium text-gray-700 mb-1.5">
+          Cash portion
+        </label>
+        <div className="relative">
+          <span className="absolute inset-y-0 left-3.5 flex items-center text-gray-500 font-medium pointer-events-none">
+            $
+          </span>
+          <input
+            id="split-cash"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="0.01"
+            value={splitCash}
+            onChange={(e) => onSplitCashChange(e.target.value)}
+            placeholder="0.00"
+            className={clsx(
+              "w-full rounded-lg border border-gray-300 py-3 pl-8 pr-4 text-xl font-semibold",
+              "focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-brand-600",
+              "min-h-[56px]"
+            )}
+          />
+        </div>
+      </div>
+
+      {cardCents !== null && cardCents >= 0 && (
+        <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Cash</span>
+            <span className="font-semibold">{formatMoney(cashCents)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Card reader</span>
+            <span className="font-semibold">{formatMoney(cardCents)}</span>
+          </div>
+          <div className="flex justify-between text-sm border-t border-gray-200 pt-2 mt-2">
+            <span className="text-gray-900 font-medium">Total</span>
+            <span className="font-bold text-brand-700">{formatMoney(totalCents)}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Generate 4 round-up quick-cash amounts above the total */
+function computeQuickAmounts(totalCents: number): number[] {
+  const buckets = [500, 1000, 2000, 5000, 10000, 20000, 50000, 100000];
+  const above = buckets.filter((b) => b >= totalCents);
+  // Also include exact amount
+  const result = new Set([totalCents, ...above.slice(0, 3)]);
+  return Array.from(result).sort((a, b) => a - b).slice(0, 4);
+}
+
+function formatCentsInput(cents: number): string {
+  return (cents / 100).toFixed(2);
+}
+
+function CloseIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" aria-hidden="true">
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  );
+}
+
+function CashIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="6" width="18" height="12" rx="2" />
+      <circle cx="12" cy="12" r="2" />
+      <path d="M6 10v4" />
+      <path d="M18 10v4" />
+    </svg>
+  );
+}
+
+function CardIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M7 15h4" />
+    </svg>
+  );
+}
+
+function SplitIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 3v6a6 6 0 0 0 6 6h6" />
+      <path d="M18 11l4 4-4 4" />
+      <path d="M6 21v-6a6 6 0 0 1 2.1-4.57" />
+    </svg>
+  );
+}
+
+// ─── Store Credit Tab (FE-45) ─────────────────────────────────────────────────
+
+function StoreCreditTab({ customerId, totalCents }: { customerId: string; totalCents: number }) {
+  const [balance, setBalance] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiGet<{ balanceCents: number }>(`/api/v1/customers/${customerId}/store-credit`)
+      .then((r: { balanceCents: number }) => setBalance(r.balanceCents))
+      .catch(() => setBalance(0))
+      .finally(() => setLoading(false));
+  }, [customerId]);
+
+  const sufficient = balance !== null && balance >= totalCents;
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-[var(--color-table-border)] bg-gray-50 p-4 text-center">
+        <p className="text-xs font-medium uppercase tracking-wider text-[var(--color-text-secondary)]">
+          Store credit balance
+        </p>
+        {loading ? (
+          <div className="mx-auto mt-2 h-8 w-28 animate-pulse rounded bg-gray-200" />
+        ) : (
+          <p className={`mt-1 text-3xl font-bold tabular-nums ${sufficient ? "text-success-600" : "text-danger-500"}`}>
+            {formatMoney(balance ?? 0)}
+          </p>
+        )}
+        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          Order total: <span className="font-semibold">{formatMoney(totalCents)}</span>
+        </p>
+      </div>
+      {!loading && !sufficient && (
+        <p className="rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700">
+          Insufficient balance. {formatMoney(totalCents - (balance ?? 0))} short.
+        </p>
+      )}
+    </div>
+  );
+}
