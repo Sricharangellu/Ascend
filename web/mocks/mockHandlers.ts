@@ -659,8 +659,8 @@ export const mockHandlers = [
     return HttpResponse.json({
       totals: { current: 120000, d1_30: 45000, d31_60: 18000, d61_90: 9000, d90_plus: 5000, total: 197000 },
       parties: [
-        { partyId: "cus_demo_1", buckets: { current: 80000, d1_30: 20000, d31_60: 0, d61_90: 0, d90_plus: 5000, total: 105000 } },
-        { partyId: "cus_demo_2", buckets: { current: 40000, d1_30: 25000, d31_60: 18000, d61_90: 9000, d90_plus: 0, total: 92000 } },
+        { partyId: "cus_demo_1", partyName: "Demo Customer One", buckets: { current: 80000, d1_30: 20000, d31_60: 0, d61_90: 0, d90_plus: 5000, total: 105000 } },
+        { partyId: "cus_demo_2", partyName: "Demo Customer Two", buckets: { current: 40000, d1_30: 25000, d31_60: 18000, d61_90: 9000, d90_plus: 0, total: 92000 } },
       ],
     });
   }),
@@ -687,7 +687,7 @@ export const mockHandlers = [
     await lat();
     return HttpResponse.json({
       totals: { current: 60000, d1_30: 22000, d31_60: 0, d61_90: 0, d90_plus: 0, total: 82000 },
-      parties: [{ partyId: "sup_demo_1", buckets: { current: 60000, d1_30: 22000, d31_60: 0, d61_90: 0, d90_plus: 0, total: 82000 } }],
+      parties: [{ partyId: "sup_demo_1", partyName: "Demo Supplier", buckets: { current: 60000, d1_30: 22000, d31_60: 0, d61_90: 0, d90_plus: 0, total: 82000 } }],
     });
   }),
   http.get(`${V1}/reports/sales-by-category`, async () => {
