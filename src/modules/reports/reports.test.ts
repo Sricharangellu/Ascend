@@ -412,6 +412,42 @@ test("cashier cannot trigger the AR-aging dunning sweep (403); manager can", asy
   assert.equal((await callAsRep(app, "manager", "POST", "/api/reports/ar-aging/sweep")).status, 200);
 });
 
+test("AR aging joins customer names; AP aging joins supplier names", async () => {
+  const app = await freshApp();
+
+  const customer = await call(app, "POST", "/api/customers/", { name: "Acme Retail LLC" });
+  assert.equal(customer.status, 201);
+  const inv = await call(app, "POST", "/api/billing/invoices", {
+    customerId: customer.json.id,
+    totalCents: 12_500,
+  });
+  assert.equal(inv.status, 201);
+
+  const ar = await call(app, "GET", "/api/reports/ar-aging");
+  assert.equal(ar.status, 200);
+  assert.ok(Array.isArray(ar.json.parties));
+  const arParty = ar.json.parties.find((p: { partyId: string }) => p.partyId === customer.json.id);
+  assert.ok(arParty, "customer appears in AR aging");
+  assert.equal(arParty.partyName, "Acme Retail LLC");
+  assert.equal(arParty.buckets.total, 12_500);
+
+  const supplier = await call(app, "POST", "/api/purchasing/suppliers", { name: "Northwind Supply" });
+  assert.equal(supplier.status, 201);
+  const bill = await call(app, "POST", "/api/billing/bills", {
+    supplierId: supplier.json.id,
+    totalCents: 8_000,
+  });
+  assert.equal(bill.status, 201);
+
+  const ap = await call(app, "GET", "/api/reports/ap-aging");
+  assert.equal(ap.status, 200);
+  assert.ok(Array.isArray(ap.json.parties));
+  const apParty = ap.json.parties.find((p: { partyId: string }) => p.partyId === supplier.json.id);
+  assert.ok(apParty, "supplier appears in AP aging");
+  assert.equal(apParty.partyName, "Northwind Supply");
+  assert.equal(apParty.buckets.total, 8_000);
+});
+
 test("top-products: a non-numeric limit falls back to the default instead of producing NaN, and a huge limit is capped", async () => {
   const app = await freshApp();
 

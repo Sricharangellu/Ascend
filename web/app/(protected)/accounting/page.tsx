@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { formatMoney, parseToCents } from "@/lib/money";
 import { hasRole } from "@/lib/auth";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
-import type { AgingReport, Bill, Invoice, BillingStatus, Account, Deposit } from "@/api-client/types";
+import type { AgingReport, AgingRow, Bill, Invoice, BillingStatus, Account, Deposit } from "@/api-client/types";
 import { fmtDate } from "@/lib/date";
 
 const TYPE_STYLE: Record<string, string> = {
@@ -74,6 +75,18 @@ export default function AccountingPage() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  const arPartyNames = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of arAging?.parties ?? []) map.set(p.partyId, p.partyName || p.partyId);
+    return map;
+  }, [arAging]);
+
+  const apPartyNames = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of apAging?.parties ?? []) map.set(p.partyId, p.partyName || p.partyId);
+    return map;
+  }, [apAging]);
 
   const seed = async () => {
     setBusy(true);
@@ -197,7 +210,7 @@ export default function AccountingPage() {
         </Card>
 
         <Card title="Accounts Receivable" description="Customer invoices and aging by days outstanding.">
-          {arAging && <AgingSummary report={arAging} />}
+          {arAging && <AgingSummary report={arAging} partyHref={(id) => `/customers/${encodeURIComponent(id)}`} partyLabel="Customer" />}
 
           {canPay && (
             <div className="mt-3 flex items-center gap-3">
@@ -223,7 +236,9 @@ export default function AccountingPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                  <th className="px-4 py-3">Invoice #</th><th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Invoice #</th>
+                  <th className="px-4 py-3">Customer</th>
+                  <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Overdue</th>
                   <th className="px-4 py-3">Due</th>
                   <th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Paid</th>
@@ -231,10 +246,18 @@ export default function AccountingPage() {
                 </tr>
               </thead>
               <tbody>
-                {invoices.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">No invoices</td></tr>}
+                {invoices.length === 0 && <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">No invoices</td></tr>}
                 {invoices.map((inv) => (
                   <tr key={inv.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                     <td className="px-4 py-3 font-medium text-slate-950">{inv.invoice_number}</td>
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/customers/${encodeURIComponent(inv.customer_id)}`}
+                        className="text-sm font-medium text-brand-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                      >
+                        {arPartyNames.get(inv.customer_id) ?? inv.customer_id}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3"><span className={`rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${BILLING_STYLE[inv.status]}`}>{inv.status}</span></td>
                     <td className="px-4 py-3">
                       {inv.dunning_level ? (
@@ -262,22 +285,32 @@ export default function AccountingPage() {
         </Card>
 
         <Card title="Accounts Payable" description="Supplier bills and aging by days outstanding.">
-          {apAging && <AgingSummary report={apAging} />}
+          {apAging && <AgingSummary report={apAging} partyHref={(id) => `/vendors/${encodeURIComponent(id)}`} partyLabel="Supplier" />}
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                  <th className="px-4 py-3">Bill #</th><th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Bill #</th>
+                  <th className="px-4 py-3">Supplier</th>
+                  <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Due</th>
                   <th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Paid</th>
                   <th className="px-4 py-3 text-right">Due amount</th><th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {bills.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No bills</td></tr>}
+                {bills.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">No bills</td></tr>}
                 {bills.map((bill) => (
                   <tr key={bill.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                     <td className="px-4 py-3 font-medium text-slate-950">{bill.bill_number}</td>
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/vendors/${encodeURIComponent(bill.supplier_id)}`}
+                        className="text-sm font-medium text-brand-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                      >
+                        {apPartyNames.get(bill.supplier_id) ?? bill.supplier_id}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3"><span className={`rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${BILLING_STYLE[bill.status]}`}>{bill.status}</span></td>
                     <td className="px-4 py-3 text-slate-500">{fmtDate(bill.due_date)}</td>
                     <td className="px-4 py-3 text-right">{formatMoney(bill.total_cents)}</td>
@@ -307,19 +340,59 @@ const AGING_BUCKETS: { key: keyof Omit<AgingReport["totals"], "total">; label: s
   { key: "d90_plus", label: "90+ days" },
 ];
 
-function AgingSummary({ report }: { report: AgingReport }) {
+function AgingSummary({
+  report,
+  partyHref,
+  partyLabel,
+}: {
+  report: AgingReport;
+  partyHref: (partyId: string) => string;
+  partyLabel: string;
+}) {
+  const topParties: AgingRow[] = report.parties.slice(0, 8);
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-      {AGING_BUCKETS.map(({ key, label }) => (
-        <div key={key} className="rounded-md border border-slate-200 bg-slate-50 p-3">
-          <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
-          <p className="mt-1 text-sm font-semibold text-slate-950">{formatMoney(report.totals[key])}</p>
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        {AGING_BUCKETS.map(({ key, label }) => (
+          <div key={key} className="rounded-md border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-950">{formatMoney(report.totals[key])}</p>
+          </div>
+        ))}
+        <div className="col-span-2 rounded-md border border-slate-200 bg-slate-100 p-3 sm:col-span-5">
+          <p className="text-xs font-medium uppercase text-slate-500">Total outstanding</p>
+          <p className="mt-1 text-sm font-semibold text-slate-950">{formatMoney(report.totals.total)}</p>
         </div>
-      ))}
-      <div className="col-span-2 rounded-md border border-slate-200 bg-slate-100 p-3 sm:col-span-5">
-        <p className="text-xs font-medium uppercase text-slate-500">Total outstanding</p>
-        <p className="mt-1 text-sm font-semibold text-slate-950">{formatMoney(report.totals.total)}</p>
       </div>
+      {topParties.length > 0 && (
+        <div className="overflow-x-auto rounded-md border border-slate-200">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                <th className="px-3 py-2">{partyLabel}</th>
+                <th className="px-3 py-2 text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topParties.map((row) => (
+                <tr key={row.partyId} className="border-b border-slate-100 last:border-0">
+                  <td className="px-3 py-2">
+                    <Link
+                      href={partyHref(row.partyId)}
+                      className="font-medium text-brand-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                    >
+                      {row.partyName || row.partyId}
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2 text-right font-semibold text-slate-950">
+                    {formatMoney(row.buckets.total)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
