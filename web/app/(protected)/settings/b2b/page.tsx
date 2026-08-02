@@ -100,7 +100,8 @@ export default function B2BSettingsPage() {
     }
   };
 
-  const PORTAL_URL = "https://finder-pos.app/b2b/portal";
+  // Relative path — never hard-code a legacy product host (AGENTS brand rule).
+  const PORTAL_URL = "/b2b/portal";
 
   return (
     <EnterpriseShell
