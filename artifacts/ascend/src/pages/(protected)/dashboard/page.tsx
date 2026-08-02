@@ -10,6 +10,7 @@ import { VerticalWidgets } from "@/components/dashboard/VerticalWidgets";
 import { RetailSetupChecklist } from "@/components/setup/RetailSetupChecklist";
 import { DashboardTopLists } from "./_components/DashboardTopLists";
 import { DashboardOperational } from "./_components/DashboardOperational";
+import { BackupHealthCard } from "./_components/BackupHealthCard";
 import { DashboardKpiSection } from "./_components/DashboardKpiSection";
 import { DashboardCharts } from "./_components/DashboardCharts";
 import { DashboardQuickActions } from "./_components/DashboardQuickActions";
@@ -306,6 +307,9 @@ export default function DashboardPage() {
         <VerticalWidgets />
 
         <DashboardOperational lowStock={lowStock} recentNotifs={recentNotifs} />
+
+        {/* Owner-only backup health — renders nothing for manager/cashier roles */}
+        <BackupHealthCard />
 
       </div>
     </EnterpriseShell>

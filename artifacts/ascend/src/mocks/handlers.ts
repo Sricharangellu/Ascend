@@ -368,6 +368,26 @@ export const handlers = [
   }),
 
   // ── GET /api/v1/flags ────────────────────────────────────────────────────
+  // ── Admin: backup status (owner-only card on the dashboard) ──
+  http.get(`${V1}/admin/db/backup-status`, async () => {
+    await delay(150);
+    return HttpResponse.json({
+      backupEnabled: true,
+      lastSuccessfulBackup: {
+        file: "ascend-backup-2026-08-02T03-00-00.sql",
+        bytes: 4_812_390,
+        at: new Date(Date.now() - 6 * 3_600_000).toISOString(),
+      },
+      schedulerJob: {
+        id: "job_backup_001",
+        status: "completed",
+        attempts: 1,
+        scheduledAt: new Date(Date.now() - 6 * 3_600_000).toISOString(),
+        lastError: null,
+      },
+    });
+  }),
+
   http.get(`${V1}/flags`, async () => {
     await latency();
     const response: FlagsResponse = {
