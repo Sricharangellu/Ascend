@@ -13,18 +13,25 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
-import { apiGet, apiPost } from "@/api-client/client";
+import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import { fmtDate, fmtDateShort } from "@/lib/date";
 import { useToast } from "@/components/Toast";
+import { Button } from "@/components/Button";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type TabKey = "orders" | "transfers" | "returns";
 
+// Returns hits allowlisted `/api/v1/inventory/returns` (no BE) — Preview only.
+const SHOW_PARTIAL_PAGES = process.env["NEXT_PUBLIC_SHOW_PARTIAL_PAGES"] === "true";
+
 const TAB_KEYS: TabKey[] = ["orders", "transfers", "returns"];
 function isTabKey(v: string | null): v is TabKey {
   return v !== null && (TAB_KEYS as string[]).includes(v);
+}
+function isVisibleTabKey(v: string | null): v is TabKey {
+  return isTabKey(v) && (v !== "returns" || SHOW_PARTIAL_PAGES);
 }
 
 interface StockMovement {
@@ -125,10 +132,10 @@ function normReturns(items: RawReturn[]): StockMovement[] {
 
 // ── Tab config ────────────────────────────────────────────────────────────────
 
-const TABS: { key: TabKey; label: string }[] = [
+const TABS: { key: TabKey; label: string; partial?: boolean }[] = [
   { key: "orders",    label: "Orders"    },
   { key: "transfers", label: "Transfers" },
-  { key: "returns",   label: "Returns"   },
+  { key: "returns",   label: "Returns", partial: true },
 ];
 
 const TAB_ENDPOINT: Record<TabKey, string> = {
@@ -235,9 +242,16 @@ function NewMovementModal({ tab, onClose, onCreated }: { tab: TabKey; onClose: (
 export default function InventoryPage() {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab");
-  const [activeTab, setActiveTab] = useState<TabKey>(isTabKey(initialTab) ? initialTab : "orders");
+  const visibleTabs = useMemo(
+    () => TABS.filter((t) => !t.partial || SHOW_PARTIAL_PAGES),
+    [],
+  );
+  const [activeTab, setActiveTab] = useState<TabKey>(
+    isVisibleTabKey(initialTab) ? initialTab : "orders",
+  );
   const [data, setData]           = useState<StockMovement[]>([]);
   const [loading, setLoading]     = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextCursor, setNextCursor]   = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -259,11 +273,16 @@ export default function InventoryPage() {
 
   const load = useCallback(() => {
     setLoading(true);
+    setLoadError(null);
     const ep = TAB_ENDPOINT[activeTab];
     apiGet<{ items: unknown[]; nextCursor: string | null }>(ep).then(r => {
       setData(normalize(r.items ?? []));
       setNextCursor(r.nextCursor ?? null);
-    }).catch(() => { setData([]); setNextCursor(null); }).finally(() => setLoading(false));
+    }).catch((err) => {
+      setData([]);
+      setNextCursor(null);
+      setLoadError(err instanceof ApiResponseError ? err.message : "Failed to load inventory movements.");
+    }).finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
@@ -276,6 +295,8 @@ export default function InventoryPage() {
     apiGet<{ items: unknown[]; nextCursor: string | null }>(ep).then(r => {
       setData(prev => [...prev, ...normalize(r.items ?? [])]);
       setNextCursor(r.nextCursor ?? null);
+    }).catch((err) => {
+      setLoadError(err instanceof ApiResponseError ? err.message : "Failed to load more movements.");
     }).finally(() => setLoadingMore(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, nextCursor, loadingMore]);
@@ -311,26 +332,37 @@ export default function InventoryPage() {
     <EnterpriseShell active="inventory" title="Inventory" subtitle="Stock movements — orders, transfers, and returns">
 
       {/* ── Spec tab bar ─────────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-[#E8E8E8] px-6 flex items-end justify-between">
+      <div className="bg-white border-b border-erp-table-border px-6 flex items-end justify-between">
         <div className="flex">
-          {TABS.map(t => (
+          {visibleTabs.map(t => (
             <button key={t.key} type="button"
-              onClick={() => { setActiveTab(t.key); clearFilters(); }}
-              className={`px-5 py-3.5 text-sm font-medium border-b-2 transition-colors ${
+              onClick={() => { setActiveTab(t.key); clearFilters(); setLoadError(null); }}
+              className={`px-5 py-3.5 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
                 activeTab === t.key
                   ? "border-brand-600 text-brand-600"
-                  : "border-transparent text-[#666] hover:text-[#333]"
+                  : "border-transparent text-erp-text-secondary hover:text-erp-text-primary"
               }`}
             >
               {t.label}
             </button>
           ))}
         </div>
-        <button type="button" onClick={() => setShowModal(true)}
-          className="mb-2 rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-[#4849d0] transition-colors">
+        <Button type="button" variant="primary" size="sm" className="mb-2" onClick={() => setShowModal(true)}>
           + New {tabLabel.slice(0, -1)}
-        </button>
+        </Button>
       </div>
+
+      {loadError && (
+        <div
+          role="alert"
+          className="mx-6 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger-100 bg-danger-50 px-4 py-3 text-sm text-danger-700"
+        >
+          <p>{loadError}</p>
+          <Button type="button" variant="secondary" size="sm" onClick={load}>
+            Retry
+          </Button>
+        </div>
+      )}
 
       {/* ── Spec filter bar ───────────────────────────────────────────────────── */}
       <div className="bg-white border-b border-[#E8E8E8] px-6 py-3">

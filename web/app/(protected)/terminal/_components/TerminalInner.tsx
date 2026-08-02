@@ -69,10 +69,22 @@ export function TerminalInner() {
         if (initial) {
           setActiveOutletId(initial.id);
           if (initial.state) setOutletState(initial.state);
+        } else {
+          addToast({
+            title: "No sell locations",
+            description: "Add an inventory location before ringing sales.",
+            variant: "error",
+          });
         }
       })
-      .catch(() => {});
-  }, []);
+      .catch((err) => {
+        addToast({
+          title: "Could not load sell locations",
+          description: err instanceof ApiResponseError ? err.message : "Stock deduct may fail for this sale.",
+          variant: "error",
+        });
+      });
+  }, [addToast]);
 
   useEffect(() => {
     const loc = outlets.find((o) => o.id === activeOutletId);
@@ -208,10 +220,26 @@ export function TerminalInner() {
           location_id: activeOutletId,
           lines: lines.map((l) => ({ product_id: l.product.id, qty: l.quantity })),
           order_id: cart.state.order?.id ?? null,
-        }).catch(() => {});
+        }).catch((err) => {
+          // Payment already succeeded — surface stock failure so cashiers don't
+          // trust an empty/unchanged on-hand count after a completed sale.
+          addToast({
+            title: "Sale recorded, stock not deducted",
+            description: err instanceof ApiResponseError
+              ? err.message
+              : "Inventory may be out of sync — adjust stock or retry deduct from inventory.",
+            variant: "error",
+          });
+        });
+      } else if (lines.length > 0 && !activeOutletId) {
+        addToast({
+          title: "Sale recorded, stock not deducted",
+          description: "No sell location was selected — adjust stock manually.",
+          variant: "error",
+        });
       }
     },
-    [cart.state.order, cart.state.lines, activeOutletId]
+    [cart.state.order, cart.state.lines, activeOutletId, addToast]
   );
 
   const handleTenderCancel = useCallback(() => { setScreen("terminal"); }, []);

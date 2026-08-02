@@ -169,7 +169,8 @@ const NAV_TREE: NavSection[] = [
       { label: "Delivery",      href: "/delivery",                featureGate: "shipping" },
       { label: "Purchasing",    href: "/purchasing",              featureGate: "purchasing" },
       { label: "EDI Imports",   href: "/purchasing/edi-imports",  featureGate: "purchasing" },
-      { label: "Error Center",  href: "/inventory/errors",        featureGate: "inventory" },
+      // Error Check Center is allowlisted / NEEDS-SRI (no detection engine) — Preview only.
+      { label: "Error Center",  href: "/inventory/errors",        featureGate: "inventory", partial: true },
       { label: "Cycle Counts",  href: "/inventory/counts",        featureGate: "inventory" },
       { label: "Reorder",       href: "/inventory/reorder",       featureGate: "inventory" },
       { label: "Serial Numbers", href: "/inventory/serials",      featureGate: "inventory" },

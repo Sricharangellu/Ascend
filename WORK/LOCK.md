@@ -2,6 +2,17 @@
 
 Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0 wave-dispatch coordination claim (started 2026-07-18) was closed 2026-07-30 as superseded — see its entry below; work since has shipped as independent claims rather than through that coordinator. Latest substantive work: Phase 7 items 1-2 (sales-velocity consolidation, demand-snapshot foundation) RELEASED; four-environment AI coordination workflow (Claude Code/Cursor/Replit) adopted 2026-07-30, see `docs/architecture/ORCHESTRATION.md` "Environment routing" + `tools/AGENT_PROMPT.md`. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B, RELEASED); Clean Architecture pilot (quotes + gateway auth) (session C, ABANDONED — see entry); SSO OIDC hardening (session D)
 
+## Active Claim (Cursor Cloud — Ascend UI ponytail audit / Wave A trust leftovers)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud `bc-c564feef` — Ascend UI ponytail audit (continues Wave A leftovers from AUDIT_2026-07-30T222326Z product-experience review / PR #133) |
+| Queue item | Wave A leftovers: (1) `partial: true` on BE-missing inventory Error Center nav + pipeline overview/receiving/issues tabs + inventory Returns tab (allowlisted missing BE); (2) replace silent `.catch(() => {})` load/mutation paths with error UI (inventory overview, gift cards, AdjustModal locations, terminal locations + stock deduct, dashboard secondary loads). |
+| Files/areas expected | `web/components/EnterpriseShell.tsx`; `web/app/(protected)/inventory/{page,pipeline/page}.tsx`; `web/app/(protected)/gift-cards/page.tsx`; `web/app/(protected)/inventory/_components/AdjustModal.tsx`; `web/app/(protected)/terminal/_components/TerminalInner.tsx`; `web/app/(protected)/dashboard/page.tsx`; `web/tests/navPartialGate.test.ts`; `WORK/**` |
+| Started | 2026-08-02T072500Z |
+| Status | RELEASED — Wave A leftovers shipped on `cursor/ui-wave-a-trust-leftovers-604f`; see AUDIT_2026-08-02T072500Z-ui-wave-a-trust-leftovers.md |
+| Blockers | none |
+
 ## Active Claim (Claude session G — Phase 0 coordinator: finish end-to-end + deployment readiness)
 
 | Field | Value |
