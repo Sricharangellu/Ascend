@@ -1,4 +1,5 @@
 - [API server typecheck & strict mode](api-server-typecheck.md) — strict:false breaks zod inference (all fields go optional); two build paths (tsc + build.mjs) must both target src/server.ts.
 - [Backup/restore verification](backup-restore-verification.md) — --schema=public omits CREATE EXTENSION (dump unrestorable); verify against dump-derived counts, never live queries.
+- [Ascend demo mode & mock activation](ascend-demo-mode.md) — ?demo=1 is stripped into localStorage at startup; gate demo/mock UI on isDemoMode()/isMockActive(), never on VITE_MOCK or the URL.
 - [Phase 12 token sweep — completion state](phase12-token-sweep.md) — full CSS var sweep done; only intentional bg-white/opacity-overlay/toggle-thumb/terminal-dark files remain.
 - [GitHub develop revert trap](github-develop-revert-trap.md) — plain merge/pull from origin/develop silently deletes the workspace tree via an old revert; use the backup-branch + path-rule merge procedure.
