@@ -84,15 +84,20 @@ interface SimulatorResult {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const TABS: { key: Tab; label: string }[] = [
-  { key: "price-books",        label: "Price Books" },
+const TABS: { key: Tab; label: string; partial?: boolean }[] = [
   { key: "customer-overrides", label: "Customer Overrides" },
-  { key: "tier",               label: "Tier Pricing" },
-  { key: "contracts",          label: "Contract Prices" },
-  { key: "scheduled",          label: "Scheduled" },
-  { key: "margin-rules",       label: "Margin Rules" },
-  { key: "simulator",          label: "Simulator" },
+  // Engine tabs are mock-backed — gated behind SHOW_PARTIAL_PAGES (Wave 3).
+  { key: "price-books",        label: "Price Books",   partial: true },
+  { key: "tier",               label: "Tier Pricing",  partial: true },
+  { key: "contracts",          label: "Contract Prices", partial: true },
+  { key: "scheduled",          label: "Scheduled",     partial: true },
+  { key: "margin-rules",       label: "Margin Rules",  partial: true },
+  { key: "simulator",          label: "Simulator",     partial: true },
 ];
+
+const SHOW_PARTIAL = process.env["NEXT_PUBLIC_SHOW_PARTIAL_PAGES"] === "true";
+const VISIBLE_TABS = TABS.filter((t) => !t.partial || SHOW_PARTIAL);
+const VISIBLE_TAB_KEYS = VISIBLE_TABS.map((t) => t.key);
 
 const BOOK_TYPE_LABEL: Record<PriceBook["type"], string> = {
   retail:         "Retail",
@@ -805,53 +810,65 @@ function SimulatorTab() {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-const TAB_KEYS: readonly Tab[] = ["price-books", "customer-overrides", "tier", "contracts", "scheduled", "margin-rules", "simulator"];
-
 export default function PricingPage() {
-  // ?tab=customer-overrides deep-links a tab (used by the old /catalog/price-book redirect).
+  // Default = Customer Overrides (production-facing). Engine tabs need SHOW_PARTIAL.
   const [activeTab, setActiveTab] = useState<Tab>(() => {
-    if (typeof window === "undefined") return "price-books";
+    if (typeof window === "undefined") return "customer-overrides";
     const t = new URLSearchParams(window.location.search).get("tab") as Tab | null;
-    return t && TAB_KEYS.includes(t) ? t : "price-books";
+    return t && (VISIBLE_TAB_KEYS as Tab[]).includes(t) ? t : "customer-overrides";
   });
 
   return (
-    <EnterpriseShell active="pricing" title="Pricing Engine" subtitle="Price books, tier rules, contracts, schedules, and margin floors" contentClassName="overflow-y-auto">
+    <EnterpriseShell
+      active="pricing"
+      title="Pricing"
+      subtitle={
+        SHOW_PARTIAL
+          ? "Customer overrides plus preview pricing-engine tabs"
+          : "Customer-specific price overrides"
+      }
+      contentClassName="overflow-y-auto"
+    >
       <div className="mx-auto max-w-[1400px] space-y-6 px-6 py-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Pricing Engine</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Resolution order: Contract → Customer Group → Tier → Price Book → Promotion → Scheduled → Retail
-            </p>
+        {!SHOW_PARTIAL && (
+          <div
+            className="rounded-lg border border-warning-100 bg-warning-50 px-4 py-3 text-sm text-warning-700"
+            role="status"
+          >
+            Price books, tiers, contracts, schedules, margin rules, and the simulator are
+            preview-only. Set <code className="font-mono text-xs">NEXT_PUBLIC_SHOW_PARTIAL_PAGES=true</code>{" "}
+            to explore them. Discounts stay on Catalog → Discounts.
           </div>
-        </div>
+        )}
 
-        <div className="border-b border-slate-200">
-          <nav className="flex gap-1" aria-label="Pricing tabs">
-            {TABS.map(t => (
-              <button
-                key={t.key}
-                onClick={() => setActiveTab(t.key)}
-                className={`px-4 py-2.5 text-sm font-semibold transition-colors ${
-                  activeTab === t.key
-                    ? "border-b-2 border-brand-600 text-brand-600"
-                    : "text-slate-500 hover:text-slate-900"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </nav>
-        </div>
+        {VISIBLE_TABS.length > 1 && (
+          <div className="border-b border-erp-table-border">
+            <nav className="flex flex-wrap gap-1" aria-label="Pricing tabs">
+              {VISIBLE_TABS.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setActiveTab(t.key)}
+                  className={`min-h-touch px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 ${
+                    activeTab === t.key
+                      ? "border-b-2 border-brand-600 text-brand-600"
+                      : "text-erp-text-secondary hover:text-erp-text-primary"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+        )}
 
-        {activeTab === "price-books"        && <PriceBooksTab />}
         {activeTab === "customer-overrides" && <CustomerOverridesTab />}
-        {activeTab === "tier"         && <TierPricingTab />}
-        {activeTab === "contracts"    && <ContractPricesTab />}
-        {activeTab === "scheduled"    && <ScheduledTab />}
-        {activeTab === "margin-rules" && <MarginRulesTab />}
-        {activeTab === "simulator"    && <SimulatorTab />}
+        {SHOW_PARTIAL && activeTab === "price-books" && <PriceBooksTab />}
+        {SHOW_PARTIAL && activeTab === "tier" && <TierPricingTab />}
+        {SHOW_PARTIAL && activeTab === "contracts" && <ContractPricesTab />}
+        {SHOW_PARTIAL && activeTab === "scheduled" && <ScheduledTab />}
+        {SHOW_PARTIAL && activeTab === "margin-rules" && <MarginRulesTab />}
+        {SHOW_PARTIAL && activeTab === "simulator" && <SimulatorTab />}
       </div>
     </EnterpriseShell>
   );

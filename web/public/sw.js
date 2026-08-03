@@ -13,7 +13,7 @@ const DB_VERSION = 1;
 const STORE = "checkout_queue";
 
 // Pages to pre-cache on install so the app shell loads offline.
-const SHELL = ["/", "/login", "/terminal", "/sell"];
+const SHELL = ["/", "/login", "/terminal"];
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 

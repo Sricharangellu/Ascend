@@ -251,7 +251,7 @@ const RECO_PLAYBOOK: Record<string, { category: RecommendationCategory; title: s
   out_of_stock:          { category: "inventory", title: "Restock out-of-stock items", action: "Receive stock for products that are out of stock.",                    href: "/inventory" },
   negative_net_profit:   { category: "profit",    title: "Fix negative net profit",    action: "Raise margins or cut expenses — spending is outpacing gross profit.",  href: "/reports" },
   thin_margin:           { category: "pricing",   title: "Improve thin margin",        action: "Review pricing or supplier costs to lift a low gross margin.",         href: "/reports" },
-  low_stock:             { category: "inventory", title: "Reorder low stock",          action: "Reorder products at or below their reorder point.",                    href: "/inventory" },
+  low_stock:             { category: "inventory", title: "Reorder low stock",          action: "Reorder products at or below their reorder point.",                    href: "/purchasing?tab=reorder" },
   no_sales_yet:          { category: "sales",     title: "Record your first sale",     action: "Ring up a sale at the register to start measuring performance.",       href: "/terminal" },
   products_never_sold:   { category: "sales",     title: "Review never-sold products", action: "Promote, reprice, or discontinue products that have never sold.",       href: "/catalog" },
   slow_movers:           { category: "sales",     title: "Clear slow movers",          action: "Discount or clear stock that has not sold recently.",                  href: "/catalog" },
