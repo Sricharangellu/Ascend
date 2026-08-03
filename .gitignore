@@ -51,3 +51,8 @@ web/.next.stuck-*
 
 # Local DB backup dumps
 artifacts/backups/
+
+# Replit migration snapshot — a full duplicate checkout of this repo.
+# Git history is the backup; a tracked second checkout breaks the
+# one-canonical-AGENTS.md guard and the repo-hygiene check (AGENTS.md).
+.migration-backup/
