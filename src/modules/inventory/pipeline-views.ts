@@ -286,4 +286,146 @@ export class PipelineViewsService {
     );
     return { po_number: String(po.po_number) };
   }
+
+  /**
+   * Active receiving-session lines for Inventory > Pipeline > Receiving.
+   * Shape matches the existing FE ReceivingTab contract.
+   */
+  async receiving(tenantId: string) {
+    const rows = await this.db.query<{
+      id: string; session_id: string; po_number: number | null;
+      supplier_name: string | null; product_name: string | null; sku: string | null;
+      expected_qty: number; accepted_qty: number; held_qty: number; rejected_qty: number;
+      unit_cost_cents: number | null; po_unit_cost_cents: number;
+      started_at: number; receiver_name: string | null; dock_code: string | null;
+      session_number: string; line_status: string; session_status: string;
+    }>(
+      `SELECT rsl.id, rsl.session_id, po.po_number, s.name AS supplier_name,
+              COALESCE(pol.product_name, p.name, '') AS product_name,
+              COALESCE(p.sku, '') AS sku,
+              rsl.expected_qty, rsl.accepted_qty, rsl.held_qty, rsl.rejected_qty,
+              rsl.unit_cost_cents, pol.unit_cost_cents AS po_unit_cost_cents,
+              rs.started_at, rs.receiver_name, rs.dock_code, rs.session_number,
+              rsl.status AS line_status, rs.status AS session_status
+         FROM receiving_session_lines rsl
+         JOIN receiving_sessions rs ON rs.tenant_id = rsl.tenant_id AND rs.id = rsl.session_id
+         JOIN purchase_orders po ON po.tenant_id = rs.tenant_id AND po.id = rs.po_id
+         LEFT JOIN suppliers s ON s.tenant_id = po.tenant_id AND s.id = po.supplier_id
+         JOIN purchase_order_lines pol ON pol.tenant_id = rsl.tenant_id AND pol.id = rsl.po_line_id
+         LEFT JOIN products p ON p.tenant_id = rsl.tenant_id AND p.id = rsl.product_id
+        WHERE rsl.tenant_id = @t
+          AND rs.status IN ('open','docked','receiving','quality_hold')
+          AND rsl.status <> 'posted'
+        ORDER BY rs.started_at DESC, rsl.created_at ASC`,
+      { t: tenantId },
+    );
+    return {
+      items: rows.map((r) => {
+        const remaining = Math.max(
+          0,
+          Number(r.expected_qty) - Number(r.accepted_qty) - Number(r.held_qty) - Number(r.rejected_qty),
+        );
+        return {
+          id: r.id,
+          session_id: r.session_id,
+          po_number: String(r.po_number ?? ""),
+          supplier_name: r.supplier_name ?? "",
+          product_name: r.product_name ?? "",
+          sku: r.sku ?? "",
+          qty_ordered: Number(r.expected_qty),
+          qty_received: Number(r.accepted_qty),
+          qty_remaining: remaining,
+          unit_cost_cents: Number(r.unit_cost_cents ?? r.po_unit_cost_cents ?? 0),
+          started_at: Number(r.started_at),
+          receiver: r.receiver_name ?? "",
+          outlet: r.dock_code ?? "",
+          batch_id: r.session_number,
+          status: r.line_status,
+          session_status: r.session_status,
+        };
+      }),
+    };
+  }
+
+  /** Increment accepted qty on an active session line (scan desk helper). */
+  async updateReceivingLine(lineId: string, tenantId: string, qtyScanned: number) {
+    if (qtyScanned <= 0) throw badRequest("qty_scanned must be positive");
+    const line = await this.db.one<{
+      id: string; session_id: string; expected_qty: number;
+      accepted_qty: number; held_qty: number; rejected_qty: number; status: string;
+    }>(
+      `SELECT id, session_id, expected_qty, accepted_qty, held_qty, rejected_qty, status
+         FROM receiving_session_lines WHERE id = @id AND tenant_id = @t`,
+      { id: lineId, t: tenantId },
+    );
+    if (!line) throw notFound(`receiving line '${lineId}' not found`);
+    if (line.status === "posted") throw badRequest("line already posted");
+    const remaining =
+      Number(line.expected_qty) - Number(line.accepted_qty) - Number(line.held_qty) - Number(line.rejected_qty);
+    if (qtyScanned > remaining) {
+      throw badRequest(`qty_scanned ${qtyScanned} exceeds remaining ${remaining}`);
+    }
+    const now = Date.now();
+    await this.db.query(
+      `UPDATE receiving_session_lines
+          SET accepted_qty = accepted_qty + @qty,
+              scanned_qty = scanned_qty + @qty,
+              status = 'scanning',
+              updated_at = @now
+        WHERE id = @id AND tenant_id = @t`,
+      { qty: qtyScanned, now, id: lineId, t: tenantId },
+    );
+    await this.db.query(
+      `UPDATE receiving_sessions
+          SET status = CASE WHEN status IN ('open','docked') THEN 'receiving' ELSE status END,
+              updated_at = @now
+        WHERE id = @sid AND tenant_id = @t`,
+      { now, sid: line.session_id, t: tenantId },
+    );
+    const items = await this.receiving(tenantId);
+    const updated = items.items.find((i) => i.id === lineId);
+    if (!updated) throw notFound(`receiving line '${lineId}' not found after update`);
+    return updated;
+  }
+
+  /**
+   * Honest pipeline summary KPIs that can be computed from real tables.
+   * Stages that don't map onto POStatus are omitted rather than fabricated.
+   */
+  async summary(tenantId: string) {
+    const open = await this.db.one<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM purchase_orders
+        WHERE tenant_id = @t AND status IN ('ordered','partially_received')`,
+      { t: tenantId },
+    );
+    const partial = await this.db.one<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM purchase_orders
+        WHERE tenant_id = @t AND status = 'partially_received'`,
+      { t: tenantId },
+    );
+    const received = await this.db.one<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM purchase_orders
+        WHERE tenant_id = @t AND status = 'received'`,
+      { t: tenantId },
+    );
+    const receivingActive = await this.db.one<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM receiving_sessions
+        WHERE tenant_id = @t AND status IN ('open','docked','receiving','quality_hold')`,
+      { t: tenantId },
+    );
+    const qualityHolds = await this.db.one<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM receiving_session_lines
+        WHERE tenant_id = @t AND held_qty > 0 AND status <> 'posted'`,
+      { t: tenantId },
+    );
+    return {
+      open_pos: open?.n ?? 0,
+      partially_received_pos: partial?.n ?? 0,
+      received_pos: received?.n ?? 0,
+      receiving_active: receivingActive?.n ?? 0,
+      quality_holds: qualityHolds?.n ?? 0,
+      // Explicitly not inventing stages the schema cannot support:
+      stages_unsupported: ["suggested", "draft", "sent", "confirmed", "in_transit", "billed", "closed"],
+    };
+  }
 }

@@ -45,7 +45,7 @@ export function ReceiveLinesCard({
                     </p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1">Cases</label>
                     <input type="number" min={0} value={entry.cases}
@@ -69,6 +69,13 @@ export function ReceiveLinesCard({
                     <label className="block text-xs font-medium text-slate-500 mb-1">Expiry date</label>
                     <input type="date" value={entry.expiryDate}
                       onChange={(e) => onUpdateEntry(entry.lineId, { expiryDate: e.target.value })}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Lot code</label>
+                    <input type="text" value={entry.lotCode ?? ""}
+                      onChange={(e) => onUpdateEntry(entry.lineId, { lotCode: e.target.value })}
+                      placeholder="LOT-2026"
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
                   </div>
                   <div>

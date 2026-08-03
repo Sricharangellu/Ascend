@@ -50,6 +50,17 @@
 
 Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0 wave-dispatch coordination claim (started 2026-07-18) was closed 2026-07-30 as superseded — see its entry below; work since has shipped as independent claims rather than through that coordinator. Latest substantive work: Phase 7 items 1-2 (sales-velocity consolidation, demand-snapshot foundation) RELEASED; four-environment AI coordination workflow (Claude Code/Cursor/Replit) adopted 2026-07-30, see `docs/architecture/ORCHESTRATION.md` "Environment routing" + `tools/AGENT_PROMPT.md`. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B, RELEASED); Clean Architecture pilot (quotes + gateway auth) (session C, ABANDONED — see entry); SSO OIDC hardening (session D)
 
+## Active Claim (Cursor cloud — procurement receiving enterprise rewrite)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor cloud `bc-28230959-25b7-472a-853f-620942780c43` (Ascend procurement rewrite) |
+| Queue item | Phase 8a — Receiving enterprise foundation (stateful sessions, scan/validate, 3-way match hardening, dashboard, FE wiring). Authorized by Sri master prompt 2026-08-03 superseding prior NEEDS-SRI on receiving sessions. Note: feature work originally landed under Replit `artifacts/*` layout; after PR #145 restored canonical `src/`+`web/`, a port onto those paths is required to finish the merge. |
+| Files/areas expected | Originally `artifacts/api-server`/`artifacts/ascend`; target canonical paths `src/modules/purchasing/**`, `src/modules/inventory/pipeline-*.ts`, `src/modules/billing/service.ts`, `web/app/(protected)/{purchasing,inventory}/**`, `WORK/audits/**` |
+| Started | 2026-08-03T003301Z |
+| Status | RELEASED on branch `cursor/procurement-receiving-enterprise-0c43` (see AUDIT_2026-08-03T003301Z) — feature deltas re-applied onto canonical `src/`/`web/` during merge of post-#145 `develop`; conflicted `artifacts/*` paths removed. |
+| Blockers | none (layout port complete on this branch). |
+
 ## Active Claim (Cursor Cloud — Phase 7 item 4: replace reorder placeholder)
 
 | Field | Value |

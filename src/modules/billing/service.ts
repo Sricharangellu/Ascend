@@ -114,10 +114,19 @@ export class BillingService {
     return bill;
   }
 
-  /** Idempotent: draft a bill from a received PO (skips if one already exists). */
+  /**
+   * Idempotent: draft a bill from a *fully* received PO (skips if one already
+   * exists). Partial receives must not AP-recognize the full PO total — that
+   * was a silent over-recognition bug. Wait until status = 'received'.
+   */
   async billFromPO(poId: string, tenantId: string): Promise<void> {
     const existing = await this.db.one("SELECT id FROM bills WHERE tenant_id = @t AND po_id = @po", { t: tenantId, po: poId });
     if (existing) return;
+    const po = await this.db.one<{ status: string }>(
+      "SELECT status FROM purchase_orders WHERE id = @po AND tenant_id = @t",
+      { po: poId, t: tenantId },
+    );
+    if (!po || po.status !== "received") return;
     try {
       await this.createBill({ poId }, tenantId);
     } catch {

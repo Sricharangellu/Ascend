@@ -170,6 +170,7 @@ const NAV_TREE: NavSection[] = [
       { label: "Movements",     href: "/inventory",               featureGate: "inventory" },
       { label: "Purchasing",    href: "/purchasing",              featureGate: "purchasing" },
       { label: "Receive Stock", href: "/inventory/receive-stock", featureGate: "inventory" },
+      { label: "Receiving Hub", href: "/purchasing/receiving",    featureGate: "purchasing" },
       { label: "Expiry",        href: "/inventory/expiry-pool",   featureGate: "inventory" },
       { label: "Cycle Counts",  href: "/inventory/counts",        featureGate: "inventory" },
       { label: "Locations",     href: "/inventory/locations",     featureGate: "inventory" },
