@@ -58,7 +58,7 @@ Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0
 | Queue item | Port remaining Wave A silent-catch fixes + Wave B palette deep-links / Cost Entry (pipeline/Error Center already on develop via Ponytail #160). Plus #133 leftover: wire dashboard outlet select into report `scope`. |
 | Files/areas expected | `web/components/CommandPalette.tsx`; `web/app/(protected)/{gift-cards,dashboard,inventory,purchase}/**`; `web/tests/**`; `WORK/**` |
 | Started | 2026-08-03T050700Z |
-| Status | RELEASED — `cursor/ui-wave-ab-trust-speed-604f`; see AUDIT_2026-08-03T050800Z-ui-wave-ab-trust-speed.md |
+| Status | ACTIVE — outlet-filter scope fix on PR #166; prior slices already on branch. |
 | Blockers | none |
 
 ## Active Claim (Cursor Cloud — Wave A dead-chrome + Quick Sell href)
