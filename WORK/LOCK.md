@@ -7,7 +7,7 @@
 | Queue item | Wave 2: Finance hub simplify; Accounting drop duplicate AR/AP pay grids; Shipping list → Delivery tab; Operations dissolve to Outlets + deep links. |
 | Files/areas expected | `web/app/(protected)/{finance,accounting,delivery,shipping,operations}/**`; `web/next.config.mjs`; `web/components/EnterpriseShell.tsx`; checklist; WORK audit + LOCK. |
 | Started | 2026-08-03 |
-| Status | ACTIVE — commit/gates/PR |
+| Status | RELEASED — Wave 2 hubs shipped; AUDIT_2026-08-03T043540Z-ponytail-wave2-hubs.md |
 | Blockers | none |
 
 
