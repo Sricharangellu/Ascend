@@ -32,12 +32,12 @@ export default function DeviceVerificationPage() {
 
   return (
     <AuthShell>
-      <div className="rounded-2xl border border-white/40 bg-white/80 p-6 shadow-2xl shadow-slate-900/10 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70 sm:p-8">
+      <div className="rounded-2xl border border-white/40 bg-white/80 p-6 shadow-2xl shadow-slate-900/10 backdrop-blur-xl sm:p-8">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-100 text-brand-700 dark:bg-brand-700/20 dark:text-brand-400">
           <DeviceIcon />
         </div>
-        <h2 className="mt-4 text-2xl font-bold dark:text-white" style={{ color: "var(--color-text-primary)" }}>Verify it&apos;s you</h2>
-        <p className="mt-2 text-sm dark:text-slate-400" style={{ color: "var(--color-text-muted)" }}>
+        <h2 className="mt-4 text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>Verify it&apos;s you</h2>
+        <p className="mt-2 text-sm" style={{ color: "var(--color-text-muted)" }}>
           We noticed a sign-in from a device or location we don&apos;t recognize. Please confirm this was you.
         </p>
 

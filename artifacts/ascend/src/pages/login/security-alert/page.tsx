@@ -20,12 +20,12 @@ const MOCK_EVENT = {
 export default function SecurityAlertPage() {
   return (
     <AuthShell>
-      <div className="rounded-2xl border border-white/40 bg-white/80 p-6 shadow-2xl shadow-slate-900/10 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70 sm:p-8">
+      <div className="rounded-2xl border border-white/40 bg-white/80 p-6 shadow-2xl shadow-slate-900/10 backdrop-blur-xl sm:p-8">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-danger-100 text-danger-700 dark:bg-danger-700/20 dark:text-danger-400">
           <AlertIcon />
         </div>
-        <h2 className="mt-4 text-2xl font-bold dark:text-white" style={{ color: "var(--color-text-primary)" }}>We&apos;ve flagged this sign-in</h2>
-        <p className="mt-2 text-sm dark:text-slate-400" style={{ color: "var(--color-text-muted)" }}>
+        <h2 className="mt-4 text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>We&apos;ve flagged this sign-in</h2>
+        <p className="mt-2 text-sm" style={{ color: "var(--color-text-muted)" }}>
           Thanks for letting us know. We&apos;ve recorded this sign-in attempt as suspicious and recommend
           resetting your password right away. We&apos;ve also signed out any other active sessions.
         </p>
