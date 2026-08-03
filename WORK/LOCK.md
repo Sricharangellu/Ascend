@@ -10,7 +10,7 @@ Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0
 | Queue item | Audit gaps + fix connectivity / API-break / rate-limiting bugs: offline outbox dropping 429s as permanent, API client missing Retry-After retry, SSO limiter not env-overridable (same class as the e2e identity flake), stale rate-limit docs. |
 | Files/areas expected | `web/lib/offlineOutbox.ts`, `web/public/sw.js`, `web/api-client/client.ts`, `web/tests/api-client.test.ts`, `src/app.ts`, `src/gateway/rateLimit.ts` (+ test), `docs/api/rate-limits.md`, `.github/workflows/ci.yml` (e2e env), `WORK/**` |
 | Started | 2026-08-03T02:12:57Z |
-| Status | ACTIVE — implementing |
+| Status | RELEASED — shipped on `cursor/audit-connectivity-rate-limit-57b8` as PR #150 → `develop`. Verified: hygiene clean, gap:scan clean (456/381/21), rateLimit.test.ts 8/8, api-client.test.ts 17/17, backend+web typecheck clean, eslint clean on touched web files. Audit: `WORK/audits/AUDIT_2026-08-03T021300Z-connectivity-api-rate-limit.md`. |
 | Blockers | none |
 
 ## Active Claim (Claude session G — Phase 0 coordinator: finish end-to-end + deployment readiness)
