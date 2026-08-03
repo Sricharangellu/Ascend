@@ -44,11 +44,12 @@ export function ConfirmDialog({
   return (
     <dialog
       ref={ref}
-      className="rounded-xl shadow-2xl p-6 max-w-sm w-full backdrop:bg-black/40 border-0 outline-none"
+      className="rounded-2xl shadow-2xl p-6 max-w-sm w-full backdrop:bg-black/50 border-0 outline-none"
+      style={{ backgroundColor: "var(--color-surface)" }}
       onKeyDown={(e) => { if (e.key === "Escape") onCancel(); }}
     >
-      <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-      <p className="mt-2 text-sm text-gray-600">{message}</p>
+      <h2 className="text-[15px] font-semibold" style={{ color: "var(--color-text-primary)" }}>{title}</h2>
+      <p className="mt-2 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>{message}</p>
       <div className="mt-5 flex justify-end gap-3">
         <Button variant="secondary" size="sm" onClick={onCancel}>Cancel</Button>
         <Button

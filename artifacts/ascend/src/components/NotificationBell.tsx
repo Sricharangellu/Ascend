@@ -28,15 +28,16 @@ function NotifItem({ n, onDismiss }: { n: Notification; onDismiss: (id: string) 
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             {!n.read && <span className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${LEVEL_DOT[n.level] ?? LEVEL_DOT.info}`} />}
-            <p className="text-xs font-semibold text-slate-800 leading-tight">{n.title}</p>
+            <p className="text-[12px] font-semibold leading-tight" style={{ color: "var(--color-text-primary)" }}>{n.title}</p>
           </div>
-          {n.body && <p className="mt-0.5 text-xs text-slate-500">{n.body}</p>}
-          <p className="mt-1 text-[10px] text-slate-400">{timeAgo(n.receivedAt)}</p>
+          {n.body && <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{n.body}</p>}
+          <p className="mt-1 text-[10px]" style={{ color: "var(--color-text-muted)" }}>{timeAgo(n.receivedAt)}</p>
         </div>
         <button
           onClick={() => onDismiss(n.id)}
           aria-label="Dismiss notification"
-          className="shrink-0 text-slate-300 hover:text-slate-500 mt-0.5"
+          className="mt-0.5 shrink-0 transition-colors hover:text-brand-500"
+          style={{ color: "var(--color-text-muted)" }}
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 2l8 8M10 2l-8 8"/></svg>
         </button>
@@ -108,22 +109,24 @@ export function NotificationBell() {
           ref={panelRef}
           role="region"
           aria-label="Notifications"
-          className="absolute right-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-lg border border-slate-700 bg-white shadow-2xl"
+          className="absolute right-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-xl border shadow-2xl"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
-            <span className="text-xs font-semibold text-slate-700">Notifications</span>
+          <div className="flex items-center justify-between border-b px-3 py-2" style={{ borderColor: "var(--color-border)" }}>
+            <span className="text-[12px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Notifications</span>
             {notifications.length > 0 && (
-              <button onClick={clearAll} className="text-[10px] font-medium text-slate-400 hover:text-slate-600">
+              <button onClick={clearAll} className="text-[10px] font-medium transition-colors hover:text-brand-600"
+                style={{ color: "var(--color-text-muted)" }}>
                 Clear all
               </button>
             )}
           </div>
 
           {/* List */}
-          <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+          <div className="max-h-80 divide-y overflow-y-auto" style={{ borderColor: "var(--color-border)" }}>
             {notifications.length === 0 ? (
-              <p className="px-4 py-6 text-center text-xs text-slate-400">No notifications</p>
+              <p className="px-4 py-6 text-center text-[11px]" style={{ color: "var(--color-text-muted)" }}>No notifications</p>
             ) : (
               notifications.map((n) => (
                 <NotifItem key={n.id} n={n} onDismiss={dismiss} />

@@ -37,13 +37,14 @@ export function Select({
     <select
       id={selectId}
       className={clsx(
-        "w-full rounded border bg-white pr-8 leading-tight",
+        "w-full rounded-lg border pr-8 leading-tight",
+        "[background-color:var(--color-surface)]",
         "appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMUw2IDdMMTEgMSIgc3Ryb2tlPSIjODg4IiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+')] bg-no-repeat bg-[center_right_10px]",
         "transition-colors duration-100",
         error
           ? "border-danger-500 focus:border-danger-500 focus:ring-2 focus:ring-danger-500 focus:ring-offset-0"
           : "border-[#D9D9D9] focus:border-brand-600 focus:ring-2 focus:ring-brand-600 focus:ring-opacity-20 focus:ring-offset-0",
-        "text-[var(--color-text-primary)] disabled:bg-gray-50 disabled:text-[var(--color-text-secondary)] disabled:cursor-not-allowed",
+        "text-[var(--color-text-primary)] disabled:[background-color:var(--color-surface-subtle)] disabled:text-[var(--color-text-secondary)] disabled:cursor-not-allowed",
         "outline-none",
         sizeClasses[size],
         className,

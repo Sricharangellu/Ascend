@@ -20,23 +20,24 @@ interface TableProps<T> {
 export function Table<T>({ columns, rows, loading, emptyMessage = "No data", rowKey, onRowClick }: TableProps<T>) {
   if (loading) {
     return (
-      <div className="overflow-hidden rounded-lg border border-[var(--color-table-border)] bg-white">
+      <div className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         <table className="w-full text-sm">
-          <thead className="bg-[var(--color-table-header)]">
+          <thead style={{ backgroundColor: "var(--color-table-header)" }}>
             <tr>
               {columns.map(col => (
-                <th key={col.key} className={clsx("px-4 py-3 text-left font-medium text-[var(--color-text-secondary)] text-xs uppercase tracking-wide", col.headerClassName)}>
+                <th key={col.key} className={clsx("px-4 py-3 text-left font-medium text-xs uppercase tracking-wide", col.headerClassName)}
+                  style={{ color: "var(--color-text-secondary)" }}>
                   {col.header}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-[var(--color-table-border)]">
+          <tbody className="divide-y" style={{ borderColor: "var(--color-table-border)" }}>
             {Array.from({ length: 5 }).map((_, i) => (
               <tr key={i}>
                 {columns.map(col => (
                   <td key={col.key} className="px-4 py-3">
-                    <div className="h-4 rounded bg-[#F0F0F0] animate-pulse" style={{ width: `${60 + (i * 7) % 40}%` }} />
+                    <div className="h-4 rounded animate-skeleton" style={{ width: `${60 + (i * 7) % 40}%` }} />
                   </td>
                 ))}
               </tr>
@@ -49,7 +50,7 @@ export function Table<T>({ columns, rows, loading, emptyMessage = "No data", row
 
   if (rows.length === 0) {
     return (
-      <div className="overflow-hidden rounded-lg border border-[var(--color-table-border)] bg-white">
+      <div className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         <table className="w-full text-sm">
           <thead className="bg-[var(--color-table-header)]">
             <tr>
@@ -74,7 +75,7 @@ export function Table<T>({ columns, rows, loading, emptyMessage = "No data", row
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-[var(--color-table-border)] bg-white">
+    <div className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-[var(--color-table-header)] border-b border-[var(--color-table-border)]">

@@ -31,26 +31,28 @@ const variantClasses: Record<ButtonVariant, string> = {
     "focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2",
   ].join(" "),
 
-  // Outlined secondary — border: 1px solid #D9D9D9
+  // Outlined secondary
   secondary: [
-    "bg-white text-[rgba(0,0,0,0.88)] border border-[#D9D9D9]",
-    "hover:bg-gray-50 hover:border-brand-600 hover:text-brand-600",
-    "active:bg-gray-100",
+    "border text-[var(--color-text-secondary)]",
+    "[background-color:var(--color-surface)] [border-color:var(--color-border)]",
+    "hover:[border-color:var(--color-primary)] hover:text-brand-600 hover:[background-color:var(--color-surface-subtle)]",
+    "active:[background-color:var(--color-surface-subtle)]",
     "disabled:opacity-50 disabled:cursor-not-allowed",
     "focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2",
   ].join(" "),
 
   danger: [
-    "bg-white text-[#FF4D4F] border border-[#FF4D4F]",
-    "hover:bg-red-50 hover:border-red-600 hover:text-red-600",
-    "active:bg-red-100",
+    "border border-danger-500 text-danger-600",
+    "[background-color:var(--color-surface)]",
+    "hover:bg-danger-50 hover:border-danger-600",
+    "active:bg-danger-100",
     "disabled:opacity-50 disabled:cursor-not-allowed",
-    "focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2",
+    "focus-visible:ring-2 focus-visible:ring-danger-500 focus-visible:ring-offset-2",
   ].join(" "),
 
   ghost: [
-    "bg-transparent text-[rgba(0,0,0,0.88)] border-none",
-    "hover:bg-gray-100 active:bg-gray-200",
+    "bg-transparent text-[var(--color-text-secondary)] border-none",
+    "hover:[background-color:var(--color-surface-subtle)] active:opacity-80",
     "disabled:opacity-40 disabled:cursor-not-allowed",
     "focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2",
   ].join(" "),

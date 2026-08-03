@@ -47,14 +47,16 @@ export function Pagination({
   const rangeEnd = Math.min(total, (page + 1) * pageSize);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#F0F0F0] bg-[#FAFAFA] px-5 py-3 text-sm text-[#555]">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3 text-[13px]"
+      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-secondary)" }}>
       <div className="flex items-center gap-2">
-        <label htmlFor="pagination-page-size" className="text-xs font-medium text-[#555]">Rows per page</label>
+        <label htmlFor="pagination-page-size" className="text-[11px] font-medium" style={{ color: "var(--color-text-secondary)" }}>Rows per page</label>
         <select
           id="pagination-page-size"
           value={pageSize}
           onChange={(e) => onPageSizeChange(Number(e.target.value))}
-          className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none"
+          className="h-7 rounded-lg border px-2 text-[12px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
         >
           {pageSizeOptions.map((n) => (
             <option key={n} value={n}>{n}</option>
@@ -71,16 +73,18 @@ export function Pagination({
           type="button"
           onClick={() => onPageChange(Math.max(0, page - 1))}
           disabled={page <= 0}
-          className="h-8 rounded border border-[#D9D9D9] px-3 text-sm text-[#555] hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+          className="h-7 rounded-lg border px-3 text-[12px] transition-colors hover:bg-[var(--color-surface-subtle)] disabled:cursor-not-allowed disabled:opacity-40"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}
         >
           Prev
         </button>
-        <span className="px-2 text-xs tabular-nums text-[#888]">Page {page + 1} of {pageCount}</span>
+        <span className="px-2 text-[11px] tabular-nums" style={{ color: "var(--color-text-muted)" }}>Page {page + 1} of {pageCount}</span>
         <button
           type="button"
           onClick={() => onPageChange(Math.min(pageCount - 1, page + 1))}
           disabled={page >= pageCount - 1}
-          className="h-8 rounded border border-[#D9D9D9] px-3 text-sm text-[#555] hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+          className="h-7 rounded-lg border px-3 text-[12px] transition-colors hover:bg-[var(--color-surface-subtle)] disabled:cursor-not-allowed disabled:opacity-40"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}
         >
           Next
         </button>

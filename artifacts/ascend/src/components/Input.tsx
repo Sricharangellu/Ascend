@@ -80,7 +80,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             aria-invalid={!!error}
             aria-describedby={describedBy}
             className={clsx(
-              "block rounded border bg-white text-[var(--color-text-primary)]",
+              "block rounded-lg border text-[var(--color-text-primary)] [background-color:var(--color-surface)]",
               "text-base transition-colors duration-150",
               "placeholder:text-[var(--color-text-secondary)]",
               "min-h-[44px] py-2 px-3",

@@ -59,7 +59,8 @@ export class GlobalErrorBoundary extends React.Component<
     return (
       <div
         role="alert"
-        className="flex min-h-screen flex-col items-center justify-center gap-6 bg-gray-50 p-6 text-center"
+        className="flex min-h-screen flex-col items-center justify-center gap-6 p-6 text-center"
+        style={{ backgroundColor: "var(--color-page-bg)" }}
       >
         <div className="max-w-md">
           <div
@@ -69,24 +70,24 @@ export class GlobalErrorBoundary extends React.Component<
             <span className="text-3xl text-danger-600">!</span>
           </div>
 
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-[20px] font-bold" style={{ color: "var(--color-text-primary)" }}>
             Something went wrong
           </h1>
 
-          <p className="mt-2 text-gray-600">
+          <p className="mt-2 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
             {isApiError
               ? err.message
               : "An unexpected error occurred. Please reload the page."}
           </p>
 
           {isApiError && err.requestId && (
-            <p className="mt-2 font-mono text-xs text-gray-400">
+            <p className="mt-2 font-mono text-[11px]" style={{ color: "var(--color-text-muted)" }}>
               Request ID: {err.requestId}
             </p>
           )}
 
           {isApiError && (
-            <p className="mt-1 font-mono text-xs text-gray-400">
+            <p className="mt-1 font-mono text-[11px]" style={{ color: "var(--color-text-muted)" }}>
               Code: {err.code}
             </p>
           )}
@@ -103,10 +104,8 @@ export class GlobalErrorBoundary extends React.Component<
           </button>
           <button
             onClick={() => window.location.reload()}
-            className="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm
-                       font-medium text-gray-700 hover:bg-gray-50
-                       focus-visible:ring-2 focus-visible:ring-brand-600
-                       focus-visible:ring-offset-2 min-h-[44px]"
+            className="h-10 rounded-lg border px-5 text-[13px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)] focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}
           >
             Reload page
           </button>
