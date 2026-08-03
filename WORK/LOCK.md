@@ -58,7 +58,7 @@ Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0
 | Queue item | Phase 7 item 4 — replace trailing-window velocity proxy on reorder surfaces with persisted demand forecasts when available (first surface: inventory pipeline reorderAlerts); velocity remains fallback. No ML / no new forecast models. |
 | Files/areas expected | `src/shared/demand-rate.ts` (+test), `src/modules/inventory/pipeline-views.ts`, `src/modules/inventory/pipeline-views.test.ts`, `WORK/**` |
 | Started | 2026-08-03T04:19:23Z |
-| Status | ACTIVE |
+| Status | RELEASED — merged to `develop` via PR #156 (`ed47428`). First-surface cutover complete; remaining reorder surfaces still on velocity. |
 | Blockers | none |
 
 ## Active Claim (Cursor Cloud — Phase 7 item 3: forecast accuracy framework)
