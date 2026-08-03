@@ -114,7 +114,7 @@ Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0
 | Queue item | POS customer attach + gift-card tender: attach customer on terminal (sync customerId), Gift Card payment method that redeems atomically with capture; remove fake Return mode stub; honest shortcuts. |
 | Files/areas expected | `src/modules/payments/{service,routes,payments.test}.ts`; `web/api-client/types.ts`; `web/components/terminal/{TenderScreen,CustomerAttachModal,ShortcutsOverlay}.tsx`; `web/app/(protected)/terminal/_components/{TerminalInner,CheckoutStatusStrip,TerminalActionBar}.tsx`; `WORK/**` |
 | Started | 2026-08-03T044716Z |
-| Status | ACTIVE — implementing |
+| Status | RELEASED — POS customer attach + gift_card tender on `cursor/ui-wave-b-pos-customer-giftcard-604f`; see AUDIT_2026-08-03T044900Z-ui-wave-b-pos-customer-giftcard.md |
 | Blockers | none |
 
 ## Active Claim (Cursor Cloud — Ascend UI ponytail audit / Wave B aging party names)
