@@ -15,6 +15,7 @@ import { DashboardKpiSection } from "./_components/DashboardKpiSection";
 import { DashboardCharts } from "./_components/DashboardCharts";
 import { DashboardQuickActions } from "./_components/DashboardQuickActions";
 import { DashboardRecommendations, type RecommendationReport, type DashboardRecommendation } from "./_components/DashboardRecommendations";
+import { AiCommandCenterBanner } from "./_components/AiCommandCenterBanner";
 import ProgressPanel from "./_components/ProgressPanel";
 
 // Map each actionable recommendation signal to the progress verification source
@@ -298,6 +299,8 @@ export default function DashboardPage() {
           sparkRev={sparkRev}
           sparkSales={sparkSales}
         />
+
+        <AiCommandCenterBanner />
 
         <DashboardRecommendations
           report={recommendationsData}

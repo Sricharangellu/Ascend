@@ -14,8 +14,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildApp, type App } from "../../app.js";
-import { matchIntent } from "./service.js";
+import { matchIntent, BRIEFING_SENTINEL } from "./service.js";
 import { AiAssistantService } from "./index.js";
+import { ReportsService } from "../reports/service.js";
 
 let __seq = 0;
 const __schema = () => `test_${process.pid}_${Date.now().toString(36)}_${__seq++}`;
@@ -60,6 +61,23 @@ async function askAndProcess(app: App, question: string): Promise<{ conversation
   return { conversationId };
 }
 
+/** Same bypass-the-queue approach as askAndProcess(), replicating exactly
+ *  what ai-assistant-answer.job.ts's briefing branch does: fetch the
+ *  recommendations report, then hand it to processQuestion(). */
+async function requestBriefingAndProcess(app: App): Promise<{ conversationId: string }> {
+  const req = await call(app, "POST", "/api/v1/ai-assistant/briefing", {});
+  assert.equal(req.status, 202, `briefing request failed: ${JSON.stringify(req.json)}`);
+  const conversationId = req.json.conversationId as string;
+  const service = new AiAssistantService(app.db, app.events);
+  const reportsService = new ReportsService(app.db);
+  const report = await reportsService.retailRecommendations("tnt_demo");
+  await service.processQuestion("tnt_demo", conversationId, {
+    data: { recommendations: report.recommendations, summary: report.summary },
+    found: report.recommendations.length > 0,
+  });
+  return { conversationId };
+}
+
 // ── matchIntent: pure, deterministic classifier (AGENTS.md: "the first
 //    recommendation system must be rule-based") ───────────────────────────
 
@@ -74,6 +92,7 @@ test("matchIntent classifies every supported category plus unknown", () => {
   assert.equal(matchIntent("any slow movers on the menu"), "slow_movers");
   assert.equal(matchIntent("show me dead stock"), "slow_movers");
   assert.equal(matchIntent("what's the weather like today"), "unknown");
+  assert.equal(matchIntent(BRIEFING_SENTINEL), "briefing", "only the exact sentinel maps to briefing, never keyword-matched");
 });
 
 // ── Module gating: same isolation boundary every business-pack-gated module
@@ -319,4 +338,48 @@ test("a cashier cannot approve or reject a recommendation", async () => {
   assert.equal(approve.status, 403);
   const reject = await call(app, "POST", `/api/v1/ai-assistant/recommendations/${recId}/reject`, {}, "cashier");
   assert.equal(reject.status, 403);
+});
+
+// ── Dashboard briefing (ADR-007): narrates reports/service.ts's existing
+//    retailRecommendations() report — a different data source than the 5
+//    signals above, same explain-only pipeline and failure posture ─────────
+
+test("a retail-default tenant is denied /api/v1/ai-assistant/briefing (same gate as /ask)", async () => {
+  const app = await freshApp();
+  const r = await call(app, "POST", "/api/v1/ai-assistant/briefing", {});
+  assert.equal(r.status, 403);
+  assert.equal(r.json.error.code, "module_not_enabled");
+});
+
+test("briefing narrates real report recommendations; missing ANTHROPIC_API_KEY fails narration honestly and creates no ai_recommendations row", async () => {
+  const app = await freshApp();
+  await enableAiAssistant(app);
+  // No products at all -> reports/service.ts's retailProof() surfaces a real
+  // "no_products" setup signal, giving the briefing something non-empty to
+  // narrate without needing to seed sales history.
+  const report = await new ReportsService(app.db).retailRecommendations("tnt_demo");
+  assert.ok(report.recommendations.length > 0, "expected at least one real recommendation for an empty tenant");
+
+  const { conversationId } = await requestBriefingAndProcess(app);
+
+  const conv = await call(app, "GET", `/api/v1/ai-assistant/conversations/${conversationId}`);
+  assert.equal(conv.status, 200);
+  assert.equal(conv.json.status, "failed", "no ANTHROPIC_API_KEY in the test env must fail narration honestly");
+  assert.match(conv.json.error, /ANTHROPIC_API_KEY/);
+  assert.equal(conv.json.answer, null, "must never fabricate a briefing when narration is unavailable");
+
+  // Critical guardrail: a briefing summarizes many existing report items —
+  // it must never create its own ai_recommendations row (no single
+  // sourceRef/action exists for "here are today's priorities" as a whole).
+  const recs = await call(app, "GET", "/api/v1/ai-assistant/recommendations");
+  assert.equal(recs.status, 200);
+  assert.equal(recs.json.items.length, 0, "briefing must not create an ai_recommendations row");
+});
+
+test("briefing conversation is stored with the sentinel question, not shown as a user-typed question", async () => {
+  const app = await freshApp();
+  await enableAiAssistant(app);
+  const { conversationId } = await requestBriefingAndProcess(app);
+  const conv = await call(app, "GET", `/api/v1/ai-assistant/conversations/${conversationId}`);
+  assert.equal(conv.json.question, BRIEFING_SENTINEL);
 });
