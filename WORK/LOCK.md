@@ -10,7 +10,18 @@ Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0
 | Queue item | Audit gaps + fix connectivity / API-break / rate-limiting bugs: offline outbox dropping 429s as permanent, API client missing Retry-After retry, SSO limiter not env-overridable (same class as the e2e identity flake), stale rate-limit docs. |
 | Files/areas expected | `web/lib/offlineOutbox.ts`, `web/public/sw.js`, `web/api-client/client.ts`, `web/tests/api-client.test.ts`, `src/app.ts`, `src/gateway/rateLimit.ts` (+ test), `docs/api/rate-limits.md`, `.github/workflows/ci.yml` (e2e env), `WORK/**` |
 | Started | 2026-08-03T02:12:57Z |
-| Status | RELEASED — PR #150 follow-up landed: skip auto-retry without `Retry-After` (protects `account_locked`); outbox/SW stop drain on 429; api-client tests 19/19. |
+| Status | RELEASED — merged to `develop` via PR #150 (`801b7a4`). |
+| Blockers | none |
+
+## Active Claim (Cursor Cloud — Phase 7 item 3: forecast accuracy framework)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud agent (`cursor/phase7-forecast-accuracy-57b8`) |
+| Queue item | Phase 7 item 3 — forecast accuracy framework (measurement layer before prediction models): persist forecast qty + compare to `demand_snapshots` actuals → variance / accuracy %. Depends on item 2 (PR #121, rebased onto post-#150 develop). |
+| Files/areas expected | `src/modules/demand_planning/{index,service,routes,demand-planning.test}.ts`, `WORK/**` |
+| Started | 2026-08-03T03:00:35Z |
+| Status | RELEASED — merged to `develop` via PR #152 (`895e45c`). Phase 7 items 1–3 complete. |
 | Blockers | none |
 
 ## Active Claim (Claude session G — Phase 0 coordinator: finish end-to-end + deployment readiness)
@@ -1252,6 +1263,16 @@ Sri asked to get Phase E/F into `develop` and asked about pushing to `staging`. 
   conflicting fix commits on top of an already-crowded set of in-flight branches
   (`cursor/ui-wave-a-trust-leftovers-604f`, `cursor/ui-wave-b-cashier-trust-604f`,
   `chore/reporting-reports-dedup`, this branch).
+## Parallel Non-Overlapping Claim (Claude, Cowork/Sonnet 5 — Phase 7 item 2: demand snapshot foundation)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude (Cowork, Sonnet 5) — continuing Phase 7 per Sri's approved scope (`WORK/FORWARD_PLAN.md`); item 1 (sales-velocity consolidation) already RELEASED above. Note on sequencing: this entry was added once the new module's shape was already drafted, not strictly before the first edit — checked `WORK/LOCK.md`'s tail for any overlapping active claim immediately before starting (none found; last activity was the heartbeat audit session, unrelated files) and no other claim has touched `src/modules/demand_planning/**`, `src/orchestration/jobs/demand-snapshot.job.ts`, `src/orchestration/{index,queues/queue-names}.ts`, or `src/modules/index.ts` since. |
+| Queue item | Item 2: minimum schema for historical demand snapshots + location/product demand history, built to support a future forecast-accuracy framework (item 3) — no forecasting model in this item. |
+| Files/areas expected | NEW `src/modules/demand_planning/{index,service,routes,demand-planning.test}.ts`; NEW `src/orchestration/jobs/demand-snapshot.job.ts`; `src/orchestration/index.ts` + `src/orchestration/queues/queue-names.ts` (additive job registration only); `src/modules/index.ts` (additive module registration only). Does NOT touch Phase 7 item 1's files, does NOT touch the excluded dirty UOM tree, does NOT touch `src/shared/moduleRegistry.ts` (confirmed by precedent — `insights`, a comparable-scope real module, isn't listed there either; that registry is for business-pack vertical feature flags, not every backend module). |
+| Started | 2026-07-28 |
+| Status | RELEASED — schema, service, routes, nightly job, and tests all shipped. New module `src/modules/demand_planning/` owns one new table (`demand_snapshots`, 162 total, no collision). `snapshotDay()` is a calendar-day-bounded aggregate sharing item 1's correctness contract (INNER JOIN, `status = 'completed'`, real date-range filter) but deliberately not built on `computeSalesVelocity()` itself — that function's trailing-window design isn't stable for a persisted historical record. `store_id` is `NOT NULL DEFAULT ''` (not nullable) specifically to keep the idempotency-guaranteeing unique constraint meaningful (Postgres treats NULL as distinct in unique keys). Nightly job (`demand-snapshot.job.ts`) snapshots yesterday, self-re-enqueues, registered in `orchestration/index.ts`/`queue-names.ts`. Manual `POST /demand-planning/snapshot` (manager-gated) + `GET /demand-planning/history/:productId` for read access. Did not touch `shared/moduleRegistry.ts` — confirmed by precedent (`insights` isn't listed there either) that it's for business-pack vertical flags, not every backend module. Gates: `npm run typecheck` clean, `npm run table:scan` clean (162 names, was 161, +1 new table), `npm run gap:scan` clean (458/381, 21 allowlisted — unchanged, confirmed gap:scan doesn't flag backend-only routes with no FE caller), `npm run hygiene` clean (1092 files). Real-Postgres tests: `demand-planning.test.ts` 6/6 new (day-boundary correctness, idempotent re-run, per-store separation, week aggregation, manager-gating, full route round trip). Dated completion audit: `WORK/audits/AUDIT_2026-07-29T015507Z-phase7-item2-demand-snapshot-foundation.md`. **Merged to develop via PR #121** after rebase onto post-#150 tip (2026-08-03). |
+| Blockers | none |
 
 ## Rules
 
