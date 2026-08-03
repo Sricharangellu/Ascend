@@ -191,7 +191,7 @@ const _BP_CATALOG: _BPMod[] = [
   { key: "compliance",       name: "Compliance",               description: "Age verification, MSA/PACT reporting, state flavor bans",      group: "retail" },
   { key: "ecommerce",        name: "Ecommerce",                description: "Online store sync, product visibility, online orders",          group: "retail",  route: "/ecommerce" },
   { key: "customer_display", name: "Customer Display",          description: "Second-screen cart mirror for customer-facing display",        group: "retail",  route: "/display" },
-  { key: "sales_orders",  name: "Sales Orders",        description: "B2B orders, credit terms, fulfilment workflows",              group: "b2b",  route: "/sales" },
+  { key: "sales_orders",  name: "Sales Orders",        description: "B2B orders, credit terms, fulfilment workflows",              group: "b2b",  route: "/orders" },
   { key: "purchasing",    name: "Purchasing",           description: "Purchase orders, receiving, vendor management, returns",     group: "b2b",  route: "/purchasing" },
   { key: "billing",       name: "Billing — AP/AR",      description: "Supplier bills, customer invoices, aging reports",           group: "b2b",  route: "/finance" },
   { key: "accounting",    name: "Accounting",           description: "Chart of accounts, journal entries, batch deposits, P&L",   group: "b2b",  route: "/accounting" },
