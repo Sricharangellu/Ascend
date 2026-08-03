@@ -382,12 +382,7 @@ function TopBar({
             Offline
           </span>
         )}
-        <a
-          href="/help"
-          className="hidden sm:block text-sm text-white/60 hover:text-white transition-colors"
-        >
-          Help
-        </a>
+        {/* Help link removed — /help has no route. Re-add when a help center ships. */}
         <NotificationBell />
         <div className="relative" ref={menuRef}>
           <button
@@ -605,19 +600,11 @@ function LeftRail({
                 <div className="pb-1">
                   {/* Register context header for Sell section */}
                   {item.section === "sell" && (
-                    <div className="mx-3 mb-1.5 mt-0.5 flex items-center justify-between rounded-md bg-white/5 px-2.5 py-1.5">
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-widest text-white/35">
-                          {registerId ?? "Main Register"}
-                        </p>
-                        <p className="text-xs font-medium text-white/70">Main Outlet</p>
-                      </div>
-                      <button
-                        type="button"
-                        className="text-[10px] font-medium text-white/40 hover:text-white/70 transition-colors"
-                      >
-                        Switch
-                      </button>
+                    <div className="mx-3 mb-1.5 mt-0.5 rounded-md bg-white/5 px-2.5 py-1.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-white/35">
+                        {registerId ?? "Main Register"}
+                      </p>
+                      <p className="text-xs font-medium text-white/70">Active register</p>
                     </div>
                   )}
 
