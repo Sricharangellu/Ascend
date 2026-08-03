@@ -48,3 +48,6 @@ version.json
 .next.stuck-*
 web/.next.stuck-*
 .env*
+
+# Local DB backup dumps
+artifacts/backups/

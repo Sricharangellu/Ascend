@@ -1,0 +1,27 @@
+kind = "slides"
+previewPath = "/ascend-pitch/"
+title = "Ascend Pitch Deck"
+version = "1.0.0"
+id = "artifacts/ascend-pitch"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/ascend-pitch/" ]
+localPort = 24957
+
+[services.development]
+run = "pnpm --filter @workspace/ascend-pitch run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ascend-pitch", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/ascend-pitch/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24957"
+BASE_PATH = "/ascend-pitch/"
