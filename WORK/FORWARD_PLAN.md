@@ -1527,6 +1527,107 @@ If you are picking up work on Ascend with no other context:
    scope back to Sri, then execute strictly in that order with regression gates between
    each item. Do not build the template's full scope speculatively.
 
+### Phase 9: Ponytail continuation, fresh security pass, priority queue (2026-08-03)
+
+**Correction to Phase 8 item 3 above:** this session (running concurrently with the one
+that wrote Phase 8 — same repo, same working tree, two AI sessions active at once; see
+the multi-agent git-safety incident logged below) found and closed one real,
+NEEDS-SRI-free code gap, and flagged a second that's ready but blocked on this sandbox's
+own limits rather than on Sri. "There is no current NEEDS-SRI-free code backlog item" was
+true when Phase 8 was written; it no longer is. Update the claim, don't just append past
+it — a future agent reading only item 3 would wrongly stop looking.
+
+**Done this session:**
+
+1. **JWT_SECRET placeholder/low-entropy rejection in production** (Medium severity, real
+   gap). `.env.example` ships `JWT_SECRET=change-me-min-32-chars-random-string`; the
+   Security review above says startup fails if `JWT_SECRET` is *missing* but, until this
+   fix, not if it's *present but is the documented placeholder* — an operator who copies
+   `.env.example` straight to prod without editing it got a server that boots fine and
+   signs valid owner-level JWTs with a secret published in the public repo. Fixed in
+   `src/app.ts` (hard fail in production for the known placeholder, a few other common
+   low-entropy values, and anything under 32 chars); 4 new tests in
+   `src/app.env-guard.test.ts`, verified against real Postgres, verified no regression in
+   `gateway/ops.test.ts` or CI's two production-mode jobs. Full writeup:
+   `WORK/audits/AUDIT_2026-08-03T033000Z-security-audit-jwt-secret-guard.md`, which also
+   re-confirms (fresh, code-verified, not doc-trusted) that MFA/RBAC/RLS/SQL-injection/
+   XSS/CORS/webhook-signature posture all hold up — nothing else in that pass needed a
+   fix. Branch `fix/security-jwt-secret-placeholder-guard`, clean ff onto `develop`.
+2. **Ponytail Phase G recovered from an orphaned commit.** Phase E+F (nav-reachability +
+   loyalty/finance shim cleanup) shipped as PR #144, but its sibling Phase G commit
+   (delete 3 dead `setup/*` re-export shims) got separated from any branch when the
+   local checkout was reset after #144's squash-merge — reachable only via `git reflog`,
+   one `git gc` from permanent loss. Recovered via cherry-pick onto a fresh branch off
+   current `develop`. Branch `fix/ponytail-phase-g-dead-setup-shims`, clean ff.
+3. **Ponytail Phase H — Wave 0 cleanup**, picked up after confirming finding #4
+   (`/team/custom-roles` vs `/settings/permissions`, item 5 below) is genuinely
+   NEEDS-SRI and finding #4's Wave-0 siblings were not: leftover pre-rebrand brand
+   strings (`finder-pos.app` → `ascend.app`, the auth-page "F" logo → "A"), and
+   `partial: true` nav-gating for two pages that don't do what they claim — Kiosk Mode's
+   save handler is a pure no-op (nothing persists), Error Center is 100% MSW-mock with
+   no backend route at all. Branch `fix/ponytail-phase-h-wave0-cleanup`, clean ff.
+
+**Ready, blocked on sandbox limits (not on Sri):**
+
+4. **Next.js 14.2.29 → 14.2.35** (High — 2 high-severity `npm audit` findings, DoS via
+   Server Components + SSRF via Server Actions/rewrites, both fixed by the 14.2.35 patch,
+   no major-version jump needed). Attempted this session; `web/node_modules` was
+   populated on macOS (darwin-arm64) and this sandbox is Linux — reconciling optional
+   platform binaries across the whole tree made `npm install` exceed this environment's
+   45-second execution ceiling on every one of 4 attempts, each leaving `ENOTEMPTY`
+   rename conflicts the next attempt had to clean up first, never reaching a rewritten
+   `package-lock.json`. Reverted the attempted `package.json` edit rather than commit an
+   unregenerated lockfile. **Single command for whoever picks this up on a normal dev
+   machine:** `cd web && npm install next@14.2.35 && npm run typecheck && npm run lint
+   && npm run build`, then commit both files.
+
+**Confirmed still NEEDS-SRI (not re-litigated, just carried forward with a decision
+still pending):**
+
+5. **`/team/custom-roles` vs `/settings/permissions`** — the 142-route Ponytail audit
+   (`cursor/ponytail-enterprise-ui-audit-72bc`) marks this CONSOLIDATE but explicitly
+   "blocked on Sri contract decision": which backend API surface becomes canonical,
+   `/custom-roles` or `/settings/custom-roles`. Not a call to make unilaterally.
+
+**Priority queue for the next session** (ordered — top of the list is where to start
+absent other direction from Sri):
+
+1. Push the three ready branches above (`fix/security-jwt-secret-placeholder-guard`,
+   `fix/ponytail-phase-g-dead-setup-shims`, `fix/ponytail-phase-h-wave0-cleanup`) plus
+   this `docs/forward-plan-phase9-session-continuity` branch — all four are independent,
+   clean fast-forwards onto `develop`, push in any order.
+2. NEEDS-SRI, highest impact per Phase 8: confirm production infrastructure
+   (`docs/architecture/DEPLOYMENTS.md` P0-P3) — blocks real deployment, not code work.
+3. NEEDS-SRI: one real backup-restore drill (`PROD_DATABASE_URL` has never been set).
+4. NEEDS-SRI: item 5 above, custom-roles/permissions canonical-API decision — once
+   decided, the actual consolidation is a normal, well-scoped Ponytail phase.
+5. Code-addressable, not yet started: `/inventory/pipeline` tab-level partial badging —
+   3 of its 6 tabs (Overview/Summary, Receiving, Issues) are mock-only, 3 are real
+   (Pending, Reorder Alerts, History); page-level `partial: true` would incorrectly hide
+   working functionality, so this needs per-tab UI, not a nav-tree flag. Flagged, not
+   scoped, in `WORK/audits/AUDIT_2026-08-03T023000Z-ponytail-phase-h-wave0-cleanup.md`.
+6. Item 4 above (Next.js bump) — ready, just needs a non-sandboxed machine.
+7. Remaining Ponytail backlog, roughly Wave-2-and-later priority per the 142-route audit:
+   Discounts-canonical / Promotions-hide / Pricing-quarantine consolidation (Critical
+   priority in that audit, larger scope — nav hiding + page splits, not a same-session
+   drive-by); `/reporting/*` → `/reports/*` alias retirement (308 references); Setup
+   duplicates → `/settings/modes` merge (blocked on updating `web/e2e/verticals.spec.ts`'s
+   4 references to `/setup/modules` alongside the merge, not a drive-by either).
+
+**Multi-agent git-safety incident, logged per this document's own Phase 8 rule #2:** this
+session's local checkout landed a commit on `docs/forward-plan-phase8-guardrails`
+(another session's already-`origin`-pushed branch) instead of its own intended branch —
+`.git/HEAD` moved out from under this session mid-task, almost certainly because another
+session (this same Phase 8 branch's author) ran a real `git checkout` in the same shared
+working tree concurrently. Caught immediately by checking `git log`'s branch-bracket
+output after commit, before pushing anything; fixed by cherry-picking the stray commit
+onto its correct branch and resetting the Phase 8 branch back to exactly match `origin`.
+No data lost, nothing force-pushed, nobody else's work touched. Confirms Phase 8's own
+rule 2 (claim before editing shared files) and rule 3 (verify before touching shared
+git state) are live concerns, not hypothetical — add "two AI sessions can have the same
+repo checked out at once and switch each other's branches underfoot" to the incident list
+future agents should watch for.
+
 ## Suggested better architecture decisions moving forward
 
 Keep:
