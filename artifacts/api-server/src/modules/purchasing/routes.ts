@@ -443,8 +443,19 @@ export function registerRoutes(router: Router, service: PurchasingService): void
   }));
 
   router.post("/bills/:billId/status", mgr, handler(async (req, res) => {
-    const b = parseBody(z.object({ status: z.enum(["approved", "held"]) }), req.body);
-    res.json(await service.setBillStatus(String(req.params.billId), tenantId(res), b.status));
+    const b = parseBody(
+      z.object({
+        status: z.enum(["approved", "held"]),
+        varianceOverrideReason: z.string().min(1).max(500).optional(),
+      }),
+      req.body,
+    );
+    res.json(
+      await service.setBillStatus(String(req.params.billId), tenantId(res), b.status, {
+        varianceOverrideReason: b.varianceOverrideReason,
+        actorId: actor(res).id,
+      }),
+    );
   }));
 
   router.post("/bills/:billId/post", mgr, handler(async (req, res) => {

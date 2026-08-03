@@ -1188,14 +1188,57 @@ export class PurchasingService {
   }
 
   /** Approve or hold a draft bill. A held bill cannot be posted until it is
-   *  approved again; a posted bill is immutable. */
-  async setBillStatus(billId: string, tenantId: string, status: "approved" | "held") {
+   *  approved again; a posted bill is immutable.
+   *
+   *  Enterprise 3-way match rule: approving a bill with `match_status=variance`
+   *  requires an explicit `varianceOverrideReason` — never silently approve
+   *  quantity/price/tax mismatches. */
+  async setBillStatus(
+    billId: string,
+    tenantId: string,
+    status: "approved" | "held",
+    opts: { varianceOverrideReason?: string | null; actorId?: string | null } = {},
+  ) {
     const bill = await this.db.one<{ status: string }>(
       "SELECT status FROM po_bills WHERE id = @id AND tenant_id = @t",
       { id: billId, t: tenantId },
     );
     if (!bill) throw new HttpError(404, "not_found", `bill '${billId}' not found`);
     if (bill.status === "posted") throw new HttpError(409, "already_posted", "a posted bill cannot be changed");
+
+    const detailed = await this.getBill(billId, tenantId);
+    if (
+      status === "approved" &&
+      detailed.match.match_status === "variance"
+    ) {
+      const reason = opts.varianceOverrideReason?.trim();
+      if (!reason) {
+        throw new HttpError(
+          400,
+          "variance_override_required",
+          "Cannot approve a bill with match variances without varianceOverrideReason",
+        );
+      }
+      await this.db.query(
+        `UPDATE po_bills
+            SET status = @status,
+                variance_override_reason = @reason,
+                variance_override_at = @now,
+                variance_override_by = @actor,
+                updated_at = @now
+          WHERE id = @id AND tenant_id = @t`,
+        {
+          status,
+          reason,
+          now: Date.now(),
+          actor: opts.actorId ?? null,
+          id: billId,
+          t: tenantId,
+        },
+      );
+      return this.getBill(billId, tenantId);
+    }
+
     await this.db.query(
       "UPDATE po_bills SET status = @status, updated_at = @now WHERE id = @id AND tenant_id = @t",
       { status, now: Date.now(), id: billId, t: tenantId },

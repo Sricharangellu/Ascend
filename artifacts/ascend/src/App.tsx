@@ -54,6 +54,7 @@ const ReturnsPage     = lazy(() => import("@/pages/(protected)/returns/page"));
 const QuotesPage      = lazy(() => import("@/pages/(protected)/quotes/page"));
 const InvoicingPage   = lazy(() => import("@/pages/(protected)/invoicing/page"));
 const PurchasingPage  = lazy(() => import("@/pages/(protected)/purchasing/page"));
+const PurchasingReceivingPage = lazy(() => import("@/pages/(protected)/purchasing/receiving/page"));
 const VendorsPage     = lazy(() => import("@/pages/(protected)/vendors/page"));
 const VendorDetailPage = lazy(() => import("@/pages/(protected)/vendors/[id]/page"));
 const ShippingPage    = lazy(() => import("@/pages/(protected)/shipping/page"));
@@ -214,6 +215,7 @@ function Router() {
         <Route path="/service-orders"><Protected Component={ServiceOrdersPage} /></Route>
 
         {/* Purchasing / Vendors */}
+        <Route path="/purchasing/receiving"><Protected Component={PurchasingReceivingPage} /></Route>
         <Route path="/purchasing"><Protected Component={PurchasingPage} /></Route>
         <Route path="/vendors"><Protected Component={VendorsPage} /></Route>
         <Route path="/vendors/:id"><Protected Component={VendorDetailPage} /></Route>

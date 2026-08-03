@@ -74,7 +74,16 @@ export function ReceiveTab({
   };
 
   const submitReceive = async () => {
-    const lines = receiveEntries.filter((e) => e.totalQty > 0).map((e) => ({ lineId: e.lineId, qty: e.totalQty }));
+    const lines = receiveEntries
+      .filter((e) => e.totalQty > 0)
+      .map((e) => ({
+        lineId: e.lineId,
+        qty: e.totalQty,
+        ...(e.expiryDate
+          ? { expiryDate: new Date(`${e.expiryDate}T00:00:00.000Z`).getTime() }
+          : {}),
+        ...(e.lotCode.trim() ? { lotCode: e.lotCode.trim() } : {}),
+      }));
     if (lines.length === 0) { setReceiveError("Enter quantities to receive."); return; }
     setReceiveBusy(true); setReceiveError(null);
     try {

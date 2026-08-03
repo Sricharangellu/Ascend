@@ -32,6 +32,7 @@ export interface ReceiveEntry {
   unitsPerCase: string;
   totalQty: number;
   expiryDate: string;
+  lotCode?: string;
   locationId: string;   // stock location this line is received into
   highlighted?: boolean;
 }
@@ -67,6 +68,7 @@ export interface ReceiveLinePayload {
   lineId: string;
   qty: number;
   expiryDate?: number; // epoch ms
+  lotCode?: string;
   locationId?: string;
 }
 
@@ -83,6 +85,7 @@ export function buildReceiveLines(entries: ReceiveEntry[]): ReceiveLinePayload[]
       const line: ReceiveLinePayload = { lineId: e.lineId, qty: e.totalQty };
       const expiryMs = e.expiryDate ? new Date(e.expiryDate).getTime() : NaN;
       if (Number.isFinite(expiryMs)) line.expiryDate = expiryMs;
+      if (e.lotCode?.trim()) line.lotCode = e.lotCode.trim();
       if (e.locationId) line.locationId = e.locationId;
       return line;
     });

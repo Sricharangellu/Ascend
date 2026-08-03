@@ -6,7 +6,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { formatMoney } from "@/lib/money";
-import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
+import { apiGet, apiPost, apiPatch, ApiResponseError } from "@/api-client/client";
 import { computeTotal, receiveStatusBadge, docTypeLabel, fmtBytes, buildReceiveLines } from "./_components/receiveStockTypes";
 import type { PendingPO, ReceiveEntry, PODocument, SortMode, LocationOption } from "./_components/receiveStockTypes";
 import { ReceiveLinesCard } from "./_components/ReceiveLinesCard";
@@ -45,7 +45,12 @@ export default function ReceiveStockPage() {
         apiGet<{ items: LocationOption[] }>("/api/v1/inventory/locations"),
       ]);
       const pending = (ordersRes.items ?? []).filter(
-        (o) => o.receive_status === "pending" || o.receive_status === "partial" || o.status === "ordered",
+        (o) =>
+          o.receive_status === "pending" ||
+          o.receive_status === "partial" ||
+          o.receive_status === "partially_received" ||
+          o.status === "ordered" ||
+          o.status === "partially_received",
       );
       setPendingPOs(pending);
       setSuppliers(suppliersRes.items ?? []);
@@ -68,13 +73,21 @@ export default function ReceiveStockPage() {
       setDocuments(docsRes.items ?? []);
       setEntries(
         (poRes.lines ?? [])
-          .filter((l) => l.remaining_qty > 0)
-          .map((l) => ({
+          .map((l) => {
+            const remaining = Math.max(
+              0,
+              (l.remaining_qty ?? (l.quantity - (l.received_qty ?? 0))),
+            );
+            return { line: l, remaining };
+          })
+          .filter(({ remaining }) => remaining > 0)
+          .map(({ line: l, remaining }) => ({
             lineId: l.id,
             cases: l.cases_ordered != null ? String(l.cases_ordered) : "1",
-            unitsPerCase: l.units_per_case != null ? String(l.units_per_case) : String(l.remaining_qty),
-            totalQty: l.remaining_qty,
+            unitsPerCase: l.units_per_case != null ? String(l.units_per_case) : String(remaining),
+            totalQty: remaining,
             expiryDate: l.expiry_date ? new Date(l.expiry_date).toISOString().slice(0, 10) : "",
+            lotCode: l.lot_code ?? "",
             locationId: "",
           })),
       );
@@ -145,8 +158,36 @@ export default function ReceiveStockPage() {
     if (lines.length === 0) { setError("No quantities entered."); return; }
     setBusy(true); setError(null); setSuccess(null);
     try {
-      await apiPost(`/api/v1/purchasing/orders/${selectedPOId}/receive`, { lines });
-      setSuccess(`Receipt submitted — ${lines.length} line(s) received.`);
+      // Enterprise path: begin a receiving session, apply accepted qtys, then
+      // close → posts through the existing receive() inventory/accounting path.
+      // Fall back to legacy one-shot receive only when session begin itself fails.
+      let session: { id: string; lines: Array<{ id: string; po_line_id: string }> } | null = null;
+      try {
+        session = await apiPost("/api/v1/purchasing/receiving/sessions", {
+          poId: selectedPOId,
+          dockCode: "RECV-DESK",
+        });
+      } catch {
+        session = null;
+      }
+
+      if (session) {
+        for (const line of lines) {
+          const sessionLine = session.lines.find((l) => l.po_line_id === line.lineId);
+          if (!sessionLine) continue;
+          await apiPatch(`/api/v1/purchasing/receiving/sessions/${session.id}/lines/${sessionLine.id}`, {
+            acceptedQty: line.qty,
+            ...(line.expiryDate != null ? { expiryDate: line.expiryDate } : {}),
+            ...(line.lotCode ? { lotCode: line.lotCode } : {}),
+            ...(line.locationId ? { locationId: line.locationId } : {}),
+          });
+        }
+        await apiPost(`/api/v1/purchasing/receiving/sessions/${session.id}/close`, {});
+        setSuccess(`Receiving session closed — ${lines.length} line(s) posted.`);
+      } else {
+        await apiPost(`/api/v1/purchasing/orders/${selectedPOId}/receive`, { lines });
+        setSuccess(`Receipt submitted — ${lines.length} line(s) received.`);
+      }
       await loadList();
       setTimeout(() => { setSelectedPOId(""); setSuccess(null); }, 2500);
     } catch (e) {

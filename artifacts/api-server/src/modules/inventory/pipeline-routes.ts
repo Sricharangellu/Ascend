@@ -36,4 +36,18 @@ export function registerPipelineRoutes(router: Router, service: PipelineViewsSer
     const result = await service.createPoFromAlert(String(req.params.id), tenantId(res), actor(res));
     res.status(201).json(result);
   }));
+
+  // Enterprise receiving sessions (Phase 8) — real, not MSW.
+  router.get("/pipeline/receiving", handler(async (_req, res) => {
+    res.json(await service.receiving(tenantId(res)));
+  }));
+
+  router.post("/pipeline/receiving/:id/update", handler(async (req, res) => {
+    const qty = Number((req.body as { qty_scanned?: unknown } | undefined)?.qty_scanned);
+    res.json(await service.updateReceivingLine(String(req.params.id), tenantId(res), qty));
+  }));
+
+  router.get("/pipeline/summary", handler(async (_req, res) => {
+    res.json(await service.summary(tenantId(res)));
+  }));
 }
