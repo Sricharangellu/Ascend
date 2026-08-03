@@ -51,6 +51,8 @@ const nextConfig = {
       // Sell aliases
       { source: "/sell", destination: "/terminal", permanent: true },
       { source: "/sales", destination: "/orders", permanent: true },
+      // Payments tender audit lives on order detail; list entry was redundant
+      { source: "/payments", destination: "/orders", permanent: true },
       // Finance aliases
       { source: "/finance/bills", destination: "/bills", permanent: true },
       { source: "/finance/settings", destination: "/settings", permanent: true },

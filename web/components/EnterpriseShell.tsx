@@ -18,7 +18,7 @@ export type NavKey =
   | "dashboard" | "register" | "inventory" | "purchasing" | "customers"
   | "orders" | "sales" | "accounting" | "shipping" | "discounts" | "ecommerce"
   | "reports" | "settings" | "operations" | "team" | "insights" | "finance"
-  | "catalog" | "gift-cards" | "vendors" | "payments" | "returns"
+  | "catalog" | "gift-cards" | "vendors" | "returns"
   | "tax-compliance" | "integrations" | "imports-exports" | "workflows"
   | "quotes" | "loyalty" | "notifications" | "audit-log" | "service-orders"
   | "inventory-locations" | "inventory-expiry" | "invoicing" | "inventory-serials"
@@ -122,7 +122,7 @@ const NAV_TREE: NavSection[] = [
       { label: "Orders",         href: "/orders",         featureGate: "orders" },
       { label: "Quotes",         href: "/quotes",         featureGate: "quotes" },
       { label: "Returns",        href: "/returns",        featureGate: "returns" },
-      { label: "Payments",       href: "/payments",       featureGate: "payments" },
+      // Payments folded into /orders/[id] Payments tab (Wave 2b); /payments redirects.
       { label: "Delivery",       href: "/delivery",       featureGate: "shipping" },
       { label: "Service Orders", href: "/service-orders", featureGate: "service-orders" },
     ],

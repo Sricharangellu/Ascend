@@ -1,3 +1,15 @@
+## Active Claim (Cursor cloud — Ponytail implement Waves 2b–3)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor cloud agent (`cursor/ponytail-implement-4fe7`) |
+| Queue item | Continue Ponytail page-by-page on develop: fix Wave 0 sales conflict markers; Payments → Orders; catalog/[id] tab collapse (~6 sections); delete orphan ReorderSuggestionsTab. |
+| Files/areas expected | `web/app/(protected)/{sales,payments,catalog/[id],orders}/**`; `web/next.config.mjs`; `web/components/EnterpriseShell.tsx`; WORK audit + LOCK. |
+| Started | 2026-08-03 |
+| Status | ACTIVE |
+| Blockers | none |
+
+
 
 ## Active Claim (Cursor cloud — Ponytail Wave 2 hubs)
 
