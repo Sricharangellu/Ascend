@@ -106,6 +106,17 @@ Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0
 | Status | RELEASED — merged to `develop` via PR #150 (`801b7a4`). |
 | Blockers | none |
 
+## Active Claim (Cursor Cloud — Ascend UI ponytail audit / Wave B POS customer + gift card)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud `bc-c564feef` — Ascend UI ponytail audit (Wave B cashier speed) |
+| Queue item | POS customer attach + gift-card tender: attach customer on terminal (sync customerId), Gift Card payment method that redeems atomically with capture; remove fake Return mode stub; honest shortcuts. |
+| Files/areas expected | `src/modules/payments/{service,routes,payments.test}.ts`; `web/api-client/types.ts`; `web/components/terminal/{TenderScreen,CustomerAttachModal,ShortcutsOverlay}.tsx`; `web/app/(protected)/terminal/_components/{TerminalInner,CheckoutStatusStrip,TerminalActionBar}.tsx`; `WORK/**` |
+| Started | 2026-08-03T044716Z |
+| Status | ACTIVE — implementing |
+| Blockers | none |
+
 ## Active Claim (Cursor Cloud — Ascend UI ponytail audit / Wave B aging party names)
 
 | Field | Value |
@@ -114,7 +125,7 @@ Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0
 | Queue item | AR/AP aging: join customer/supplier names into AgingRow; fix `/reports/ar-aging` to AgingReport contract; deep-link parties to `/customers/:id` and `/vendors/:id`; show party names on accounting AR/AP lists where IDs were bare. |
 | Files/areas expected | `src/modules/reports/{service,reports.test}.ts`; `web/api-client/types.ts`; `web/app/(protected)/reports/ar-aging/page.tsx`; `web/app/(protected)/accounting/page.tsx`; `WORK/**` |
 | Started | 2026-08-02T200816Z |
-| Status | RELEASED — aging party names + deep links on `cursor/aging-party-names-deeplinks-604f`; see AUDIT_2026-08-02T200816Z-aging-party-names-deeplinks.md |
+| Status | RELEASED — merged to develop via PR #141 (`0f30096`); see AUDIT_2026-08-02T200816Z-aging-party-names-deeplinks.md |
 | Blockers | none |
 
 ## Active Claim (Claude session G — Phase 0 coordinator: finish end-to-end + deployment readiness)

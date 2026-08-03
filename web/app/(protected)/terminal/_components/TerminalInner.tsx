@@ -19,6 +19,10 @@ import { DiscountModal } from "@/components/terminal/DiscountModal";
 import { OfflineQueueBanner } from "@/components/terminal/OfflineQueueBanner";
 import { RegisterSessionGuard } from "@/components/terminal/RegisterSessionGuard";
 import { ShortcutsOverlay } from "@/components/terminal/ShortcutsOverlay";
+import {
+  CustomerAttachModal,
+  type AttachedCustomer,
+} from "@/components/terminal/CustomerAttachModal";
 import { useFlag } from "@/flags/useFlag";
 import { ScanToast } from "@/components/ScanToast";
 import { useFinderContext } from "@/lib/useFinderContext";
@@ -37,14 +41,16 @@ export function TerminalInner() {
   const [completedPayment, setCompletedPayment] = useState<Payment | null>(null);
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
   const [ageVerified, setAgeVerified] = useState(false);
-  const [returnMode, setReturnMode] = useState(false);
   const [discountCents, setDiscountCents] = useState(0);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [scannedName, setScannedName] = useState<string | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [attachedCustomer, setAttachedCustomer] = useState<AttachedCustomer | null>(null);
   const [activeOutletId, setActiveOutletId] = useState<string>("");
   const [outlets, setOutlets] = useState<{ id: string; name: string; state?: string }[]>([]);
   const [outletState, setOutletState] = useState<string>("");
+  const [outletLoadError, setOutletLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -65,13 +71,16 @@ export function TerminalInner() {
       .then((d) => {
         const locs = d.items ?? [];
         setOutlets(locs);
+        setOutletLoadError(null);
         const initial = locs[0];
         if (initial) {
           setActiveOutletId(initial.id);
           if (initial.state) setOutletState(initial.state);
         }
       })
-      .catch(() => {});
+      .catch((err: unknown) => {
+        setOutletLoadError(err instanceof Error ? err.message : "Could not load outlets");
+      });
   }, []);
 
   useEffect(() => {
@@ -97,7 +106,7 @@ export function TerminalInner() {
     syncTimerRef.current = setTimeout(() => { void syncOrder(); }, delay);
     return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cart.state.lines, discountCents]);
+  }, [cart.state.lines, discountCents, attachedCustomer?.id]);
 
   const syncOrder = useCallback(async () => {
     const lines = cart.state.lines;
@@ -115,6 +124,7 @@ export function TerminalInner() {
       // for POS-created orders, since the inventory/deduct call below carries
       // the outlet separately and this create/update payload never did.
       ...(activeOutletId ? { storeId: activeOutletId } : {}),
+      customerId: attachedCustomer?.id ?? null,
     };
 
     if (isOffline) {
@@ -139,7 +149,7 @@ export function TerminalInner() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cart.state.lines, isOffline, ageVerified, discountCents, activeOutletId]);
+  }, [cart.state.lines, isOffline, ageVerified, discountCents, activeOutletId, attachedCustomer?.id]);
 
   const handleAddProduct = useCallback(
     (product: Product) => {
@@ -177,12 +187,14 @@ export function TerminalInner() {
     setScreen("tender");
   }, [cart.state.order]);
 
-  const handleReturnMode = useCallback(() => {
-    setReturnMode((current) => {
-      const next = !current;
-      addToast({ title: next ? "Return mode enabled" : "Return mode disabled", variant: next ? "warning" : "info" });
-      return next;
-    });
+  const handleSelectCustomer = useCallback((customer: AttachedCustomer) => {
+    setAttachedCustomer(customer);
+    addToast({ title: `Customer attached: ${customer.name}`, variant: "success" });
+  }, [addToast]);
+
+  const handleClearCustomer = useCallback(() => {
+    setAttachedCustomer(null);
+    addToast({ title: "Customer cleared", variant: "info" });
   }, [addToast]);
 
   const handleTenderSuccess = useCallback(
@@ -202,10 +214,16 @@ export function TerminalInner() {
           location_id: activeOutletId,
           lines: lines.map((l) => ({ product_id: l.product.id, qty: l.quantity })),
           order_id: cart.state.order?.id ?? null,
-        }).catch(() => {});
+        }).catch((err: unknown) => {
+          addToast({
+            title: "Inventory deduct failed",
+            description: err instanceof Error ? err.message : "Stock was not deducted after payment.",
+            variant: "error",
+          });
+        });
       }
     },
-    [cart.state.order, cart.state.lines, activeOutletId]
+    [cart.state.order, cart.state.lines, activeOutletId, addToast]
   );
 
   const handleTenderCancel = useCallback(() => { setScreen("terminal"); }, []);
@@ -217,8 +235,8 @@ export function TerminalInner() {
     setCompletedOrder(null);
     setScreen("terminal");
     setAgeVerified(false);
-    setReturnMode(false);
     setDiscountCents(0);
+    setAttachedCustomer(null);
     addToast({ title: "New sale started", variant: "info" });
   }, [cart, addToast]);
 
@@ -226,7 +244,6 @@ export function TerminalInner() {
     cart.clearCart();
     orderIdRef.current = null;
     setAgeVerified(false);
-    setReturnMode(false);
     setDiscountCents(0);
   }, [cart]);
 
@@ -240,6 +257,12 @@ export function TerminalInner() {
     (!hasAgeRestricted || ageVerified);
   const totalCents = cart.state.order?.totalCents ?? cart.localSubtotalCents;
 
+  // Prefer local attach state; fall back to order.customerId after sync.
+  const tenderOrder =
+    cart.state.order && attachedCustomer
+      ? { ...cart.state.order, customerId: attachedCustomer.id }
+      : cart.state.order;
+
   return (
     <EnterpriseShell
       active="register"
@@ -250,21 +273,28 @@ export function TerminalInner() {
     >
       <RegisterSessionGuard registerId={registerId}>
         <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+          {outletLoadError && (
+            <div role="alert" className="border-b border-danger-200 bg-danger-50 px-4 py-2 text-sm text-danger-700">
+              {outletLoadError}
+            </div>
+          )}
           <CheckoutStatusStrip
             cashier={user?.name ?? "Cashier"}
             isOffline={isOffline}
-            returnMode={returnMode}
             itemCount={cart.itemCount}
             onShortcuts={() => setShortcutsOpen(true)}
             activeOutletId={activeOutletId}
             outlets={outlets}
             onOutletChange={setActiveOutletId}
+            customerName={attachedCustomer?.name ?? null}
+            onAttachCustomer={() => setShowCustomerModal(true)}
+            onClearCustomer={handleClearCustomer}
           />
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
             <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
               <ProductGrid onAddProduct={handleAddProduct} />
             </div>
-            <div className="h-[42vh] shrink-0 overflow-hidden border-t border-slate-200 lg:h-auto lg:w-[45%] lg:border-l lg:border-t-0">
+            <div className="h-[42vh] shrink-0 overflow-hidden border-t border-erp-table-border lg:h-auto lg:w-[45%] lg:border-l lg:border-t-0">
               <CartPanel
                 cart={cart}
                 onCharge={handleCharge}
@@ -278,19 +308,19 @@ export function TerminalInner() {
           <TerminalActionBar
             canCharge={canCharge}
             totalCents={totalCents}
-            returnMode={returnMode}
             hasCart={cart.state.lines.length > 0}
             discountActive={discountCents > 0}
+            customerAttached={Boolean(attachedCustomer)}
             onDiscount={() => setShowDiscountModal(true)}
-            onReturnMode={handleReturnMode}
+            onAttachCustomer={() => setShowCustomerModal(true)}
             onCharge={handleCharge}
           />
         </div>
       </RegisterSessionGuard>
 
-      {screen === "tender" && cart.state.order && (
+      {screen === "tender" && tenderOrder && (
         <TenderScreen
-          order={cart.state.order}
+          order={tenderOrder}
           onSuccess={handleTenderSuccess}
           onCancel={handleTenderCancel}
           splitEnabled={splitTenderEnabled}
@@ -315,6 +345,13 @@ export function TerminalInner() {
           onClose={() => setShowDiscountModal(false)}
         />
       )}
+
+      <CustomerAttachModal
+        open={showCustomerModal}
+        onClose={() => setShowCustomerModal(false)}
+        onSelect={handleSelectCustomer}
+        currentCustomerId={attachedCustomer?.id}
+      />
 
       <ScanToast productName={scannedName} onDismiss={() => setScannedName(null)} />
       <ShortcutsOverlay open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
