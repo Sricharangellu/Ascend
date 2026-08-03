@@ -30,6 +30,17 @@ describe("isNavChildVisible — partial gate", () => {
     expect(isNavChildVisible(products, { showPartial: true, ...allow })).toBe(true);
   });
 
+  it("hides the BE-missing inventory Error Center unless partial pages are opted in", () => {
+    const errors = {
+      label: "Error Center",
+      href: "/inventory/errors",
+      featureGate: "inventory",
+      partial: true,
+    };
+    expect(isNavChildVisible(errors, { showPartial: false, ...allow })).toBe(false);
+    expect(isNavChildVisible(errors, { showPartial: true, ...allow })).toBe(true);
+  });
+
   it("still applies the tenant route gate and user feature gate", () => {
     const child = { label: "X", href: "/x", featureGate: "catalog", partial: true };
     // partial + flag on, but route disabled by capabilities → hidden

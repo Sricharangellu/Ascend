@@ -45,6 +45,7 @@ export default function GiftCardsPage() {
   const [cards, setCards] = useState<GiftCard[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Issue form
   const [issueAmount, setIssueAmount] = useState("");
@@ -59,9 +60,14 @@ export default function GiftCardsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
+    setLoadError(null);
     apiGet<{ items: GiftCard[]; total: number }>("/api/v1/giftcards")
       .then(r => { setCards(r.items); setTotal(r.total); })
-      .catch(() => {})
+      .catch((e) => {
+        setCards([]);
+        setTotal(0);
+        setLoadError(e instanceof ApiResponseError ? e.message : "Failed to load gift cards.");
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -205,10 +211,23 @@ export default function GiftCardsPage() {
 
         {/* ── Card list ────────────────────────────────────────────────── */}
         <Card title={`All Gift Cards${total > 0 ? ` (${total})` : ""}`} noPadding>
+          {loadError && (
+            <div
+              role="alert"
+              className="mx-4 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger-100 bg-danger-50 px-4 py-3 text-sm text-danger-700"
+            >
+              <p>{loadError}</p>
+              <Button type="button" variant="secondary" size="sm" onClick={load}>
+                Retry
+              </Button>
+            </div>
+          )}
           {loading ? (
             <div className="space-y-2 p-4">{[...Array(4)].map((_, i) => <div key={i} className="h-10 animate-pulse rounded bg-slate-100" />)}</div>
+          ) : !loadError && cards.length === 0 ? (
+            <p className="px-5 py-10 text-center text-sm text-erp-text-secondary">No gift cards issued yet.</p>
           ) : cards.length === 0 ? (
-            <p className="px-5 py-10 text-center text-sm text-slate-400">No gift cards issued yet.</p>
+            <p className="px-5 py-6 text-center text-sm text-erp-text-secondary">Unable to load gift cards.</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
