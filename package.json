@@ -8,7 +8,9 @@
     "prevent:drift": "node tools/prevention-agent.mjs",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "gap:scan": "node tools/api-gap-scan.mjs",
+    "table:scan": "node tools/table-collision-scan.mjs"
   },
   "private": true,
   "dependencies": {
