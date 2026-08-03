@@ -100,7 +100,7 @@ export default function B2BSettingsPage() {
     }
   };
 
-  const PORTAL_URL = "https://finder-pos.app/b2b/portal";
+  const PORTAL_URL = "https://ascend.app/b2b/portal";
 
   return (
     <EnterpriseShell

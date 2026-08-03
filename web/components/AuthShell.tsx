@@ -51,7 +51,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
             aria-hidden="true"
             className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-xl font-bold text-brand-700 shadow-lg"
           >
-            F
+            A
           </div>
           <span className="text-xl font-semibold text-white">Ascend</span>
         </div>

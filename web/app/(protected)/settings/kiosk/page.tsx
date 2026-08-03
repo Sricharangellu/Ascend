@@ -99,7 +99,7 @@ export default function KioskSettingsPage() {
     window.setTimeout(() => setSaved(false), 3000);
   };
 
-  const KIOSK_URL = "https://finder-pos.app/kiosk";
+  const KIOSK_URL = "https://ascend.app/kiosk";
 
   return (
     <EnterpriseShell

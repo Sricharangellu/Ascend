@@ -314,7 +314,7 @@ function SettingsTab() {
           <div>
             <span className="text-xs font-medium uppercase text-slate-500">Storefront URL</span>
             <div className="mt-1 flex min-h-[44px] items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 select-all">
-              https://store.finder-pos.app/demo
+              https://store.ascend.app/demo
             </div>
             <p className="mt-1 text-xs text-slate-400">Read-only — contact support to change your store URL.</p>
           </div>
