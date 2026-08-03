@@ -1,19 +1,51 @@
 {
-  "name": "workspace",
-  "version": "0.0.0",
-  "license": "MIT",
+  "name": "ascend",
+  "version": "2.0.0",
+  "description": "Ascend - Year 1 Foundation (modular monolith). Offline-first POS backend on Postgres.",
+  "type": "module",
   "scripts": {
-    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
-    "build": "pnpm run typecheck && pnpm -r --if-present run build",
-    "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
+    "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
+    "start": "tsx --env-file-if-exists=.env src/server.ts",
+    "db:setup": "bash scripts/db-setup.sh",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:libs": "tsc --build tsconfig.workspace.json",
+    "typecheck:workspace": "pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "test": "tsx scripts/test.ts",
+    "smoke": "tsx scripts/smoke.ts",
+    "hygiene": "node tools/hygiene-check.mjs",
+    "ops:check": "tsx scripts/ops-check.ts",
+    "prevent:drift": "node tools/prevention-agent.mjs",
+    "gap:scan": "node tools/api-gap-scan.mjs",
+    "table:scan": "node tools/table-collision-scan.mjs",
+    "dashboard": "node tools/dashboard.mjs",
+    "seed:e2e": "tsx scripts/seed-e2e.ts",
+    "seed:demo": "tsx scripts/seed-demo.ts",
+    "business:matrix": "tsx scripts/generate-business-pack-matrix.ts",
+    "verify": "npm run hygiene && npm run gap:scan && npm run table:scan && npm run typecheck && npm test && npm run smoke && npm --prefix web run typecheck && npm --prefix web run lint && npm --prefix web run build"
   },
-  "private": true,
   "dependencies": {
-    "@replit/connectors-sdk": "^0.4.1"
+    "@anthropic-ai/sdk": "^0.115.0",
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.2",
+    "helmet": "^8.2.0",
+    "ioredis": "^5.11.1",
+    "jsonwebtoken": "^9.0.2",
+    "otpauth": "^9.5.1",
+    "pg": "^8.21.0",
+    "pino": "^10.3.1",
+    "stripe": "22.2.2",
+    "uuid": "^11.0.5",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
-    "prettier": "^3.9.6",
-    "typescript": "~5.9.3"
+    "@types/bcryptjs": "^2.4.6",
+    "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/node": "^22.10.5",
+    "@types/pg": "^8.20.0",
+    "embedded-postgres": "18.4.0-beta.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
   }
 }
