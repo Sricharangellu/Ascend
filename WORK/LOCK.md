@@ -1,6 +1,114 @@
+## Active Claim (Cursor Cloud — HOTFIX restore Ascend tsconfig)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud `bc-c564feef` — Ascend UI ponytail audit |
+| Queue item | HOTFIX: Replit merge left project-references `tsconfig.json` (no compilerOptions) on develop — Docker build fails (`Cannot set properties of undefined (setting 'rootDir')`); restore Ascend tsconfig from `0f30096`. |
+| Files/areas expected | `tsconfig.json`, `WORK/**` |
+| Started | 2026-08-03T061100Z |
+| Status | RELEASED — `cursor/hotfix-restore-ascend-tsconfig-604f`; see AUDIT_2026-08-03T061100Z-hotfix-restore-ascend-tsconfig.md |
+| Blockers | none |
+
+## Active Claim (Cursor cloud — Ponytail implement Waves 2b–3)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor cloud agent (`cursor/ponytail-implement-4fe7`) |
+| Queue item | Continue Ponytail page-by-page on develop: fix Wave 0 sales conflict markers; Payments → Orders; catalog/[id] tab collapse (~6 sections); delete orphan ReorderSuggestionsTab. |
+| Files/areas expected | `web/app/(protected)/{sales,payments,catalog/[id],orders}/**`; `web/next.config.mjs`; `web/components/EnterpriseShell.tsx`; WORK audit + LOCK. |
+| Started | 2026-08-03 |
+| Status | RELEASED — Wave 2b–3 shipped; AUDIT_2026-08-03T044200Z-ponytail-wave2b3-payments-catalog.md |
+| Blockers | none |
+
+
+
+## Active Claim (Cursor cloud — Ponytail Wave 2 hubs)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor cloud agent (Ponytail Wave 2) |
+| Queue item | Wave 2: Finance hub simplify; Accounting drop duplicate AR/AP pay grids; Shipping list → Delivery tab; Operations dissolve to Outlets + deep links. |
+| Files/areas expected | `web/app/(protected)/{finance,accounting,delivery,shipping,operations}/**`; `web/next.config.mjs`; `web/components/EnterpriseShell.tsx`; checklist; WORK audit + LOCK. |
+| Started | 2026-08-03 |
+| Status | RELEASED — Wave 2 hubs shipped; AUDIT_2026-08-03T043540Z-ponytail-wave2-hubs.md |
+| Blockers | none |
+
+
+## Active Claim (Cursor cloud — Ponytail Wave 1 consolidation)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor cloud agent (Ponytail Wave 1) |
+| Queue item | Wave 1 from AUDIT_2026-08-02T230500Z-ponytail-enterprise-ui.md: reporting/sell/finance redirects; setup profile/modules → settings/modes; Purchasing hub (?tab=) + nav trim; Delivery under Sell; inventory/reorder redirect; finance/dashboard link fixes. |
+| Files/areas expected | `web/next.config.mjs`; `web/components/EnterpriseShell.tsx`; `web/app/(protected)/{purchasing,finance,setup,sell,inventory/reorder,dashboard,shipping}/**`; `web/components/setup/RetailSetupChecklist.tsx`; tests; WORK audit + LOCK. |
+| Started | 2026-08-03 |
+| Status | RELEASED — Wave 1 consolidation shipped; AUDIT_2026-08-03T042850Z-ponytail-wave1-consolidation.md |
+| Blockers | none |
+
+
+## Active Claim (Cursor cloud — Ponytail Wave 0 honesty)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor cloud agent (Ponytail Wave 0) |
+| Queue item | Wave 0 from AUDIT_2026-08-02T230500Z-ponytail-enterprise-ui.md: (1) partial-gate Error Center + hide Pipeline mock tabs; (2) rewire/hide mocked /sales → /orders; (3) fix finder-pos brand strings + signup/onboarding "F" mark; (4) kiosk honesty (Preview / no fake save). |
+| Files/areas expected | `web/components/EnterpriseShell.tsx`; `web/app/(protected)/{sales,inventory/pipeline,settings/kiosk,settings/b2b,onboarding}/**`; `web/app/signup/**`; related vitest; WORK audit + LOCK. NO backend src modules. |
+| Started | 2026-08-02 |
+| Status | RELEASED — Wave 0 honesty shipped; AUDIT_2026-08-02T232920Z-ponytail-wave0-honesty.md |
+| Blockers | none |
+
 # Ascend — Multi-Agent Work Lock
 
 Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0 wave-dispatch coordination claim (started 2026-07-18) was closed 2026-07-30 as superseded — see its entry below; work since has shipped as independent claims rather than through that coordinator. Latest substantive work: Phase 7 items 1-2 (sales-velocity consolidation, demand-snapshot foundation) RELEASED; four-environment AI coordination workflow (Claude Code/Cursor/Replit) adopted 2026-07-30, see `docs/architecture/ORCHESTRATION.md` "Environment routing" + `tools/AGENT_PROMPT.md`. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B, RELEASED); Clean Architecture pilot (quotes + gateway auth) (session C, ABANDONED — see entry); SSO OIDC hardening (session D)
+
+## Active Claim (Cursor Cloud — Wave A/B trust leftovers + palette)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud `bc-c564feef` — Ascend UI ponytail audit |
+| Queue item | Port remaining Wave A silent-catch fixes + Wave B palette deep-links / Cost Entry (pipeline/Error Center already on develop via Ponytail #160). Plus #133 leftover: wire dashboard outlet select into report `scope`. |
+| Files/areas expected | `web/components/CommandPalette.tsx`; `web/app/(protected)/{gift-cards,dashboard,inventory,purchase}/**`; `web/tests/**`; `WORK/**` |
+| Started | 2026-08-03T050700Z |
+| Status | ACTIVE — outlet-filter scope fix on PR #166; prior slices already on branch. |
+| Blockers | none |
+
+## Active Claim (Cursor Cloud — Wave A dead-chrome + Quick Sell href)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud `bc-c564feef` — Ascend UI ponytail audit |
+| Queue item | Port remaining #133 Critical dead-chrome leftovers still on develop: Catalog Quick Sell href `/register`→`/terminal`; remove Help 404 + Register Switch noop; remove Import customers dead CTA + fake checkboxes; wire customer edit pencil → `/customers/:id`. (Outlet filter → #166; Quick Sell handler → #163.) Plus Wave C settings naming start. |
+| Files/areas expected | `web/components/EnterpriseShell.tsx`; `web/app/(protected)/catalog/[id]/page.tsx`; `web/app/(protected)/customers/**`; `WORK/**` |
+| Started | 2026-08-03T054600Z |
+| Status | RELEASED — `cursor/ui-wave-a-dead-chrome-604f`; see AUDIT_2026-08-03T054700Z-ui-wave-a-dead-chrome.md |
+| Queue item | Port remaining Wave A silent-catch fixes + Wave B palette deep-links / Cost Entry (pipeline/Error Center already on develop via Ponytail #160). Plus #133 leftover: wire dashboard outlet select into report `scope`. |
+| Files/areas expected | `web/components/CommandPalette.tsx`; `web/app/(protected)/{gift-cards,dashboard,inventory,purchase}/**`; `web/tests/**`; `WORK/**` |
+| Started | 2026-08-03T050700Z |
+| Status | RELEASED — `cursor/ui-wave-ab-trust-speed-604f`; see AUDIT_2026-08-03T050800Z-ui-wave-ab-trust-speed.md |
+| Blockers | none |
+
+## Active Claim (Cursor cloud — procurement receiving enterprise rewrite)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor cloud `bc-28230959-25b7-472a-853f-620942780c43` (Ascend procurement rewrite) |
+| Queue item | Phase 8a — Receiving enterprise foundation (stateful sessions, scan/validate, 3-way match hardening, dashboard, FE wiring). Authorized by Sri master prompt 2026-08-03 superseding prior NEEDS-SRI on receiving sessions. Note: feature work originally landed under Replit `artifacts/*` layout; after PR #145 restored canonical `src/`+`web/`, a port onto those paths is required to finish the merge. |
+| Files/areas expected | Originally `artifacts/api-server`/`artifacts/ascend`; target canonical paths `src/modules/purchasing/**`, `src/modules/inventory/pipeline-*.ts`, `src/modules/billing/service.ts`, `web/app/(protected)/{purchasing,inventory}/**`, `WORK/audits/**` |
+| Started | 2026-08-03T003301Z |
+| Status | RELEASED on branch `cursor/procurement-receiving-enterprise-0c43` (see AUDIT_2026-08-03T003301Z) — feature deltas re-applied onto canonical `src/`/`web/` during merge of post-#145 `develop`; conflicted `artifacts/*` paths removed. |
+| Blockers | none (layout port complete on this branch). |
+
+
+## Active Claim (Cursor Cloud — Phase 7 item 4: replace reorder placeholder)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud agent (`cursor/phase7-reorder-forecast-demand-57b8`) |
+| Queue item | Phase 7 item 4 — replace trailing-window velocity proxy on reorder surfaces with persisted demand forecasts when available (first surface: inventory pipeline reorderAlerts); velocity remains fallback. No ML / no new forecast models. |
+| Files/areas expected | `src/shared/demand-rate.ts` (+test), `src/modules/inventory/pipeline-views.ts`, `src/modules/inventory/pipeline-views.test.ts`, `WORK/**` |
+| Started | 2026-08-03T04:19:23Z |
+| Status | RELEASED — merged to `develop` via PR #156 (`ed47428`). First-surface cutover complete; remaining reorder surfaces still on velocity. |
+| Blockers | none |
 
 ## Active Claim (Cursor Cloud — Phase 7 item 3: forecast accuracy framework)
 
@@ -24,6 +132,28 @@ Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0
 | Status | RELEASED — merged to `develop` via PR #150 (`801b7a4`). |
 | Blockers | none |
 
+## Active Claim (Cursor Cloud — Ascend UI ponytail audit / Wave B POS customer + gift card)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud `bc-c564feef` — Ascend UI ponytail audit (Wave B cashier speed) |
+| Queue item | POS customer attach + gift-card tender: attach customer on terminal (sync customerId), Gift Card payment method that redeems atomically with capture; remove fake Return mode stub; honest shortcuts. Plus #133 leftover: Catalog Quick Sell → `/terminal?product=` deep-link. |
+| Files/areas expected | `src/modules/payments/{service,routes,payments.test}.ts`; `web/api-client/types.ts`; `web/components/terminal/{TenderScreen,CustomerAttachModal,ShortcutsOverlay}.tsx`; `web/app/(protected)/terminal/{page.tsx,_components/{TerminalInner,CheckoutStatusStrip,TerminalActionBar}.tsx}`; `WORK/**` |
+| Started | 2026-08-03T044716Z |
+| Status | ACTIVE — adding Quick Sell deep-link on same PR #163; prior slices already on branch. |
+| Blockers | none |
+
+## Active Claim (Cursor Cloud — HOTFIX develop Replit merge CI)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud `bc-c564feef` — Ascend UI ponytail audit |
+| Queue item | HOTFIX: restore Ascend root after Replit develop merge (`74f7d91`). |
+| Files/areas expected | `package.json`, `tsconfig.json`, `.npmrc`, `.gitignore`, `.migration-backup/**`, `WORK/**` |
+| Started | 2026-08-03T050536Z |
+| Status | RELEASED — SUPERSEDED. `develop` tip `0a437bd` already has Ascend `package.json` (`8519c72`+) and no tracked `.migration-backup/`; PR #165 closed without merge. |
+| Blockers | none |
+
 ## Active Claim (Cursor Cloud — Ascend UI ponytail audit / Wave B aging party names)
 
 | Field | Value |
@@ -32,7 +162,7 @@ Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0
 | Queue item | AR/AP aging: join customer/supplier names into AgingRow; fix `/reports/ar-aging` to AgingReport contract; deep-link parties to `/customers/:id` and `/vendors/:id`; show party names on accounting AR/AP lists where IDs were bare. |
 | Files/areas expected | `src/modules/reports/{service,reports.test}.ts`; `web/api-client/types.ts`; `web/app/(protected)/reports/ar-aging/page.tsx`; `web/app/(protected)/accounting/page.tsx`; `WORK/**` |
 | Started | 2026-08-02T200816Z |
-| Status | RELEASED — aging party names + deep links on `cursor/aging-party-names-deeplinks-604f`; see AUDIT_2026-08-02T200816Z-aging-party-names-deeplinks.md |
+| Status | RELEASED — merged to develop via PR #141 (`0f30096`); see AUDIT_2026-08-02T200816Z-aging-party-names-deeplinks.md |
 | Blockers | none |
 
 ## Active Claim (Claude session G — Phase 0 coordinator: finish end-to-end + deployment readiness)

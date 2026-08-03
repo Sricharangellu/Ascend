@@ -2,9 +2,10 @@
  * @vitest-environment jsdom
  *
  * Partial/preview nav gating (AGENTS.md "Mock And Partial Rules"): mock-backed
- * pages (Pricing, Promotions, Warehouse, Document Center) must stay hidden from
- * navigation unless NEXT_PUBLIC_SHOW_PARTIAL_PAGES=true, without affecting real
- * pages or the tenant/feature gates.
+ * pages must stay hidden from navigation unless NEXT_PUBLIC_SHOW_PARTIAL_PAGES=true,
+ * without affecting real pages or the tenant/feature gates.
+ *
+ * Ponytail Wave 0 also gates Error Center + Kiosk (preview / no backend).
  */
 
 import { describe, it, expect } from "vitest";
@@ -29,6 +30,17 @@ describe("isNavChildVisible — partial gate", () => {
     expect(isNavChildVisible(products, { showPartial: true, ...allow })).toBe(true);
   });
 
+  it("hides the BE-missing inventory Error Center unless partial pages are opted in", () => {
+    const errors = {
+      label: "Error Center",
+      href: "/inventory/errors",
+      featureGate: "inventory",
+      partial: true,
+    };
+    expect(isNavChildVisible(errors, { showPartial: false, ...allow })).toBe(false);
+    expect(isNavChildVisible(errors, { showPartial: true, ...allow })).toBe(true);
+  });
+
   it("still applies the tenant route gate and user feature gate", () => {
     const child = { label: "X", href: "/x", featureGate: "catalog", partial: true };
     // partial + flag on, but route disabled by capabilities → hidden
@@ -39,5 +51,24 @@ describe("isNavChildVisible — partial gate", () => {
     expect(
       isNavChildVisible(child, { showPartial: true, routeEnabled: () => true, hasFeature: () => false }),
     ).toBe(false);
+  });
+
+  it("gates Error Center and Kiosk as partial (Wave 0 honesty)", () => {
+    const errors = {
+      label: "Error Center",
+      href: "/inventory/errors",
+      featureGate: "inventory",
+      partial: true,
+    };
+    const kiosk = {
+      label: "Kiosk Mode",
+      href: "/settings/kiosk",
+      featureGate: "settings",
+      partial: true,
+    };
+    expect(isNavChildVisible(errors, { showPartial: false, ...allow })).toBe(false);
+    expect(isNavChildVisible(kiosk, { showPartial: false, ...allow })).toBe(false);
+    expect(isNavChildVisible(errors, { showPartial: true, ...allow })).toBe(true);
+    expect(isNavChildVisible(kiosk, { showPartial: true, ...allow })).toBe(true);
   });
 });

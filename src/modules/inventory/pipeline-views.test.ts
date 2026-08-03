@@ -174,6 +174,53 @@ test("pipeline/reorder-alerts: safety_stock (Phase 6 item 2) is additive to sugg
   assert.equal(row.suggested_qty, 16, "suggested_qty = reorder_pt (10) + safety_stock (6), no MOQ/case_pack here");
 });
 
+test("pipeline/reorder-alerts: Phase 7 item 4 — covering forecast drives avg_daily_sales over velocity", async () => {
+  const app = await freshApp();
+  const productId = await makeProduct(app, "PIPE-FCST-1");
+
+  const supplier = await call(app, "POST", `/api/catalog/${productId}/suppliers`, {
+    vendor_name: "Forecast Alert Vendor", is_preferred: true, cost_cents: 100,
+  });
+  assert.equal(supplier.status, 201);
+
+  // Seed live sales that would imply ~1 unit/day over a 30-day lookback.
+  const DAY = 86_400_000;
+  const orderId = `ord_pipe_fcst_${Math.random().toString(36).slice(2)}`;
+  const lineId = `oln_pipe_fcst_${Math.random().toString(36).slice(2)}`;
+  await app.db.withTenant("tnt_demo").query(
+    `INSERT INTO orders (id, tenant_id, order_number, state_code, status, subtotal_cents, tax_cents, total_cents, store_id, created_at, updated_at)
+     VALUES (@id, 'tnt_demo', @num, 'CA', 'completed', 15000, 0, 15000, null, @createdAt, @createdAt)`,
+    { id: orderId, num: orderId, createdAt: Date.now() - DAY },
+  );
+  await app.db.withTenant("tnt_demo").query(
+    `INSERT INTO order_lines (id, tenant_id, order_id, product_id, name, quantity, unit_cents, tax_cents, line_cents, taxable)
+     VALUES (@id, 'tnt_demo', @orderId, @productId, 'Test Line', 30, 500, 0, 15000, 0)`,
+    { id: lineId, orderId, productId },
+  );
+
+  await call(app, "POST", `/api/inventory/${productId}/receive`, { quantity: 2 });
+  await call(app, "PUT", `/api/inventory/${productId}/reorder-point`, { reorderPt: 10 });
+
+  // Persist a covering weekly forecast of 70 units → 10/day, which must beat velocity.
+  const weekStart = Math.floor(Date.now() / (7 * DAY)) * (7 * DAY);
+  const fcst = await call(app, "POST", "/api/demand-planning/forecasts", {
+    productId,
+    periodType: "week",
+    periodStart: weekStart,
+    forecastUnits: 70,
+    method: "manual",
+  });
+  assert.equal(fcst.status, 201, JSON.stringify(fcst.json));
+
+  const alerts = await call(app, "GET", "/api/inventory/pipeline/reorder-alerts");
+  assert.equal(alerts.status, 200, JSON.stringify(alerts.json));
+  const row = alerts.json.items.find((a: { product_id: string }) => a.product_id === productId);
+  assert.ok(row, "expected the below-reorder-point product in alerts");
+  assert.equal(row.demand_source, "forecast");
+  assert.equal(row.avg_daily_sales, 10);
+  assert.equal(row.days_until_stockout, 0, "2 stock / 10 per day → 0 whole days");
+});
+
 test("pipeline/reorder-alerts: create-po 400s when the product has no preferred supplier", async () => {
   const app = await freshApp();
   const productId = await makeProduct(app, "PIPE-ALERT-2");

@@ -27,17 +27,22 @@ import type { SearchHit, SearchResponse } from "@/api-client/types";
 
 // ─── Route mapping ────────────────────────────────────────────────────────────
 
-function hrefForHit(hit: SearchHit): string {
+/**
+ * Map a search hit to its entity detail URL when one exists.
+ * Exported for unit tests — hubs are last-resort fallbacks only.
+ */
+export function hrefForHit(hit: SearchHit): string {
   switch (hit.type) {
-    case "product":     return `/inventory`;
-    case "customer":    return `/customers`;
-    case "vendor":      return `/purchasing`;
-    case "invoice":     return `/finance`;
-    case "sales_order": return `/sales`;
-    case "quotation":   return `/sales`;
-    case "purchase_order": return `/purchasing`;
-    case "order":       return `/orders`;
-    default:            return `/dashboard`;
+    case "product":        return `/catalog/${hit.id}`;
+    case "customer":       return `/customers/${hit.id}`;
+    case "vendor":         return `/vendors/${hit.id}`;
+    case "purchase_order": return `/purchasing/${hit.id}`;
+    case "order":          return `/orders/${hit.id}`;
+    // No dedicated detail routes yet — land on the owning list hub.
+    case "invoice":        return `/finance`;
+    case "sales_order":    return `/sales`;
+    case "quotation":      return `/quotes`;
+    default:               return `/dashboard`;
   }
 }
 

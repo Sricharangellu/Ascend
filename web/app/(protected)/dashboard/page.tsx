@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useQuery, invalidateQuery } from "@/lib/useQuery";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
-import { apiGet, apiPost } from "@/api-client/client";
+import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { useFinderContext, type FinderDateRange } from "@/lib/useFinderContext";
 import { useRealtimeStream } from "@/hooks/useRealtimeStream";
 import { VerticalWidgets } from "@/components/dashboard/VerticalWidgets";
@@ -106,24 +106,48 @@ function dateRangeForPreset(preset: FinderDateRange["preset"]): FinderDateRange 
 export default function DashboardPage() {
   const { storeId, outletId, dateRange, granularity, setDateRange, setGranularity } = useFinderContext();
   const range: Range = dateRange.preset === "today" ? "today" : dateRange.preset === "current_month" ? "30d" : "7d";
-  const scope = new URLSearchParams({ store_id: storeId, outlet_id: outletId }).toString();
 
   const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
   const [recentNotifs, setRecentNotifs] = useState<DashNotification[]>([]);
   const [outlets, setOutlets] = useState<OutletItem[]>([]);
+  // Local outlet filter drives report fetches. Was decorative before — the select
+  // updated selectedOutletId but every query still used context outletId.
   const [selectedOutletId, setSelectedOutletId] = useState<string>(outletId);
   const [progressRefresh, setProgressRefresh] = useState(0);
+  const [sidePanelError, setSidePanelError] = useState<string | null>(null);
+
+  // Empty selectedOutletId = "All Outlets" (omit outlet_id). Do not fall back
+  // to context outletId here — that made the All Outlets option a no-op.
+  const scope = new URLSearchParams({
+    store_id: storeId,
+    ...(selectedOutletId ? { outlet_id: selectedOutletId } : {}),
+  }).toString();
 
   useEffect(() => {
+    const noteFailure = (label: string, err: unknown) => {
+      const detail = err instanceof ApiResponseError ? err.message : "request failed";
+      const msg = `${label}: ${detail}`;
+      setSidePanelError((prev) => (prev ? `${prev} · ${msg}` : msg));
+    };
+
     apiGet<{ items: LowStockItem[] }>("/api/v1/inventory/levels?pageSize=200")
       .then((d) => setLowStock((d.items ?? []).filter((i) => i.lowStock).slice(0, 5)))
-      .catch(() => {});
+      .catch((err) => {
+        setLowStock([]);
+        noteFailure("Low stock", err);
+      });
     apiGet<{ items: DashNotification[] }>("/api/v1/notifications?limit=5")
       .then((d) => setRecentNotifs(d.items ?? []))
-      .catch(() => {});
+      .catch((err) => {
+        setRecentNotifs([]);
+        noteFailure("Notifications", err);
+      });
     apiGet<{ items: OutletItem[] }>("/api/v1/outlets")
       .then((d) => setOutlets(d.items ?? []))
-      .catch(() => {});
+      .catch((err) => {
+        setOutlets([]);
+        noteFailure("Outlets", err);
+      });
   }, []);
 
   const trendRange = range === "today" ? "7d" : range;
@@ -305,6 +329,12 @@ export default function DashboardPage() {
         <DashboardQuickActions />
 
         <VerticalWidgets />
+
+        {sidePanelError && (
+          <p role="alert" className="rounded-lg border border-danger-100 bg-danger-50 px-4 py-3 text-sm text-danger-700">
+            Some dashboard panels failed to load — {sidePanelError}
+          </p>
+        )}
 
         <DashboardOperational lowStock={lowStock} recentNotifs={recentNotifs} />
 
