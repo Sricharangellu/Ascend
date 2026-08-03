@@ -7,7 +7,7 @@
 | Queue item | Wave 3: delete reporting + thin alias page trees; relocate Outlets to setup/outlets; Pricing quarantine to Customer Overrides; ecommerce/promotions redirect; Delivery stage token cleanup. |
 | Files/areas expected | `web/app/(protected)/{reporting,sell,sales,shipping,finance,setup,inventory/reorder,ecommerce,operations,pricing,delivery}/**`; `web/next.config.mjs`; `web/public/sw.js`; mocks; WORK audit + LOCK. |
 | Started | 2026-08-03 |
-| Status | ACTIVE — implementing |
+| Status | RELEASED — Wave 3 cleanup shipped onto develop lineage; AUDIT_2026-08-03T044331Z-ponytail-wave3-cleanup.md |
 | Blockers | none |
 
 

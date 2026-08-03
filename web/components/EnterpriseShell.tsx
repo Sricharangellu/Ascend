@@ -183,7 +183,8 @@ const NAV_TREE: NavSection[] = [
     icon: <ShippingIcon />,
     children: [
       { label: "Delivery", href: "/delivery", featureGate: "shipping" },
-      { label: "Shipments", href: "/shipping", featureGate: "shipping" },
+      // Wave 2/3 — shipment registry lives on Delivery → Shipments tab
+      { label: "Shipments", href: "/delivery?tab=shipments", featureGate: "shipping" },
     ],
   },
   {
