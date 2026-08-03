@@ -41,7 +41,7 @@ function StoreHeader() {
   const router = useRouter();
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white shadow-sm">
+    <header className="sticky top-0 z-30 shadow-sm" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         {/* Brand */}
         <a href="/store" className="flex items-center gap-2.5">
@@ -53,14 +53,14 @@ function StoreHeader() {
               <path d="M16 10a4 4 0 01-8 0"/>
             </svg>
           </div>
-          <span className="text-base font-bold text-[#111]">Ascend Store</span>
+          <span className="text-base font-bold" style={{ color: "var(--color-text-primary)" }}>Ascend Store</span>
         </a>
 
         {/* Nav */}
         <nav className="flex items-center gap-4">
           {customer ? (
             <>
-              <a href="/store" className="hidden sm:block text-sm font-medium text-slate-500 hover:text-[#111] transition-colors">
+              <a href="/store" className="hidden sm:block text-sm font-medium transition-colors" style={{ color: "var(--color-text-muted)" }}>
                 Products
               </a>
               {/* Customer menu */}
@@ -68,7 +68,8 @@ function StoreHeader() {
                 <button
                   type="button"
                   onClick={() => router.push("/store/account")}
-                  className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+                  className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+                  style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
                 >
                   <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-600 text-[11px] font-bold text-white">
                     {customer.name.charAt(0).toUpperCase()}
@@ -78,7 +79,8 @@ function StoreHeader() {
                 <button
                   type="button"
                   onClick={() => void logout().then(() => router.replace("/store/login"))}
-                  className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-50 transition-colors"
+                  className="rounded-xl px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+                  style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
                   title="Sign out"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -113,7 +115,7 @@ function StoreLayoutInner({ children }: { children: React.ReactNode }) {
       <main>
         <StoreGuard>{children}</StoreGuard>
       </main>
-      <footer className="mt-16 border-t border-slate-200 bg-white py-8 text-center text-xs text-slate-400">
+      <footer className="mt-16 py-8 text-center text-xs" style={{ borderTop: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-muted)" }}>
         Powered by Ascend · Private store — members only
       </footer>
     </div>

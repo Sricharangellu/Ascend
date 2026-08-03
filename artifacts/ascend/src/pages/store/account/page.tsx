@@ -64,60 +64,62 @@ export default function StoreAccountPage() {
       {/* Account header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-[#111]">My Account</h1>
-          <p className="mt-0.5 text-sm text-slate-400">{customer.email}</p>
+          <h1 className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>My Account</h1>
+          <p className="mt-0.5 text-sm" style={{ color: "var(--color-text-muted)" }}>{customer.email}</p>
         </div>
         <button
           type="button"
           onClick={() => void handleLogout()}
-          className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+          className="rounded-xl px-4 py-2 text-sm font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+          style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
         >
           Sign out
         </button>
       </div>
 
       {/* Profile card */}
-      <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-6 rounded-2xl p-5 shadow-sm" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         <div className="flex items-center gap-4">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-600/10 text-xl font-bold text-brand-600">
             {customer.name.charAt(0).toUpperCase()}
           </div>
           <div>
-            <p className="font-semibold text-[#111]">{customer.name}</p>
-            <p className="text-sm text-slate-400">{customer.email}</p>
-            <p className="mt-0.5 text-xs text-slate-300">Member since {fmtDate(customer.created_at)}</p>
+            <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{customer.name}</p>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>{customer.email}</p>
+            <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>Member since {fmtDate(customer.created_at)}</p>
           </div>
         </div>
       </div>
 
       {/* Order history */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="text-sm font-semibold text-[#111]">Order History</h2>
+      <div className="rounded-2xl shadow-sm overflow-hidden" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
+          <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Order History</h2>
         </div>
 
         {ordersLoading ? (
-          <div className="space-y-2 p-4">{[1,2,3].map((i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-slate-100" />)}</div>
+          <div className="space-y-2 p-4">{[1,2,3].map((i) => <div key={i} className="h-12 animate-skeleton rounded-lg" />)}</div>
         ) : orders.length === 0 ? (
           <div className="py-12 text-center">
-            <p className="text-sm text-slate-400">No orders yet.</p>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No orders yet.</p>
             <button type="button" onClick={() => router.push("/store")}
               className="mt-2 text-sm font-medium text-brand-600 hover:underline">
               Browse products →
             </button>
           </div>
         ) : (
-          <div className="divide-y divide-slate-50">
+          <div className="divide-y divide-[var(--color-table-border)]">
             {orders.map((o) => (
               <div key={o.id} className="flex items-center gap-4 px-5 py-3.5">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-[#111]">{o.so_number}</p>
-                  <p className="text-xs text-slate-400">{fmtDate(o.created_at)}</p>
+                  <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{o.so_number}</p>
+                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDate(o.created_at)}</p>
                 </div>
-                <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_COLOR[o.status] ?? "bg-slate-100 text-slate-500"}`}>
+                <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_COLOR[o.status] ?? ""}`}
+                  style={STATUS_COLOR[o.status] ? undefined : { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }}>
                   {STATUS_LABEL[o.status] ?? o.status}
                 </span>
-                <p className="text-sm font-bold text-[#111] w-20 text-right">{formatMoney(o.total_cents)}</p>
+                <p className="text-sm font-bold w-20 text-right" style={{ color: "var(--color-text-primary)" }}>{formatMoney(o.total_cents)}</p>
               </div>
             ))}
           </div>
@@ -126,7 +128,7 @@ export default function StoreAccountPage() {
 
       <div className="mt-6">
         <button type="button" onClick={() => router.push("/store")}
-          className="text-sm font-medium text-slate-400 hover:text-brand-600 transition-colors">
+          className="text-sm font-medium transition-colors hover:text-brand-600" style={{ color: "var(--color-text-muted)" }}>
           ← Continue shopping
         </button>
       </div>

@@ -154,8 +154,8 @@ export default function MfaPage() {
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success-100 text-success-700 dark:bg-success-700/20 dark:text-success-400">
             <CheckIcon />
           </div>
-          <h2 className="mt-4 text-2xl font-bold text-slate-900 dark:text-white">Verification successful</h2>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Redirecting to your dashboard…</p>
+          <h2 className="mt-4 text-2xl font-bold dark:text-white" style={{ color: "var(--color-text-primary)" }}>Verification successful</h2>
+          <p className="mt-2 text-sm dark:text-slate-400" style={{ color: "var(--color-text-muted)" }}>Redirecting to your dashboard…</p>
         </div>
       </AuthShell>
     );
@@ -165,8 +165,8 @@ export default function MfaPage() {
     <AuthShell>
       <div className="rounded-2xl border border-white/40 bg-white/80 p-6 shadow-2xl shadow-slate-900/10 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70 sm:p-8">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Two-factor verification</h2>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          <h2 className="text-2xl font-bold dark:text-white" style={{ color: "var(--color-text-primary)" }}>Two-factor verification</h2>
+          <p className="mt-1 text-sm dark:text-slate-400" style={{ color: "var(--color-text-muted)" }}>
             {method === "authenticator" && "Enter the 6-digit code from your authenticator app to continue."}
             {method === "email" && "Enter the 6-digit code we emailed to your account."}
             {method === "backup" && "Enter one of the backup codes you saved when you set up MFA."}
@@ -188,7 +188,7 @@ export default function MfaPage() {
             <button key={m.key} type="button" role="tab" aria-selected={method === m.key}
               disabled={verifying} onClick={() => switchMethod(m.key)}
               className={`min-h-[36px] rounded-lg px-2 text-[11px] font-medium transition-colors sm:text-[13px] ${
-                method === m.key ? "shadow-sm" : "hover:text-[var(--color-text-primary)]"
+                method === m.key ? "shadow-sm" : ""
               }`}
               style={method === m.key
                 ? { backgroundColor: "var(--color-surface)", color: "var(--color-brand-600)" }
@@ -206,7 +206,7 @@ export default function MfaPage() {
 
         {method === "backup" ? (
           <div className="flex flex-col gap-1">
-            <label htmlFor="backupCode" className="text-sm font-medium text-slate-700 dark:text-slate-200">
+            <label htmlFor="backupCode" className="text-sm font-medium dark:text-slate-200" style={{ color: "var(--color-text-secondary)" }}>
               Backup code
             </label>
             <input
@@ -218,9 +218,10 @@ export default function MfaPage() {
               onChange={(e) => setBackupCode(e.target.value)}
               disabled={verifying}
               placeholder="XXXX-XXXX"
-              className="min-h-[44px] w-full rounded-lg border border-slate-300 bg-white/90 px-3 text-center font-mono text-lg tracking-widest text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800/80 dark:text-white dark:placeholder:text-slate-500"
+              className="min-h-[44px] w-full rounded-lg border bg-white/90 px-3 text-center font-mono text-lg tracking-widest outline-none transition-colors placeholder:text-[var(--color-text-muted)] focus:border-brand-500 focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800/80 dark:text-white dark:placeholder:text-slate-500 dark:border-slate-600"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
             />
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-xs dark:text-slate-400" style={{ color: "var(--color-text-muted)" }}>
               Each backup code can only be used once. Generate new codes from Settings after signing in.
             </p>
           </div>
@@ -230,7 +231,7 @@ export default function MfaPage() {
           </div>
         ) : (
           <fieldset>
-            <legend className="text-sm font-medium text-slate-700 dark:text-slate-200">Verification code</legend>
+            <legend className="text-sm font-medium dark:text-slate-200" style={{ color: "var(--color-text-secondary)" }}>Verification code</legend>
             <div className="mt-2 flex justify-between gap-2">
               {digits.map((digit, index) => (
                 <input
@@ -248,7 +249,8 @@ export default function MfaPage() {
                   onPaste={handlePaste}
                   disabled={verifying}
                   aria-label={`Digit ${index + 1} of ${CODE_LENGTH}`}
-                  className="h-12 w-12 rounded-lg border border-slate-300 bg-white/90 text-center text-lg font-semibold text-slate-900 outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800/80 dark:text-white sm:h-14 sm:w-14"
+                  className="h-12 w-12 rounded-lg border bg-white/90 text-center text-lg font-semibold outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800/80 dark:text-white sm:h-14 sm:w-14"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
                 />
               ))}
             </div>
@@ -262,7 +264,7 @@ export default function MfaPage() {
         )}
 
         {method === "email" && (
-          <div className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">
+          <div className="mt-4 text-center text-sm dark:text-slate-400" style={{ color: "var(--color-text-muted)" }}>
             {resendIn > 0 ? (
               <span>Resend code in {resendIn}s</span>
             ) : (
@@ -278,7 +280,7 @@ export default function MfaPage() {
         )}
 
         {import.meta.env.DEV && (
-          <p className="mt-4 text-center text-xs text-slate-400 dark:text-slate-500">
+          <p className="mt-4 text-center text-xs dark:text-slate-500" style={{ color: "var(--color-text-muted)" }}>
             {method === "backup"
               ? <>Dev mode: use code <span className="font-mono">ABCD-1234</span>.</>
               : <>Dev mode: use code <span className="font-mono">123456</span>.</>}

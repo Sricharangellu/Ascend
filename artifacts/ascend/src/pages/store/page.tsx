@@ -48,17 +48,20 @@ function ProductCard({ group }: { group: ProductGroup }) {
     : `${formatMoney(minPrice)} – ${formatMoney(maxPrice)}`;
 
   return (
-    <article className="group relative flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-all overflow-hidden">
+    <article className="group relative flex flex-col rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all"
+      style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
       {/* Image / placeholder */}
       <div
-        className="relative aspect-[4/3] cursor-pointer bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center overflow-hidden"
+        className="relative aspect-[4/3] cursor-pointer flex items-center justify-center overflow-hidden"
+        style={{ background: "linear-gradient(to bottom right, var(--color-surface-subtle), var(--color-surface-subtle))" }}
         onClick={() => router.push(`/store/${master.id}`)}
       >
         {master.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={master.image_url} alt={master.name} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
         ) : (
-          <svg className="h-14 w-14 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="h-14 w-14" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            style={{ color: "var(--color-text-muted)" }}>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V7" />
           </svg>
         )}
@@ -73,17 +76,18 @@ function ProductCard({ group }: { group: ProductGroup }) {
       {/* Body */}
       <div className="flex flex-1 flex-col gap-2 p-4">
         <div>
-          <p className="text-xs text-slate-400 uppercase tracking-wide">{master.category}</p>
+          <p className="text-xs uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>{master.category}</p>
           <h2
-            className="mt-0.5 text-sm font-semibold text-[#111] leading-snug cursor-pointer hover:text-brand-600 transition-colors line-clamp-2"
+            className="mt-0.5 text-sm font-semibold leading-snug cursor-pointer hover:text-brand-600 transition-colors line-clamp-2"
+            style={{ color: "var(--color-text-primary)" }}
             onClick={() => router.push(`/store/${master.id}`)}
           >
             {master.name}
           </h2>
-          <p className="mt-0.5 font-mono text-[11px] text-slate-400">{master.sku}</p>
+          <p className="mt-0.5 font-mono text-[11px]" style={{ color: "var(--color-text-muted)" }}>{master.sku}</p>
         </div>
 
-        <p className="text-base font-bold text-[#111]">{priceRange}</p>
+        <p className="text-base font-bold" style={{ color: "var(--color-text-primary)" }}>{priceRange}</p>
 
         {/* Variant pills preview */}
         {variants.length > 0 && (
@@ -168,16 +172,18 @@ export default function StorePage() {
       {/* Search + filter */}
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#111]">Our Products</h1>
-          <p className="mt-1 text-sm text-slate-500">{groups.length} product{groups.length !== 1 ? "s" : ""}</p>
+          <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>Our Products</h1>
+          <p className="mt-1 text-sm" style={{ color: "var(--color-text-muted)" }}>{groups.length} product{groups.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex gap-2">
           <div className="relative">
-            <svg className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="pointer-events-none absolute left-3 top-2.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+              style={{ color: "var(--color-text-muted)" }}>
               <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35" strokeLinecap="round"/>
             </svg>
             <input
-              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-4 text-sm shadow-sm focus:border-brand-600 focus:outline-none"
+              className="w-full rounded-xl border py-2 pl-9 pr-4 text-sm shadow-sm focus:border-brand-600 focus:outline-none"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
               placeholder="Search products…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -196,8 +202,9 @@ export default function StorePage() {
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors capitalize ${
               category === cat
                 ? "bg-brand-600 text-white"
-                : "bg-white border border-slate-200 text-slate-600 hover:border-brand-600 hover:text-brand-600"
+                : "hover:border-brand-600 hover:text-brand-600"
             }`}
+            style={category === cat ? undefined : { backgroundColor: "var(--color-surface)", borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
           >
             {cat === "all" ? "All" : cat}
           </button>
@@ -208,19 +215,19 @@ export default function StorePage() {
       {loading ? (
         <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {[1,2,3,4,5,6,7,8].map((i) => (
-            <div key={i} className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-              <div className="aspect-[4/3] animate-pulse bg-slate-100" />
+            <div key={i} className="rounded-2xl overflow-hidden" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+              <div className="aspect-[4/3] animate-skeleton" />
               <div className="space-y-2 p-4">
-                <div className="h-4 w-3/4 animate-pulse rounded bg-slate-100" />
-                <div className="h-3 w-1/2 animate-pulse rounded bg-slate-100" />
-                <div className="h-8 animate-pulse rounded-xl bg-slate-100 mt-4" />
+                <div className="h-4 w-3/4 animate-skeleton rounded" />
+                <div className="h-3 w-1/2 animate-skeleton rounded" />
+                <div className="h-8 animate-skeleton rounded-xl mt-4" />
               </div>
             </div>
           ))}
         </div>
       ) : groups.length === 0 ? (
         <div className="py-20 text-center">
-          <p className="text-slate-400">No products found.</p>
+          <p style={{ color: "var(--color-text-muted)" }}>No products found.</p>
         </div>
       ) : (
         <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

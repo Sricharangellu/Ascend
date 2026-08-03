@@ -24,8 +24,8 @@ export default function SecurityAlertPage() {
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-danger-100 text-danger-700 dark:bg-danger-700/20 dark:text-danger-400">
           <AlertIcon />
         </div>
-        <h2 className="mt-4 text-2xl font-bold text-slate-900 dark:text-white">We&apos;ve flagged this sign-in</h2>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+        <h2 className="mt-4 text-2xl font-bold dark:text-white" style={{ color: "var(--color-text-primary)" }}>We&apos;ve flagged this sign-in</h2>
+        <p className="mt-2 text-sm dark:text-slate-400" style={{ color: "var(--color-text-muted)" }}>
           Thanks for letting us know. We&apos;ve recorded this sign-in attempt as suspicious and recommend
           resetting your password right away. We&apos;ve also signed out any other active sessions.
         </p>

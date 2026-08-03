@@ -110,8 +110,8 @@ function LoginContent() {
     <AuthShell>
       <div className="rounded-2xl border border-white/40 bg-white/80 p-6 shadow-2xl shadow-slate-900/10 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70 sm:p-8">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Sign in</h2>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          <h2 className="text-2xl font-bold dark:text-white" style={{ color: "var(--color-text-primary)" }}>Sign in</h2>
+          <p className="mt-1 text-sm dark:text-slate-400" style={{ color: "var(--color-text-muted)" }}>
             Welcome back. Enter your details to access your workspace.
           </p>
         </div>
@@ -138,7 +138,7 @@ function LoginContent() {
         <form onSubmit={handleSubmit} noValidate aria-label="Sign in form" className="flex flex-col gap-4">
           {/* Email */}
           <div className="flex flex-col gap-1">
-            <label htmlFor="email" className="text-sm font-medium text-slate-700 dark:text-slate-200">
+            <label htmlFor="email" className="text-sm font-medium dark:text-slate-200" style={{ color: "var(--color-text-secondary)" }}>
               Email address
               <span className="ml-1 text-danger-600" aria-hidden="true">*</span>
               <span className="sr-only">(required)</span>
@@ -157,11 +157,12 @@ function LoginContent() {
               placeholder="you@company.com"
               aria-invalid={!!emailError}
               aria-describedby={emailError ? "email-error" : undefined}
-              className={`min-h-[44px] w-full rounded-lg border bg-white/90 px-3 text-base text-slate-900 outline-none transition-colors placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800/80 dark:text-white dark:placeholder:text-slate-500 ${
+              className={`min-h-[44px] w-full rounded-lg border bg-white/90 px-3 text-base outline-none transition-colors placeholder:text-[var(--color-text-muted)] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800/80 dark:text-white dark:placeholder:text-slate-500 ${
                 emailError
                   ? "border-danger-500 focus:border-danger-500 focus:ring-2 focus:ring-danger-500"
-                  : "border-slate-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500 dark:border-slate-600"
+                  : "border-[var(--color-border)] focus:border-brand-500 focus:ring-2 focus:ring-brand-500 dark:border-slate-600"
               }`}
+              style={{ color: "var(--color-text-primary)" }}
             />
             {emailError && (
               <p id="email-error" className="text-sm text-danger-600 dark:text-danger-400">
@@ -173,7 +174,7 @@ function LoginContent() {
           {/* Password */}
           <div className="flex flex-col gap-1">
             <div className="flex items-center justify-between">
-              <label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-200">
+              <label htmlFor="password" className="text-sm font-medium dark:text-slate-200" style={{ color: "var(--color-text-secondary)" }}>
                 Password
                 <span className="ml-1 text-danger-600" aria-hidden="true">*</span>
                 <span className="sr-only">(required)</span>
@@ -197,18 +198,20 @@ function LoginContent() {
                 placeholder="••••••••"
                 aria-invalid={!!passwordError}
                 aria-describedby={[passwordError ? "password-error" : null, capsLockOn ? "capslock-hint" : null].filter(Boolean).join(" ") || undefined}
-                className={`min-h-[44px] w-full rounded-lg border bg-white/90 px-3 pr-11 text-base text-slate-900 outline-none transition-colors placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800/80 dark:text-white dark:placeholder:text-slate-500 ${
+                className={`min-h-[44px] w-full rounded-lg border bg-white/90 px-3 pr-11 text-base outline-none transition-colors placeholder:text-[var(--color-text-muted)] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800/80 dark:text-white dark:placeholder:text-slate-500 ${
                   passwordError
                     ? "border-danger-500 focus:border-danger-500 focus:ring-2 focus:ring-danger-500"
-                    : "border-slate-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500 dark:border-slate-600"
+                    : "border-[var(--color-border)] focus:border-brand-500 focus:ring-2 focus:ring-brand-500 dark:border-slate-600"
                 }`}
+                style={{ color: "var(--color-text-primary)" }}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 aria-label={showPassword ? "Hide password" : "Show password"}
                 aria-pressed={showPassword}
-                className="absolute right-2 flex h-9 w-9 items-center justify-center rounded-md text-slate-400 hover:text-slate-600 focus-visible:ring-2 focus-visible:ring-brand-600 dark:text-slate-500 dark:hover:text-slate-300"
+                className="absolute right-2 flex h-9 w-9 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:ring-brand-600 dark:text-slate-500"
+                style={{ color: "var(--color-text-muted)" }}
               >
                 {showPassword ? <EyeOffIcon /> : <EyeIcon />}
               </button>
@@ -228,31 +231,32 @@ function LoginContent() {
                 import.meta.env.VITE_MOCK === "true" ||
                 (import.meta.env.VITE_MOCK !== "false" && import.meta.env.DEV);
               return isMock ? (
-                <p className="text-xs text-slate-400 dark:text-slate-500">
+                <p className="text-xs dark:text-slate-500" style={{ color: "var(--color-text-muted)" }}>
                   Dev mode: any password works (use &quot;wrong&quot; to test an error).
                 </p>
               ) : (
-                <p className="text-xs text-slate-400 dark:text-slate-500">
-                  Demo credentials: <span className="font-medium text-slate-600 dark:text-slate-400">owner@ascend.dev</span> / <span className="font-medium text-slate-600 dark:text-slate-400">AscendDemo!2026</span>
+                <p className="text-xs dark:text-slate-500" style={{ color: "var(--color-text-muted)" }}>
+                  Demo credentials: <span className="font-medium dark:text-slate-400" style={{ color: "var(--color-text-secondary)" }}>owner@ascend.dev</span> / <span className="font-medium dark:text-slate-400" style={{ color: "var(--color-text-secondary)" }}>AscendDemo!2026</span>
                 </p>
               );
             })()}
           </div>
 
           {/* Remember me */}
-          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <label className="flex items-center gap-2 text-sm dark:text-slate-300" style={{ color: "var(--color-text-secondary)" }}>
             <input
               type="checkbox"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-2 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800"
+              className="h-4 w-4 rounded text-brand-600 focus:ring-2 focus:ring-brand-500 dark:bg-slate-800"
+              style={{ borderColor: "var(--color-border)" }}
             />
             Remember me on this device
           </label>
 
           {mfaPendingToken && (
             <div className="flex flex-col gap-1">
-              <label htmlFor="mfa-code" className="text-sm font-medium text-slate-700 dark:text-slate-200">
+              <label htmlFor="mfa-code" className="text-sm font-medium dark:text-slate-200" style={{ color: "var(--color-text-secondary)" }}>
                 Authentication code
                 <span className="ml-1 text-danger-600" aria-hidden="true">*</span>
                 <span className="sr-only">(required)</span>
@@ -267,9 +271,10 @@ function LoginContent() {
                 onChange={(e) => setMfaCode(e.target.value)}
                 disabled={isLoading}
                 placeholder="123456 or backup code"
-                className="min-h-[44px] w-full rounded-lg border border-slate-300 bg-white/90 px-3 text-base text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800/80 dark:text-white dark:placeholder:text-slate-500"
+                className="min-h-[44px] w-full rounded-lg border bg-white/90 px-3 text-base outline-none transition-colors placeholder:text-[var(--color-text-muted)] focus:border-brand-500 focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800/80 dark:text-white dark:placeholder:text-slate-500 dark:border-slate-600"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
               />
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs dark:text-slate-400" style={{ color: "var(--color-text-muted)" }}>
                 Enter the 6-digit code from your authenticator app or a saved backup code.
               </p>
             </div>
@@ -307,7 +312,7 @@ function LoginContent() {
             ))}
           </div>
 
-          <p className="mt-3 text-center text-xs text-slate-400 dark:text-slate-500">
+          <p className="mt-3 text-center text-xs dark:text-slate-500" style={{ color: "var(--color-text-muted)" }}>
             Need SAML-based single sign-on for your organization?{" "}
             <Link href="#" className="font-medium text-brand-600 hover:underline dark:text-brand-400">
               Contact your administrator
@@ -316,20 +321,20 @@ function LoginContent() {
           </p>
         </div>
 
-        <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-6 text-center text-sm dark:text-slate-400" style={{ color: "var(--color-text-muted)" }}>
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="font-semibold text-slate-900 hover:underline dark:text-white">
+          <Link href="/signup" className="font-semibold hover:underline dark:text-white" style={{ color: "var(--color-text-primary)" }}>
             Create one free
           </Link>
         </p>
       </div>
 
       {/* Security/compliance reassurance */}
-      <p className="mt-4 flex items-center justify-center gap-2 text-center text-xs text-slate-400 dark:text-slate-500">
+      <p className="mt-4 flex items-center justify-center gap-2 text-center text-xs dark:text-slate-500" style={{ color: "var(--color-text-muted)" }}>
         <LockIcon />
         Protected by multi-factor authentication and enterprise-grade encryption.
       </p>
-      <p className="mt-1 text-center text-xs text-slate-400 dark:text-slate-500">
+      <p className="mt-1 text-center text-xs dark:text-slate-500" style={{ color: "var(--color-text-muted)" }}>
         Signing in from a new device or location may require additional verification.
       </p>
     </AuthShell>

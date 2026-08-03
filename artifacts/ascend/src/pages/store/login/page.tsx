@@ -40,7 +40,7 @@ export default function StoreLoginPage() {
     } finally { setSubmitting(false); }
   };
 
-  const FLD = "w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 transition-colors";
+  const FLD = "w-full rounded-xl border px-4 py-2.5 text-sm outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 transition-colors";
 
   return (
     <div className="flex min-h-[calc(100vh-64px)] items-center justify-center px-4 py-12">
@@ -56,10 +56,10 @@ export default function StoreLoginPage() {
               <path d="M16 10a4 4 0 01-8 0"/>
             </svg>
           </div>
-          <h1 className="text-xl font-bold text-[#111]">
+          <h1 className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>
             {mode === "login" ? "Sign in to shop" : "Create an account"}
           </h1>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm" style={{ color: "var(--color-text-muted)" }}>
             {mode === "login"
               ? "This is a private store — account required."
               : "Register to browse and purchase products."}
@@ -94,10 +94,11 @@ export default function StoreLoginPage() {
 
           {mode === "register" && (
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-500">Full name</label>
+              <label className="mb-1 block text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Full name</label>
               <input
                 autoFocus
                 className={FLD}
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -108,10 +109,11 @@ export default function StoreLoginPage() {
           )}
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-500">Email address</label>
+            <label className="mb-1 block text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Email address</label>
             <input
               autoFocus={mode === "login"}
               className={FLD}
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -121,9 +123,10 @@ export default function StoreLoginPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-500">Password</label>
+            <label className="mb-1 block text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Password</label>
             <input
               className={FLD}
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -134,9 +137,10 @@ export default function StoreLoginPage() {
 
           {mode === "register" && (
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-500">Confirm password</label>
+              <label className="mb-1 block text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Confirm password</label>
               <input
                 className={FLD}
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
                 type="password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
@@ -160,7 +164,7 @@ export default function StoreLoginPage() {
         </form>
 
         {/* Toggle mode */}
-        <p className="mt-5 text-center text-sm text-slate-400">
+        <p className="mt-5 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>
           {mode === "login" ? (
             <>Don&apos;t have an account?{" "}
               <button type="button" onClick={() => { setMode("register"); setError(null); }}

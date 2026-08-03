@@ -96,7 +96,7 @@ function Field({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-1">
+      <label htmlFor={id} className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>
         {label}{required && <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>}
       </label>
       <input
@@ -106,9 +106,10 @@ function Field({
         placeholder={placeholder}
         autoComplete={autoComplete}
         required={required}
-        className={`w-full rounded-md border px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 transition-colors ${
-          error ? "border-red-400 bg-red-50" : "border-slate-300 bg-white hover:border-slate-400"
+        className={`w-full rounded-md border px-3 py-2.5 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 transition-colors ${
+          error ? "border-red-400 bg-red-50" : "hover:border-slate-400"
         }`}
+        style={error ? undefined : { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
       />
       {error && <p role="alert" className="mt-1 text-xs text-red-600">{error}</p>}
     </div>
@@ -204,26 +205,28 @@ export default function SignupPage() {
         {/* Header */}
         <div className="mb-6 text-center">
           <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950 text-white text-xl font-bold mb-3">F</div>
-          <h1 className="text-2xl font-bold text-slate-900">Create your account</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>Create your account</h1>
+          <p className="mt-1 text-sm" style={{ color: "var(--color-text-muted)" }}>
             {step === 1 ? "Set up your workspace in under a minute." : "Choose your business type — this shapes your entire interface."}
           </p>
         </div>
 
         {/* Progress */}
         <div className="mb-6">
-          <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5">
-            <span className={step === 1 ? "font-semibold text-slate-700" : "text-slate-400"}>Account details</span>
-            <span className={step === 2 ? "font-semibold text-slate-700" : "text-slate-400"}>Business type</span>
+          <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: "var(--color-text-muted)" }}>
+            <span className={step === 1 ? "font-semibold" : ""}
+              style={step === 1 ? { color: "var(--color-text-secondary)" } : undefined}>Account details</span>
+            <span className={step === 2 ? "font-semibold" : ""}
+              style={step === 2 ? { color: "var(--color-text-secondary)" } : undefined}>Business type</span>
           </div>
-          <div className="h-1.5 rounded-full bg-slate-200">
+          <div className="h-1.5 rounded-full" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
             <div className="h-1.5 rounded-full bg-brand-600 transition-all duration-500" style={{ width: `${progressPct}%` }} />
           </div>
         </div>
 
         {/* ── Step 1: Account details ── */}
         {step === 1 && (
-          <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="rounded-xl border p-8 shadow-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
             <form onSubmit={(e) => void handleStep1(e)} noValidate className="space-y-4">
               <Field
                 id="storeName" label="Store name" value={storeName}
@@ -253,10 +256,10 @@ export default function SignupPage() {
                 Continue →
               </Button>
             </form>
-            <p className="mt-4 text-center text-xs text-slate-500">
+            <p className="mt-4 text-center text-xs" style={{ color: "var(--color-text-muted)" }}>
               By creating an account you agree to our{" "}
-              <span className="font-medium text-slate-700">Terms of Service</span> and{" "}
-              <span className="font-medium text-slate-700">Privacy Policy</span>.
+              <span className="font-medium" style={{ color: "var(--color-text-secondary)" }}>Terms of Service</span> and{" "}
+              <span className="font-medium" style={{ color: "var(--color-text-secondary)" }}>Privacy Policy</span>.
             </p>
           </div>
         )}
@@ -286,22 +289,26 @@ export default function SignupPage() {
                     className={`text-left rounded-xl border p-4 transition-all ${
                       active
                         ? "border-brand-500 bg-brand-50 ring-2 ring-brand-500"
-                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                        : ""
                     }`}
+                    style={active ? undefined : { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
                     aria-pressed={active}
                   >
                     <div className="flex items-start gap-3">
                       <span className="text-2xl leading-none mt-0.5">{bt.icon}</span>
                       <div className="flex-1 min-w-0">
-                        <p className={`font-semibold text-sm leading-tight ${active ? "text-brand-700" : "text-slate-800"}`}>
+                        <p className={`font-semibold text-sm leading-tight ${active ? "text-brand-700" : ""}`}
+                          style={active ? undefined : { color: "var(--color-text-secondary)" }}>
                           {bt.name}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500 leading-snug">{bt.desc}</p>
+                        <p className="mt-1 text-xs leading-snug" style={{ color: "var(--color-text-muted)" }}>{bt.desc}</p>
                         <div className="mt-2 flex flex-wrap gap-1">
                           {bt.highlight.map(h => (
                             <span key={h} className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                              active ? "bg-brand-100 text-brand-700" : "bg-slate-100 text-slate-500"
-                            }`}>{h}</span>
+                              active ? "bg-brand-100 text-brand-700" : ""
+                            }`}
+                              style={active ? undefined : { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }}
+                            >{h}</span>
                           ))}
                         </div>
                       </div>
@@ -326,7 +333,8 @@ export default function SignupPage() {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                className="rounded-lg border px-5 py-2.5 text-sm font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
               >
                 ← Back
               </button>
@@ -345,9 +353,9 @@ export default function SignupPage() {
           </div>
         )}
 
-        <p className="mt-6 text-center text-sm text-slate-500">
+        <p className="mt-6 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>
           Already have an account?{" "}
-          <Link href="/login" className="font-semibold text-slate-900 hover:underline">Sign in</Link>
+          <Link href="/login" className="font-semibold hover:underline" style={{ color: "var(--color-text-primary)" }}>Sign in</Link>
         </p>
       </div>
     </AuthShell>

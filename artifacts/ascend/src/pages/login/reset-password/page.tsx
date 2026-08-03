@@ -87,8 +87,8 @@ function ResetPasswordForm() {
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-danger-100 text-danger-700 dark:bg-danger-700/20 dark:text-danger-400 mx-auto">
             <AlertIcon />
           </div>
-          <h2 className="mt-4 text-2xl font-bold text-slate-900 dark:text-white">Invalid reset link</h2>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          <h2 className="mt-4 text-2xl font-bold dark:text-white" style={{ color: "var(--color-text-primary)" }}>Invalid reset link</h2>
+          <p className="mt-2 text-sm dark:text-slate-400" style={{ color: "var(--color-text-muted)" }}>
             This password reset link is missing or has expired. Request a new one to continue.
           </p>
           <Link
@@ -110,8 +110,8 @@ function ResetPasswordForm() {
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-success-100 text-success-700 dark:bg-success-700/20 dark:text-success-400">
               <CheckIcon />
             </div>
-            <h2 className="mt-4 text-2xl font-bold text-slate-900 dark:text-white">Password updated</h2>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            <h2 className="mt-4 text-2xl font-bold dark:text-white" style={{ color: "var(--color-text-primary)" }}>Password updated</h2>
+            <p className="mt-2 text-sm dark:text-slate-400" style={{ color: "var(--color-text-muted)" }}>
               Your password has been changed. Redirecting you to sign in…
             </p>
             <Link href="/login" className="mt-6 text-sm font-medium text-brand-600 hover:underline dark:text-brand-400">
@@ -121,8 +121,8 @@ function ResetPasswordForm() {
         ) : (
           <>
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Set a new password</h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              <h2 className="text-2xl font-bold dark:text-white" style={{ color: "var(--color-text-primary)" }}>Set a new password</h2>
+              <p className="mt-1 text-sm dark:text-slate-400" style={{ color: "var(--color-text-muted)" }}>
                 Choose a strong password you haven&apos;t used before.
               </p>
             </div>
@@ -142,7 +142,7 @@ function ResetPasswordForm() {
 
             <form onSubmit={handleSubmit} noValidate aria-label="Reset password form" className="flex flex-col gap-4">
               <div className="flex flex-col gap-1">
-                <label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                <label htmlFor="password" className="text-sm font-medium dark:text-slate-200" style={{ color: "var(--color-text-secondary)" }}>
                   New password
                   <span className="ml-1 text-danger-600" aria-hidden="true">*</span>
                   <span className="sr-only">(required)</span>
@@ -161,11 +161,12 @@ function ResetPasswordForm() {
                   placeholder="At least 8 characters"
                   aria-invalid={!!passwordError}
                   aria-describedby="password-strength"
-                  className={`min-h-[44px] w-full rounded-lg border bg-white/90 px-3 text-base text-slate-900 outline-none transition-colors placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800/80 dark:text-white dark:placeholder:text-slate-500 ${
+                  className={`min-h-[44px] w-full rounded-lg border bg-white/90 px-3 text-base outline-none transition-colors placeholder:text-[var(--color-text-muted)] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800/80 dark:text-white dark:placeholder:text-slate-500 ${
                     passwordError
                       ? "border-danger-500 focus:border-danger-500 focus:ring-2 focus:ring-danger-500"
-                      : "border-slate-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500 dark:border-slate-600"
+                      : "border-[var(--color-border)] focus:border-brand-500 focus:ring-2 focus:ring-brand-500 dark:border-slate-600"
                   }`}
+                  style={{ color: "var(--color-text-primary)" }}
                 />
                 {passwordError && <p className="text-sm text-danger-600 dark:text-danger-400">{passwordError}</p>}
 
@@ -176,18 +177,19 @@ function ResetPasswordForm() {
                         <span
                           key={i}
                           className={`h-1.5 flex-1 rounded-full ${
-                            i < strength ? STRENGTH_COLORS[strength] : "bg-slate-200 dark:bg-slate-700"
+                            i < strength ? STRENGTH_COLORS[strength] : "dark:bg-slate-700"
                           }`}
+                          style={i < strength ? undefined : { backgroundColor: "var(--color-surface-subtle)" }}
                         />
                       ))}
                     </div>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{STRENGTH_LABELS[strength]}</p>
+                    <p className="mt-1 text-xs dark:text-slate-400" style={{ color: "var(--color-text-muted)" }}>{STRENGTH_LABELS[strength]}</p>
                   </div>
                 )}
               </div>
 
               <div className="flex flex-col gap-1">
-                <label htmlFor="confirmPassword" className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                <label htmlFor="confirmPassword" className="text-sm font-medium dark:text-slate-200" style={{ color: "var(--color-text-secondary)" }}>
                   Confirm new password
                   <span className="ml-1 text-danger-600" aria-hidden="true">*</span>
                   <span className="sr-only">(required)</span>
@@ -204,11 +206,12 @@ function ResetPasswordForm() {
                   disabled={submitting}
                   aria-invalid={!!confirmError}
                   aria-describedby={confirmError ? "confirm-error" : undefined}
-                  className={`min-h-[44px] w-full rounded-lg border bg-white/90 px-3 text-base text-slate-900 outline-none transition-colors placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800/80 dark:text-white dark:placeholder:text-slate-500 ${
+                  className={`min-h-[44px] w-full rounded-lg border bg-white/90 px-3 text-base outline-none transition-colors placeholder:text-[var(--color-text-muted)] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800/80 dark:text-white dark:placeholder:text-slate-500 ${
                     confirmError
                       ? "border-danger-500 focus:border-danger-500 focus:ring-2 focus:ring-danger-500"
-                      : "border-slate-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500 dark:border-slate-600"
+                      : "border-[var(--color-border)] focus:border-brand-500 focus:ring-2 focus:ring-brand-500 dark:border-slate-600"
                   }`}
+                  style={{ color: "var(--color-text-primary)" }}
                 />
                 {confirmError && (
                   <p id="confirm-error" className="text-sm text-danger-600 dark:text-danger-400">
