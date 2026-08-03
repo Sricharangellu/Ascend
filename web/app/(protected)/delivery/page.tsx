@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
@@ -17,6 +18,9 @@ import type {
   ShipmentsResponse,
   Invoice,
 } from "@/api-client/types";
+import { ShipmentsPanel } from "./_components/ShipmentsPanel";
+
+type DeliveryTab = "orders" | "shipments";
 
 // The five pipeline stages, in order. `fulfillment_status` on a sales order
 // names the stage it has reached.
@@ -65,7 +69,7 @@ function StageStepper({ status }: { status: string }) {
   );
 }
 
-export default function DeliveryPage() {
+function DeliveryOrdersWorkspace() {
   const [orders, setOrders] = useState<SalesOrder[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pickList, setPickList] = useState<PickList | null>(null);
@@ -160,184 +164,311 @@ export default function DeliveryPage() {
   const allPicked = pickList?.lines?.every((l) => l.status === "picked") ?? false;
 
   return (
+    <>
+      {error && (
+        <Card
+          role="alert"
+          className="border-danger-100 bg-danger-50 p-3 text-sm text-danger-700"
+        >
+          {error}
+        </Card>
+      )}
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:items-start">
+        <Card className="overflow-hidden p-0">
+          <div className="border-b border-erp-table-border px-4 py-3">
+            <h2 className="text-sm font-semibold text-erp-text-primary">Sales orders</h2>
+          </div>
+          {!ordersLoaded ? (
+            <ul className="divide-y divide-erp-table-border">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <li key={i} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Skeleton className="h-3.5 w-24" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </li>
+              ))}
+            </ul>
+          ) : orders.length === 0 ? (
+            <p className="px-4 py-8 text-center text-sm text-erp-text-secondary">
+              No sales orders yet. Create one from Orders or an ecommerce checkout.
+            </p>
+          ) : (
+            <ul className="max-h-[70vh] divide-y divide-erp-table-border overflow-y-auto">
+              {orders.map((o) => (
+                <li key={o.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(o.id)}
+                    aria-current={o.id === selectedId ? "true" : undefined}
+                    className={`flex min-h-touch w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-erp-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 ${
+                      o.id === selectedId ? "bg-brand-50" : ""
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-erp-text-primary">{o.so_number}</p>
+                      <p className="truncate text-xs text-erp-text-secondary">{formatMoney(o.total_cents)}</p>
+                    </div>
+                    <StageBadge status={o.fulfillment_status} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card className="p-4">
+          {!selected ? (
+            <p className="py-8 text-center text-sm text-erp-text-secondary">
+              Select a sales order to manage its delivery.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-semibold text-erp-text-primary">{selected.so_number}</h2>
+                  <p className="text-xs text-erp-text-secondary">{formatMoney(selected.total_cents)}</p>
+                </div>
+                <StageBadge status={selected.fulfillment_status} />
+              </div>
+
+              <div className="-mx-1 overflow-x-auto px-1 pb-1">
+                <StageStepper status={selected.fulfillment_status} />
+              </div>
+
+              {detailLoading && (
+                <p className="text-xs text-erp-text-secondary" role="status">
+                  Loading delivery detail…
+                </p>
+              )}
+
+              {!canManage && (
+                <p className="text-xs text-erp-text-secondary">
+                  You need the manager role to advance the pipeline.
+                </p>
+              )}
+
+              <div className="rounded-lg border border-erp-table-border p-4">
+                {selected.fulfillment_status === "unfulfilled" && (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-sm text-erp-text-secondary">
+                      Create a pick list to begin fulfilment.
+                    </p>
+                    <Button
+                      onClick={() => startPicking(selected)}
+                      loading={busy}
+                      disabled={busy || !canManage}
+                    >
+                      Start picking
+                    </Button>
+                  </div>
+                )}
+
+                {selected.fulfillment_status === "picking" && pickList && (
+                  <div className="flex flex-col gap-3">
+                    <p className="text-sm font-medium text-erp-text-primary">Pick list</p>
+                    <ul className="flex flex-col gap-2">
+                      {(pickList.lines ?? []).map((l) => (
+                        <li key={l.id} className="flex items-center justify-between gap-3 text-sm">
+                          <span className="min-w-0 truncate">
+                            <span className="font-medium text-erp-text-primary">
+                              {l.name ?? l.product_id}
+                            </span>
+                            <span className="text-erp-text-secondary">
+                              {" "}
+                              · {l.picked_qty}/{l.quantity}
+                            </span>
+                          </span>
+                          {l.status === "picked" ? (
+                            <span className="inline-flex shrink-0 rounded-full bg-success-50 px-2 py-0.5 text-xs font-medium text-success-700">
+                              Picked
+                            </span>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => pickLine(l.id)}
+                              disabled={busy || !canManage}
+                              className="shrink-0"
+                            >
+                              Pick
+                            </Button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={pack}
+                        loading={busy}
+                        disabled={busy || !canManage || !allPicked}
+                      >
+                        Pack
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {selected.fulfillment_status === "packed" && (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-sm text-erp-text-secondary">
+                      Packed{shipment ? ` — shipment ${shipment.ship_number} ready` : ""}. Ship it
+                      out.
+                    </p>
+                    <Button
+                      onClick={ship}
+                      loading={busy}
+                      disabled={busy || !canManage || !shipment}
+                    >
+                      Mark shipped
+                    </Button>
+                  </div>
+                )}
+
+                {selected.fulfillment_status === "shipped" && (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0 break-words text-sm text-erp-text-secondary">
+                      In transit{shipment?.carrier ? ` via ${shipment.carrier}` : ""}
+                      {shipment?.tracking_number ? ` (${shipment.tracking_number})` : ""}.
+                    </div>
+                    <Button
+                      onClick={deliver}
+                      loading={busy}
+                      disabled={busy || !canManage || !shipment}
+                    >
+                      Mark delivered
+                    </Button>
+                  </div>
+                )}
+
+                {selected.fulfillment_status === "delivered" && (
+                  <p className="text-sm font-medium text-success-700">
+                    Delivered{shipment?.tracking_number ? ` — ${shipment.tracking_number}` : ""}.
+                    Pipeline complete.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-erp-table-border p-4">
+                {invoice ? (
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-erp-text-secondary">
+                    Invoice <span className="font-medium text-erp-text-primary">{invoice.invoice_number}</span>{" "}
+                    — {formatMoney(invoice.total_cents)}
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
+                        invoice.status === "paid"
+                          ? "bg-success-50 text-success-700"
+                          : "bg-warning-50 text-warning-700"
+                      }`}
+                    >
+                      {invoice.status}
+                    </span>
+                  </p>
+                ) : selected.status === "invoiced" ? (
+                  <p className="text-sm text-erp-text-secondary">Invoiced.</p>
+                ) : selected.status === "approved" ? (
+                  <>
+                    <p className="text-sm text-erp-text-secondary">Not invoiced yet.</p>
+                    <Button
+                      variant="secondary"
+                      onClick={createInvoice}
+                      loading={busy}
+                      disabled={busy || !canManage}
+                    >
+                      Create invoice
+                    </Button>
+                  </>
+                ) : (
+                  <p className="text-sm text-erp-text-secondary">
+                    Approve the order to raise an invoice.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </Card>
+      </div>
+    </>
+  );
+}
+
+function tabFromQuery(raw: string | null): DeliveryTab {
+  return raw === "shipments" ? "shipments" : "orders";
+}
+
+function DeliveryHub() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [activeTab, setActiveTab] = useState<DeliveryTab>(() =>
+    tabFromQuery(searchParams.get("tab")),
+  );
+
+  useEffect(() => {
+    setActiveTab(tabFromQuery(searchParams.get("tab")));
+  }, [searchParams]);
+
+  const onChangeTab = useCallback(
+    (t: DeliveryTab) => {
+      setActiveTab(t);
+      const params = new URLSearchParams(searchParams.toString());
+      if (t === "orders") params.delete("tab");
+      else params.set("tab", t);
+      const q = params.toString();
+      router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
+  return (
+    <>
+      <div
+        className="flex gap-1 border-b border-erp-table-border"
+        role="tablist"
+        aria-label="Delivery views"
+      >
+        {(
+          [
+            { id: "orders" as const, label: "Orders" },
+            { id: "shipments" as const, label: "Shipments" },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === t.id}
+            onClick={() => onChangeTab(t.id)}
+            className={`min-h-touch border-b-2 px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 ${
+              activeTab === t.id
+                ? "border-brand-600 text-brand-600"
+                : "border-transparent text-erp-text-secondary hover:text-erp-text-primary"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "orders" ? <DeliveryOrdersWorkspace /> : <ShipmentsPanel />}
+    </>
+  );
+}
+
+export default function DeliveryPage() {
+  return (
     <EnterpriseShell
       active="delivery"
       title="Delivery"
-      subtitle="Fulfil sales & ecommerce orders: pick → pack → ship → deliver"
+      subtitle="Pick, pack, ship, and track fulfillment"
       contentClassName="overflow-y-auto"
     >
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6">
-        {error && (
-          <Card role="alert" className="border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
-            {error}
-          </Card>
-        )}
-
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:items-start">
-          {/* ── Sales order list ─────────────────────────────────────────── */}
-          <Card className="overflow-hidden p-0">
-            <div className="border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
-              <h2 className="text-sm font-semibold">Sales orders</h2>
-            </div>
-            {!ordersLoaded ? (
-              <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <li key={i} className="flex items-center justify-between gap-3 px-4 py-3">
-                    <div className="min-w-0 flex-1 space-y-1.5">
-                      <Skeleton className="h-3.5 w-24" />
-                      <Skeleton className="h-3 w-16" />
-                    </div>
-                    <Skeleton className="h-5 w-16 rounded-full" />
-                  </li>
-                ))}
-              </ul>
-            ) : orders.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-neutral-500">
-                No sales orders yet. Create one from Sales or an ecommerce checkout.
-              </p>
-            ) : (
-              <ul className="max-h-[70vh] divide-y divide-neutral-100 overflow-y-auto dark:divide-neutral-800">
-                {orders.map((o) => (
-                  <li key={o.id}>
-                    <button
-                      onClick={() => setSelectedId(o.id)}
-                      aria-current={o.id === selectedId ? "true" : undefined}
-                      className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-neutral-50 dark:hover:bg-neutral-800/50 ${
-                        o.id === selectedId ? "bg-blue-50 dark:bg-blue-900/20" : ""
-                      }`}
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{o.so_number}</p>
-                        <p className="truncate text-xs text-neutral-500">{formatMoney(o.total_cents)}</p>
-                      </div>
-                      <StageBadge status={o.fulfillment_status} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-
-          {/* ── Pipeline panel for the selected order ────────────────────── */}
-          <Card className="p-4">
-            {!selected ? (
-              <p className="py-8 text-center text-sm text-neutral-500">Select a sales order to manage its delivery.</p>
-            ) : (
-              <div className="flex flex-col gap-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-semibold">{selected.so_number}</h2>
-                    <p className="text-xs text-neutral-500">{formatMoney(selected.total_cents)}</p>
-                  </div>
-                  <StageBadge status={selected.fulfillment_status} />
-                </div>
-
-                <div className="-mx-1 overflow-x-auto px-1 pb-1">
-                  <StageStepper status={selected.fulfillment_status} />
-                </div>
-
-                {detailLoading && (
-                  <p className="text-xs text-neutral-500" role="status">Loading delivery detail…</p>
-                )}
-
-                {!canManage && (
-                  <p className="text-xs text-neutral-500">You need the manager role to advance the pipeline.</p>
-                )}
-
-                {/* Stage-appropriate action */}
-                <div className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-                  {selected.fulfillment_status === "unfulfilled" && (
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-sm text-neutral-600 dark:text-neutral-300">Create a pick list to begin fulfilment.</p>
-                      <Button onClick={() => startPicking(selected)} loading={busy} disabled={busy || !canManage}>Start picking</Button>
-                    </div>
-                  )}
-
-                  {selected.fulfillment_status === "picking" && pickList && (
-                    <div className="flex flex-col gap-3">
-                      <p className="text-sm font-medium">Pick list</p>
-                      <ul className="flex flex-col gap-2">
-                        {(pickList.lines ?? []).map((l) => (
-                          <li key={l.id} className="flex items-center justify-between gap-3 text-sm">
-                            <span className="min-w-0 truncate">
-                              <span className="font-medium text-neutral-700 dark:text-neutral-200">{l.name ?? l.product_id}</span>
-                              <span className="text-neutral-500"> · {l.picked_qty}/{l.quantity}</span>
-                            </span>
-                            {l.status === "picked" ? (
-                              <span className="inline-flex shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/40 dark:text-green-300">
-                                Picked
-                              </span>
-                            ) : (
-                              <Button size="sm" variant="secondary" onClick={() => pickLine(l.id)} disabled={busy || !canManage} className="shrink-0">
-                                Pick
-                              </Button>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                      <div className="flex justify-end">
-                        <Button onClick={pack} loading={busy} disabled={busy || !canManage || !allPicked}>Pack</Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {selected.fulfillment_status === "packed" && (
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-sm text-neutral-600 dark:text-neutral-300">
-                        Packed{shipment ? ` — shipment ${shipment.ship_number} ready` : ""}. Ship it out.
-                      </p>
-                      <Button onClick={ship} loading={busy} disabled={busy || !canManage || !shipment}>Mark shipped</Button>
-                    </div>
-                  )}
-
-                  {selected.fulfillment_status === "shipped" && (
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="min-w-0 break-words text-sm text-neutral-600 dark:text-neutral-300">
-                        In transit{shipment?.carrier ? ` via ${shipment.carrier}` : ""}
-                        {shipment?.tracking_number ? ` (${shipment.tracking_number})` : ""}.
-                      </div>
-                      <Button onClick={deliver} loading={busy} disabled={busy || !canManage || !shipment}>Mark delivered</Button>
-                    </div>
-                  )}
-
-                  {selected.fulfillment_status === "delivered" && (
-                    <p className="text-sm font-medium text-green-700 dark:text-green-300">
-                      Delivered{shipment?.tracking_number ? ` — ${shipment.tracking_number}` : ""}. Pipeline complete.
-                    </p>
-                  )}
-                </div>
-
-                {/* Billing — parallel to fulfilment. Show the linked AR invoice, or
-                    offer to raise one once the order is approved. */}
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-                  {invoice ? (
-                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-neutral-600 dark:text-neutral-300">
-                      Invoice <span className="font-medium">{invoice.invoice_number}</span> — {formatMoney(invoice.total_cents)}
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
-                          invoice.status === "paid"
-                            ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
-                            : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-                        }`}
-                      >
-                        {invoice.status}
-                      </span>
-                    </p>
-                  ) : selected.status === "invoiced" ? (
-                    <p className="text-sm text-neutral-500">Invoiced.</p>
-                  ) : selected.status === "approved" ? (
-                    <>
-                      <p className="text-sm text-neutral-600 dark:text-neutral-300">Not invoiced yet.</p>
-                      <Button variant="secondary" onClick={createInvoice} loading={busy} disabled={busy || !canManage}>Create invoice</Button>
-                    </>
-                  ) : (
-                    <p className="text-sm text-neutral-500">Approve the order to raise an invoice.</p>
-                  )}
-                </div>
-              </div>
-            )}
-          </Card>
-        </div>
+        <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+          <DeliveryHub />
+        </Suspense>
       </div>
     </EnterpriseShell>
   );
