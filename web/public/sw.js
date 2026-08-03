@@ -168,7 +168,13 @@ async function drainOutbox() {
           for (const client of clients) {
             client.postMessage({ type: "OUTBOX_ITEM_REPLAYED", id: item.id });
           }
-        } else if (res.status >= 400 && res.status < 500) {
+        } else if (
+          res.status >= 400 &&
+          res.status < 500 &&
+          // 429 / 408 are transient — dropping them silently loses a sale.
+          res.status !== 429 &&
+          res.status !== 408
+        ) {
           // Permanent error — remove and notify with failure.
           await idbDelete(db, item.id);
           const clients = await self.clients.matchAll({ type: "window" });
@@ -180,7 +186,7 @@ async function drainOutbox() {
             });
           }
         } else {
-          // Server/network error — increment retry, leave in queue.
+          // Server / rate-limit / timeout — increment retry, leave in queue.
           await idbPut(db, { ...item, retryCount: (item.retryCount ?? 0) + 1 });
         }
       } catch {

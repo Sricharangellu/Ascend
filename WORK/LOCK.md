@@ -2,6 +2,17 @@
 
 Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0 wave-dispatch coordination claim (started 2026-07-18) was closed 2026-07-30 as superseded — see its entry below; work since has shipped as independent claims rather than through that coordinator. Latest substantive work: Phase 7 items 1-2 (sales-velocity consolidation, demand-snapshot foundation) RELEASED; four-environment AI coordination workflow (Claude Code/Cursor/Replit) adopted 2026-07-30, see `docs/architecture/ORCHESTRATION.md` "Environment routing" + `tools/AGENT_PROMPT.md`. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B, RELEASED); Clean Architecture pilot (quotes + gateway auth) (session C, ABANDONED — see entry); SSO OIDC hardening (session D)
 
+## Active Claim (Cursor Cloud — connectivity / API breaks / rate limiting audit+fix)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud agent (`cursor/audit-connectivity-rate-limit-57b8`) |
+| Queue item | Audit gaps + fix connectivity / API-break / rate-limiting bugs: offline outbox dropping 429s as permanent, API client missing Retry-After retry, SSO limiter not env-overridable (same class as the e2e identity flake), stale rate-limit docs. |
+| Files/areas expected | `web/lib/offlineOutbox.ts`, `web/public/sw.js`, `web/api-client/client.ts`, `web/tests/api-client.test.ts`, `src/app.ts`, `src/gateway/rateLimit.ts` (+ test), `docs/api/rate-limits.md`, `.github/workflows/ci.yml` (e2e env), `WORK/**` |
+| Started | 2026-08-03T02:12:57Z |
+| Status | ACTIVE — implementing |
+| Blockers | none |
+
 ## Active Claim (Claude session G — Phase 0 coordinator: finish end-to-end + deployment readiness)
 
 | Field | Value |

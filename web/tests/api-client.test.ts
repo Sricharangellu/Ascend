@@ -4,12 +4,19 @@
  * Integration test for the API client against MSW mocks.
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { http, HttpResponse } from "msw";
-import { apiDownload, apiPost, ApiResponseError } from "@/api-client/client";
+import {
+  apiDownload,
+  apiGet,
+  apiPost,
+  ApiResponseError,
+  retryAfterMs,
+} from "@/api-client/client";
 import type { LoginResponse } from "@/api-client/types";
 import { clearSession, setSession, hasSessionHint } from "@/lib/auth";
 import { server } from "@/mocks/server";
+import { isTransientClientStatus } from "@/lib/offlineOutbox";
 
 beforeEach(() => {
   clearSession();
@@ -64,9 +71,108 @@ describe("apiFetch — login flow", () => {
   });
 });
 
+describe("retryAfterMs + outbox transient status", () => {
+  it("clamps Retry-After seconds into a bounded delay", () => {
+    expect(retryAfterMs("0")).toBe(250);
+    expect(retryAfterMs("2")).toBe(2000);
+    expect(retryAfterMs("999")).toBe(10_000);
+    expect(retryAfterMs(null)).toBe(250);
+    expect(retryAfterMs("not-a-number")).toBe(250);
+  });
+
+  it("treats 429/408 as transient for offline outbox replay", () => {
+    expect(isTransientClientStatus(429)).toBe(true);
+    expect(isTransientClientStatus(408)).toBe(true);
+    expect(isTransientClientStatus(400)).toBe(false);
+    expect(isTransientClientStatus(401)).toBe(false);
+    expect(isTransientClientStatus(404)).toBe(false);
+  });
+});
+
+describe("apiFetch — 429 Retry-After", () => {
+  it("waits once for Retry-After then succeeds", async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    server.use(
+      http.get("*/api/v1/flags", () => {
+        calls += 1;
+        if (calls === 1) {
+          return HttpResponse.json(
+            { error: { code: "rate_limit_exceeded", message: "Too many requests — slow down.", requestId: "rl_1" } },
+            { status: 429, headers: { "Retry-After": "1" } },
+          );
+        }
+        return HttpResponse.json({ flags: { ok: true } });
+      }),
+    );
+    setSession("t", 900, "r", {
+      id: "u1",
+      email: "e@e.com",
+      name: "T",
+      role: "cashier",
+      tenantId: "t1",
+    });
+
+    const pending = apiGet<{ flags: Record<string, boolean> }>("/api/v1/flags");
+    await vi.advanceTimersByTimeAsync(1000);
+    const data = await pending;
+    expect(data.flags.ok).toBe(true);
+    expect(calls).toBe(2);
+    vi.useRealTimers();
+  });
+
+  it("surfaces the 429 after a single exhausted retry", async () => {
+    vi.useFakeTimers();
+    server.use(
+      http.get("*/api/v1/flags", () =>
+        HttpResponse.json(
+          { error: { code: "rate_limit_exceeded", message: "Too many requests — slow down.", requestId: "rl_2" } },
+          { status: 429, headers: { "Retry-After": "1" } },
+        ),
+      ),
+    );
+    setSession("t", 900, "r", {
+      id: "u1",
+      email: "e@e.com",
+      name: "T",
+      role: "cashier",
+      tenantId: "t1",
+    });
+
+    const pending = apiGet("/api/v1/flags").then(
+      () => null,
+      (err: unknown) => err,
+    );
+    await vi.advanceTimersByTimeAsync(1000);
+    const err = await pending;
+    expect(err).toBeInstanceOf(ApiResponseError);
+    expect((err as ApiResponseError).status).toBe(429);
+    expect((err as ApiResponseError).code).toBe("rate_limit_exceeded");
+    expect((err as ApiResponseError).retryAfterSec).toBe(1);
+    vi.useRealTimers();
+  });
+
+  it("wraps fetch network failures as network_error", async () => {
+    server.use(
+      http.get("*/api/v1/flags", () => HttpResponse.error()),
+    );
+    setSession("t", 900, "r", {
+      id: "u1",
+      email: "e@e.com",
+      name: "T",
+      role: "cashier",
+      tenantId: "t1",
+    });
+    await expect(apiGet("/api/v1/flags")).rejects.toMatchObject({
+      name: "ApiResponseError",
+      code: "network_error",
+      status: 0,
+    });
+  });
+});
+
 describe("apiFetch — health endpoints", () => {
   it("GET /healthz returns ok", async () => {
-    const { apiGet } = await import("@/api-client/client");
     const data = await apiGet<{ status: string }>("/healthz");
     expect(data.status).toBe("ok");
   });

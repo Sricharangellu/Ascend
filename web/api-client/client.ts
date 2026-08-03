@@ -6,10 +6,50 @@
  * token refresh. If the refresh succeeds the original request is retried
  * transparently. If it fails the session is cleared and the user is sent to
  * /login.
+ *
+ * 429 handling: one automatic retry after honouring `Retry-After` (capped).
+ * Matches docs/api/rate-limits.md — capacity blips should not surface as hard
+ * failures when a single wait-and-retry would succeed. Network failures
+ * (TypeError from fetch) are wrapped as `network_error` so callers can treat
+ * connectivity the same way as other ApiResponseError codes.
  */
 
 import type { ApiError, ApiFieldIssue } from "./types";
 import { getAccessToken } from "@/lib/auth";
+
+/** Cap how long we'll sleep for a single 429 Retry-After before giving up. */
+const MAX_RETRY_AFTER_MS = 10_000;
+/** Floor so a missing/zero Retry-After still backs off briefly. */
+const MIN_RETRY_AFTER_MS = 250;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Parse Retry-After (seconds or HTTP-date) into a clamped delay in ms. */
+export function retryAfterMs(header: string | null): number {
+  if (!header) return MIN_RETRY_AFTER_MS;
+  const asSeconds = Number(header);
+  if (Number.isFinite(asSeconds) && asSeconds >= 0) {
+    return Math.min(Math.max(asSeconds * 1000, MIN_RETRY_AFTER_MS), MAX_RETRY_AFTER_MS);
+  }
+  const asDate = Date.parse(header);
+  if (!Number.isNaN(asDate)) {
+    const delta = asDate - Date.now();
+    return Math.min(Math.max(delta, MIN_RETRY_AFTER_MS), MAX_RETRY_AFTER_MS);
+  }
+  return MIN_RETRY_AFTER_MS;
+}
+
+function wrapNetworkError(err: unknown, method: string, path: string): never {
+  if (err instanceof ApiResponseError) throw err;
+  if (err instanceof DOMException && err.name === "AbortError") throw err;
+  const message =
+    err instanceof Error && err.message
+      ? err.message
+      : `Network request failed: ${method} ${path}`;
+  throw new ApiResponseError("network_error", message, "", 0);
+}
 
 // ─── API Error class ──────────────────────────────────────────────────────────
 
@@ -21,7 +61,9 @@ export class ApiResponseError extends Error {
     public readonly status: number,
     public readonly payload?: unknown,
     /** Per-field validation issues from the backend (validation_error 400s). */
-    public readonly details?: ApiFieldIssue[]
+    public readonly details?: ApiFieldIssue[],
+    /** Seconds suggested by the backend on 429 (when present). */
+    public readonly retryAfterSec?: number,
   ) {
     super(message);
     this.name = "ApiResponseError";
@@ -97,6 +139,8 @@ export interface FetchOptions<TBody = unknown> {
   signal?: AbortSignal;
   /** Internal — set to true on the one automatic retry after a token refresh. */
   _retry?: boolean;
+  /** Internal — set to true after the one automatic 429 Retry-After wait. */
+  _rateLimitRetry?: boolean;
 }
 
 /**
@@ -108,7 +152,14 @@ export async function apiFetch<TResponse>(
   path: string,
   options: FetchOptions = {}
 ): Promise<TResponse> {
-  const { body, headers = {}, anonymous = false, signal, _retry = false } = options;
+  const {
+    body,
+    headers = {},
+    anonymous = false,
+    signal,
+    _retry = false,
+    _rateLimitRetry = false,
+  } = options;
 
   const reqHeaders: Record<string, string> = {
     "Content-Type": "application/json",
@@ -125,12 +176,17 @@ export async function apiFetch<TResponse>(
 
   const url = `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
 
-  const response = await fetch(url, {
-    method,
-    headers: reqHeaders,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-    signal,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method,
+      headers: reqHeaders,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal,
+    });
+  } catch (err) {
+    wrapNetworkError(err, method, path);
+  }
 
   // 401 on an authenticated request — try a silent token refresh once.
   if (response.status === 401 && !anonymous && !_retry) {
@@ -150,6 +206,12 @@ export async function apiFetch<TResponse>(
     }
     // Throw so any in-flight awaits don't silently continue.
     throw new ApiResponseError("unauthenticated", "Session expired. Please sign in again.", "", 401);
+  }
+
+  // 429 — honour Retry-After once, then surface the error if still limited.
+  if (response.status === 429 && !_rateLimitRetry) {
+    await sleep(retryAfterMs(response.headers.get("Retry-After")));
+    return apiFetch<TResponse>(method, path, { ...options, _rateLimitRetry: true });
   }
 
   // 204 No Content — no body to parse
@@ -172,13 +234,18 @@ export async function apiFetch<TResponse>(
   if (!response.ok) {
     const envelope = json as Partial<ApiError>;
     const err = envelope?.error;
+    const retryHeader = response.headers.get("Retry-After");
+    const retrySec = retryHeader !== null && Number.isFinite(Number(retryHeader))
+      ? Number(retryHeader)
+      : undefined;
     throw new ApiResponseError(
       err?.code ?? "UNKNOWN_ERROR",
       err?.message ?? `HTTP ${response.status}`,
       err?.requestId ?? "",
       response.status,
       json,
-      parseFieldIssues(err?.details)
+      parseFieldIssues(err?.details),
+      retrySec,
     );
   }
 
@@ -193,7 +260,13 @@ export async function apiDownload(
   path: string,
   options: Omit<FetchOptions, "body"> = {}
 ): Promise<Blob> {
-  const { headers = {}, anonymous = false, signal, _retry = false } = options;
+  const {
+    headers = {},
+    anonymous = false,
+    signal,
+    _retry = false,
+    _rateLimitRetry = false,
+  } = options;
 
   const reqHeaders: Record<string, string> = {
     Accept: "text/csv,application/octet-stream,*/*",
@@ -208,11 +281,16 @@ export async function apiDownload(
   }
 
   const url = `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
-  const response = await fetch(url, {
-    method: "GET",
-    headers: reqHeaders,
-    signal,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "GET",
+      headers: reqHeaders,
+      signal,
+    });
+  } catch (err) {
+    wrapNetworkError(err, "GET", path);
+  }
 
   if (response.status === 401 && !anonymous && !_retry) {
     if (!_refreshPromise) {
@@ -231,6 +309,11 @@ export async function apiDownload(
     throw new ApiResponseError("unauthenticated", "Session expired. Please sign in again.", "", 401);
   }
 
+  if (response.status === 429 && !_rateLimitRetry) {
+    await sleep(retryAfterMs(response.headers.get("Retry-After")));
+    return apiDownload(path, { ...options, _rateLimitRetry: true });
+  }
+
   if (!response.ok) {
     let code = "UNKNOWN_ERROR";
     let message = `HTTP ${response.status}`;
@@ -243,7 +326,11 @@ export async function apiDownload(
     } catch {
       // Non-JSON download errors still surface with status and method context.
     }
-    throw new ApiResponseError(code, message, requestId, response.status);
+    const retryHeader = response.headers.get("Retry-After");
+    const retrySec = retryHeader !== null && Number.isFinite(Number(retryHeader))
+      ? Number(retryHeader)
+      : undefined;
+    throw new ApiResponseError(code, message, requestId, response.status, undefined, undefined, retrySec);
   }
 
   return response.blob();

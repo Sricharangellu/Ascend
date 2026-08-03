@@ -183,9 +183,19 @@ export async function requestSync(): Promise<void> {
 }
 
 /**
+ * 4xx statuses that are NOT permanent client errors — leave the item queued.
+ * 429 is capacity/throttle (Retry-After); 408 is a request timeout the backend
+ * may accept on a later attempt. Dropping either silently loses a sale.
+ */
+export function isTransientClientStatus(status: number): boolean {
+  return status === 408 || status === 429;
+}
+
+/**
  * Drain the outbox from the main thread (fallback when Background Sync unavailable).
- * Replays each item in order, removes on 2xx, retries on network error,
- * removes on permanent 4xx (the backend has already rejected it).
+ * Replays each item in order, removes on 2xx, retries on network error / 5xx /
+ * transient 4xx (429 rate-limit, 408 timeout), removes on permanent 4xx
+ * (the backend has already rejected it).
  */
 export async function drainOutboxMainThread(
   getToken: () => string | null,
@@ -210,13 +220,13 @@ export async function drainOutboxMainThread(
       if (res.ok) {
         await removeItem(item.id);
         succeeded++;
-      } else if (res.status >= 400 && res.status < 500) {
+      } else if (res.status >= 400 && res.status < 500 && !isTransientClientStatus(res.status)) {
         // Permanent client error — don't retry, remove with failure log
         console.warn(`[outbox] permanent failure for ${item.id}: ${res.status}`);
         await removeItem(item.id);
         failed++;
       } else {
-        // Server error — leave in queue for next attempt
+        // Server / rate-limit / timeout — leave in queue for next attempt
         await incrementRetry(item.id);
       }
     } catch {
