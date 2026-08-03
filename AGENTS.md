@@ -492,3 +492,36 @@ lost-then-recovered work). These rules exist so it cannot recur:
 - Conventional commits; typecheck + tests must pass before committing.
 - Product specs live in `docs/` and `contracts/` — do not duplicate them into WORK/.
 - Clean up after yourself: no stray files at repo root, no leftover worktrees/branches.
+
+## Cursor Cloud specific instructions
+
+Notes for cloud-agent VMs (Ubuntu/Linux, not the macOS runbook above). Dependencies are
+already refreshed on VM startup by the environment update script (`npm ci` at the repo root
+and in `web/`), so you normally do NOT need to run installs yourself. Node is pinned to
+`.nvmrc` (24). Gates and their commands are defined in **Command Gates** above — this section
+only records the non-obvious cloud caveats.
+
+- **`/dev/shm` is only 64 MB by default — too small for the backend test/smoke Postgres.**
+  `npm test` (the full backend suite) and any embedded-Postgres run can fail with
+  `could not resize shared memory segment … No space left on device` (Postgres `dsm_impl_posix`)
+  when a parallel query needs a DSM segment. Before running the full backend suite, enlarge it:
+  `sudo mount -o remount,size=2g /dev/shm`. This is NOT persistent across VM boots (tmpfs is
+  re-created at boot), so re-run it each session. `npm run smoke` alone happens to fit in 64 MB,
+  but `npm test` / `npm run verify` do not.
+- **`npm ci` prints benign `allow-scripts` warnings** (embedded-postgres, esbuild, msw postinstalls
+  "not covered"). npm 11 blocks those postinstalls, but the platform packages ship prebuilt
+  binaries, so `tsx`, embedded-postgres, `next build`, and the smoke test all work regardless —
+  ignore the warnings. Prefer `npm ci` over `npm install` here; `npm install` needlessly rewrites
+  `web/package-lock.json` (`peer` flags) and dirties the tree.
+- **Running the real dev stack (mocks OFF) for UI/e2e in the cloud VM** — the macOS runbook's
+  `pg_ctl -D /opt/homebrew/...` does not apply. Instead use the preinstalled Postgres 16 cluster:
+  1. `sudo pg_ctlcluster 16 main start`
+  2. Create the dev role/db once (idempotent): role `finder` / password `finder`, database
+     `finder_dev` (e.g. via `sudo -u postgres psql`). The backend auto-creates all tables on boot.
+  3. Backend: `DATABASE_URL=postgresql://finder:finder@localhost:5432/finder_dev
+     JWT_SECRET=<≥32 chars> PORT=3001 NODE_ENV=development PG_SSL=false npm run dev`
+  4. Frontend (mocks off, proxying to the backend):
+     `cd web && NEXT_PUBLIC_MOCK=false BACKEND_URL=http://localhost:3001 PORT=3000 npm run dev`
+  - On first boot with an empty `users` table the backend auto-seeds the demo login
+    `owner@ascend.dev` / `AscendDemo!2026` (tenant `tnt_demo`). Use it to sign in.
+  - `NEXT_PUBLIC_MOCK=false` is mandatory to hit the real backend — the frontend defaults mocks ON.
