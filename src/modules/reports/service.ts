@@ -96,6 +96,8 @@ export interface AgingBuckets {
 
 export interface AgingRow {
   partyId: string; // customer_id (AR) or supplier_id (AP)
+  /** Display name from customers/suppliers join; falls back to partyId. */
+  partyName: string;
   buckets: AgingBuckets;
 }
 
@@ -460,13 +462,33 @@ export class ReportsService {
 
   /** Accounts Receivable aging — open invoice balances bucketed by days overdue. */
   async arAging(tenantId: string, now = Date.now()): Promise<AgingReport> {
-    const rows = await this.db.query<{ customer_id: string; balance: number; due_date: number | null }>(
-      `SELECT customer_id, (total_cents - paid_cents) AS balance, due_date
-         FROM invoices
-        WHERE tenant_id = @t AND status <> 'void' AND (total_cents - paid_cents) > 0`,
+    const rows = await this.db.query<{
+      customer_id: string;
+      party_name: string;
+      balance: number;
+      due_date: number | null;
+    }>(
+      `SELECT i.customer_id,
+              COALESCE(NULLIF(TRIM(c.name), ''), i.customer_id) AS party_name,
+              (i.total_cents - i.paid_cents) AS balance,
+              i.due_date
+         FROM invoices i
+         LEFT JOIN customers c
+           ON c.id = i.customer_id AND c.tenant_id = i.tenant_id
+        WHERE i.tenant_id = @t
+          AND i.status <> 'void'
+          AND (i.total_cents - i.paid_cents) > 0`,
       { t: tenantId },
     );
-    return this.buildAging(rows.map((r) => ({ partyId: r.customer_id, balance: Number(r.balance), dueDate: r.due_date })), now);
+    return this.buildAging(
+      rows.map((r) => ({
+        partyId: r.customer_id,
+        partyName: r.party_name,
+        balance: Number(r.balance),
+        dueDate: r.due_date,
+      })),
+      now,
+    );
   }
 
   /** Dunning sweep: set dunning_level (1/2/3) on overdue open/partial invoices.
@@ -498,24 +520,56 @@ export class ReportsService {
 
   /** Accounts Payable aging — open supplier bill balances bucketed by days overdue. */
   async apAging(tenantId: string, now = Date.now()): Promise<AgingReport> {
-    const rows = await this.db.query<{ supplier_id: string; balance: number; due_date: number | null }>(
-      `SELECT supplier_id, (total_cents - paid_cents) AS balance, due_date
-         FROM bills
-        WHERE tenant_id = @t AND status <> 'void' AND (total_cents - paid_cents) > 0`,
+    const rows = await this.db.query<{
+      supplier_id: string;
+      party_name: string;
+      balance: number;
+      due_date: number | null;
+    }>(
+      `SELECT b.supplier_id,
+              COALESCE(NULLIF(TRIM(s.name), ''), b.supplier_id) AS party_name,
+              (b.total_cents - b.paid_cents) AS balance,
+              b.due_date
+         FROM bills b
+         LEFT JOIN suppliers s
+           ON s.id = b.supplier_id AND s.tenant_id = b.tenant_id
+        WHERE b.tenant_id = @t
+          AND b.status <> 'void'
+          AND (b.total_cents - b.paid_cents) > 0`,
       { t: tenantId },
     );
-    return this.buildAging(rows.map((r) => ({ partyId: r.supplier_id, balance: Number(r.balance), dueDate: r.due_date })), now);
+    return this.buildAging(
+      rows.map((r) => ({
+        partyId: r.supplier_id,
+        partyName: r.party_name,
+        balance: Number(r.balance),
+        dueDate: r.due_date,
+      })),
+      now,
+    );
   }
 
-  private buildAging(rows: Array<{ partyId: string; balance: number; dueDate: number | null }>, now: number): AgingReport {
+  private buildAging(
+    rows: Array<{ partyId: string; partyName: string; balance: number; dueDate: number | null }>,
+    now: number,
+  ): AgingReport {
     const totals = emptyBuckets();
-    const byParty = new Map<string, AgingBuckets>();
+    const byParty = new Map<string, { name: string; buckets: AgingBuckets }>();
     for (const r of rows) {
-      if (!byParty.has(r.partyId)) byParty.set(r.partyId, emptyBuckets());
-      addToBucket(byParty.get(r.partyId)!, r.balance, r.dueDate, now);
+      if (!byParty.has(r.partyId)) {
+        byParty.set(r.partyId, { name: r.partyName, buckets: emptyBuckets() });
+      }
+      addToBucket(byParty.get(r.partyId)!.buckets, r.balance, r.dueDate, now);
       addToBucket(totals, r.balance, r.dueDate, now);
     }
-    return { totals, parties: Array.from(byParty, ([partyId, buckets]) => ({ partyId, buckets })).sort((a, b) => b.buckets.total - a.buckets.total) };
+    return {
+      totals,
+      parties: Array.from(byParty, ([partyId, { name, buckets }]) => ({
+        partyId,
+        partyName: name,
+        buckets,
+      })).sort((a, b) => b.buckets.total - a.buckets.total),
+    };
   }
 
   /** Revenue + units grouped by product category (completed orders in window). */

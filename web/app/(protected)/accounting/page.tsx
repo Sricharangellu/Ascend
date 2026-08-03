@@ -3,6 +3,7 @@
 /**
  * Accounting (Ponytail Wave 2) — COA, deposits, aging summaries.
  * Invoice/bill pay grids removed; pay on /invoicing and /bills.
+ * Aging party deep-links from #141 kept on the summary cards.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -13,7 +14,7 @@ import { Button } from "@/components/Button";
 import { formatMoney } from "@/lib/money";
 import { hasRole } from "@/lib/auth";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
-import type { AgingReport, Account, Deposit } from "@/api-client/types";
+import type { AgingReport, AgingRow, Account, Deposit } from "@/api-client/types";
 
 const TYPE_STYLE: Record<string, string> = {
   asset: "bg-blue-50 text-blue-700 ring-blue-200",
@@ -35,23 +36,63 @@ const AGING_BUCKETS: { key: keyof Omit<AgingReport["totals"], "total">; label: s
   { key: "d90_plus", label: "90+ days" },
 ];
 
-function AgingSummary({ report }: { report: AgingReport }) {
+function AgingSummary({
+  report,
+  partyHref,
+  partyLabel,
+}: {
+  report: AgingReport;
+  partyHref: (partyId: string) => string;
+  partyLabel: string;
+}) {
+  const topParties: AgingRow[] = report.parties.slice(0, 8);
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-      {AGING_BUCKETS.map(({ key, label }) => (
-        <div key={key} className="rounded-md border border-erp-table-border bg-erp-page p-3">
-          <p className="text-xs font-medium uppercase text-erp-text-secondary">{label}</p>
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        {AGING_BUCKETS.map(({ key, label }) => (
+          <div key={key} className="rounded-md border border-erp-table-border bg-erp-page p-3">
+            <p className="text-xs font-medium uppercase text-erp-text-secondary">{label}</p>
+            <p className="mt-1 text-sm font-semibold text-erp-text-primary">
+              {formatMoney(report.totals[key])}
+            </p>
+          </div>
+        ))}
+        <div className="col-span-2 rounded-md border border-erp-table-border bg-erp-table-header p-3 sm:col-span-5">
+          <p className="text-xs font-medium uppercase text-erp-text-secondary">Total outstanding</p>
           <p className="mt-1 text-sm font-semibold text-erp-text-primary">
-            {formatMoney(report.totals[key])}
+            {formatMoney(report.totals.total)}
           </p>
         </div>
-      ))}
-      <div className="col-span-2 rounded-md border border-erp-table-border bg-erp-table-header p-3 sm:col-span-5">
-        <p className="text-xs font-medium uppercase text-erp-text-secondary">Total outstanding</p>
-        <p className="mt-1 text-sm font-semibold text-erp-text-primary">
-          {formatMoney(report.totals.total)}
-        </p>
       </div>
+      {topParties.length > 0 && (
+        <div className="overflow-x-auto rounded-md border border-erp-table-border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-erp-table-border bg-erp-table-header text-left text-xs font-semibold uppercase tracking-[0.08em] text-erp-text-secondary">
+                <th className="px-3 py-2">{partyLabel}</th>
+                <th className="px-3 py-2 text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topParties.map((row) => (
+                <tr key={row.partyId} className="border-b border-erp-table-border last:border-0">
+                  <td className="px-3 py-2">
+                    <Link
+                      href={partyHref(row.partyId)}
+                      className="font-medium text-brand-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+                    >
+                      {row.partyName || row.partyId}
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2 text-right font-semibold text-erp-text-primary">
+                    {formatMoney(row.buckets.total)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -267,7 +308,13 @@ export default function AccountingPage() {
         </Card>
 
         <Card title="AR aging" description="Receivables by days outstanding. Pay invoices in Invoicing.">
-          {arAging && <AgingSummary report={arAging} />}
+          {arAging && (
+            <AgingSummary
+              report={arAging}
+              partyHref={(id) => `/customers/${encodeURIComponent(id)}`}
+              partyLabel="Customer"
+            />
+          )}
           {canManage && (
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <Button variant="secondary" size="sm" disabled={sweepBusy} onClick={() => void runDunningSweep()}>
@@ -288,7 +335,13 @@ export default function AccountingPage() {
         </Card>
 
         <Card title="AP aging" description="Payables by days outstanding. Pay bills on Bills.">
-          {apAging && <AgingSummary report={apAging} />}
+          {apAging && (
+            <AgingSummary
+              report={apAging}
+              partyHref={(id) => `/vendors/${encodeURIComponent(id)}`}
+              partyLabel="Supplier"
+            />
+          )}
           <div className="mt-3">
             <Link href="/bills" className="text-sm font-medium text-brand-600 hover:underline">
               Open bills →
