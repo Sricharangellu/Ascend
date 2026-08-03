@@ -42,6 +42,7 @@ first; there's nothing here for it to pick up.
 
 | # | UTC | Commit | Summary |
 |---|---|---|---|
+| — | 2026-08-03T060225Z | (wave3) | Ponytail Wave 3 on develop: deleted `/reporting/*` + every thin alias page twin (next.config redirects are the sole SoT); Outlets ownership inverted to `/setup/outlets` with `/operations` redirecting; Pricing quarantined to Customer Overrides behind SHOW_PARTIAL; Delivery stage chrome retokenised. Waves 0–2 already on develop via PR #160 — deliberately not replayed (parallel-session collision, recorded in the audit). Root `tsconfig.json` no-op typecheck found here too, but left to its dedicated hotfix PR #171 rather than fixed twice. |
 | — | 2026-08-03T054700Z | (ui-audit) | Continue product-experience Wave A/B: #165 closed superseded (develop already restored); #163 Quick Sell deep-link; #166 outlet filter scope; #169 dead-chrome + Quick Sell href. Waiting CI then merge. |
 | — | 2026-08-03T042850Z | (wave1) | Ponytail Wave 1: reporting/sell/finance/setup redirects; Inventory nav trim + Purchasing hub ?tab=; Delivery→Sell; checklist/dashboard link fixes. |
 | — | 2026-08-02T232920Z | (wave0) | Ponytail Wave 0 honesty: hide Error Center + Kiosk (partial); /sales→/orders; Pipeline mock tabs gated; brand F→A + finder-pos URLs; kiosk no fake save. |

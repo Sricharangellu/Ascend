@@ -44,6 +44,18 @@
 | Status | RELEASED — `cursor/hotfix-restore-ascend-tsconfig-604f`; see AUDIT_2026-08-03T061100Z-hotfix-restore-ascend-tsconfig.md |
 | Blockers | none |
 
+## Active Claim (Cursor cloud — Ponytail Wave 3 alias cleanup on develop)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor cloud agent (`cursor/ponytail-wave3-develop-72bc`) |
+| Queue item | Wave 3 delta develop still lacked: delete `/reporting/*` + thin alias page twins; invert Outlets ownership to `/setup/outlets`; Pricing quarantine to Customer Overrides; Delivery stage tokens. Waves 0–2 were already landed by `cursor/ponytail-implement-4fe7` (PR #160) — not replayed. |
+| Files/areas expected | `web/app/(protected)/{reporting,sell,sales,shipping,finance,setup,inventory,ecommerce,catalog,operations,pricing,delivery}/**`; `web/next.config.mjs`; `web/public/sw.js`; `web/mocks/mockHandlers.ts`; WORK audit + LOCK. |
+| Started | 2026-08-03 |
+| Status | RELEASED — Wave 3 shipped; AUDIT_2026-08-03T060225Z-ponytail-wave3-develop.md |
+| Blockers | none |
+
+
 ## Active Claim (Cursor cloud — Ponytail implement Waves 2b–3)
 
 | Field | Value |
