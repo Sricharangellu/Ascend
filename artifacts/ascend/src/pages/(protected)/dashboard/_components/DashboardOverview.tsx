@@ -49,7 +49,9 @@ export function DashboardOverview({
   openPOs,
   loadingPOs,
   activeUsers,
-  recommendationCount
+  recommendationCount,
+  industry,
+  view
 }: {
   summary?: SummaryResponse;
   loadingSummary: boolean;
@@ -61,10 +63,35 @@ export function DashboardOverview({
   loadingPOs: boolean;
   activeUsers: number;
   recommendationCount: number;
+  industry: string;
+  view: string;
 }) {
   const revCents = summary?.revenue.grossCents ?? 0;
   const gpCents = summary?.kpi?.grossProfitCents ?? revCents;
   const openSales = summary?.orders.open ?? 0;
+
+  const kpis = [
+    { id: "revenue", label: "Revenue", value: formatMoney(revCents), icon: <IconTrendUp />, loading: loadingSummary, href: "/reports" },
+    { id: "profit", label: "Gross Profit", value: formatMoney(gpCents), icon: <IconDollar />, loading: loadingSummary, href: "/reports" },
+    { id: "cash", label: "Cash Flow", value: formatMoney(cashFlowCents), icon: <IconActivity />, loading: loadingCash, href: "/finance" },
+    { id: "inventory", label: "Inventory Value", value: formatMoney(inventoryValueCents), icon: <IconLayers />, loading: loadingValuation, href: "/reports" },
+    { id: "pos", label: "Open POs", value: openPOs, icon: <IconTruck />, loading: loadingPOs, href: "/purchasing" },
+    { id: "sales", label: "Open Sales", value: openSales, icon: <IconShoppingCart />, loading: loadingSummary, href: "/orders" },
+    { id: "users", label: "Active Users", value: activeUsers, icon: <IconUsers />, href: "/team" },
+    { id: "ai", label: "AI Insights", value: recommendationCount, icon: <IconSparkles />, href: "/reports" },
+  ];
+
+  let order = ["revenue", "profit", "cash", "inventory", "pos", "sales", "users", "ai"];
+  
+  if (view === "Finance") {
+    order = ["cash", "revenue", "profit", "inventory", "sales", "pos", "users", "ai"];
+  } else if (industry === "Wholesale" || industry === "Distribution") {
+    order = ["pos", "inventory", "revenue", "profit", "sales", "cash", "users", "ai"];
+  } else if (industry === "E-commerce") {
+    order = ["revenue", "sales", "profit", "cash", "inventory", "pos", "users", "ai"];
+  }
+
+  const sortedKpis = order.map(id => kpis.find(k => k.id === id)!).filter(Boolean);
 
   return (
     <section>
@@ -76,14 +103,9 @@ export function DashboardOverview({
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
-        <LiveKpi label="Revenue" value={formatMoney(revCents)} icon={<IconTrendUp />} loading={loadingSummary} href="/reports" />
-        <LiveKpi label="Gross Profit" value={formatMoney(gpCents)} icon={<IconDollar />} loading={loadingSummary} href="/reports" />
-        <LiveKpi label="Cash Flow" value={formatMoney(cashFlowCents)} icon={<IconActivity />} loading={loadingCash} href="/finance" />
-        <LiveKpi label="Inventory Value" value={formatMoney(inventoryValueCents)} icon={<IconLayers />} loading={loadingValuation} href="/reports" />
-        <LiveKpi label="Open POs" value={openPOs} icon={<IconTruck />} loading={loadingPOs} href="/purchasing" />
-        <LiveKpi label="Open Sales" value={openSales} icon={<IconShoppingCart />} loading={loadingSummary} href="/orders" />
-        <LiveKpi label="Active Users" value={activeUsers} icon={<IconUsers />} href="/team" />
-        <LiveKpi label="AI Insights" value={recommendationCount} icon={<IconSparkles />} href="/reports" />
+        {sortedKpis.map((k) => (
+          <LiveKpi key={k.id} label={k.label} value={k.value} icon={k.icon} loading={k.loading} href={k.href} />
+        ))}
       </div>
     </section>
   );

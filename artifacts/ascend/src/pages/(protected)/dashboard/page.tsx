@@ -15,10 +15,12 @@ import { DashboardTimeline } from "./_components/DashboardTimeline";
 import { DashboardCharts } from "./_components/DashboardCharts";
 import { DashboardTopPerformers } from "./_components/DashboardTopPerformers";
 import { DashboardQuickActions } from "./_components/DashboardQuickActions";
+import { DashboardExecutive } from "./_components/DashboardExecutive";
 import ProgressPanel from "./_components/ProgressPanel";
 import { BackupHealthCard } from "./_components/BackupHealthCard";
 
 import type { RecommendationReport, DashboardRecommendation } from "./_components/DashboardAiCommandCenter";
+import { getUser } from "@/lib/auth";
 
 const SIGNAL_TO_VERIFICATION: Record<string, string> = {
   no_products: "retail.first_product",
@@ -30,6 +32,9 @@ const SIGNAL_TO_VERIFICATION: Record<string, string> = {
 };
 
 export type Range = "today" | "7d" | "30d";
+
+export type DashboardView = "Executive" | "Operations" | "Finance" | "Store";
+export type Industry = "Retail" | "Wholesale" | "Distribution" | "Manufacturing" | "Healthcare" | "Hospitality" | "E-commerce" | "Enterprise Services";
 
 export interface SummaryResponse {
   orders: { open: number; completed: number; refunded: number; voided: number; total: number };
@@ -129,6 +134,12 @@ export default function DashboardPage() {
         invalidateQuery(`dashboard:summary:${range}:${scope}`);
         invalidateQuery("dashboard:recommendations:30d");
         invalidateQuery(`dashboard:cash:${range}`);
+        // Executive workspace queries
+        invalidateQuery(`dashboard:pl:${range}:${scope}`);
+        invalidateQuery(`dashboard:executive-trend:30d:${scope}`);
+        invalidateQuery(`dashboard:ar-aging:${scope}`);
+        invalidateQuery(`dashboard:ap-aging:${scope}`);
+        invalidateQuery(`dashboard:vendor-sales:${range}:${scope}`);
       }
     }, [range, scope]),
   );
@@ -156,6 +167,83 @@ export default function DashboardPage() {
     expiringSoon: (expiryData?.items ?? []).length,
   };
 
+  const { data: businessProfile } = useQuery("settings:business-profile", () => apiGet<{ businessType?: string }>("/api/v1/settings/business-profile"), { staleMs: Infinity });
+
+  const VALID_INDUSTRIES: Industry[] = ["Retail", "Wholesale", "Distribution", "Manufacturing", "Healthcare", "Hospitality", "E-commerce", "Enterprise Services"];
+  const VALID_VIEWS: DashboardView[] = ["Executive", "Operations", "Finance", "Store"];
+
+  const [industry, setIndustry] = useState<Industry>(() => {
+    const stored = localStorage.getItem("ascend_dashboard_industry");
+    return VALID_INDUSTRIES.find(v => v === stored) ?? "Retail";
+  });
+  useEffect(() => {
+    if (!VALID_INDUSTRIES.includes(localStorage.getItem("ascend_dashboard_industry") as Industry) && businessProfile?.businessType) {
+      const mapped = VALID_INDUSTRIES.find(v => v.toLowerCase() === businessProfile.businessType?.toLowerCase());
+      if (mapped) setIndustry(mapped);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessProfile?.businessType]);
+
+  const [view, setView] = useState<DashboardView>(() => {
+    const stored = localStorage.getItem("ascend_dashboard_view");
+    const valid = VALID_VIEWS.find(v => v === stored);
+    if (valid) return valid;
+    const user = getUser();
+    const role = user?.role || "owner";
+    if (role === "cashier") return "Store";
+    if (role === "manager") return "Operations";
+    return "Executive";
+  });
+
+  const handleSetIndustry = (val: Industry) => {
+    setIndustry(val);
+    localStorage.setItem("ascend_dashboard_industry", val);
+  };
+  const handleSetView = (val: DashboardView) => {
+    setView(val);
+    localStorage.setItem("ascend_dashboard_view", val);
+  };
+
+  // Section components configured by view
+  const S_HERO = <DashboardHero key="hero" />;
+  const S_KPI = <DashboardOverview key="kpi" summary={summary} loadingSummary={loadingSummary} inventoryValueCents={num(valuation?.totalCostCents)} loadingValuation={loadingVal} cashFlowCents={cashFlowCents} loadingCash={loadingCash} openPOs={openPOs} loadingPOs={loadingPOs} activeUsers={activeUsers} recommendationCount={recData?.summary?.total ?? 0} industry={industry} view={view} />;
+  const S_EXEC = <DashboardExecutive key="executive" range={range} scope={scope} topCustomers={topCustomersData?.items ?? []} />;
+  const S_AI = <DashboardAiCommandCenter key="ai" report={recData} loading={loadingRecs} onTrackTask={onTrackRecommendation} reorderCount={(reorderData?.items ?? []).length} />;
+  const S_PIPELINE = <DashboardPipeline key="pipeline" />;
+  const S_TIMELINE = <DashboardTimeline key="timeline" notifs={notifsData?.items ?? []} />;
+  const S_CHARTS = <DashboardCharts key="charts" range={range} scope={scope} />;
+  const S_TOP = <DashboardTopPerformers key="top" topProducts={topProductsData?.items ?? []} topCustomers={topCustomersData?.items ?? []} />;
+  const S_QA = <DashboardQuickActions key="qa" />;
+  const S_OPS = <DashboardOpsHub key="ops" inventoryStats={inventoryStats} industry={industry} view={view} />;
+  const S_PROG = <ProgressPanel key="prog" refreshSignal={progressRefresh} />;
+  const S_BACKUP = <BackupHealthCard key="backup" />;
+
+  // Define layout structures per preset
+  const layouts: Record<DashboardView, { top: React.ReactNode[]; main: React.ReactNode[]; side: React.ReactNode[] }> = {
+    Executive: {
+      top: [S_HERO],
+      main: [S_KPI, S_EXEC, S_PIPELINE, S_CHARTS, S_TOP, S_OPS],
+      side: [S_AI, S_TIMELINE, S_PROG, S_BACKUP]
+    },
+    Operations: {
+      top: [S_QA],
+      main: [S_KPI, S_OPS, S_PIPELINE, S_CHARTS, S_TOP],
+      side: [S_AI, S_TIMELINE, S_PROG, S_BACKUP]
+    },
+    Finance: {
+      top: [],
+      main: [S_EXEC, S_KPI, S_CHARTS, S_TOP, S_OPS],
+      side: [S_AI, S_TIMELINE, S_PROG, S_BACKUP]
+    },
+    Store: {
+      top: [S_QA],
+      main: [S_KPI, S_CHARTS, S_TOP, S_OPS],
+      side: [S_TIMELINE, S_PROG, S_BACKUP]
+    }
+  };
+
+  const currentLayout = layouts[view];
+
   return (
     <EnterpriseShell
       active="dashboard"
@@ -165,64 +253,56 @@ export default function DashboardPage() {
     >
       <div className="mx-auto w-full max-w-[1600px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         
+        {/* Header Controls */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="inline-flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-1 shadow-sm">
+            {(["Executive", "Operations", "Finance", "Store"] as DashboardView[]).map(v => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => handleSetView(v)}
+                className={`rounded-md px-4 py-1.5 text-[13px] font-semibold transition-all ${view === v ? "bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] shadow-sm ring-1 ring-[var(--color-border)]" : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"}`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] font-medium text-[var(--color-text-secondary)]">Industry focus:</span>
+            <select
+              value={industry}
+              onChange={(e) => handleSetIndustry(e.target.value as Industry)}
+              className="h-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-[13px] font-medium text-[var(--color-text-primary)] shadow-sm outline-none transition-colors hover:border-[var(--color-border-strong)] focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]"
+            >
+              <option value="Retail">Retail</option>
+              <option value="Wholesale">Wholesale</option>
+              <option value="Distribution">Distribution</option>
+              <option value="Manufacturing">Manufacturing</option>
+              <option value="Healthcare">Healthcare</option>
+              <option value="Hospitality">Hospitality</option>
+              <option value="E-commerce">E-commerce</option>
+              <option value="Enterprise Services">Enterprise Services</option>
+            </select>
+          </div>
+        </div>
+
         {/* Retail Setup Checklist Banner (auto-hides when complete) */}
         <RetailSetupChecklist />
 
-        {/* Hero Section */}
-        <DashboardHero />
+        {/* Top Span */}
+        <div className="space-y-6">
+          {currentLayout.top}
+        </div>
 
-        {/* Quick Actions Strip */}
-        <DashboardQuickActions />
-
-        {/* Live Business Overview (KPIs) */}
-        <DashboardOverview
-          summary={summary}
-          loadingSummary={loadingSummary}
-          inventoryValueCents={num(valuation?.totalCostCents)}
-          loadingValuation={loadingVal}
-          cashFlowCents={cashFlowCents}
-          loadingCash={loadingCash}
-          openPOs={openPOs}
-          loadingPOs={loadingPOs}
-          activeUsers={activeUsers}
-          recommendationCount={recData?.summary?.total ?? 0}
-        />
-
+        {/* Main Grid */}
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
           <div className="xl:col-span-2 space-y-6">
-            {/* Enterprise Workflow Pipeline */}
-            <DashboardPipeline />
-
-            {/* Business Operations Hub */}
-            <DashboardOpsHub inventoryStats={inventoryStats} />
-
-            {/* Performance Analytics (Charts) */}
-            <DashboardCharts range={range} scope={scope} />
-
-            {/* Top Performers */}
-            <DashboardTopPerformers 
-              topProducts={topProductsData?.items ?? []} 
-              topCustomers={topCustomersData?.items ?? []} 
-            />
+            {currentLayout.main}
           </div>
 
           <div className="space-y-6">
-            {/* AI Command Center Briefing */}
-            <DashboardAiCommandCenter
-              report={recData}
-              loading={loadingRecs}
-              onTrackTask={onTrackRecommendation}
-              reorderCount={(reorderData?.items ?? []).length}
-            />
-
-            {/* Activity Timeline */}
-            <DashboardTimeline notifs={notifsData?.items ?? []} />
-
-            {/* Progress Panel */}
-            <ProgressPanel refreshSignal={progressRefresh} />
-
-            {/* Backup Health */}
-            <BackupHealthCard />
+            {currentLayout.side}
           </div>
         </div>
 

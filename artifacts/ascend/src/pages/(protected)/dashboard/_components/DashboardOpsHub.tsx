@@ -54,77 +54,105 @@ function OpsCard({ title, icon, href, metrics }: OpsCardProps) {
   );
 }
 
-export function DashboardOpsHub({ inventoryStats }: { inventoryStats: { warehouses: number; skus: number; lowStock: number; expiringSoon: number } }) {
+export function DashboardOpsHub({ inventoryStats, industry, view }: { inventoryStats: { warehouses: number; skus: number; lowStock: number; expiringSoon: number }, industry: string, view: string }) {
+  const cards = [
+    {
+      id: "inventory",
+      title: "Inventory",
+      icon: <IconBox />,
+      href: "/inventory",
+      metrics: [
+        { label: "Warehouses", value: inventoryStats.warehouses },
+        { label: "SKUs", value: inventoryStats.skus },
+        { label: "Low Stock", value: inventoryStats.lowStock, accent: inventoryStats.lowStock > 0 ? "warning" as const : undefined },
+        { label: "Expiring Soon", value: inventoryStats.expiringSoon, accent: inventoryStats.expiringSoon > 0 ? "danger" as const : undefined }
+      ]
+    },
+    {
+      id: "purchasing",
+      title: "Purchasing",
+      icon: <IconCart />,
+      href: "/purchasing",
+      metrics: [
+        { label: "Open POs", value: "View" },
+        { label: "Pending Approvals", value: "View" }
+      ]
+    },
+    {
+      id: "sales",
+      title: "Sales",
+      icon: <IconTag />,
+      href: "/sales",
+      metrics: [
+        { label: "Open Orders", value: "View" },
+        { label: "Quotations", value: "View" }
+      ]
+    },
+    {
+      id: "pos",
+      title: "POS",
+      icon: <IconTerminal />,
+      href: "/terminal",
+      metrics: [
+        { label: "Active Registers", value: "View" }
+      ]
+    },
+    {
+      id: "finance",
+      title: "Finance",
+      icon: <IconDollar />,
+      href: "/finance",
+      metrics: [
+        { label: "Open Bills", value: "View" },
+        { label: "Invoices", value: "View" }
+      ]
+    },
+    {
+      id: "crm",
+      title: "CRM",
+      icon: <IconUsers />,
+      href: "/customers",
+      metrics: [
+        { label: "Total Customers", value: "View" }
+      ]
+    },
+    {
+      id: "analytics",
+      title: "Analytics",
+      icon: <IconChart />,
+      href: "/reports",
+      metrics: []
+    },
+    {
+      id: "admin",
+      title: "Administration",
+      icon: <IconSettings />,
+      href: "/settings",
+      metrics: []
+    }
+  ];
+
+  let order = ["inventory", "purchasing", "sales", "pos", "finance", "crm", "analytics", "admin"];
+  if (view === "Finance") {
+    order = ["finance", "analytics", "sales", "inventory", "purchasing", "crm", "pos", "admin"];
+  } else if (industry === "Wholesale" || industry === "Distribution") {
+    order = ["inventory", "purchasing", "finance", "sales", "crm", "analytics", "pos", "admin"];
+  } else if (industry === "E-commerce") {
+    order = ["sales", "inventory", "crm", "analytics", "finance", "purchasing", "pos", "admin"];
+  }
+
+  const sortedCards = order.map(id => cards.find(c => c.id === id)!).filter(Boolean);
+
   return (
     <section>
-      <h2 className="mb-4 text-lg font-bold tracking-tight text-[var(--color-text-primary)]">Business Operations Hub</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold tracking-tight text-[var(--color-text-primary)]">Business Operations Hub</h2>
+        <span className="text-[11px] font-medium text-[var(--color-text-muted)] border border-[var(--color-border)] rounded-full px-2 py-0.5">
+          Optimized for {industry}
+        </span>
+      </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        <OpsCard
-          title="Inventory"
-          icon={<IconBox />}
-          href="/inventory"
-          metrics={[
-            { label: "Warehouses", value: inventoryStats.warehouses },
-            { label: "SKUs", value: inventoryStats.skus },
-            { label: "Low Stock", value: inventoryStats.lowStock, accent: inventoryStats.lowStock > 0 ? "warning" : undefined },
-            { label: "Expiring Soon", value: inventoryStats.expiringSoon, accent: inventoryStats.expiringSoon > 0 ? "danger" : undefined }
-          ]}
-        />
-        <OpsCard
-          title="Purchasing"
-          icon={<IconCart />}
-          href="/purchasing"
-          metrics={[
-            { label: "Open POs", value: "View" },
-            { label: "Pending Approvals", value: "View" }
-          ]}
-        />
-        <OpsCard
-          title="Sales"
-          icon={<IconTag />}
-          href="/sales"
-          metrics={[
-            { label: "Open Orders", value: "View" },
-            { label: "Quotations", value: "View" }
-          ]}
-        />
-        <OpsCard
-          title="POS"
-          icon={<IconTerminal />}
-          href="/terminal"
-          metrics={[
-            { label: "Active Registers", value: "View" }
-          ]}
-        />
-        <OpsCard
-          title="Finance"
-          icon={<IconDollar />}
-          href="/finance"
-          metrics={[
-            { label: "Open Bills", value: "View" },
-            { label: "Invoices", value: "View" }
-          ]}
-        />
-        <OpsCard
-          title="CRM"
-          icon={<IconUsers />}
-          href="/customers"
-          metrics={[
-            { label: "Total Customers", value: "View" }
-          ]}
-        />
-        <OpsCard
-          title="Analytics"
-          icon={<IconChart />}
-          href="/reports"
-          metrics={[]}
-        />
-        <OpsCard
-          title="Administration"
-          icon={<IconSettings />}
-          href="/settings"
-          metrics={[]}
-        />
+        {sortedCards.map(c => <OpsCard key={c.id} {...c} />)}
       </div>
     </section>
   );
