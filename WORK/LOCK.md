@@ -1,3 +1,14 @@
+## Active Claim (Cursor Cloud — HOTFIX restore Ascend tsconfig)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud `bc-c564feef` — Ascend UI ponytail audit |
+| Queue item | HOTFIX: Replit merge left project-references `tsconfig.json` (no compilerOptions) on develop — Docker build fails (`Cannot set properties of undefined (setting 'rootDir')`); restore Ascend tsconfig from `0f30096`. |
+| Files/areas expected | `tsconfig.json`, `WORK/**` |
+| Started | 2026-08-03T061100Z |
+| Status | RELEASED — `cursor/hotfix-restore-ascend-tsconfig-604f`; see AUDIT_2026-08-03T061100Z-hotfix-restore-ascend-tsconfig.md |
+| Blockers | none |
+
 ## Active Claim (Cursor cloud — Ponytail implement Waves 2b–3)
 
 | Field | Value |
