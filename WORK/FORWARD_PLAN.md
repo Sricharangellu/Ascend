@@ -1390,6 +1390,13 @@ before the next starts:
    Only after velocity consolidation, snapshots, and the accuracy framework
    all exist does replacing the trailing-window velocity proxy with a real
    forecast engine get evaluated.
+   **2026-08-03 — evaluated + first surface cutover:** no new forecast *model*
+   (ML/seasonal/weighted still out of scope). Shared `resolveDemandRates()`
+   (`src/shared/demand-rate.ts`) prefers a covering `demand_forecasts` row,
+   else Phase 7 item 1 velocity. First migrated surface: inventory pipeline
+   `reorderAlerts()`. Remaining reorder/insights/purchasing surfaces still on
+   velocity until migrated the same way. Audit:
+   `WORK/audits/AUDIT_2026-08-03T042109Z-phase7-item4-reorder-forecast-demand.md`.
 
 Explicitly out of scope for this phase: AI/ML forecasting models, EDI, new
 receiving workflows, buyer workspace, supplier-scoring redesign, procurement
