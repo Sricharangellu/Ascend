@@ -10,7 +10,7 @@ Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0
 | Queue item | Audit gaps + fix connectivity / API-break / rate-limiting bugs: offline outbox dropping 429s as permanent, API client missing Retry-After retry, SSO limiter not env-overridable (same class as the e2e identity flake), stale rate-limit docs. |
 | Files/areas expected | `web/lib/offlineOutbox.ts`, `web/public/sw.js`, `web/api-client/client.ts`, `web/tests/api-client.test.ts`, `src/app.ts`, `src/gateway/rateLimit.ts` (+ test), `docs/api/rate-limits.md`, `.github/workflows/ci.yml` (e2e env), `WORK/**` |
 | Started | 2026-08-03T02:12:57Z |
-| Status | ACTIVE — follow-up on PR #150: don't auto-retry `account_locked` 429s; outbox drain should honour Retry-After / stop stampeding; regression tests. |
+| Status | RELEASED — PR #150 follow-up landed: skip auto-retry without `Retry-After` (protects `account_locked`); outbox/SW stop drain on 429; api-client tests 19/19. |
 | Blockers | none |
 
 ## Active Claim (Claude session G — Phase 0 coordinator: finish end-to-end + deployment readiness)
