@@ -1,5 +1,29 @@
 # Ascend — Multi-Agent Work Lock
 
+## Update 2026-08-03 (later): Phase H — Wave 0 cleanup, ready to push
+
+`fix/ponytail-phase-h-wave0-cleanup`, single commit `90e63f6`, branched
+directly off current `origin/develop` (`801b7a4`) — clean fast-forward
+candidate. Note: this is a sibling of `fix/ponytail-phase-g-dead-setup-shims`
+(see that branch's own `WORK/LOCK.md` note, not visible on mainline develop
+yet) — the two are independent, non-overlapping, push either order.
+
+Picked up Wave 0 (Critical, smallest-scope) from the 142-route Cursor audit
+after confirming finding #4 (`/team/custom-roles` vs `/settings/permissions`)
+is explicitly NEEDS-SRI ("blocked on Sri contract decision" — which backend
+API surface becomes canonical) and not mine to decide unilaterally. Did:
+AuthShell leftover "F" logo glyph -> "A"; 3 leftover `finder-pos.app` URL
+strings -> `ascend.app` (kiosk, b2b portal, ecommerce storefront display);
+`partial: true` nav-gating for Kiosk Mode (save handler is a no-op, nothing
+persists) and Error Center (fully MSW-mock-only, no backend route exists).
+Re-verified audit's "/sales mock history" claim directly — it's real,
+already fixed in a prior pass, no action needed. Left `/inventory/pipeline`
+alone (3 of 6 tabs real, 3 mock — needs tab-level badging, not page-level
+hide — flagged as next candidate). All three gates + eslint clean. Full
+detail: `WORK/audits/AUDIT_2026-08-03T023000Z-ponytail-phase-h-wave0-cleanup.md`.
+
+Push command for Sri: `git push origin fix/ponytail-phase-h-wave0-cleanup:develop`
+
 Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0 wave-dispatch coordination claim (started 2026-07-18) was closed 2026-07-30 as superseded — see its entry below; work since has shipped as independent claims rather than through that coordinator. Latest substantive work: Phase 7 items 1-2 (sales-velocity consolidation, demand-snapshot foundation) RELEASED; four-environment AI coordination workflow (Claude Code/Cursor/Replit) adopted 2026-07-30, see `docs/architecture/ORCHESTRATION.md` "Environment routing" + `tools/AGENT_PROMPT.md`. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B, RELEASED); Clean Architecture pilot (quotes + gateway auth) (session C, ABANDONED — see entry); SSO OIDC hardening (session D)
 
 ## Active Claim (Cursor Cloud — connectivity / API breaks / rate limiting audit+fix)
