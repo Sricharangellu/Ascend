@@ -50,6 +50,17 @@
 
 Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0 wave-dispatch coordination claim (started 2026-07-18) was closed 2026-07-30 as superseded — see its entry below; work since has shipped as independent claims rather than through that coordinator. Latest substantive work: Phase 7 items 1-2 (sales-velocity consolidation, demand-snapshot foundation) RELEASED; four-environment AI coordination workflow (Claude Code/Cursor/Replit) adopted 2026-07-30, see `docs/architecture/ORCHESTRATION.md` "Environment routing" + `tools/AGENT_PROMPT.md`. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B, RELEASED); Clean Architecture pilot (quotes + gateway auth) (session C, ABANDONED — see entry); SSO OIDC hardening (session D)
 
+## Active Claim (Cursor Cloud — Wave A/B trust leftovers + palette)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud `bc-c564feef` — Ascend UI ponytail audit |
+| Queue item | Port remaining Wave A silent-catch fixes + Wave B palette deep-links / Cost Entry (pipeline/Error Center already on develop via Ponytail #160). Plus #133 leftover: wire dashboard outlet select into report `scope`. |
+| Files/areas expected | `web/components/CommandPalette.tsx`; `web/app/(protected)/{gift-cards,dashboard,inventory,purchase}/**`; `web/tests/**`; `WORK/**` |
+| Started | 2026-08-03T050700Z |
+| Status | ACTIVE — outlet-filter scope fix on PR #166; prior slices already on branch. |
+| Blockers | none |
+
 ## Active Claim (Cursor Cloud — Wave A dead-chrome + Quick Sell href)
 
 | Field | Value |
@@ -59,6 +70,10 @@ Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0
 | Files/areas expected | `web/components/EnterpriseShell.tsx`; `web/app/(protected)/catalog/[id]/page.tsx`; `web/app/(protected)/customers/**`; `WORK/**` |
 | Started | 2026-08-03T054600Z |
 | Status | RELEASED — `cursor/ui-wave-a-dead-chrome-604f`; see AUDIT_2026-08-03T054700Z-ui-wave-a-dead-chrome.md |
+| Queue item | Port remaining Wave A silent-catch fixes + Wave B palette deep-links / Cost Entry (pipeline/Error Center already on develop via Ponytail #160). Plus #133 leftover: wire dashboard outlet select into report `scope`. |
+| Files/areas expected | `web/components/CommandPalette.tsx`; `web/app/(protected)/{gift-cards,dashboard,inventory,purchase}/**`; `web/tests/**`; `WORK/**` |
+| Started | 2026-08-03T050700Z |
+| Status | RELEASED — `cursor/ui-wave-ab-trust-speed-604f`; see AUDIT_2026-08-03T050800Z-ui-wave-ab-trust-speed.md |
 | Blockers | none |
 
 ## Active Claim (Cursor cloud — procurement receiving enterprise rewrite)
