@@ -39,6 +39,35 @@ const nextConfig = {
       { source: "/readyz", destination: `${backendUrl}/readyz` },
     ];
   },
+
+  // Ponytail Wave 1 — permanent redirects for legacy / alias IA.
+  // Keep thin page.tsx redirects too where Next needs them for typed routes.
+  async redirects() {
+    return [
+      // Reports: /reporting was a full re-export twin of /reports
+      { source: "/reporting", destination: "/reports", permanent: true },
+      { source: "/reporting/closing", destination: "/reports/end-of-day", permanent: true },
+      { source: "/reporting/:path*", destination: "/reports/:path*", permanent: true },
+      // Sell aliases
+      { source: "/sell", destination: "/terminal", permanent: true },
+      { source: "/sales", destination: "/orders", permanent: true },
+      // Finance aliases
+      { source: "/finance/bills", destination: "/bills", permanent: true },
+      { source: "/finance/settings", destination: "/settings", permanent: true },
+      { source: "/finance/payment-made", destination: "/bills", permanent: true },
+      // Setup duplicates of capabilities-driven Business Modes
+      { source: "/setup/business-profile", destination: "/settings/modes", permanent: true },
+      { source: "/setup/modules", destination: "/settings/modes", permanent: true },
+      // Purchasing hub — standalone reorder page folds into Purchasing Reorder tab
+      { source: "/inventory/reorder", destination: "/purchasing?tab=reorder", permanent: true },
+      // Ecommerce: customers child was a misleading re-export of /customers
+      { source: "/ecommerce/customers", destination: "/customers", permanent: true },
+      // Ponytail Wave 2 — shipping registry folds into Delivery Shipments tab
+      { source: "/shipping", destination: "/delivery?tab=shipments", permanent: true },
+      // Operations mega-page dissolved to Outlets (+ deep links on that page)
+      { source: "/operations", destination: "/setup/outlets", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

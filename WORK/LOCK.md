@@ -1,3 +1,39 @@
+
+## Active Claim (Cursor cloud — Ponytail Wave 2 hubs)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor cloud agent (Ponytail Wave 2) |
+| Queue item | Wave 2: Finance hub simplify; Accounting drop duplicate AR/AP pay grids; Shipping list → Delivery tab; Operations dissolve to Outlets + deep links. |
+| Files/areas expected | `web/app/(protected)/{finance,accounting,delivery,shipping,operations}/**`; `web/next.config.mjs`; `web/components/EnterpriseShell.tsx`; checklist; WORK audit + LOCK. |
+| Started | 2026-08-03 |
+| Status | RELEASED — Wave 2 hubs shipped; AUDIT_2026-08-03T043540Z-ponytail-wave2-hubs.md |
+| Blockers | none |
+
+
+## Active Claim (Cursor cloud — Ponytail Wave 1 consolidation)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor cloud agent (Ponytail Wave 1) |
+| Queue item | Wave 1 from AUDIT_2026-08-02T230500Z-ponytail-enterprise-ui.md: reporting/sell/finance redirects; setup profile/modules → settings/modes; Purchasing hub (?tab=) + nav trim; Delivery under Sell; inventory/reorder redirect; finance/dashboard link fixes. |
+| Files/areas expected | `web/next.config.mjs`; `web/components/EnterpriseShell.tsx`; `web/app/(protected)/{purchasing,finance,setup,sell,inventory/reorder,dashboard,shipping}/**`; `web/components/setup/RetailSetupChecklist.tsx`; tests; WORK audit + LOCK. |
+| Started | 2026-08-03 |
+| Status | RELEASED — Wave 1 consolidation shipped; AUDIT_2026-08-03T042850Z-ponytail-wave1-consolidation.md |
+| Blockers | none |
+
+
+## Active Claim (Cursor cloud — Ponytail Wave 0 honesty)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor cloud agent (Ponytail Wave 0) |
+| Queue item | Wave 0 from AUDIT_2026-08-02T230500Z-ponytail-enterprise-ui.md: (1) partial-gate Error Center + hide Pipeline mock tabs; (2) rewire/hide mocked /sales → /orders; (3) fix finder-pos brand strings + signup/onboarding "F" mark; (4) kiosk honesty (Preview / no fake save). |
+| Files/areas expected | `web/components/EnterpriseShell.tsx`; `web/app/(protected)/{sales,inventory/pipeline,settings/kiosk,settings/b2b,onboarding}/**`; `web/app/signup/**`; related vitest; WORK audit + LOCK. NO backend src modules. |
+| Started | 2026-08-02 |
+| Status | RELEASED — Wave 0 honesty shipped; AUDIT_2026-08-02T232920Z-ponytail-wave0-honesty.md |
+| Blockers | none |
+
 # Ascend — Multi-Agent Work Lock
 
 Status: ACTIVE — session G (Cowork/Claude, Fable 5) coordinating Phase 0 (finish end-to-end + deployment readiness, Sri directive 2026-07-18). See claim below. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)

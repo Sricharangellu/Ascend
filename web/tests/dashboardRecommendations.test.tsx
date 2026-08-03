@@ -19,7 +19,7 @@ const report: RecommendationReport = {
       title: "Restock low inventory",
       detail: "Some products are at or below reorder point.",
       action: "Review reorder list",
-      href: "/inventory/reorder",
+      href: "/purchasing?tab=reorder",
       count: 4,
       rank: 2,
     },
@@ -60,7 +60,7 @@ describe("DashboardRecommendations", () => {
     expect(within(rows[2]).getByText("Categorize expenses")).toBeInTheDocument();
 
     expect(screen.getByText("1 critical")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Review reorder list" })).toHaveAttribute("href", "/inventory/reorder");
+    expect(screen.getByRole("link", { name: "Review reorder list" })).toHaveAttribute("href", "/purchasing?tab=reorder");
   });
 
   it("shows loading state", () => {
