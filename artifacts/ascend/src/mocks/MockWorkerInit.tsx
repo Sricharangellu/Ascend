@@ -73,7 +73,7 @@ export default function MockWorkerInit({ children }: { children: ReactNode }) {
   if (!ready) {
     return (
       <div
-        className="flex min-h-screen items-center justify-center bg-slate-50"
+        className="flex min-h-screen items-center justify-center bg-[var(--color-surface-subtle)]"
         role="status"
         aria-label="Preparing workspace"
       >

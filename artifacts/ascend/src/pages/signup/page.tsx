@@ -106,8 +106,8 @@ function Field({
         placeholder={placeholder}
         autoComplete={autoComplete}
         required={required}
-        className={`w-full rounded-md border px-3 py-2.5 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 transition-colors ${
-          error ? "border-red-400 bg-red-50" : "hover:border-slate-400"
+        className={`w-full rounded-md border px-3 py-2.5 text-sm placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-brand-600 transition-colors ${
+          error ? "border-red-400 bg-red-50" : "hover:border-[var(--color-border)]"
         }`}
         style={error ? undefined : { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
       />
@@ -204,7 +204,7 @@ export default function SignupPage() {
 
         {/* Header */}
         <div className="mb-6 text-center">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950 text-white text-xl font-bold mb-3">F</div>
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl text-white text-xl font-bold mb-3">F</div>
           <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>Create your account</h1>
           <p className="mt-1 text-sm" style={{ color: "var(--color-text-muted)" }}>
             {step === 1 ? "Set up your workspace in under a minute." : "Choose your business type — this shapes your entire interface."}

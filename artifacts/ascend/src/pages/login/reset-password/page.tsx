@@ -177,7 +177,7 @@ function ResetPasswordForm() {
                         <span
                           key={i}
                           className={`h-1.5 flex-1 rounded-full ${
-                            i < strength ? STRENGTH_COLORS[strength] : "dark:bg-slate-700"
+                            i < strength ? STRENGTH_COLORS[strength] : ""
                           }`}
                           style={i < strength ? undefined : { backgroundColor: "var(--color-surface-subtle)" }}
                         />
