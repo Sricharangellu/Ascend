@@ -283,11 +283,12 @@ function LoginContent() {
         {/* SSO */}
         <div className="mt-6">
           <div className="relative flex items-center">
-            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
-            <span className="px-3 text-xs font-medium uppercase text-slate-400 dark:text-slate-500">
+            <div className="h-px flex-1" style={{ backgroundColor: "var(--color-border)" }} />
+            <span className="px-3 text-[10px] font-semibold uppercase tracking-[0.08em]"
+              style={{ color: "var(--color-text-muted)" }}>
               Or continue with
             </span>
-            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+            <div className="h-px flex-1" style={{ backgroundColor: "var(--color-border)" }} />
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-3">
@@ -297,7 +298,8 @@ function LoginContent() {
                 type="button"
                 disabled
                 title="Available on the Enterprise plan"
-                className="flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-400 opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-500"
+                className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl border px-3 text-[13px] font-medium opacity-60 transition-colors"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-muted)" }}
               >
                 <ProviderIcon provider={provider.key} />
                 {provider.label}
@@ -340,32 +342,32 @@ function LoginCardSkeleton() {
     <div
       role="status"
       aria-label="Loading sign-in form"
-      className="animate-pulse rounded-2xl border border-white/40 bg-white/80 p-6 shadow-2xl shadow-slate-900/10 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70 sm:p-8"
+      className="rounded-2xl border border-white/40 bg-white/80 p-6 shadow-2xl shadow-slate-900/10 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70 sm:p-8"
     >
-      <div className="h-7 w-32 rounded bg-slate-200 dark:bg-slate-700" />
-      <div className="mt-2 h-4 w-56 rounded bg-slate-100 dark:bg-slate-800" />
+      <div className="h-7 w-32 animate-skeleton rounded" />
+      <div className="mt-2 h-4 w-56 animate-skeleton rounded" />
 
       <div className="mt-6 flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-700" />
-          <div className="h-11 w-full rounded-lg bg-slate-100 dark:bg-slate-800" />
+          <div className="h-4 w-24 animate-skeleton rounded" />
+          <div className="h-11 w-full animate-skeleton rounded-lg" />
         </div>
         <div className="flex flex-col gap-1">
-          <div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-700" />
-          <div className="h-11 w-full rounded-lg bg-slate-100 dark:bg-slate-800" />
+          <div className="h-4 w-24 animate-skeleton rounded" />
+          <div className="h-11 w-full animate-skeleton rounded-lg" />
         </div>
-        <div className="h-4 w-40 rounded bg-slate-100 dark:bg-slate-800" />
-        <div className="h-11 w-full rounded-lg bg-slate-200 dark:bg-slate-700" />
+        <div className="h-4 w-40 animate-skeleton rounded" />
+        <div className="h-11 w-full animate-skeleton rounded-lg" />
       </div>
 
       <div className="mt-6 flex items-center gap-3">
-        <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
-        <div className="h-3 w-24 rounded bg-slate-100 dark:bg-slate-800" />
-        <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
+        <div className="h-px flex-1" style={{ backgroundColor: "var(--color-border)" }} />
+        <div className="h-3 w-24 animate-skeleton rounded" />
+        <div className="h-px flex-1" style={{ backgroundColor: "var(--color-border)" }} />
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3">
-        <div className="h-11 rounded-lg bg-slate-100 dark:bg-slate-800" />
-        <div className="h-11 rounded-lg bg-slate-100 dark:bg-slate-800" />
+        <div className="h-11 animate-skeleton rounded-lg" />
+        <div className="h-11 animate-skeleton rounded-lg" />
       </div>
     </div>
   );

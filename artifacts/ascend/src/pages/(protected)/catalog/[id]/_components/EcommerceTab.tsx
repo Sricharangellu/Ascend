@@ -26,8 +26,9 @@ interface VariantOnlineStatus {
   online: boolean;
 }
 
-const FLD = "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none";
-const AREA = `${FLD} min-h-[80px] resize-y`;
+const FLD_CLS = "w-full rounded-lg border px-3 py-2 text-[13px] outline-none transition-all focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500";
+const FLD_STYLE = { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" } as React.CSSProperties;
+const AREA_CLS = `${FLD_CLS} min-h-[80px] resize-y`;
 
 function slugify(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -37,27 +38,20 @@ function slugify(name: string) {
 
 function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      disabled={disabled}
-      onClick={() => onChange(!on)}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-brand-600 focus:ring-offset-1 disabled:opacity-40 ${on ? "bg-brand-600" : "bg-slate-200"}`}
-    >
+    <button type="button" role="switch" aria-checked={on} disabled={disabled} onClick={() => onChange(!on)}
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-brand-600 focus:ring-offset-1 disabled:opacity-40 ${on ? "bg-brand-600" : "bg-slate-200"}`}>
       <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? "translate-x-5" : "translate-x-0"}`} />
     </button>
   );
 }
 
-// ── Section card ──────────────────────────────────────────────────────────────
-
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-100 px-5 py-4">
-        <p className="text-sm font-semibold text-[#111]">{title}</p>
-        {hint && <p className="mt-0.5 text-xs text-slate-400">{hint}</p>}
+    <div className="rounded-xl border shadow-[var(--shadow-sm)]"
+      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+      <div className="border-b px-5 py-4" style={{ borderColor: "var(--color-border)" }}>
+        <p className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>{title}</p>
+        {hint && <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-muted)" }}>{hint}</p>}
       </div>
       <div className="space-y-3 px-5 py-4">{children}</div>
     </div>
@@ -65,20 +59,19 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">{children}</label>;
+  return <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-secondary)" }}>{children}</label>;
 }
-
-// ── Image row ─────────────────────────────────────────────────────────────────
 
 function ImageRow({ url, onRemove }: { url: string; onRemove: () => void }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-      <div className="h-10 w-10 shrink-0 rounded-md bg-slate-200 overflow-hidden">
+    <div className="flex items-center gap-3 rounded-lg border px-3 py-2"
+      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
+      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md" style={{ backgroundColor: "var(--color-border)" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={url} alt="" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
       </div>
-      <p className="flex-1 truncate text-xs text-slate-500">{url}</p>
-      <button type="button" onClick={onRemove} className="text-slate-400 hover:text-red-500">
+      <p className="flex-1 truncate text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{url}</p>
+      <button type="button" onClick={onRemove} className="transition-colors hover:text-red-500" style={{ color: "var(--color-text-muted)" }}>
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
         </svg>
@@ -162,12 +155,13 @@ export function EcommerceTab({ product }: { product: CatalogProduct }) {
     <div className="space-y-4">
 
       {/* ── Online status banner ─────────────────────────────────────────── */}
-      <div className={`flex items-center justify-between rounded-xl border px-5 py-4 shadow-sm ${settings.online ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}>
+      <div className={`flex items-center justify-between rounded-xl border px-5 py-4 shadow-[var(--shadow-sm)] ${settings.online ? "border-emerald-200 bg-emerald-50" : ""}`}
+        style={!settings.online ? { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" } : {}}>
         <div>
-          <p className="text-sm font-semibold text-[#111]">
+          <p className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>
             {settings.online ? "Listed on website" : "Not listed on website"}
           </p>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
             {settings.online
               ? "Customers can find and purchase this product online."
               : "Toggle on to make this product visible in your online store."}
@@ -175,12 +169,9 @@ export function EcommerceTab({ product }: { product: CatalogProduct }) {
         </div>
         <div className="flex items-center gap-3">
           {settings.online && (
-            <a
-              href={storeUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
-            >
+            <a href={storeUrl} target="_blank" rel="noreferrer"
+              className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-semibold shadow-[var(--shadow-sm)] transition-colors hover:bg-[var(--color-surface-subtle)]"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}>
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
@@ -198,17 +189,14 @@ export function EcommerceTab({ product }: { product: CatalogProduct }) {
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <FieldLabel>Online Price ($)</FieldLabel>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className={FLD}
+                <input type="number" step="0.01" min="0"
+                  className={FLD_CLS} style={FLD_STYLE}
                   value={settings.online_price_cents != null ? (settings.online_price_cents / 100).toFixed(2) : ""}
                   onChange={(e) => set("online_price_cents", e.target.value ? Math.round(parseFloat(e.target.value) * 100) : null)}
                   placeholder={`${(product.price_cents / 100).toFixed(2)} (same as in-store)`}
                 />
                 {inStoreDiff && (
-                  <p className={`mt-1 text-xs ${displayPrice < product.price_cents ? "text-emerald-600" : "text-amber-600"}`}>
+                  <p className={`mt-1 text-[11px] ${displayPrice < product.price_cents ? "text-emerald-600" : "text-amber-600"}`}>
                     {displayPrice < product.price_cents
                       ? `${formatMoney(product.price_cents - displayPrice)} below in-store price`
                       : `${formatMoney(displayPrice - product.price_cents)} above in-store price`}
@@ -217,10 +205,11 @@ export function EcommerceTab({ product }: { product: CatalogProduct }) {
               </div>
               <div>
                 <FieldLabel>Display Price</FieldLabel>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-[#111]">
+                <div className="rounded-lg border px-3 py-2 text-[13px] font-semibold"
+                  style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-primary)" }}>
                   {formatMoney(displayPrice)}
                   {inStoreDiff && (
-                    <span className="ml-2 text-xs font-normal text-slate-400">overrides {formatMoney(product.price_cents)}</span>
+                    <span className="ml-2 text-[11px] font-normal" style={{ color: "var(--color-text-muted)" }}>overrides {formatMoney(product.price_cents)}</span>
                   )}
                 </div>
               </div>
@@ -231,22 +220,16 @@ export function EcommerceTab({ product }: { product: CatalogProduct }) {
           <Section title="Listing Details" hint="Customize how this product appears to customers online.">
             <div>
               <FieldLabel>Display Title</FieldLabel>
-              <input
-                className={FLD}
-                value={settings.online_title ?? ""}
-                onChange={(e) => set("online_title", e.target.value || null)}
-                placeholder={product.name}
-              />
-              <p className="mt-1 text-[11px] text-slate-400">Leave blank to use the product name: <em>{product.name}</em></p>
+              <input className={FLD_CLS} style={FLD_STYLE}
+                value={settings.online_title ?? ""} onChange={(e) => set("online_title", e.target.value || null)}
+                placeholder={product.name} />
+              <p className="mt-1 text-[11px]" style={{ color: "var(--color-text-muted)" }}>Leave blank to use the product name: <em>{product.name}</em></p>
             </div>
             <div>
               <FieldLabel>Online Description</FieldLabel>
-              <textarea
-                className={AREA}
-                value={settings.online_description ?? ""}
-                onChange={(e) => set("online_description", e.target.value || null)}
-                placeholder="Describe this product for online customers…"
-              />
+              <textarea className={AREA_CLS} style={FLD_STYLE}
+                value={settings.online_description ?? ""} onChange={(e) => set("online_description", e.target.value || null)}
+                placeholder="Describe this product for online customers…" />
             </div>
           </Section>
 
@@ -263,24 +246,14 @@ export function EcommerceTab({ product }: { product: CatalogProduct }) {
             </div>
             {settings.images.length < 5 && (
               <div className="flex gap-2">
-                <input
-                  className={`${FLD} flex-1`}
-                  value={newImageUrl}
-                  onChange={(e) => setNewImageUrl(e.target.value)}
+                <input className={`${FLD_CLS} flex-1`} style={FLD_STYLE}
+                  value={newImageUrl} onChange={(e) => setNewImageUrl(e.target.value)}
                   placeholder="https://example.com/image.jpg"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && newImageUrl.trim()) {
-                      set("images", [...settings.images, newImageUrl.trim()]);
-                      setNewImageUrl("");
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  disabled={!newImageUrl.trim()}
+                  onKeyDown={(e) => { if (e.key === "Enter" && newImageUrl.trim()) { set("images", [...settings.images, newImageUrl.trim()]); setNewImageUrl(""); } }} />
+                <button type="button" disabled={!newImageUrl.trim()}
                   onClick={() => { set("images", [...settings.images, newImageUrl.trim()]); setNewImageUrl(""); }}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-                >
+                  className="rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)] disabled:opacity-40"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
                   Add
                 </button>
               </div>
@@ -291,46 +264,38 @@ export function EcommerceTab({ product }: { product: CatalogProduct }) {
           <Section title="SEO & URL" hint="Control how search engines and the URL display this product.">
             <div>
               <FieldLabel>URL Slug</FieldLabel>
-              <div className="flex items-center overflow-hidden rounded-lg border border-slate-200 focus-within:border-brand-600">
-                <span className="shrink-0 bg-slate-50 px-3 py-2 text-xs text-slate-400 border-r border-slate-200">/store/</span>
-                <input
-                  className="flex-1 px-3 py-2 text-sm outline-none"
-                  value={settings.seo_slug ?? ""}
-                  onChange={(e) => set("seo_slug", e.target.value)}
-                  placeholder={slugify(product.name)}
-                />
+              <div className="flex items-center overflow-hidden rounded-lg border focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20"
+                style={{ borderColor: "var(--color-border)" }}>
+                <span className="shrink-0 border-r px-3 py-2 text-[11px]"
+                  style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }}>/store/</span>
+                <input className="flex-1 bg-transparent px-3 py-2 text-[13px] outline-none"
+                  style={{ color: "var(--color-text-primary)" }}
+                  value={settings.seo_slug ?? ""} onChange={(e) => set("seo_slug", e.target.value)}
+                  placeholder={slugify(product.name)} />
               </div>
             </div>
             <div>
               <FieldLabel>Meta Title</FieldLabel>
-              <input
-                className={FLD}
-                value={settings.seo_title ?? ""}
-                onChange={(e) => set("seo_title", e.target.value || null)}
-                placeholder={settings.online_title ?? product.name}
-                maxLength={60}
-              />
-              <p className="mt-1 text-[11px] text-slate-400">{(settings.seo_title ?? "").length}/60 characters</p>
+              <input className={FLD_CLS} style={FLD_STYLE}
+                value={settings.seo_title ?? ""} onChange={(e) => set("seo_title", e.target.value || null)}
+                placeholder={settings.online_title ?? product.name} maxLength={60} />
+              <p className="mt-1 text-[10px]" style={{ color: "var(--color-text-muted)" }}>{(settings.seo_title ?? "").length}/60 characters</p>
             </div>
             <div>
               <FieldLabel>Meta Description</FieldLabel>
-              <textarea
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none min-h-[60px] resize-y"
-                value={settings.seo_description ?? ""}
-                onChange={(e) => set("seo_description", e.target.value || null)}
-                placeholder="Brief description for search engines…"
-                maxLength={160}
-              />
-              <p className="mt-1 text-[11px] text-slate-400">{(settings.seo_description ?? "").length}/160 characters</p>
+              <textarea className={`${AREA_CLS} min-h-[60px]`} style={FLD_STYLE}
+                value={settings.seo_description ?? ""} onChange={(e) => set("seo_description", e.target.value || null)}
+                placeholder="Brief description for search engines…" maxLength={160} />
+              <p className="mt-1 text-[10px]" style={{ color: "var(--color-text-muted)" }}>{(settings.seo_description ?? "").length}/160 characters</p>
             </div>
 
             {/* SERP preview */}
             {(settings.seo_title || settings.seo_description) && (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Search preview</p>
-                <p className="text-sm font-medium text-blue-600 truncate">{settings.seo_title ?? settings.online_title ?? product.name}</p>
-                <p className="text-xs text-emerald-700">yourstore.com/store/{settings.seo_slug ?? slugify(product.name)}</p>
-                <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{settings.seo_description ?? settings.online_description ?? product.name}</p>
+              <div className="rounded-xl border p-3" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-secondary)" }}>Search preview</p>
+                <p className="truncate text-[13px] font-medium text-blue-600">{settings.seo_title ?? settings.online_title ?? product.name}</p>
+                <p className="text-[11px] text-emerald-700">yourstore.com/store/{settings.seo_slug ?? slugify(product.name)}</p>
+                <p className="mt-0.5 line-clamp-2 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{settings.seo_description ?? settings.online_description ?? product.name}</p>
               </div>
             )}
           </Section>
@@ -339,17 +304,18 @@ export function EcommerceTab({ product }: { product: CatalogProduct }) {
           {variants.length > 0 && (
             <Section title="Variant Visibility" hint="Control which variants customers can see and purchase online.">
               {loadingVariants ? (
-                <div className="space-y-2">{[1,2,3].map((i) => <div key={i} className="h-10 animate-pulse rounded bg-slate-100"/>)}</div>
+                <div className="space-y-2">{[1,2,3].map((i) => <div key={i} className="h-10 animate-skeleton rounded-lg"/>)}</div>
               ) : (
-                <div className="divide-y divide-slate-100 rounded-lg border border-slate-200 overflow-hidden">
+                <div className="overflow-hidden rounded-xl border divide-y divide-[var(--color-table-border)]"
+                  style={{ borderColor: "var(--color-border)" }}>
                   {variants.map((v) => (
                     <div key={v.id} className="flex items-center gap-3 px-4 py-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-[#111] truncate">{v.name}</p>
-                        <p className="text-xs text-slate-400">{v.sku} · {formatMoney(v.price_cents)}</p>
+                        <p className="truncate text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>{v.name}</p>
+                        <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{v.sku} · {formatMoney(v.price_cents)}</p>
                       </div>
                       {v.variant_label && (
-                        <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-semibold text-brand-600 shrink-0">
+                        <span className="shrink-0 rounded-full bg-brand-600/10 px-2 py-0.5 text-[11px] font-semibold text-brand-600">
                           {v.variant_label}
                         </span>
                       )}
@@ -365,14 +331,10 @@ export function EcommerceTab({ product }: { product: CatalogProduct }) {
 
       {/* ── Save bar ────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-end gap-3">
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {saved && <span className="text-sm font-medium text-emerald-600">Saved</span>}
-        <button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={saving}
-          className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors"
-        >
+        {error && <p className="text-[13px] text-red-600">{error}</p>}
+        {saved && <span className="text-[13px] font-medium text-emerald-600">Saved</span>}
+        <button type="button" onClick={() => void handleSave()} disabled={saving}
+          className="rounded-xl bg-brand-600 px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors">
           {saving ? "Saving…" : "Save online settings"}
         </button>
       </div>

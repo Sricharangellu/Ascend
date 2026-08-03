@@ -66,23 +66,20 @@ export function SalesTab({ productId }: { productId: string }) {
 
       {/* Period filter */}
       <div className="flex items-center justify-between">
-        <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+        <div className="flex gap-1 rounded-xl border p-1 shadow-[var(--shadow-sm)]"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
           {PERIODS.map(({ key, label }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setPeriod(key)}
-              className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-                period === key
-                  ? "bg-brand-600 text-white"
-                  : "text-slate-500 hover:text-[#111]"
+            <button key={key} type="button" onClick={() => setPeriod(key)}
+              className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+                period === key ? "bg-brand-600 text-white" : "hover:bg-[var(--color-surface-subtle)]"
               }`}
-            >
+              style={period !== key ? { color: "var(--color-text-secondary)" } : {}}>
               {label}
             </button>
           ))}
         </div>
-        <button type="button" onClick={() => void load()} className="text-xs text-slate-400 hover:text-[#111]">
+        <button type="button" onClick={() => void load()} className="text-[11px] transition-colors hover:text-[var(--color-text-primary)]"
+          style={{ color: "var(--color-text-muted)" }}>
           Refresh
         </button>
       </div>
@@ -95,57 +92,60 @@ export function SalesTab({ productId }: { productId: string }) {
           { label: "Revenue",       value: formatMoney(totalRevenue) },
           { label: "Avg order",     value: formatMoney(avgOrder) },
         ].map(({ label, value }) => (
-          <div key={label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs text-slate-500">{label}</p>
-            <p className="mt-1 text-xl font-bold text-slate-900">{value}</p>
+          <div key={label} className="rounded-xl border p-4 shadow-[var(--shadow-sm)]"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+            <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{label}</p>
+            <p className="mt-1 text-[20px] font-bold" style={{ color: "var(--color-text-primary)" }}>{value}</p>
           </div>
         ))}
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
-          <h3 className="text-sm font-semibold text-[#111]">Sales history</h3>
-          <span className="text-xs text-slate-400">{items.length} records</span>
+      <div className="overflow-hidden rounded-xl border shadow-[var(--shadow-sm)]"
+        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <div className="flex items-center justify-between border-b px-5 py-3.5" style={{ borderColor: "var(--color-border)" }}>
+          <h3 className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Sales history</h3>
+          <span className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{items.length} records</span>
         </div>
 
         {loading ? (
-          <div className="space-y-2 p-4">{[1,2,3,4].map((i)=><div key={i} className="h-10 animate-pulse rounded bg-slate-100"/>)}</div>
+          <div className="space-y-2 p-4">{[1,2,3,4].map((i)=><div key={i} className="h-10 animate-skeleton rounded-lg"/>)}</div>
         ) : error ? (
-          <p className="px-5 py-4 text-sm text-red-600">{error}</p>
+          <p className="px-5 py-4 text-[13px]" style={{ color: "var(--color-danger-text)" }}>{error}</p>
         ) : items.length === 0 ? (
-          <p className="px-5 py-10 text-center text-sm text-slate-400">
+          <p className="px-5 py-10 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>
             No sales in the selected period.
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                <tr>
-                  <th className="px-4 py-3 text-left">Sale #</th>
-                  <th className="px-4 py-3 text-left">Date</th>
+            <table className="w-full text-[13px]">
+              <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+                <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.06em]"
+                  style={{ color: "var(--color-text-secondary)" }}>
+                  <th className="px-4 py-3">Sale #</th>
+                  <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3 text-right">Qty</th>
                   <th className="px-4 py-3 text-right">Unit price</th>
                   <th className="px-4 py-3 text-right">Tax</th>
                   <th className="px-4 py-3 text-right">Total</th>
-                  <th className="px-4 py-3 text-left">Customer</th>
-                  <th className="px-4 py-3 text-left">Cashier</th>
-                  <th className="px-4 py-3 text-left">Payment</th>
+                  <th className="px-4 py-3">Customer</th>
+                  <th className="px-4 py-3">Cashier</th>
+                  <th className="px-4 py-3">Payment</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-[var(--color-table-border)]">
                 {items.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-mono text-xs font-semibold text-brand-600">{s.sale_number}</td>
-                    <td className="px-4 py-3 text-slate-600">{fmtDate(s.date)}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-900">{s.quantity}</td>
-                    <td className="px-4 py-3 text-right text-slate-600">{formatMoney(s.unit_price_cents)}</td>
-                    <td className="px-4 py-3 text-right text-slate-500">{formatMoney(s.tax_cents)}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-900">{formatMoney(s.total_cents)}</td>
-                    <td className="px-4 py-3 text-slate-600">{s.customer_name ?? <span className="text-slate-400">Walk-in</span>}</td>
-                    <td className="px-4 py-3 text-slate-600">{s.cashier_name}</td>
+                  <tr key={s.id} className="transition-colors hover:bg-[var(--color-table-row-hover)]">
+                    <td className="px-4 py-3 font-mono text-[11px] font-semibold text-brand-600">{s.sale_number}</td>
+                    <td className="px-4 py-3 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{fmtDate(s.date)}</td>
+                    <td className="px-4 py-3 text-right font-semibold" style={{ color: "var(--color-text-primary)" }}>{s.quantity}</td>
+                    <td className="px-4 py-3 text-right text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{formatMoney(s.unit_price_cents)}</td>
+                    <td className="px-4 py-3 text-right text-[11px]" style={{ color: "var(--color-text-muted)" }}>{formatMoney(s.tax_cents)}</td>
+                    <td className="px-4 py-3 text-right font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(s.total_cents)}</td>
+                    <td className="px-4 py-3 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{s.customer_name ?? <span style={{ color: "var(--color-text-muted)" }}>Walk-in</span>}</td>
+                    <td className="px-4 py-3 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{s.cashier_name}</td>
                     <td className="px-4 py-3">
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${METHOD_COLOR[s.payment_method] ?? "bg-slate-100 text-slate-600"}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${METHOD_COLOR[s.payment_method] ?? "bg-slate-100 text-slate-600"}`}>
                         {METHOD_LABEL[s.payment_method] ?? s.payment_method}
                       </span>
                     </td>

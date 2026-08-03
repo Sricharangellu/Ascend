@@ -34,9 +34,14 @@ function fmtDate(ts: number | null) {
 }
 
 function TrendBadge({ trend }: { trend: "up" | "down" | "stable" }) {
-  if (trend === "up")     return <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">↑ Rising</span>;
-  if (trend === "down")   return <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">↓ Falling</span>;
-  return <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">→ Stable</span>;
+  if (trend === "up")   return <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">↑ Rising</span>;
+  if (trend === "down") return <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">↓ Falling</span>;
+  return (
+    <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+      style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
+      → Stable
+    </span>
+  );
 }
 
 function MiniSparkline({ history, min, max }: { history: PricePoint[]; min: number; max: number }) {
@@ -80,17 +85,23 @@ export function SupplierPriceComparisonTab({ productId }: { productId: string })
 
   if (loading) return (
     <div className="space-y-3">
-      {[1, 2, 3].map((i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100" />)}
+      {[1, 2, 3].map((i) => <div key={i} className="h-20 animate-skeleton rounded-xl" />)}
     </div>
   );
 
-  if (error) return <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>;
+  if (error) return (
+    <p role="alert" className="rounded-xl border px-4 py-3 text-[13px]"
+      style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>
+      {error}
+    </p>
+  );
+
   if (!data || data.items.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center">
-        <p className="text-sm text-slate-400">No supplier pricing data available.</p>
+      <div className="rounded-xl border border-dashed py-12 text-center" style={{ borderColor: "var(--color-border)" }}>
+        <p className="text-[13px]" style={{ color: "var(--color-text-muted)" }}>No supplier pricing data available.</p>
         <button type="button" onClick={() => router.push(`/catalog/${productId}?tab=suppliers`)}
-          className="mt-2 text-sm text-brand-600 hover:underline">
+          className="mt-2 text-[13px] text-brand-600 hover:underline">
           Add a supplier
         </button>
       </div>
@@ -112,17 +123,17 @@ export function SupplierPriceComparisonTab({ productId }: { productId: string })
   return (
     <div className="space-y-5">
 
-      {/* ── Best price callout ────────────────────────────────────────────────── */}
+      {/* ── Best price callout ─────────────────────────────────────────────── */}
       {cheapest && (
         <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4">
           <svg className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
           <div>
-            <p className="text-sm font-semibold text-emerald-900">
+            <p className="text-[13px] font-semibold text-emerald-900">
               Best price: {formatMoney(cheapest.last_cost_cents)}/unit from {cheapest.supplier_name}
             </p>
-            <p className="mt-0.5 text-xs text-emerald-700">
+            <p className="mt-0.5 text-[11px] text-emerald-700">
               {data.items.length > 1
                 ? `Saves ${formatMoney(data.items.reduce((max, s) => Math.max(max, s.last_cost_cents - cheapest.last_cost_cents), 0))}/unit vs most expensive option`
                 : "Only supplier on record"}
@@ -131,35 +142,39 @@ export function SupplierPriceComparisonTab({ productId }: { productId: string })
         </div>
       )}
 
-      {/* ── Comparison table ──────────────────────────────────────────────────── */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
-          <h3 className="text-sm font-semibold text-slate-900">Supplier pricing comparison</h3>
-          <p className="text-xs text-slate-400">Retail price: {formatMoney(data.current_retail_price_cents)}</p>
+      {/* ── Comparison table ───────────────────────────────────────────────── */}
+      <div className="overflow-hidden rounded-xl border shadow-[var(--shadow-sm)]"
+        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <div className="border-b px-5 py-3" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
+          <h3 className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Supplier pricing comparison</h3>
+          <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>Retail price: {formatMoney(data.current_retail_price_cents)}</p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-slate-100">
-              <tr className="text-left">
-                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Supplier</th>
-                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Vendor SKU</th>
-                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Unit Cost</th>
-                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Landed Cost</th>
-                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Margin</th>
-                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">MOQ</th>
-                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Lead Time</th>
-                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">30d Trend</th>
-                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Price History</th>
-                <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Last Order</th>
+          <table className="w-full text-[13px]">
+            <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+              <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.06em]"
+                style={{ color: "var(--color-text-secondary)" }}>
+                <th className="px-5 py-2.5">Supplier</th>
+                <th className="px-5 py-2.5">Vendor SKU</th>
+                <th className="px-5 py-2.5">Unit Cost</th>
+                <th className="px-5 py-2.5">Landed Cost</th>
+                <th className="px-5 py-2.5">Margin</th>
+                <th className="px-5 py-2.5">MOQ</th>
+                <th className="px-5 py-2.5">Lead Time</th>
+                <th className="px-5 py-2.5">30d Trend</th>
+                <th className="px-5 py-2.5">Price History</th>
+                <th className="px-5 py-2.5">Last Order</th>
                 <th className="px-5 py-2.5" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[var(--color-table-border)]">
               {sortedItems.map((s, i) => {
                 const isBest = s.last_cost_cents === cheapest?.last_cost_cents;
                 const margin = retailMargins.find((m) => m.id === s.supplier_id)?.margin ?? 0;
                 return (
-                  <tr key={s.supplier_id} className={`hover:bg-slate-50/70 transition-colors ${isBest ? "bg-emerald-50/30" : ""}`}>
+                  <tr key={s.supplier_id}
+                    className="transition-colors hover:bg-[var(--color-table-row-hover)]"
+                    style={isBest ? { backgroundColor: "rgba(16,185,129,0.04)" } : {}}>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-2">
                         {isBest && (
@@ -168,42 +183,41 @@ export function SupplierPriceComparisonTab({ productId }: { productId: string })
                         {s.is_preferred && (
                           <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-blue-700">Preferred</span>
                         )}
-                        <span className="font-medium text-slate-900">{s.supplier_name}</span>
+                        <span className="font-medium" style={{ color: "var(--color-text-primary)" }}>{s.supplier_name}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 text-xs text-slate-500">{s.vendor_sku ?? "—"}</td>
+                    <td className="px-5 py-3.5 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{s.vendor_sku ?? "—"}</td>
                     <td className="px-5 py-3.5">
-                      <span className={`font-semibold ${isBest ? "text-emerald-700" : i === sortedItems.length - 1 ? "text-red-600" : "text-slate-900"}`}>
+                      <span className={`font-semibold ${isBest ? "text-emerald-700" : i === sortedItems.length - 1 ? "text-red-600" : ""}`}
+                        style={!isBest && i !== sortedItems.length - 1 ? { color: "var(--color-text-primary)" } : {}}>
                         {formatMoney(s.last_cost_cents)}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-xs text-slate-600">{formatMoney(s.landed_cost_cents)}</td>
+                    <td className="px-5 py-3.5 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{formatMoney(s.landed_cost_cents)}</td>
                     <td className="px-5 py-3.5">
-                      <span className={`text-xs font-semibold ${
+                      <span className={`text-[11px] font-semibold ${
                         margin >= 35 ? "text-emerald-700" : margin >= 20 ? "text-amber-600" : "text-red-600"
                       }`}>
                         {margin.toFixed(1)}%
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-xs text-slate-600">{s.moq ?? "—"}</td>
-                    <td className="px-5 py-3.5 text-xs text-slate-600">{s.lead_time_days != null ? `${s.lead_time_days}d` : "—"}</td>
+                    <td className="px-5 py-3.5 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{s.moq ?? "—"}</td>
+                    <td className="px-5 py-3.5 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{s.lead_time_days != null ? `${s.lead_time_days}d` : "—"}</td>
                     <td className="px-5 py-3.5"><TrendBadge trend={s.price_30d_trend} /></td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-end gap-2">
                         <MiniSparkline history={s.price_history} min={minCost} max={maxCost} />
                         <div className="text-right">
-                          <p className="text-[10px] text-slate-400">Low: {formatMoney(Math.min(...s.price_history.map((p) => p.cost)))}</p>
-                          <p className="text-[10px] text-slate-400">High: {formatMoney(Math.max(...s.price_history.map((p) => p.cost)))}</p>
+                          <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>Low: {formatMoney(Math.min(...s.price_history.map((p) => p.cost)))}</p>
+                          <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>High: {formatMoney(Math.max(...s.price_history.map((p) => p.cost)))}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 text-xs text-slate-500">{fmtDate(s.last_purchase_date)}</td>
+                    <td className="px-5 py-3.5 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{fmtDate(s.last_purchase_date)}</td>
                     <td className="px-5 py-3.5">
-                      <button
-                        type="button"
+                      <button type="button"
                         onClick={() => router.push(`/purchasing/new?supplier=${s.supplier_id}&product=${productId}`)}
-                        className="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-600 whitespace-nowrap"
-                      >
+                        className="whitespace-nowrap rounded-lg bg-brand-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-[#4849d0] transition-colors">
                         Create PO
                       </button>
                     </td>
@@ -215,15 +229,16 @@ export function SupplierPriceComparisonTab({ productId }: { productId: string })
         </div>
       </div>
 
-      {/* ── Price history detail ──────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">Price history (last 90 days)</h3>
+      {/* ── Price history detail ───────────────────────────────────────────── */}
+      <div className="rounded-xl border p-5 shadow-[var(--shadow-sm)]"
+        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <h3 className="mb-4 text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Price history (last 90 days)</h3>
         <div className="space-y-4">
           {sortedItems.map((s) => (
             <div key={s.supplier_id}>
               <div className="mb-1.5 flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-700">{s.supplier_name}</span>
-                <span className="text-xs text-slate-400">Current: {formatMoney(s.last_cost_cents)}</span>
+                <span className="text-[12px] font-medium" style={{ color: "var(--color-text-secondary)" }}>{s.supplier_name}</span>
+                <span className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>Current: {formatMoney(s.last_cost_cents)}</span>
               </div>
               <div className="flex gap-3">
                 {s.price_history.map((point, idx) => {
@@ -239,8 +254,8 @@ export function SupplierPriceComparisonTab({ productId }: { productId: string })
                           style={{ height: `${Math.max(8, pct)}%` }}
                         />
                       </div>
-                      <p className="text-[10px] text-slate-900 font-semibold">{formatMoney(point.cost)}</p>
-                      <p className="text-[9px] text-slate-400">
+                      <p className="text-[10px] font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(point.cost)}</p>
+                      <p className="text-[9px]" style={{ color: "var(--color-text-muted)" }}>
                         {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(point.date))}
                       </p>
                     </div>

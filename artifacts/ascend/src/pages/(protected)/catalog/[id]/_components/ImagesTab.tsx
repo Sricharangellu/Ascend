@@ -83,11 +83,16 @@ export function ImagesTab({ productId }: { productId: string }) {
 
   if (loading) return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-      {[1, 2, 3].map((i) => <div key={i} className="aspect-square animate-pulse rounded-xl bg-slate-100" />)}
+      {[1, 2, 3].map((i) => <div key={i} className="aspect-square animate-skeleton rounded-xl" />)}
     </div>
   );
 
-  if (error) return <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>;
+  if (error) return (
+    <p role="alert" className="rounded-xl border px-4 py-3 text-[13px]"
+      style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>
+      {error}
+    </p>
+  );
 
   return (
     <div className="space-y-5">
@@ -95,40 +100,36 @@ export function ImagesTab({ productId }: { productId: string }) {
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold text-slate-700">Product Images</p>
-          <p className="text-xs text-slate-400">{images.length} image{images.length !== 1 ? "s" : ""} · Add via URL</p>
+          <p className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Product Images</p>
+          <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{images.length} image{images.length !== 1 ? "s" : ""} · Add via URL</p>
         </div>
         <Button size="sm" variant="secondary" onClick={openAdd}>+ Add image</Button>
       </div>
 
       {/* ── Add image form ─────────────────────────────────────────────────── */}
       {showAdd && (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Add Image via URL</p>
+        <div className="space-y-3 rounded-xl border p-4" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-secondary)" }}>Add Image via URL</p>
           <div className="space-y-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">Image URL *</label>
-              <input
-                ref={urlRef}
-                className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-                value={urlInput}
-                onChange={(e) => { setUrlInput(e.target.value); setUrlError(""); }}
-                placeholder="https://example.com/image.jpg"
-              />
-              {urlError && <p className="mt-1 text-xs text-red-600">{urlError}</p>}
+              <label className="mb-1 block text-[12px] font-medium" style={{ color: "var(--color-text-secondary)" }}>Image URL *</label>
+              <input ref={urlRef}
+                className="w-full rounded-lg border px-3 py-2 text-[13px] outline-none transition-all focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+                value={urlInput} onChange={(e) => { setUrlInput(e.target.value); setUrlError(""); }}
+                placeholder="https://example.com/image.jpg" />
+              {urlError && <p className="mt-1 text-[11px] text-red-600">{urlError}</p>}
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">Alt text</label>
+              <label className="mb-1 block text-[12px] font-medium" style={{ color: "var(--color-text-secondary)" }}>Alt text</label>
               <input
-                className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-                value={altInput}
-                onChange={(e) => setAltInput(e.target.value)}
-                placeholder="Describe the image"
-              />
+                className="w-full rounded-lg border px-3 py-2 text-[13px] outline-none transition-all focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+                value={altInput} onChange={(e) => setAltInput(e.target.value)} placeholder="Describe the image" />
             </div>
           </div>
           {urlInput && !urlError && (
-            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <div className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={urlInput} alt="Preview" className="max-h-40 w-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
             </div>
@@ -144,58 +145,44 @@ export function ImagesTab({ productId }: { productId: string }) {
 
       {/* ── Image grid ─────────────────────────────────────────────────────── */}
       {images.length === 0 && !showAdd ? (
-        <div className="rounded-lg border border-dashed border-slate-200 py-16 text-center">
-          <svg className="mx-auto mb-3 h-10 w-10 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <div className="rounded-xl border border-dashed py-16 text-center" style={{ borderColor: "var(--color-border)" }}>
+          <svg className="mx-auto mb-3 h-10 w-10" style={{ color: "var(--color-border)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
           </svg>
-          <p className="text-sm text-slate-400">No images yet</p>
+          <p className="text-[13px]" style={{ color: "var(--color-text-muted)" }}>No images yet</p>
           <Button size="sm" variant="secondary" className="mt-3" onClick={openAdd}>Add first image</Button>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {images.map((img) => (
-            <div key={img.id} className={`group relative overflow-hidden rounded-xl border-2 bg-white shadow-sm transition-all ${img.is_primary ? "border-brand-600" : "border-slate-200 hover:border-slate-300"}`}>
-              {/* Image */}
-              <div className="aspect-square overflow-hidden bg-slate-50">
+            <div key={img.id} className={`group relative overflow-hidden rounded-xl border-2 shadow-[var(--shadow-sm)] transition-all ${img.is_primary ? "border-brand-600" : "hover:border-brand-400"}`}
+              style={!img.is_primary ? { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" } : { backgroundColor: "var(--color-surface)" }}>
+              <div className="aspect-square overflow-hidden" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={img.image_url}
-                  alt={img.alt_text ?? "Product image"}
+                <img src={img.image_url} alt={img.alt_text ?? "Product image"}
                   className="h-full w-full object-cover transition-transform group-hover:scale-105"
                   onError={(e) => {
                     const el = e.target as HTMLImageElement;
                     el.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23f1f5f9'/%3E%3Ctext x='50' y='55' text-anchor='middle' fill='%2394a3b8' font-size='12'%3ENo preview%3C/text%3E%3C/svg%3E";
-                  }}
-                />
+                  }} />
               </div>
-
-              {/* Primary badge */}
               {img.is_primary && (
                 <div className="absolute left-2 top-2">
                   <Badge variant="blue">Primary</Badge>
                 </div>
               )}
-
-              {/* Actions overlay on hover */}
-              <div className="absolute inset-x-0 bottom-0 flex translate-y-full flex-col gap-1 bg-white/95 p-2 shadow-md transition-transform group-hover:translate-y-0">
-                {img.alt_text && <p className="truncate text-[11px] text-slate-400">"{img.alt_text}"</p>}
+              <div className="absolute inset-x-0 bottom-0 flex translate-y-full flex-col gap-1 p-2 shadow-md transition-transform group-hover:translate-y-0"
+                style={{ backgroundColor: "var(--color-surface)" }}>
+                {img.alt_text && <p className="truncate text-[10px]" style={{ color: "var(--color-text-muted)" }}>"{img.alt_text}"</p>}
                 <div className="flex gap-1">
                   {!img.is_primary && (
-                    <button
-                      type="button"
-                      onClick={() => void setPrimary(img)}
-                      disabled={busy}
-                      className="flex-1 rounded border border-brand-600/30 py-1 text-[11px] font-medium text-brand-600 hover:bg-brand-600/5 disabled:opacity-40"
-                    >
+                    <button type="button" onClick={() => void setPrimary(img)} disabled={busy}
+                      className="flex-1 rounded-lg border border-brand-600/30 py-1 text-[11px] font-medium text-brand-600 hover:bg-brand-600/5 disabled:opacity-40 transition-colors">
                       Set primary
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => void removeImage(img)}
-                    disabled={busy}
-                    className="flex-1 rounded border border-red-200 py-1 text-[11px] font-medium text-red-500 hover:bg-red-50 disabled:opacity-40"
-                  >
+                  <button type="button" onClick={() => void removeImage(img)} disabled={busy}
+                    className="flex-1 rounded-lg border border-red-200 py-1 text-[11px] font-medium text-red-500 hover:bg-red-50 disabled:opacity-40 transition-colors">
                     Remove
                   </button>
                 </div>
@@ -203,16 +190,13 @@ export function ImagesTab({ productId }: { productId: string }) {
             </div>
           ))}
 
-          {/* Add placeholder */}
-          <button
-            type="button"
-            onClick={openAdd}
-            className="flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-white text-slate-400 transition-colors hover:border-brand-600 hover:text-brand-600"
-          >
+          <button type="button" onClick={openAdd}
+            className="flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed transition-colors hover:border-brand-600 hover:text-brand-600"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
-            <span className="text-xs font-medium">Add image</span>
+            <span className="text-[11px] font-medium">Add image</span>
           </button>
         </div>
       )}

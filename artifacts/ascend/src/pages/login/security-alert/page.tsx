@@ -36,7 +36,8 @@ export default function SecurityAlertPage() {
           Preview: this event isn&apos;t actually recorded and no sessions are actually signed out yet.
         </div>
 
-        <dl className="mt-6 flex flex-col gap-2 rounded-lg border border-danger-200 bg-danger-50 p-4 text-sm dark:border-danger-700/40 dark:bg-danger-700/10">
+        <dl className="mt-6 flex flex-col gap-2 rounded-xl border p-4 text-[13px]"
+          style={{ borderColor: "var(--color-danger-border)", backgroundColor: "var(--color-danger-bg)" }}>
           <Row label="Device" value={MOCK_EVENT.browser} />
           <Row label="Location" value={MOCK_EVENT.location} />
           <Row label="IP address" value={MOCK_EVENT.ip} />
@@ -66,8 +67,8 @@ export default function SecurityAlertPage() {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <dt className="text-slate-600 dark:text-slate-400">{label}</dt>
-      <dd className="font-medium text-slate-900 dark:text-white">{value}</dd>
+      <dt style={{ color: "var(--color-danger-text)" }}>{label}</dt>
+      <dd className="font-medium" style={{ color: "var(--color-text-primary)" }}>{value}</dd>
     </div>
   );
 }

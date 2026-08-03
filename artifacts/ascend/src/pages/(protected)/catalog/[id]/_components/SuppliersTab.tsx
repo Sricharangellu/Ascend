@@ -36,12 +36,13 @@ type SupplierForm = {
 
 const EMPTY_FORM: SupplierForm = { vendor_name: "", vendor_sku: "", cost_cents: "", lead_time_days: "", moq: "", case_pack: "", is_preferred: false, notes: "" };
 
-const INPUT = "w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600";
+const INPUT = "w-full rounded-lg border px-3 py-2 text-[13px] outline-none transition-all focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500";
+const INPUT_STYLE = { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" } as React.CSSProperties;
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-slate-500">{label}</label>
+      <label className="mb-1 block text-[12px] font-medium" style={{ color: "var(--color-text-secondary)" }}>{label}</label>
       {children}
     </div>
   );
@@ -110,48 +111,62 @@ export function SuppliersTab({ productId }: { productId: string }) {
 
   if (loading) return (
     <div className="space-y-3">
-      {[1, 2].map((i) => <div key={i} className="h-20 animate-pulse rounded-lg bg-slate-100" />)}
+      {[1, 2].map((i) => <div key={i} className="h-20 animate-skeleton rounded-xl" />)}
     </div>
   );
 
-  if (error) return <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>;
+  if (error) return (
+    <p role="alert" className="rounded-xl border px-4 py-3 text-[13px]"
+      style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>
+      {error}
+    </p>
+  );
 
   return (
     <div className="space-y-4">
 
       {/* ── Add / Edit form ──────────────────────────────────────────────── */}
       {showAdd && (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-5">
-          <p className="mb-4 text-sm font-semibold text-slate-700">{editId ? "Edit supplier" : "Add supplier"}</p>
+        <div className="rounded-xl border p-5" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
+          <p className="mb-4 text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>{editId ? "Edit supplier" : "Add supplier"}</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="col-span-2 sm:col-span-3">
               <Field label="Supplier / Vendor name *">
-                <input className={INPUT} value={form.vendor_name} onChange={(e) => setForm((f) => ({ ...f, vendor_name: e.target.value }))} placeholder="e.g. Acme Distributors" />
+                <input className={INPUT} style={INPUT_STYLE} value={form.vendor_name}
+                  onChange={(e) => setForm((f) => ({ ...f, vendor_name: e.target.value }))} placeholder="e.g. Acme Distributors" />
               </Field>
             </div>
             <Field label="Vendor SKU">
-              <input className={INPUT} value={form.vendor_sku} onChange={(e) => setForm((f) => ({ ...f, vendor_sku: e.target.value }))} placeholder="e.g. ACM-0042" />
+              <input className={INPUT} style={INPUT_STYLE} value={form.vendor_sku}
+                onChange={(e) => setForm((f) => ({ ...f, vendor_sku: e.target.value }))} placeholder="e.g. ACM-0042" />
             </Field>
             <Field label="Cost ($)">
-              <input type="number" step="0.01" min={0} className={INPUT} value={form.cost_cents} onChange={(e) => setForm((f) => ({ ...f, cost_cents: e.target.value }))} placeholder="0.00" />
+              <input type="number" step="0.01" min={0} className={INPUT} style={INPUT_STYLE} value={form.cost_cents}
+                onChange={(e) => setForm((f) => ({ ...f, cost_cents: e.target.value }))} placeholder="0.00" />
             </Field>
             <Field label="Lead Time (days)">
-              <input type="number" min={0} className={INPUT} value={form.lead_time_days} onChange={(e) => setForm((f) => ({ ...f, lead_time_days: e.target.value }))} placeholder="e.g. 5" />
+              <input type="number" min={0} className={INPUT} style={INPUT_STYLE} value={form.lead_time_days}
+                onChange={(e) => setForm((f) => ({ ...f, lead_time_days: e.target.value }))} placeholder="e.g. 5" />
             </Field>
             <Field label="MOQ (min order qty)">
-              <input type="number" min={1} className={INPUT} value={form.moq} onChange={(e) => setForm((f) => ({ ...f, moq: e.target.value }))} placeholder="e.g. 6" />
+              <input type="number" min={1} className={INPUT} style={INPUT_STYLE} value={form.moq}
+                onChange={(e) => setForm((f) => ({ ...f, moq: e.target.value }))} placeholder="e.g. 6" />
             </Field>
             <Field label="Case Pack">
-              <input type="number" min={1} className={INPUT} value={form.case_pack} onChange={(e) => setForm((f) => ({ ...f, case_pack: e.target.value }))} placeholder="e.g. 12" />
+              <input type="number" min={1} className={INPUT} style={INPUT_STYLE} value={form.case_pack}
+                onChange={(e) => setForm((f) => ({ ...f, case_pack: e.target.value }))} placeholder="e.g. 12" />
             </Field>
             <div className="col-span-2 sm:col-span-3">
               <Field label="Notes">
-                <input className={INPUT} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Optional notes about this supplier" />
+                <input className={INPUT} style={INPUT_STYLE} value={form.notes}
+                  onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Optional notes about this supplier" />
               </Field>
             </div>
-            <div className="col-span-2 sm:col-span-3 flex items-center gap-2">
-              <input type="checkbox" id="preferred" checked={form.is_preferred} onChange={(e) => setForm((f) => ({ ...f, is_preferred: e.target.checked }))} className="h-4 w-4 rounded border-slate-300 accent-brand-600" />
-              <label htmlFor="preferred" className="text-sm text-slate-600">Set as preferred supplier</label>
+            <div className="col-span-2 flex items-center gap-2 sm:col-span-3">
+              <input type="checkbox" id="preferred" checked={form.is_preferred}
+                onChange={(e) => setForm((f) => ({ ...f, is_preferred: e.target.checked }))}
+                className="h-4 w-4 rounded accent-brand-600" style={{ borderColor: "var(--color-border)" }} />
+              <label htmlFor="preferred" className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>Set as preferred supplier</label>
             </div>
           </div>
           <div className="mt-4 flex justify-end gap-2">
@@ -165,54 +180,57 @@ export function SuppliersTab({ productId }: { productId: string }) {
 
       {/* ── Supplier cards ───────────────────────────────────────────────── */}
       {suppliers.length === 0 && !showAdd ? (
-        <div className="rounded-lg border border-dashed border-slate-200 py-12 text-center">
-          <p className="text-sm text-slate-400">No suppliers linked to this product.</p>
+        <div className="rounded-xl border border-dashed py-12 text-center" style={{ borderColor: "var(--color-border)" }}>
+          <p className="text-[13px]" style={{ color: "var(--color-text-muted)" }}>No suppliers linked to this product.</p>
           <Button size="sm" variant="secondary" className="mt-3" onClick={openAdd}>Add first supplier</Button>
         </div>
       ) : (
         <>
           <div className="flex items-center justify-between">
-            <p className="text-sm text-slate-500">{suppliers.length} supplier{suppliers.length !== 1 ? "s" : ""}</p>
+            <p className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>{suppliers.length} supplier{suppliers.length !== 1 ? "s" : ""}</p>
             {!showAdd && <Button size="sm" variant="secondary" onClick={openAdd}>+ Add supplier</Button>}
           </div>
 
           <div className="space-y-3">
             {suppliers.map((s) => (
-              <div key={s.id} className={`rounded-lg border bg-white shadow-sm ${s.is_preferred ? "border-brand-600" : "border-slate-200"}`}>
+              <div key={s.id} className={`rounded-xl border shadow-[var(--shadow-sm)] ${s.is_preferred ? "border-brand-600" : ""}`}
+                style={!s.is_preferred ? { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" } : { backgroundColor: "var(--color-surface)" }}>
                 <div className="flex items-start justify-between px-5 py-4">
                   <div className="flex items-center gap-2">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-900">{s.vendor_name}</span>
+                        <span className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>{s.vendor_name}</span>
                         {s.is_preferred && <Badge variant="blue">Preferred</Badge>}
                       </div>
-                      {s.vendor_sku && <p className="text-xs text-slate-400 mt-0.5">Vendor SKU: {s.vendor_sku}</p>}
+                      {s.vendor_sku && <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-muted)" }}>Vendor SKU: {s.vendor_sku}</p>}
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
                     {!s.is_preferred && (
                       <button type="button" onClick={() => void setPreferred(s)} disabled={busy}
-                        className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40">
+                        className="rounded-lg border px-2 py-1 text-[11px] transition-colors hover:bg-[var(--color-surface-subtle)] disabled:opacity-40"
+                        style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
                         Set preferred
                       </button>
                     )}
                     <button type="button" onClick={() => openEdit(s)}
-                      className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">
+                      className="rounded-lg border px-2 py-1 text-[11px] transition-colors hover:bg-[var(--color-surface-subtle)]"
+                      style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
                       Edit
                     </button>
                     <button type="button" onClick={() => void remove(s)} disabled={busy}
-                      className="rounded border border-red-100 px-2 py-1 text-xs text-red-500 hover:bg-red-50 disabled:opacity-40">
+                      className="rounded-lg border border-red-100 px-2 py-1 text-[11px] text-red-500 hover:bg-red-50 disabled:opacity-40 transition-colors">
                       Remove
                     </button>
                   </div>
                 </div>
-                <div className="border-t border-slate-100 px-5 py-3">
-                  <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-500">
-                    <span>Cost: <strong className="text-slate-700">{s.cost_cents != null ? formatMoney(s.cost_cents) : "—"}</strong></span>
-                    <span>Lead time: <strong className="text-slate-700">{s.lead_time_days != null ? `${s.lead_time_days}d` : "—"}</strong></span>
-                    <span>MOQ: <strong className="text-slate-700">{s.moq ?? "—"}</strong></span>
-                    <span>Case pack: <strong className="text-slate-700">{s.case_pack ?? "—"}</strong></span>
-                    {s.notes && <span className="col-span-2 italic text-slate-400">"{s.notes}"</span>}
+                <div className="border-t px-5 py-3" style={{ borderColor: "var(--color-border)" }}>
+                  <div className="flex flex-wrap gap-x-6 gap-y-1 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
+                    <span>Cost: <strong style={{ color: "var(--color-text-primary)" }}>{s.cost_cents != null ? formatMoney(s.cost_cents) : "—"}</strong></span>
+                    <span>Lead time: <strong style={{ color: "var(--color-text-primary)" }}>{s.lead_time_days != null ? `${s.lead_time_days}d` : "—"}</strong></span>
+                    <span>MOQ: <strong style={{ color: "var(--color-text-primary)" }}>{s.moq ?? "—"}</strong></span>
+                    <span>Case pack: <strong style={{ color: "var(--color-text-primary)" }}>{s.case_pack ?? "—"}</strong></span>
+                    {s.notes && <span className="col-span-2 italic" style={{ color: "var(--color-text-muted)" }}>"{s.notes}"</span>}
                   </div>
                 </div>
               </div>

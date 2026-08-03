@@ -182,21 +182,17 @@ export default function MfaPage() {
           </div>
         )}
 
-        <div role="tablist" aria-label="Verification method" className="mb-5 grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
+        <div role="tablist" aria-label="Verification method" className="mb-5 grid grid-cols-3 gap-1 rounded-xl p-1"
+          style={{ backgroundColor: "var(--color-surface-subtle)" }}>
           {METHODS.map((m) => (
-            <button
-              key={m.key}
-              type="button"
-              role="tab"
-              aria-selected={method === m.key}
-              disabled={verifying}
-              onClick={() => switchMethod(m.key)}
-              className={`min-h-[36px] rounded-md px-2 text-xs font-medium transition-colors sm:text-sm ${
-                method === m.key
-                  ? "bg-white text-brand-700 shadow-sm dark:bg-slate-900 dark:text-brand-400"
-                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            <button key={m.key} type="button" role="tab" aria-selected={method === m.key}
+              disabled={verifying} onClick={() => switchMethod(m.key)}
+              className={`min-h-[36px] rounded-lg px-2 text-[11px] font-medium transition-colors sm:text-[13px] ${
+                method === m.key ? "shadow-sm" : "hover:text-[var(--color-text-primary)]"
               }`}
-            >
+              style={method === m.key
+                ? { backgroundColor: "var(--color-surface)", color: "var(--color-brand-600)" }
+                : { color: "var(--color-text-secondary)" }}>
               {m.label}
             </button>
           ))}

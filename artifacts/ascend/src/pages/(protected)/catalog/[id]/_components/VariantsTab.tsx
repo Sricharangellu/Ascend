@@ -50,10 +50,10 @@ function cartesian(arrays: string[][]): string[][] {
 const STATUS_COLOR: Record<string, string> = {
   active:   "bg-emerald-100 text-emerald-700",
   draft:    "bg-amber-100 text-amber-700",
-  archived: "bg-slate-100 text-slate-500",
+  archived: "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)]",
 };
 
-const FLD = "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none";
+const FLD = "w-full rounded-lg border px-3 py-2 text-[13px] outline-none transition-all focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500";
 
 // ── Value chips input ──────────────────────────────────────────────────────────
 // Enter-based value chips over the attribute's `values` array: type a value and
@@ -84,7 +84,8 @@ function ValueChipsInput({
   const removeAt = (i: number) => onChange(values.filter((_, idx) => idx !== i));
 
   return (
-    <div className="flex min-h-[2.5rem] w-full flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus-within:border-[#5D5FEF]">
+    <div className="flex min-h-[2.5rem] w-full flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[13px] focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 transition-all"
+      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
       {values.map((t, i) => (
         <span
           key={`${t}-${i}`}
@@ -167,7 +168,8 @@ function AttrRow({
         draggable
         onDragStart={() => onDragStart(index)}
         onDragEnd={onDragEnd}
-        className="mt-1.5 cursor-grab touch-none rounded p-1 text-slate-300 hover:text-slate-500 active:cursor-grabbing"
+        className="mt-1.5 cursor-grab touch-none rounded p-1 transition-colors active:cursor-grabbing hover:text-[var(--color-text-secondary)]"
+        style={{ color: "var(--color-border)" }}
         aria-label={`Reorder ${attr.name || "attribute"}`}
         title="Drag to reorder"
       >
@@ -176,12 +178,9 @@ function AttrRow({
         </svg>
       </button>
       <div className="w-32">
-        <input
-          className={FLD}
-          value={attr.name}
-          onChange={(e) => onName(attr.id, e.target.value)}
-          placeholder="e.g. Size"
-        />
+        <input className={FLD}
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+          value={attr.name} onChange={(e) => onName(attr.id, e.target.value)} placeholder="e.g. Size" />
       </div>
       <div className="flex-1">
         <ValueChipsInput
@@ -193,7 +192,8 @@ function AttrRow({
       <button
         type="button"
         onClick={() => onRemove(attr.id)}
-        className="mt-1 rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+        className="mt-1 rounded-lg p-2 transition-colors hover:bg-red-50 hover:text-red-500"
+        style={{ color: "var(--color-text-muted)" }}
         aria-label="Remove attribute"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -267,49 +267,44 @@ function LinkProductModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-[#111]">Link Existing Product as Variant</h2>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
+      <div className="w-full max-w-lg rounded-2xl shadow-2xl" style={{ backgroundColor: "var(--color-surface)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--color-border)" }}>
+          <h2 className="text-[15px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Link Existing Product as Variant</h2>
+          <button type="button" onClick={onClose} className="transition-colors hover:text-[var(--color-text-primary)]"
+            style={{ color: "var(--color-text-muted)" }} aria-label="Close">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
         <div className="space-y-3 px-5 py-4">
-          {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+          {error && <p role="alert" className="rounded-xl border px-3 py-2 text-[13px]"
+            style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>{error}</p>}
           <div className="relative">
-            <svg className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="pointer-events-none absolute left-3 top-2.5 h-4 w-4" style={{ color: "var(--color-text-muted)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35" strokeLinecap="round"/>
             </svg>
-            <input
-              autoFocus
-              className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm focus:border-brand-600 focus:outline-none"
-              placeholder="Search products by name or SKU…"
-              value={q}
-              onChange={(e) => handleKey(e.target.value)}
-            />
+            <input autoFocus
+              className="w-full rounded-xl border py-2 pl-9 pr-3 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+              placeholder="Search products by name or SKU…" value={q} onChange={(e) => handleKey(e.target.value)} />
           </div>
-          <div className="min-h-[120px] rounded-lg border border-slate-200">
+          <div className="min-h-[120px] rounded-xl border" style={{ borderColor: "var(--color-border)" }}>
             {searching ? (
-              <p className="p-4 text-center text-sm text-slate-400">Searching…</p>
+              <p className="p-4 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>Searching…</p>
             ) : results.length === 0 ? (
-              <p className="p-4 text-center text-sm text-slate-400">{q ? "No products found." : "Type to search."}</p>
+              <p className="p-4 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>{q ? "No products found." : "Type to search."}</p>
             ) : (
-              <div className="divide-y divide-slate-100 max-h-60 overflow-y-auto">
+              <div className="max-h-60 overflow-y-auto divide-y divide-[var(--color-table-border)]">
                 {results.map((p) => (
-                  <label key={p.id} className="flex cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-slate-50">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded border-slate-300 text-brand-600"
-                      checked={selected.has(p.id)}
-                      onChange={() => toggle(p.id)}
-                    />
+                  <label key={p.id} className="flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[var(--color-table-row-hover)]">
+                    <input type="checkbox" className="h-4 w-4 rounded accent-brand-600"
+                      checked={selected.has(p.id)} onChange={() => toggle(p.id)} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-[#111]">{p.name}</p>
-                      <p className="text-xs text-slate-400">{p.sku} · {formatMoney(p.price_cents)}</p>
+                      <p className="truncate text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>{p.name}</p>
+                      <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{p.sku} · {formatMoney(p.price_cents)}</p>
                     </div>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${STATUS_COLOR[p.status] ?? ""}`}>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${STATUS_COLOR[p.status] ?? ""}`}>
                       {p.status}
                     </span>
                   </label>
@@ -318,27 +313,23 @@ function LinkProductModal({
             )}
           </div>
           <div>
-            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.08em]"
+              style={{ color: "var(--color-text-secondary)" }}>
               Variant Label (applies to all selected)
             </label>
-            <input
-              className={FLD}
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="e.g. Large, Red, 1L — optional"
-            />
+            <input className={FLD}
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+              value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Large, Red, 1L — optional" />
           </div>
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+        <div className="flex justify-end gap-2 border-t px-5 py-3" style={{ borderColor: "var(--color-border)" }}>
+          <button type="button" onClick={onClose}
+            className="rounded-xl border px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
             Cancel
           </button>
-          <button
-            type="button"
-            onClick={() => void handleLink()}
-            disabled={linking || selected.size === 0}
-            className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40"
-          >
+          <button type="button" onClick={() => void handleLink()} disabled={linking || selected.size === 0}
+            className="rounded-xl bg-brand-600 px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors">
             {linking ? "Linking…" : `Link ${selected.size > 0 ? `${selected.size} ` : ""}Product${selected.size !== 1 ? "s" : ""}`}
           </button>
         </div>
@@ -417,13 +408,14 @@ function CreateVariantWizard({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+      <div className="w-full max-w-xl rounded-2xl shadow-2xl" style={{ backgroundColor: "var(--color-surface)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between border-b px-5 py-4" style={{ borderColor: "var(--color-border)" }}>
           <div>
-            <h2 className="text-base font-semibold text-[#111]">Create Variant</h2>
-            <p className="mt-1 text-xs text-slate-500">Add one sellable child product under {product.name}.</p>
+            <h2 className="text-[15px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Create Variant</h2>
+            <p className="mt-1 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>Add one sellable child product under {product.name}.</p>
           </div>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
+          <button type="button" onClick={onClose} className="transition-colors hover:text-[var(--color-text-primary)]"
+            style={{ color: "var(--color-text-muted)" }} aria-label="Close">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -431,80 +423,62 @@ function CreateVariantWizard({
         </div>
 
         <div className="space-y-5 px-5 py-4">
-          {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+          {error && <p role="alert" className="rounded-xl border px-3 py-2 text-[13px]"
+            style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>{error}</p>}
 
           <div>
-            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-secondary)" }}>
               Variant label
             </label>
-            <input
-              autoFocus
-              className={FLD}
-              value={values.label}
-              onChange={(e) => setField("label", e.target.value)}
-              placeholder="e.g. Small / Red / 12 pack"
-            />
+            <input autoFocus className={FLD}
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+              value={values.label} onChange={(e) => setField("label", e.target.value)}
+              placeholder="e.g. Small / Red / 12 pack" />
           </div>
 
           <div className="grid grid-cols-4 gap-2">
             {steps.map((item, index) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setStep(index)}
-                className={`h-2 rounded-full transition-colors ${index <= step ? "bg-brand-600" : "bg-slate-200"}`}
-                aria-label={`Go to ${item.title}`}
-              />
+              <button key={item.key} type="button" onClick={() => setStep(index)}
+                className={`h-2 rounded-full transition-colors ${index <= step ? "bg-brand-600" : ""}`}
+                style={index > step ? { backgroundColor: "var(--color-border)" } : {}}
+                aria-label={`Go to ${item.title}`} />
             ))}
           </div>
 
-          <div className="rounded-xl border border-slate-200 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+          <div className="rounded-xl border p-4" style={{ borderColor: "var(--color-border)" }}>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-secondary)" }}>
               Step {step + 1} of {steps.length}
             </p>
-            <label className="mt-2 block text-sm font-semibold text-[#111]">{current.title}</label>
-            <input
-              className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
-              value={values[current.field]}
-              onChange={(e) => setField(current.field, e.target.value)}
-              placeholder={current.placeholder}
-              inputMode={current.field === "sellingPrice" ? "decimal" : "text"}
-            />
+            <label className="mt-2 block text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>{current.title}</label>
+            <input className="mt-2 w-full rounded-xl border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+              value={values[current.field]} onChange={(e) => setField(current.field, e.target.value)}
+              placeholder={current.placeholder} inputMode={current.field === "sellingPrice" ? "decimal" : "text"} />
           </div>
 
-          <div className="grid gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600 sm:grid-cols-2">
-            <span><strong className="text-slate-900">UPC:</strong> {values.upc || "Required"}</span>
-            <span><strong className="text-slate-900">SKU:</strong> {values.sku || "Required"}</span>
-            <span><strong className="text-slate-900">Price:</strong> {priceCents === null ? "Required" : formatMoney(priceCents)}</span>
-            <span><strong className="text-slate-900">Category:</strong> {values.category || "Required"}</span>
+          <div className="grid gap-2 rounded-xl p-3 text-[12px] sm:grid-cols-2"
+            style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
+            <span><strong style={{ color: "var(--color-text-primary)" }}>UPC:</strong> {values.upc || "Required"}</span>
+            <span><strong style={{ color: "var(--color-text-primary)" }}>SKU:</strong> {values.sku || "Required"}</span>
+            <span><strong style={{ color: "var(--color-text-primary)" }}>Price:</strong> {priceCents === null ? "Required" : formatMoney(priceCents)}</span>
+            <span><strong style={{ color: "var(--color-text-primary)" }}>Category:</strong> {values.category || "Required"}</span>
           </div>
         </div>
 
-        <div className="flex items-center justify-between border-t border-slate-200 px-5 py-3">
-          <button
-            type="button"
-            onClick={() => setStep((prev) => Math.max(0, prev - 1))}
-            disabled={step === 0}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-          >
+        <div className="flex items-center justify-between border-t px-5 py-3" style={{ borderColor: "var(--color-border)" }}>
+          <button type="button" onClick={() => setStep((prev) => Math.max(0, prev - 1))} disabled={step === 0}
+            className="rounded-xl border px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)] disabled:opacity-40"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
             Back
           </button>
           {step < steps.length - 1 ? (
-            <button
-              type="button"
-              onClick={() => setStep((prev) => Math.min(steps.length - 1, prev + 1))}
-              disabled={!canContinue}
-              className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40"
-            >
+            <button type="button" onClick={() => setStep((prev) => Math.min(steps.length - 1, prev + 1))} disabled={!canContinue}
+              className="rounded-xl bg-brand-600 px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors">
               Next
             </button>
           ) : (
-            <button
-              type="button"
-              onClick={() => void handleCreate()}
-              disabled={saving || !canCreate}
-              className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40"
-            >
+            <button type="button" onClick={() => void handleCreate()} disabled={saving || !canCreate}
+              className="rounded-xl bg-brand-600 px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors">
               {saving ? "Creating…" : "Create Variant"}
             </button>
           )}
@@ -633,24 +607,22 @@ export function VariantsTab({
             </svg>
           </div>
           <div>
-            <p className="text-sm font-semibold text-brand-600">This product is a variant</p>
-            <p className="mt-0.5 text-sm text-slate-600">
+            <p className="text-[13px] font-semibold text-brand-600">This product is a variant</p>
+            <p className="mt-0.5 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
               {product.variant_label
-                ? <>Label: <span className="font-semibold text-[#111]">{product.variant_label}</span> · </>
+                ? <>Label: <span className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{product.variant_label}</span> · </>
                 : null}
               It belongs to a master product.
             </p>
-            <button
-              type="button"
-              onClick={() => router.push(`/catalog/${product.parent_product_id}`)}
-              className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:underline"
-            >
+            <button type="button" onClick={() => router.push(`/catalog/${product.parent_product_id}`)}
+              className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-600 hover:underline">
               View master product →
             </button>
           </div>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs text-slate-500">
+        <div className="rounded-xl border p-5 shadow-[var(--shadow-sm)]"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+          <p className="text-[12px]" style={{ color: "var(--color-text-secondary)" }}>
             To manage this variant or change its label, go to the master product&apos;s Variants tab.
           </p>
         </div>
@@ -663,11 +635,12 @@ export function VariantsTab({
     <div className="space-y-5">
 
       {/* Matrix builder */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+      <div className="rounded-xl border shadow-[var(--shadow-sm)]"
+        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--color-border)" }}>
           <div>
-            <h3 className="text-sm font-semibold text-[#111]">Generate Variants</h3>
-            <p className="mt-0.5 text-xs text-slate-400">
+            <h3 className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Generate Variants</h3>
+            <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-muted)" }}>
               Define attributes and auto-generate all variant combinations.
             </p>
           </div>
@@ -680,7 +653,8 @@ export function VariantsTab({
 
         <div className="space-y-3 px-5 py-4">
           {/* Column headers */}
-          <div className="flex gap-2 pl-6 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          <div className="flex gap-2 pl-6 text-[10px] font-semibold uppercase tracking-[0.08em]"
+            style={{ color: "var(--color-text-secondary)" }}>
             <span className="w-32">Attribute</span>
             <span className="flex-1">Values</span>
           </div>
@@ -721,59 +695,49 @@ export function VariantsTab({
 
           {/* Combination preview — search, sort, and remove/disable before generating */}
           {combos.length > 0 && (
-            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+            <div className="rounded-xl border p-3" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-secondary)" }}>
                   Preview — {includedCount} of {combos.length} will be created
                 </p>
                 <div className="flex items-center gap-2">
-                  <input
-                    value={previewSearch}
-                    onChange={(e) => setPreviewSearch(e.target.value)}
-                    placeholder="Search…"
-                    aria-label="Search combinations"
-                    className="w-28 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs focus:border-[#5D5FEF] focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setPreviewSort((s) => (s === "az" ? "matrix" : "az"))}
-                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
-                    title="Toggle sort order"
-                  >
+                  <input value={previewSearch} onChange={(e) => setPreviewSearch(e.target.value)}
+                    placeholder="Search…" aria-label="Search combinations"
+                    className="w-28 rounded-lg border px-2 py-1 text-[11px] outline-none focus:ring-1 focus:ring-brand-500/20"
+                    style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} />
+                  <button type="button" onClick={() => setPreviewSort((s) => (s === "az" ? "matrix" : "az"))}
+                    className="rounded-lg border px-2 py-1 text-[11px] font-medium transition-colors hover:bg-[var(--color-surface)]"
+                    style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+                    title="Toggle sort order">
                     Sort: {previewSort === "az" ? "A–Z" : "Matrix"}
                   </button>
                   {excluded.size > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setExcluded(new Set())}
-                      className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
-                    >
+                    <button type="button" onClick={() => setExcluded(new Set())}
+                      className="rounded-lg border px-2 py-1 text-[11px] font-medium transition-colors hover:bg-[var(--color-surface)]"
+                      style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
                       Reset ({excluded.size})
                     </button>
                   )}
                 </div>
               </div>
               {previewCombos.length === 0 ? (
-                <p className="py-3 text-center text-xs text-slate-400">No combinations match “{previewSearch}”.</p>
+                <p className="py-3 text-center text-[11px]" style={{ color: "var(--color-text-muted)" }}>No combinations match "{previewSearch}".</p>
               ) : (
                 <div className="flex max-h-56 flex-wrap gap-1.5 overflow-y-auto">
                   {previewCombos.map((c) => {
                     const off = excluded.has(c.key);
                     return (
-                      <button
-                        key={c.key}
-                        type="button"
-                        onClick={() => toggleExcluded(c.key)}
+                      <button key={c.key} type="button" onClick={() => toggleExcluded(c.key)}
                         title={off ? "Excluded — click to include" : "Included — click to exclude"}
                         aria-pressed={!off}
-                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                          off
-                            ? "border-slate-200 bg-slate-100 text-slate-400 line-through"
-                            : "border-slate-200 bg-white text-slate-700 hover:border-[#5D5FEF]/40"
+                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+                          off ? "line-through" : "hover:border-brand-400"
                         }`}
-                      >
+                        style={off
+                          ? { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }
+                          : { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}>
                         {c.label}
-                        <span className={off ? "text-slate-400" : "text-slate-300"}>{off ? "+" : "×"}</span>
+                        <span style={{ color: "var(--color-text-muted)" }}>{off ? "+" : "×"}</span>
                       </button>
                     );
                   })}
@@ -782,51 +746,45 @@ export function VariantsTab({
             </div>
           )}
 
-          {genError && <p role="alert" className="text-sm text-red-600">{genError}</p>}
+          {genError && <p role="alert" className="text-[13px] text-red-600">{genError}</p>}
         </div>
 
-        <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3">
-          <p className="text-xs text-slate-400">
+        <div className="flex items-center justify-between border-t px-5 py-3" style={{ borderColor: "var(--color-border)" }}>
+          <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>
             Existing variants are kept. Only new combinations are added.
           </p>
-          <button
-            type="button"
-            onClick={() => void handleGenerate()}
+          <button type="button" onClick={() => void handleGenerate()}
             disabled={generating || validAttrs.length === 0}
-            className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors"
-          >
+            className="rounded-xl bg-brand-600 px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors">
             {generating ? "Generating…" : "Generate Variants"}
           </button>
         </div>
       </div>
 
       {/* Variant list */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3.5">
-          <h3 className="text-sm font-semibold text-[#111]">
+      <div className="overflow-hidden rounded-xl border shadow-[var(--shadow-sm)]"
+        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <div className="flex items-center justify-between gap-3 border-b px-5 py-3.5" style={{ borderColor: "var(--color-border)" }}>
+          <h3 className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>
             Variants
             {children.length > 0 && (
-              <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+              <span className="ml-2 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
                 {children.length}
               </span>
             )}
           </h3>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowCreate(true)}
-              className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#4849d0] transition-colors"
-            >
+            <button type="button" onClick={() => setShowCreate(true)}
+              className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-[#4849d0] transition-colors">
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
               Create variant
             </button>
-            <button
-              type="button"
-              onClick={() => setShowLink(true)}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
-            >
+            <button type="button" onClick={() => setShowLink(true)}
+              className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-semibold transition-colors hover:bg-[var(--color-surface-subtle)]"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
               </svg>
@@ -836,70 +794,62 @@ export function VariantsTab({
         </div>
 
         {loading ? (
-          <div className="space-y-2 p-4">{[1,2,3].map((i) => <div key={i} className="h-10 animate-pulse rounded bg-slate-100"/>)}</div>
+          <div className="space-y-2 p-4">{[1,2,3].map((i) => <div key={i} className="h-10 animate-skeleton rounded-lg"/>)}</div>
         ) : children.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-12 text-center">
-            <svg className="h-8 w-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-8 w-8" style={{ color: "var(--color-border)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
-            <p className="text-sm text-slate-400">No variants yet.</p>
-            <p className="text-xs text-slate-400">Create a variant, use Generate Variants above, or link an existing product.</p>
+            <p className="text-[13px]" style={{ color: "var(--color-text-muted)" }}>No variants yet.</p>
+            <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>Create a variant, use Generate Variants above, or link an existing product.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                <tr>
-                  <th className="px-4 py-3 text-left">Label</th>
-                  <th className="px-4 py-3 text-left">Name</th>
-                  <th className="px-4 py-3 text-left">SKU</th>
-                  <th className="px-4 py-3 text-left">UPC</th>
-                  <th className="px-4 py-3 text-left">Category</th>
+            <table className="w-full text-[13px]">
+              <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+                <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.06em]"
+                  style={{ color: "var(--color-text-secondary)" }}>
+                  <th className="px-4 py-3">Label</th>
+                  <th className="px-4 py-3">Name</th>
+                  <th className="px-4 py-3">SKU</th>
+                  <th className="px-4 py-3">UPC</th>
+                  <th className="px-4 py-3">Category</th>
                   <th className="px-4 py-3 text-right">Price</th>
-                  <th className="px-4 py-3 text-left">Status</th>
+                  <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-[var(--color-table-border)]">
                 {children.map((child) => (
-                  <tr
-                    key={child.id}
-                    className="hover:bg-slate-50 cursor-pointer"
-                    onClick={() => router.push(`/catalog/${child.id}`)}
-                  >
+                  <tr key={child.id} className="cursor-pointer transition-colors hover:bg-[var(--color-table-row-hover)]"
+                    onClick={() => router.push(`/catalog/${child.id}`)}>
                     <td className="px-4 py-3">
                       {child.variant_label ? (
-                        <span className="rounded-full bg-brand-600/10 px-2.5 py-0.5 text-xs font-semibold text-brand-600">
+                        <span className="rounded-full bg-brand-600/10 px-2.5 py-0.5 text-[11px] font-semibold text-brand-600">
                           {child.variant_label}
                         </span>
                       ) : (
-                        <span className="text-slate-400">—</span>
+                        <span style={{ color: "var(--color-text-muted)" }}>—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 font-medium text-[#111]">{child.name}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-500">{child.sku}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-500">{child.barcode || "—"}</td>
-                    <td className="px-4 py-3 text-slate-600">{child.category}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-900">{formatMoney(child.price_cents)}</td>
+                    <td className="px-4 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{child.name}</td>
+                    <td className="px-4 py-3 font-mono text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{child.sku}</td>
+                    <td className="px-4 py-3 font-mono text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{child.barcode || "—"}</td>
+                    <td className="px-4 py-3 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{child.category}</td>
+                    <td className="px-4 py-3 text-right font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(child.price_cents)}</td>
                     <td className="px-4 py-3">
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${STATUS_COLOR[child.status] ?? ""}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${STATUS_COLOR[child.status] ?? ""}`}>
                         {child.status}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-end gap-3">
-                        <button
-                          type="button"
-                          onClick={() => router.push(`/catalog/${child.id}`)}
-                          className="text-xs font-medium text-brand-600 hover:underline"
-                        >
+                        <button type="button" onClick={() => router.push(`/catalog/${child.id}`)}
+                          className="text-[11px] font-medium text-brand-600 hover:underline">
                           Edit
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setUnlinkId(child.id)}
-                          className="text-xs font-medium text-red-500 hover:underline"
-                        >
+                        <button type="button" onClick={() => setUnlinkId(child.id)}
+                          className="text-[11px] font-medium text-red-500 hover:underline">
                           Unlink
                         </button>
                       </div>
@@ -946,18 +896,19 @@ export function VariantsTab({
       {/* Unlink confirm */}
       {unlinkId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
-            <p className="font-semibold text-[#111]">Unlink this variant?</p>
-            <p className="mt-1 text-sm text-slate-500">
+          <div className="w-full max-w-sm rounded-2xl p-6 shadow-2xl" style={{ backgroundColor: "var(--color-surface)" }}>
+            <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>Unlink this variant?</p>
+            <p className="mt-1 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
               The product will remain in your catalog but will no longer be linked to this master.
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button type="button" onClick={() => setUnlinkId(null)}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                className="rounded-xl border px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
                 Cancel
               </button>
               <button type="button" onClick={() => void handleUnlink(unlinkId)}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">
+                className="rounded-xl bg-red-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-red-700 transition-colors">
                 Unlink
               </button>
             </div>

@@ -186,7 +186,7 @@ export default function ProductDetailPage() {
     return (
       <EnterpriseShell active="catalog" title="Product" subtitle="Loading…" contentClassName="overflow-y-auto">
         <div className="mx-auto max-w-5xl space-y-4 px-4 py-5 sm:px-6">
-          {[1, 2, 3].map((i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-gray-100" />)}
+          {[1, 2, 3].map((i) => <div key={i} className="h-24 animate-skeleton rounded-xl" />)}
         </div>
       </EnterpriseShell>
     );
@@ -196,7 +196,8 @@ export default function ProductDetailPage() {
     return (
       <EnterpriseShell active="catalog" title="Product" subtitle="Not found" contentClassName="overflow-y-auto">
         <div className="mx-auto max-w-5xl px-4 py-5 sm:px-6">
-          <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+          <p role="alert" className="rounded-xl border px-4 py-3 text-[13px]"
+            style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>
             {error ?? "Product not found."}
           </p>
           <Button variant="secondary" size="sm" onClick={() => router.back()} className="mt-4">← Back</Button>
@@ -216,7 +217,8 @@ export default function ProductDetailPage() {
             <button
               type="button"
               onClick={() => router.push("/catalog")}
-              className="flex items-center gap-1 text-sm text-slate-500 transition-colors hover:text-[#111]"
+              className="flex items-center gap-1 text-[12px] transition-colors hover:text-[var(--color-text-primary)]"
+              style={{ color: "var(--color-text-secondary)" }}
               aria-label="Back to Products"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
@@ -228,7 +230,7 @@ export default function ProductDetailPage() {
 
             {/* Name row */}
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-base font-bold text-slate-900 leading-tight">{product.name}</h1>
+              <h1 className="text-[20px] font-bold leading-tight tracking-tight" style={{ color: "var(--color-text-primary)" }}>{product.name}</h1>
               <Badge variant={STATUS_BADGE[product.status]}>{product.status}</Badge>
               <Badge variant="gray">{product.sku}</Badge>
               <ProductTypeBadge product={product} variantCount={variantCount} />
@@ -238,7 +240,8 @@ export default function ProductDetailPage() {
 
             {/* Metrics row: price + margin + stock status */}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+              <span className="rounded-full border px-2.5 py-0.5 text-[11px] font-semibold"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}>
                 {formatMoney(product.price_cents)}
               </span>
               {product.raw_cost_price_cents != null && product.raw_cost_price_cents > 0 && (() => {
@@ -257,7 +260,8 @@ export default function ProductDetailPage() {
                 <StockBadge total={stockTotal} reorderPoint={product.reorder_point ?? 0} />
               )}
               {product.barcode && (
-                <span className="rounded-full border border-slate-100 bg-slate-50 px-2.5 py-0.5 font-mono text-[11px] text-slate-500">
+                <span className="rounded-full border px-2.5 py-0.5 font-mono text-[10px]"
+                  style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
                   {product.barcode}
                 </span>
               )}
@@ -267,7 +271,7 @@ export default function ProductDetailPage() {
               <button
                 type="button"
                 onClick={() => router.push(`/catalog/${product.parent_product_id}`)}
-                className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline"
+                className="flex items-center gap-1 text-[11px] font-medium text-brand-600 hover:underline"
               >
                 ↑ Part of master product
               </button>
@@ -280,7 +284,8 @@ export default function ProductDetailPage() {
               <button
                 type="button"
                 onClick={() => setShowActions((v) => !v)}
-                className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-medium shadow-[var(--shadow-sm)] transition-colors hover:bg-[var(--color-surface-subtle)]"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}
                 aria-haspopup="menu"
                 aria-expanded={showActions}
               >
@@ -293,49 +298,33 @@ export default function ProductDetailPage() {
               {showActions && (
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setShowActions(false)} />
-                  <div className="absolute right-0 top-full z-40 mt-1 w-52 rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
-                    <button type="button"
-                      onClick={() => { setShowActions(false); router.push(`/register?product=${product.id}`); }}
-                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-                      </svg>
-                      Quick Sell
-                    </button>
-                    <button type="button"
-                      onClick={() => { setShowActions(false); setActiveTab("transactions"); }}
-                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/>
-                      </svg>
-                      Create Return
-                    </button>
-                    <button type="button"
-                      onClick={() => { setShowActions(false); window.open(`/store/${product.id}`, "_blank"); }}
-                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-                      </svg>
-                      View on store
-                    </button>
+                  <div className="absolute right-0 top-full z-40 mt-1 w-52 rounded-xl border py-1 shadow-xl"
+                    style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+                    {[
+                      { label: "Quick Sell", onClick: () => { setShowActions(false); router.push(`/register?product=${product.id}`); } },
+                      { label: "Create Return", onClick: () => { setShowActions(false); setActiveTab("transactions"); } },
+                      { label: "View on store", onClick: () => { setShowActions(false); window.open(`/store/${product.id}`, "_blank"); } },
+                    ].map(({ label, onClick }) => (
+                      <button key={label} type="button" onClick={onClick}
+                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-[13px] transition-colors hover:bg-[var(--color-surface-subtle)]"
+                        style={{ color: "var(--color-text-secondary)" }}>
+                        {label}
+                      </button>
+                    ))}
                     {product.barcode && (
                       <button type="button"
                         onClick={() => { setShowActions(false); void testBarcode(); }}
-                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <rect x="2" y="4" width="2" height="16"/><rect x="6" y="4" width="1" height="16"/><rect x="9" y="4" width="2" height="16"/><rect x="13" y="4" width="1" height="16"/><rect x="16" y="4" width="2" height="16"/><rect x="20" y="4" width="2" height="16"/>
-                        </svg>
+                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-[13px] transition-colors hover:bg-[var(--color-surface-subtle)]"
+                        style={{ color: "var(--color-text-secondary)" }}>
                         Test barcode scan
                       </button>
                     )}
-                    <div className="my-1 border-t border-slate-100" />
+                    <div className="my-1 border-t" style={{ borderColor: "var(--color-border)" }} />
                     <button type="button"
                       onClick={() => { setShowActions(false); void handleDuplicate(); }}
                       disabled={duplicating}
-                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                      </svg>
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-[13px] transition-colors hover:bg-[var(--color-surface-subtle)] disabled:opacity-40"
+                      style={{ color: "var(--color-text-secondary)" }}>
                       {duplicating ? "Duplicating…" : "Duplicate"}
                     </button>
                   </div>
@@ -351,10 +340,10 @@ export default function ProductDetailPage() {
 
         {/* ── Barcode test result ──────────────────────────────────────────── */}
         {barcodeResult && (
-          <div role="status" className={`mb-3 flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium ${
+          <div role="status" className={`mb-3 flex items-center gap-2 rounded-xl border px-4 py-2.5 text-[13px] font-medium ${
             barcodeResult === "ok"
-              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-              : "bg-red-50 text-red-700 border border-red-200"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-red-200 bg-red-50 text-red-700"
           }`}>
             {barcodeResult === "ok" ? "✓ Barcode scan verified — product found" : "✗ Barcode not found in scanner lookup"}
           </div>
@@ -362,30 +351,27 @@ export default function ProductDetailPage() {
 
         {/* ── Tab nav ───────────────────────────────────────────────────────── */}
         <div className="mb-5 -mx-1 overflow-x-auto">
-          <div className="flex gap-0 border-b border-slate-200 min-w-max px-1">
+          <div className="flex gap-0 min-w-max border-b px-1" style={{ borderColor: "var(--color-border)" }}>
             {TABS.map(({ key, label, group }, idx) => {
-              const prevGroup = idx > 0 ? TABS[idx - 1].group : group;
+              const prevGroup = idx > 0 ? TABS[idx - 1]!.group : group;
               const showDivider = GROUP_BREAKS.has(group) && prevGroup !== group;
               const badge = key === "expiry" && expiryAlertCount > 0 ? expiryAlertCount : null;
               return (
                 <div key={key} className="flex items-center">
                   {showDivider && (
                     <div className="mx-1 flex items-center gap-2 self-stretch" aria-hidden="true">
-                      <div className="h-5 w-px bg-slate-200" />
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      <div className="h-5 w-px" style={{ backgroundColor: "var(--color-border)" }} />
+                      <span className="text-[9px] font-semibold uppercase tracking-[0.1em]"
+                        style={{ color: "var(--color-text-muted)" }}>
                         {GROUP_LABELS[group]}
                       </span>
                     </div>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab(key)}
-                    className={`relative flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
-                      activeTab === key
-                        ? "border-b-2 border-brand-600 text-brand-600"
-                        : "border-b-2 border-transparent text-slate-500 hover:text-[#111]"
+                  <button type="button" onClick={() => setActiveTab(key)}
+                    className={`relative flex items-center gap-1.5 whitespace-nowrap px-3.5 py-2.5 text-[13px] font-medium transition-colors ${
+                      activeTab === key ? "border-b-2 border-brand-600 text-brand-600" : "border-b-2 border-transparent hover:text-[var(--color-text-primary)]"
                     }`}
-                  >
+                    style={activeTab !== key ? { color: "var(--color-text-secondary)" } : {}}>
                     {label}
                     {badge !== null && (
                       <span className="flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">

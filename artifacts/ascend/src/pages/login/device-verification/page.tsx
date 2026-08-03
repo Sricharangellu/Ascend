@@ -48,7 +48,8 @@ export default function DeviceVerificationPage() {
           Preview: device details below are illustrative — new-device detection isn&apos;t wired to a real backend yet.
         </div>
 
-        <dl className="mt-6 flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm dark:border-slate-700 dark:bg-slate-800/60">
+        <dl className="mt-6 flex flex-col gap-2 rounded-xl border p-4 text-[13px]"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
           <Row label="Device" value={MOCK_DEVICE.browser} />
           <Row label="Location" value={MOCK_DEVICE.location} />
           <Row label="IP address" value={MOCK_DEVICE.ip} />
@@ -78,8 +79,8 @@ export default function DeviceVerificationPage() {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <dt className="text-slate-500 dark:text-slate-400">{label}</dt>
-      <dd className="font-medium text-slate-900 dark:text-white">{value}</dd>
+      <dt style={{ color: "var(--color-text-secondary)" }}>{label}</dt>
+      <dd className="font-medium" style={{ color: "var(--color-text-primary)" }}>{value}</dd>
     </div>
   );
 }

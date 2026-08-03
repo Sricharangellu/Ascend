@@ -17,7 +17,7 @@ interface RowState {
 }
 
 const STEPS = ["SKU & UPC", "Pricing", "Categories"] as const;
-const FLD = "w-full rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-[#5D5FEF] focus:outline-none";
+const FLD = "w-full rounded-lg border px-2 py-1 text-[13px] outline-none transition-all focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500";
 
 function displayName(v: CatalogProduct): string {
   return v.variant_label || v.name;
@@ -117,12 +117,13 @@ export function VariantSetupWizard({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-2xl shadow-2xl" style={{ backgroundColor: "var(--color-surface)" }} onClick={(e) => e.stopPropagation()}>
         {/* Header + stepper */}
-        <div className="border-b border-slate-200 px-6 py-4">
+        <div className="border-b px-6 py-4" style={{ borderColor: "var(--color-border)" }}>
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-[#111]">Set up variants</h2>
-            <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
+            <h2 className="text-[15px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Set up variants</h2>
+            <button type="button" onClick={onClose} className="transition-colors hover:text-[var(--color-text-primary)]"
+              style={{ color: "var(--color-text-muted)" }} aria-label="Close">
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -131,17 +132,15 @@ export function VariantSetupWizard({
           <div className="mt-3 flex items-center gap-2">
             {STEPS.map((label, i) => (
               <div key={label} className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setStep(i)}
-                  className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
-                    i === step ? "bg-[#5D5FEF] text-white" : i < step ? "bg-[#5D5FEF]/10 text-[#5D5FEF]" : "bg-slate-100 text-slate-400"
+                <button type="button" onClick={() => setStep(i)}
+                  className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                    i === step ? "bg-brand-600 text-white" : i < step ? "bg-brand-600/10 text-brand-600" : ""
                   }`}
-                >
-                  <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${i === step ? "bg-white/20" : "bg-black/5"}`}>{i + 1}</span>
+                  style={i > step ? { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" } : {}}>
+                  <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[9px] ${i === step ? "bg-white/20" : "bg-black/5"}`}>{i + 1}</span>
                   {label}
                 </button>
-                {i < STEPS.length - 1 && <span className="h-px w-4 bg-slate-200" />}
+                {i < STEPS.length - 1 && <span className="h-px w-4" style={{ backgroundColor: "var(--color-border)" }} />}
               </div>
             ))}
           </div>
@@ -149,19 +148,23 @@ export function VariantSetupWizard({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          {error && <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+          {error && <p role="alert" className="mb-3 rounded-xl border px-3 py-2 text-[13px]"
+            style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>{error}</p>}
 
           {step === 0 && (
-            <table className="w-full text-sm">
-              <thead className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                <tr><th className="py-2 text-left">Variant</th><th className="py-2 text-left">SKU</th><th className="py-2 text-left">UPC / Barcode</th></tr>
+            <table className="w-full text-[13px]">
+              <thead style={{ borderBottom: "1px solid var(--color-border)" }}>
+                <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.06em]"
+                  style={{ color: "var(--color-text-secondary)" }}>
+                  <th className="py-2">Variant</th><th className="py-2">SKU</th><th className="py-2">UPC / Barcode</th>
+                </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-[var(--color-table-border)]">
                 {variants.map((c) => (
                   <tr key={c.id}>
-                    <td className="py-2 pr-3 font-medium text-[#111]">{displayName(c)}</td>
-                    <td className="py-2 pr-3"><input className={`${FLD} font-mono`} value={rows[c.id].sku} onChange={(e) => setField(c.id, "sku", e.target.value)} aria-label={`SKU for ${displayName(c)}`} /></td>
-                    <td className="py-2"><input className={`${FLD} font-mono`} value={rows[c.id].barcode} onChange={(e) => setField(c.id, "barcode", e.target.value)} placeholder="—" aria-label={`UPC for ${displayName(c)}`} /></td>
+                    <td className="py-2 pr-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{displayName(c)}</td>
+                    <td className="py-2 pr-3"><input className={`${FLD} font-mono`} style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} value={rows[c.id]!.sku} onChange={(e) => setField(c.id, "sku", e.target.value)} aria-label={`SKU for ${displayName(c)}`} /></td>
+                    <td className="py-2"><input className={`${FLD} font-mono`} style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} value={rows[c.id]!.barcode} onChange={(e) => setField(c.id, "barcode", e.target.value)} placeholder="—" aria-label={`UPC for ${displayName(c)}`} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -170,27 +173,31 @@ export function VariantSetupWizard({
 
           {step === 1 && (
             <>
-              <label className="mb-3 flex items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-[#5D5FEF]" checked={useParentPrice} onChange={(e) => setUseParentPrice(e.target.checked)} />
+              <label className="mb-3 flex items-center gap-2 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
+                <input type="checkbox" className="h-4 w-4 rounded accent-brand-600" checked={useParentPrice} onChange={(e) => setUseParentPrice(e.target.checked)} />
                 Use parent selling price for all variants (<span className="font-semibold">${parentPriceLabel}</span>)
               </label>
-              <table className="w-full text-sm">
-                <thead className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                  <tr><th className="py-2 text-left">Variant</th><th className="py-2 text-left">Selling</th><th className="py-2 text-left">Compare at</th><th className="py-2 text-left">Cost</th></tr>
+              <table className="w-full text-[13px]">
+                <thead style={{ borderBottom: "1px solid var(--color-border)" }}>
+                  <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.06em]"
+                    style={{ color: "var(--color-text-secondary)" }}>
+                    <th className="py-2">Variant</th><th className="py-2">Selling</th><th className="py-2">Compare at</th><th className="py-2">Cost</th>
+                  </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-[var(--color-table-border)]">
                   {variants.map((c) => (
                     <tr key={c.id}>
-                      <td className="py-2 pr-3 font-medium text-[#111]">{displayName(c)}</td>
+                      <td className="py-2 pr-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{displayName(c)}</td>
                       <td className="py-2 pr-3">
                         <input className={FLD} inputMode="decimal"
-                          value={useParentPrice ? parentPriceLabel : rows[c.id].price}
+                          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+                          value={useParentPrice ? parentPriceLabel : rows[c.id]!.price}
                           disabled={useParentPrice}
                           onChange={(e) => setField(c.id, "price", e.target.value)}
                           aria-label={`Selling price for ${displayName(c)}`} />
                       </td>
-                      <td className="py-2 pr-3"><input className={FLD} inputMode="decimal" value={rows[c.id].msrp} onChange={(e) => setField(c.id, "msrp", e.target.value)} placeholder="—" aria-label={`Compare-at price for ${displayName(c)}`} /></td>
-                      <td className="py-2"><input className={FLD} inputMode="decimal" value={rows[c.id].cost} onChange={(e) => setField(c.id, "cost", e.target.value)} placeholder="—" aria-label={`Cost for ${displayName(c)}`} /></td>
+                      <td className="py-2 pr-3"><input className={FLD} inputMode="decimal" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} value={rows[c.id]!.msrp} onChange={(e) => setField(c.id, "msrp", e.target.value)} placeholder="—" aria-label={`Compare-at price for ${displayName(c)}`} /></td>
+                      <td className="py-2"><input className={FLD} inputMode="decimal" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} value={rows[c.id]!.cost} onChange={(e) => setField(c.id, "cost", e.target.value)} placeholder="—" aria-label={`Cost for ${displayName(c)}`} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -200,21 +207,22 @@ export function VariantSetupWizard({
 
           {step === 2 && (
             <div>
-              <p className="mb-3 text-sm text-slate-600">Assign every variant to one or more categories.</p>
+              <p className="mb-3 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>Assign every variant to one or more categories.</p>
               {categories.length === 0 ? (
-                <p className="py-6 text-center text-sm text-slate-400">No categories defined yet.</p>
+                <p className="py-6 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>No categories defined yet.</p>
               ) : (
                 <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
                   {categories.map((cat) => (
-                    <label key={cat.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50">
-                      <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-[#5D5FEF]" checked={selectedCats.has(cat.id)} onChange={() => toggleCat(cat.id)} />
-                      <span className="truncate">{cat.name}</span>
+                    <label key={cat.id} className="flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-[13px] transition-colors hover:bg-[var(--color-surface-subtle)]"
+                      style={{ borderColor: "var(--color-border)" }}>
+                      <input type="checkbox" className="h-4 w-4 rounded accent-brand-600" checked={selectedCats.has(cat.id)} onChange={() => toggleCat(cat.id)} />
+                      <span className="truncate" style={{ color: "var(--color-text-primary)" }}>{cat.name}</span>
                     </label>
                   ))}
                 </div>
               )}
               {catsTouched && (
-                <p className="mt-3 text-xs text-slate-400">
+                <p className="mt-3 text-[11px]" style={{ color: "var(--color-text-muted)" }}>
                   Applies {selectedCats.size} categor{selectedCats.size === 1 ? "y" : "ies"} to all {variants.length} variants, replacing any existing category tags.
                 </p>
               )}
@@ -223,21 +231,22 @@ export function VariantSetupWizard({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-slate-200 px-6 py-3">
-          <p className="text-xs text-slate-400">{variants.length} variant{variants.length !== 1 ? "s" : ""}</p>
+        <div className="flex items-center justify-between border-t px-6 py-3" style={{ borderColor: "var(--color-border)" }}>
+          <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{variants.length} variant{variants.length !== 1 ? "s" : ""}</p>
           <div className="flex gap-2">
             <button type="button" onClick={() => (step === 0 ? onClose() : setStep((s) => s - 1))}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+              className="rounded-xl border px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
               {step === 0 ? "Cancel" : "Back"}
             </button>
             {isLast ? (
               <button type="button" onClick={() => void handleFinish()} disabled={saving}
-                className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40">
+                className="rounded-xl bg-brand-600 px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors">
                 {saving ? "Saving…" : "Finish & save"}
               </button>
             ) : (
               <button type="button" onClick={() => setStep((s) => s + 1)}
-                className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0]">
+                className="rounded-xl bg-brand-600 px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#4849d0] transition-colors">
                 Next
               </button>
             )}
