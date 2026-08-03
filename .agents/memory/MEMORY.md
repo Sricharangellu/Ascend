@@ -1,2 +1,0 @@
-- [API server typecheck & strict mode](api-server-typecheck.md) — strict:false breaks zod inference (all fields go optional); two build paths (tsc + build.mjs) must both target src/server.ts.
-- [Backup/restore verification](backup-restore-verification.md) — --schema=public omits CREATE EXTENSION (dump unrestorable); verify against dump-derived counts, never live queries.
