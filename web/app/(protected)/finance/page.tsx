@@ -417,6 +417,9 @@ export default function FinancePage() {
 }
 
 function financeTabFromPath(pathname: string): TabId {
-  if (pathname.endsWith("/bills") || pathname.endsWith("/payment-made")) return "ap";
+  // "/finance/payment-made" was a dead, unreferenced route shim (deleted —
+  // see WORK/audits — nothing ever linked to it); this matcher only needs
+  // to recognize the one real path that still redirects here.
+  if (pathname.endsWith("/bills")) return "ap";
   return "ar";
 }

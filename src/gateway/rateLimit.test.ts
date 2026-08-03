@@ -153,3 +153,17 @@ test("a malformed numeric override (NaN) falls back to the safe default instead 
   }
   assert.equal(allowed, 60, "NaN capacity enforces the documented default (60), not unlimited");
 });
+
+test("IP limiter sets X-RateLimit-Limit/Remaining and a finite Retry-After on 429", async () => {
+  const mw = rateLimitMiddleware({ capacity: 2, refillRate: 0 });
+  const res = fakeRes();
+  assert.equal(await invoke(mw, fakeReq(), res), null);
+  assert.equal(res.getHeader("X-RateLimit-Limit"), "2");
+  assert.equal(res.getHeader("X-RateLimit-Remaining"), "1");
+  assert.equal(await invoke(mw, fakeReq(), res), null);
+  const err = await invoke(mw, fakeReq(), res);
+  assert.ok(err instanceof Error);
+  assert.equal(res.getHeader("X-RateLimit-Remaining"), "0");
+  // refillRate 0 must not emit "Infinity" — clients parse Retry-After as an int.
+  assert.equal(res.getHeader("Retry-After"), "1");
+});

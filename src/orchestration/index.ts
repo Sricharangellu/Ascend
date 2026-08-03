@@ -133,6 +133,7 @@ import { outboxRetentionJob, OUTBOX_RETENTION_INTERVAL_MS } from "./jobs/outbox-
 import { trialExpiryJob, TRIAL_EXPIRY_INTERVAL_MS } from "./jobs/trial-expiry.job.js";
 import { inventoryReconciliationJob, INVENTORY_RECONCILIATION_INTERVAL_MS } from "./jobs/inventory-reconciliation.job.js";
 import { aiAssistantAnswerJob } from "./jobs/ai-assistant-answer.job.js";
+import { demandSnapshotJob, DEMAND_SNAPSHOT_INTERVAL_MS } from "./jobs/demand-snapshot.job.js";
 
 export interface OrchestrationBootstrap {
   runner: WorkflowRunner;
@@ -316,6 +317,30 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
   if (backgroundJobsEnabled) {
     void jobProducer.enqueueOnce({
       type: QueueNames.INVENTORY_RECONCILIATION,
+      tenantId: "system",
+      payload: {},
+      runAt: Date.now(),
+      maxAttempts: 3,
+    }).catch(() => {});
+  }
+
+  // Phase 7 item 2: daily demand-snapshot sweep — persists yesterday's
+  // completed sales into demand_snapshots (see demand-snapshot.job.ts for
+  // why "yesterday" not "today", and why this is system-scoped like the
+  // inventory-reconciliation sweep above rather than per-tenant).
+  jobConsumer.register(QueueNames.DEMAND_SNAPSHOT, async (job) => {
+    await demandSnapshotJob(job, db);
+    await jobProducer.enqueueOnce({
+      type: QueueNames.DEMAND_SNAPSHOT,
+      tenantId: "system",
+      payload: {},
+      runAt: Date.now() + DEMAND_SNAPSHOT_INTERVAL_MS,
+      maxAttempts: 3,
+    });
+  });
+  if (backgroundJobsEnabled) {
+    void jobProducer.enqueueOnce({
+      type: QueueNames.DEMAND_SNAPSHOT,
       tenantId: "system",
       payload: {},
       runAt: Date.now(),

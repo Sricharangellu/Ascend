@@ -344,7 +344,18 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   // domain-modules loop) is unaffected. Same brute-force posture as identity login.
   const ssoPublicRouter = Router();
   registerSsoPublicRoutes(ssoPublicRouter, new SsoService(db));
-  app.use("/api/v1/sso", rateLimitMiddleware({ capacity: 10, refillRate: 0.33, redis }), ssoPublicRouter);
+  // Env-overridable for the same reason as /api/identity above: a single-IP
+  // test suite (Playwright CI) can exhaust the brute-force bucket and cascade
+  // every SSO-handshake spec. Defaults keep prod posture unchanged.
+  app.use(
+    "/api/v1/sso",
+    rateLimitMiddleware({
+      capacity: Number(process.env["SSO_RATE_LIMIT_CAPACITY"] ?? 10),
+      refillRate: Number(process.env["SSO_RATE_LIMIT_REFILL"] ?? 0.33),
+      redis,
+    }),
+    ssoPublicRouter,
+  );
 
   // ── Auth + per-tenant tiered rate limit applied to all /api/v1/* routes.
   // makeAuthMiddleware handles both JWT sessions and API key tokens (fpk_ prefix).

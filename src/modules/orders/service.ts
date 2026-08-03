@@ -39,6 +39,7 @@ export interface OrderRow {
   total_cents: Cents;
   customer_id: string | null;
   store_id: string | null;
+  created_by: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -233,6 +234,7 @@ export class OrdersService {
       total_cents: computed.totalCents,
       customer_id: input.customerId ?? null,
       store_id: input.storeId ?? null,
+      created_by: actorId,
       created_at: now,
       updated_at: now,
     };
@@ -257,11 +259,11 @@ export class OrdersService {
         `INSERT INTO orders
            (id, tenant_id, order_number, state_code, status, subtotal_cents,
             discount_cents, tax_cents, total_cents, customer_id, store_id,
-            created_at, updated_at)
+            created_by, created_at, updated_at)
          VALUES
            (@id, @tenant_id, @order_number, @state_code, @status, @subtotal_cents,
             @discount_cents, @tax_cents, @total_cents, @customer_id, @store_id,
-            @created_at, @updated_at)`,
+            @created_by, @created_at, @updated_at)`,
         order as unknown as Record<string, unknown>,
       );
       for (const line of lines) {
@@ -615,15 +617,16 @@ export class OrdersService {
         await tdb.query(
           `INSERT INTO orders
              (id, tenant_id, order_number, state_code, status, subtotal_cents, discount_cents,
-              tax_cents, total_cents, customer_id, store_id, parent_order_id, created_at, updated_at)
+              tax_cents, total_cents, customer_id, store_id, created_by, parent_order_id, created_at, updated_at)
            VALUES
              (@id, @tenant_id, @order_number, @state_code, 'open', @subtotal_cents, 0,
-              @tax_cents, @total_cents, @customer_id, @store_id, @parent_order_id, @created_at, @updated_at)`,
+              @tax_cents, @total_cents, @customer_id, @store_id, @created_by, @parent_order_id, @created_at, @updated_at)`,
           {
             id: childId, tenant_id: tenantId, order_number: childNumber,
             state_code: original.state_code,
             subtotal_cents: subtotal, tax_cents: tax, total_cents: subtotal + tax,
             customer_id: original.customer_id, store_id: original.store_id,
+            created_by: original.created_by,
             parent_order_id: orderId, created_at: now, updated_at: now,
           },
         );
@@ -646,6 +649,7 @@ export class OrdersService {
           state_code: original.state_code, status: "open",
           subtotal_cents: subtotal, discount_cents: 0, tax_cents: tax, total_cents: subtotal + tax,
           customer_id: original.customer_id, store_id: original.store_id,
+          created_by: original.created_by,
           created_at: now, updated_at: now, lines: childLines,
         });
       }

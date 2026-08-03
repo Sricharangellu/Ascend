@@ -35,6 +35,7 @@ import { storeLocationsModule } from "./store_locations/index.js";
 import { permissionRequestsModule } from "./permission_requests/index.js";
 import { productBatchesModule } from "./product_batches/index.js";
 import { aiAssistantModule } from "./ai_assistant/index.js";
+import { demandPlanningModule } from "./demand_planning/index.js";
 import { customerInvoicesModule } from "./customer_invoices/index.js";
 import { serviceOrdersModule } from "./service_orders/index.js";
 import { serialNumbersModule } from "./serial_numbers/index.js";
@@ -103,6 +104,7 @@ export const modules: PosModule[] = [
   permissionRequestsModule,
   productBatchesModule,
   aiAssistantModule,
+  demandPlanningModule,
   customerInvoicesModule,
   serviceOrdersModule,
   workforceModule,

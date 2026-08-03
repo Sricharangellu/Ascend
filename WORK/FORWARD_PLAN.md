@@ -1,7 +1,37 @@
 # Ascend Forward Plan (authoritative)
 
-Last reviewed: 2026-07-18 (FE↔BE gap scan — see `WORK/audits/AUDIT_2026-07-18T005030Z-fe-be-gap-audit.md`)
-Scope reviewed: `/Users/sri/Desktop/Desk/Finder/finder-pos`
+Last reviewed: 2026-08-02 (POS-audit fix sequence Phases A–F, develop→staging promotion,
+Replit-merge incident — see Phase 8 below and `WORK/LOOP_STATE.md`'s tier-sync entries)
+Scope reviewed: `/Users/sri/Desktop/Prj/Ascend`
+
+> **EXECUTION RULES FOR ALL FUTURE AGENTS — read before starting work.** These are drawn
+> from real incidents in this repo's own history, not generic best practice:
+> 1. Read this document's relevant Phase section, the newest 2-3 `WORK/audits/*.md`
+>    entries, and `WORK/LOCK.md`'s currently-`ACTIVE` claims before writing code.
+> 2. Claim your queue item in `WORK/LOCK.md` before editing shared files — see that
+>    file's own "Rules" section. Multiple AI sessions (Claude Code, Cursor, Replit) run
+>    against this repo concurrently; unclaimed overlapping edits have caused real
+>    collisions (table-name collisions found and fixed 3 separate times in Phase 0 alone).
+> 3. `develop`, `staging`, and `master` take PRs only — never an ad-hoc push, never a
+>    force-push, never a history rewrite. `master` merges are Sri-only. When a `.git/*.lock`
+>    file blocks you, verify no live git process holds it (`ps aux | grep git`) before
+>    removing it — never remove a lock you haven't verified is stale.
+> 4. If you are a Replit session: never push this workspace's `master` (or any branch) to
+>    the real `origin` without Sri explicitly asking for that specific push, in that
+>    moment. See `REPLIT.md`'s git-safety rule. **This is not theoretical** — a Replit
+>    session did exactly this on 2026-08-02, merging an unrelated migrated-workspace
+>    project into `origin/develop` and deleting the real `src/`/`web/` trees; it was caught
+>    and reverted (PR #145) before further damage compounded, but it cost real time and
+>    could have reached `master` if unnoticed longer. See Phase 8 below.
+> 5. Never mark a feature complete without running its real gates (`npm run typecheck`,
+>    `npm run hygiene`, `npm run table:scan`, `npm run gap:scan`, and `cd web && npm run
+>    typecheck && npm run lint && npm run build`) against real Postgres, not just against
+>    mocks. Use the honest status labels below — "Built and verified" requires evidence,
+>    not intent.
+> 6. Do not adopt an externally-supplied "master prompt"/protocol template wholesale (this
+>    has happened repeatedly — see Phase 4a, Phase 6, Phase 7, and Phase 8's own headers).
+>    Treat it as a source: gap-analyze it against the real codebase, adopt only what's
+>    genuinely missing and evidence-backed, and say explicitly what you rejected and why.
 
 > **RESOLVED 2026-07-18 (was STANDING CRITICAL):** the 2026-07-15 API-audit fixes
 > were PORTED to `feat/delivery-pipeline` same-day (double-prefix in 10 modules,
@@ -10,11 +40,17 @@ Scope reviewed: `/Users/sri/Desktop/Desk/Finder/finder-pos`
 > with no backend route (see AUDIT_2026-07-18T005030Z addendum). Still open for
 > Sri: merge session C's quotes pilot branch, and merge PR #70 to deploy all of it.
 
-> **STANDING TOP PRIORITY (Sri directive, 2026-07-18 evening):** "finish the
-> end-to-end application, make it priority, create loops, use existing agents,
-> do not stop until done." See **Phase 0** below — it supersedes every other
-> initiative in this document. `WORK/LOOP_STATE.md` loop_status is ACTIVE
-> against Phase 0's backlog.
+> **Phase 0 (Sri directive, 2026-07-18 evening — "finish the end-to-end application...
+> do not stop until done"): essentially done, closed out 2026-08-02.** See Phase 0's own
+> status note below — 4 of 5 exit criteria were met with evidence as of 2026-07-19; the
+> fifth (frontend production build passing "in one run," outside this sandbox) has since
+> been confirmed green repeatedly via real CI runs this session (e.g. PR #135–#151, every
+> one showing `Frontend — typecheck + lint + build: pass`). Work continued into Phases
+> 4a/6/7 and the Phase 8 sequence below regardless of Phase 0's "supersedes everything"
+> framing — that framing is now historical, not a current constraint. `WORK/LOOP_STATE.md`
+> `loop_status` is STOPPED (refreshed 2026-07-30) — no autonomous loop is running;
+> coordination happens via GitHub Issues + `WORK/LOCK.md` + PRs instead, see
+> `docs/architecture/ORCHESTRATION.md`.
 
 > Sequencing is **phase-based, not time-based**. A phase is complete when its exit
 > criteria pass — never by calendar. Point-in-time verification results live in the
@@ -458,58 +494,112 @@ This architecture is acceptable for the current stage. A modular monolith is the
 
 ## Security review
 
-Security is partially addressed, but not finished.
+**Refreshed 2026-08-02 — this section was last substantively true 2026-07-18; Phase
+4/4a (2026-07-22) verified significantly more of it than shown below at the time.
+Read this version, not an older cached one.**
 
-Good signs:
+Good signs, verified with evidence (not just present in code — see Phase 4/4a for
+citations):
 
 - Production startup fails if `JWT_SECRET` or `DATABASE_URL` is missing.
-- Helmet is enabled.
-- CORS is restricted in production by allowlist.
-- Stripe webhook uses raw body and signature verification.
-- There is rate limiting.
-- Metrics endpoint supports bearer token protection.
-- SQL helper appears designed around parameterized queries.
-- CI includes checks for unguarded mutation routes and raw SQL interpolation.
+- Helmet is enabled; CORS is restricted in production by allowlist.
+- Stripe webhook uses raw body + signature verification, fails closed (503) if
+  `STRIPE_WEBHOOK_SECRET` is unset — dedicated test coverage (`payments/webhook.test.ts`).
+- Redis-backed sliding-window rate limiting (`src/gateway/rateLimit.ts`, SEC-9) — degrades
+  to in-process (not off) when `REDIS_URL` is unset.
+- Webhook secrets are AES-256-GCM encrypted (`src/modules/webhooks/service.ts`, DB-16) —
+  fails closed (503) in production if `WEBHOOK_SECRET_KEY` is unset, does not silently
+  store plaintext.
+- Metrics endpoint closes with `503 metrics_unconfigured` in production with no
+  `METRICS_TOKEN` set — not silently unauthenticated.
+- Circuit breaker around all Stripe calls (`src/shared/circuit-breaker.ts`) — fails fast
+  (503) after N consecutive gateway failures instead of paying full retry cost.
+- **Tenant isolation VERIFIED CLEAN** (Phase 0 iter 9, re-confirmed no regression since):
+  every literal `WHERE id=@id` mutation is gated by a prior tenant-scoped verify or
+  re-reads a just-created row; dynamic `${where}` builders include `tenant_id`; RLS
+  backstop underneath (`db/rls/policies.sql`, applied automatically to every table with a
+  `tenant_id` column, registered last in `src/modules/index.ts` specifically so it covers
+  every other module's tables including ones added later).
+- CI includes checks for unguarded mutation routes and raw SQL interpolation
+  (`Production guard — lint anti-patterns`), plus `gap:scan` (FE↔BE contract drift) and
+  `table:scan` (cross-module table-name collisions — a bug class that hit this repo 3
+  separate times before the check existed).
 
-Concerns:
+Concerns, still real:
 
-- Some production security settings are warnings, not hard failures, including Redis and Stripe.
-- If `WEBHOOK_SECRET_KEY` is unset, webhook secrets may be stored in plaintext according to `.env.example`.
-- If `METRICS_TOKEN` is empty, metrics may be unauthenticated according to `.env.example`.
-- Redis is optional, so rate limiting may be per-instance in production if Redis is not configured.
-- MFA/device verification pages contain mocked flows.
-- Frontend auth has mock/demo refresh-token behavior.
-- Role and permission enforcement must be audited endpoint-by-endpoint and component-by-component.
-- Row Level Security policies exist in `db/rls/policies.sql`, but production enforcement needs proof, tests, and deployment confirmation.
-- Secrets, Vercel env vars, database URLs, Stripe keys, webhook keys, SendGrid keys, and JWT secrets need a formal rotation and environment checklist.
+- Some production security settings are warnings, not hard failures (documented,
+  deliberate — see Phase 4's `app.ts` startup-check list). NEEDS-SRI: confirm which
+  *warned* (not required) vars are actually set in the live Vercel/Render env — no code
+  can see platform secrets from a sandbox.
+- MFA/device verification pages and frontend auth refresh-token behavior still contain
+  mock/demo flows — not re-verified this pass.
+- RLS policy *presence* is proven; production *enforcement* (that RLS is actually
+  switched on against the live database, not just defined in a SQL file) still needs a
+  direct Sri-side confirmation against whichever database production actually uses — see
+  the open production-infrastructure question below.
+- Secrets/env rotation checklist: `docs/architecture/PIPELINE.md`'s configuration
+  registry now exists (added 2026-07-30) with Purpose/Environment/Used-by/Owner/Rotation/
+  Verification columns per secret — the checklist itself is now built; what's still open
+  is Sri actually working through it against the real platform dashboards.
 
-Security conclusion: not production-ready for real customers until RBAC, tenant isolation, secret handling, RLS, rate limiting, audit logging, and auth flows are verified with tests and production configuration.
+Security conclusion: materially stronger than the 2026-07-18 assessment on RBAC/tenant
+isolation/secret handling/rate limiting/audit logging (all now verified with tests, not
+just present in code) — but still gated on the same handful of Sri-only items every
+prior pass has named: confirm production infra + secrets, run one real restore drill.
 
 ## Deployment readiness
 
-Current answer: no, not confidently deployment-ready.
+**Refreshed 2026-08-02.** The code-quality gates that blocked this answer on 2026-07-18
+are now closed. The blocker that remains is infrastructure, not code:
 
-The app may be deployable as a demo or preview environment, but it should not be treated as ready for real stores, real payments, real inventory, or real compliance.
+- Backend typecheck, backend tests (real Postgres), frontend typecheck, frontend lint,
+  frontend build, and Playwright E2E all pass — confirmed repeatedly via real CI this
+  session (not local-only claims): every PR in the #135–#151 range shows all four
+  required checks green.
+- `npm run hygiene` / `table:scan` / `gap:scan` all clean on the current `develop`/
+  `staging` tip (1095 files, 161 table names zero collisions, 456/381 API paths 21
+  allowlisted).
+- `develop` and `staging` are in sync as of PR #147/#151 (2026-08-02) — the promotion
+  path itself works end-to-end for code.
 
-Reasons:
+**What's actually blocking real production deployment — `docs/architecture/DEPLOYMENTS.md`
+(open incident, not resolved as of this writing):**
 
-- Backend typecheck passes, but full backend tests were not run in this review.
-- Frontend typecheck passes, but frontend lint fails locally due to dependency integrity.
-- Frontend build was not verified in this review.
-- E2E tests were not run in this review.
-- Mocks are still a major part of the frontend experience.
-- Security posture needs hardening.
-- Production environment variables and Vercel configuration need verification.
-- Database migration strategy needs a real production runbook and rollback procedure.
-- Operational monitoring, alerting, backups, restore tests, logs, and incident flow need proof.
-- Payment, refund, inventory, and accounting correctness need deeper test coverage.
+- Where production actually runs is **unconfirmed**. Docs claim Render; the claimed URL
+  (`ascend-prod.onrender.com`) times out completely from three independent networks; zero
+  Render deploy logic exists anywhere in this repo's CI/CD (`ci.yml`/`scripts/deploy.sh`
+  only ever target Vercel project IDs).
+- Confirmed live and reproduced this session: the `deploy-staging` CI job fails with
+  `Error: Project not found (VERCEL_PROJECT_ID: prj_TiPX9UYctGKJbQr4Lb1WFwSsKiN1)` — that
+  Vercel project is dead. A `master` merge today would very likely hit the identical
+  class of failure on `Deploy → Production (Vercel --prod)`, or worse, silently target
+  infrastructure nobody has confirmed is real.
+- What database production uses is **unconfirmed** — the database actually populated and
+  in active use (`us-west-2`, ~172 tables, demo login) is documented as *testing*'s, not
+  *production*'s isolated `ca-central-1` project, which has never been confirmed to
+  receive a live connection.
+- No production backup has ever actually run (`PROD_DATABASE_URL` secret unset) — the
+  backup cron's own clean-skip path has been firing since it was set up, per Phase 4a #3.
+  Restore-from-backup cannot be tested until this is fixed, and until it's tested, treat
+  disaster recovery as unproven regardless of how good the *code* around it is.
 
-Deployment recommendation:
+None of the above is code-addressable. It's four Sri-only actions, all named in
+`DEPLOYMENTS.md`'s P0-P3 plan: (P0) confirm via browser whether the Render URL responds
+at all; (P1) get Render-dashboard-confirmed answers on what's actually running there;
+(P2) reconcile the contradicting docs once P1 answers exist; (P3) fix the monitoring
+probe once the real URL is known. Do not treat a red `deploy-staging`/`deploy-production`
+CI job as a code regression until these are resolved — it is very likely infra, not code,
+exactly as reproduced this session.
 
-- Demo deployment: acceptable.
+Deployment recommendation (unchanged in spirit from 2026-07-18, updated for what's now
+proven vs. still open):
+
+- Demo deployment: acceptable — code gates are clean.
 - Internal alpha with fake payments and demo data: acceptable.
-- Pilot with one friendly store and limited scope: only after hardening the core path.
-- General production launch: not ready.
+- Pilot with one friendly store and limited scope: code is ready; **infra is not** — do
+  not attempt this until DEPLOYMENTS.md's P0/P1 are closed.
+- General production launch: not ready — blocked on infra confirmation + one real
+  restore drill, not on further feature work.
 
 ## Is the app going in the right direction?
 
@@ -1316,6 +1406,126 @@ Exit criteria for Phase 7 (this slice):
 - The broken draft-PO-creation bug is fixed separately (own commit/claim) or
   explicitly still tracked if not yet done.
 - A dated completion audit in `WORK/audits/` records what shipped.
+
+### Phase 8: Execution-grade guardrails, failure prevention, multi-agent safety (approved scope, 2026-08-02)
+
+Source: Sri supplied a generic "MASTER PROMPT — update the forward plan into an
+execution-ready roadmap" template (audit-first, per-phase Business Objective/Failure
+Scenarios/Guardrails/Security/Deployment Checklist sections, enterprise-scale
+considerations, a 10-point future-agent rulebook). Same verdict as Phase 4a/6/7's own
+handling of similar templates: **treat it as a source, not a literal spec.** Rewriting
+this whole 1400-line document into that generic structure would delete a large amount of
+specific, evidence-cited content (Phase 0's 8 real bugs found by writing tests, the
+table-collision bug class found 3 times, DEPLOYMENTS.md's P0-P3 plan, today's Replit
+incident) in favor of generic boilerplate this document's own "Avoid" list already warns
+against ("treating docs as proof of implementation"). What follows is what's genuinely
+missing, grounded in this session's real findings — not a restructure.
+
+**What already exists and should not be re-built** (the master prompt's own request to
+audit before writing applies to itself first):
+
+- Failure-scenario thinking: Phase 4a's reliability audit already covers retry/backoff
+  (`src/orchestration/policies/retry.policy.ts`), circuit breaking
+  (`src/shared/circuit-breaker.ts`), transactional outbox, saga/compensation workflows,
+  and inventory reconciliation — see that Phase for the full "what's verified built" list.
+- Data-integrity guardrails: negative-inventory prevention, atomic transfer legs,
+  cycle-count double-close prevention, and the immutable `inventory_movements` ledger are
+  all shipped — see Phase 0 iterations 10-13's bug-fix trail.
+- Audit compliance (who/what/when/before/after): the audit-log module already covers
+  this; RLS + tenant-scoped verify-then-mutate covers cross-tenant isolation (verified
+  clean, see Security review above).
+- A release gate checklist already exists below (`## Release gate checklist`) — extend
+  it, don't duplicate it.
+- Honest status labels already exist below (`## Human-language status labels`) — use
+  them, don't invent new ones.
+
+**Real gaps found this session, in priority order — each is a standalone, independently
+gated item, not a big-bang rewrite:**
+
+1. **DONE, 2026-08-02: AI-agent / multi-session git-safety rules.** Added as the
+   "EXECUTION RULES FOR ALL FUTURE AGENTS" blockquote at the top of this document. Not
+   theoretical — grounded in a real incident the same day: a Replit session merged its
+   separately-migrated copy of this repo into `origin/develop`, deleting `src/`/`web/`
+   and replacing `package.json` with a bare workspace stub. Caught before further
+   commits landed on top; fixed with a forward-only `git revert` (PR #145), zero data
+   loss, `staging`/`master` never touched. Full incident record:
+   `WORK/LOOP_STATE.md`'s "NEW 2026-08-02 — incident" row. This is exactly the kind of
+   guardrail the master prompt asked for ("AI Agent Guardrails... never modify
+   production data directly") — except grounded in what actually happened here, not a
+   hypothetical.
+2. **DONE, 2026-08-02: table-name collision prevention.** Flagged as a backlog candidate
+   back in Phase 0 (2026-07-19, "worth a lint/CI check... Not built this wave") after
+   the bug class hit 3 times. Confirmed already built and running as
+   `npm run table:scan` (`tools/table-collision-scan.mjs`) — part of the standard gate
+   sequence now. No new work needed; noting closure here so the Phase 0 flag isn't
+   mistaken for still-open.
+3. **NEEDS-SRI, not code-addressable: production infrastructure confirmation.** See the
+   refreshed Deployment readiness section above — this is the single highest-impact gap
+   for "no deployment surprises." Every other item on this list is secondary to knowing
+   where production actually runs.
+4. **NEEDS-SRI, not code-addressable: one real backup-restore drill.** `PROD_DATABASE_URL`
+   has never been set, so the backup cron has never produced a real artifact and restore
+   has never been tested end-to-end. Code-side (the backup/restore scripts themselves)
+   is built per Phase 4a; what's missing is running it once for real.
+5. **OPEN, code-addressable, not yet scoped: a `WORK/audits/` completion-audit template
+   check.** Every phase in this document ends with "a dated completion audit records
+   what shipped" — true in practice (dozens exist), but nothing enforces the format
+   stays consistent (evidence citations, real test counts, explicit out-of-scope
+   notes). Not queuing a CI check for this without Sri confirming it's worth the
+   overhead — named here as a candidate, same treatment Phase 0 gave the table-collision
+   check before it was built.
+
+**Explicitly not adopted from the source template** (with reasons, matching Phase 4a/6's
+own convention of naming rejected scope rather than silently dropping it):
+
+- The full per-phase Business Objective/Current State/Backend/Frontend/Database/
+  Security/Testing/Deployment section template — this document's existing phases
+  already carry equivalent information in a denser, evidence-cited form specific to
+  each phase; forcing every future phase into 8 subsections regardless of size would
+  add ceremony without adding information.
+- "Thousands of stores, millions of products" scale planning — per this repo's own CTO
+  doctrine (evidence beats aspiration): Postgres with this schema's tenant-leading
+  indexes comfortably serves ~10k tenants / 50k users / 2k concurrent / 30k sales-per-day
+  at current scale assumptions. Nothing in this codebase or its traffic is anywhere near
+  that ceiling. Designing past a measured bottleneck is explicitly against this
+  document's own "Avoid" list philosophy. Revisit if/when a real metric approaches a
+  real limit, not preemptively.
+- A generic "AI Agent Guardrails" checklist disconnected from this repo — replaced with
+  item 1 above, which is the same intent grounded in a real incident and a real fix.
+- Re-explaining the procurement-vs-demand-planning architectural separation the source
+  template asked for — Phase 6 and Phase 7's own scoping already draws exactly this
+  line (supplier→PO→receiving→ledger vs. sales-history→snapshot→forecast), and
+  ADR-006 already governs the UOM-conversion boundary the template warned not to mix in.
+  Nothing new to add.
+
+Exit criteria for Phase 8 (this slice):
+
+- Items 1-2 above: done, verifiable by reading this document's own top blockquote and
+  running `npm run table:scan`.
+- Items 3-4: remain NEEDS-SRI until Sri acts — not blocked on any future agent's code
+  work, do not attempt to "solve" these with more application code.
+- Item 5: not started — needs Sri's go/no-go before scoping.
+
+#### Next agent starting point
+
+If you are picking up work on Ascend with no other context:
+
+1. Read this document's top blockquote (execution rules), then `WORK/LOCK.md`'s
+   currently-`ACTIVE` claims (if any), then the newest 2-3 files in `WORK/audits/`.
+2. Check `git log --oneline -10` on `develop` and compare against this document's "Last
+   reviewed" date — if substantial work has landed since, this document is stale again;
+   say so explicitly rather than planning against outdated status, the same way this
+   Phase 8 update corrected the 2026-07-18 Security/Deployment sections.
+3. There is no current NEEDS-SRI-free code backlog item waiting to be picked up
+   speculatively. The two highest-value real gaps (production infra confirmation, one
+   backup-restore drill) both require Sri's direct dashboard/browser access — a future
+   agent cannot close them. If Sri has not supplied a specific initiative, the honest
+   move is to say so, not invent scope.
+4. If Sri does supply a new initiative or another "master prompt" style template: follow
+   this document's own established pattern (Phase 4a/6/7/8) — audit the real codebase
+   first, write a dated gap-analysis audit in `WORK/audits/`, propose a narrow approved
+   scope back to Sri, then execute strictly in that order with regression gates between
+   each item. Do not build the template's full scope speculatively.
 
 ## Suggested better architecture decisions moving forward
 

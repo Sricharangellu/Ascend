@@ -16,6 +16,8 @@ interface KpiCardProps {
   sparkline?: SparklinePoint[];
   /** Deep-link for "View report" — renders a small link below the KPI */
   reportHref?: string;
+  /** Plain muted caption rendered under the title — for callers that just need a label/value/caption stat, no icon/trend/sparkline */
+  helper?: string;
 }
 
 const TONE_ICON: Record<string, string> = {
@@ -63,6 +65,7 @@ export function KpiCard({
   loading = false,
   sparkline,
   reportHref,
+  helper,
 }: KpiCardProps) {
   const isPositive = trend ? trend.value >= 0 : true;
 
@@ -85,6 +88,7 @@ export function KpiCard({
         <p className="text-2xl font-bold tabular-nums text-[var(--color-text-primary)]">{value}</p>
       )}
       <p className="mt-0.5 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-secondary)]">{title}</p>
+      {helper && !loading && <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{helper}</p>}
 
       <div className="mt-2 flex items-center justify-between">
         {trend && !loading ? (
