@@ -11,7 +11,7 @@ export function StatusBadge({ status }: { status: string }) {
       ? "bg-green-100 text-green-800"
       : status === "paused"
       ? "bg-yellow-100 text-yellow-800"
-      : "bg-gray-100 text-gray-600";
+      : "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]";
   return (
     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${classes}`}>
       {status}
@@ -83,12 +83,13 @@ export function StatusActionsDropdown({
         </svg>
       </Button>
       {open && (
-        <div className="absolute right-0 z-20 mt-1 w-36 rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div className="absolute right-0 z-20 mt-1 w-36 rounded-lg border shadow-lg" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
           <div className="py-1">
             <button
               type="button"
               onClick={() => { setOpen(false); onEdit(discount); }}
-              className="w-full border-b border-gray-100 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+              className="w-full border-b px-4 py-2 text-left text-sm hover:bg-[var(--color-surface-subtle)]"
+              style={{ borderColor: "var(--color-table-border)", color: "var(--color-text-secondary)" }}
             >
               Edit
             </button>
@@ -97,7 +98,8 @@ export function StatusActionsDropdown({
                 key={a.status}
                 type="button"
                 onClick={() => { setOpen(false); onStatusChange(discount.id, a.status); }}
-                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                className="w-full px-4 py-2 text-left text-sm hover:bg-[var(--color-surface-subtle)]"
+                style={{ color: "var(--color-text-secondary)" }}
               >
                 {a.label}
               </button>

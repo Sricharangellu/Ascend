@@ -127,8 +127,9 @@ export default function ManufacturingPage() {
               {FILTERS.map(s => (
                 <button key={s} type="button" onClick={() => setFilter(s)}
                   className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors ${
-                    filter === s ? "bg-brand-600 text-white" : "bg-gray-100 text-[var(--color-text-secondary)] hover:bg-gray-200"
-                  }`}>
+                    filter === s ? "bg-brand-600 text-white" : "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)]"
+                  }`}
+                  style={filter === s ? {} : { backgroundColor: "var(--color-surface-subtle)" }}>
                   {s.replace("_", " ")}
                 </button>
               ))}
@@ -138,7 +139,7 @@ export default function ManufacturingPage() {
 
           {loading ? (
             <div className="space-y-2">
-              {[1,2,3].map(i => <div key={i} className="h-16 animate-pulse rounded-xl bg-gray-100" />)}
+              {[1,2,3].map(i => <div key={i} className="h-16 animate-skeleton rounded-xl" />)}
             </div>
           ) : orders.length === 0 ? (
             <Card><p className="py-8 text-center text-sm text-[var(--color-text-secondary)]">No orders found.</p></Card>
@@ -147,8 +148,9 @@ export default function ManufacturingPage() {
               {orders.map(o => (
                 <button key={o.id} type="button" onClick={() => openDetail(o.id)}
                   className={`w-full rounded-xl border p-3 text-left transition-colors hover:border-brand-400 hover:bg-brand-50 ${
-                    selected?.id === o.id ? "border-brand-600 bg-brand-50" : "border-[var(--color-table-border)] bg-white"
-                  }`}>
+                    selected?.id === o.id ? "border-brand-600 bg-brand-50" : "border-[var(--color-table-border)]"
+                  }`}
+                  style={selected?.id === o.id ? {} : { backgroundColor: "var(--color-surface)" }}>
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold text-[var(--color-text-primary)] truncate">{o.product_id}</p>
                     <Badge variant={STATUS_BADGE[o.status] ?? "gray"} size="sm">{o.status.replace("_"," ")}</Badge>
@@ -170,7 +172,7 @@ export default function ManufacturingPage() {
               </div>
             </Card>
           )}
-          {detailLoading && <div className="h-64 animate-pulse rounded-xl bg-gray-100" />}
+          {detailLoading && <div className="h-64 animate-skeleton rounded-xl" />}
           {selected && !detailLoading && (
             <div className="space-y-4">
               <Card>
@@ -204,7 +206,7 @@ export default function ManufacturingPage() {
                 ) : (
                   <div className="overflow-x-auto rounded-xl border border-[var(--color-table-border)]">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 text-xs font-medium text-[var(--color-text-secondary)] uppercase">
+                      <thead style={{ backgroundColor: "var(--color-table-header)" }} className="text-xs font-medium text-[var(--color-text-secondary)] uppercase">
                         <tr>
                           <th className="px-3 py-2 text-left">Material</th>
                           <th className="px-3 py-2 text-right">Required</th>
@@ -212,7 +214,7 @@ export default function ManufacturingPage() {
                           <th className="px-3 py-2 text-left">Unit</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-[var(--color-table-border)] bg-white">
+                      <tbody className="divide-y divide-[var(--color-table-border)]" style={{ backgroundColor: "var(--color-surface)" }}>
                         {selected.bom.map(line => (
                           <tr key={line.id}>
                             <td className="px-3 py-2 font-medium text-[var(--color-text-primary)]">{line.raw_material_id}</td>
@@ -242,19 +244,22 @@ export default function ManufacturingPage() {
               <input type="text" value={form.productId}
                 onChange={e => setForm(f => ({ ...f, productId: e.target.value }))}
                 placeholder="SKU or product ID"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                style={{ border: "1px solid var(--color-border)" }} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Quantity *</label>
               <input type="number" min={1} value={form.quantity}
                 onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                style={{ border: "1px solid var(--color-border)" }} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Notes</label>
               <input type="text" value={form.notes}
                 onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                style={{ border: "1px solid var(--color-border)" }} />
             </div>
           </div>
 
@@ -268,13 +273,16 @@ export default function ManufacturingPage() {
                 <div key={i} className="flex gap-2 items-center">
                   <input type="text" placeholder="Material ID" value={line.rawMaterialId}
                     onChange={e => updateBomLine(i, "rawMaterialId", e.target.value)}
-                    className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-brand-600" />
+                    className="flex-1 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-brand-600"
+                    style={{ border: "1px solid var(--color-border)" }} />
                   <input type="number" placeholder="Qty" value={line.qtyRequired} min={0.001} step={0.001}
                     onChange={e => updateBomLine(i, "qtyRequired", e.target.value)}
-                    className="w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand-600" />
+                    className="w-20 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-brand-600"
+                    style={{ border: "1px solid var(--color-border)" }} />
                   <input type="text" placeholder="Unit" value={line.unit}
                     onChange={e => updateBomLine(i, "unit", e.target.value)}
-                    className="w-16 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand-600" />
+                    className="w-16 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-brand-600"
+                    style={{ border: "1px solid var(--color-border)" }} />
                   {form.bom.length > 1 && (
                     <button type="button" onClick={() => removeBomLine(i)}
                       className="text-red-500 hover:text-red-700 text-sm">×</button>

@@ -104,65 +104,71 @@ function InvoiceBuilder({ onClose, onSaved }: { onClose: () => void; onSaved: ()
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-4xl rounded-xl bg-white shadow-2xl flex flex-col max-h-[95vh]" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+      <div className="w-full max-w-4xl rounded-xl shadow-2xl flex flex-col max-h-[95vh]" style={{ backgroundColor: "var(--color-surface)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">New Customer Invoice</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Scan UPCs or enter products manually</p>
+            <h2 className="text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>New Customer Invoice</h2>
+            <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>Scan UPCs or enter products manually</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+          <button onClick={onClose} className="text-2xl leading-none" style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
 
         <div className="flex-1 overflow-y-auto">
           {/* Customer info */}
-          <div className="px-6 py-4 border-b border-slate-100">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3">Customer Details</p>
+          <div className="px-6 py-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
+            <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: "var(--color-text-muted)" }}>Customer Details</p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="sm:col-span-2">
-                <label className="block text-xs text-slate-500 mb-1">Customer Name</label>
+                <label className="block text-xs mb-1" style={{ color: "var(--color-text-muted)" }}>Customer Name</label>
                 <input value={customerName} onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="Walk-in Customer"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ border: "1px solid var(--color-border)" }} />
               </div>
               <div>
-                <label className="block text-xs text-slate-500 mb-1">Email</label>
+                <label className="block text-xs mb-1" style={{ color: "var(--color-text-muted)" }}>Email</label>
                 <input type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)}
                   placeholder="customer@email.com"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ border: "1px solid var(--color-border)" }} />
               </div>
               <div>
-                <label className="block text-xs text-slate-500 mb-1">Phone</label>
+                <label className="block text-xs mb-1" style={{ color: "var(--color-text-muted)" }}>Phone</label>
                 <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)}
                   placeholder="555-0100"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ border: "1px solid var(--color-border)" }} />
               </div>
               <div className="sm:col-span-2">
-                <label className="block text-xs text-slate-500 mb-1">Billing Address</label>
+                <label className="block text-xs mb-1" style={{ color: "var(--color-text-muted)" }}>Billing Address</label>
                 <input value={billingAddress} onChange={(e) => setBillingAddress(e.target.value)}
                   placeholder="Street, City, State ZIP"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ border: "1px solid var(--color-border)" }} />
               </div>
               <div>
-                <label className="block text-xs text-slate-500 mb-1">Due Date</label>
+                <label className="block text-xs mb-1" style={{ color: "var(--color-text-muted)" }}>Due Date</label>
                 <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ border: "1px solid var(--color-border)" }} />
               </div>
               <div>
-                <label className="block text-xs text-slate-500 mb-1">Notes</label>
+                <label className="block text-xs mb-1" style={{ color: "var(--color-text-muted)" }}>Notes</label>
                 <input value={notes} onChange={(e) => setNotes(e.target.value)}
                   placeholder="Terms, instructions…"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ border: "1px solid var(--color-border)" }} />
               </div>
             </div>
           </div>
 
           {/* Line items */}
           <div className="px-6 py-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3">Line Items</p>
+            <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: "var(--color-text-muted)" }}>Line Items</p>
             {err && <p className="text-sm text-red-600 mb-3">{err}</p>}
             <div className="space-y-2">
               {/* Header */}
-              <div className="grid grid-cols-[1fr_2fr_80px_100px_80px_60px_auto] gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              <div className="grid grid-cols-[1fr_2fr_80px_100px_80px_60px_auto] gap-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>
                 <span>UPC / SKU</span><span>Product</span><span>Qty</span><span>Price</span><span>Discount</span><span>Tax %</span><span />
               </div>
               {lines.map((line, idx) => (
@@ -172,33 +178,39 @@ function InvoiceBuilder({ onClose, onSaved }: { onClose: () => void; onSaved: ()
                     onChange={(e) => updateLine(idx, { upc: e.target.value })}
                     onBlur={(e) => void lookupUpc(idx, e.target.value)}
                     placeholder="Scan / type UPC"
-                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    style={{ border: "1px solid var(--color-border)" }}
                   />
                   <input
                     value={scanning === idx ? "Looking up…" : line.name}
                     onChange={(e) => updateLine(idx, { name: e.target.value })}
                     placeholder="Product name"
                     disabled={scanning === idx}
-                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                    className="rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                    style={{ border: "1px solid var(--color-border)" }}
                   />
                   <input type="number" min="1" value={line.quantity}
                     onChange={(e) => updateLine(idx, { quantity: parseInt(e.target.value, 10) || 1 })}
-                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    className="rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    style={{ border: "1px solid var(--color-border)" }} />
                   <input type="number" min="0" step="0.01"
                     value={(line.unit_price_cents / 100).toFixed(2)}
                     onChange={(e) => updateLine(idx, { unit_price_cents: Math.round(parseFloat(e.target.value || "0") * 100) })}
-                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    className="rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    style={{ border: "1px solid var(--color-border)" }} />
                   <input type="number" min="0" step="0.01"
                     value={(line.discount_cents / 100).toFixed(2)}
                     onChange={(e) => updateLine(idx, { discount_cents: Math.round(parseFloat(e.target.value || "0") * 100) })}
-                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    className="rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    style={{ border: "1px solid var(--color-border)" }} />
                   <input type="number" min="0" max="100" step="0.01"
                     value={line.tax_rate_pct}
                     onChange={(e) => updateLine(idx, { tax_rate_pct: parseFloat(e.target.value || "0") })}
-                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    className="rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    style={{ border: "1px solid var(--color-border)" }} />
                   <div className="flex items-center gap-1">
-                    <span className="text-xs font-mono text-slate-500 w-16 text-right">{formatMoney(lineTotal(line))}</span>
-                    <button onClick={() => removeLine(idx)} className="text-slate-300 hover:text-red-500 text-lg leading-none px-1">&times;</button>
+                    <span className="text-xs font-mono w-16 text-right" style={{ color: "var(--color-text-muted)" }}>{formatMoney(lineTotal(line))}</span>
+                    <button onClick={() => removeLine(idx)} className="text-lg leading-none px-1" style={{ color: "var(--color-border)" }} onMouseEnter={(e) => (e.currentTarget.style.color = "red")} onMouseLeave={(e) => (e.currentTarget.style.color = "var(--color-border)")}>&times;</button>
                   </div>
                 </div>
               ))}
@@ -208,12 +220,12 @@ function InvoiceBuilder({ onClose, onSaved }: { onClose: () => void; onSaved: ()
         </div>
 
         {/* Totals + actions */}
-        <div className="border-t border-slate-200 px-6 py-4 flex items-end justify-between gap-4">
+        <div className="px-6 py-4 flex items-end justify-between gap-4" style={{ borderTop: "1px solid var(--color-border)" }}>
           <div className="space-y-1 text-sm min-w-48">
-            <div className="flex justify-between text-slate-600"><span>Subtotal</span><span className="font-mono">{formatMoney(subtotal)}</span></div>
-            {totalDiscount > 0 && <div className="flex justify-between text-slate-600"><span>Discount</span><span className="font-mono text-red-600">−{formatMoney(totalDiscount)}</span></div>}
-            <div className="flex justify-between text-slate-600"><span>Tax</span><span className="font-mono">{formatMoney(totalTax)}</span></div>
-            <div className="flex justify-between text-slate-900 font-semibold text-base border-t border-slate-200 pt-1"><span>Total</span><span className="font-mono">{formatMoney(total)}</span></div>
+            <div className="flex justify-between" style={{ color: "var(--color-text-secondary)" }}><span>Subtotal</span><span className="font-mono">{formatMoney(subtotal)}</span></div>
+            {totalDiscount > 0 && <div className="flex justify-between" style={{ color: "var(--color-text-secondary)" }}><span>Discount</span><span className="font-mono text-red-600">−{formatMoney(totalDiscount)}</span></div>}
+            <div className="flex justify-between" style={{ color: "var(--color-text-secondary)" }}><span>Tax</span><span className="font-mono">{formatMoney(totalTax)}</span></div>
+            <div className="flex justify-between font-semibold text-base pt-1" style={{ color: "var(--color-text-primary)", borderTop: "1px solid var(--color-border)" }}><span>Total</span><span className="font-mono">{formatMoney(total)}</span></div>
           </div>
           <div className="flex gap-2">
             <Button variant="secondary" onClick={onClose}>Discard</Button>
@@ -252,16 +264,16 @@ function InvoiceDetailModal({ invoice, onClose, onStatusChange }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-2xl rounded-xl bg-white shadow-2xl flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+      <div className="w-full max-w-2xl rounded-xl shadow-2xl flex flex-col max-h-[90vh]" style={{ backgroundColor: "var(--color-surface)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-semibold text-slate-950">{invoice.invoice_number}</h2>
+              <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>{invoice.invoice_number}</h2>
               <Badge variant={STATUS_BADGE[invoice.status]}>{STATUS_LABEL[invoice.status]}</Badge>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">{invoice.customer_name}</p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>{invoice.customer_name}</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+          <button onClick={onClose} className="text-xl" style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
           {/* Customer */}
@@ -275,8 +287,8 @@ function InvoiceDetailModal({ invoice, onClose, onStatusChange }: {
               ["Notes", invoice.notes ?? "—"],
             ].map(([k, v]) => (
               <div key={k}>
-                <p className="text-xs text-slate-400">{k}</p>
-                <p className="font-medium text-slate-900 break-words">{v}</p>
+                <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{k}</p>
+                <p className="font-medium break-words" style={{ color: "var(--color-text-primary)" }}>{v}</p>
               </div>
             ))}
           </div>
@@ -284,9 +296,9 @@ function InvoiceDetailModal({ invoice, onClose, onStatusChange }: {
           {/* Line items */}
           {totalLines.length > 0 && (
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Items</p>
+              <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--color-text-muted)" }}>Items</p>
               <table className="w-full text-sm">
-                <thead className="text-xs text-slate-400">
+                <thead className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                   <tr>
                     <th className="text-left pb-1">Product</th>
                     <th className="text-center pb-1">Qty</th>
@@ -294,16 +306,16 @@ function InvoiceDetailModal({ invoice, onClose, onStatusChange }: {
                     <th className="text-right pb-1">Total</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-[var(--color-table-border)] divide-y">
                   {totalLines.map((l) => (
                     <tr key={l.id}>
                       <td className="py-1.5">
-                        <p className="text-slate-900">{l.name}</p>
-                        {l.upc && <p className="text-[11px] text-slate-400 font-mono">{l.upc}</p>}
+                        <p style={{ color: "var(--color-text-primary)" }}>{l.name}</p>
+                        {l.upc && <p className="text-[11px] font-mono" style={{ color: "var(--color-text-muted)" }}>{l.upc}</p>}
                       </td>
-                      <td className="py-1.5 text-center text-slate-600">{l.quantity}</td>
-                      <td className="py-1.5 text-right font-mono text-slate-600">{formatMoney(l.unit_price_cents)}</td>
-                      <td className="py-1.5 text-right font-mono font-medium text-slate-900">{formatMoney(l.line_total_cents)}</td>
+                      <td className="py-1.5 text-center" style={{ color: "var(--color-text-secondary)" }}>{l.quantity}</td>
+                      <td className="py-1.5 text-right font-mono" style={{ color: "var(--color-text-secondary)" }}>{formatMoney(l.unit_price_cents)}</td>
+                      <td className="py-1.5 text-right font-mono font-medium" style={{ color: "var(--color-text-primary)" }}>{formatMoney(l.line_total_cents)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -312,11 +324,11 @@ function InvoiceDetailModal({ invoice, onClose, onStatusChange }: {
           )}
 
           {/* Totals */}
-          <div className="border-t border-slate-200 pt-3 space-y-1 text-sm">
-            <div className="flex justify-between text-slate-600"><span>Subtotal</span><span className="font-mono">{formatMoney(invoice.subtotal_cents)}</span></div>
-            {invoice.discount_cents > 0 && <div className="flex justify-between text-slate-600"><span>Discount</span><span className="font-mono text-red-600">−{formatMoney(invoice.discount_cents)}</span></div>}
-            <div className="flex justify-between text-slate-600"><span>Tax</span><span className="font-mono">{formatMoney(invoice.tax_cents)}</span></div>
-            <div className="flex justify-between font-semibold text-slate-900 text-base"><span>Total</span><span className="font-mono">{formatMoney(invoice.total_cents)}</span></div>
+          <div className="pt-3 space-y-1 text-sm" style={{ borderTop: "1px solid var(--color-border)" }}>
+            <div className="flex justify-between" style={{ color: "var(--color-text-secondary)" }}><span>Subtotal</span><span className="font-mono">{formatMoney(invoice.subtotal_cents)}</span></div>
+            {invoice.discount_cents > 0 && <div className="flex justify-between" style={{ color: "var(--color-text-secondary)" }}><span>Discount</span><span className="font-mono text-red-600">−{formatMoney(invoice.discount_cents)}</span></div>}
+            <div className="flex justify-between" style={{ color: "var(--color-text-secondary)" }}><span>Tax</span><span className="font-mono">{formatMoney(invoice.tax_cents)}</span></div>
+            <div className="flex justify-between font-semibold text-base" style={{ color: "var(--color-text-primary)" }}><span>Total</span><span className="font-mono">{formatMoney(invoice.total_cents)}</span></div>
             {invoice.paid_cents > 0 && invoice.paid_cents < invoice.total_cents && (
               <div className="flex justify-between text-amber-700"><span>Paid</span><span className="font-mono">{formatMoney(invoice.paid_cents)}</span></div>
             )}
@@ -325,7 +337,7 @@ function InvoiceDetailModal({ invoice, onClose, onStatusChange }: {
             )}
           </div>
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+        <div className="flex justify-end gap-2 px-5 py-3" style={{ borderTop: "1px solid var(--color-border)" }}>
           <Button variant="secondary" onClick={onClose}>Close</Button>
           {next[invoice.status] && (
             <Button variant="primary" onClick={() => void handleNext()} disabled={changing}>
@@ -401,29 +413,30 @@ export default function InvoicingPage() {
         {/* Stats */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Card className="p-4">
-            <p className="text-2xl font-bold text-slate-900">{total}</p>
-            <p className="text-xs text-slate-500 mt-0.5">Total Invoices</p>
+            <p className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>{total}</p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>Total Invoices</p>
           </Card>
           <Card className="p-4">
             <p className="text-2xl font-bold text-emerald-700">{formatMoney(totalRevenue)}</p>
-            <p className="text-xs text-slate-500 mt-0.5">Collected</p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>Collected</p>
           </Card>
           <Card className="p-4">
             <p className="text-2xl font-bold text-amber-700">{formatMoney(totalOutstanding)}</p>
-            <p className="text-xs text-slate-500 mt-0.5">Outstanding</p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>Outstanding</p>
           </Card>
           <Card className="p-4">
             <p className="text-2xl font-bold text-red-700">{totalsByStatus["overdue"] ?? 0}</p>
-            <p className="text-xs text-slate-500 mt-0.5">Overdue</p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>Overdue</p>
           </Card>
         </div>
 
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1">
+          <div className="flex gap-1 rounded-lg p-1" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
             {(["all", ...ALL_STATUSES] as const).map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)}
-                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${statusFilter === s ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}>
+                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${statusFilter === s ? "bg-blue-600 text-white" : "hover:bg-[var(--color-surface-subtle)]"}`}
+                style={statusFilter === s ? {} : { color: "var(--color-text-secondary)" }}>
                 {s === "all" ? "All" : STATUS_LABEL[s]}
                 {s !== "all" && totalsByStatus[s] ? ` (${totalsByStatus[s]})` : ""}
               </button>
@@ -437,49 +450,49 @@ export default function InvoicingPage() {
         {/* Table */}
         <Card className="overflow-hidden p-0">
           {loading ? (
-            <div className="flex items-center justify-center py-16 text-sm text-slate-400">Loading invoices…</div>
+            <div className="flex items-center justify-center py-16 text-sm" style={{ color: "var(--color-text-muted)" }}>Loading invoices…</div>
           ) : invoices.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
-              <p className="text-sm font-medium text-slate-700">No invoices yet</p>
-              <p className="text-xs text-slate-400">Create your first customer invoice to get started.</p>
+              <p className="text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>No invoices yet</p>
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Create your first customer invoice to get started.</p>
               <button onClick={() => setShowBuilder(true)} className="mt-2 text-sm text-blue-600 hover:underline">Create invoice →</button>
             </div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50">
+              <thead style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
                 <tr>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Invoice #</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Customer</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
-                  <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Total</th>
-                  <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Paid</th>
-                  <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Balance</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Due</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Created</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Invoice #</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Customer</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Status</th>
+                  <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Total</th>
+                  <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Paid</th>
+                  <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Balance</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Due</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Created</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-[var(--color-table-border)] divide-y">
                 {invoices.map((inv) => {
                   const balance = inv.total_cents - inv.paid_cents;
                   const isOverdue = inv.status === "overdue";
                   return (
-                    <tr key={inv.id} className={`hover:bg-slate-50 cursor-pointer ${isOverdue ? "bg-red-50/30" : ""}`}
+                    <tr key={inv.id} className={`hover:bg-[var(--color-surface-subtle)] cursor-pointer ${isOverdue ? "bg-red-50/30" : ""}`}
                       onClick={() => void openDetail(inv)}>
                       <td className="px-5 py-3 font-mono text-blue-600 font-medium">{inv.invoice_number}</td>
                       <td className="px-5 py-3">
-                        <p className="font-medium text-slate-900">{inv.customer_name}</p>
-                        {inv.customer_email && <p className="text-xs text-slate-400">{inv.customer_email}</p>}
+                        <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{inv.customer_name}</p>
+                        {inv.customer_email && <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{inv.customer_email}</p>}
                       </td>
                       <td className="px-5 py-3"><Badge variant={STATUS_BADGE[inv.status]}>{STATUS_LABEL[inv.status]}</Badge></td>
-                      <td className="px-5 py-3 text-right font-mono font-medium text-slate-900">{formatMoney(inv.total_cents)}</td>
-                      <td className="px-5 py-3 text-right font-mono text-slate-500">{formatMoney(inv.paid_cents)}</td>
+                      <td className="px-5 py-3 text-right font-mono font-medium" style={{ color: "var(--color-text-primary)" }}>{formatMoney(inv.total_cents)}</td>
+                      <td className="px-5 py-3 text-right font-mono" style={{ color: "var(--color-text-muted)" }}>{formatMoney(inv.paid_cents)}</td>
                       <td className={`px-5 py-3 text-right font-mono font-medium ${balance > 0 ? (isOverdue ? "text-red-700" : "text-amber-700") : "text-emerald-600"}`}>
                         {balance > 0 ? formatMoney(balance) : "—"}
                       </td>
-                      <td className="px-5 py-3 text-slate-500 text-xs">
+                      <td className="px-5 py-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
                         {inv.due_date ? fmtDate(inv.due_date) : "—"}
                       </td>
-                      <td className="px-5 py-3 text-slate-400 text-xs">{fmtDate(inv.created_at)}</td>
+                      <td className="px-5 py-3 text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDate(inv.created_at)}</td>
                     </tr>
                   );
                 })}
@@ -487,7 +500,7 @@ export default function InvoicingPage() {
             </table>
           )}
           {!loading && total > 0 && (
-            <div className="border-t border-slate-200 px-5 py-3 text-xs text-slate-400">
+            <div className="px-5 py-3 text-xs" style={{ borderTop: "1px solid var(--color-border)", color: "var(--color-text-muted)" }}>
               {total} invoice{total !== 1 ? "s" : ""}
             </div>
           )}

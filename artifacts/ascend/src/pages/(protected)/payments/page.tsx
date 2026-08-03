@@ -112,9 +112,9 @@ export default function PaymentsPage() {
 
         <section className="grid gap-5 xl:grid-cols-[23rem_minmax(0,1fr)]">
           <Card className="overflow-hidden p-0">
-            <div className="border-b border-slate-200 px-4 py-3">
-              <h2 className="text-base font-semibold text-slate-950">Recent Orders</h2>
-              <p className="text-sm text-slate-500">Select an order to inspect tender records.</p>
+            <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
+              <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Recent Orders</h2>
+              <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Select an order to inspect tender records.</p>
             </div>
             {loadingOrders ? (
               <TableSkeleton headers={["Order #", "Status", "Total"]} rows={8} />
@@ -123,7 +123,7 @@ export default function PaymentsPage() {
                 <p className="text-sm font-medium text-[var(--color-text-primary)]">No orders yet.</p>
               </div>
             ) : (
-              <div className="max-h-[34rem] divide-y divide-slate-100 overflow-y-auto">
+              <div className="max-h-[34rem] divide-y divide-[var(--color-table-border)] overflow-y-auto">
                 {orders.map((order) => (
                   <OrderButton
                     key={order.id}
@@ -137,10 +137,10 @@ export default function PaymentsPage() {
           </Card>
 
           <Card className="overflow-hidden p-0">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
               <div>
-                <h2 className="text-base font-semibold text-slate-950">Tender Records</h2>
-                <p className="text-sm text-slate-500">
+                <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Tender Records</h2>
+                <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
                   {selectedOrder ? `${selectedOrder.orderNumber} · ${selectedOrder.status}` : "No order selected"}
                 </p>
               </div>
@@ -152,8 +152,11 @@ export default function PaymentsPage() {
                     onClick={() => setFilter(item)}
                     aria-pressed={filter === item}
                     className={`min-h-[36px] rounded-md px-3 text-sm font-medium capitalize transition-colors ${
-                      filter === item ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      filter === item ? "text-white" : "hover:bg-[var(--color-surface-subtle)]"
                     }`}
+                    style={filter === item
+                      ? { backgroundColor: "var(--color-sidebar-bg)" }
+                      : { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}
                   >
                     {item}
                   </button>
@@ -170,7 +173,7 @@ export default function PaymentsPage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  <thead className="text-left text-xs font-semibold uppercase tracking-[0.08em]" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
                     <tr>
                       <th className="px-4 py-3">Payment</th>
                       <th className="px-4 py-3">Method</th>
@@ -181,18 +184,18 @@ export default function PaymentsPage() {
                       <th className="px-4 py-3">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-[var(--color-table-border)]">
                     {filteredPayments.map((payment) => (
-                      <tr key={payment.id} className="hover:bg-slate-50">
+                      <tr key={payment.id} className="hover:bg-[var(--color-surface-subtle)]">
                         <td className="px-4 py-3">
-                          <p className="font-mono text-xs font-medium text-slate-800">{payment.id}</p>
-                          <p className="mt-1 text-xs text-slate-500">{fmtDateTime(payment.createdAt)}</p>
-                          {payment.authCode && <p className="mt-1 text-xs text-slate-400">{payment.authCode}</p>}
+                          <p className="font-mono text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>{payment.id}</p>
+                          <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDateTime(payment.createdAt)}</p>
+                          {payment.authCode && <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>{payment.authCode}</p>}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge variant={METHOD_BADGE[payment.method]}>{payment.method}</Badge>
-                            {payment.cardLast4 && <span className="text-xs text-slate-500">•••• {payment.cardLast4}</span>}
+                            {payment.cardLast4 && <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>•••• {payment.cardLast4}</span>}
                           </div>
                         </td>
                         <MoneyCell cents={payment.amountCents} />
@@ -221,19 +224,19 @@ function OrderButton({ order, selected, onClick }: { order: Order; selected: boo
       type="button"
       onClick={onClick}
       className={`w-full border-l-4 px-4 py-3 text-left transition-colors ${
-        selected ? "border-l-brand-600 bg-brand-50" : "border-l-transparent hover:bg-slate-50"
+        selected ? "border-l-brand-600 bg-brand-50" : "border-l-transparent hover:bg-[var(--color-surface-subtle)]"
       }`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-slate-950">{order.orderNumber}</p>
-          <p className="mt-1 text-xs text-slate-500">{fmtDateTime(order.createdAt)}</p>
+          <p className="truncate text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{order.orderNumber}</p>
+          <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDateTime(order.createdAt)}</p>
         </div>
         <OrderStatusBadge status={order.status} />
       </div>
       <div className="mt-2 flex items-center justify-between text-xs">
-        <span className="text-slate-500">{order.lines.length} line{order.lines.length === 1 ? "" : "s"}</span>
-        <span className="font-semibold tabular-nums text-slate-900">{formatMoney(order.totalCents)}</span>
+        <span style={{ color: "var(--color-text-muted)" }}>{order.lines.length} line{order.lines.length === 1 ? "" : "s"}</span>
+        <span className="font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{formatMoney(order.totalCents)}</span>
       </div>
     </button>
   );
@@ -246,7 +249,7 @@ function OrderStatusBadge({ status }: { status: OrderStatus }) {
 
 function MoneyCell({ cents, muted = false }: { cents: number; muted?: boolean }) {
   return (
-    <td className={`px-4 py-3 text-right font-medium tabular-nums ${muted ? "text-slate-300" : "text-slate-900"}`}>
+    <td className="px-4 py-3 text-right font-medium tabular-nums" style={{ color: muted ? "var(--color-border)" : "var(--color-text-primary)" }}>
       {formatMoney(cents)}
     </td>
   );
@@ -264,16 +267,16 @@ function Metric({
   tone: "neutral" | "success" | "warning" | "brand";
 }) {
   const toneClass = {
-    neutral: "border-slate-200 bg-white",
+    neutral: "border-[var(--color-border)] bg-[var(--color-surface)]",
     success: "border-success-200 bg-success-50",
     warning: "border-warning-200 bg-warning-50",
     brand: "border-brand-200 bg-brand-50",
   }[tone];
   return (
     <div className={`rounded-md border p-4 shadow-sm ${toneClass}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-slate-950">{value}</p>
-      <p className="mt-1 text-xs text-slate-500">{helper}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--color-text-muted)" }}>{label}</p>
+      <p className="mt-1 text-xl font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{value}</p>
+      <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>{helper}</p>
     </div>
   );
 }

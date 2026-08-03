@@ -48,15 +48,15 @@ export function ForecastingTab() {
     return () => { cancelled = true; };
   }, []);
 
-  if (loading) return <p className="text-sm text-slate-500" aria-busy="true">Loading…</p>;
+  if (loading) return <p className="text-sm" style={{ color: "var(--color-text-muted)" }} aria-busy="true">Loading…</p>;
 
   return (
     <div className="space-y-6">
       <Card className="overflow-hidden p-0">
-        <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3">
+        <div className="flex items-start justify-between gap-3 px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
           <div>
-            <h2 className="text-base font-semibold text-slate-950">Reorder recommendations</h2>
-            <p className="text-sm text-slate-500">Products at or below reorder point, or projected to run out before lead time.</p>
+            <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Reorder recommendations</h2>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Products at or below reorder point, or projected to run out before lead time.</p>
           </div>
           {reorder.some((r) => r.belowReorderPoint) && (
             <Button variant="primary" size="sm" loading={creatingPOs} onClick={() => void handleCreateReorderPOs()}>
@@ -66,12 +66,15 @@ export function ForecastingTab() {
         </div>
         {reorder.length === 0 ? (
           <div className="px-4 py-10 text-center">
-            <p className="text-sm text-slate-500">All products are well-stocked.</p>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>All products are well-stocked.</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <tr
+                className="text-left text-xs font-semibold uppercase tracking-[0.08em]"
+                style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}
+              >
                 <th className="px-4 py-3">Product</th>
                 <th className="px-4 py-3">On hand</th>
                 <th className="px-4 py-3 hidden sm:table-cell">Reorder qty</th>
@@ -80,26 +83,27 @@ export function ForecastingTab() {
                 <th className="px-4 py-3">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[var(--color-table-border)]">
               {reorder.map((r) => (
-                <tr key={r.productId} className="hover:bg-slate-50 transition-colors">
+                <tr key={r.productId} className="hover:bg-[var(--color-surface-subtle)] transition-colors">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-slate-950">{r.name}</p>
-                    <p className="text-xs text-slate-400 font-mono">{r.sku}</p>
+                    <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{r.name}</p>
+                    <p className="text-xs font-mono" style={{ color: "var(--color-text-muted)" }}>{r.sku}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={r.currentStock === 0 ? "font-semibold text-red-600" : r.belowReorderPoint ? "font-semibold text-amber-600" : "text-slate-700"}>
+                    <span className={r.currentStock === 0 ? "font-semibold text-red-600" : r.belowReorderPoint ? "font-semibold text-amber-600" : ""}
+                          style={r.currentStock === 0 || r.belowReorderPoint ? {} : { color: "var(--color-text-secondary)" }}>
                       {r.currentStock}
                     </span>
-                    <span className="text-slate-400 text-xs ml-1">/ {r.reorderPoint} min</span>
+                    <span className="text-xs ml-1" style={{ color: "var(--color-text-muted)" }}>/ {r.reorderPoint} min</span>
                   </td>
-                  <td className="px-4 py-3 hidden sm:table-cell text-slate-700">
+                  <td className="px-4 py-3 hidden sm:table-cell" style={{ color: "var(--color-text-secondary)" }}>
                     {r.reorderQuantity > 0 ? r.reorderQuantity : "—"}
                   </td>
-                  <td className="px-4 py-3 hidden md:table-cell text-slate-700">
+                  <td className="px-4 py-3 hidden md:table-cell" style={{ color: "var(--color-text-secondary)" }}>
                     {r.daysOfStock >= 9999 ? "∞" : `${r.daysOfStock}d`}
                   </td>
-                  <td className="px-4 py-3 hidden md:table-cell text-slate-500">
+                  <td className="px-4 py-3 hidden md:table-cell" style={{ color: "var(--color-text-muted)" }}>
                     {r.velocityPerDay.toFixed(1)} u/day
                   </td>
                   <td className="px-4 py-3">
@@ -113,18 +117,21 @@ export function ForecastingTab() {
       </Card>
 
       <Card className="overflow-hidden p-0">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="text-base font-semibold text-slate-950">Top sellers — order recommendations</h2>
-          <p className="text-sm text-slate-500">Highest-velocity products over the last 30 days. Flag indicates below reorder point.</p>
+        <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Top sellers — order recommendations</h2>
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Highest-velocity products over the last 30 days. Flag indicates below reorder point.</p>
         </div>
         {topSellers.length === 0 ? (
           <div className="px-4 py-10 text-center">
-            <p className="text-sm text-slate-500">No sales data available yet.</p>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No sales data available yet.</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <tr
+                className="text-left text-xs font-semibold uppercase tracking-[0.08em]"
+                style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}
+              >
                 <th className="px-4 py-3 w-10">#</th>
                 <th className="px-4 py-3">Product</th>
                 <th className="px-4 py-3">Units sold</th>
@@ -132,16 +139,16 @@ export function ForecastingTab() {
                 <th className="px-4 py-3">Stock status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[var(--color-table-border)]">
               {topSellers.map((t) => (
-                <tr key={t.productId} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 text-slate-400 font-medium">{t.rank}</td>
+                <tr key={t.productId} className="hover:bg-[var(--color-surface-subtle)] transition-colors">
+                  <td className="px-4 py-3 font-medium" style={{ color: "var(--color-text-muted)" }}>{t.rank}</td>
                   <td className="px-4 py-3">
-                    <p className="font-medium text-slate-950">{t.name}</p>
-                    <p className="text-xs text-slate-400 font-mono">{t.sku}</p>
+                    <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{t.name}</p>
+                    <p className="text-xs font-mono" style={{ color: "var(--color-text-muted)" }}>{t.sku}</p>
                   </td>
-                  <td className="px-4 py-3 font-semibold text-slate-950">{t.totalUnitsSold.toLocaleString()}</td>
-                  <td className="px-4 py-3 hidden sm:table-cell text-slate-700">{formatMoney(t.revenueGrossCents)}</td>
+                  <td className="px-4 py-3 font-semibold" style={{ color: "var(--color-text-primary)" }}>{t.totalUnitsSold.toLocaleString()}</td>
+                  <td className="px-4 py-3 hidden sm:table-cell" style={{ color: "var(--color-text-secondary)" }}>{formatMoney(t.revenueGrossCents)}</td>
                   <td className="px-4 py-3">
                     {t.belowReorderPoint
                       ? <Badge variant="yellow">Reorder needed</Badge>

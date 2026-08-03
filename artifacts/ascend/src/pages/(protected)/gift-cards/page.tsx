@@ -122,8 +122,13 @@ export default function GiftCardsPage() {
                       className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
                         issueAmount === String(d)
                           ? "border-slate-950 bg-slate-950 text-white"
-                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-400"
+                          : ""
                       }`}
+                      style={issueAmount === String(d) ? {} : {
+                        borderColor: "var(--color-border)",
+                        backgroundColor: "var(--color-surface)",
+                        color: "var(--color-text-secondary)",
+                      }}
                     >
                       ${d}
                     </button>
@@ -131,7 +136,7 @@ export default function GiftCardsPage() {
                 </div>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "var(--color-text-muted)" }}>$</span>
                     <input
                       type="number"
                       min="1"
@@ -140,7 +145,8 @@ export default function GiftCardsPage() {
                       onChange={e => setIssueAmount(e.target.value)}
                       onKeyDown={e => { if (e.key === "Enter") void handleIssue(); }}
                       placeholder="Custom amount"
-                      className="w-full rounded-md border border-slate-300 pl-7 pr-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none"
+                      className="w-full rounded-md pl-7 pr-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none"
+                      style={{ border: "1px solid var(--color-border)" }}
                     />
                   </div>
                   <Button variant="primary" loading={issuing} disabled={!issueAmount || issuing} onClick={() => void handleIssue()}>
@@ -151,8 +157,8 @@ export default function GiftCardsPage() {
                 {issuedCard && (
                   <div className="rounded-lg border-2 border-dashed border-emerald-300 bg-emerald-50 p-4 text-center">
                     <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600 mb-1">Card issued</p>
-                    <p className="text-2xl font-bold tracking-widest text-slate-900 font-mono">{issuedCard.code}</p>
-                    <p className="mt-1 text-sm text-slate-600">Balance: <span className="font-semibold">{formatMoney(issuedCard.balance_cents)}</span></p>
+                    <p className="text-2xl font-bold tracking-widest font-mono" style={{ color: "var(--color-text-primary)" }}>{issuedCard.code}</p>
+                    <p className="mt-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>Balance: <span className="font-semibold">{formatMoney(issuedCard.balance_cents)}</span></p>
                     <button onClick={() => void navigator.clipboard.writeText(issuedCard.code).then(() => addToast({ title: "Code copied", variant: "success" }))} className="mt-2 text-xs text-emerald-700 hover:text-emerald-900 font-medium">
                       Copy code
                     </button>
@@ -172,7 +178,8 @@ export default function GiftCardsPage() {
                   onChange={e => setCheckCode(e.target.value.toUpperCase())}
                   onKeyDown={e => { if (e.key === "Enter") void handleCheck(); }}
                   placeholder="GC-XXXX-XXXX-XXXX"
-                  className="flex-1 rounded-md border border-slate-300 px-3 py-2.5 text-sm font-mono uppercase tracking-wider focus:border-brand-500 focus:outline-none"
+                  className="flex-1 rounded-md px-3 py-2.5 text-sm font-mono uppercase tracking-wider focus:border-brand-500 focus:outline-none"
+                  style={{ border: "1px solid var(--color-border)" }}
                 />
                 <Button variant="secondary" loading={checking} disabled={!checkCode.trim() || checking} onClick={() => void handleCheck()}>
                   Check
@@ -182,14 +189,14 @@ export default function GiftCardsPage() {
               {checkError && <p role="alert" className="text-sm text-red-600">{checkError}</p>}
 
               {checkedCard && (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-2">
+                <div className="rounded-lg p-4 space-y-2" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
                   <div className="flex items-center justify-between">
-                    <span className="font-mono font-semibold text-slate-900">{checkedCard.code}</span>
+                    <span className="font-mono font-semibold" style={{ color: "var(--color-text-primary)" }}>{checkedCard.code}</span>
                     <Badge variant={STATUS_BADGE[checkedCard.status] ?? "gray"}>{checkedCard.status}</Badge>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div><p className="text-slate-500 text-xs">Balance</p><p className="font-semibold text-slate-900">{formatMoney(checkedCard.balance_cents)}</p></div>
-                    <div><p className="text-slate-500 text-xs">Original</p><p className="font-semibold text-slate-900">{formatMoney(checkedCard.initial_cents)}</p></div>
+                    <div><p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Balance</p><p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(checkedCard.balance_cents)}</p></div>
+                    <div><p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Original</p><p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(checkedCard.initial_cents)}</p></div>
                   </div>
                   {canManage && checkedCard.status === "active" && (
                     <Button variant="ghost" size="sm" onClick={() => void handleVoid(checkedCard.code)} className="text-red-600 hover:bg-red-50">
@@ -205,13 +212,16 @@ export default function GiftCardsPage() {
         {/* ── Card list ────────────────────────────────────────────────── */}
         <Card title={`All Gift Cards${total > 0 ? ` (${total})` : ""}`} noPadding>
           {loading ? (
-            <div className="space-y-2 p-4">{[...Array(4)].map((_, i) => <div key={i} className="h-10 animate-pulse rounded bg-slate-100" />)}</div>
+            <div className="space-y-2 p-4">{[...Array(4)].map((_, i) => <div key={i} className="h-10 animate-skeleton rounded" />)}</div>
           ) : cards.length === 0 ? (
-            <p className="px-5 py-10 text-center text-sm text-slate-400">No gift cards issued yet.</p>
+            <p className="px-5 py-10 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No gift cards issued yet.</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                <tr
+                  className="text-left text-xs font-semibold uppercase tracking-[0.08em]"
+                  style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}
+                >
                   <th className="px-4 py-3">Code</th>
                   <th className="px-4 py-3 text-right">Balance</th>
                   <th className="px-4 py-3 text-right hidden sm:table-cell">Original</th>
@@ -220,14 +230,14 @@ export default function GiftCardsPage() {
                   {canManage && <th className="px-4 py-3" />}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[var(--color-table-border)]">
                 {cards.map(card => (
-                  <tr key={card.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3 font-mono font-semibold text-slate-900 text-xs tracking-wider">{card.code}</td>
-                    <td className="px-4 py-3 text-right tabular-nums font-medium text-slate-900">{formatMoney(card.balance_cents)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-500 hidden sm:table-cell">{formatMoney(card.initial_cents)}</td>
+                  <tr key={card.id} className="hover:bg-[var(--color-surface-subtle)] transition-colors">
+                    <td className="px-4 py-3 font-mono font-semibold text-xs tracking-wider" style={{ color: "var(--color-text-primary)" }}>{card.code}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-medium" style={{ color: "var(--color-text-primary)" }}>{formatMoney(card.balance_cents)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums hidden sm:table-cell" style={{ color: "var(--color-text-muted)" }}>{formatMoney(card.initial_cents)}</td>
                     <td className="px-4 py-3"><Badge variant={STATUS_BADGE[card.status] ?? "gray"}>{card.status}</Badge></td>
-                    <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">{fmtDate(card.created_at)}</td>
+                    <td className="px-4 py-3 text-xs hidden md:table-cell" style={{ color: "var(--color-text-muted)" }}>{fmtDate(card.created_at)}</td>
                     {canManage && (
                       <td className="px-4 py-3 text-right">
                         {card.status === "active" && (

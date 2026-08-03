@@ -72,8 +72,8 @@ export default function DiscountsPage() {
           noPadding
         >
           {/* Toolbar */}
-          <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
-            <p className="text-sm text-gray-500">
+          <div className="flex items-center justify-between border-b px-5 py-3" style={{ borderColor: "var(--color-border)" }}>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
               {items.length} rule{items.length !== 1 ? "s" : ""} configured
             </p>
             <Button
@@ -93,8 +93,8 @@ export default function DiscountsPage() {
             />
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <table className="min-w-full divide-y text-sm divide-[var(--color-table-border)]">
+                <thead className="text-left text-xs font-semibold uppercase tracking-wide" style={{ backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
                   <tr>
                     <th className="px-5 py-3">Name</th>
                     <th className="px-5 py-3">Type</th>
@@ -106,30 +106,30 @@ export default function DiscountsPage() {
                     <th className="px-5 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
+                <tbody className="divide-y divide-[var(--color-table-border)]" style={{ backgroundColor: "var(--color-surface)" }}>
                   {items.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-gray-400">
+                      <td colSpan={8} className="py-8 text-center" style={{ color: "var(--color-text-muted)" }}>
                         No discount rules yet. Create one to get started.
                       </td>
                     </tr>
                   )}
                   {items.map((d) => (
-                    <tr key={d.id} className="hover:bg-gray-50">
-                      <td className="whitespace-nowrap px-5 py-3 font-medium text-gray-900">{d.name}</td>
+                    <tr key={d.id} className="hover:bg-[var(--color-surface-subtle)]">
+                      <td className="whitespace-nowrap px-5 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{d.name}</td>
                       <td className="whitespace-nowrap px-5 py-3">
                         <RuleTypeBadge ruleType={d.rule_type} />
                       </td>
-                      <td className="whitespace-nowrap px-5 py-3 text-gray-700">{valueLabel(d)}</td>
-                      <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-gray-600">
+                      <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--color-text-secondary)" }}>{valueLabel(d)}</td>
+                      <td className="whitespace-nowrap px-5 py-3 font-mono text-xs" style={{ color: "var(--color-text-secondary)" }}>
                         {d.coupon_code ?? (d.auto_applicable ? (
                           <span className="rounded bg-green-50 px-1.5 py-0.5 font-sans text-xs text-green-700 not-italic">
                             auto
                           </span>
                         ) : "—")}
                       </td>
-                      <td className="whitespace-nowrap px-5 py-3 capitalize text-gray-600">{d.apply_to}</td>
-                      <td className="whitespace-nowrap px-5 py-3 text-right text-gray-500">
+                      <td className="whitespace-nowrap px-5 py-3 capitalize" style={{ color: "var(--color-text-secondary)" }}>{d.apply_to}</td>
+                      <td className="whitespace-nowrap px-5 py-3 text-right" style={{ color: "var(--color-text-muted)" }}>
                         {d.used_count}{d.usage_limit != null ? `/${d.usage_limit}` : ""}
                       </td>
                       <td className="whitespace-nowrap px-5 py-3">
@@ -137,7 +137,7 @@ export default function DiscountsPage() {
                       </td>
                       <td className="whitespace-nowrap px-5 py-3 text-right">
                         {statusBusy === d.id ? (
-                          <span className="text-xs text-gray-400">Updating…</span>
+                          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Updating…</span>
                         ) : (
                           <StatusActionsDropdown
                             discount={d}

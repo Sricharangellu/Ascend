@@ -131,7 +131,7 @@ export default function ReturnsPage() {
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
           <Card className="overflow-hidden p-0">
-            <div className="grid gap-3 border-b border-slate-200 px-4 py-3 lg:grid-cols-[minmax(220px,1fr)_auto]">
+            <div className="grid gap-3 px-4 py-3 lg:grid-cols-[minmax(220px,1fr)_auto]" style={{ borderBottom: "1px solid var(--color-border)" }}>
               <label>
                 <span className="sr-only">Search receipts</span>
                 <input
@@ -139,7 +139,8 @@ export default function ReturnsPage() {
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search receipt, order ID, customer, state..."
-                  className="min-h-[40px] w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                  className="min-h-[40px] w-full rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                  style={{ border: "1px solid var(--color-border)" }}
                 />
               </label>
               <div className="flex gap-1 overflow-x-auto" role="group" aria-label="Return filters">
@@ -150,8 +151,11 @@ export default function ReturnsPage() {
                     onClick={() => setFilter(item)}
                     aria-pressed={filter === item}
                     className={`min-h-[40px] whitespace-nowrap rounded-md px-3 text-sm font-medium capitalize transition-colors ${
-                      filter === item ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      filter === item ? "text-white" : "hover:bg-[var(--color-surface-subtle)]"
                     }`}
+                    style={filter === item
+                      ? { backgroundColor: "var(--color-sidebar-bg)" }
+                      : { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}
                   >
                     {item}
                   </button>
@@ -166,7 +170,7 @@ export default function ReturnsPage() {
                 <p className="text-sm font-medium text-[var(--color-text-primary)]">No orders match this view.</p>
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-[var(--color-table-border)]">
                 {filteredOrders.map((order) => (
                   <ReturnOrderRow
                     key={order.id}
@@ -187,8 +191,8 @@ export default function ReturnsPage() {
               {selectedOrder ? (
                 <div className="space-y-4">
                   <div>
-                    <p className="text-sm font-semibold text-slate-950">{selectedOrder.orderNumber}</p>
-                    <p className="mt-1 text-xs text-slate-500">{fmtDate(selectedOrder.createdAt)}</p>
+                    <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{selectedOrder.orderNumber}</p>
+                    <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDate(selectedOrder.createdAt)}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <MiniStat label="Status" value={selectedOrder.status} />
@@ -196,11 +200,11 @@ export default function ReturnsPage() {
                     <MiniStat label="Tax" value={formatMoney(selectedOrder.taxCents)} />
                     <MiniStat label="Lines" value={String(selectedOrder.lines.length)} />
                   </div>
-                  <div className="divide-y divide-slate-100 rounded-md border border-slate-200">
+                  <div className="divide-y divide-[var(--color-table-border)] rounded-md" style={{ border: "1px solid var(--color-border)" }}>
                     {selectedOrder.lines.slice(0, 6).map((line) => (
                       <div key={line.id} className="flex justify-between gap-3 px-3 py-2 text-xs">
-                        <span className="truncate font-medium text-slate-700">{line.name}</span>
-                        <span className="shrink-0 tabular-nums text-slate-500">x{line.quantity} · {formatMoney(line.lineCents)}</span>
+                        <span className="truncate font-medium" style={{ color: "var(--color-text-secondary)" }}>{line.name}</span>
+                        <span className="shrink-0 tabular-nums" style={{ color: "var(--color-text-muted)" }}>x{line.quantity} · {formatMoney(line.lineCents)}</span>
                       </div>
                     ))}
                   </div>
@@ -211,22 +215,22 @@ export default function ReturnsPage() {
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-slate-500">Select a receipt to inspect return detail.</p>
+                <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Select a receipt to inspect return detail.</p>
               )}
             </Card>
 
             <Card title="Vendor Returns" noPadding>
               {vendorReturns.length === 0 ? (
-                <p className="px-5 py-4 text-sm text-slate-500">No vendor returns recorded.</p>
+                <p className="px-5 py-4 text-sm" style={{ color: "var(--color-text-muted)" }}>No vendor returns recorded.</p>
               ) : (
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-[var(--color-table-border)]">
                   {vendorReturns.slice(0, 8).map((item) => (
                     <div key={item.id} className="px-5 py-3">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold capitalize text-slate-950">{item.reason}</p>
-                        <span className="text-sm font-semibold tabular-nums text-slate-900">{formatMoney(item.total_cost_cents)}</span>
+                        <p className="text-sm font-semibold capitalize" style={{ color: "var(--color-text-primary)" }}>{item.reason}</p>
+                        <span className="text-sm font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{formatMoney(item.total_cost_cents)}</span>
                       </div>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
                         {fmtDate(item.created_at)} · {item.credit_id ? "credit memo linked" : "no credit memo"}
                       </p>
                     </div>
@@ -258,18 +262,18 @@ function ReturnOrderRow({
 }) {
   return (
     <div className={`grid gap-3 border-l-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_auto_auto] ${
-      selected ? "border-l-brand-600 bg-brand-50/50" : order.status === "refunded" ? "border-l-warning-500 hover:bg-warning-50/40" : "border-l-success-500 hover:bg-slate-50"
+      selected ? "border-l-brand-600 bg-brand-50/50" : order.status === "refunded" ? "border-l-warning-500 hover:bg-warning-50/40" : "border-l-success-500 hover:bg-[var(--color-surface-subtle)]"
     }`}>
       <button type="button" onClick={onSelect} className="min-w-0 text-left">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="truncate text-sm font-semibold text-slate-950">{order.orderNumber}</p>
+          <p className="truncate text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{order.orderNumber}</p>
           <Badge variant={STATUS_BADGE[order.status]}>{order.status}</Badge>
         </div>
-        <p className="mt-1 text-xs text-slate-500">{fmtDate(order.createdAt)} · {order.lines.length} line{order.lines.length === 1 ? "" : "s"}</p>
+        <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDate(order.createdAt)} · {order.lines.length} line{order.lines.length === 1 ? "" : "s"}</p>
       </button>
       <button type="button" onClick={onSelect} className="text-left lg:text-right">
-        <p className="text-sm font-semibold tabular-nums text-slate-950">{formatMoney(order.totalCents)}</p>
-        <p className="mt-1 text-xs text-slate-500">{order.stateCode}</p>
+        <p className="text-sm font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{formatMoney(order.totalCents)}</p>
+        <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>{order.stateCode}</p>
       </button>
       <div className="flex items-center justify-end">
         <Button variant="danger" size="sm" disabled={!canRefund || busy} onClick={onRefund}>
@@ -292,25 +296,25 @@ function Metric({
   tone: "neutral" | "success" | "warning" | "brand";
 }) {
   const toneClass = {
-    neutral: "border-slate-200 bg-white",
+    neutral: "border-[var(--color-border)] bg-[var(--color-surface)]",
     success: "border-success-200 bg-success-50",
     warning: "border-warning-200 bg-warning-50",
     brand: "border-brand-200 bg-brand-50",
   }[tone];
   return (
     <div className={`rounded-md border p-4 shadow-sm ${toneClass}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-slate-950">{value}</p>
-      <p className="mt-1 text-xs text-slate-500">{helper}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--color-text-muted)" }}>{label}</p>
+      <p className="mt-1 text-xl font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{value}</p>
+      <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>{helper}</p>
     </div>
   );
 }
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-slate-100 px-2 py-1.5">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{label}</p>
-      <p className="mt-0.5 truncate text-xs font-semibold tabular-nums text-slate-800">{value}</p>
+    <div className="rounded-md px-2 py-1.5" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-muted)" }}>{label}</p>
+      <p className="mt-0.5 truncate text-xs font-semibold tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{value}</p>
     </div>
   );
 }

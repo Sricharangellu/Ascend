@@ -62,7 +62,7 @@ export default function KitchenDisplayPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] p-4 font-mono">
+    <div className="min-h-screen p-4 font-mono" style={{ backgroundColor: "var(--color-sidebar-bg)" }}>
       {/* KDS Header */}
       <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
         <div className="flex items-center gap-3">

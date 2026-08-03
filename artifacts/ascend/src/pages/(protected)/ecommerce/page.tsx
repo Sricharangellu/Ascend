@@ -68,8 +68,8 @@ function OrdersTab() {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h2 className="text-base font-semibold text-slate-950">Online Orders</h2>
-        <p className="mt-0.5 text-sm text-slate-500">Orders placed through your online storefront.</p>
+        <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Online Orders</h2>
+        <p className="mt-0.5 text-sm" style={{ color: "var(--color-text-muted)" }}>Orders placed through your online storefront.</p>
       </div>
 
       {error && (
@@ -83,8 +83,8 @@ function OrdersTab() {
       ) : (
       <Card noPadding>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
+          <table className="min-w-full divide-y text-sm divide-[var(--color-table-border)]">
+            <thead className="text-left text-xs font-semibold uppercase" style={{ backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
               <tr>
                 <th className="px-4 py-3">Order #</th>
                 <th className="px-4 py-3">Customer</th>
@@ -93,29 +93,29 @@ function OrdersTab() {
                 <th className="px-4 py-3">Date</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
+            <tbody className="divide-y divide-[var(--color-table-border)]" style={{ backgroundColor: "var(--color-surface)" }}>
               {orders.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={5} className="px-4 py-8 text-center" style={{ color: "var(--color-text-muted)" }}>
                     No online orders yet.
                   </td>
                 </tr>
               ) : (
                 orders.map((order) => (
-                  <tr key={order.id} className="hover:bg-slate-50">
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-semibold text-slate-700">
+                  <tr key={order.id} className="hover:bg-[var(--color-surface-subtle)]">
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-semibold" style={{ color: "var(--color-text-secondary)" }}>
                       {orderNumber(order)}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-950">
+                    <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-primary)" }}>
                       {order.customerName ?? order.customer_id ?? "—"}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <Badge variant={statusBadge(order.status)}>{order.status}</Badge>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-slate-950">
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>
                       {formatMoney(orderTotal(order))}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-500">
+                    <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-muted)" }}>
                       {fmtDate(orderDate(order))}
                     </td>
                   </tr>
@@ -173,8 +173,8 @@ function DeliveryTab() {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h2 className="text-base font-semibold text-slate-950">Delivery</h2>
-        <p className="mt-0.5 text-sm text-slate-500">Online orders shipped or delivered to your customers.</p>
+        <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Delivery</h2>
+        <p className="mt-0.5 text-sm" style={{ color: "var(--color-text-muted)" }}>Online orders shipped or delivered to your customers.</p>
       </div>
 
       {error && (
@@ -188,8 +188,8 @@ function DeliveryTab() {
       ) : (
       <Card noPadding>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
+          <table className="min-w-full divide-y text-sm divide-[var(--color-table-border)]">
+            <thead className="text-left text-xs font-semibold uppercase" style={{ backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
               <tr>
                 <th className="px-4 py-3">Order #</th>
                 <th className="px-4 py-3">Customer</th>
@@ -198,29 +198,29 @@ function DeliveryTab() {
                 <th className="px-4 py-3">Date</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
+            <tbody className="divide-y divide-[var(--color-table-border)]" style={{ backgroundColor: "var(--color-surface)" }}>
               {orders.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={5} className="px-4 py-8 text-center" style={{ color: "var(--color-text-muted)" }}>
                     No shipped online orders yet.
                   </td>
                 </tr>
               ) : (
                 orders.map((order) => (
-                  <tr key={order.id} className="hover:bg-slate-50">
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-semibold text-slate-700">
+                  <tr key={order.id} className="hover:bg-[var(--color-surface-subtle)]">
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-semibold" style={{ color: "var(--color-text-secondary)" }}>
                       {orderNumber(order)}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-950">
+                    <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-primary)" }}>
                       {order.customerName ?? order.customer_id ?? "—"}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <Badge variant={fulfillmentBadge(order.fulfillment_status)}>{order.fulfillment_status ?? "—"}</Badge>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-slate-950">
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>
                       {formatMoney(orderTotal(order))}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-500">
+                    <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-muted)" }}>
                       {fmtDate(orderDate(order))}
                     </td>
                   </tr>
@@ -282,8 +282,8 @@ function SettingsTab() {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h2 className="text-base font-semibold text-slate-950">Storefront Settings</h2>
-        <p className="mt-0.5 text-sm text-slate-500">Configure your online storefront.</p>
+        <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Storefront Settings</h2>
+        <p className="mt-0.5 text-sm" style={{ color: "var(--color-text-muted)" }}>Configure your online storefront.</p>
       </div>
 
       {error && (
@@ -300,28 +300,29 @@ function SettingsTab() {
       <Card>
         <div className="flex flex-col gap-5 max-w-lg">
           <label className="block">
-            <span className="text-xs font-medium uppercase text-slate-500">Store name</span>
+            <span className="text-xs font-medium uppercase" style={{ color: "var(--color-text-muted)" }}>Store name</span>
             <input
               type="text"
               value={settings.storeName}
               onChange={(e) => setSettings((prev) => ({ ...prev, storeName: e.target.value }))}
               placeholder="e.g. My Store"
-              className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
+              className="mt-1 min-h-[44px] w-full rounded-md border px-3 text-sm outline-none focus:ring-2 focus:ring-brand-600"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
             />
           </label>
 
           <div>
-            <span className="text-xs font-medium uppercase text-slate-500">Storefront URL</span>
-            <div className="mt-1 flex min-h-[44px] items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 select-all">
+            <span className="text-xs font-medium uppercase" style={{ color: "var(--color-text-muted)" }}>Storefront URL</span>
+            <div className="mt-1 flex min-h-[44px] items-center rounded-md border px-3 text-sm select-all" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }}>
               https://store.finder-pos.app/demo
             </div>
-            <p className="mt-1 text-xs text-slate-400">Read-only — contact support to change your store URL.</p>
+            <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>Read-only — contact support to change your store URL.</p>
           </div>
 
-          <div className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3">
+          <div className="flex items-center justify-between rounded-md border px-4 py-3" style={{ borderColor: "var(--color-border)" }}>
             <div>
-              <p className="text-sm font-medium text-slate-950">Accept online orders</p>
-              <p className="mt-0.5 text-xs text-slate-500">When off, the storefront shows products but checkout is disabled.</p>
+              <p className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>Accept online orders</p>
+              <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>When off, the storefront shows products but checkout is disabled.</p>
             </div>
             <button
               type="button"
@@ -340,9 +341,9 @@ function SettingsTab() {
             </button>
           </div>
 
-          <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-sm font-medium text-slate-950">Shipping zones</p>
-            <p className="mt-1 text-xs text-slate-500">
+          <div className="rounded-md border px-4 py-3" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
+            <p className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>Shipping zones</p>
+            <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
               Shipping zones and rates are configured under{" "}
               <a href="/settings" className="text-brand-600 hover:underline">
                 Settings → Shipping Methods
@@ -352,7 +353,7 @@ function SettingsTab() {
           </div>
         </div>
 
-        <div className="mt-5 flex gap-2 border-t border-slate-200 pt-4">
+        <div className="mt-5 flex gap-2 border-t pt-4" style={{ borderColor: "var(--color-border)" }}>
           <Button variant="primary" size="sm" disabled={saving} onClick={() => void save()}>
             {saving ? "Saving…" : "Save settings"}
           </Button>
@@ -393,7 +394,7 @@ export default function EcommercePage() {
     >
       <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6">
         {/* Tab bar */}
-        <div className="border-b border-slate-200">
+        <div className="border-b" style={{ borderColor: "var(--color-border)" }}>
           <nav className="-mb-px flex gap-6" aria-label="Ecommerce tabs">
             {TABS.map((tab) => (
               <button
@@ -407,9 +408,10 @@ export default function EcommercePage() {
                 className={[
                   "whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition-colors",
                   activeTab === tab.id
-                    ? "border-slate-950 text-slate-950"
-                    : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700",
+                    ? "border-[var(--color-text-primary)] text-[var(--color-text-primary)]"
+                    : "border-transparent hover:border-[var(--color-border)]",
                 ].join(" ")}
+                style={activeTab !== tab.id ? { color: "var(--color-text-muted)" } : { color: "var(--color-text-primary)" }}
               >
                 {tab.label}
               </button>

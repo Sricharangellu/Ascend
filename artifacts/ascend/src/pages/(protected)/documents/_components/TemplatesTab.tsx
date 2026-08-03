@@ -40,7 +40,7 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 function typeColor(t: DocType): string {
-  return TYPE_COLORS[t] ?? "bg-slate-50 text-slate-700";
+  return TYPE_COLORS[t] ?? "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]";
 }
 
 export function TemplatesTab() {
@@ -67,7 +67,7 @@ export function TemplatesTab() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16 text-sm text-slate-400">
+      <div className="flex items-center justify-center py-16 text-sm" style={{ color: "var(--color-text-muted)" }}>
         Loading…
       </div>
     );
@@ -80,13 +80,13 @@ export function TemplatesTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           Reusable document templates — download and fill to create new documents.
         </p>
       </div>
 
       {templates.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-16 text-slate-400">
+        <div className="flex flex-col items-center gap-2 py-16" style={{ color: "var(--color-text-muted)" }}>
           <svg
             width="32"
             height="32"
@@ -109,11 +109,12 @@ export function TemplatesTab() {
           {templates.map((tpl) => (
             <div
               key={tpl.id}
-              className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 transition-shadow hover:shadow-md"
+              className="flex flex-col gap-3 rounded-xl border p-4 transition-shadow hover:shadow-md"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-900 leading-snug">
+                  <p className="text-sm font-semibold leading-snug" style={{ color: "var(--color-text-primary)" }}>
                     {tpl.name}
                   </p>
                 </div>
@@ -127,20 +128,21 @@ export function TemplatesTab() {
                 </span>
               </div>
 
-              <p className="text-xs text-slate-500 leading-relaxed">{tpl.description}</p>
+              <p className="text-xs leading-relaxed" style={{ color: "var(--color-text-muted)" }}>{tpl.description}</p>
 
-              <div className="flex items-center justify-between text-xs text-slate-400">
+              <div className="flex items-center justify-between text-xs" style={{ color: "var(--color-text-muted)" }}>
                 <span>{tpl.file_name}</span>
                 <span>{tpl.uses} uses</span>
               </div>
 
-              <div className="flex items-center justify-between border-t border-slate-100 pt-3">
-                <span className="text-xs text-slate-400">
+              <div className="flex items-center justify-between border-t pt-3" style={{ borderColor: "var(--color-table-border)" }}>
+                <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                   Added {fmtDate(tpl.created_at)}
                 </span>
                 <button
                   type="button"
-                  className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-indigo-300 hover:text-indigo-700 transition-colors"
+                  className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium hover:border-indigo-300 hover:text-indigo-700 transition-colors"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
                   onClick={() => {
                     // In production this would trigger a real download
                     alert(`Downloading ${tpl.file_name}…`);

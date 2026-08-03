@@ -144,12 +144,12 @@ export default function OnboardingPage() {
                   type="button"
                   onClick={() => { setSelected(bt.key); setStep("confirm"); }}
                   className={`group relative flex flex-col rounded-xl border-2 p-3 text-left transition-all hover:border-brand-500 hover:bg-brand-50 hover:shadow-sm ${
-                    selected === bt.key ? "border-brand-600 bg-brand-50" : "border-slate-200"
+                    selected === bt.key ? "border-brand-600 bg-brand-50" : "border-[var(--color-border)]"
                   }`}
                 >
                   <span
                     className={`absolute right-2 top-2 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
-                      ready ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+                      ready ? "bg-emerald-100 text-emerald-700" : "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)]"
                     }`}
                   >
                     {ready ? "Ready" : "Preview"}

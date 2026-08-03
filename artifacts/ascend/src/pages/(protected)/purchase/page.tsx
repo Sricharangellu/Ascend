@@ -181,7 +181,8 @@ export default function PurchasePage() {
                           step="0.01"
                           value={drafts[it.line_id] ?? ""}
                           onChange={(e) => setDrafts((d) => ({ ...d, [it.line_id]: e.target.value }))}
-                          className="w-24 rounded-md border border-[var(--erp-border)] px-2 py-1 text-right tabular-nums"
+                          className="w-24 rounded-md px-2 py-1 text-right tabular-nums"
+                          style={{ border: "1px solid var(--color-border)" }}
                           aria-label={`Cost for ${it.product_name}`}
                         />
                       </div>

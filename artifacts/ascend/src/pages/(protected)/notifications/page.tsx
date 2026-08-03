@@ -107,7 +107,7 @@ function Skeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div className="space-y-2">
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100" />
+        <div key={i} className="h-20 animate-skeleton rounded-xl" />
       ))}
     </div>
   );
@@ -161,25 +161,28 @@ function InboxTab() {
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-sm font-semibold text-slate-900">
+        <span className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
           {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
         </span>
-        <div className="flex overflow-hidden rounded-lg border border-slate-200 text-sm">
+        <div className="flex overflow-hidden rounded-lg text-sm" style={{ border: "1px solid var(--color-border)" }}>
           {(["all", "unread"] as const).map(f => (
             <button key={f} type="button" onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 capitalize transition-colors ${filter === f ? "bg-brand-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}>
+              className={`px-3 py-1.5 capitalize transition-colors ${filter === f ? "bg-brand-600 text-white" : "hover:bg-[var(--color-surface-subtle)]"}`}
+              style={filter === f ? {} : { backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}>
               {f}
             </button>
           ))}
         </div>
         <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
-          className="h-9 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 focus:border-brand-600 focus:outline-none">
+          className="h-9 rounded-lg px-3 text-sm focus:border-brand-600 focus:outline-none"
+          style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
           <option value="all">All types</option>
           {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
         {unreadCount > 0 && (
           <button type="button" disabled={markingAll} onClick={() => void markAllRead()}
-            className="ml-auto rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+            className="ml-auto rounded-lg px-4 py-2 text-sm font-medium hover:bg-[var(--color-surface-subtle)] disabled:opacity-50"
+            style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
             {markingAll ? "Marking…" : "Mark all as read"}
           </button>
         )}
@@ -189,8 +192,8 @@ function InboxTab() {
       {loading && <Skeleton />}
 
       {!loading && filtered.length === 0 && (
-        <div className="rounded-xl border border-dashed border-slate-200 py-16 text-center">
-          <p className="text-sm text-slate-400">{filter === "unread" ? "No unread notifications." : "No notifications found."}</p>
+        <div className="rounded-xl border border-dashed py-16 text-center" style={{ borderColor: "var(--color-border)" }}>
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>{filter === "unread" ? "No unread notifications." : "No notifications found."}</p>
         </div>
       )}
 
@@ -198,17 +201,18 @@ function InboxTab() {
         <div className="space-y-2">
           {filtered.map(n => (
             <div key={n.id}
-              className={`relative rounded-xl border px-5 py-4 transition-colors ${n.read ? "border-slate-200 bg-white" : "border-brand-600/30 bg-indigo-50"}`}>
+              className={`relative rounded-xl border px-5 py-4 transition-colors ${n.read ? "border-slate-200" : "border-brand-600/30 bg-indigo-50"}`}
+              style={n.read ? { backgroundColor: "var(--color-surface)" } : {}}>
               {!n.read && <span className="absolute left-2.5 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-brand-600" />}
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1 pl-2">
                   <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-900">{n.title}</span>
+                    <span className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{n.title}</span>
                     <Badge label={n.severity} cls={SEV_CLS[n.severity]} />
-                    <Badge label={TYPE_LABELS[n.type]} cls="bg-slate-100 text-slate-600" />
+                    <Badge label={TYPE_LABELS[n.type]} cls="bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]" />
                   </div>
-                  <p className="text-sm text-slate-600">{n.body}</p>
-                  <p className="mt-1 text-xs text-slate-400">{relativeTime(n.created_at)}</p>
+                  <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{n.body}</p>
+                  <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>{relativeTime(n.created_at)}</p>
                 </div>
                 {!n.read && (
                   <button type="button" onClick={() => void markRead(n.id)}
@@ -274,10 +278,10 @@ function PreferencesTab() {
         Control which channels each notification type uses. Changes take effect immediately for your account.
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl shadow-sm" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-500">
+            <thead className="text-left text-xs font-semibold" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
               <tr>
                 <th className="px-5 py-3 min-w-[200px]">Notification Type</th>
                 {CHANNELS.map(ch => (
@@ -289,14 +293,14 @@ function PreferencesTab() {
                 <th className="px-5 py-3">Min Severity</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[var(--color-table-border)]">
               {loading ? (
-                <tr><td colSpan={6} className="py-8 text-center"><div className="mx-auto h-3 w-48 animate-pulse rounded bg-slate-100" /></td></tr>
+                <tr><td colSpan={6} className="py-8 text-center"><div className="mx-auto h-3 w-48 animate-skeleton rounded" /></td></tr>
               ) : error ? (
                 <tr><td colSpan={6} className="px-5 py-4 text-sm text-red-600">{error}</td></tr>
               ) : prefs.map(p => (
-                <tr key={p.type} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-5 py-3.5 font-medium text-slate-900">{p.label}</td>
+                <tr key={p.type} className="hover:bg-[var(--color-surface-subtle)] transition-colors">
+                  <td className="px-5 py-3.5 font-medium" style={{ color: "var(--color-text-primary)" }}>{p.label}</td>
                   {CHANNELS.map(ch => (
                     <td key={ch} className="px-5 py-3.5 text-center">
                       <Toggle on={p[ch]} onChange={() => toggle(p.type, ch)} />
@@ -305,7 +309,8 @@ function PreferencesTab() {
                   <td className="px-5 py-3.5">
                     <select value={p.min_severity}
                       onChange={e => setSeverity(p.type, e.target.value as PrefRow["min_severity"])}
-                      className="h-8 rounded-lg border border-slate-200 px-2 text-xs focus:border-brand-600 focus:outline-none">
+                      className="h-8 rounded-lg px-2 text-xs focus:border-brand-600 focus:outline-none"
+                      style={{ border: "1px solid var(--color-border)" }}>
                       <option value="info">Info+</option>
                       <option value="warning">Warning+</option>
                       <option value="critical">Critical only</option>
@@ -319,7 +324,7 @@ function PreferencesTab() {
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between border-t border-slate-200 px-5 py-3">
+        <div className="flex items-center justify-between px-5 py-3" style={{ borderTop: "1px solid var(--color-border)" }}>
           {saved && <p className="text-xs text-emerald-600 font-medium">Preferences saved.</p>}
           {!saved && <span />}
           <button type="button" disabled={saving || loading} onClick={() => void handleSave()}
@@ -382,9 +387,9 @@ function AlertRulesTab() {
         Alert rules fire notifications automatically when business conditions are met. Each rule can target multiple channels.
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5">
-          <h3 className="text-sm font-semibold text-slate-900">{rules.length} alert rules</h3>
+      <div className="overflow-hidden rounded-xl shadow-sm" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: "1px solid var(--color-border)" }}>
+          <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{rules.length} alert rules</h3>
           <button className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
             + New Rule
           </button>
@@ -394,7 +399,7 @@ function AlertRulesTab() {
           <p className="px-5 py-6 text-sm text-red-600">{error}</p>
         ) : (
           <table className="w-full text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-500">
+            <thead className="text-left text-xs font-semibold" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
               <tr>
                 <th className="px-5 py-3">Rule</th>
                 <th className="px-5 py-3">Trigger</th>
@@ -406,14 +411,14 @@ function AlertRulesTab() {
                 <th className="px-5 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[var(--color-table-border)]">
               {rules.map(r => (
-                <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-5 py-3.5 font-medium text-slate-900">{r.name}</td>
+                <tr key={r.id} className="hover:bg-[var(--color-surface-subtle)] transition-colors">
+                  <td className="px-5 py-3.5 font-medium" style={{ color: "var(--color-text-primary)" }}>{r.name}</td>
                   <td className="px-5 py-3.5">
                     <Badge label={TRIGGER_LABELS[r.trigger] ?? r.trigger} cls="bg-indigo-100 text-indigo-700" />
                   </td>
-                  <td className="px-5 py-3.5 text-xs text-slate-600">
+                  <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-secondary)" }}>
                     {CONDITION_LABELS[r.condition] ?? r.condition}
                     {r.threshold !== null && <span className="ml-1 font-semibold">{r.threshold}</span>}
                   </td>
@@ -424,8 +429,8 @@ function AlertRulesTab() {
                       ))}
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 text-right font-semibold text-slate-900">{r.fires_count.toLocaleString()}</td>
-                  <td className="px-5 py-3.5 text-xs text-slate-500">
+                  <td className="px-5 py-3.5 text-right font-semibold" style={{ color: "var(--color-text-primary)" }}>{r.fires_count.toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-muted)" }}>
                     {r.last_fired_at ? relativeTime(r.last_fired_at) : "Never"}
                   </td>
                   <td className="px-5 py-3.5">
@@ -433,7 +438,8 @@ function AlertRulesTab() {
                   </td>
                   <td className="px-5 py-3.5">
                     <div className="flex gap-1.5">
-                      <button className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                      <button className="rounded-lg px-2.5 py-1 text-xs font-semibold hover:bg-[var(--color-surface-subtle)]"
+                        style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
                         Edit
                       </button>
                       <button onClick={() => void deleteRule(r.id)}
@@ -445,7 +451,7 @@ function AlertRulesTab() {
                 </tr>
               ))}
               {rules.length === 0 && (
-                <tr><td colSpan={8} className="py-10 text-center text-sm text-slate-400">No alert rules configured.</td></tr>
+                <tr><td colSpan={8} className="py-10 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No alert rules configured.</td></tr>
               )}
             </tbody>
           </table>
@@ -499,7 +505,7 @@ function DigestTab() {
 
   const ALL_TYPES = Object.entries(TYPE_LABELS);
 
-  const inp = "h-9 rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20";
+  const inp = "h-9 rounded-lg px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20";
 
   return (
     <div className="space-y-5 max-w-2xl">
@@ -512,39 +518,39 @@ function DigestTab() {
 
       {!loading && !error && config && (
         <div className="space-y-5">
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 className="mb-4 text-sm font-semibold text-slate-900">Schedule</h3>
+          <div className="rounded-xl p-6 shadow-sm" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+            <h3 className="mb-4 text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Schedule</h3>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-slate-900">Enable digest emails</p>
-                  <p className="text-xs text-slate-500">Send scheduled summaries to configured recipients</p>
+                  <p className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>Enable digest emails</p>
+                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Send scheduled summaries to configured recipients</p>
                 </div>
                 <Toggle on={config.enabled} onChange={v => update("enabled", v)} />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-500">Frequency</label>
+                  <label className="mb-1 block text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Frequency</label>
                   <select value={config.frequency} onChange={e => update("frequency", e.target.value as DigestConfig["frequency"])}
-                    className={inp + " w-full"} disabled={!config.enabled}>
+                    className={inp + " w-full"} style={{ border: "1px solid var(--color-border)" }} disabled={!config.enabled}>
                     <option value="daily">Daily</option>
                     <option value="weekly">Weekly</option>
                   </select>
                 </div>
                 {config.frequency === "weekly" && (
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-slate-500">Day of week</label>
+                    <label className="mb-1 block text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Day of week</label>
                     <select value={config.day_of_week} onChange={e => update("day_of_week", Number(e.target.value))}
-                      className={inp + " w-full"} disabled={!config.enabled}>
+                      className={inp + " w-full"} style={{ border: "1px solid var(--color-border)" }} disabled={!config.enabled}>
                       {DAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}
                     </select>
                   </div>
                 )}
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-500">Send at (store time)</label>
+                  <label className="mb-1 block text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Send at (store time)</label>
                   <select value={config.hour} onChange={e => update("hour", Number(e.target.value))}
-                    className={inp + " w-full"} disabled={!config.enabled}>
+                    className={inp + " w-full"} style={{ border: "1px solid var(--color-border)" }} disabled={!config.enabled}>
                     {Array.from({ length: 24 }, (_, h) => (
                       <option key={h} value={h}>{h.toString().padStart(2, "0")}:00</option>
                     ))}
@@ -554,13 +560,14 @@ function DigestTab() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 className="mb-4 text-sm font-semibold text-slate-900">What to include</h3>
+          <div className="rounded-xl p-6 shadow-sm" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+            <h3 className="mb-4 text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>What to include</h3>
             <div className="grid grid-cols-2 gap-2">
               {ALL_TYPES.map(([type, label]) => {
                 const checked = config.include.includes(type);
                 return (
-                  <label key={type} className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200 px-3 py-2.5 hover:bg-slate-50 transition-colors">
+                  <label key={type} className="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5 hover:bg-[var(--color-surface-subtle)] transition-colors"
+                    style={{ border: "1px solid var(--color-border)" }}>
                     <input type="checkbox" checked={checked} disabled={!config.enabled}
                       onChange={e => {
                         const next = e.target.checked
@@ -568,20 +575,22 @@ function DigestTab() {
                           : config.include.filter(t => t !== type);
                         update("include", next);
                       }}
-                      className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600" />
-                    <span className="text-sm text-slate-700">{label}</span>
+                      className="h-4 w-4 rounded text-brand-600 focus:ring-brand-600"
+                      style={{ borderColor: "var(--color-border)" }} />
+                    <span className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{label}</span>
                   </label>
                 );
               })}
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 className="mb-4 text-sm font-semibold text-slate-900">Recipients</h3>
+          <div className="rounded-xl p-6 shadow-sm" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+            <h3 className="mb-4 text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Recipients</h3>
             <div className="space-y-2">
               {config.recipient_emails.map(email => (
-                <div key={email} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2.5">
-                  <span className="text-sm text-slate-700">{email}</span>
+                <div key={email} className="flex items-center justify-between rounded-lg px-3 py-2.5"
+                  style={{ border: "1px solid var(--color-border)" }}>
+                  <span className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{email}</span>
                   <button onClick={() => removeEmail(email)} className="text-xs text-red-500 hover:underline">Remove</button>
                 </div>
               ))}
@@ -589,9 +598,10 @@ function DigestTab() {
                 <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && addEmail()}
                   placeholder="Add email address…"
-                  className={inp + " flex-1"} disabled={!config.enabled} />
+                  className={inp + " flex-1"} style={{ border: "1px solid var(--color-border)" }} disabled={!config.enabled} />
                 <button type="button" onClick={addEmail} disabled={!newEmail.trim() || !config.enabled}
-                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+                  className="rounded-lg px-4 py-2 text-sm font-semibold hover:bg-[var(--color-surface-subtle)] disabled:opacity-50"
+                  style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
                   Add
                 </button>
               </div>
@@ -625,15 +635,16 @@ export default function NotificationsPage() {
       contentClassName="overflow-y-auto"
     >
       <div className="mx-auto w-full max-w-6xl space-y-0 px-4 py-5 sm:px-6">
-        <div className="border-b border-slate-200">
+        <div style={{ borderBottom: "1px solid var(--color-border)" }}>
           <nav className="-mb-px flex gap-1 overflow-x-auto">
             {TABS.map(t => (
               <button key={t.key} onClick={() => setActiveTab(t.key)}
                 className={`shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
                   activeTab === t.key
                     ? "border-brand-600 text-brand-600"
-                    : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
-                }`}>
+                    : "border-transparent hover:border-slate-300"
+                }`}
+                style={activeTab === t.key ? {} : { color: "var(--color-text-muted)" }}>
                 {t.label}
               </button>
             ))}

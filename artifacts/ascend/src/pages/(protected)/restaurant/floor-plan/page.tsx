@@ -124,7 +124,7 @@ export default function FloorPlanPage() {
             ].map(({ label, count, color }) => (
               <div key={label} className="flex items-center gap-1.5">
                 <span className={`text-lg font-bold ${color}`}>{count}</span>
-                <span className="text-[var(--color-text-secondary)]">{label}</span>
+                <span style={{ color: "var(--color-text-secondary)" }}>{label}</span>
               </div>
             ))}
           </div>
@@ -132,8 +132,9 @@ export default function FloorPlanPage() {
             {sections.map((s) => (
               <button key={s} type="button" onClick={() => setFilter(s)}
                 className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors ${
-                  filter === s ? "bg-brand-600 text-white" : "bg-gray-100 text-[var(--color-text-secondary)] hover:bg-gray-200"
-                }`}>
+                  filter === s ? "bg-brand-600 text-white" : "hover:bg-[var(--color-surface-subtle)]"
+                }`}
+                style={filter === s ? undefined : { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
                 {s}
               </button>
             ))}
@@ -144,12 +145,12 @@ export default function FloorPlanPage() {
         {loading ? (
           <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
             {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-100" />
+              <div key={i} className="h-28 animate-skeleton rounded-xl" />
             ))}
           </div>
         ) : visible.length === 0 ? (
           <Card>
-            <p className="py-10 text-center text-sm text-[var(--color-text-secondary)]">
+            <p className="py-10 text-center text-sm" style={{ color: "var(--color-text-secondary)" }}>
               No tables yet. Add tables in Setup → Restaurant.
             </p>
           </Card>
@@ -184,7 +185,7 @@ export default function FloorPlanPage() {
         )}
 
         {/* Table action legend */}
-        <div className="flex flex-wrap gap-3 text-xs text-[var(--color-text-secondary)]">
+        <div className="flex flex-wrap gap-3 text-xs" style={{ color: "var(--color-text-secondary)" }}>
           {Object.entries(STATUS_COLOR).map(([status]) => (
             <span key={status} className="flex items-center gap-1.5 capitalize">
               <span className={`h-2 w-2 rounded-full ${STATUS_DOT[status]}`} />
@@ -200,23 +201,25 @@ export default function FloorPlanPage() {
           <div className="space-y-4 p-4">
             <div className="flex items-center gap-2">
               <span className={`h-3 w-3 rounded-full ${STATUS_DOT[selected.status]}`} />
-              <span className="capitalize font-medium text-[var(--color-text-primary)]">{selected.status}</span>
-              <span className="text-[var(--color-text-secondary)]">· {selected.capacity} seats</span>
+              <span className="capitalize font-medium" style={{ color: "var(--color-text-primary)" }}>{selected.status}</span>
+              <span style={{ color: "var(--color-text-secondary)" }}>· {selected.capacity} seats</span>
               {selected.floor_section && (
-                <span className="text-[var(--color-text-secondary)]">· {selected.floor_section}</span>
+                <span style={{ color: "var(--color-text-secondary)" }}>· {selected.floor_section}</span>
               )}
             </div>
 
             {selected.status === "available" && (
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">Party size</label>
+                  <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Party size</label>
                   <div className="flex items-center gap-2">
                     <button type="button" onClick={() => setPartySize(Math.max(1, partySize - 1))}
-                      className="h-8 w-8 rounded-lg border border-slate-200 text-lg font-bold hover:bg-gray-50">−</button>
+                      className="h-8 w-8 rounded-lg border text-lg font-bold hover:bg-[var(--color-surface-subtle)]"
+                      style={{ borderColor: "var(--color-border)" }}>−</button>
                     <span className="w-8 text-center text-lg font-bold">{partySize}</span>
                     <button type="button" onClick={() => setPartySize(Math.min(selected.capacity, partySize + 1))}
-                      className="h-8 w-8 rounded-lg border border-slate-200 text-lg font-bold hover:bg-gray-50">+</button>
+                      className="h-8 w-8 rounded-lg border text-lg font-bold hover:bg-[var(--color-surface-subtle)]"
+                      style={{ borderColor: "var(--color-border)" }}>+</button>
                   </div>
                 </div>
                 <Button variant="primary" fullWidth loading={processing} onClick={handleOpenSession}>

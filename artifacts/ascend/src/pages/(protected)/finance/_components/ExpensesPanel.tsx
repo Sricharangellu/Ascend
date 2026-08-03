@@ -61,9 +61,13 @@ interface ExpensesViewProps {
 
 function SummaryTile({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className={`rounded-md border p-4 shadow-sm ${highlight ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-white"}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
-      <p className={`mt-1 text-xl font-semibold tabular-nums ${highlight ? "text-amber-700" : "text-slate-950"}`}>{value}</p>
+    <div
+      className={`rounded-md border p-4 shadow-sm ${highlight ? "border-amber-200 bg-amber-50" : ""}`}
+      style={highlight ? {} : { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--color-text-muted)" }}>{label}</p>
+      <p className={`mt-1 text-xl font-semibold tabular-nums ${highlight ? "text-amber-700" : ""}`}
+        style={highlight ? {} : { color: "var(--color-text-primary)" }}>{value}</p>
     </div>
   );
 }
@@ -119,38 +123,42 @@ export function ExpensesView({
 
       {canManage && (
         <Card className="p-4">
-          <h3 className="mb-3 text-sm font-semibold text-slate-950">Record an expense</h3>
+          <h3 className="mb-3 text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Record an expense</h3>
           <form onSubmit={submitCreate} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-slate-700">Amount</span>
+              <span className="font-medium" style={{ color: "var(--color-text-secondary)" }}>Amount</span>
               <input
                 aria-label="Amount" inputMode="decimal" placeholder="0.00" value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="min-h-[40px] rounded-md border border-slate-300 px-3 text-sm"
+                className="min-h-[40px] rounded-md px-3 text-sm"
+                style={{ border: "1px solid var(--color-border)" }}
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-slate-700">Category <span className="text-slate-400">(optional)</span></span>
+              <span className="font-medium" style={{ color: "var(--color-text-secondary)" }}>Category <span style={{ color: "var(--color-text-muted)" }}>(optional)</span></span>
               <input
                 aria-label="Category" placeholder="e.g. Rent" value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="min-h-[40px] rounded-md border border-slate-300 px-3 text-sm"
+                className="min-h-[40px] rounded-md px-3 text-sm"
+                style={{ border: "1px solid var(--color-border)" }}
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-slate-700">Vendor <span className="text-slate-400">(optional)</span></span>
+              <span className="font-medium" style={{ color: "var(--color-text-secondary)" }}>Vendor <span style={{ color: "var(--color-text-muted)" }}>(optional)</span></span>
               <input
                 aria-label="Vendor" placeholder="e.g. Landlord Co" value={vendor}
                 onChange={(e) => setVendor(e.target.value)}
-                className="min-h-[40px] rounded-md border border-slate-300 px-3 text-sm"
+                className="min-h-[40px] rounded-md px-3 text-sm"
+                style={{ border: "1px solid var(--color-border)" }}
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-slate-700">Note <span className="text-slate-400">(optional)</span></span>
+              <span className="font-medium" style={{ color: "var(--color-text-secondary)" }}>Note <span style={{ color: "var(--color-text-muted)" }}>(optional)</span></span>
               <input
                 aria-label="Note" placeholder="Description" value={note}
                 onChange={(e) => setNote(e.target.value)}
-                className="min-h-[40px] rounded-md border border-slate-300 px-3 text-sm"
+                className="min-h-[40px] rounded-md px-3 text-sm"
+                style={{ border: "1px solid var(--color-border)" }}
               />
             </label>
             <div className="sm:col-span-2 lg:col-span-4 flex items-center gap-3">
@@ -163,12 +171,15 @@ export function ExpensesView({
 
       <Card className="overflow-hidden p-0">
         {loading ? (
-          <div role="status" aria-label="Loading expenses" className="p-6 text-sm text-slate-500">Loading expenses…</div>
+          <div role="status" aria-label="Loading expenses" className="p-6 text-sm" style={{ color: "var(--color-text-muted)" }}>Loading expenses…</div>
         ) : expenses.length === 0 ? (
-          <div className="p-6 text-sm text-slate-500">No expenses recorded yet.</div>
+          <div className="p-6 text-sm" style={{ color: "var(--color-text-muted)" }}>No expenses recorded yet.</div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
+            <thead
+              className="text-left text-[11px] uppercase tracking-wide"
+              style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}
+            >
               <tr>
                 <th className="px-4 py-2 font-semibold">Date</th>
                 <th className="px-4 py-2 font-semibold">Category</th>
@@ -178,10 +189,10 @@ export function ExpensesView({
                 {canManage && <th className="px-4 py-2 text-right font-semibold">Actions</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[var(--color-table-border)]">
               {expenses.map((exp) => (
                 <tr key={exp.id}>
-                  <td className="px-4 py-2 tabular-nums text-slate-700">{fmtDate(exp.spent_at)}</td>
+                  <td className="px-4 py-2 tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{fmtDate(exp.spent_at)}</td>
                   <td className="px-4 py-2">
                     {exp.category ? (
                       <Badge variant="blue">{exp.category}</Badge>
@@ -189,9 +200,9 @@ export function ExpensesView({
                       <span className="text-amber-700">Uncategorized</span>
                     )}
                   </td>
-                  <td className="px-4 py-2 text-slate-700">{exp.vendor ?? "—"}</td>
-                  <td className="px-4 py-2 text-slate-500">{exp.note ?? "—"}</td>
-                  <td className="px-4 py-2 text-right tabular-nums text-slate-950">{formatMoney(exp.amount_cents)}</td>
+                  <td className="px-4 py-2" style={{ color: "var(--color-text-secondary)" }}>{exp.vendor ?? "—"}</td>
+                  <td className="px-4 py-2" style={{ color: "var(--color-text-muted)" }}>{exp.note ?? "—"}</td>
+                  <td className="px-4 py-2 text-right tabular-nums" style={{ color: "var(--color-text-primary)" }}>{formatMoney(exp.amount_cents)}</td>
                   {canManage && (
                     <td className="px-4 py-2">
                       <div className="flex items-center justify-end gap-2">
@@ -202,7 +213,8 @@ export function ExpensesView({
                               placeholder="Category"
                               value={catDraft[exp.id] ?? ""}
                               onChange={(e) => setCatDraft((d) => ({ ...d, [exp.id]: e.target.value }))}
-                              className="min-h-[32px] w-32 rounded-md border border-slate-300 px-2 text-sm"
+                              className="min-h-[32px] w-32 rounded-md px-2 text-sm"
+                              style={{ border: "1px solid var(--color-border)" }}
                             />
                             <Button
                               variant="secondary" disabled={busy || !(catDraft[exp.id] ?? "").trim()}

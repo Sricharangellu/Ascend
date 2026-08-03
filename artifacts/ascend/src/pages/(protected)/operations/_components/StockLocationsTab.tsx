@@ -110,30 +110,30 @@ export function StockLocationsTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-900">Stock Locations ({items.length})</h2>
+        <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Stock Locations ({items.length})</h2>
         <Button variant="primary" size="sm" onClick={() => setShowForm((v) => !v)}>+ New Location</Button>
       </div>
 
       {showForm && (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+        <div className="rounded-lg p-4 space-y-3" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
           <div className="flex flex-wrap gap-3">
-            <input value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} placeholder="Code (e.g. MAIN-FLR)" className="w-36 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
-            <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Name" className="flex-1 min-w-36 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
-            <select value={form.location_type} onChange={(e) => setForm((f) => ({ ...f, location_type: e.target.value }))} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
+            <input value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} placeholder="Code (e.g. MAIN-FLR)" className="w-36 rounded-lg px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" style={{ border: "1px solid var(--color-border)" }} />
+            <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Name" className="flex-1 min-w-36 rounded-lg px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" style={{ border: "1px solid var(--color-border)" }} />
+            <select value={form.location_type} onChange={(e) => setForm((f) => ({ ...f, location_type: e.target.value }))} className="rounded-lg px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" style={{ border: "1px solid var(--color-border)" }}>
               <option value="floor">Floor</option>
               <option value="warehouse">Warehouse</option>
               <option value="damage">Damage</option>
               <option value="receiving">Receiving</option>
             </select>
-            <input value={form.outlet_id} onChange={(e) => setForm((f) => ({ ...f, outlet_id: e.target.value }))} placeholder="Outlet ID (optional)" className="w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+            <input value={form.outlet_id} onChange={(e) => setForm((f) => ({ ...f, outlet_id: e.target.value }))} placeholder="Outlet ID (optional)" className="w-40 rounded-lg px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" style={{ border: "1px solid var(--color-border)" }} />
           </div>
           <div className="flex flex-wrap items-center gap-4">
             <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-              <input type="checkbox" checked={form.is_sellable} onChange={(e) => setForm((f) => ({ ...f, is_sellable: e.target.checked }))} className="h-4 w-4 rounded border-gray-300 accent-blue-600" />
+              <input type="checkbox" checked={form.is_sellable} onChange={(e) => setForm((f) => ({ ...f, is_sellable: e.target.checked }))} className="h-4 w-4 rounded accent-blue-600" style={{ borderColor: "var(--color-border)" }} />
               Sellable
             </label>
             <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-              <input type="checkbox" checked={form.is_receiving_location} onChange={(e) => setForm((f) => ({ ...f, is_receiving_location: e.target.checked }))} className="h-4 w-4 rounded border-gray-300 accent-blue-600" />
+              <input type="checkbox" checked={form.is_receiving_location} onChange={(e) => setForm((f) => ({ ...f, is_receiving_location: e.target.checked }))} className="h-4 w-4 rounded accent-blue-600" style={{ borderColor: "var(--color-border)" }} />
               Receiving
             </label>
             <div className="ml-auto flex gap-2">
@@ -144,38 +144,38 @@ export function StockLocationsTab() {
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
+      <div className="overflow-x-auto rounded-lg" style={{ border: "1px solid var(--color-border)" }}>
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-              <th className="px-4 py-3">Code</th>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Type</th>
-              <th className="px-4 py-3">Outlet</th>
-              <th className="px-4 py-3">Sellable</th>
-              <th className="px-4 py-3">Receiving</th>
-              <th className="px-4 py-3">Status</th>
+            <tr style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)" }} className="text-left text-xs font-semibold uppercase tracking-[0.08em]" >
+              <th className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>Code</th>
+              <th className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>Name</th>
+              <th className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>Type</th>
+              <th className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>Outlet</th>
+              <th className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>Sellable</th>
+              <th className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>Receiving</th>
+              <th className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>Status</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
-            {loading && <tr><td colSpan={8} className="px-4 py-6 text-center text-gray-400">Loading…</td></tr>}
-            {!loading && items.length === 0 && <tr><td colSpan={8} className="px-4 py-6 text-center text-gray-400">No stock locations yet. Create one above.</td></tr>}
+          <tbody className="divide-y divide-[var(--color-table-border)]">
+            {loading && <tr><td colSpan={8} className="px-4 py-6 text-center" style={{ color: "var(--color-text-muted)" }}>Loading…</td></tr>}
+            {!loading && items.length === 0 && <tr><td colSpan={8} className="px-4 py-6 text-center" style={{ color: "var(--color-text-muted)" }}>No stock locations yet. Create one above.</td></tr>}
             {items.map((loc) => (
-              <tr key={loc.id} className="hover:bg-gray-50">
+              <tr key={loc.id} className="hover:bg-[var(--color-surface-subtle)]">
                 <td className="px-4 py-3">
-                  <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{loc.code}</span>
+                  <span className="font-mono text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--color-surface-subtle)" }}>{loc.code}</span>
                 </td>
-                <td className="px-4 py-3 font-medium text-gray-900">{loc.name}</td>
+                <td className="px-4 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{loc.name}</td>
                 <td className="px-4 py-3">
                   <Badge variant={LOC_TYPE_BADGE[loc.location_type] ?? "gray"}>{loc.location_type}</Badge>
                 </td>
-                <td className="px-4 py-3 text-gray-500">{loc.outlet_id ?? "—"}</td>
+                <td className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>{loc.outlet_id ?? "—"}</td>
                 <td className="px-4 py-3">
-                  {loc.is_sellable ? <span className="text-green-700 font-medium">Yes</span> : <span className="text-gray-400">No</span>}
+                  {loc.is_sellable ? <span className="text-green-700 font-medium">Yes</span> : <span style={{ color: "var(--color-text-muted)" }}>No</span>}
                 </td>
                 <td className="px-4 py-3">
-                  {loc.is_receiving_location ? <span className="text-green-700 font-medium">Yes</span> : <span className="text-gray-400">No</span>}
+                  {loc.is_receiving_location ? <span className="text-green-700 font-medium">Yes</span> : <span style={{ color: "var(--color-text-muted)" }}>No</span>}
                 </td>
                 <td className="px-4 py-3">
                   <button
@@ -183,7 +183,7 @@ export function StockLocationsTab() {
                     disabled={toggling === loc.id}
                     onClick={() => void toggleActive(loc)}
                     aria-pressed={loc.is_active}
-                    className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${loc.is_active ? "bg-blue-600" : "bg-gray-300"} ${toggling === loc.id ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                    className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${loc.is_active ? "bg-blue-600" : "bg-slate-300"} ${toggling === loc.id ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                   >
                     <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${loc.is_active ? "translate-x-4" : "translate-x-0.5"}`} />
                     <span className="sr-only">{loc.is_active ? "Active" : "Inactive"}</span>
@@ -193,7 +193,8 @@ export function StockLocationsTab() {
                   <Button size="sm" variant="secondary" onClick={() => void openStockModal(loc)}>View Stock</Button>
                   <button
                     onClick={() => openTransferModal(loc)}
-                    className="text-xs text-slate-600 hover:text-slate-900 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+                    className="text-xs hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+                    style={{ color: "var(--color-text-secondary)" }}
                     aria-label={`Transfer stock from ${loc.name}`}
                   >
                     Transfer
@@ -210,30 +211,30 @@ export function StockLocationsTab() {
         onClose={() => setViewStockLoc(null)}
         title={viewStockLoc ? `Stock at ${viewStockLoc.name} (${viewStockLoc.code})` : "Stock"}
       >
-        {stockLoading && <p className="py-6 text-center text-sm text-gray-400">Loading stock…</p>}
+        {stockLoading && <p className="py-6 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>Loading stock…</p>}
         {!stockLoading && stockItems.length === 0 && (
-          <p className="py-6 text-center text-sm text-gray-400">No stock recorded at this location.</p>
+          <p className="py-6 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No stock recorded at this location.</p>
         )}
         {!stockLoading && stockItems.length > 0 && (
           <div className="overflow-x-auto -mx-4 sm:-mx-6">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                  <th className="px-4 py-2.5">Product ID</th>
-                  <th className="px-4 py-2.5 text-right">On Hand</th>
-                  <th className="px-4 py-2.5 text-right">Committed</th>
-                  <th className="px-4 py-2.5 text-right">Available</th>
-                  <th className="px-4 py-2.5 text-right">Avg Cost</th>
+                <tr style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)" }} className="text-left text-xs font-semibold uppercase tracking-[0.08em]">
+                  <th className="px-4 py-2.5" style={{ color: "var(--color-text-muted)" }}>Product ID</th>
+                  <th className="px-4 py-2.5 text-right" style={{ color: "var(--color-text-muted)" }}>On Hand</th>
+                  <th className="px-4 py-2.5 text-right" style={{ color: "var(--color-text-muted)" }}>Committed</th>
+                  <th className="px-4 py-2.5 text-right" style={{ color: "var(--color-text-muted)" }}>Available</th>
+                  <th className="px-4 py-2.5 text-right" style={{ color: "var(--color-text-muted)" }}>Avg Cost</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[var(--color-table-border)]">
                 {stockItems.map((s) => (
-                  <tr key={s.product_id} className="hover:bg-gray-50">
-                    <td className="px-4 py-2.5 font-mono text-xs text-gray-700">{s.product_id}</td>
+                  <tr key={s.product_id} className="hover:bg-[var(--color-surface-subtle)]">
+                    <td className="px-4 py-2.5 font-mono text-xs" style={{ color: "var(--color-text-secondary)" }}>{s.product_id}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{s.quantity_on_hand}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-orange-600">{s.quantity_committed}</td>
                     <td className={`px-4 py-2.5 text-right tabular-nums font-medium ${s.quantity_available <= 0 ? "text-red-600" : "text-green-700"}`}>{s.quantity_available}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-gray-500">{formatMoney(s.average_cost_cents)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: "var(--color-text-muted)" }}>{formatMoney(s.average_cost_cents)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -255,18 +256,20 @@ export function StockLocationsTab() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">From Location</label>
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>From Location</label>
             <select disabled value={transferForm.fromLocationId}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 cursor-not-allowed">
+              className="w-full rounded-lg px-3 py-2 text-sm cursor-not-allowed"
+              style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }}>
               {transferLoc && <option value={transferLoc.id}>{transferLoc.name} ({transferLoc.code})</option>}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">To Location</label>
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>To Location</label>
             <select
               value={transferForm.toLocationId}
               onChange={(e) => setTransferForm((f) => ({ ...f, toLocationId: e.target.value }))}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              style={{ border: "1px solid var(--color-border)" }}
             >
               <option value="">Select destination…</option>
               {otherLocations.map((l) => (
@@ -275,17 +278,19 @@ export function StockLocationsTab() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Product</label>
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Product</label>
             <input type="text" value={transferForm.productQuery}
               onChange={(e) => setTransferForm((f) => ({ ...f, productQuery: e.target.value }))}
               placeholder="Enter product ID or name…"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+              className="w-full rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              style={{ border: "1px solid var(--color-border)" }} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Quantity</label>
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Quantity</label>
             <input type="number" min={1} value={transferForm.quantity}
               onChange={(e) => setTransferForm((f) => ({ ...f, quantity: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+              className="w-full rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              style={{ border: "1px solid var(--color-border)" }} />
           </div>
           {transferError && <p role="alert" className="text-sm text-red-600">{transferError}</p>}
         </div>

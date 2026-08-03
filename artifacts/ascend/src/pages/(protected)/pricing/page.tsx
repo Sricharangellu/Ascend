@@ -112,13 +112,13 @@ const BOOK_TYPE_CLS: Record<PriceBook["type"], string> = {
 const CONTRACT_STATUS_CLS: Record<ContractPrice["status"], string> = {
   active:  "bg-emerald-100 text-emerald-700",
   pending: "bg-amber-100 text-amber-700",
-  expired: "bg-slate-100 text-slate-500",
+  expired: "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)]",
 };
 
 const SCHED_STATUS_CLS: Record<ScheduledPrice["status"], string> = {
   upcoming: "bg-blue-100 text-blue-700",
   active:   "bg-emerald-100 text-emerald-700",
-  ended:    "bg-slate-100 text-slate-500",
+  ended:    "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)]",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -132,7 +132,7 @@ function Badge({ label, cls }: { label: string; cls: string }) {
 function SectionHeader({ title, action }: { title: string; action?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between">
-      <h3 className="text-sm font-semibold text-slate-700">{title}</h3>
+      <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-secondary)" }}>{title}</h3>
       {action}
     </div>
   );
@@ -140,14 +140,14 @@ function SectionHeader({ title, action }: { title: string; action?: React.ReactN
 
 function TableShell({ cols, children, empty }: { cols: string[]; children: React.ReactNode; empty?: boolean }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl shadow-sm" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
       <table className="w-full text-sm">
-        <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-500">
+        <thead className="text-left text-xs font-semibold" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
           <tr>{cols.map(c => <th key={c} className="px-5 py-3">{c}</th>)}</tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-[var(--color-table-border)]">
           {empty
-            ? <tr><td colSpan={cols.length} className="py-12 text-center text-sm text-slate-400">No records found.</td></tr>
+            ? <tr><td colSpan={cols.length} className="py-12 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No records found.</td></tr>
             : children}
         </tbody>
       </table>
@@ -169,7 +169,7 @@ function PriceBooksTab() {
   }, []);
 
   if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
-  if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
+  if (loading) return <div className="h-64 animate-skeleton rounded-xl" />;
 
   return (
     <div className="space-y-4">
@@ -185,24 +185,25 @@ function PriceBooksTab() {
       />
       <TableShell cols={["Name", "Type", "Products", "Currency", "Status", ""]} empty={books.length === 0}>
         {books.map(b => (
-          <tr key={b.id} className="hover:bg-slate-50 transition-colors">
+          <tr key={b.id} className="hover:bg-[var(--color-surface-subtle)] transition-colors">
             <td className="px-5 py-3.5">
-              <p className="font-semibold text-slate-900">{b.name}</p>
-              {b.description && <p className="text-xs text-slate-400">{b.description}</p>}
+              <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{b.name}</p>
+              {b.description && <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{b.description}</p>}
             </td>
             <td className="px-5 py-3.5">
               <Badge label={BOOK_TYPE_LABEL[b.type]} cls={BOOK_TYPE_CLS[b.type]} />
             </td>
-            <td className="px-5 py-3.5 text-slate-600">{b.productCount.toLocaleString()}</td>
-            <td className="px-5 py-3.5 text-slate-600">{b.currency}</td>
+            <td className="px-5 py-3.5" style={{ color: "var(--color-text-secondary)" }}>{b.productCount.toLocaleString()}</td>
+            <td className="px-5 py-3.5" style={{ color: "var(--color-text-secondary)" }}>{b.currency}</td>
             <td className="px-5 py-3.5">
-              <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${b.active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+              <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${b.active ? "bg-emerald-100 text-emerald-700" : "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)]"}`}>
                 {b.active ? "Active" : "Inactive"}
               </span>
             </td>
             <td className="px-5 py-3.5">
               <Can permission="pricing.manage">
-                <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                <button className="rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-[var(--color-surface-subtle)]"
+                  style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
                   Edit
                 </button>
               </Can>
@@ -282,7 +283,8 @@ function CustomerOverridesTab() {
         <select
           value={selectedCustomer}
           onChange={(e) => setSelectedCustomer(e.target.value)}
-          className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#5D5FEF]"
+          className="h-9 rounded-lg px-3 text-sm outline-none focus:border-[#5D5FEF]"
+          style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}
           aria-label="Customer"
         >
           <option value="">Select customer to edit prices</option>
@@ -295,10 +297,11 @@ function CustomerOverridesTab() {
           placeholder="Search products…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="h-9 w-48 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[#5D5FEF]"
+          className="h-9 w-48 rounded-lg px-3 text-sm outline-none focus:border-[#5D5FEF]"
+          style={{ border: "1px solid var(--color-border)" }}
         />
         {!selectedCustomer && (
-          <p className="text-xs text-slate-400">Select a customer to view and edit their custom prices.</p>
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Select a customer to view and edit their custom prices.</p>
         )}
       </div>
 
@@ -307,7 +310,7 @@ function CustomerOverridesTab() {
           ? [1, 2, 3, 4, 5].map((i) => (
               <tr key={i}>
                 {[1, 2, 3, 4, 5, 6, 7].map((j) => (
-                  <td key={j} className="px-5 py-3"><div className="h-4 animate-pulse rounded bg-slate-100" /></td>
+                  <td key={j} className="px-5 py-3"><div className="h-4 animate-skeleton rounded" /></td>
                 ))}
               </tr>
             ))
@@ -318,11 +321,11 @@ function CustomerOverridesTab() {
                 ? Math.round((1 - override / p.price_cents) * 100)
                 : null;
               return (
-                <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-5 py-3 font-mono text-xs text-slate-500">{p.sku}</td>
-                  <td className="px-5 py-3 font-medium text-slate-900">{p.name}</td>
-                  <td className="px-5 py-3 capitalize text-slate-500">{p.category}</td>
-                  <td className="px-5 py-3 text-right tabular-nums text-slate-500">{formatMoney(p.price_cents)}</td>
+                <tr key={p.id} className="hover:bg-[var(--color-surface-subtle)] transition-colors">
+                  <td className="px-5 py-3 font-mono text-xs" style={{ color: "var(--color-text-muted)" }}>{p.sku}</td>
+                  <td className="px-5 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{p.name}</td>
+                  <td className="px-5 py-3 capitalize" style={{ color: "var(--color-text-muted)" }}>{p.category}</td>
+                  <td className="px-5 py-3 text-right tabular-nums" style={{ color: "var(--color-text-muted)" }}>{formatMoney(p.price_cents)}</td>
                   <td className="px-5 py-3 text-right">
                     {isEditing ? (
                       <input
@@ -337,7 +340,8 @@ function CustomerOverridesTab() {
                         aria-label={`Custom price for ${p.name}`}
                       />
                     ) : (
-                      <span className={`tabular-nums font-medium ${override ? "text-[#5D5FEF]" : "text-slate-400"}`}>
+                      <span className={`tabular-nums font-medium ${override ? "text-[#5D5FEF]" : ""}`}
+                        style={override ? {} : { color: "var(--color-text-muted)" }}>
                         {override ? formatMoney(override) : "—"}
                       </span>
                     )}
@@ -350,13 +354,15 @@ function CustomerOverridesTab() {
                       isEditing ? (
                         <div className="flex justify-end gap-1">
                           <button disabled={saving} onClick={() => void handleSave(p.id)} className="rounded-lg bg-[#5D5FEF] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#4B4DC8] disabled:opacity-40">Save</button>
-                          <button onClick={() => setEditing(null)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+                          <button onClick={() => setEditing(null)} className="rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-[var(--color-surface-subtle)]"
+                            style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>Cancel</button>
                         </div>
                       ) : (
                         <Can permission="pricing.manage">
                           <button
                             onClick={() => setEditing({ productId: p.id, value: override ? (override / 100).toFixed(2) : (p.price_cents / 100).toFixed(2) })}
-                            className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            className="rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-[var(--color-surface-subtle)]"
+                            style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}
                           >
                             {override ? "Edit" : "Set"}
                           </button>
@@ -386,7 +392,7 @@ function TierPricingTab() {
   }, []);
 
   if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
-  if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
+  if (loading) return <div className="h-64 animate-skeleton rounded-xl" />;
 
   return (
     <div className="space-y-4">
@@ -405,23 +411,24 @@ function TierPricingTab() {
       />
       <div className="space-y-3">
         {rules.map(rule => (
-          <div key={rule.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div key={rule.id} className="rounded-xl p-5 shadow-sm" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="font-semibold text-slate-900">{rule.name}</p>
+                  <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{rule.name}</p>
                   <Badge
                     label={rule.active ? "Active" : "Inactive"}
-                    cls={rule.active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}
+                    cls={rule.active ? "bg-emerald-100 text-emerald-700" : "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)]"}
                   />
                 </div>
-                <p className="mt-0.5 text-xs text-slate-500">
+                <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>
                   Scope: {rule.scope === "product" ? rule.productName : rule.scope === "category" ? rule.categoryName : "All products"}
                   {rule.customerGroup && ` · ${rule.customerGroup}`}
                 </p>
               </div>
               <Can permission="pricing.manage">
-                <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                <button className="rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-[var(--color-surface-subtle)]"
+                  style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
                   Edit
                 </button>
               </Can>
@@ -429,9 +436,9 @@ function TierPricingTab() {
             <div className="mt-4 flex flex-wrap gap-2">
               {rule.tiers.map((t, i) => (
                 <div key={i} className="flex items-center gap-1.5 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2">
-                  <span className="text-xs text-slate-500">Qty ≥</span>
-                  <span className="font-bold text-slate-900">{t.minQty}</span>
-                  <span className="text-xs text-slate-400">→</span>
+                  <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Qty ≥</span>
+                  <span className="font-bold" style={{ color: "var(--color-text-primary)" }}>{t.minQty}</span>
+                  <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>→</span>
                   <span className="font-bold text-brand-600">{t.discountPct}% off</span>
                 </div>
               ))}
@@ -439,7 +446,7 @@ function TierPricingTab() {
           </div>
         ))}
         {rules.length === 0 && (
-          <p className="py-10 text-center text-sm text-slate-400">No tier pricing rules configured.</p>
+          <p className="py-10 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No tier pricing rules configured.</p>
         )}
       </div>
     </div>
@@ -466,7 +473,7 @@ function ContractPricesTab() {
   }, [contracts, search]);
 
   if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
-  if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
+  if (loading) return <div className="h-64 animate-skeleton rounded-xl" />;
 
   return (
     <div className="space-y-4">
@@ -474,7 +481,8 @@ function ContractPricesTab() {
         <input
           value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search contracts..."
-          className="h-9 w-64 rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+          className="h-9 w-64 rounded-lg px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+          style={{ border: "1px solid var(--color-border)" }}
         />
         <Can permission="pricing.manage">
           <button className="ml-auto rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
@@ -490,22 +498,23 @@ function ContractPricesTab() {
         {filtered.map(c => {
           const discountPct = Math.round((1 - c.contractCents / c.retailCents) * 100);
           return (
-            <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+            <tr key={c.id} className="hover:bg-[var(--color-surface-subtle)] transition-colors">
               <td className="px-5 py-3.5 font-semibold text-brand-600">{c.contractNumber}</td>
-              <td className="px-5 py-3.5 text-slate-900">{c.customerName}</td>
-              <td className="px-5 py-3.5 text-slate-900">{c.productName}</td>
-              <td className="px-5 py-3.5 font-mono text-xs text-slate-500">{c.sku}</td>
-              <td className="px-5 py-3.5 text-slate-500 line-through">{formatMoney(c.retailCents)}</td>
+              <td className="px-5 py-3.5" style={{ color: "var(--color-text-primary)" }}>{c.customerName}</td>
+              <td className="px-5 py-3.5" style={{ color: "var(--color-text-primary)" }}>{c.productName}</td>
+              <td className="px-5 py-3.5 font-mono text-xs" style={{ color: "var(--color-text-muted)" }}>{c.sku}</td>
+              <td className="px-5 py-3.5 line-through" style={{ color: "var(--color-text-muted)" }}>{formatMoney(c.retailCents)}</td>
               <td className="px-5 py-3.5 font-semibold text-emerald-700">{formatMoney(c.contractCents)}</td>
               <td className="px-5 py-3.5 text-brand-600 font-semibold">{discountPct}%</td>
-              <td className="px-5 py-3.5 text-xs text-slate-500">{fmtDate(c.effectiveDate)}</td>
-              <td className="px-5 py-3.5 text-xs text-slate-500">{fmtDate(c.expiryDate)}</td>
+              <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDate(c.effectiveDate)}</td>
+              <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDate(c.expiryDate)}</td>
               <td className="px-5 py-3.5">
                 <Badge label={c.status} cls={CONTRACT_STATUS_CLS[c.status]} />
               </td>
               <td className="px-5 py-3.5">
                 <Can permission="pricing.manage">
-                  <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                  <button className="rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-[var(--color-surface-subtle)]"
+                    style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
                     Edit
                   </button>
                 </Can>
@@ -537,7 +546,7 @@ function ScheduledTab() {
   [schedules, filter]);
 
   if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
-  if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
+  if (loading) return <div className="h-64 animate-skeleton rounded-xl" />;
 
   return (
     <div className="space-y-4">
@@ -550,8 +559,9 @@ function ScheduledTab() {
             key={s}
             onClick={() => setFilter(s)}
             className={`rounded-full px-3 py-1 text-xs font-semibold capitalize transition-colors ${
-              filter === s ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              filter === s ? "bg-brand-600 text-white" : "hover:bg-[var(--color-surface-subtle)]"
             }`}
+            style={filter === s ? {} : { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}
           >
             {s === "all" ? "All" : s}
           </button>
@@ -571,26 +581,27 @@ function ScheduledTab() {
           const changePct = Math.round(((s.scheduledCents - s.originalCents) / s.originalCents) * 100);
           const isMarkdown = changePct < 0;
           return (
-            <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-              <td className="px-5 py-3.5 font-semibold text-slate-900">{s.name}</td>
-              <td className="px-5 py-3.5 text-slate-700">{s.productName}</td>
-              <td className="px-5 py-3.5 font-mono text-xs text-slate-500">{s.sku}</td>
-              <td className="px-5 py-3.5 text-slate-500">{formatMoney(s.originalCents)}</td>
-              <td className="px-5 py-3.5 font-semibold text-slate-900">{formatMoney(s.scheduledCents)}</td>
+            <tr key={s.id} className="hover:bg-[var(--color-surface-subtle)] transition-colors">
+              <td className="px-5 py-3.5 font-semibold" style={{ color: "var(--color-text-primary)" }}>{s.name}</td>
+              <td className="px-5 py-3.5" style={{ color: "var(--color-text-secondary)" }}>{s.productName}</td>
+              <td className="px-5 py-3.5 font-mono text-xs" style={{ color: "var(--color-text-muted)" }}>{s.sku}</td>
+              <td className="px-5 py-3.5" style={{ color: "var(--color-text-muted)" }}>{formatMoney(s.originalCents)}</td>
+              <td className="px-5 py-3.5 font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(s.scheduledCents)}</td>
               <td className={`px-5 py-3.5 font-bold ${isMarkdown ? "text-emerald-600" : "text-red-600"}`}>
                 {isMarkdown ? "" : "+"}{changePct}%
               </td>
-              <td className="px-5 py-3.5 text-xs text-slate-500">{fmtDate(s.startAt)}</td>
-              <td className="px-5 py-3.5 text-xs text-slate-500">{fmtDate(s.endAt)}</td>
+              <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDate(s.startAt)}</td>
+              <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDate(s.endAt)}</td>
               <td className="px-5 py-3.5">
                 <Badge label={s.status} cls={SCHED_STATUS_CLS[s.status]} />
               </td>
-              <td className="px-5 py-3.5 text-xs text-slate-500">
+              <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-muted)" }}>
                 {s.approvedBy ?? (s.approvalRequired ? <span className="text-amber-600 font-semibold">Pending</span> : "Auto")}
               </td>
               <td className="px-5 py-3.5">
                 <Can permission="pricing.manage">
-                  <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                  <button className="rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-[var(--color-surface-subtle)]"
+                    style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
                     {s.status === "upcoming" ? "Edit" : "View"}
                   </button>
                 </Can>
@@ -623,7 +634,7 @@ function MarginRulesTab() {
   };
 
   if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
-  if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
+  if (loading) return <div className="h-64 animate-skeleton rounded-xl" />;
 
   return (
     <div className="space-y-4">
@@ -642,15 +653,15 @@ function MarginRulesTab() {
       />
       <TableShell cols={["Rule Name", "Scope", "Min Margin", "Action", "Status", ""]} empty={rules.length === 0}>
         {rules.map(r => (
-          <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-            <td className="px-5 py-3.5 font-semibold text-slate-900">{r.name}</td>
+          <tr key={r.id} className="hover:bg-[var(--color-surface-subtle)] transition-colors">
+            <td className="px-5 py-3.5 font-semibold" style={{ color: "var(--color-text-primary)" }}>{r.name}</td>
             <td className="px-5 py-3.5">
-              <p className="text-slate-700 capitalize">{r.scope}</p>
-              {r.categoryName && <p className="text-xs text-slate-400">{r.categoryName}</p>}
-              {r.productName  && <p className="text-xs text-slate-400">{r.productName}</p>}
+              <p className="capitalize" style={{ color: "var(--color-text-secondary)" }}>{r.scope}</p>
+              {r.categoryName && <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{r.categoryName}</p>}
+              {r.productName  && <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{r.productName}</p>}
             </td>
             <td className="px-5 py-3.5">
-              <span className="text-lg font-bold text-slate-900">{r.minMarginPct}%</span>
+              <span className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>{r.minMarginPct}%</span>
             </td>
             <td className="px-5 py-3.5">
               <Badge label={r.action.charAt(0).toUpperCase() + r.action.slice(1)} cls={ACTION_CLS[r.action]} />
@@ -658,12 +669,13 @@ function MarginRulesTab() {
             <td className="px-5 py-3.5">
               <Badge
                 label={r.active ? "Active" : "Inactive"}
-                cls={r.active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}
+                cls={r.active ? "bg-emerald-100 text-emerald-700" : "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)]"}
               />
             </td>
             <td className="px-5 py-3.5">
               <Can permission="pricing.manage">
-                <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                <button className="rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-[var(--color-surface-subtle)]"
+                  style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
                   Edit
                 </button>
               </Can>
@@ -712,33 +724,36 @@ function SimulatorTab() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">Price Resolution Simulator</h3>
-        <p className="mb-5 text-xs text-slate-500">
+      <div className="rounded-xl p-6 shadow-sm" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <h3 className="mb-4 text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Price Resolution Simulator</h3>
+        <p className="mb-5 text-xs" style={{ color: "var(--color-text-muted)" }}>
           Enter a product SKU, quantity, and optionally a customer to see exactly which pricing rule applies and why.
         </p>
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-500">Product SKU</label>
+            <label className="mb-1 block text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Product SKU</label>
             <input
               value={productSku} onChange={e => setProductSku(e.target.value)}
               placeholder="e.g. SKU-001"
-              className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+              className="h-9 w-full rounded-lg px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+              style={{ border: "1px solid var(--color-border)" }}
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-500">Quantity</label>
+            <label className="mb-1 block text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Quantity</label>
             <input
               type="number" min={1} value={qty} onChange={e => setQty(Number(e.target.value))}
-              className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+              className="h-9 w-full rounded-lg px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+              style={{ border: "1px solid var(--color-border)" }}
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-500">Customer ID (optional)</label>
+            <label className="mb-1 block text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Customer ID (optional)</label>
             <input
               value={customerId} onChange={e => setCustomerId(e.target.value)}
               placeholder="e.g. cust_001"
-              className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+              className="h-9 w-full rounded-lg px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+              style={{ border: "1px solid var(--color-border)" }}
             />
           </div>
         </div>
@@ -753,13 +768,13 @@ function SimulatorTab() {
       </div>
 
       {result && (
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-xl p-6 shadow-sm" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
           <div className="mb-5 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-900">Resolution Result</h3>
+            <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Resolution Result</h3>
             <div className="text-right">
-              <p className="text-xs text-slate-400">Final Price</p>
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Final Price</p>
               <p className="text-2xl font-bold text-brand-600">{formatMoney(result.finalCents)}</p>
-              <p className="text-xs text-slate-500">via {result.source}</p>
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>via {result.source}</p>
             </div>
           </div>
 
@@ -768,15 +783,18 @@ function SimulatorTab() {
               const step = result.steps.find(s => s.priority === i + 1);
               const applied = step?.applied ?? false;
               return (
-                <li key={i} className={`flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm ${applied ? "bg-indigo-50 border border-indigo-200" : "bg-slate-50"}`}>
-                  <span className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold ${applied ? "bg-brand-600 text-white" : "bg-slate-200 text-slate-500"}`}>
+                <li key={i} className={`flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm ${applied ? "bg-indigo-50 border border-indigo-200" : "bg-[var(--color-surface-subtle)]"}`}>
+                  <span className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold ${applied ? "bg-brand-600 text-white" : "text-[var(--color-text-muted)]"}`}
+                    style={applied ? {} : { backgroundColor: "var(--color-border)" }}>
                     {i + 1}
                   </span>
-                  <span className={`flex-1 ${applied ? "font-semibold text-slate-900" : "text-slate-400 line-through"}`}>
+                  <span className={`flex-1 ${applied ? "font-semibold" : "line-through"}`}
+                    style={{ color: applied ? "var(--color-text-primary)" : "var(--color-text-muted)" }}>
                     {ruleName}
                   </span>
                   {step && (
-                    <span className={`font-semibold ${applied ? "text-brand-600" : "text-slate-400"}`}>
+                    <span className={`font-semibold ${applied ? "text-brand-600" : ""}`}
+                      style={applied ? {} : { color: "var(--color-text-muted)" }}>
                       {formatMoney(step.price)}
                     </span>
                   )}
@@ -789,9 +807,9 @@ function SimulatorTab() {
       )}
 
       {!result && (
-        <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center">
-          <p className="text-sm text-slate-400">Enter a SKU and click Resolve Price to see the full pricing stack.</p>
-          <div className="mt-4 space-y-1 text-xs text-slate-400">
+        <div className="rounded-xl border border-dashed py-12 text-center" style={{ borderColor: "var(--color-border)" }}>
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Enter a SKU and click Resolve Price to see the full pricing stack.</p>
+          <div className="mt-4 space-y-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
             {RESOLUTION_ORDER.map((r, i) => (
               <p key={i}>{i + 1}. {r}</p>
             ))}
@@ -819,14 +837,14 @@ export default function PricingPage() {
       <div className="mx-auto max-w-[1400px] space-y-6 px-6 py-6">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Pricing Engine</h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>Pricing Engine</h1>
+            <p className="mt-1 text-sm" style={{ color: "var(--color-text-muted)" }}>
               Resolution order: Contract → Customer Group → Tier → Price Book → Promotion → Scheduled → Retail
             </p>
           </div>
         </div>
 
-        <div className="border-b border-slate-200">
+        <div style={{ borderBottom: "1px solid var(--color-border)" }}>
           <nav className="flex gap-1" aria-label="Pricing tabs">
             {TABS.map(t => (
               <button
@@ -835,8 +853,9 @@ export default function PricingPage() {
                 className={`px-4 py-2.5 text-sm font-semibold transition-colors ${
                   activeTab === t.key
                     ? "border-b-2 border-brand-600 text-brand-600"
-                    : "text-slate-500 hover:text-slate-900"
+                    : "hover:text-[var(--color-text-primary)]"
                 }`}
+                style={activeTab === t.key ? {} : { color: "var(--color-text-muted)" }}
               >
                 {t.label}
               </button>

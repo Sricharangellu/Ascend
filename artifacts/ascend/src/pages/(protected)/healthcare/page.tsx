@@ -102,18 +102,19 @@ export default function HealthcarePage() {
               value={q}
               onChange={e => handleSearch(e.target.value)}
               placeholder="Search patients…"
-              className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
+              className="flex-1 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+              style={{ border: "1px solid var(--color-border)" }}
             />
             <Button variant="primary" size="sm" onClick={() => setModal(true)}>+ New</Button>
           </div>
 
           {loading ? (
             <div className="space-y-2">
-              {[1,2,3,4].map(i => <div key={i} className="h-16 animate-pulse rounded-xl bg-gray-100" />)}
+              {[1,2,3,4].map(i => <div key={i} className="h-16 animate-skeleton rounded-xl" />)}
             </div>
           ) : patients.length === 0 ? (
             <Card>
-              <p className="py-8 text-center text-sm text-[var(--color-text-secondary)]">No patients found.</p>
+              <p className="py-8 text-center text-sm" style={{ color: "var(--color-text-secondary)" }}>No patients found.</p>
             </Card>
           ) : (
             <div className="space-y-1.5">
@@ -121,10 +122,11 @@ export default function HealthcarePage() {
                 <button key={p.id} type="button"
                   onClick={() => openDetail(p.id)}
                   className={`w-full rounded-xl border p-3 text-left transition-colors hover:border-brand-400 hover:bg-brand-50 ${
-                    selected?.id === p.id ? "border-brand-600 bg-brand-50" : "border-[var(--color-table-border)] bg-white"
-                  }`}>
-                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">{p.name}</p>
-                  <p className="text-xs text-[var(--color-text-secondary)]">
+                    selected?.id === p.id ? "border-brand-600 bg-brand-50" : ""
+                  }`}
+                  style={selected?.id === p.id ? {} : { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+                  <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{p.name}</p>
+                  <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
                     {p.dob ? `DOB: ${p.dob}` : "No DOB"}{p.phone ? ` · ${p.phone}` : ""}
                   </p>
                 </button>
@@ -139,25 +141,25 @@ export default function HealthcarePage() {
             <Card>
               <div className="py-16 text-center">
                 <p className="text-2xl">🏥</p>
-                <p className="mt-2 text-sm text-[var(--color-text-secondary)]">Select a patient to view their records</p>
+                <p className="mt-2 text-sm" style={{ color: "var(--color-text-secondary)" }}>Select a patient to view their records</p>
               </div>
             </Card>
           )}
           {detailLoading && (
-            <div className="h-64 animate-pulse rounded-xl bg-gray-100" />
+            <div className="h-64 animate-skeleton rounded-xl" />
           )}
           {selected && !detailLoading && (
             <div className="space-y-4">
               <Card>
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="text-base font-bold text-[var(--color-text-primary)]">{selected.name}</h3>
-                    <p className="text-sm text-[var(--color-text-secondary)]">
+                    <h3 className="text-base font-bold" style={{ color: "var(--color-text-primary)" }}>{selected.name}</h3>
+                    <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
                       {selected.dob && `DOB: ${selected.dob}`}
                       {selected.gender && ` · ${selected.gender}`}
                     </p>
-                    {selected.phone && <p className="text-sm text-[var(--color-text-secondary)]">{selected.phone}</p>}
-                    {selected.email && <p className="text-sm text-[var(--color-text-secondary)]">{selected.email}</p>}
+                    {selected.phone && <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{selected.phone}</p>}
+                    {selected.email && <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{selected.email}</p>}
                     {selected.allergies && (
                       <p className="mt-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-700">
                         ⚠ Allergies: {selected.allergies}
@@ -169,24 +171,25 @@ export default function HealthcarePage() {
               </Card>
 
               <div>
-                <h4 className="mb-2 text-sm font-semibold text-[var(--color-text-primary)]">
+                <h4 className="mb-2 text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
                   Prescriptions ({selected.prescriptions.length})
                 </h4>
                 {selected.prescriptions.length === 0 ? (
                   <Card>
-                    <p className="py-6 text-center text-sm text-[var(--color-text-secondary)]">No prescriptions on file.</p>
+                    <p className="py-6 text-center text-sm" style={{ color: "var(--color-text-secondary)" }}>No prescriptions on file.</p>
                   </Card>
                 ) : (
                   <div className="space-y-2">
                     {selected.prescriptions.map(rx => (
                       <div key={rx.id}
-                        className="flex items-center justify-between rounded-xl border border-[var(--color-table-border)] bg-white px-4 py-3">
+                        className="flex items-center justify-between rounded-xl px-4 py-3"
+                        style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
                         <div>
-                          <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                          <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
                             {rx.drug_name}
-                            <span className="ml-2 text-xs font-normal text-[var(--color-text-secondary)]">{rx.dosage}</span>
+                            <span className="ml-2 text-xs font-normal" style={{ color: "var(--color-text-secondary)" }}>{rx.dosage}</span>
                           </p>
-                          <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
+                          <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-secondary)" }}>
                             Qty {rx.quantity} · Refills left: {rx.refills_remaining}
                             {rx.prescriber && ` · Dr. ${rx.prescriber}`}
                           </p>
@@ -225,13 +228,14 @@ export default function HealthcarePage() {
             { key: "email",  label: "Email",         type: "email", placeholder: "jane@example.com" },
           ].map(({ key, label, type, placeholder }) => (
             <div key={key}>
-              <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">{label}</label>
+              <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>{label}</label>
               <input
                 type={type}
                 placeholder={placeholder}
                 value={form[key as keyof typeof form]}
                 onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
+                className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                style={{ border: "1px solid var(--color-border)" }}
               />
             </div>
           ))}

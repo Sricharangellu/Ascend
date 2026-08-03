@@ -119,12 +119,14 @@ export function AllDocumentsTab({ refreshKey = 0, onUpload }: Props) {
           placeholder="Search documents…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          className="h-8 w-56 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+          className="h-8 w-56 rounded-lg border px-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+          style={{ borderColor: "var(--color-border)" }}
         />
         <select
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
-          className="h-8 rounded-lg border border-slate-200 px-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+          className="h-8 rounded-lg border px-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+          style={{ borderColor: "var(--color-border)" }}
         >
           <option value="all">All types</option>
           {(Object.keys(TYPE_LABELS) as DocType[]).map((t) => (
@@ -136,7 +138,8 @@ export function AllDocumentsTab({ refreshKey = 0, onUpload }: Props) {
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
-          className="h-8 rounded-lg border border-slate-200 px-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+          className="h-8 rounded-lg border px-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+          style={{ borderColor: "var(--color-border)" }}
         >
           <option value="all">All statuses</option>
           <option value="active">Active</option>
@@ -158,11 +161,11 @@ export function AllDocumentsTab({ refreshKey = 0, onUpload }: Props) {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-16 text-sm text-slate-400">
+        <div className="flex items-center justify-center py-16 text-sm" style={{ color: "var(--color-text-muted)" }}>
           Loading…
         </div>
       ) : docs.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-16 text-slate-400">
+        <div className="flex flex-col items-center gap-2 py-16" style={{ color: "var(--color-text-muted)" }}>
           <svg
             width="32"
             height="32"
@@ -178,10 +181,10 @@ export function AllDocumentsTab({ refreshKey = 0, onUpload }: Props) {
           <p className="text-sm">No documents found</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-medium text-slate-500">
+              <tr className="border-b text-left text-xs font-medium" style={{ borderColor: "var(--color-table-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Size</th>
@@ -192,25 +195,26 @@ export function AllDocumentsTab({ refreshKey = 0, onUpload }: Props) {
                 <th className="px-4 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[var(--color-table-border)]">
               {docs.map((doc) => (
                 <tr
                   key={doc.id}
-                  className="cursor-pointer transition-colors hover:bg-slate-50"
+                  className="cursor-pointer transition-colors hover:bg-[var(--color-surface-subtle)]"
                   onClick={() => setSelected(doc)}
                 >
                   <td className="max-w-xs px-4 py-3">
                     <div className="flex items-start gap-2">
                       <FileIcon mime={doc.mime_type} />
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-slate-900">{doc.name}</p>
-                        <p className="truncate text-xs text-slate-400">{doc.file_name}</p>
+                        <p className="truncate font-medium" style={{ color: "var(--color-text-primary)" }}>{doc.name}</p>
+                        <p className="truncate text-xs" style={{ color: "var(--color-text-muted)" }}>{doc.file_name}</p>
                         {doc.tags.length > 0 && (
                           <div className="mt-1 flex flex-wrap gap-1">
                             {doc.tags.slice(0, 3).map((t) => (
                               <span
                                 key={t}
-                                className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500"
+                                className="rounded px-1.5 py-0.5 text-[10px]"
+                                style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }}
                               >
                                 {t}
                               </span>
@@ -220,30 +224,31 @@ export function AllDocumentsTab({ refreshKey = 0, onUpload }: Props) {
                       </div>
                     </div>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                  <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>
                     {TYPE_LABELS[doc.type]}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-500">
+                  <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-muted)" }}>
                     {formatBytes(doc.file_size_bytes)}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                  <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>
                     {doc.uploaded_by}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-500">
+                  <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-muted)" }}>
                     {fmtDate(doc.uploaded_at)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
                     {doc.expires_at ? (
                       <span
                         className={
-                          isExpiringSoon(doc) ? "font-medium text-amber-700" : "text-slate-500"
+                          isExpiringSoon(doc) ? "font-medium text-amber-700" : undefined
                         }
+                        style={!isExpiringSoon(doc) ? { color: "var(--color-text-muted)" } : undefined}
                       >
                         {fmtDate(doc.expires_at)}
                         {isExpiringSoon(doc) && " ⚠"}
                       </span>
                     ) : (
-                      <span className="text-slate-300">—</span>
+                      <span style={{ color: "var(--color-text-muted)" }}>—</span>
                     )}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
@@ -257,7 +262,8 @@ export function AllDocumentsTab({ refreshKey = 0, onUpload }: Props) {
                       <button
                         onClick={() => archive(doc)}
                         disabled={archiving === doc.id}
-                        className="text-xs text-slate-400 hover:text-red-600 disabled:opacity-50"
+                        className="text-xs hover:text-red-600 disabled:opacity-50"
+                        style={{ color: "var(--color-text-muted)" }}
                         aria-label={`Archive ${doc.name}`}
                       >
                         Archive
@@ -278,14 +284,16 @@ export function AllDocumentsTab({ refreshKey = 0, onUpload }: Props) {
           onClick={() => setSelected(null)}
         >
           <div
-            className="w-full max-w-md overflow-y-auto rounded-t-2xl bg-white shadow-xl sm:rounded-none sm:rounded-l-2xl"
+            className="w-full max-w-md overflow-y-auto rounded-t-2xl shadow-xl sm:rounded-none sm:rounded-l-2xl"
+            style={{ backgroundColor: "var(--color-surface)" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-              <h2 className="text-base font-semibold text-slate-900">{selected.name}</h2>
+            <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--color-table-border)" }}>
+              <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>{selected.name}</h2>
               <button
                 onClick={() => setSelected(null)}
-                className="text-slate-400 hover:text-slate-600"
+                className="hover:opacity-70"
+                style={{ color: "var(--color-text-muted)" }}
                 aria-label="Close"
               >
                 ✕
@@ -294,31 +302,32 @@ export function AllDocumentsTab({ refreshKey = 0, onUpload }: Props) {
             <div className="space-y-4 px-5 py-5">
               <div className="flex items-center gap-2">
                 <Badge variant={STATUS_BADGE[selected.status]}>{selected.status}</Badge>
-                <span className="text-xs text-slate-400">v{selected.version}</span>
+                <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>v{selected.version}</span>
               </div>
               {selected.description && (
-                <p className="text-sm text-slate-600">{selected.description}</p>
+                <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{selected.description}</p>
               )}
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                <dt className="text-slate-500">Type</dt>
-                <dd className="text-slate-900">{TYPE_LABELS[selected.type]}</dd>
-                <dt className="text-slate-500">File</dt>
-                <dd className="truncate text-slate-900">{selected.file_name}</dd>
-                <dt className="text-slate-500">Size</dt>
-                <dd className="text-slate-900">{formatBytes(selected.file_size_bytes)}</dd>
-                <dt className="text-slate-500">Uploaded by</dt>
-                <dd className="text-slate-900">{selected.uploaded_by}</dd>
-                <dt className="text-slate-500">Uploaded</dt>
-                <dd className="text-slate-900">{fmtDateTime(selected.uploaded_at)}</dd>
+                <dt style={{ color: "var(--color-text-muted)" }}>Type</dt>
+                <dd style={{ color: "var(--color-text-primary)" }}>{TYPE_LABELS[selected.type]}</dd>
+                <dt style={{ color: "var(--color-text-muted)" }}>File</dt>
+                <dd className="truncate" style={{ color: "var(--color-text-primary)" }}>{selected.file_name}</dd>
+                <dt style={{ color: "var(--color-text-muted)" }}>Size</dt>
+                <dd style={{ color: "var(--color-text-primary)" }}>{formatBytes(selected.file_size_bytes)}</dd>
+                <dt style={{ color: "var(--color-text-muted)" }}>Uploaded by</dt>
+                <dd style={{ color: "var(--color-text-primary)" }}>{selected.uploaded_by}</dd>
+                <dt style={{ color: "var(--color-text-muted)" }}>Uploaded</dt>
+                <dd style={{ color: "var(--color-text-primary)" }}>{fmtDateTime(selected.uploaded_at)}</dd>
                 {selected.expires_at && (
                   <>
-                    <dt className="text-slate-500">Expires</dt>
+                    <dt style={{ color: "var(--color-text-muted)" }}>Expires</dt>
                     <dd
                       className={
                         isExpiringSoon(selected)
                           ? "font-medium text-amber-700"
-                          : "text-slate-900"
+                          : undefined
                       }
+                      style={!isExpiringSoon(selected) ? { color: "var(--color-text-primary)" } : undefined}
                     >
                       {fmtDate(selected.expires_at)}
                       {isExpiringSoon(selected) && " — expiring soon"}
@@ -327,8 +336,8 @@ export function AllDocumentsTab({ refreshKey = 0, onUpload }: Props) {
                 )}
                 {selected.linked_entity_name && (
                   <>
-                    <dt className="text-slate-500">Linked to</dt>
-                    <dd className="text-slate-900">
+                    <dt style={{ color: "var(--color-text-muted)" }}>Linked to</dt>
+                    <dd style={{ color: "var(--color-text-primary)" }}>
                       {selected.linked_entity_type}: {selected.linked_entity_name}
                     </dd>
                   </>
@@ -339,7 +348,8 @@ export function AllDocumentsTab({ refreshKey = 0, onUpload }: Props) {
                   {selected.tags.map((t) => (
                     <span
                       key={t}
-                      className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-600"
+                      className="rounded-full px-2.5 py-0.5 text-xs"
+                      style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}
                     >
                       {t}
                     </span>
@@ -362,7 +372,7 @@ function FileIcon({ mime }: { mime: string }) {
       ? "text-green-600"
       : mime.includes("word") || mime.includes("document")
       ? "text-blue-600"
-      : "text-slate-400";
+      : undefined;
 
   return (
     <svg
@@ -374,7 +384,8 @@ function FileIcon({ mime }: { mime: string }) {
       strokeWidth="1.5"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={`mt-0.5 shrink-0 ${color}`}
+      className={`mt-0.5 shrink-0 ${color ?? ""}`}
+      style={!color ? { color: "var(--color-text-muted)" } : undefined}
       aria-hidden="true"
     >
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />

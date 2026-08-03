@@ -32,7 +32,7 @@ export default function DocumentsPage() {
     >
       <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6">
         {/* Tab bar */}
-        <div className="flex gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 w-fit">
+        <div className="flex gap-1 rounded-xl border p-1 w-fit" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -41,9 +41,10 @@ export default function DocumentsPage() {
               className={[
                 "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
                 tab === t.key
-                  ? "bg-white text-brand-600 shadow-sm"
-                  : "text-slate-500 hover:text-slate-800",
+                  ? "bg-[var(--color-surface)] text-brand-600 shadow-sm"
+                  : "hover:text-[var(--color-text-primary)]",
               ].join(" ")}
+              style={tab !== t.key ? { color: "var(--color-text-muted)" } : undefined}
             >
               {t.label}
             </button>

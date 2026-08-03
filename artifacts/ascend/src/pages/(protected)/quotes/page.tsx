@@ -78,8 +78,9 @@ export default function QuotesPage() {
     <EnterpriseShell active="quotes" title="Quotes" subtitle="Create and manage sales quotations">
 
       {/* Page header */}
-      <div className="bg-white border-b border-[#E8E8E8] px-6 py-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-[#111]">Quotes</h1>
+      <div className="border-b px-6 py-4 flex items-center justify-between"
+        style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}>
+        <h1 className="text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>Quotes</h1>
         {canManage && (
           <button type="button" onClick={() => setShowModal(true)}
             className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-[#4849d0] transition-colors">
@@ -89,12 +90,14 @@ export default function QuotesPage() {
       </div>
 
       {/* Filter bar */}
-      <div className="bg-white border-b border-[#E8E8E8] px-6 py-3">
+      <div className="border-b px-6 py-3"
+        style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}>
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-[#555]">Status</label>
+            <label className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Status</label>
             <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
-              className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
+              className="h-8 rounded border px-2 text-sm focus:border-brand-600 focus:outline-none"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)", backgroundColor: "var(--color-surface)" }}>
               <option value="all">All statuses</option>
               <option value="draft">Draft</option>
               <option value="sent">Sent</option>
@@ -104,20 +107,23 @@ export default function QuotesPage() {
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-[#555]">Customer</label>
+            <label className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Customer</label>
             <input type="text" value={filterCustomer} onChange={(e) => setFilterCustomer(e.target.value)} placeholder="Customer…"
-              className="h-8 w-36 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none" />
+              className="h-8 w-36 rounded border px-2 text-sm focus:border-brand-600 focus:outline-none"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)", backgroundColor: "var(--color-surface)" }} />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-[#555]">Quote #</label>
+            <label className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Quote #</label>
             <input type="text" value={filterQuoteNo} onChange={(e) => setFilterQuoteNo(e.target.value)} placeholder="QT-00001"
-              className="h-8 w-28 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none" />
+              className="h-8 w-28 rounded border px-2 text-sm focus:border-brand-600 focus:outline-none"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)", backgroundColor: "var(--color-surface)" }} />
           </div>
           {moreFilters && (
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[#555]">Valid after</label>
+              <label className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Valid after</label>
               <input type="date"
-                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none" />
+                className="h-8 rounded border px-2 text-sm focus:border-brand-600 focus:outline-none"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)", backgroundColor: "var(--color-surface)" }} />
             </div>
           )}
           <div className="flex items-center gap-2 ml-auto">
@@ -132,7 +138,7 @@ export default function QuotesPage() {
           </div>
         </div>
         {!loading && (
-          <p className="mt-2 text-xs text-[#666]">
+          <p className="mt-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
             Showing <strong>{visible.length}</strong> quote{visible.length !== 1 ? "s" : ""}
           </p>
         )}
@@ -142,7 +148,8 @@ export default function QuotesPage() {
       <div className="flex-1 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-[#F0F0F0] bg-[#FAFAFA] text-left text-xs font-semibold text-[#888] uppercase tracking-wider">
+            <tr className="border-b text-left text-xs font-semibold uppercase tracking-wider"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-secondary)" }}>
               <th className="w-6 px-4 py-3" />
               <th className="px-4 py-3">Quote # / Date</th>
               <th className="px-4 py-3">Customer</th>
@@ -155,12 +162,12 @@ export default function QuotesPage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={8} className="px-4 py-12 text-center text-[#888]">
+              <tr><td colSpan={8} className="px-4 py-12 text-center" style={{ color: "var(--color-text-muted)" }}>
                 <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
               </td></tr>
             )}
             {!loading && visible.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-12 text-center text-[#888]">
+              <tr><td colSpan={8} className="px-4 py-12 text-center" style={{ color: "var(--color-text-muted)" }}>
                 No quotes found.
                 {(filterStatus !== "all" || filterCustomer || filterQuoteNo) && (
                   <button type="button" onClick={clearFilters} className="ml-2 text-brand-600 hover:underline">Clear filters</button>

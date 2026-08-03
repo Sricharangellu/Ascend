@@ -198,7 +198,7 @@ export default function ModulesMarketplacePage() {
         {/* Header row */}
         <div className="mb-5 flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <p className="text-xs text-[var(--color-text-secondary)]">
+            <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
               {enabledCount} module{enabledCount !== 1 ? "s" : ""} active
               {profile?.businessType && (
                 <span className="ml-2 capitalize">· Base plan: <strong>{profile.businessType}</strong></span>
@@ -211,9 +211,10 @@ export default function ModulesMarketplacePage() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search modules…"
-              className="w-56 rounded-lg border border-slate-200 py-2 pl-8 pr-3 text-sm outline-none focus:border-brand-600"
+              className="w-56 rounded-lg border py-2 pl-8 pr-3 text-sm outline-none focus:border-brand-600"
+              style={{ borderColor: "var(--color-border)" }}
             />
-            <span className="pointer-events-none absolute left-2.5 top-2.5 text-[var(--color-text-secondary)] text-sm">⌕</span>
+            <span className="pointer-events-none absolute left-2.5 top-2.5 text-sm" style={{ color: "var(--color-text-secondary)" }}>⌕</span>
           </div>
         </div>
 
@@ -221,15 +222,16 @@ export default function ModulesMarketplacePage() {
 
           {/* Left sidebar — group nav */}
           <div className="lg:col-span-1">
-            <div className="rounded-xl border border-[var(--color-table-border)] bg-white overflow-hidden sticky top-20">
-              <div className="p-3 border-b border-[var(--color-table-border)]">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Verticals</p>
+            <div className="rounded-xl border overflow-hidden sticky top-20" style={{ borderColor: "var(--color-table-border)", backgroundColor: "var(--color-surface)" }}>
+              <div className="p-3" style={{ borderBottom: "1px solid var(--color-table-border)" }}>
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-secondary)" }}>Verticals</p>
               </div>
               <nav className="divide-y divide-[var(--color-table-border)]">
                 <button type="button" onClick={() => setActiveGroup(null)}
-                  className={`w-full px-3 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 ${
-                    !activeGroup ? "bg-brand-50 text-brand-700 font-semibold" : "text-[var(--color-text-primary)]"
-                  }`}>
+                  className={`w-full px-3 py-2.5 text-left text-sm transition-colors hover:bg-[var(--color-surface-subtle)] ${
+                    !activeGroup ? "bg-brand-50 text-brand-700 font-semibold" : ""
+                  }`}
+                  style={!activeGroup ? undefined : { color: "var(--color-text-primary)" }}>
                   All verticals
                 </button>
                 {GROUP_ORDER.filter(g => g in grouped).map(g => {
@@ -238,12 +240,13 @@ export default function ModulesMarketplacePage() {
                   const total = (grouped[g] ?? []).length;
                   return (
                     <button key={g} type="button" onClick={() => setActiveGroup(activeGroup === g ? null : g)}
-                      className={`w-full px-3 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 ${
-                        activeGroup === g ? "bg-brand-50 text-brand-700 font-semibold" : "text-[var(--color-text-primary)]"
-                      }`}>
+                      className={`w-full px-3 py-2.5 text-left text-sm transition-colors hover:bg-[var(--color-surface-subtle)] ${
+                        activeGroup === g ? "bg-brand-50 text-brand-700 font-semibold" : ""
+                      }`}
+                      style={activeGroup === g ? undefined : { color: "var(--color-text-primary)" }}>
                       <span className="flex items-center justify-between">
                         <span>{meta?.icon} {meta?.label ?? g}</span>
-                        <span className="text-xs text-[var(--color-text-secondary)]">{count}/{total}</span>
+                        <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{count}/{total}</span>
                       </span>
                     </button>
                   );
@@ -257,7 +260,7 @@ export default function ModulesMarketplacePage() {
 
             {loading ? (
               <div className="space-y-4">
-                {[1,2,3].map(i => <div key={i} className="h-32 animate-pulse rounded-xl bg-gray-100" />)}
+                {[1,2,3].map(i => <div key={i} className="h-32 animate-skeleton rounded-xl" />)}
               </div>
             ) : (
 
@@ -266,16 +269,17 @@ export default function ModulesMarketplacePage() {
                 {!activeGroup && !search && (
                   <div>
                     <div className="mb-3 flex items-center gap-2">
-                      <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Core — always included</h2>
+                      <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Core — always included</h2>
                       <Badge variant="green" size="sm">Always on</Badge>
                     </div>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {coreModules.map(m => (
                         <div key={m.key}
-                          className="flex items-center justify-between rounded-xl border border-[var(--color-table-border)] bg-white px-4 py-3">
+                          className="flex items-center justify-between rounded-xl border px-4 py-3"
+                          style={{ borderColor: "var(--color-table-border)", backgroundColor: "var(--color-surface)" }}>
                           <div className="min-w-0 mr-3">
-                            <p className="text-sm font-semibold text-[var(--color-text-primary)]">{m.name}</p>
-                            <p className="text-xs text-[var(--color-text-secondary)] line-clamp-1">{m.description}</p>
+                            <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{m.name}</p>
+                            <p className="text-xs line-clamp-1" style={{ color: "var(--color-text-secondary)" }}>{m.description}</p>
                           </div>
                           <Toggle on disabled onChange={() => {}} />
                         </div>
@@ -287,7 +291,7 @@ export default function ModulesMarketplacePage() {
                 {/* Optional modules by group */}
                 {visibleGroups.length === 0 && search && (
                   <Card>
-                    <p className="py-8 text-center text-sm text-[var(--color-text-secondary)]">
+                    <p className="py-8 text-center text-sm" style={{ color: "var(--color-text-secondary)" }}>
                       No modules match "<strong>{search}</strong>"
                     </p>
                   </Card>
@@ -303,13 +307,13 @@ export default function ModulesMarketplacePage() {
                         <div className="flex items-center gap-2">
                           <span className="text-lg">{meta?.icon}</span>
                           <div>
-                            <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">{meta?.label ?? group}</h2>
+                            <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{meta?.label ?? group}</h2>
                             {meta?.description && (
-                              <p className="text-xs text-[var(--color-text-secondary)]">{meta.description}</p>
+                              <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{meta.description}</p>
                             )}
                           </div>
                         </div>
-                        <span className="text-xs text-[var(--color-text-secondary)]">
+                        <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
                           {onCount}/{mods.length} enabled
                         </span>
                       </div>
@@ -321,17 +325,18 @@ export default function ModulesMarketplacePage() {
                               className={`flex items-start justify-between rounded-xl border px-4 py-3 transition-colors ${
                                 on
                                   ? "border-brand-200 bg-brand-50"
-                                  : "border-[var(--color-table-border)] bg-white hover:border-gray-300"
-                              }`}>
+                                  : ""
+                              }`}
+                              style={on ? undefined : { borderColor: "var(--color-table-border)", backgroundColor: "var(--color-surface)" }}>
                               <div className="min-w-0 mr-3">
                                 <div className="flex items-center gap-1.5">
-                                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">{m.name}</p>
+                                  <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{m.name}</p>
                                   {m.route && on && (
                                     <a href={m.route}
                                       className="text-[10px] text-brand-600 hover:underline">↗</a>
                                   )}
                                 </div>
-                                <p className="mt-0.5 text-xs text-[var(--color-text-secondary)] line-clamp-2">{m.description}</p>
+                                <p className="mt-0.5 text-xs line-clamp-2" style={{ color: "var(--color-text-secondary)" }}>{m.description}</p>
                               </div>
                               <div className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
                                 <Toggle on={on} onChange={v => toggleModule(m.key, v)} />

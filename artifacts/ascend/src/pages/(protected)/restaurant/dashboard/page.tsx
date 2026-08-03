@@ -77,8 +77,9 @@ function RangeButton({ label, active, onClick }: { label: string; active: boolea
       className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
         active
           ? "bg-brand-600 text-white"
-          : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+          : "border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)]"
       }`}
+      style={active ? undefined : { backgroundColor: "var(--color-surface)" }}
     >
       {label}
     </button>
@@ -89,13 +90,14 @@ function QuickLink({ href, label, sub }: { href: string; label: string; sub: str
   return (
     <Link
       href={href}
-      className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm transition-colors hover:border-brand-600/40 hover:bg-brand-600/5"
+      className="flex items-center justify-between rounded-lg border px-4 py-3 shadow-sm transition-colors hover:border-brand-600/40 hover:bg-brand-600/5"
+      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
     >
       <div>
-        <p className="text-sm font-semibold text-[#111]">{label}</p>
-        <p className="text-xs text-slate-500">{sub}</p>
+        <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{label}</p>
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{sub}</p>
       </div>
-      <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <svg className="h-4 w-4" style={{ color: "var(--color-text-muted)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
       </svg>
     </Link>
@@ -139,8 +141,8 @@ export default function RestaurantDashboardPage() {
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-lg font-semibold text-[#111]">Restaurant Dashboard</h1>
-            <p className="text-sm text-slate-500">
+            <h1 className="text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>Restaurant Dashboard</h1>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
               {new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date())}
             </p>
           </div>
@@ -190,14 +192,14 @@ export default function RestaurantDashboardPage() {
 
         {/* ── Table occupancy bar ──────────────────────────────────────────── */}
         {!loading && kpis && (
-          <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <div className="rounded-lg border px-4 py-3 shadow-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-medium text-[#111]">Table Occupancy</span>
-              <span className="text-xs text-slate-500">
+              <span className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>Table Occupancy</span>
+              <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                 {kpis.open_tables} of {kpis.total_tables} tables occupied
               </span>
             </div>
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--color-surface-subtle)]">
               <div
                 className="h-full rounded-full bg-brand-600 transition-all duration-500"
                 style={{
@@ -205,7 +207,7 @@ export default function RestaurantDashboardPage() {
                 }}
               />
             </div>
-            <div className="mt-1.5 flex justify-between text-[11px] text-slate-400">
+            <div className="mt-1.5 flex justify-between text-[11px]" style={{ color: "var(--color-text-muted)" }}>
               <span>0%</span>
               <span>50%</span>
               <span>100%</span>
@@ -217,11 +219,11 @@ export default function RestaurantDashboardPage() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
 
           {/* Hourly revenue chart — 3 cols */}
-          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm lg:col-span-3">
-            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-              <h2 className="text-sm font-semibold text-[#111]">Hourly Revenue</h2>
+          <div className="overflow-hidden rounded-lg border shadow-sm lg:col-span-3" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+            <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid var(--color-table-border)" }}>
+              <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Hourly Revenue</h2>
               {!loading && peakBucket && (
-                <span className="text-xs text-slate-400">
+                <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                   Peak: {peakBucket.label} · {formatMoney(peakBucket.revenue_cents)}
                 </span>
               )}
@@ -239,30 +241,30 @@ export default function RestaurantDashboardPage() {
           </div>
 
           {/* Top menu items — 2 cols */}
-          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm lg:col-span-2">
-            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-              <h2 className="text-sm font-semibold text-[#111]">Top Menu Items</h2>
-              <span className="text-xs text-slate-400">by qty sold</span>
+          <div className="overflow-hidden rounded-lg border shadow-sm lg:col-span-2" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+            <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid var(--color-table-border)" }}>
+              <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Top Menu Items</h2>
+              <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>by qty sold</span>
             </div>
             <div>
               {loading ? (
                 <div className="space-y-3 px-4 py-4">
                   {[1, 2, 3, 4, 5].map((i) => (
-                    <div key={i} className="h-5 animate-pulse rounded bg-slate-100" />
+                    <div key={i} className="h-5 animate-skeleton rounded" />
                   ))}
                 </div>
               ) : topItems.length === 0 ? (
-                <p className="py-8 text-center text-sm text-slate-500">No sales data yet.</p>
+                <p className="py-8 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No sales data yet.</p>
               ) : (
-                <div className="divide-y divide-slate-50">
+                <div className="divide-y divide-[var(--color-table-border)]">
                   {topItems.map((item, i) => (
-                    <div key={item.name} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50">
-                      <span className="w-5 shrink-0 text-right text-[11px] font-semibold text-slate-400">
+                    <div key={item.name} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--color-surface-subtle)]">
+                      <span className="w-5 shrink-0 text-right text-[11px] font-semibold" style={{ color: "var(--color-text-muted)" }}>
                         {i + 1}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm text-[#111]">{item.name}</p>
-                        <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-slate-100">
+                        <p className="truncate text-sm" style={{ color: "var(--color-text-primary)" }}>{item.name}</p>
+                        <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-[var(--color-surface-subtle)]">
                           <div
                             className="h-full rounded-full bg-brand-600/70"
                             style={{ width: `${(item.qty_sold / maxQty) * 100}%` }}
@@ -270,8 +272,8 @@ export default function RestaurantDashboardPage() {
                         </div>
                       </div>
                       <div className="shrink-0 text-right">
-                        <p className="text-sm font-semibold text-[#111]">{item.qty_sold}</p>
-                        <p className="text-[11px] text-slate-400">{formatMoney(item.revenue_cents)}</p>
+                        <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{item.qty_sold}</p>
+                        <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{formatMoney(item.revenue_cents)}</p>
                       </div>
                     </div>
                   ))}
@@ -282,9 +284,9 @@ export default function RestaurantDashboardPage() {
         </div>
 
         {/* ── Active table sessions ────────────────────────────────────────── */}
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-            <h2 className="text-sm font-semibold text-[#111]">
+        <div className="overflow-hidden rounded-lg border shadow-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid var(--color-table-border)" }}>
+            <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
               Active Sessions
               {!loading && sessions.length > 0 && (
                 <span className="ml-2 inline-flex items-center rounded-full bg-brand-600/10 px-1.5 py-0.5 text-[11px] font-semibold text-brand-600">
@@ -300,14 +302,14 @@ export default function RestaurantDashboardPage() {
           {loading ? (
             <div className="space-y-3 px-4 py-4">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-8 animate-pulse rounded bg-slate-100" />
+                <div key={i} className="h-8 animate-skeleton rounded" />
               ))}
             </div>
           ) : sessions.length === 0 ? (
-            <p className="py-10 text-center text-sm text-slate-500">No active table sessions right now.</p>
+            <p className="py-10 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No active table sessions right now.</p>
           ) : (
             <table className="w-full text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <thead className="text-xs font-semibold uppercase tracking-wide" style={{ borderBottom: "1px solid var(--color-table-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
                 <tr>
                   <th className="px-4 py-2.5 text-left">Table</th>
                   <th className="px-4 py-2.5 text-left">Section</th>
@@ -315,12 +317,12 @@ export default function RestaurantDashboardPage() {
                   <th className="px-4 py-2.5 text-right">Elapsed</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[var(--color-table-border)]">
                 {sessions.map((s, i) => (
-                  <tr key={i} className="hover:bg-[#FAFAFA]">
-                    <td className="px-4 py-2.5 font-semibold text-[#111]">{s.table_number}</td>
-                    <td className="px-4 py-2.5 text-slate-500">{s.floor_section ?? "—"}</td>
-                    <td className="px-4 py-2.5 text-right text-[#111]">{s.party_size}</td>
+                  <tr key={i} className="hover:bg-[var(--color-surface-subtle)]">
+                    <td className="px-4 py-2.5 font-semibold" style={{ color: "var(--color-text-primary)" }}>{s.table_number}</td>
+                    <td className="px-4 py-2.5" style={{ color: "var(--color-text-muted)" }}>{s.floor_section ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-right" style={{ color: "var(--color-text-primary)" }}>{s.party_size}</td>
                     <td className={`px-4 py-2.5 text-right font-semibold ${sessionTone(s.elapsed_mins)}`}>
                       {elapsed(s.elapsed_mins)}
                     </td>

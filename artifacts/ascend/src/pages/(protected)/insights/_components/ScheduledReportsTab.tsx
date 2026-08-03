@@ -80,10 +80,10 @@ export function ScheduledReportsTab({ isOwner }: { isOwner: boolean }) {
   return (
     <div className="space-y-5">
       <Card className="overflow-hidden p-0">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
           <div>
-            <h2 className="text-base font-semibold text-slate-950">Scheduled reports</h2>
-            <p className="text-sm text-slate-500">Automated report emails sent on a recurring schedule.</p>
+            <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Scheduled reports</h2>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Automated report emails sent on a recurring schedule.</p>
           </div>
           {isOwner && !showAdd && (
             <Button variant="primary" size="sm" onClick={() => setShowAdd(true)}>+ New report</Button>
@@ -91,33 +91,37 @@ export function ScheduledReportsTab({ isOwner }: { isOwner: boolean }) {
         </div>
 
         {showAdd && isOwner && (
-          <div className="border-b border-slate-200 bg-slate-50 px-4 py-4 space-y-3">
+          <div className="px-4 py-4 space-y-3" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Report name</label>
+                <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Report name</label>
                 <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   placeholder="e.g. Weekly Sales Digest"
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+                  className="w-full rounded-md px-3 py-2 text-sm outline-none"
+                  style={{ border: "1px solid var(--color-border)" }} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Recipients (comma-separated emails)</label>
+                <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Recipients (comma-separated emails)</label>
                 <input value={form.recipientEmails} onChange={(e) => setForm((f) => ({ ...f, recipientEmails: e.target.value }))}
                   placeholder="owner@example.com, cfo@example.com"
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+                  className="w-full rounded-md px-3 py-2 text-sm outline-none"
+                  style={{ border: "1px solid var(--color-border)" }} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Report type</label>
+                <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Report type</label>
                 <select value={form.reportType} onChange={(e) => setForm((f) => ({ ...f, reportType: e.target.value as ReportType }))}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950 bg-white">
+                  className="w-full rounded-md px-3 py-2 text-sm outline-none"
+                  style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
                   {(Object.entries(REPORT_TYPE_LABELS) as [ReportType, string][]).map(([v, l]) => (
                     <option key={v} value={v}>{l}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Frequency</label>
+                <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Frequency</label>
                 <select value={form.frequency} onChange={(e) => setForm((f) => ({ ...f, frequency: e.target.value as Frequency }))}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950 bg-white">
+                  className="w-full rounded-md px-3 py-2 text-sm outline-none"
+                  style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
                   {(Object.entries(FREQ_LABELS) as [Frequency, string][]).map(([v, l]) => (
                     <option key={v} value={v}>{l}</option>
                   ))}
@@ -139,13 +143,16 @@ export function ScheduledReportsTab({ isOwner }: { isOwner: boolean }) {
           <TableSkeleton headers={["Name", "Type", "Frequency", "Last sent", "Next send", "Status"]} rows={4} />
         ) : reports.length === 0 ? (
           <div className="px-4 py-10 text-center">
-            <p className="text-sm text-slate-500">No scheduled reports yet.</p>
-            {isOwner && <p className="mt-1 text-sm text-slate-400">Create one above to start sending automated reports.</p>}
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No scheduled reports yet.</p>
+            {isOwner && <p className="mt-1 text-sm" style={{ color: "var(--color-text-muted)" }}>Create one above to start sending automated reports.</p>}
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <tr
+                className="text-left text-xs font-semibold uppercase tracking-[0.08em]"
+                style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}
+              >
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Frequency</th>
@@ -155,17 +162,17 @@ export function ScheduledReportsTab({ isOwner }: { isOwner: boolean }) {
                 {isOwner && <th className="px-4 py-3" />}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[var(--color-table-border)]">
               {reports.map((r) => (
-                <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                <tr key={r.id} className="hover:bg-[var(--color-surface-subtle)] transition-colors">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-slate-950">{r.name}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{r.recipientEmails.join(", ")}</p>
+                    <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{r.name}</p>
+                    <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>{r.recipientEmails.join(", ")}</p>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{REPORT_TYPE_LABELS[r.reportType] ?? r.reportType}</td>
+                  <td className="px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{REPORT_TYPE_LABELS[r.reportType] ?? r.reportType}</td>
                   <td className="px-4 py-3"><Badge variant="blue">{FREQ_LABELS[r.frequency] ?? r.frequency}</Badge></td>
-                  <td className="px-4 py-3 text-slate-500 hidden md:table-cell">{fmtDate(r.lastSentAt)}</td>
-                  <td className="px-4 py-3 text-slate-500 hidden md:table-cell">{fmtDate(r.nextSendAt)}</td>
+                  <td className="px-4 py-3 hidden md:table-cell" style={{ color: "var(--color-text-muted)" }}>{fmtDate(r.lastSentAt)}</td>
+                  <td className="px-4 py-3 hidden md:table-cell" style={{ color: "var(--color-text-muted)" }}>{fmtDate(r.nextSendAt)}</td>
                   <td className="px-4 py-3">
                     <Badge variant={r.enabled ? "green" : "gray"}>{r.enabled ? "Active" : "Paused"}</Badge>
                   </td>

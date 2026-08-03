@@ -79,20 +79,22 @@ function BookingModal({ initialSlotId, members, onClose, onSaved }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-xl bg-white shadow-xl flex flex-col max-h-[90vh]"
+      <div className="w-full max-w-md rounded-xl shadow-xl flex flex-col max-h-[90vh]"
+           style={{ backgroundColor: "var(--color-surface)" }}
            onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-950">New Booking</h2>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>New Booking</h2>
           <button type="button" onClick={onClose} aria-label="Close"
-                  className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+                  className="text-xl leading-none" style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
         <form id="booking-form" onSubmit={submit} className="flex-1 overflow-y-auto flex flex-col gap-3 px-5 py-4">
           {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="bf-member">Member (optional)</label>
+            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }} htmlFor="bf-member">Member (optional)</label>
             <select id="bf-member" value={form.member_id} onChange={field("member_id")}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600">
+                    className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                    style={{ border: "1px solid var(--color-border)" }}>
               <option value="">— Walk-in / Guest —</option>
               {members.map(m => (
                 <option key={m.id} value={m.id}>{m.name} ({m.membership_number})</option>
@@ -103,26 +105,29 @@ function BookingModal({ initialSlotId, members, onClose, onSaved }: {
           {!form.member_id && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="bf-guest">Guest Name</label>
+                <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }} htmlFor="bf-guest">Guest Name</label>
                 <input id="bf-guest" type="text" value={form.guest_name} onChange={field("guest_name")} placeholder="Full name"
-                       className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                       className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                       style={{ border: "1px solid var(--color-border)" }} />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="bf-phone">Phone</label>
+                <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }} htmlFor="bf-phone">Phone</label>
                 <input id="bf-phone" type="tel" value={form.guest_phone} onChange={field("guest_phone")} placeholder="+1 555…"
-                       className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                       className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                       style={{ border: "1px solid var(--color-border)" }} />
               </div>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="bf-players">Players</label>
+              <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }} htmlFor="bf-players">Players</label>
               <input id="bf-players" type="number" min="1" max="8" value={form.players} onChange={field("players")} required
-                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                     className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                     style={{ border: "1px solid var(--color-border)" }} />
             </div>
             <div className="flex flex-col justify-end pb-1">
-              <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: "var(--color-text-secondary)" }}>
                 <input type="checkbox" checked={form.cart_included}
                        onChange={e => setForm(f => ({ ...f, cart_included: e.target.checked }))}
                        className="rounded accent-brand-600" />
@@ -132,12 +137,13 @@ function BookingModal({ initialSlotId, members, onClose, onSaved }: {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="bf-notes">Notes</label>
+            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }} htmlFor="bf-notes">Notes</label>
             <textarea id="bf-notes" rows={2} value={form.notes} onChange={field("notes")} placeholder="Optional…"
-                      className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                      className="w-full resize-none rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                      style={{ border: "1px solid var(--color-border)" }} />
           </div>
         </form>
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+        <div className="flex justify-end gap-2 px-5 py-3" style={{ borderTop: "1px solid var(--color-border)" }}>
           <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
           <Button variant="primary" size="sm" type="submit" form="booking-form" disabled={saving}>
             {saving ? "Saving…" : "Create Booking"}
@@ -208,10 +214,13 @@ export default function GolfBookingsPage() {
 
         {/* Sub-nav */}
         <div className="flex items-center gap-2 flex-wrap">
-          <a href="/golf" className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">Tee Sheet</a>
+          <a href="/golf" className="rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-[var(--color-surface-subtle)]"
+             style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>Tee Sheet</a>
           <a href="/golf/bookings" className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white">Bookings</a>
-          <a href="/golf/members" className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">Members</a>
-          <a href="/golf/pro-shop" className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">Pro Shop</a>
+          <a href="/golf/members" className="rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-[var(--color-surface-subtle)]"
+             style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>Members</a>
+          <a href="/golf/pro-shop" className="rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-[var(--color-surface-subtle)]"
+             style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>Pro Shop</a>
         </div>
 
         {/* Summary cards */}
@@ -222,8 +231,8 @@ export default function GolfBookingsPage() {
             { label: "Outstanding", value: formatMoney(outstanding), color: outstanding > 0 ? "text-amber-700" : "text-slate-400" },
             { label: "Confirmed", value: String(visible.filter(b => b.status === "confirmed").length), color: "text-blue-700" },
           ].map(c => (
-            <div key={c.label} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-              <p className="text-xs text-slate-500">{c.label}</p>
+            <div key={c.label} className="rounded-xl px-4 py-3" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{c.label}</p>
               <p className={`text-xl font-bold ${c.color}`}>{c.value}</p>
             </div>
           ))}
@@ -232,9 +241,11 @@ export default function GolfBookingsPage() {
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-2">
           <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)}
-                 className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                 className="rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                 style={{ border: "1px solid var(--color-border)" }} />
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600">
+                  className="rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                  style={{ border: "1px solid var(--color-border)" }}>
             <option value="all">All statuses</option>
             <option value="confirmed">Confirmed</option>
             <option value="pending">Pending</option>
@@ -243,7 +254,8 @@ export default function GolfBookingsPage() {
             <option value="completed">Completed</option>
           </select>
           <input type="search" placeholder="Search name…" value={q} onChange={e => setQ(e.target.value)}
-                 className="w-44 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                 className="w-44 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                 style={{ border: "1px solid var(--color-border)" }} />
           <div className="ml-auto">
             <Button variant="primary" size="sm" onClick={() => setShowModal(true)}>+ New Booking</Button>
           </div>
@@ -253,20 +265,23 @@ export default function GolfBookingsPage() {
 
         {loading ? (
           <div className="space-y-2">
-            {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-16 animate-pulse rounded-xl bg-slate-100" />)}
+            {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-16 animate-skeleton rounded-xl" />)}
           </div>
         ) : visible.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-200 py-14 text-center">
-            <p className="text-sm font-medium text-slate-600">No bookings match your filters</p>
+          <div className="rounded-xl border border-dashed py-14 text-center" style={{ borderColor: "var(--color-border)" }}>
+            <p className="text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>No bookings match your filters</p>
             <button onClick={() => setShowModal(true)}
                     className="mt-3 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
               Create First Booking
             </button>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <div className="overflow-hidden rounded-xl" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
             <table className="w-full text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-medium text-slate-500 uppercase tracking-wide">
+              <thead
+                className="text-xs font-medium uppercase tracking-wide"
+                style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}
+              >
                 <tr>
                   <th className="px-4 py-3 text-left">Time</th>
                   <th className="px-4 py-3 text-left">Guest / Member</th>
@@ -276,24 +291,24 @@ export default function GolfBookingsPage() {
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[var(--color-table-border)]">
                 {visible.map(b => (
                   <tr key={b.id} className={`transition-opacity ${updatingId === b.id ? "opacity-40" : ""}`}>
-                    <td className="px-4 py-3 font-medium text-slate-900">
+                    <td className="px-4 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>
                       {b.tee_time}
-                      <span className="ml-1 text-xs text-slate-400">{b.holes}H</span>
+                      <span className="ml-1 text-xs" style={{ color: "var(--color-text-muted)" }}>{b.holes}H</span>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="font-medium text-slate-900">{b.member_name ?? b.guest_name ?? "—"}</p>
-                      {b.guest_phone && <p className="text-xs text-slate-400">{b.guest_phone}</p>}
-                      {b.member_id && <p className="text-xs text-slate-400">Member</p>}
+                      <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{b.member_name ?? b.guest_name ?? "—"}</p>
+                      {b.guest_phone && <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{b.guest_phone}</p>}
+                      {b.member_id && <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Member</p>}
                     </td>
-                    <td className="px-4 py-3 text-slate-500">
+                    <td className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>
                       {b.players} player{b.players !== 1 ? "s" : ""}
                       {b.cart_included && " · Cart"}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <p className="font-medium text-slate-900">{formatMoney(b.total_cents)}</p>
+                      <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{formatMoney(b.total_cents)}</p>
                       {b.paid_cents < b.total_cents && (
                         <p className="text-xs text-amber-600">Due: {formatMoney(b.total_cents - b.paid_cents)}</p>
                       )}
@@ -306,11 +321,13 @@ export default function GolfBookingsPage() {
                         {b.status === "confirmed" && (
                           <>
                             <button onClick={() => updateStatus(b.id, "completed")}
-                                    className="rounded border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50">
+                                    className="rounded px-2 py-1 text-xs hover:bg-[var(--color-surface-subtle)]"
+                                    style={{ border: "1px solid var(--color-border)" }}>
                               Complete
                             </button>
                             <button onClick={() => updateStatus(b.id, "no_show")}
-                                    className="rounded border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50">
+                                    className="rounded px-2 py-1 text-xs hover:bg-[var(--color-surface-subtle)]"
+                                    style={{ border: "1px solid var(--color-border)" }}>
                               No Show
                             </button>
                             <button onClick={() => updateStatus(b.id, "cancelled")}

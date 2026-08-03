@@ -93,37 +93,42 @@ function MemberModal({ member, onClose, onSaved }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-xl bg-white shadow-xl flex flex-col max-h-[90vh]"
+      <div className="w-full max-w-md rounded-xl shadow-xl flex flex-col max-h-[90vh]"
+           style={{ backgroundColor: "var(--color-surface)" }}
            onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-950">{isEdit ? "Edit Member" : "Add Member"}</h2>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>{isEdit ? "Edit Member" : "Add Member"}</h2>
           <button type="button" onClick={onClose} aria-label="Close"
-                  className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+                  className="text-xl leading-none" style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
         <form id="member-form" onSubmit={submit} className="flex-1 overflow-y-auto flex flex-col gap-3 px-5 py-4">
           {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="mf-name">Full Name *</label>
+            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }} htmlFor="mf-name">Full Name *</label>
             <input id="mf-name" type="text" value={form.name} onChange={field("name")} required
-                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                   className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                   style={{ border: "1px solid var(--color-border)" }} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="mf-email">Email *</label>
+              <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }} htmlFor="mf-email">Email *</label>
               <input id="mf-email" type="email" value={form.email} onChange={field("email")} required
-                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                     className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                     style={{ border: "1px solid var(--color-border)" }} />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="mf-phone">Phone</label>
+              <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }} htmlFor="mf-phone">Phone</label>
               <input id="mf-phone" type="tel" value={form.phone} onChange={field("phone")}
-                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                     className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                     style={{ border: "1px solid var(--color-border)" }} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="mf-tier">Tier</label>
+              <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }} htmlFor="mf-tier">Tier</label>
               <select id="mf-tier" value={form.tier} onChange={field("tier")}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600">
+                      className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                      style={{ border: "1px solid var(--color-border)" }}>
                 <option value="standard">Standard</option>
                 <option value="premium">Premium</option>
                 <option value="vip">VIP</option>
@@ -131,24 +136,27 @@ function MemberModal({ member, onClose, onSaved }: {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="mf-hcp">Handicap</label>
+              <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }} htmlFor="mf-hcp">Handicap</label>
               <input id="mf-hcp" type="number" step="0.1" min="0" max="54" value={form.handicap} onChange={field("handicap")}
                      placeholder="Optional"
-                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                     className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                     style={{ border: "1px solid var(--color-border)" }} />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="mf-exp">Membership Expires</label>
+            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }} htmlFor="mf-exp">Membership Expires</label>
             <input id="mf-exp" type="date" value={form.expires_at} onChange={field("expires_at")}
-                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                   className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                   style={{ border: "1px solid var(--color-border)" }} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="mf-notes">Notes</label>
+            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }} htmlFor="mf-notes">Notes</label>
             <textarea id="mf-notes" rows={2} value={form.notes} onChange={field("notes")}
-                      className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                      className="w-full resize-none rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                      style={{ border: "1px solid var(--color-border)" }} />
           </div>
         </form>
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+        <div className="flex justify-end gap-2 px-5 py-3" style={{ borderTop: "1px solid var(--color-border)" }}>
           <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
           <Button variant="primary" size="sm" type="submit" form="member-form" disabled={saving}>
             {saving ? "Saving…" : isEdit ? "Save Changes" : "Add Member"}
@@ -203,10 +211,13 @@ export default function GolfMembersPage() {
 
         {/* Sub-nav */}
         <div className="flex items-center gap-2 flex-wrap">
-          <a href="/golf" className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">Tee Sheet</a>
-          <a href="/golf/bookings" className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">Bookings</a>
+          <a href="/golf" className="rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-[var(--color-surface-subtle)]"
+             style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>Tee Sheet</a>
+          <a href="/golf/bookings" className="rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-[var(--color-surface-subtle)]"
+             style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>Bookings</a>
           <a href="/golf/members" className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white">Members</a>
-          <a href="/golf/pro-shop" className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">Pro Shop</a>
+          <a href="/golf/pro-shop" className="rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-[var(--color-surface-subtle)]"
+             style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>Pro Shop</a>
         </div>
 
         {/* Alerts */}
@@ -233,8 +244,9 @@ export default function GolfMembersPage() {
               <button key={t}
                       onClick={() => setFilterTier(t)}
                       className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                        filterTier === t ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                      }`}>
+                        filterTier === t ? "bg-brand-600 text-white" : "hover:bg-[var(--color-surface-subtle)]"
+                      }`}
+                      style={filterTier === t ? {} : { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
                 {t === "all" ? "All" : t.charAt(0).toUpperCase() + t.slice(1)} ({count})
               </button>
             );
@@ -244,7 +256,8 @@ export default function GolfMembersPage() {
         {/* Toolbar */}
         <div className="flex items-center gap-2">
           <input type="search" placeholder="Search name, email, number…" value={q} onChange={e => setQ(e.target.value)}
-                 className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                 className="flex-1 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand-600"
+                 style={{ border: "1px solid var(--color-border)" }} />
           <Button variant="primary" size="sm" onClick={() => setModal("new")}>+ Add Member</Button>
         </div>
 
@@ -252,20 +265,23 @@ export default function GolfMembersPage() {
 
         {loading ? (
           <div className="space-y-2">
-            {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100" />)}
+            {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-20 animate-skeleton rounded-xl" />)}
           </div>
         ) : visible.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-200 py-14 text-center">
-            <p className="text-sm font-medium text-slate-600">No members found</p>
+          <div className="rounded-xl border border-dashed py-14 text-center" style={{ borderColor: "var(--color-border)" }}>
+            <p className="text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>No members found</p>
             <button onClick={() => setModal("new")}
                     className="mt-3 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
               Add First Member
             </button>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <div className="overflow-hidden rounded-xl" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
             <table className="w-full text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-medium text-slate-500 uppercase tracking-wide">
+              <thead
+                className="text-xs font-medium uppercase tracking-wide"
+                style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}
+              >
                 <tr>
                   <th className="px-4 py-3 text-left">Member</th>
                   <th className="px-4 py-3 text-left">Tier</th>
@@ -276,38 +292,38 @@ export default function GolfMembersPage() {
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[var(--color-table-border)]">
                 {visible.map(m => {
                   const expired = membershipExpired(m);
                   const expiringSoon = membershipExpiringSoon(m);
                   return (
-                    <tr key={m.id} className="hover:bg-slate-50">
+                    <tr key={m.id} className="hover:bg-[var(--color-surface-subtle)]">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">
                             {memberInitials(m.name)}
                           </div>
                           <div>
-                            <p className="font-medium text-slate-900">{m.name}</p>
-                            <p className="text-xs text-slate-400">{m.membership_number} · {m.email}</p>
+                            <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{m.name}</p>
+                            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{m.membership_number} · {m.email}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant={TIER_BADGE[m.tier]}>{m.tier.charAt(0).toUpperCase() + m.tier.slice(1)}</Badge>
                       </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {m.handicap != null ? m.handicap : <span className="text-slate-300">—</span>}
+                      <td className="px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>
+                        {m.handicap != null ? m.handicap : <span style={{ color: "var(--color-text-muted)" }}>—</span>}
                       </td>
-                      <td className="px-4 py-3 text-slate-600">{m.rounds_played}</td>
+                      <td className="px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{m.rounds_played}</td>
                       <td className="px-4 py-3 text-right">
                         {m.outstanding_cents > 0
                           ? <span className="font-medium text-amber-700">{formatMoney(m.outstanding_cents)}</span>
-                          : <span className="text-slate-300">—</span>}
+                          : <span style={{ color: "var(--color-text-muted)" }}>—</span>}
                       </td>
                       <td className="px-4 py-3">
                         {m.expires_at == null ? (
-                          <span className="text-slate-400 text-xs">No expiry</span>
+                          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>No expiry</span>
                         ) : expired ? (
                           <span className="text-xs font-medium text-red-600">Expired</span>
                         ) : expiringSoon ? (
@@ -315,12 +331,13 @@ export default function GolfMembersPage() {
                             {fmtDate(m.expires_at)}
                           </span>
                         ) : (
-                          <span className="text-xs text-slate-500">{fmtDate(m.expires_at)}</span>
+                          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDate(m.expires_at)}</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
                         <button onClick={() => setModal(m)}
-                                className="rounded border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50">
+                                className="rounded px-2 py-1 text-xs hover:bg-[var(--color-surface-subtle)]"
+                                style={{ border: "1px solid var(--color-border)" }}>
                           Edit
                         </button>
                       </td>

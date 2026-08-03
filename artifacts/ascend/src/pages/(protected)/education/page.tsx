@@ -199,7 +199,7 @@ export default function EducationPage() {
                 className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                   filter === value
                     ? "bg-brand-600 text-white"
-                    : "bg-gray-100 text-[var(--color-text-secondary)] hover:bg-gray-200"
+                    : "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]"
                 }`}
               >
                 {value === "all" ? `All (${students.length})` : `${value} (${students.filter((student) => student.status === value).length})`}
@@ -217,7 +217,7 @@ export default function EducationPage() {
             {loading ? (
               <div className="space-y-2">
                 {[1, 2, 3, 4].map((index) => (
-                  <div key={index} className="h-20 animate-pulse rounded-xl bg-gray-100" />
+                  <div key={index} className="h-20 animate-skeleton rounded-xl" />
                 ))}
               </div>
             ) : visibleStudents.length === 0 ? (
@@ -232,7 +232,7 @@ export default function EducationPage() {
                     type="button"
                     onClick={() => openStudent(student)}
                     className={`w-full rounded-xl border px-4 py-3 text-left transition-all hover:shadow-sm ${
-                      selected?.id === student.id ? "border-brand-500 bg-brand-50" : "border-[var(--color-table-border)] bg-white"
+                      selected?.id === student.id ? "border-brand-500 bg-brand-50" : "border-[var(--color-table-border)] bg-[var(--color-surface)]"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -294,15 +294,15 @@ export default function EducationPage() {
                     </div>
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      <div className="rounded-lg bg-gray-50 px-3 py-2">
+                      <div className="rounded-lg px-3 py-2" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
                         <p className="text-[11px] uppercase tracking-wide text-[var(--color-text-secondary)]">Balance</p>
                         <p className="text-sm font-semibold text-[var(--color-text-primary)]">{formatMoney(selected.outstanding ?? 0)}</p>
                       </div>
-                      <div className="rounded-lg bg-gray-50 px-3 py-2">
+                      <div className="rounded-lg px-3 py-2" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
                         <p className="text-[11px] uppercase tracking-wide text-[var(--color-text-secondary)]">Open fees</p>
                         <p className="text-sm font-semibold text-[var(--color-text-primary)]">{dueFees.length}</p>
                       </div>
-                      <div className="rounded-lg bg-gray-50 px-3 py-2">
+                      <div className="rounded-lg px-3 py-2" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
                         <p className="text-[11px] uppercase tracking-wide text-[var(--color-text-secondary)]">Notes</p>
                         <p className="line-clamp-2 text-sm font-medium text-[var(--color-text-primary)]">{selected.notes ?? "No notes"}</p>
                       </div>
@@ -324,7 +324,7 @@ export default function EducationPage() {
                       <p className="py-8 text-center text-sm text-[var(--color-text-secondary)]">No fee records yet.</p>
                     ) : (
                       selected.fees!.map((fee) => (
-                        <div key={fee.id} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-table-border)] bg-white px-3 py-2">
+                        <div key={fee.id} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-table-border)] bg-[var(--color-surface)] px-3 py-2">
                           <div className="min-w-0">
                             <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">{fee.description}</p>
                             <p className="text-xs text-[var(--color-text-secondary)]">
@@ -368,7 +368,8 @@ export default function EducationPage() {
                 placeholder={placeholder}
                 value={studentForm[key as keyof typeof studentForm]}
                 onChange={(event) => setStudentForm((form) => ({ ...form, [key]: event.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
+                className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-brand-600"
+                style={{ borderColor: "var(--color-border)" }}
               />
             </div>
           ))}
@@ -378,7 +379,8 @@ export default function EducationPage() {
               rows={3}
               value={studentForm.notes}
               onChange={(event) => setStudentForm((form) => ({ ...form, notes: event.target.value }))}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
+              className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-brand-600"
+              style={{ borderColor: "var(--color-border)" }}
               placeholder="Scholarship, payment schedule, advisor notes..."
             />
           </div>
@@ -401,7 +403,8 @@ export default function EducationPage() {
               type="text"
               value={feeForm.description}
               onChange={(event) => setFeeForm((form) => ({ ...form, description: event.target.value }))}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
+              className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-brand-600"
+              style={{ borderColor: "var(--color-border)" }}
               placeholder="Tuition installment"
             />
           </div>
@@ -413,7 +416,8 @@ export default function EducationPage() {
                 min={1}
                 value={feeForm.amountCents}
                 onChange={(event) => setFeeForm((form) => ({ ...form, amountCents: event.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
+                className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-brand-600"
+                style={{ borderColor: "var(--color-border)" }}
                 placeholder="25000"
               />
             </div>
@@ -423,7 +427,8 @@ export default function EducationPage() {
                 type="date"
                 value={feeForm.dueDate}
                 onChange={(event) => setFeeForm((form) => ({ ...form, dueDate: event.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
+                className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-brand-600"
+                style={{ borderColor: "var(--color-border)" }}
               />
             </div>
           </div>

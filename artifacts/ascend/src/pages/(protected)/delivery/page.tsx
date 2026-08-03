@@ -28,11 +28,11 @@ const STAGE_LABEL: Record<string, string> = {
   delivered: "Delivered",
 };
 const STAGE_STYLE: Record<string, string> = {
-  unfulfilled: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300",
-  picking: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-  packed: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  shipped: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300",
-  delivered: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+  unfulfilled: "bg-neutral-100 text-neutral-600",
+  picking: "bg-amber-100 text-amber-700",
+  packed: "bg-blue-100 text-blue-700",
+  shipped: "bg-indigo-100 text-indigo-700",
+  delivered: "bg-green-100 text-green-700",
 };
 
 function StageBadge({ status }: { status: string }) {
@@ -52,12 +52,12 @@ function StageStepper({ status }: { status: string }) {
         <div key={s} className="flex items-center gap-1.5">
           <div className="flex flex-col items-center gap-1">
             <div
-              className={`h-2.5 w-2.5 rounded-full ${i <= idx ? "bg-blue-500" : "bg-neutral-300 dark:bg-neutral-700"}`}
+              className={`h-2.5 w-2.5 rounded-full ${i <= idx ? "bg-blue-500" : "bg-neutral-300"}`}
               aria-current={i === idx ? "step" : undefined}
             />
-            <span className={`text-[10px] ${i <= idx ? "text-neutral-700 dark:text-neutral-200" : "text-neutral-400"}`}>{STAGE_LABEL[s]}</span>
+            <span className={`text-[10px] ${i <= idx ? "text-neutral-700" : "text-neutral-400"}`}>{STAGE_LABEL[s]}</span>
           </div>
-          {i < STAGES.length - 1 && <div className={`h-px w-6 ${i < idx ? "bg-blue-500" : "bg-neutral-300 dark:bg-neutral-700"}`} />}
+          {i < STAGES.length - 1 && <div className={`h-px w-6 ${i < idx ? "bg-blue-500" : "bg-neutral-300"}`} />}
         </div>
       ))}
     </div>
@@ -167,7 +167,7 @@ export default function DeliveryPage() {
     >
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6">
         {error && (
-          <Card role="alert" className="border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
+          <Card role="alert" className="border-red-200 bg-red-50 p-3 text-sm text-red-700">
             {error}
           </Card>
         )}
@@ -175,11 +175,11 @@ export default function DeliveryPage() {
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:items-start">
           {/* ── Sales order list ─────────────────────────────────────────── */}
           <Card className="overflow-hidden p-0">
-            <div className="border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+            <div className="border-b px-4 py-3" style={{ borderColor: "var(--color-border)" }}>
               <h2 className="text-sm font-semibold">Sales orders</h2>
             </div>
             {!ordersLoaded ? (
-              <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
+              <ul className="divide-y divide-[var(--color-table-border)]">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <li key={i} className="flex items-center justify-between gap-3 px-4 py-3">
                     <div className="min-w-0 flex-1 space-y-1.5">
@@ -195,14 +195,14 @@ export default function DeliveryPage() {
                 No sales orders yet. Create one from Sales or an ecommerce checkout.
               </p>
             ) : (
-              <ul className="max-h-[70vh] divide-y divide-neutral-100 overflow-y-auto dark:divide-neutral-800">
+              <ul className="max-h-[70vh] divide-y divide-[var(--color-table-border)] overflow-y-auto">
                 {orders.map((o) => (
                   <li key={o.id}>
                     <button
                       onClick={() => setSelectedId(o.id)}
                       aria-current={o.id === selectedId ? "true" : undefined}
-                      className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-neutral-50 dark:hover:bg-neutral-800/50 ${
-                        o.id === selectedId ? "bg-blue-50 dark:bg-blue-900/20" : ""
+                      className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-[var(--color-surface-subtle)] ${
+                        o.id === selectedId ? "bg-blue-50" : ""
                       }`}
                     >
                       <div className="min-w-0">
@@ -244,10 +244,10 @@ export default function DeliveryPage() {
                 )}
 
                 {/* Stage-appropriate action */}
-                <div className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+                <div className="rounded-lg border border-[var(--color-border)] p-4">
                   {selected.fulfillment_status === "unfulfilled" && (
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-sm text-neutral-600 dark:text-neutral-300">Create a pick list to begin fulfilment.</p>
+                      <p className="text-sm text-neutral-600">Create a pick list to begin fulfilment.</p>
                       <Button onClick={() => startPicking(selected)} loading={busy} disabled={busy || !canManage}>Start picking</Button>
                     </div>
                   )}
@@ -259,11 +259,11 @@ export default function DeliveryPage() {
                         {(pickList.lines ?? []).map((l) => (
                           <li key={l.id} className="flex items-center justify-between gap-3 text-sm">
                             <span className="min-w-0 truncate">
-                              <span className="font-medium text-neutral-700 dark:text-neutral-200">{l.name ?? l.product_id}</span>
+                              <span className="font-medium text-neutral-700">{l.name ?? l.product_id}</span>
                               <span className="text-neutral-500"> · {l.picked_qty}/{l.quantity}</span>
                             </span>
                             {l.status === "picked" ? (
-                              <span className="inline-flex shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/40 dark:text-green-300">
+                              <span className="inline-flex shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
                                 Picked
                               </span>
                             ) : (
@@ -282,7 +282,7 @@ export default function DeliveryPage() {
 
                   {selected.fulfillment_status === "packed" && (
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-sm text-neutral-600 dark:text-neutral-300">
+                      <p className="text-sm text-neutral-600">
                         Packed{shipment ? ` — shipment ${shipment.ship_number} ready` : ""}. Ship it out.
                       </p>
                       <Button onClick={ship} loading={busy} disabled={busy || !canManage || !shipment}>Mark shipped</Button>
@@ -291,7 +291,7 @@ export default function DeliveryPage() {
 
                   {selected.fulfillment_status === "shipped" && (
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="min-w-0 break-words text-sm text-neutral-600 dark:text-neutral-300">
+                      <div className="min-w-0 break-words text-sm text-neutral-600">
                         In transit{shipment?.carrier ? ` via ${shipment.carrier}` : ""}
                         {shipment?.tracking_number ? ` (${shipment.tracking_number})` : ""}.
                       </div>
@@ -300,7 +300,7 @@ export default function DeliveryPage() {
                   )}
 
                   {selected.fulfillment_status === "delivered" && (
-                    <p className="text-sm font-medium text-green-700 dark:text-green-300">
+                    <p className="text-sm font-medium text-green-700">
                       Delivered{shipment?.tracking_number ? ` — ${shipment.tracking_number}` : ""}. Pipeline complete.
                     </p>
                   )}
@@ -308,15 +308,15 @@ export default function DeliveryPage() {
 
                 {/* Billing — parallel to fulfilment. Show the linked AR invoice, or
                     offer to raise one once the order is approved. */}
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] p-4">
                   {invoice ? (
-                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-neutral-600 dark:text-neutral-300">
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-neutral-600">
                       Invoice <span className="font-medium">{invoice.invoice_number}</span> — {formatMoney(invoice.total_cents)}
                       <span
                         className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
                           invoice.status === "paid"
-                            ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
-                            : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-amber-100 text-amber-700"
                         }`}
                       >
                         {invoice.status}
@@ -326,7 +326,7 @@ export default function DeliveryPage() {
                     <p className="text-sm text-neutral-500">Invoiced.</p>
                   ) : selected.status === "approved" ? (
                     <>
-                      <p className="text-sm text-neutral-600 dark:text-neutral-300">Not invoiced yet.</p>
+                      <p className="text-sm text-neutral-600">Not invoiced yet.</p>
                       <Button variant="secondary" onClick={createInvoice} loading={busy} disabled={busy || !canManage}>Create invoice</Button>
                     </>
                   ) : (

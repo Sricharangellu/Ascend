@@ -79,8 +79,9 @@ export default function BarTabsPage() {
             {(["open", "closed"] as const).map((s) => (
               <button key={s} type="button" onClick={() => setFilter(s)}
                 className={`rounded-full px-4 py-1.5 text-sm font-medium capitalize transition-colors ${
-                  filter === s ? "bg-brand-600 text-white" : "bg-gray-100 text-[var(--color-text-secondary)] hover:bg-gray-200"
-                }`}>
+                  filter === s ? "bg-brand-600 text-white" : "hover:bg-[var(--color-surface-subtle)]"
+                }`}
+                style={filter === s ? undefined : { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
                 {s}
                 {s === "open" && openCount > 0 && (
                   <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-0.5 text-xs">{openCount}</span>
@@ -96,11 +97,11 @@ export default function BarTabsPage() {
         {/* Tabs grid */}
         {loading ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[1,2,3].map(i => <div key={i} className="h-40 animate-pulse rounded-xl bg-gray-100" />)}
+            {[1,2,3].map(i => <div key={i} className="h-40 animate-skeleton rounded-xl" />)}
           </div>
         ) : tabs.length === 0 ? (
           <Card>
-            <p className="py-10 text-center text-sm text-[var(--color-text-secondary)]">
+            <p className="py-10 text-center text-sm" style={{ color: "var(--color-text-secondary)" }}>
               {filter === "open" ? "No open tabs right now." : "No closed tabs found."}
             </p>
           </Card>
@@ -108,13 +109,14 @@ export default function BarTabsPage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {tabs.map((tab) => (
               <div key={tab.id}
-                className="rounded-xl border border-[var(--color-table-border)] bg-white p-5 shadow-sm">
+                className="rounded-xl border p-5 shadow-sm"
+                style={{ borderColor: "var(--color-table-border)", backgroundColor: "var(--color-surface)" }}>
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                    <p className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>
                       {tab.customer_name ?? "Walk-in"}
                     </p>
-                    <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
+                    <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-secondary)" }}>
                       {elapsed(tab.opened_at)} ago · {tab.order_ids.length} round{tab.order_ids.length !== 1 ? "s" : ""}
                     </p>
                   </div>
@@ -138,7 +140,7 @@ export default function BarTabsPage() {
                 )}
 
                 {tab.status === "closed" && tab.closed_at && (
-                  <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
+                  <p className="mt-3 text-xs" style={{ color: "var(--color-text-secondary)" }}>
                     Closed {fmtTime(tab.closed_at)}
                   </p>
                 )}
@@ -152,7 +154,7 @@ export default function BarTabsPage() {
       <Modal open={newModal} onClose={() => setNewModal(false)} title="Open New Tab">
         <div className="space-y-4 p-4">
           <div>
-            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>
               Customer name (optional)
             </label>
             <input
@@ -161,7 +163,8 @@ export default function BarTabsPage() {
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleOpenTab()}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
+              className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-brand-600"
+              style={{ borderColor: "var(--color-border)" }}
               autoFocus
             />
           </div>

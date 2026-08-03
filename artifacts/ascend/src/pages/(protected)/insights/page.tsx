@@ -25,21 +25,25 @@ export default function InsightsPage() {
       <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6">
         {!allowed ? (
           <Card>
-            <p role="alert" className="text-sm text-slate-700">
+            <p role="alert" className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
               You don&apos;t have access to Insights. Ask an owner or manager.
             </p>
           </Card>
         ) : (
           <>
-            <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1 w-fit shadow-sm">
+            <div className="flex gap-1 rounded-lg p-1 w-fit shadow-sm"
+                 style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
               {([ ["reports", "Scheduled Reports"], ["forecasting", "Forecasting"] ] as [Tab, string][]).map(([key, label]) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => setTab(key)}
                   className={`min-h-[36px] rounded px-4 text-sm font-medium transition-colors ${
-                    tab === key ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100"
+                    tab === key ? "text-white" : "hover:bg-[var(--color-surface-subtle)]"
                   }`}
+                  style={tab === key
+                    ? { backgroundColor: "var(--color-sidebar-bg)" }
+                    : { color: "var(--color-text-secondary)" }}
                 >
                   {label}
                 </button>

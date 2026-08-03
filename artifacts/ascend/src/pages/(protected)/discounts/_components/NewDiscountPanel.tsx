@@ -179,8 +179,10 @@ export function NewDiscountPanel({
   if (!open) return null;
 
   const inputCls =
-    "min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600";
-  const labelCls = "block text-xs font-medium text-gray-700 mb-1";
+    "min-h-[44px] w-full rounded-lg border px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600";
+  const inputStyle = { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" };
+  const labelCls = "block text-xs font-medium mb-1";
+  const labelStyle = { color: "var(--color-text-secondary)" };
 
   return (
     <>
@@ -188,17 +190,19 @@ export function NewDiscountPanel({
       <div
         role="dialog"
         aria-label={editingDiscount ? "Edit discount" : "New discount"}
-        className="fixed right-0 top-0 z-40 h-full w-full max-w-lg overflow-y-auto bg-white shadow-2xl"
+        className="fixed right-0 top-0 z-40 h-full w-full max-w-lg overflow-y-auto shadow-2xl"
+        style={{ backgroundColor: "var(--color-surface)" }}
       >
-        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-gray-900">
+        <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--color-border)" }}>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>
             {editingDiscount ? "Edit Discount Rule" : "New Discount Rule"}
           </h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close panel"
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded p-1 text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-600"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded p-1 hover:bg-[var(--color-surface-subtle)] focus:outline-none focus:ring-2 focus:ring-brand-600"
+            style={{ color: "var(--color-text-muted)" }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M18 6L6 18M6 6l12 12" />
@@ -215,7 +219,7 @@ export function NewDiscountPanel({
 
           {/* Name */}
           <div>
-            <label className={labelCls}>Name <span className="text-red-500">*</span></label>
+            <label className={labelCls} style={labelStyle}>Name <span className="text-red-500">*</span></label>
             <input
               type="text"
               required
@@ -223,12 +227,13 @@ export function NewDiscountPanel({
               onChange={(e) => set("name", e.target.value)}
               placeholder="e.g. Summer Sale 20%"
               className={inputCls}
+              style={inputStyle}
             />
           </div>
 
           {/* Rule type */}
           <div>
-            <p className={labelCls}>Rule type</p>
+            <p className={labelCls} style={labelStyle}>Rule type</p>
             <div className="flex gap-3">
               {(["simple", "volume", "bxgy"] as const).map((rt) => (
                 <label key={rt} className="flex cursor-pointer items-center gap-2">
@@ -240,7 +245,7 @@ export function NewDiscountPanel({
                     onChange={() => set("rule_type", rt)}
                     className="h-4 w-4 border-gray-300 text-brand-600 focus:ring-brand-600"
                   />
-                  <span className="text-sm capitalize text-gray-700">
+                  <span className="text-sm capitalize" style={{ color: "var(--color-text-secondary)" }}>
                     {rt === "bxgy" ? "Buy X Get Y" : rt}
                   </span>
                 </label>
@@ -251,7 +256,7 @@ export function NewDiscountPanel({
           {/* Discount type + value */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <p className={labelCls}>Discount type</p>
+              <p className={labelCls} style={labelStyle}>Discount type</p>
               <div className="flex gap-3">
                 {(["percent", "fixed"] as const).map((dt) => (
                   <label key={dt} className="flex cursor-pointer items-center gap-2">
@@ -263,13 +268,13 @@ export function NewDiscountPanel({
                       onChange={() => set("discount_type", dt)}
                       className="h-4 w-4 border-gray-300 text-brand-600 focus:ring-brand-600"
                     />
-                    <span className="text-sm capitalize text-gray-700">{dt}</span>
+                    <span className="text-sm capitalize" style={{ color: "var(--color-text-secondary)" }}>{dt}</span>
                   </label>
                 ))}
               </div>
             </div>
             <div>
-              <label className={labelCls}>
+              <label className={labelCls} style={labelStyle}>
                 Value {form.discount_type === "fixed" ? "($)" : "(%)"}
                 <span className="text-red-500"> *</span>
               </label>
@@ -282,17 +287,19 @@ export function NewDiscountPanel({
                 onChange={(e) => set("value", e.target.value)}
                 placeholder={form.discount_type === "fixed" ? "5.00" : "10"}
                 className={inputCls}
+                style={inputStyle}
               />
             </div>
           </div>
 
           {/* Apply to */}
           <div>
-            <label className={labelCls}>Apply to</label>
+            <label className={labelCls} style={labelStyle}>Apply to</label>
             <select
               value={form.apply_to}
               onChange={(e) => set("apply_to", e.target.value as ApplyTo)}
               className={inputCls}
+              style={inputStyle}
             >
               <option value="order">Order</option>
               <option value="product">Product</option>
@@ -302,13 +309,14 @@ export function NewDiscountPanel({
 
           {/* Coupon code */}
           <div>
-            <label className={labelCls}>Coupon code (optional)</label>
+            <label className={labelCls} style={labelStyle}>Coupon code (optional)</label>
             <input
               type="text"
               value={form.coupon_code}
               onChange={(e) => set("coupon_code", e.target.value.toUpperCase())}
               placeholder="e.g. SAVE20"
               className={inputCls}
+              style={inputStyle}
             />
           </div>
 
@@ -322,7 +330,7 @@ export function NewDiscountPanel({
                   onChange={(e) => set("auto_applicable", e.target.checked)}
                   className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-600"
                 />
-                <span className="text-sm text-gray-700">
+                <span className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
                   Auto-applicable (apply automatically without a code)
                 </span>
               </label>
@@ -331,7 +339,7 @@ export function NewDiscountPanel({
 
           {/* Min order */}
           <div>
-            <label className={labelCls}>Minimum order amount ($, optional)</label>
+            <label className={labelCls} style={labelStyle}>Minimum order amount ($, optional)</label>
             <input
               type="number"
               min="0"
@@ -340,13 +348,14 @@ export function NewDiscountPanel({
               onChange={(e) => set("min_order_cents", e.target.value)}
               placeholder="0.00"
               className={inputCls}
+              style={inputStyle}
             />
           </div>
 
           {/* Volume: min qty */}
           {form.rule_type === "volume" && (
             <div>
-              <label className={labelCls}>Minimum quantity</label>
+              <label className={labelCls} style={labelStyle}>Minimum quantity</label>
               <input
                 type="number"
                 min="1"
@@ -355,6 +364,7 @@ export function NewDiscountPanel({
                 onChange={(e) => set("min_qty", e.target.value)}
                 placeholder="e.g. 5"
                 className={inputCls}
+                style={inputStyle}
               />
             </div>
           )}
@@ -363,7 +373,7 @@ export function NewDiscountPanel({
           {form.rule_type === "bxgy" && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={labelCls}>Buy quantity</label>
+                <label className={labelCls} style={labelStyle}>Buy quantity</label>
                 <input
                   type="number"
                   min="1"
@@ -372,10 +382,11 @@ export function NewDiscountPanel({
                   onChange={(e) => set("buy_qty", e.target.value)}
                   placeholder="e.g. 2"
                   className={inputCls}
+                  style={inputStyle}
                 />
               </div>
               <div>
-                <label className={labelCls}>Get quantity</label>
+                <label className={labelCls} style={labelStyle}>Get quantity</label>
                 <input
                   type="number"
                   min="1"
@@ -384,6 +395,7 @@ export function NewDiscountPanel({
                   onChange={(e) => set("get_qty", e.target.value)}
                   placeholder="e.g. 1"
                   className={inputCls}
+                  style={inputStyle}
                 />
               </div>
             </div>
@@ -392,7 +404,7 @@ export function NewDiscountPanel({
           {/* Usage limits */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>Total usage limit (optional)</label>
+              <label className={labelCls} style={labelStyle}>Total usage limit (optional)</label>
               <input
                 type="number"
                 min="1"
@@ -401,10 +413,11 @@ export function NewDiscountPanel({
                 onChange={(e) => set("usage_limit", e.target.value)}
                 placeholder="Unlimited"
                 className={inputCls}
+                style={inputStyle}
               />
             </div>
             <div>
-              <label className={labelCls}>Per-customer limit (optional)</label>
+              <label className={labelCls} style={labelStyle}>Per-customer limit (optional)</label>
               <input
                 type="number"
                 min="1"
@@ -413,6 +426,7 @@ export function NewDiscountPanel({
                 onChange={(e) => set("per_customer_limit", e.target.value)}
                 placeholder="Unlimited"
                 className={inputCls}
+                style={inputStyle}
               />
             </div>
           </div>
@@ -420,28 +434,30 @@ export function NewDiscountPanel({
           {/* Date range */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>Start date (optional)</label>
+              <label className={labelCls} style={labelStyle}>Start date (optional)</label>
               <input
                 type="date"
                 value={form.start_date}
                 onChange={(e) => set("start_date", e.target.value)}
                 className={inputCls}
+                style={inputStyle}
               />
             </div>
             <div>
-              <label className={labelCls}>End date (optional)</label>
+              <label className={labelCls} style={labelStyle}>End date (optional)</label>
               <input
                 type="date"
                 value={form.end_date}
                 onChange={(e) => set("end_date", e.target.value)}
                 className={inputCls}
+                style={inputStyle}
               />
             </div>
           </div>
 
           {/* Tier restriction */}
           <div>
-            <label className={labelCls}>Tier restriction (1-5, optional)</label>
+            <label className={labelCls} style={labelStyle}>Tier restriction (1-5, optional)</label>
             <input
               type="number"
               min="1"
@@ -451,11 +467,12 @@ export function NewDiscountPanel({
               onChange={(e) => set("tier_restriction", e.target.value)}
               placeholder="No restriction"
               className={inputCls}
+              style={inputStyle}
             />
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 border-t border-gray-100 pt-4">
+          <div className="flex gap-3 border-t pt-4" style={{ borderColor: "var(--color-table-border)" }}>
             <Button type="button" variant="secondary" onClick={onClose} fullWidth disabled={submitting}>
               Cancel
             </Button>

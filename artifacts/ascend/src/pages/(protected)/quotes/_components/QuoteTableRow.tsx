@@ -34,14 +34,17 @@ export function QuoteTableRow({
   return (
     <Fragment>
       <tr
-        className="border-b border-[#F5F5F5] hover:bg-[#FAFAFA] cursor-pointer"
+        className="cursor-pointer hover:bg-[var(--color-surface-subtle)]"
+        style={{ borderBottom: "1px solid var(--color-table-border)" }}
         onClick={onToggleExpand}
       >
         {/* Chevron */}
         <td className="px-4 py-3">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
             strokeLinecap="round" strokeLinejoin="round"
-            className={`text-[#999] transition-transform ${isExpanded ? "rotate-90" : ""}`} aria-hidden="true">
+            className={`transition-transform ${isExpanded ? "rotate-90" : ""}`}
+            style={{ color: "var(--color-text-muted)" }}
+            aria-hidden="true">
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </td>
@@ -49,7 +52,7 @@ export function QuoteTableRow({
         {/* Quote # / date */}
         <td className="px-4 py-3">
           <p className="font-semibold text-brand-600 font-mono text-xs">{quote.quote_number}</p>
-          <p className="text-xs text-[#888]">{fmtDateTime(quote.created_at)}</p>
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDateTime(quote.created_at)}</p>
         </td>
 
         {/* Customer — avatar */}
@@ -59,7 +62,7 @@ export function QuoteTableRow({
               style={{ backgroundColor: avatarColor(custName) }} aria-hidden="true">
               {initials(custName)}
             </div>
-            <span className="text-sm text-[#111]">{custName}</span>
+            <span className="text-sm" style={{ color: "var(--color-text-primary)" }}>{custName}</span>
           </div>
         </td>
 
@@ -71,19 +74,19 @@ export function QuoteTableRow({
               {initials(repName)}
             </div>
             <div>
-              <p className="text-xs font-medium text-[#111]">{repName}</p>
-              <p className="text-[11px] text-[#888]">Main Outlet</p>
+              <p className="text-xs font-medium" style={{ color: "var(--color-text-primary)" }}>{repName}</p>
+              <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>Main Outlet</p>
             </div>
           </div>
         </td>
 
         {/* Note */}
-        <td className="px-4 py-3 text-xs text-[#888] italic max-w-[140px] truncate">
+        <td className="px-4 py-3 text-xs italic max-w-[140px] truncate" style={{ color: "var(--color-text-muted)" }}>
           {quote.note ?? "—"}
         </td>
 
         {/* Total */}
-        <td className="px-4 py-3 text-right font-semibold tabular-nums text-[#111]">
+        <td className="px-4 py-3 text-right font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>
           {formatMoney(quote.total_cents)}
         </td>
 

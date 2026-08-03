@@ -161,18 +161,19 @@ export default function ImportsExportsPage() {
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
           <Card className="overflow-hidden p-0">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
               <div>
-                <h2 className="text-base font-semibold text-slate-950">Catalog CSV Import</h2>
-                <p className="text-sm text-slate-500">Required columns: SKU, name, and numeric priceCents.</p>
+                <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Catalog CSV Import</h2>
+                <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Required columns: SKU, name, and numeric priceCents.</p>
               </div>
-              <label className="inline-flex min-h-[40px] cursor-pointer items-center rounded-md border border-brand-300 bg-white px-4 text-sm font-medium text-brand-700 hover:bg-brand-50">
+              <label className="inline-flex min-h-[40px] cursor-pointer items-center rounded-md border border-brand-300 px-4 text-sm font-medium text-brand-700 hover:bg-brand-50"
+                     style={{ backgroundColor: "var(--color-surface)" }}>
                 Choose CSV
                 <input type="file" accept=".csv,text/csv" className="sr-only" onChange={(event) => void readFile(event.target.files?.[0])} />
               </label>
             </div>
 
-            <div className="border-b border-slate-200 p-4">
+            <div className="p-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
               <textarea
                 value={csv}
                 onChange={(event) => {
@@ -183,16 +184,20 @@ export default function ImportsExportsPage() {
                 rows={7}
                 spellCheck={false}
                 placeholder={TEMPLATE}
-                className="w-full resize-y rounded-md border border-slate-300 px-3 py-2 font-mono text-xs leading-5 focus:outline-none focus:ring-2 focus:ring-brand-600"
+                className="w-full resize-y rounded-md px-3 py-2 font-mono text-xs leading-5 focus:outline-none focus:ring-2 focus:ring-brand-600"
+                style={{ border: "1px solid var(--color-border)" }}
               />
             </div>
 
             {preview.length === 0 ? (
-              <div className="px-4 py-10 text-center text-sm text-slate-500">Choose a CSV file or paste CSV content to preview rows.</div>
+              <div className="px-4 py-10 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>Choose a CSV file or paste CSV content to preview rows.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  <thead
+                    className="text-left text-xs font-semibold uppercase tracking-[0.08em]"
+                    style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}
+                  >
                     <tr>
                       <th className="px-4 py-3">Row</th>
                       <th className="px-4 py-3">SKU</th>
@@ -202,14 +207,14 @@ export default function ImportsExportsPage() {
                       <th className="px-4 py-3">Validation</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-[var(--color-table-border)]">
                     {preview.slice(0, 50).map((row: CsvPreviewRow) => (
-                      <tr key={row.row} className={row.valid ? "hover:bg-slate-50" : "bg-danger-50/50"}>
-                        <td className="px-4 py-3 text-slate-500">{row.row}</td>
-                        <td className="px-4 py-3 font-mono text-xs text-slate-700">{row.sku || "-"}</td>
-                        <td className="px-4 py-3 font-medium text-slate-900">{row.name || "-"}</td>
-                        <td className="px-4 py-3 text-right tabular-nums text-slate-700">{row.price || "-"}</td>
-                        <td className="px-4 py-3 text-slate-600">{row.category || "general"}</td>
+                      <tr key={row.row} className={row.valid ? "hover:bg-[var(--color-surface-subtle)]" : "bg-danger-50/50"}>
+                        <td className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>{row.row}</td>
+                        <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--color-text-secondary)" }}>{row.sku || "-"}</td>
+                        <td className="px-4 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{row.name || "-"}</td>
+                        <td className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{row.price || "-"}</td>
+                        <td className="px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{row.category || "general"}</td>
                         <td className="px-4 py-3">
                           <Badge variant={row.valid ? "green" : "red"}>{row.valid ? "ready" : row.issue ?? "invalid"}</Badge>
                         </td>
@@ -220,8 +225,9 @@ export default function ImportsExportsPage() {
               </div>
             )}
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs text-slate-500">{preview.length > 50 ? `Showing first 50 of ${preview.length} rows` : `${preview.length} rows previewed`}</p>
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+                 style={{ borderTop: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{preview.length > 50 ? `Showing first 50 of ${preview.length} rows` : `${preview.length} rows previewed`}</p>
               <Button variant="primary" size="sm" loading={busy} disabled={!canManage || preview.length === 0 || invalidRows > 0} onClick={() => void importCatalog()}>
                 Import catalog
               </Button>
@@ -241,7 +247,7 @@ export default function ImportsExportsPage() {
             </Card>
 
             <Card title="Import Rules">
-              <ul className="space-y-2 text-sm text-slate-600">
+              <ul className="space-y-2 text-sm" style={{ color: "var(--color-text-secondary)" }}>
                 <li>SKU is the upsert key.</li>
                 <li>Name and priceCents are required.</li>
                 <li>priceCents must be an integer.</li>
@@ -295,16 +301,19 @@ function Metric({
   tone: "neutral" | "success" | "brand" | "danger";
 }) {
   const toneClass = {
-    neutral: "border-slate-200 bg-white",
+    neutral: "",
     success: "border-success-200 bg-success-50",
     brand: "border-brand-200 bg-brand-50",
     danger: "border-danger-200 bg-danger-50",
   }[tone];
   return (
-    <div className={`rounded-md border p-4 shadow-sm ${toneClass}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-slate-950">{value}</p>
-      <p className="mt-1 truncate text-xs text-slate-500">{helper}</p>
+    <div
+      className={`rounded-md border p-4 shadow-sm ${toneClass}`}
+      style={tone === "neutral" ? { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" } : {}}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--color-text-muted)" }}>{label}</p>
+      <p className="mt-1 text-xl font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{value}</p>
+      <p className="mt-1 truncate text-xs" style={{ color: "var(--color-text-muted)" }}>{helper}</p>
     </div>
   );
 }
@@ -312,7 +321,9 @@ function Metric({
 function BatchCard({ title, empty, children }: { title: string; empty: string; children: React.ReactNode[] }) {
   return (
     <Card title={title} noPadding>
-      {children.length === 0 ? <p className="px-5 py-4 text-sm text-slate-500">{empty}</p> : <div className="divide-y divide-slate-100">{children}</div>}
+      {children.length === 0
+        ? <p className="px-5 py-4 text-sm" style={{ color: "var(--color-text-muted)" }}>{empty}</p>
+        : <div className="divide-y divide-[var(--color-table-border)]">{children}</div>}
     </Card>
   );
 }
@@ -322,8 +333,8 @@ function BatchItem({ title, subtitle, status, date }: { title: string; subtitle:
   return (
     <div className="flex items-start justify-between gap-3 px-5 py-3">
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-slate-950">{title}</p>
-        <p className="mt-1 truncate text-xs text-slate-500">{subtitle} · {fmtDate(date)}</p>
+        <p className="truncate text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{title}</p>
+        <p className="mt-1 truncate text-xs" style={{ color: "var(--color-text-muted)" }}>{subtitle} · {fmtDate(date)}</p>
       </div>
       <Badge variant={variant}>{status}</Badge>
     </div>

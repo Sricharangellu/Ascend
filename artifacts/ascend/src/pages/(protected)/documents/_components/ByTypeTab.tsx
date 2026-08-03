@@ -106,7 +106,7 @@ export function ByTypeTab() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16 text-sm text-slate-400">
+      <div className="flex items-center justify-center py-16 text-sm" style={{ color: "var(--color-text-muted)" }}>
         Loading…
       </div>
     );
@@ -132,8 +132,9 @@ export function ByTypeTab() {
                   "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors",
                   activeType === t.key
                     ? "bg-indigo-50 font-semibold text-indigo-700"
-                    : "text-slate-700 hover:bg-slate-100",
+                    : "hover:bg-[var(--color-surface-subtle)]",
                 ].join(" ")}
+                style={activeType !== t.key ? { color: "var(--color-text-secondary)" } : undefined}
               >
                 <span className="flex items-center gap-2">
                   <span aria-hidden="true">{TYPE_ICONS[t.key] ?? "📄"}</span>
@@ -144,8 +145,9 @@ export function ByTypeTab() {
                     "rounded-full px-2 py-0.5 text-xs font-medium",
                     activeType === t.key
                       ? "bg-indigo-100 text-indigo-700"
-                      : "bg-slate-100 text-slate-500",
-                  ].join(" ")}
+                      : undefined,
+                  ].filter(Boolean).join(" ")}
+                  style={activeType !== t.key ? { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" } : undefined}
                 >
                   {t.count}
                 </span>
@@ -153,7 +155,7 @@ export function ByTypeTab() {
             </li>
           ))}
           {types.length === 0 && (
-            <li className="px-3 py-2 text-sm text-slate-400">No documents</li>
+            <li className="px-3 py-2 text-sm" style={{ color: "var(--color-text-muted)" }}>No documents</li>
           )}
         </ul>
       </nav>
@@ -161,22 +163,23 @@ export function ByTypeTab() {
       {/* Doc list */}
       <div className="min-w-0 flex-1">
         {activeType && (
-          <h3 className="mb-3 text-sm font-semibold text-slate-700">{activeLabel}</h3>
+          <h3 className="mb-3 text-sm font-semibold" style={{ color: "var(--color-text-secondary)" }}>{activeLabel}</h3>
         )}
         {docsLoading ? (
-          <div className="py-8 text-center text-sm text-slate-400">Loading…</div>
+          <div className="py-8 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>Loading…</div>
         ) : docs.length === 0 ? (
-          <div className="py-8 text-center text-sm text-slate-400">No documents in this category</div>
+          <div className="py-8 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No documents in this category</div>
         ) : (
           <ul className="space-y-2">
             {docs.map((doc) => (
               <li
                 key={doc.id}
-                className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 hover:border-indigo-300 hover:bg-indigo-50/30 transition-colors"
+                className="flex items-center justify-between gap-4 rounded-xl border px-4 py-3 hover:border-indigo-300 hover:bg-indigo-50/30 transition-colors"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-900">{doc.name}</p>
-                  <p className="text-xs text-slate-400">
+                  <p className="truncate text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>{doc.name}</p>
+                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                     {doc.file_name} · {formatBytes(doc.file_size_bytes)} · v{doc.version}
                   </p>
                   {doc.tags.length > 0 && (
@@ -184,7 +187,8 @@ export function ByTypeTab() {
                       {doc.tags.slice(0, 4).map((t) => (
                         <span
                           key={t}
-                          className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500"
+                          className="rounded px-1.5 py-0.5 text-[10px]"
+                          style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }}
                         >
                           {t}
                         </span>
@@ -193,8 +197,8 @@ export function ByTypeTab() {
                   )}
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="text-xs text-slate-500">{doc.uploaded_by}</p>
-                  <p className="text-xs text-slate-400">{fmtDate(doc.uploaded_at)}</p>
+                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{doc.uploaded_by}</p>
+                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDate(doc.uploaded_at)}</p>
                   {doc.expires_at && (
                     <p className="text-xs text-amber-600">Exp {fmtDate(doc.expires_at)}</p>
                   )}

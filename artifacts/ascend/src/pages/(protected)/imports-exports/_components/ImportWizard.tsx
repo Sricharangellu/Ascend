@@ -215,8 +215,8 @@ export function ImportWizard({ onImportDone }: { onImportDone: () => void }) {
   return (
     <Card className="overflow-hidden p-0">
       {/* Step indicator */}
-      <div className="flex items-center gap-0 border-b border-slate-200 bg-slate-50 px-4 py-3">
-        <h2 className="mr-4 text-base font-semibold text-slate-950">New Import</h2>
+      <div className="flex items-center gap-0 px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
+        <h2 className="mr-4 text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>New Import</h2>
         <div className="flex items-center gap-1">
           {stepOrder.map((s, i) => (
             <span
@@ -225,8 +225,9 @@ export function ImportWizard({ onImportDone }: { onImportDone: () => void }) {
                 "rounded-full px-2.5 py-0.5 text-xs font-medium",
                 i < currentIdx ? "bg-success-100 text-success-700" :
                 i === currentIdx ? "bg-brand-600 text-white" :
-                "bg-slate-100 text-slate-400",
+                "",
               ].join(" ")}
+              style={i >= currentIdx && i !== currentIdx ? { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" } : {}}
             >
               {stepLabels[s]}
             </span>
@@ -245,13 +246,14 @@ export function ImportWizard({ onImportDone }: { onImportDone: () => void }) {
               onDrop={handleDrop}
               className={[
                 "flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors",
-                dragging ? "border-brand-400 bg-brand-50" : "border-slate-300 hover:border-brand-300",
+                dragging ? "border-brand-400 bg-brand-50" : "hover:border-brand-300",
               ].join(" ")}
+              style={dragging ? {} : { borderColor: "var(--color-border)" }}
             >
-              <svg aria-hidden="true" className="mb-3 h-10 w-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+              <svg aria-hidden="true" className="mb-3 h-10 w-10" style={{ color: "var(--color-text-muted)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
               </svg>
-              <p className="text-sm font-medium text-slate-700">
+              <p className="text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
                 Drag &amp; drop a CSV file here, or{" "}
                 <button
                   type="button"
@@ -261,7 +263,7 @@ export function ImportWizard({ onImportDone }: { onImportDone: () => void }) {
                   browse files
                 </button>
               </p>
-              <p className="mt-1 text-xs text-slate-400">Only .csv files are supported</p>
+              <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>Only .csv files are supported</p>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -272,13 +274,14 @@ export function ImportWizard({ onImportDone }: { onImportDone: () => void }) {
             </div>
 
             {fileName && (
-              <div className="flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="flex items-center gap-3 rounded-md px-4 py-3"
+                   style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
                 <svg aria-hidden="true" className="h-5 w-5 shrink-0 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-950">{fileName}</p>
-                  <p className="text-xs text-slate-500">{(fileSize / 1024).toFixed(1)} KB · {totalRows} data rows</p>
+                  <p className="truncate text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>{fileName}</p>
+                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{(fileSize / 1024).toFixed(1)} KB · {totalRows} data rows</p>
                 </div>
               </div>
             )}
@@ -294,26 +297,27 @@ export function ImportWizard({ onImportDone }: { onImportDone: () => void }) {
         {/* Step 2: Map columns */}
         {step === "map" && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
               Map your CSV columns to Ascend fields. Matches were auto-detected where possible.
             </p>
-            <div className="overflow-x-auto rounded-md border border-slate-200">
+            <div className="overflow-x-auto rounded-md" style={{ border: "1px solid var(--color-border)" }}>
               <table className="w-full text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50">
+                <thead style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Ascend Field</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">CSV Column</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-muted)" }}>Ascend Field</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-muted)" }}>CSV Column</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-[var(--color-table-border)]">
                   {mappings.map((m) => (
                     <tr key={m.finderField}>
-                      <td className="px-4 py-3 font-mono text-xs font-medium text-slate-800">{m.finderField}</td>
+                      <td className="px-4 py-3 font-mono text-xs font-medium" style={{ color: "var(--color-text-primary)" }}>{m.finderField}</td>
                       <td className="px-4 py-3">
                         <select
                           value={m.csvHeader ?? ""}
                           onChange={(e) => updateMapping(m.finderField, e.target.value || null)}
-                          className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                          className="w-full rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                          style={{ border: "1px solid var(--color-border)" }}
                         >
                           <option value="">— skip —</option>
                           {csvHeaders.map((h) => (
@@ -336,23 +340,24 @@ export function ImportWizard({ onImportDone }: { onImportDone: () => void }) {
         {/* Step 3: Preview */}
         {step === "preview" && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-600">
-              <span className="font-semibold text-slate-950">{totalRows} rows</span> ready to import. Showing first 5:
+            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+              <span className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{totalRows} rows</span> ready to import. Showing first 5:
             </p>
-            <div className="overflow-x-auto rounded-md border border-slate-200">
+            <div className="overflow-x-auto rounded-md" style={{ border: "1px solid var(--color-border)" }}>
               <table className="w-full text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50">
+                <thead style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
                   <tr>
                     {mappings.filter(m => m.csvHeader).map((m) => (
-                      <th key={m.finderField} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">{m.finderField}</th>
+                      <th key={m.finderField} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em]"
+                          style={{ color: "var(--color-text-muted)" }}>{m.finderField}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-[var(--color-table-border)]">
                   {previewRows.map((row, i) => (
-                    <tr key={i} className="hover:bg-slate-50">
+                    <tr key={i} className="hover:bg-[var(--color-surface-subtle)]">
                       {mappings.filter(m => m.csvHeader).map((m) => (
-                        <td key={m.finderField} className="px-4 py-3 text-slate-700">{row[m.finderField] ?? "—"}</td>
+                        <td key={m.finderField} className="px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{row[m.finderField] ?? "—"}</td>
                       ))}
                     </tr>
                   ))}
@@ -369,16 +374,16 @@ export function ImportWizard({ onImportDone }: { onImportDone: () => void }) {
         {/* Step 4: Importing */}
         {step === "importing" && (
           <div className="space-y-4 py-4">
-            <p className="text-sm font-medium text-slate-700">
+            <p className="text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
               Importing row {Math.min(Math.ceil((progress / 100) * totalRows), totalRows)} of {totalRows}...
             </p>
-            <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200">
+            <div className="h-3 w-full overflow-hidden rounded-full" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
               <div
                 className="h-full rounded-full bg-brand-600 transition-all duration-200"
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <p className="text-xs text-slate-500">{progress}% complete</p>
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{progress}% complete</p>
           </div>
         )}
 
@@ -391,8 +396,8 @@ export function ImportWizard({ onImportDone }: { onImportDone: () => void }) {
               </svg>
             </div>
             <div>
-              <p className="text-lg font-semibold text-slate-950">Import complete</p>
-              <p className="mt-1 text-sm text-slate-600">{importedCount} products imported successfully.</p>
+              <p className="text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>Import complete</p>
+              <p className="mt-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>{importedCount} products imported successfully.</p>
             </div>
             <Button variant="secondary" size="sm" onClick={reset}>Import another file</Button>
           </div>

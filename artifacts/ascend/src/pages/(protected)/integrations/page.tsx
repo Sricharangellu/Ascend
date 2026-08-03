@@ -158,10 +158,10 @@ export default function IntegrationsPage() {
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
           <Card className="overflow-hidden p-0">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
               <div>
-                <h2 className="text-base font-semibold text-slate-950">Company Integrations</h2>
-                <p className="text-sm text-slate-500">Configured provider connections and statuses.</p>
+                <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Company Integrations</h2>
+                <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Configured provider connections and statuses.</p>
               </div>
               <Button variant="secondary" size="sm" disabled={connecting} onClick={() => void pushQueue()}>
                 Push queue
@@ -175,18 +175,18 @@ export default function IntegrationsPage() {
                 <p className="text-sm font-medium text-[var(--color-text-primary)]">No integrations connected yet.</p>
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-[var(--color-table-border)] divide-y">
                 {integrations.map((item) => (
                   <div key={item.id} className="grid gap-3 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-sm font-semibold text-slate-950">{item.provider_name}</p>
+                        <p className="truncate text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{item.provider_name}</p>
                         <Badge variant={item.status === "active" ? "green" : "gray"}>{item.status}</Badge>
                       </div>
-                      <p className="mt-1 text-xs text-slate-500">{item.provider_type} · updated {fmtDate(item.updated_at)}</p>
+                      <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>{item.provider_type} · updated {fmtDate(item.updated_at)}</p>
                     </div>
-                    <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{item.provider_id}</span>
-                    <span className="text-xs text-slate-500">{item.settings ? "settings saved" : "no settings"}</span>
+                    <span className="rounded-md px-2 py-1 text-xs font-medium" style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>{item.provider_id}</span>
+                    <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{item.settings ? "settings saved" : "no settings"}</span>
                   </div>
                 ))}
               </div>
@@ -196,15 +196,16 @@ export default function IntegrationsPage() {
           <div className="space-y-5">
             <Card title="Connect Provider">
               {availableProviders.length === 0 ? (
-                <p className="text-sm text-slate-500">No inactive providers are available.</p>
+                <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No inactive providers are available.</p>
               ) : (
                 <div className="space-y-3">
                   <label className="block">
-                    <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Provider</span>
+                    <span className="text-xs font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-muted)" }}>Provider</span>
                     <select
                       value={providerId}
                       onChange={(event) => setProviderId(event.target.value)}
-                      className="mt-1 min-h-[40px] w-full rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                      className="mt-1 min-h-[40px] w-full rounded-md px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                      style={{ borderWidth: "1px", borderStyle: "solid", borderColor: "var(--color-border)" }}
                     >
                       {availableProviders.map((provider) => (
                         <option key={provider.id} value={provider.id}>{provider.name} · {provider.provider_type}</option>
@@ -220,16 +221,16 @@ export default function IntegrationsPage() {
 
             <Card title="Webhook Subscriptions" noPadding>
               {webhooks.length === 0 ? (
-                <p className="px-5 py-4 text-sm text-slate-500">No webhook subscriptions.</p>
+                <p className="px-5 py-4 text-sm" style={{ color: "var(--color-text-muted)" }}>No webhook subscriptions.</p>
               ) : (
-                <div className="divide-y divide-slate-100">
+                <div className="divide-[var(--color-table-border)] divide-y">
                   {webhooks.slice(0, 6).map((hook) => (
                     <div key={hook.id} className="px-5 py-3">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="truncate text-sm font-semibold text-slate-950">{hook.url}</p>
+                        <p className="truncate text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{hook.url}</p>
                         <Badge variant={hook.active ? "green" : "gray"}>{hook.active ? "active" : "inactive"}</Badge>
                       </div>
-                      <p className="mt-1 text-xs text-slate-500">{hook.event_types} · {fmtDate(hook.created_at)}</p>
+                      <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>{hook.event_types} · {fmtDate(hook.created_at)}</p>
                     </div>
                   ))}
                 </div>
@@ -285,9 +286,9 @@ function Metric({
   }[tone];
   return (
     <div className={`rounded-md border p-4 shadow-sm ${toneClass}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-slate-950">{value}</p>
-      <p className="mt-1 text-xs text-slate-500">{helper}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--color-text-muted)" }}>{label}</p>
+      <p className="mt-1 text-xl font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{value}</p>
+      <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>{helper}</p>
     </div>
   );
 }
@@ -295,7 +296,7 @@ function Metric({
 function ActivityCard({ title, empty, children }: { title: string; empty: string; children: React.ReactNode[] }) {
   return (
     <Card title={title} noPadding>
-      {children.length === 0 ? <p className="px-5 py-4 text-sm text-slate-500">{empty}</p> : <div className="divide-y divide-slate-100">{children}</div>}
+      {children.length === 0 ? <p className="px-5 py-4 text-sm" style={{ color: "var(--color-text-muted)" }}>{empty}</p> : <div className="divide-[var(--color-table-border)] divide-y">{children}</div>}
     </Card>
   );
 }
@@ -305,8 +306,8 @@ function ActivityItem({ title, subtitle, meta }: { title: string; subtitle: stri
   return (
     <div className="flex items-start justify-between gap-3 px-5 py-3">
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-slate-950">{title}</p>
-        <p className="mt-1 truncate text-xs text-slate-500">{subtitle}</p>
+        <p className="truncate text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{title}</p>
+        <p className="mt-1 truncate text-xs" style={{ color: "var(--color-text-muted)" }}>{subtitle}</p>
       </div>
       <Badge variant={variant}>{meta}</Badge>
     </div>

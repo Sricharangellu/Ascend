@@ -71,32 +71,33 @@ export default function OperationsPage() {
   };
 
   const locationCols = [
-    { key: "code", header: "Code", render: (r: FulfillmentLocation) => <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{r.code}</span> },
-    { key: "name", header: "Name", render: (r: FulfillmentLocation) => <span className="font-medium text-gray-900">{r.name}</span> },
+    { key: "code", header: "Code", render: (r: FulfillmentLocation) => <span className="font-mono text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--color-surface-subtle)" }}>{r.code}</span> },
+    { key: "name", header: "Name", render: (r: FulfillmentLocation) => <span className="font-medium" style={{ color: "var(--color-text-primary)" }}>{r.name}</span> },
     { key: "type", header: "Type", render: (r: FulfillmentLocation) => <Badge variant="blue">{r.type}</Badge> },
-    { key: "desc", header: "Description", render: (r: FulfillmentLocation) => <span className="text-gray-500">{r.description ?? "—"}</span> },
+    { key: "desc", header: "Description", render: (r: FulfillmentLocation) => <span style={{ color: "var(--color-text-muted)" }}>{r.description ?? "—"}</span> },
   ];
 
   const pickCols = [
-    { key: "num", header: "Pick #", render: (r: PickList) => <span className="font-medium text-gray-900">{r.pick_number}</span> },
+    { key: "num", header: "Pick #", render: (r: PickList) => <span className="font-medium" style={{ color: "var(--color-text-primary)" }}>{r.pick_number}</span> },
     { key: "status", header: "Status", render: (r: PickList) => <Badge variant={statusBadge(r.status)}>{r.status}</Badge> },
-    { key: "assigned", header: "Assigned To", render: (r: PickList) => <span className="text-gray-500">{r.assigned_to ?? "Unassigned"}</span> },
-    { key: "created", header: "Created", render: (r: PickList) => <span className="text-gray-500 text-xs">{fmtDate(r.created_at)}</span> },
+    { key: "assigned", header: "Assigned To", render: (r: PickList) => <span style={{ color: "var(--color-text-muted)" }}>{r.assigned_to ?? "Unassigned"}</span> },
+    { key: "created", header: "Created", render: (r: PickList) => <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDate(r.created_at)}</span> },
   ];
 
   const registerCols = [
-    { key: "name", header: "Register Name", render: (r: Register) => <span className="font-medium text-gray-900">{r.name}</span> },
+    { key: "name", header: "Register Name", render: (r: Register) => <span className="font-medium" style={{ color: "var(--color-text-primary)" }}>{r.name}</span> },
     { key: "status", header: "Status", render: (r: Register) => <Badge variant={r.status === "open" ? "green" : "gray"}>{r.status}</Badge> },
   ];
 
   return (
     <EnterpriseShell active="operations" title="Operations" subtitle="Locations & Pick/Pack" contentClassName="overflow-y-auto">
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        <div className="border-b border-gray-200">
+        <div style={{ borderBottom: "1px solid var(--color-border)" }}>
           <nav className="flex gap-6">
             {(["locations", "picklists", "outlets", "stock-locations"] as const).map((t) => (
               <button key={t} onClick={() => setTab(t)}
-                className={`pb-3 text-sm font-medium capitalize transition-colors border-b-2 ${tab === t ? "border-brand-600 text-brand-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+                className={`pb-3 text-sm font-medium capitalize transition-colors border-b-2 ${tab === t ? "border-brand-600 text-brand-600" : "border-transparent hover:text-[var(--color-text-primary)]"}`}
+                style={tab === t ? {} : { color: "var(--color-text-muted)" }}>
                 {t === "picklists" ? "Pick Lists" : t === "outlets" ? "Outlets" : t === "stock-locations" ? "Stock Locations" : "Locations"}
               </button>
             ))}
@@ -106,7 +107,7 @@ export default function OperationsPage() {
         {tab === "locations" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-900">Storage Locations ({locations.length})</h2>
+              <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Storage Locations ({locations.length})</h2>
               <Button variant="primary" size="sm" onClick={() => setShowNewLocation(true)}>+ New Location</Button>
             </div>
             <Table columns={locationCols} rows={locations} loading={loading} rowKey={(r) => r.id} emptyMessage="No locations yet. Add bins, shelves, or aisles." />
@@ -116,7 +117,7 @@ export default function OperationsPage() {
         {tab === "picklists" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-900">Pick Lists ({pickLists.length})</h2>
+              <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Pick Lists ({pickLists.length})</h2>
             </div>
             <Table columns={pickCols} rows={pickLists} loading={loading} rowKey={(r) => r.id} emptyMessage="No pick lists. They're auto-created when sales orders are fulfilled." />
           </div>
@@ -127,21 +128,21 @@ export default function OperationsPage() {
         {tab === "outlets" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-900">Outlets ({outlets.length})</h2>
+              <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Outlets ({outlets.length})</h2>
               <Button variant="primary" size="sm" onClick={() => setShowNewOutlet(true)}>+ New Outlet</Button>
             </div>
             {loading ? (
-              <p className="text-sm text-gray-500">Loading outlets…</p>
+              <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Loading outlets…</p>
             ) : outlets.length === 0 ? (
-              <p className="text-sm text-gray-500">No outlets yet. Create one to get started.</p>
+              <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No outlets yet. Create one to get started.</p>
             ) : (
               <div className="space-y-4">
                 {outlets.map((outlet) => (
-                  <div key={outlet.id} className="border border-gray-200 rounded-lg p-4 space-y-3">
+                  <div key={outlet.id} className="rounded-lg p-4 space-y-3" style={{ border: "1px solid var(--color-border)" }}>
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="text-sm font-semibold text-gray-900">{outlet.name}</h3>
-                        {outlet.timezone && <p className="text-xs text-gray-500">{outlet.timezone}</p>}
+                        <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{outlet.name}</h3>
+                        {outlet.timezone && <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{outlet.timezone}</p>}
                       </div>
                       <Badge variant="blue">{outlet.registers.length} register{outlet.registers.length !== 1 ? "s" : ""}</Badge>
                     </div>
@@ -157,7 +158,8 @@ export default function OperationsPage() {
                             if (e.key === "Escape") setAddRegisterState((prev) => { const n = { ...prev }; delete n[outlet.id]; return n; });
                           }}
                           placeholder="Register name"
-                          className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                          className="flex-1 rounded-lg px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                          style={{ border: "1px solid var(--color-border)" }}
                         />
                         <Button variant="primary" size="sm" onClick={() => void handleAddRegister(outlet.id)}>Add</Button>
                         <Button variant="secondary" size="sm" onClick={() => setAddRegisterState((prev) => { const n = { ...prev }; delete n[outlet.id]; return n; })}>Cancel</Button>
@@ -176,26 +178,26 @@ export default function OperationsPage() {
       <Modal open={showNewLocation} onClose={() => setShowNewLocation(false)} title="New Location"
         footer={<div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setShowNewLocation(false)}>Cancel</Button><Button variant="primary" loading={saving} onClick={() => void handleCreateLocation()}>Create</Button></div>}>
         <div className="space-y-4">
-          <div><label className="block text-sm font-medium text-gray-700 mb-1">Location Code</label>
-            <input value={newLoc.code} onChange={(e) => setNewLoc((p) => ({ ...p, code: e.target.value }))} placeholder="A-01-B" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" /></div>
-          <div><label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-            <input value={newLoc.name} onChange={(e) => setNewLoc((p) => ({ ...p, name: e.target.value }))} placeholder="Aisle A, Shelf 1, Bin B" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" /></div>
-          <div><label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-            <select value={newLoc.type} onChange={(e) => setNewLoc((p) => ({ ...p, type: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500">
+          <div><label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Location Code</label>
+            <input value={newLoc.code} onChange={(e) => setNewLoc((p) => ({ ...p, code: e.target.value }))} placeholder="A-01-B" className="w-full rounded-lg px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" style={{ border: "1px solid var(--color-border)" }} /></div>
+          <div><label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Name</label>
+            <input value={newLoc.name} onChange={(e) => setNewLoc((p) => ({ ...p, name: e.target.value }))} placeholder="Aisle A, Shelf 1, Bin B" className="w-full rounded-lg px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" style={{ border: "1px solid var(--color-border)" }} /></div>
+          <div><label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Type</label>
+            <select value={newLoc.type} onChange={(e) => setNewLoc((p) => ({ ...p, type: e.target.value }))} className="w-full rounded-lg px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" style={{ border: "1px solid var(--color-border)" }}>
               <option value="bin">Bin</option><option value="shelf">Shelf</option><option value="aisle">Aisle</option><option value="zone">Zone</option><option value="rack">Rack</option>
             </select></div>
-          <div><label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
-            <input value={newLoc.description} onChange={(e) => setNewLoc((p) => ({ ...p, description: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" /></div>
+          <div><label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Description (optional)</label>
+            <input value={newLoc.description} onChange={(e) => setNewLoc((p) => ({ ...p, description: e.target.value }))} className="w-full rounded-lg px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" style={{ border: "1px solid var(--color-border)" }} /></div>
         </div>
       </Modal>
 
       <Modal open={showNewOutlet} onClose={() => setShowNewOutlet(false)} title="New Outlet"
         footer={<div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setShowNewOutlet(false)}>Cancel</Button><Button variant="primary" loading={savingOutlet} onClick={() => void handleCreateOutlet()}>Create</Button></div>}>
         <div className="space-y-4">
-          <div><label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-            <input value={newOutlet.name} onChange={(e) => setNewOutlet((p) => ({ ...p, name: e.target.value }))} placeholder="Main Store" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" /></div>
-          <div><label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
-            <input value={newOutlet.timezone} onChange={(e) => setNewOutlet((p) => ({ ...p, timezone: e.target.value }))} placeholder="UTC" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" /></div>
+          <div><label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Name</label>
+            <input value={newOutlet.name} onChange={(e) => setNewOutlet((p) => ({ ...p, name: e.target.value }))} placeholder="Main Store" className="w-full rounded-lg px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" style={{ border: "1px solid var(--color-border)" }} /></div>
+          <div><label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Timezone</label>
+            <input value={newOutlet.timezone} onChange={(e) => setNewOutlet((p) => ({ ...p, timezone: e.target.value }))} placeholder="UTC" className="w-full rounded-lg px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" style={{ border: "1px solid var(--color-border)" }} /></div>
         </div>
       </Modal>
     </EnterpriseShell>

@@ -109,7 +109,8 @@ function PayControl({
         onChange={(e) => setAmount(e.target.value)}
         disabled={busy}
         aria-label="Payment amount"
-        className="w-20 rounded border border-slate-300 px-1.5 py-1 text-right text-xs outline-none focus:border-slate-950 focus:ring-1 focus:ring-slate-950"
+        className="w-20 rounded px-1.5 py-1 text-right text-xs outline-none focus:ring-1"
+        style={{ border: "1px solid var(--color-border)" }}
       />
       <Button
         size="sm"

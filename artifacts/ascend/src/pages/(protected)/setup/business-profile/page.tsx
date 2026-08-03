@@ -156,7 +156,7 @@ export default function BusinessProfilePage() {
         {loading ? (
           <div className="space-y-4">
             {[1,2,3].map(i => (
-              <div key={i} className="h-24 animate-pulse rounded-2xl bg-gray-100" />
+              <div key={i} className="h-24 animate-skeleton rounded-2xl" />
             ))}
           </div>
         ) : (
@@ -166,8 +166,8 @@ export default function BusinessProfilePage() {
               <div className="mb-4 flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">1</div>
                 <div>
-                  <h2 className="text-base font-semibold text-[var(--color-text-primary)]">Choose your business type</h2>
-                  <p className="text-xs text-[var(--color-text-secondary)]">Activates a curated module bundle for your industry</p>
+                  <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Choose your business type</h2>
+                  <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>Activates a curated module bundle for your industry</p>
                 </div>
               </div>
 
@@ -182,14 +182,16 @@ export default function BusinessProfilePage() {
                       className={`group rounded-xl border-2 p-3 text-left transition-all hover:shadow-sm ${
                         isSelected
                           ? "border-brand-600 bg-brand-50 shadow-sm"
-                          : "border-slate-200 bg-white hover:border-brand-300"
+                          : "hover:border-brand-300"
                       }`}
+                      style={isSelected ? undefined : { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
                     >
                       <div className="mb-1.5 text-2xl">{bundle.icon}</div>
-                      <p className={`text-sm font-semibold leading-tight ${isSelected ? "text-brand-700" : "text-[var(--color-text-primary)]"}`}>
+                      <p className={`text-sm font-semibold leading-tight ${isSelected ? "text-brand-700" : ""}`}
+                        style={isSelected ? undefined : { color: "var(--color-text-primary)" }}>
                         {bundle.name}
                       </p>
-                      <p className="mt-0.5 line-clamp-2 text-[11px] text-[var(--color-text-secondary)]">
+                      <p className="mt-0.5 line-clamp-2 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
                         {bundle.description}
                       </p>
                       {isSelected && (
@@ -220,8 +222,8 @@ export default function BusinessProfilePage() {
                 <div className="flex items-center gap-3">
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">2</div>
                   <div>
-                    <h2 className="text-base font-semibold text-[var(--color-text-primary)]">Customise modules</h2>
-                    <p className="text-xs text-[var(--color-text-secondary)]">{totalEnabled} of {totalOptional + (profile?.coreModules.length ?? 0)} modules enabled</p>
+                    <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Customise modules</h2>
+                    <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{totalEnabled} of {totalOptional + (profile?.coreModules.length ?? 0)} modules enabled</p>
                   </div>
                 </div>
 
@@ -231,8 +233,9 @@ export default function BusinessProfilePage() {
                     type="button"
                     onClick={() => setActiveGroup("all")}
                     className={`rounded-full px-3 py-1 text-[11px] font-medium transition-colors ${
-                      activeGroup === "all" ? "bg-brand-600 text-white" : "bg-gray-100 text-[var(--color-text-secondary)] hover:bg-gray-200"
+                      activeGroup === "all" ? "bg-brand-600 text-white" : "hover:bg-[var(--color-surface-subtle)]"
                     }`}
+                    style={activeGroup === "all" ? undefined : { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}
                   >All</button>
                   {groupsWithModules.filter(g => g !== "common").map((g) => (
                     <button
@@ -240,8 +243,9 @@ export default function BusinessProfilePage() {
                       type="button"
                       onClick={() => setActiveGroup(g)}
                       className={`rounded-full px-3 py-1 text-[11px] font-medium capitalize transition-colors ${
-                        activeGroup === g ? "bg-brand-600 text-white" : "bg-gray-100 text-[var(--color-text-secondary)] hover:bg-gray-200"
+                        activeGroup === g ? "bg-brand-600 text-white" : "hover:bg-[var(--color-surface-subtle)]"
                       }`}
+                      style={activeGroup === g ? undefined : { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}
                     >
                       {GROUP_LABELS[g]?.split(" ")[0]}
                     </button>
@@ -255,7 +259,7 @@ export default function BusinessProfilePage() {
                   if (!mods?.length) return null;
                   return (
                     <Card key={group}>
-                      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-secondary)" }}>
                         {GROUP_LABELS[group] ?? group}
                       </h3>
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -267,20 +271,27 @@ export default function BusinessProfilePage() {
                               key={mod.key}
                               className={`flex items-center justify-between rounded-xl border px-4 py-3 transition-all ${
                                 isCore
-                                  ? "border-[var(--color-table-border)] bg-gray-50"
+                                  ? ""
                                   : isEnabled
                                   ? "border-brand-200 bg-white shadow-sm"
-                                  : "border-[var(--color-table-border)] bg-gray-50 opacity-60"
+                                  : "opacity-60"
                               }`}
+                              style={
+                                isCore
+                                  ? { borderColor: "var(--color-table-border)", backgroundColor: "var(--color-surface-subtle)" }
+                                  : isEnabled
+                                  ? undefined
+                                  : { borderColor: "var(--color-table-border)", backgroundColor: "var(--color-surface-subtle)" }
+                              }
                             >
                               <div className="min-w-0 flex-1 pr-3">
                                 <div className="flex flex-wrap items-center gap-1.5">
-                                  <span className="text-sm font-medium text-[var(--color-text-primary)]">{mod.name}</span>
+                                  <span className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>{mod.name}</span>
                                   {isCore && (
                                     <Badge variant="gray" size="sm">Core</Badge>
                                   )}
                                 </div>
-                                <p className="mt-0.5 text-[11px] leading-tight text-[var(--color-text-secondary)]">
+                                <p className="mt-0.5 text-[11px] leading-tight" style={{ color: "var(--color-text-secondary)" }}>
                                   {mod.description}
                                 </p>
                               </div>
@@ -319,17 +330,17 @@ export default function BusinessProfilePage() {
 
             {/* ── Sticky save bar ───────────────────────────────────────── */}
             <div className="sticky bottom-4 z-20">
-              <div className="flex items-center justify-between rounded-2xl border border-[var(--color-table-border)] bg-white/95 px-5 py-4 shadow-lg backdrop-blur-sm">
+              <div className="flex items-center justify-between rounded-2xl border px-5 py-4 shadow-lg backdrop-blur-sm" style={{ borderColor: "var(--color-table-border)", backgroundColor: "var(--color-surface)" }}>
                 <div>
-                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                  <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
                     {totalEnabled} modules active
                     {selectedType && profile?.bundles[selectedType] && (
-                      <span className="ml-2 text-[var(--color-text-secondary)] font-normal">
+                      <span className="ml-2 font-normal" style={{ color: "var(--color-text-secondary)" }}>
                         · {profile.bundles[selectedType]!.icon} {profile.bundles[selectedType]!.name}
                       </span>
                     )}
                   </p>
-                  <p className="text-xs text-[var(--color-text-secondary)]">
+                  <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
                     Changes take effect immediately — the navigation will update
                   </p>
                 </div>
