@@ -198,7 +198,7 @@ export default function VendorsPage() {
                     onClick={() => setFilter(item)}
                     aria-pressed={filter === item}
                     className={`min-h-[40px] whitespace-nowrap rounded-md px-3 text-sm font-medium capitalize transition-colors ${
-                      filter === item ? "bg-slate-950 text-white" : "hover:bg-[var(--color-surface-subtle)]"
+                      filter === item ? "bg-[var(--color-text-primary)] text-white" : "hover:bg-[var(--color-surface-subtle)]"
                     }`}
                     style={filter !== item ? { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" } : {}}
                   >

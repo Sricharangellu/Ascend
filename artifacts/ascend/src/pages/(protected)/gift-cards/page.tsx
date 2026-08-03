@@ -119,12 +119,12 @@ export default function GiftCardsPage() {
                       key={d}
                       type="button"
                       onClick={() => setIssueAmount(String(d))}
-                      className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
-                        issueAmount === String(d)
-                          ? "border-slate-950 bg-slate-950 text-white"
-                          : ""
-                      }`}
-                      style={issueAmount === String(d) ? {} : {
+                      className="rounded-md border px-3 py-1.5 text-sm font-medium transition-colors"
+                      style={issueAmount === String(d) ? {
+                        backgroundColor: "var(--color-text-primary)",
+                        borderColor: "var(--color-text-primary)",
+                        color: "white",
+                      } : {
                         borderColor: "var(--color-border)",
                         backgroundColor: "var(--color-surface)",
                         color: "var(--color-text-secondary)",

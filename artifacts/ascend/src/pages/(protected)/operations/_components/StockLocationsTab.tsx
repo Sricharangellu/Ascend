@@ -183,7 +183,8 @@ export function StockLocationsTab() {
                     disabled={toggling === loc.id}
                     onClick={() => void toggleActive(loc)}
                     aria-pressed={loc.is_active}
-                    className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${loc.is_active ? "bg-blue-600" : "bg-slate-300"} ${toggling === loc.id ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                    className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${toggling === loc.id ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                    style={{ backgroundColor: loc.is_active ? "#2563eb" : "var(--color-border)" }}
                   >
                     <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${loc.is_active ? "translate-x-4" : "translate-x-0.5"}`} />
                     <span className="sr-only">{loc.is_active ? "Active" : "Inactive"}</span>

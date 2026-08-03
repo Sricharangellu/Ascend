@@ -753,7 +753,7 @@ export default function PermissionsPage() {
                 <span className={`h-3 w-3 rounded-full ${activeRole.color}`} />
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-[#111]">{activeRole.name}</p>
+                    <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{activeRole.name}</p>
                     {activeRole.custom && (
                       <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase" style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }}>Custom</span>
                     )}
@@ -816,7 +816,7 @@ export default function PermissionsPage() {
                       {group.features.map((feature) => {
                         const enabled = isImmutable || currentFeatures.has(feature.id);
                         return (
-                          <div key={feature.id} className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-[#FAFAFA]">
+                          <div key={feature.id} className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-[var(--color-surface-subtle)]">
                             <div className="mr-4">
                               <p className="text-sm font-medium" style={{ color: enabled ? "var(--color-text-primary)" : "var(--color-text-muted)" }}>{feature.label}</p>
                               <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{feature.description}</p>

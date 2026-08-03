@@ -88,7 +88,7 @@ export default function WorkforcePage() {
         {/* Stat row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { label: "Employees",       value: employees.length,            color: "border-slate-300" },
+            { label: "Employees",       value: employees.length,            color: "border-[var(--color-border)]" },
             { label: "Shifts This Week", value: shifts.length,               color: "border-blue-400" },
             { label: "Hours Scheduled",  value: `${totalHours.toFixed(0)}h`, color: "border-emerald-400" },
             { label: "Pending Requests", value: pendingCount,                color: "border-amber-400" },

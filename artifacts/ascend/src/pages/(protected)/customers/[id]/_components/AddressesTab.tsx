@@ -185,7 +185,7 @@ export function AddressesTab({
                     type="checkbox"
                     checked={editForm.is_default}
                     onChange={(e) => setEditForm((f) => ({ ...f, is_default: e.target.checked }))}
-                    className="h-4 w-4 rounded border-slate-300 accent-blue-600"
+                    className="h-4 w-4 rounded accent-blue-600" style={{ borderColor: "var(--color-border)" }}
                   />
                   Default
                 </label>
@@ -288,7 +288,7 @@ export function AddressesTab({
                   type="checkbox"
                   checked={form.is_default}
                   onChange={(e) => setForm((f) => ({ ...f, is_default: e.target.checked }))}
-                  className="h-4 w-4 rounded border-slate-300 accent-blue-600"
+                  className="h-4 w-4 rounded accent-blue-600" style={{ borderColor: "var(--color-border)" }}
                 />
                 Set as default
               </label>

@@ -91,16 +91,16 @@ export function ReorderTab({
             <button
               type="button"
               onClick={() => setViewMode("vendor")}
-              className={`px-3 py-1.5 transition-colors ${viewMode === "vendor" ? "bg-slate-900 text-white" : "hover:bg-[var(--color-surface-subtle)]"}`}
-              style={viewMode === "vendor" ? undefined : { backgroundColor: "var(--color-surface)", color: "var(--color-text-muted)" }}
+              className={`px-3 py-1.5 transition-colors ${viewMode === "vendor" ? "text-white" : "hover:bg-[var(--color-surface-subtle)]"}`}
+              style={viewMode === "vendor" ? { backgroundColor: "var(--color-text-primary)" } : { backgroundColor: "var(--color-surface)", color: "var(--color-text-muted)" }}
             >
               By vendor
             </button>
             <button
               type="button"
               onClick={() => setViewMode("product")}
-              className={`border-l px-3 py-1.5 transition-colors ${viewMode === "product" ? "bg-slate-900 text-white" : "hover:bg-[var(--color-surface-subtle)]"}`}
-              style={viewMode === "product" ? { borderColor: "var(--color-border)" } : { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-muted)" }}
+              className={`border-l px-3 py-1.5 transition-colors ${viewMode === "product" ? "text-white" : "hover:bg-[var(--color-surface-subtle)]"}`}
+              style={viewMode === "product" ? { borderColor: "var(--color-border)", backgroundColor: "var(--color-text-primary)" } : { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-muted)" }}
             >
               By product
             </button>

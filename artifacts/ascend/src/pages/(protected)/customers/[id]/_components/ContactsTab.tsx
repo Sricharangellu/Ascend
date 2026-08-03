@@ -156,7 +156,7 @@ export function ContactsTab({
                   type="checkbox"
                   checked={editTarget.is_primary}
                   onChange={(e) => setEditTarget((t) => t && ({ ...t, is_primary: e.target.checked }))}
-                  className="h-4 w-4 rounded border-slate-300 accent-blue-600"
+                  className="h-4 w-4 rounded accent-blue-600" style={{ borderColor: "var(--color-border)" }}
                 />
                 Primary contact
               </label>
@@ -220,7 +220,7 @@ export function ContactsTab({
                   type="checkbox"
                   checked={form.is_primary}
                   onChange={(e) => setForm((f) => ({ ...f, is_primary: e.target.checked }))}
-                  className="h-4 w-4 rounded border-slate-300 accent-blue-600"
+                  className="h-4 w-4 rounded accent-blue-600" style={{ borderColor: "var(--color-border)" }}
                 />
                 Primary contact
               </label>
