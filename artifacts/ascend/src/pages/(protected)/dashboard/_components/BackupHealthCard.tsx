@@ -1,8 +1,8 @@
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { Card } from "@/components/Card";
 import { useQuery } from "@/lib/useQuery";
-import { apiGet } from "@/api-client/client";
+import { apiDownload, apiGet, ApiResponseError } from "@/api-client/client";
 import { hasRole } from "@/lib/auth";
 
 interface BackupStatusResponse {
@@ -33,6 +33,31 @@ export function BackupHealthCard() {
   const isOwner = hasRole("owner");
   const fetchStatus = useCallback(() => apiGet<BackupStatusResponse>("/api/v1/admin/db/backup-status"), []);
   const { data, loading, error } = useQuery("dashboard:backup-status", fetchStatus, { staleMs: 60_000, enabled: isOwner });
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  const downloadBackup = async () => {
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const blob = await apiDownload("/api/v1/admin/db/export", {
+        headers: { Accept: "application/sql,application/octet-stream,*/*" },
+      });
+      const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19) + "Z";
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `ascend-backup-${ts}.sql`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setDownloadError(
+        err instanceof ApiResponseError ? err.message : "Backup download failed. Please try again."
+      );
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   if (!isOwner) return null;
 
@@ -92,6 +117,27 @@ export function BackupHealthCard() {
           )}
         </dl>
       )}
+
+      <div className="mt-4 border-t pt-3" style={{ borderColor: "var(--color-border)" }}>
+        <button
+          type="button"
+          onClick={() => void downloadBackup()}
+          disabled={downloading}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+          style={{
+            borderColor: "var(--color-border)",
+            color: "var(--color-text-primary)",
+            backgroundColor: "var(--color-surface)",
+          }}
+        >
+          {downloading ? "Preparing backup…" : "Download backup"}
+        </button>
+        {downloadError && (
+          <p role="alert" className="mt-2 rounded-lg border border-danger-100 bg-danger-50 px-3 py-2 text-[11px] text-danger-700">
+            {downloadError}
+          </p>
+        )}
+      </div>
     </Card>
   );
 }
