@@ -66,17 +66,14 @@ Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0
 | Field | Value |
 |---|---|
 | Agent/session | Cursor Cloud `bc-c564feef` — Ascend UI ponytail audit |
-<<<<<<< HEAD
 | Queue item | Port remaining #133 Critical dead-chrome leftovers still on develop: Catalog Quick Sell href `/register`→`/terminal`; remove Help 404 + Register Switch noop; remove Import customers dead CTA + fake checkboxes; wire customer edit pencil → `/customers/:id`. (Outlet filter → #166; Quick Sell handler → #163.) Plus Wave C settings naming start. |
 | Files/areas expected | `web/components/EnterpriseShell.tsx`; `web/app/(protected)/catalog/[id]/page.tsx`; `web/app/(protected)/customers/**`; `WORK/**` |
 | Started | 2026-08-03T054600Z |
 | Status | RELEASED — `cursor/ui-wave-a-dead-chrome-604f`; see AUDIT_2026-08-03T054700Z-ui-wave-a-dead-chrome.md |
-=======
 | Queue item | Port remaining Wave A silent-catch fixes + Wave B palette deep-links / Cost Entry (pipeline/Error Center already on develop via Ponytail #160). Plus #133 leftover: wire dashboard outlet select into report `scope`. |
 | Files/areas expected | `web/components/CommandPalette.tsx`; `web/app/(protected)/{gift-cards,dashboard,inventory,purchase}/**`; `web/tests/**`; `WORK/**` |
 | Started | 2026-08-03T050700Z |
 | Status | RELEASED — `cursor/ui-wave-ab-trust-speed-604f`; see AUDIT_2026-08-03T050800Z-ui-wave-ab-trust-speed.md |
->>>>>>> 94271e1 (fix(web): Wave A trust leftovers + palette deep-links + Cost Entry)
 | Blockers | none |
 
 ## Active Claim (Cursor cloud — procurement receiving enterprise rewrite)
