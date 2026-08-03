@@ -1,7 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildApp, type App } from "../../app.js";
-import { DemandPlanningService } from "./service.js";
+import {
+  DemandPlanningService,
+  computeAccuracyMetrics,
+  periodEndMs,
+} from "./service.js";
 
 const TEST_TENANT = "tnt_demo";
 const DAY_MS = 86_400_000;
@@ -148,4 +152,130 @@ test("POST /demand-planning/snapshot then GET /history returns the persisted poi
   assert.equal(hist.status, 200);
   assert.equal(hist.json.points.length, 1);
   assert.equal(hist.json.points[0].unitsSold, 11);
+});
+
+// ── Phase 7 item 3: forecast accuracy ───────────────────────────────────────
+
+test("computeAccuracyMetrics: perfect / over / under / both-zero", () => {
+  assert.deepEqual(computeAccuracyMetrics(10, 10), {
+    varianceUnits: 0, variancePct: 0, accuracyPct: 100,
+  });
+  assert.equal(computeAccuracyMetrics(10, 8).varianceUnits, -2);
+  assert.equal(computeAccuracyMetrics(10, 8).variancePct, -20);
+  assert.equal(computeAccuracyMetrics(10, 8).accuracyPct, 80);
+  assert.deepEqual(computeAccuracyMetrics(0, 0), {
+    varianceUnits: 0, variancePct: 0, accuracyPct: 100,
+  });
+  assert.equal(computeAccuracyMetrics(0, 5).variancePct, null);
+  assert.equal(periodEndMs("day", 0), DAY_MS);
+  assert.equal(periodEndMs("week", 0), 7 * DAY_MS);
+});
+
+test("createForecast + getForecastAccuracy compares against demand_snapshots", async () => {
+  const app = await freshApp();
+  const p = await makeProduct(app, "DP-ACC-1");
+  const service = new DemandPlanningService(app.db);
+  // Use yesterday so the period is closed (accuracy defaults to closedOnly).
+  const dayStart = Math.floor(Date.now() / DAY_MS) * DAY_MS - DAY_MS;
+
+  await insertOrder(app, { productId: p, quantity: 10, createdAt: dayStart + 1000 });
+  await service.snapshotDay(dayStart + 500);
+
+  const forecast = await service.createForecast({
+    tenantId: TEST_TENANT,
+    productId: p,
+    periodType: "day",
+    periodStart: dayStart,
+    forecastUnits: 8,
+    method: "manual",
+  });
+  assert.equal(forecast.forecastUnits, 8);
+  assert.equal(forecast.periodEnd, dayStart + DAY_MS);
+
+  const rows = await service.getForecastAccuracy({
+    tenantId: TEST_TENANT,
+    productId: p,
+    periodType: "day",
+    fromMs: dayStart,
+    toMs: dayStart + DAY_MS,
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]!.actualUnits, 10);
+  assert.equal(rows[0]!.forecastUnits, 8);
+  assert.equal(rows[0]!.varianceUnits, 2);
+  assert.equal(rows[0]!.variancePct, 25);
+  assert.equal(rows[0]!.accuracyPct, 80);
+});
+
+test("getForecastAccuracy skips open (not-yet-ended) periods by default", async () => {
+  const app = await freshApp();
+  const p = await makeProduct(app, "DP-OPEN-1");
+  const service = new DemandPlanningService(app.db);
+  const today = Math.floor(Date.now() / DAY_MS) * DAY_MS;
+
+  await service.createForecast({
+    tenantId: TEST_TENANT,
+    productId: p,
+    periodType: "day",
+    periodStart: today,
+    forecastUnits: 5,
+  });
+
+  const closed = await service.getForecastAccuracy({
+    tenantId: TEST_TENANT,
+    productId: p,
+    periodType: "day",
+    fromMs: today,
+    toMs: today + DAY_MS,
+  });
+  assert.equal(closed.length, 0, "today is still open — should not score yet");
+
+  const includingOpen = await service.getForecastAccuracy({
+    tenantId: TEST_TENANT,
+    productId: p,
+    periodType: "day",
+    fromMs: today,
+    toMs: today + DAY_MS,
+    closedOnly: false,
+  });
+  assert.equal(includingOpen.length, 1);
+});
+
+test("POST /forecasts is manager-gated; GET /accuracy returns scored rows", async () => {
+  const app = await freshApp();
+  const p = await makeProduct(app, "DP-ACC-ROUTE");
+  const dayStart = Math.floor(Date.now() / DAY_MS) * DAY_MS - DAY_MS;
+  await insertOrder(app, { productId: p, quantity: 4, createdAt: dayStart + 1000 });
+  await call(app, "POST", "/api/demand-planning/snapshot", { date: dayStart + 500 }, "manager");
+
+  const denied = await call(
+    app,
+    "POST",
+    "/api/demand-planning/forecasts",
+    { productId: p, periodType: "day", periodStart: dayStart, forecastUnits: 5 },
+    "cashier",
+  );
+  assert.equal(denied.status, 403);
+
+  const created = await call(
+    app,
+    "POST",
+    "/api/demand-planning/forecasts",
+    { productId: p, periodType: "day", periodStart: dayStart, forecastUnits: 5, method: "baseline" },
+    "manager",
+  );
+  assert.equal(created.status, 201);
+  assert.equal(created.json.forecastUnits, 5);
+
+  const accuracy = await call(
+    app,
+    "GET",
+    `/api/demand-planning/accuracy?periodType=day&from=${dayStart}&to=${dayStart + DAY_MS}&productId=${p}`,
+    undefined,
+    "manager",
+  );
+  assert.equal(accuracy.status, 200);
+  assert.equal(accuracy.json.rows.length, 1);
+  assert.equal(accuracy.json.rows[0].actualUnits, 4);
+  assert.equal(accuracy.json.rows[0].method, "baseline");
 });

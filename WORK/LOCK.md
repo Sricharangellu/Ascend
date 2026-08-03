@@ -10,8 +10,19 @@ Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0
 | Queue item | Audit gaps + fix connectivity / API-break / rate-limiting bugs: offline outbox dropping 429s as permanent, API client missing Retry-After retry, SSO limiter not env-overridable (same class as the e2e identity flake), stale rate-limit docs. |
 | Files/areas expected | `web/lib/offlineOutbox.ts`, `web/public/sw.js`, `web/api-client/client.ts`, `web/tests/api-client.test.ts`, `src/app.ts`, `src/gateway/rateLimit.ts` (+ test), `docs/api/rate-limits.md`, `.github/workflows/ci.yml` (e2e env), `WORK/**` |
 | Started | 2026-08-03T02:12:57Z |
-| Status | RELEASED — PR #150 follow-up landed: skip auto-retry without `Retry-After` (protects `account_locked`); outbox/SW stop drain on 429; api-client tests 19/19. |
+| Status | RELEASED — merged to `develop` via PR #150 (`801b7a4`). |
 | Blockers | none |
+
+## Active Claim (Cursor Cloud — Phase 7 item 3: forecast accuracy framework)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud agent (`cursor/phase7-forecast-accuracy-57b8`) |
+| Queue item | Phase 7 item 3 — forecast accuracy framework (measurement layer before prediction models): persist forecast qty + compare to `demand_snapshots` actuals → variance / accuracy %. Depends on item 2 (PR #121, rebased onto post-#150 develop). |
+| Files/areas expected | `src/modules/demand_planning/{index,service,routes,demand-planning.test}.ts`, `WORK/**` |
+| Started | 2026-08-03T03:00:35Z |
+| Status | ACTIVE — implementing |
+| Blockers | PR #121 CI in progress (rebased); building item 3 on top of the rebased tip |
 
 ## Active Claim (Claude session G — Phase 0 coordinator: finish end-to-end + deployment readiness)
 

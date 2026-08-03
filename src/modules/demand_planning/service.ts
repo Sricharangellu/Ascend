@@ -1,33 +1,22 @@
 import type { DB } from "../../shared/db.js";
+import { badRequest } from "../../shared/http.js";
 
 const DAY_MS = 86_400_000;
 const WEEK_MS = 7 * DAY_MS;
 
 /**
- * Demand Planning module — Phase 7 item 2 ("Demand snapshot foundation",
- * `WORK/FORWARD_PLAN.md`). Persists a daily, tenant/product/store-scoped
- * history of *actual* units sold, independent of `src/shared/sales-velocity.ts`
- * (Phase 7 item 1).
+ * Demand Planning module — Phase 7 items 2–3 (`WORK/FORWARD_PLAN.md`).
  *
- * Deliberately NOT built on top of `computeSalesVelocity()`: that function
- * answers "how much sold in the last N days from right now" (a live,
- * shifting trailing window — correct for reorder suggestions, wrong for a
- * persisted historical record, since re-running it later would describe a
- * different window). This module needs a stable, idempotent, calendar-day-
- * bounded aggregate that produces the same answer no matter when it's
- * computed or re-computed. `snapshotDay()` below is that query — it shares
- * `computeSalesVelocity()`'s correctness contract on purpose (INNER JOIN
- * orders, `o.status = 'completed'`, a real bounded date-range WHERE filter)
- * so it doesn't become a sixth drifted "how much did we sell" implementation
- * (see `WORK/audits/AUDIT_2026-07-28T203748Z-phase7-demand-planning-foundation-gap.md`
- * Finding 1 for the history of why that matters here) — it is just bounded
- * by `[dayStart, dayEnd)` instead of `[now - lookbackDays, now)`.
+ * Item 2 (`demand_snapshots`): persisted daily actual units sold. Deliberately
+ * NOT built on `computeSalesVelocity()` — that answers "how much sold in the
+ * last N days from right now" (a shifting trailing window). Snapshots need a
+ * stable calendar-day aggregate. See
+ * `AUDIT_2026-07-28T203748Z-phase7-demand-planning-foundation-gap.md`.
  *
- * No forecasting model lives here — this item is the "actuals" ledger a
- * future forecast-accuracy framework (Phase 7 item 3) compares predictions
- * against. `getDemandHistory()` is the only read path, and it aggregates the
- * persisted daily rows into week/month buckets at query time rather than
- * storing three copies of the same data at different grains.
+ * Item 3 (`demand_forecasts` + accuracy read path): the measurement layer
+ * **before** any prediction model. Callers persist a forecast (qty + period +
+ * method); accuracy is computed by joining closed periods against snapshot
+ * actuals. No ML — just "was our forecast correct?"
  */
 
 export interface SnapshotDayResult {
@@ -52,8 +41,100 @@ export interface DemandHistoryOptions {
   toMs: number;
 }
 
+export type ForecastPeriodType = "day" | "week" | "month";
+
+export interface CreateForecastInput {
+  tenantId: string;
+  productId: string;
+  storeId?: string | null;
+  periodType: ForecastPeriodType;
+  periodStart: number;
+  forecastUnits: number;
+  /** Label for how the forecast was produced — not a model. Default `manual`. */
+  method?: string;
+  createdBy?: string | null;
+}
+
+export interface DemandForecast {
+  id: string;
+  tenantId: string;
+  productId: string;
+  storeId: string;
+  periodType: ForecastPeriodType;
+  periodStart: number;
+  periodEnd: number;
+  forecastUnits: number;
+  method: string;
+  createdAt: number;
+  createdBy: string | null;
+}
+
+export interface ForecastAccuracyRow {
+  forecastId: string;
+  productId: string;
+  storeId: string;
+  periodType: ForecastPeriodType;
+  periodStart: number;
+  periodEnd: number;
+  method: string;
+  forecastUnits: number;
+  actualUnits: number;
+  /** actual − forecast (negative = over-forecast). */
+  varianceUnits: number;
+  /**
+   * ((actual − forecast) / forecast) × 100. `null` when forecast was 0 and
+   * actual was not (undefined relative error).
+   */
+  variancePct: number | null;
+  /**
+   * 100 × (1 − |actual − forecast| / max(actual, forecast, 1)), floored at 0.
+   * Both-zero → 100.
+   */
+  accuracyPct: number;
+}
+
+export interface ForecastAccuracyOptions {
+  tenantId: string;
+  productId?: string | null;
+  storeId?: string | null;
+  periodType: ForecastPeriodType;
+  fromMs: number;
+  toMs: number;
+  /** When true (default), only periods that have already ended. */
+  closedOnly?: boolean;
+}
+
 function dayStartOf(ms: number): number {
   return Math.floor(ms / DAY_MS) * DAY_MS;
+}
+
+/** Exclusive end of a period starting at `periodStart` for the given grain. */
+export function periodEndMs(periodType: ForecastPeriodType, periodStart: number): number {
+  if (periodType === "day") return periodStart + DAY_MS;
+  if (periodType === "week") return periodStart + WEEK_MS;
+  // Calendar month: advance one month from the UTC month containing periodStart.
+  const d = new Date(periodStart);
+  const next = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
+  return next;
+}
+
+export function computeAccuracyMetrics(
+  forecastUnits: number,
+  actualUnits: number,
+): Pick<ForecastAccuracyRow, "varianceUnits" | "variancePct" | "accuracyPct"> {
+  const varianceUnits = actualUnits - forecastUnits;
+  let variancePct: number | null;
+  if (forecastUnits === 0) {
+    variancePct = actualUnits === 0 ? 0 : null;
+  } else {
+    variancePct = (varianceUnits / forecastUnits) * 100;
+  }
+  const denom = Math.max(actualUnits, forecastUnits, 1);
+  const accuracyPct =
+    forecastUnits === 0 && actualUnits === 0
+      ? 100
+      : Math.max(0, 100 * (1 - Math.abs(varianceUnits) / denom));
+  return { varianceUnits, variancePct, accuracyPct };
 }
 
 export class DemandPlanningService {
@@ -187,5 +268,186 @@ export class DemandPlanningService {
       unitsSold: Number(r.units),
       revenueCents: Number(r.revenue),
     }));
+  }
+
+  // ── Phase 7 item 3: forecast persistence + accuracy ───────────────────────
+
+  /**
+   * Persist a forecast for a future (or historical) period. Upserts on the
+   * unique (tenant, product, store, period_type, period_start, method) key so
+   * re-recording the same method for the same period replaces the qty rather
+   * than inserting a duplicate.
+   */
+  async createForecast(input: CreateForecastInput): Promise<DemandForecast> {
+    if (!Number.isInteger(input.forecastUnits) || input.forecastUnits < 0) {
+      throw badRequest("forecastUnits must be a non-negative integer");
+    }
+    if (!Number.isFinite(input.periodStart)) {
+      throw badRequest("periodStart must be a finite epoch ms");
+    }
+    const storeId = input.storeId ?? "";
+    const method = (input.method?.trim() || "manual").slice(0, 64);
+    const now = Date.now();
+    const id = `dfcst_${input.tenantId}_${input.productId}_${storeId || "_all"}_${input.periodType}_${input.periodStart}_${method}`
+      .replace(/[^a-zA-Z0-9_.:-]/g, "_")
+      .slice(0, 200);
+
+    await this.db.query(
+      `INSERT INTO demand_forecasts
+         (id, tenant_id, product_id, store_id, period_type, period_start, forecast_units, method, created_at, created_by)
+       VALUES (@id, @tenantId, @productId, @storeId, @periodType, @periodStart, @forecastUnits, @method, @now, @createdBy)
+       ON CONFLICT (tenant_id, product_id, store_id, period_type, period_start, method)
+       DO UPDATE SET forecast_units = EXCLUDED.forecast_units,
+                     created_at = EXCLUDED.created_at,
+                     created_by = EXCLUDED.created_by`,
+      {
+        id,
+        tenantId: input.tenantId,
+        productId: input.productId,
+        storeId,
+        periodType: input.periodType,
+        periodStart: input.periodStart,
+        forecastUnits: input.forecastUnits,
+        method,
+        now,
+        createdBy: input.createdBy ?? null,
+      },
+    );
+
+    return {
+      id,
+      tenantId: input.tenantId,
+      productId: input.productId,
+      storeId,
+      periodType: input.periodType,
+      periodStart: input.periodStart,
+      periodEnd: periodEndMs(input.periodType, input.periodStart),
+      forecastUnits: input.forecastUnits,
+      method,
+      createdAt: now,
+      createdBy: input.createdBy ?? null,
+    };
+  }
+
+  async listForecasts(opts: {
+    tenantId: string;
+    productId?: string | null;
+    storeId?: string | null;
+    periodType?: ForecastPeriodType | null;
+    fromMs: number;
+    toMs: number;
+  }): Promise<DemandForecast[]> {
+    const params: Record<string, unknown> = {
+      tenantId: opts.tenantId,
+      fromMs: opts.fromMs,
+      toMs: opts.toMs,
+    };
+    const where = [
+      "tenant_id = @tenantId",
+      "period_start >= @fromMs",
+      "period_start < @toMs",
+    ];
+    if (opts.productId) {
+      where.push("product_id = @productId");
+      params["productId"] = opts.productId;
+    }
+    if (opts.storeId != null && opts.storeId !== "") {
+      where.push("store_id = @storeId");
+      params["storeId"] = opts.storeId;
+    }
+    if (opts.periodType) {
+      where.push("period_type = @periodType");
+      params["periodType"] = opts.periodType;
+    }
+
+    const rows = await this.db.query<{
+      id: string;
+      tenant_id: string;
+      product_id: string;
+      store_id: string;
+      period_type: ForecastPeriodType;
+      period_start: string;
+      forecast_units: number;
+      method: string;
+      created_at: string;
+      created_by: string | null;
+    }>(
+      `SELECT id, tenant_id, product_id, store_id, period_type, period_start,
+              forecast_units, method, created_at, created_by
+         FROM demand_forecasts
+        WHERE ${where.join(" AND ")}
+        ORDER BY period_start ASC, product_id ASC`,
+      params,
+    );
+
+    return rows.map((r) => {
+      const periodStart = Number(r.period_start);
+      const periodType = r.period_type;
+      return {
+        id: r.id,
+        tenantId: r.tenant_id,
+        productId: r.product_id,
+        storeId: r.store_id,
+        periodType,
+        periodStart,
+        periodEnd: periodEndMs(periodType, periodStart),
+        forecastUnits: Number(r.forecast_units),
+        method: r.method,
+        createdAt: Number(r.created_at),
+        createdBy: r.created_by,
+      };
+    });
+  }
+
+  /**
+   * Compare persisted forecasts against `demand_snapshots` actuals for the
+   * same tenant/product/store/period. Only closed periods are scored by
+   * default (a period still accumulating sales has no fair "actual" yet).
+   */
+  async getForecastAccuracy(opts: ForecastAccuracyOptions): Promise<ForecastAccuracyRow[]> {
+    const forecasts = await this.listForecasts({
+      tenantId: opts.tenantId,
+      productId: opts.productId,
+      storeId: opts.storeId,
+      periodType: opts.periodType,
+      fromMs: opts.fromMs,
+      toMs: opts.toMs,
+    });
+
+    const now = Date.now();
+    const closedOnly = opts.closedOnly !== false;
+    const out: ForecastAccuracyRow[] = [];
+
+    for (const f of forecasts) {
+      if (closedOnly && f.periodEnd > now) continue;
+
+      // Actuals: sum daily snapshots in [periodStart, periodEnd).
+      // When the forecast is store-scoped, match that store; otherwise sum all stores.
+      const points = await this.getDemandHistory({
+        tenantId: opts.tenantId,
+        productId: f.productId,
+        storeId: f.storeId || null,
+        periodType: "day",
+        fromMs: f.periodStart,
+        toMs: f.periodEnd,
+      });
+      const actualUnits = points.reduce((sum, p) => sum + p.unitsSold, 0);
+      const metrics = computeAccuracyMetrics(f.forecastUnits, actualUnits);
+
+      out.push({
+        forecastId: f.id,
+        productId: f.productId,
+        storeId: f.storeId,
+        periodType: f.periodType,
+        periodStart: f.periodStart,
+        periodEnd: f.periodEnd,
+        method: f.method,
+        forecastUnits: f.forecastUnits,
+        actualUnits,
+        ...metrics,
+      });
+    }
+
+    return out;
   }
 }
