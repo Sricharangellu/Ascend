@@ -25,10 +25,10 @@ interface FinanceBill extends Bill {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const BILLING_STYLE: Record<BillingStatus, string> = {
-  open: "bg-blue-50 text-blue-700 ring-blue-200",
-  partial: "bg-amber-50 text-amber-700 ring-amber-200",
-  paid: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  void: "bg-slate-100 text-slate-500 ring-slate-200",
+  open:    "bg-info-50 text-info-700 border border-info-200",
+  partial: "bg-warning-50 text-warning-700 border border-warning-200",
+  paid:    "bg-success-50 text-success-700 border border-success-200",
+  void:    "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)] border border-[var(--color-border)]",
 };
 
 const TABS = [
@@ -56,9 +56,14 @@ function isOverdue(item: { due_date: number | null; status: BillingStatus }): bo
 
 function SummaryCard({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className={`rounded-md border p-4 shadow-sm ${highlight ? "border-red-200 bg-red-50" : "border-slate-200 bg-white"}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
-      <p className={`mt-1 text-xl font-semibold tabular-nums ${highlight ? "text-red-700" : "text-slate-950"}`}>{value}</p>
+    <div
+      className={`rounded-xl border p-4 shadow-[var(--shadow-sm)] ${highlight ? "border-danger-200 bg-danger-50" : ""}`}
+      style={highlight ? {} : { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-secondary)" }}>{label}</p>
+      <p className={`mt-1.5 text-[20px] font-bold tabular-nums ${highlight ? "text-danger-700" : ""}`}
+        style={highlight ? {} : { color: "var(--color-text-primary)" }}
+      >{value}</p>
     </div>
   );
 }
@@ -105,7 +110,8 @@ function PayControl({
         onChange={(e) => setAmount(e.target.value)}
         disabled={busy}
         aria-label="Payment amount"
-        className="w-20 rounded border border-slate-300 px-1.5 py-1 text-right text-xs outline-none focus:border-slate-950 focus:ring-1 focus:ring-slate-950"
+        className="w-20 rounded px-1.5 py-1 text-right text-xs outline-none focus:ring-1"
+        style={{ border: "1px solid var(--color-border)" }}
       />
       <Button
         size="sm"
@@ -238,30 +244,31 @@ export default function FinancePage() {
       subtitle="Receivables, Payables & Aging"
       contentClassName="overflow-y-auto"
     >
-      <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6">
-        <div className="border-b border-slate-200 pb-4">
-          <h1 className="text-lg font-semibold text-slate-950">Finance center</h1>
-          <p className="mt-1 text-sm text-slate-500">Track outstanding receivables, supplier payables, and aging exposure.</p>
+      <div className="mx-auto w-full max-w-7xl space-y-5 px-5 py-5 sm:px-6">
+        <div className="border-b pb-4" style={{ borderColor: "var(--color-border)" }}>
+          <h1 className="text-[20px] font-bold tracking-tight" style={{ color: "var(--color-text-primary)" }}>Finance center</h1>
+          <p className="mt-0.5 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>Track outstanding receivables, supplier payables, and aging exposure.</p>
         </div>
         {error && (
-          <div className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>
+          <div className="rounded-xl border px-4 py-3 text-[13px]" style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>{error}</div>
         )}
 
         {/* Tab bar */}
-        <div className="flex gap-1 border-b border-slate-200">
+        <div className="flex gap-0 border-b" style={{ borderColor: "var(--color-border)" }}>
           {TABS.map((t) => (
             <button
               key={t.id}
-                onClick={() => {
-                  setTab(t.id);
-                  router.replace(t.id === "ap" ? "/finance/bills" : t.id === "aging" ? "/reporting/ar-aging" : "/finance", { scroll: false });
-                }}
-                aria-current={tab === t.id ? "page" : undefined}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
-                tab === t.id
-                  ? "border-b-2 border-slate-950 text-slate-950"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
+              onClick={() => {
+                setTab(t.id);
+                router.replace(t.id === "ap" ? "/finance/bills" : t.id === "aging" ? "/reporting/ar-aging" : "/finance", { scroll: false });
+              }}
+              aria-current={tab === t.id ? "page" : undefined}
+              className={[
+                "relative px-4 py-2.5 text-[13px] font-medium transition-colors duration-150",
+                "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:rounded-t-full after:transition-all",
+                tab === t.id ? "text-brand-600 after:bg-brand-600" : "after:bg-transparent",
+              ].join(" ")}
+              style={{ color: tab === t.id ? undefined : "var(--color-text-secondary)" }}
             >
               {t.label}
             </button>
@@ -279,50 +286,37 @@ export default function FinancePage() {
 
             <Card title="Invoices" description="Customer invoices and payment status." noPadding>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                      <th className="px-5 py-3">Invoice #</th>
-                      <th className="px-4 py-3">Customer</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3 text-right">Total</th>
-                      <th className="px-4 py-3">Due Date</th>
-                      <th className="px-4 py-3 text-right">Due Amount</th>
-                      {canPay && <th className="px-5 py-3 text-right">Actions</th>}
+                <table className="w-full text-[13px]">
+                  <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+                    <tr>
+                      {["Invoice #", "Customer", "Status", "Total", "Due Date", "Due Amount", ...(canPay ? ["Actions"] : [])].map((h, i) => (
+                        <th key={h} className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.05em] ${i > 2 ? "text-right" : "text-left"}`}
+                          style={{ color: "var(--color-text-secondary)" }}>{h}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
                     {invoices.length === 0 && (
-                      <tr>
-                        <td colSpan={canPay ? 7 : 6} className="px-5 py-8 text-center text-slate-500">
-                          No invoices found
-                        </td>
-                      </tr>
+                      <tr><td colSpan={canPay ? 7 : 6} className="px-4 py-8 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>No invoices found</td></tr>
                     )}
                     {invoices.map((inv) => (
-                      <tr key={inv.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                        <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-950">{inv.invoice_number}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-slate-600">{inv.customer_id}</td>
+                      <tr key={inv.id} className="border-b last:border-0 transition-colors duration-75"
+                        style={{ borderColor: "var(--color-table-border)" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-table-row-hover)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "")}>
+                        <td className="whitespace-nowrap px-4 py-3 font-semibold" style={{ color: "var(--color-text-primary)" }}>{inv.invoice_number}</td>
+                        <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{inv.customer_id}</td>
                         <td className="whitespace-nowrap px-4 py-3">
-                          <span
-                            className={`rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${BILLING_STYLE[inv.status]}`}
-                          >
-                            {inv.status}
-                          </span>
+                          <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold capitalize ${BILLING_STYLE[inv.status]}`}>{inv.status}</span>
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-700">{formatMoney(inv.total_cents)}</td>
-                        <td className={`whitespace-nowrap px-4 py-3 ${isOverdue(inv) ? "font-medium text-red-600" : "text-slate-500"}`}>
-                          {fmtDate(inv.due_date)}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-slate-950">{formatMoney(dueAmount(inv))}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{formatMoney(inv.total_cents)}</td>
+                        <td className={`whitespace-nowrap px-4 py-3 text-right text-[12px] ${isOverdue(inv) ? "font-medium text-danger-600" : ""}`}
+                          style={isOverdue(inv) ? {} : { color: "var(--color-text-secondary)" }}>{fmtDate(inv.due_date)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{formatMoney(dueAmount(inv))}</td>
                         {canPay && (
-                          <td className="whitespace-nowrap px-5 py-3 text-right">
+                          <td className="whitespace-nowrap px-4 py-3 text-right">
                             {inv.status !== "paid" && inv.status !== "void" && (
-                              <PayControl
-                                busy={busy}
-                                max={dueAmount(inv)}
-                                onPay={(cents) => void payInvoice(inv.id, cents)}
-                              />
+                              <PayControl busy={busy} max={dueAmount(inv)} onPay={(cents) => void payInvoice(inv.id, cents)} />
                             )}
                           </td>
                         )}
@@ -345,50 +339,37 @@ export default function FinancePage() {
 
             <Card title="Bills" description="Supplier bills awaiting payment." noPadding>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                      <th className="py-2 pr-4">Bill #</th>
-                      <th className="py-2 pr-4">Supplier</th>
-                      <th className="py-2 pr-4">Status</th>
-                      <th className="py-2 pr-4 text-right">Total</th>
-                      <th className="py-2 pr-4">Due Date</th>
-                      <th className="py-2 pr-4 text-right">Due Amount</th>
-                      {canPay && <th className="py-2 text-right">Actions</th>}
+                <table className="w-full text-[13px]">
+                  <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+                    <tr>
+                      {["Bill #", "Supplier", "Status", "Total", "Due Date", "Due Amount", ...(canPay ? ["Actions"] : [])].map((h, i) => (
+                        <th key={h} className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.05em] ${i > 2 ? "text-right" : "text-left"}`}
+                          style={{ color: "var(--color-text-secondary)" }}>{h}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
                     {bills.length === 0 && (
-                      <tr>
-                        <td colSpan={canPay ? 7 : 6} className="py-6 text-center text-slate-400">
-                          No bills found
-                        </td>
-                      </tr>
+                      <tr><td colSpan={canPay ? 7 : 6} className="px-4 py-6 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>No bills found</td></tr>
                     )}
                     {bills.map((bill) => (
-                      <tr key={bill.id} className="border-b last:border-0">
-                        <td className="py-2 pr-4 font-medium">{bill.bill_number}</td>
-                        <td className="py-2 pr-4 text-slate-600">{bill.supplier_id}</td>
-                        <td className="py-2 pr-4">
-                          <span
-                            className={`rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${BILLING_STYLE[bill.status]}`}
-                          >
-                            {bill.status}
-                          </span>
+                      <tr key={bill.id} className="border-b last:border-0 transition-colors duration-75"
+                        style={{ borderColor: "var(--color-table-border)" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-table-row-hover)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "")}>
+                        <td className="whitespace-nowrap px-4 py-3 font-semibold" style={{ color: "var(--color-text-primary)" }}>{bill.bill_number}</td>
+                        <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{bill.supplier_id}</td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold capitalize ${BILLING_STYLE[bill.status]}`}>{bill.status}</span>
                         </td>
-                        <td className="py-2 pr-4 text-right">{formatMoney(bill.total_cents)}</td>
-                        <td className={`py-2 pr-4 ${isOverdue(bill) ? "font-medium text-red-600" : "text-slate-500"}`}>
-                          {fmtDate(bill.due_date)}
-                        </td>
-                        <td className="py-2 pr-4 text-right">{formatMoney(dueAmount(bill))}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{formatMoney(bill.total_cents)}</td>
+                        <td className={`whitespace-nowrap px-4 py-3 text-right text-[12px] ${isOverdue(bill) ? "font-medium text-danger-600" : ""}`}
+                          style={isOverdue(bill) ? {} : { color: "var(--color-text-secondary)" }}>{fmtDate(bill.due_date)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{formatMoney(dueAmount(bill))}</td>
                         {canPay && (
-                          <td className="py-2 text-right">
+                          <td className="whitespace-nowrap px-4 py-3 text-right">
                             {bill.status !== "paid" && bill.status !== "void" && (
-                              <PayControl
-                                busy={busy}
-                                max={dueAmount(bill)}
-                                onPay={(cents) => void payBill(bill.id, cents)}
-                              />
+                              <PayControl busy={busy} max={dueAmount(bill)} onPay={(cents) => void payBill(bill.id, cents)} />
                             )}
                           </td>
                         )}

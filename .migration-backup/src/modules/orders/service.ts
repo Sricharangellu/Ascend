@@ -1,0 +1,719 @@
+import { v7 as uuidv7 } from "uuid";
+import type { DB } from "../../shared/db.js";
+import type { EventBus } from "../../shared/events.js";
+import type { Cents } from "../../shared/money.js";
+import type { StateCode } from "../../shared/types.js";
+import { notFound, badRequest, conflict } from "../../shared/http.js";
+import { writeAudit } from "../../shared/audit.js";
+import { computeOrderTax, type TaxableLine } from "./tax.js";
+
+export type OrderStatus = "open" | "completed" | "refunded" | "voided";
+
+export type CourseValue = "appetizer" | "main" | "dessert" | "drinks";
+export type CourseStatus = "pending" | "in_progress" | "ready" | "served";
+
+export interface OrderCourse {
+  id: string;
+  order_id: string;
+  line_id: string;
+  course: CourseValue;
+  status: CourseStatus;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface SplitOrderInput {
+  splitCount?: number;
+  lineIds?: string[][];
+}
+
+export interface OrderRow {
+  id: string;
+  tenant_id: string;
+  order_number: string;
+  state_code: StateCode;
+  status: OrderStatus;
+  subtotal_cents: Cents;
+  discount_cents: Cents;
+  tax_cents: Cents;
+  total_cents: Cents;
+  customer_id: string | null;
+  store_id: string | null;
+  created_by: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface OrderLineRow {
+  id: string;
+  tenant_id: string;
+  order_id: string;
+  product_id: string;
+  name: string;
+  quantity: number;
+  unit_cents: Cents;
+  tax_cents: Cents;
+  line_cents: Cents;
+  taxable: number; // 1|0
+  /** Purchasing/selling unit this line was scanned/entered as ("case", "box"),
+   *  or null for a plain each sale. Display-only — quantity above is always
+   *  base (each) units regardless of this field (POS-v1 / ADR-006). */
+  unit_kind?: string | null;
+  /** The human-entered count in unit_kind (e.g. 2 for "2 Case"). Null when
+   *  unit_kind is null. */
+  unit_qty?: number | null;
+}
+
+export interface OrderWithLines extends OrderRow {
+  lines: OrderLineRow[];
+}
+
+export interface CreateOrderLineInput {
+  productId: string;
+  /** Base (each) units by the time this reaches create()/update() — the route
+   *  layer has already converted a scanned unit ("1 case") into base units
+   *  before calling either method, exactly like purchasing's pattern. Neither
+   *  method has any unit-awareness; they only ever see base-unit quantities. */
+  quantity: number;
+  ageVerified?: boolean; // required true when product.age_restricted (BE-16)
+  /** Display-only — see OrderLineRow.unit_kind. Never used in quantity/price/tax math. */
+  unitKind?: string;
+  /** Display-only — the human-entered count in unitKind (e.g. 1 for "1 Case"). */
+  unitQty?: number;
+}
+
+export interface CreateOrderInput {
+  stateCode?: StateCode; // optional — defaults to "CA" when not supplied (e.g. from POS terminal)
+  lines: CreateOrderLineInput[];
+  discountCents?: Cents;
+  customerId?: string | null;
+  storeId?: string | null;
+}
+
+export interface UpdateOrderInput {
+  lines: CreateOrderLineInput[];
+  discountCents?: Cents;
+  customerId?: string | null;
+  storeId?: string | null;
+}
+
+export interface ListOrdersQuery {
+  status?: OrderStatus;
+  limit?: number;
+  offset?: number;
+  cursor?: string;
+  storeId?: string;
+}
+
+export interface CursorPage<T> {
+  items: T[];
+  nextCursor: string | null;
+  limit: number;
+}
+
+/** product columns owned by the catalog module (read-only, by id). */
+interface ProductRow {
+  id: string;
+  name: string;
+  price_cents: Cents;
+  tax_class: string;
+  status: string;
+  is_master: boolean;
+  age_restricted: number; // 1|0
+}
+
+const VOIDABLE_STATUSES = new Set<OrderStatus>(["open", "completed"]);
+
+export class OrdersService {
+  constructor(
+    private readonly db: DB,
+    private readonly events: EventBus,
+  ) {}
+
+  async create(input: CreateOrderInput, tenantId: string, actorId = "system"): Promise<OrderWithLines> {
+    if (input.lines.length === 0) {
+      throw badRequest("an order requires at least one line");
+    }
+
+    interface Resolved {
+      input: CreateOrderLineInput;
+      product: ProductRow;
+      taxable: boolean;
+      lineGross: Cents;
+    }
+
+    // DB-3: Batch-fetch all products and inventory in 2 queries instead of
+    // 3 queries per line (N+1 → O(1)). Committed stock is aggregated in a
+    // single GROUP BY across all requested product IDs.
+    for (const line of input.lines) {
+      if (line.quantity <= 0) throw badRequest(`line quantity must be positive for ${line.productId}`);
+    }
+    const productIds = input.lines.map((l) => l.productId);
+
+    // Two parameterised queries (no string interpolation) using Postgres array params.
+    // node-postgres passes JavaScript arrays directly as Postgres array literals.
+    const products = await this.db.query<ProductRow & { is_master: boolean; sku: string }>(
+      `SELECT p.id, p.sku, p.name, p.price_cents, p.tax_class, p.status, p.age_restricted,
+              EXISTS(SELECT 1 FROM products c
+                     WHERE c.tenant_id = p.tenant_id AND c.parent_product_id = p.id) AS is_master
+         FROM products p
+        WHERE p.tenant_id = ? AND p.id = ANY(?)`,
+      [tenantId, productIds],
+    );
+    const productMap = new Map(products.map((p) => [p.id, p]));
+
+    // Single query: on-hand stock + committed quantity for all requested products.
+    const stockRows = await this.db.query<{ product_id: string; stock_qty: number; committed: number }>(
+      `SELECT i.product_id,
+              i.stock_qty,
+              COALESCE((
+                SELECT SUM(ol.quantity)
+                FROM order_lines ol
+                JOIN orders o ON o.id = ol.order_id
+                WHERE ol.product_id = i.product_id
+                  AND o.tenant_id = i.tenant_id
+                  AND o.status NOT IN ('completed','voided','refunded')
+              ), 0) AS committed
+         FROM inventory i
+        WHERE i.tenant_id = ? AND i.product_id = ANY(?)`,
+      [tenantId, productIds],
+    );
+    const stockMap = new Map(stockRows.map((r) => [r.product_id, r]));
+
+    const resolved: Resolved[] = [];
+    for (const line of input.lines) {
+      const product = productMap.get(line.productId);
+      if (!product) throw badRequest(`product '${line.productId}' not found`);
+
+      if (product.status !== "active") {
+        throw badRequest(`product '${line.productId}' is ${product.status} and cannot be sold`);
+      }
+      if (product.is_master) {
+        throw badRequest(`product '${line.productId}' is a variant master and cannot be sold directly`);
+      }
+      if (product.age_restricted && !line.ageVerified) {
+        throw badRequest(`product '${line.productId}' is age-restricted — set ageVerified: true after ID check`);
+      }
+
+      // BE-9: Inventory reservation — only enforced when an inventory row exists.
+      const stock = stockMap.get(line.productId);
+      if (stock !== undefined) {
+        const available = Number(stock.stock_qty) - Number(stock.committed);
+        if (line.quantity > available) {
+          throw conflict(
+            `Insufficient stock for SKU ${product.sku ?? line.productId}: ${available} available, ${line.quantity} requested`,
+          );
+        }
+      }
+
+      const taxable = product.tax_class !== "exempt";
+      const lineGross = product.price_cents * line.quantity;
+      resolved.push({ input: line, product, taxable, lineGross });
+    }
+
+    const taxInputs: TaxableLine[] = resolved.map((r) => ({
+      lineGross: r.lineGross,
+      taxable: r.taxable,
+    }));
+
+    const computed = computeOrderTax(taxInputs, input.stateCode ?? "CA", input.discountCents ?? 0);
+
+    const now = Date.now();
+    const orderId = `ord_${uuidv7()}`;
+    const orderNumber = `FP-${orderId.slice(-8).toUpperCase()}`;
+
+    const order: OrderRow = {
+      id: orderId,
+      tenant_id: tenantId,
+      order_number: orderNumber,
+      state_code: input.stateCode ?? "CA",
+      status: "open",
+      subtotal_cents: computed.subtotalCents,
+      discount_cents: computed.discountCents,
+      tax_cents: computed.taxCents,
+      total_cents: computed.totalCents,
+      customer_id: input.customerId ?? null,
+      store_id: input.storeId ?? null,
+      created_by: actorId,
+      created_at: now,
+      updated_at: now,
+    };
+
+    const lines: OrderLineRow[] = resolved.map((r, i) => ({
+      id: `oln_${uuidv7()}`,
+      tenant_id: tenantId,
+      order_id: orderId,
+      product_id: r.product.id,
+      name: r.product.name,
+      quantity: r.input.quantity,
+      unit_cents: r.product.price_cents,
+      tax_cents: computed.lines[i].taxCents,
+      line_cents: computed.lines[i].lineCents,
+      taxable: r.taxable ? 1 : 0,
+      unit_kind: r.input.unitKind ?? null,
+      unit_qty: r.input.unitQty ?? null,
+    }));
+
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
+      await tdb.query(
+        `INSERT INTO orders
+           (id, tenant_id, order_number, state_code, status, subtotal_cents,
+            discount_cents, tax_cents, total_cents, customer_id, store_id,
+            created_by, created_at, updated_at)
+         VALUES
+           (@id, @tenant_id, @order_number, @state_code, @status, @subtotal_cents,
+            @discount_cents, @tax_cents, @total_cents, @customer_id, @store_id,
+            @created_by, @created_at, @updated_at)`,
+        order as unknown as Record<string, unknown>,
+      );
+      for (const line of lines) {
+        await tdb.query(
+          `INSERT INTO order_lines
+             (id, tenant_id, order_id, product_id, name, quantity, unit_cents,
+              tax_cents, line_cents, taxable, unit_kind, unit_qty)
+           VALUES
+             (@id, @tenant_id, @order_id, @product_id, @name, @quantity, @unit_cents,
+              @tax_cents, @line_cents, @taxable, @unit_kind, @unit_qty)`,
+          line as unknown as Record<string, unknown>,
+        );
+      }
+    });
+
+    await this.events.publish(
+      "order.created",
+      {
+        id: order.id,
+        tenantId,
+        orderNumber: order.order_number,
+        stateCode: order.state_code,
+        totalCents: order.total_cents,
+        lines: lines.map((l) => ({
+          productId: l.product_id,
+          quantity: l.quantity,
+          unitCents: l.unit_cents,
+        })),
+      },
+      order.id,
+    );
+
+    await writeAudit(this.db, {
+      tenantId,
+      actorId,
+      action: "order.created",
+      entityType: "order",
+      entityId: order.id,
+      after: { orderNumber: order.order_number, totalCents: order.total_cents, lineCount: lines.length },
+    });
+
+    return { ...order, lines };
+  }
+
+  /** Replace the lines of an open order in-place (cart update from POS terminal).
+   *  Deletes existing lines, recomputes tax/totals, and updates the order row.
+   *  The order id and order_number are preserved. */
+  async update(id: string, input: UpdateOrderInput, tenantId: string): Promise<OrderWithLines> {
+    const existing = await this.getOrThrow(id, tenantId);
+    if (existing.status !== "open") throw conflict(`order '${id}' is ${existing.status} and cannot be updated`);
+    if (input.lines.length === 0) throw badRequest("an order requires at least one line");
+
+    // Resolve products and check inventory (same logic as create).
+    interface Resolved { input: CreateOrderLineInput; product: ProductRow; taxable: boolean; lineGross: Cents; }
+    const resolved: Resolved[] = [];
+    for (const line of input.lines) {
+      if (line.quantity <= 0) throw badRequest(`line quantity must be positive for ${line.productId}`);
+      const product = await this.db.one<ProductRow>(
+        `SELECT p.id, p.name, p.price_cents, p.tax_class, p.status, p.age_restricted,
+                EXISTS(SELECT 1 FROM products c WHERE c.tenant_id = p.tenant_id AND c.parent_product_id = p.id) AS is_master
+           FROM products p WHERE p.id = @id AND p.tenant_id = @tenantId`,
+        { id: line.productId, tenantId },
+      );
+      if (!product) throw badRequest(`product '${line.productId}' not found`);
+      if (product.status !== "active") throw badRequest(`product '${line.productId}' is ${product.status} and cannot be sold`);
+      if (product.age_restricted && !line.ageVerified) throw badRequest(`product '${line.productId}' is age-restricted — set ageVerified: true`);
+      resolved.push({ input: line, product, taxable: product.tax_class !== "exempt", lineGross: product.price_cents * line.quantity });
+    }
+
+    const taxInputs: TaxableLine[] = resolved.map((r) => ({ lineGross: r.lineGross, taxable: r.taxable }));
+    const computed = computeOrderTax(taxInputs, existing.state_code, input.discountCents ?? 0);
+    const now = Date.now();
+
+    const newLines: OrderLineRow[] = resolved.map((r) => {
+      const tax = Math.round((r.lineGross / (computed.subtotalCents || 1)) * computed.taxCents);
+      return {
+        id: `ol_${uuidv7()}`, tenant_id: tenantId, order_id: id,
+        product_id: r.product.id, name: r.product.name,
+        quantity: r.input.quantity, unit_cents: r.product.price_cents,
+        tax_cents: tax, line_cents: r.lineGross + tax, taxable: r.taxable ? 1 : 0,
+        unit_kind: r.input.unitKind ?? null, unit_qty: r.input.unitQty ?? null,
+      };
+    });
+
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
+      // Replace lines.
+      await tdb.query("DELETE FROM order_lines WHERE order_id = @id AND tenant_id = @t", { id, t: tenantId });
+      for (const l of newLines) {
+        await tdb.query(
+          `INSERT INTO order_lines (id, tenant_id, order_id, product_id, name, quantity, unit_cents, tax_cents, line_cents, taxable, unit_kind, unit_qty)
+           VALUES (@id,@tenant_id,@order_id,@product_id,@name,@quantity,@unit_cents,@tax_cents,@line_cents,@taxable,@unit_kind,@unit_qty)`,
+          l as unknown as Record<string, unknown>,
+        );
+      }
+      // Update order totals in place.
+      await tdb.query(
+        `UPDATE orders SET subtotal_cents=@sub, discount_cents=@disc, tax_cents=@tax, total_cents=@total,
+           customer_id=@cust, store_id=@store, updated_at=@now
+           WHERE id=@id AND tenant_id=@t`,
+        {
+          sub: computed.subtotalCents, disc: computed.discountCents,
+          tax: computed.taxCents, total: computed.totalCents,
+          cust: input.customerId ?? existing.customer_id,
+          store: input.storeId ?? existing.store_id,
+          now, id, t: tenantId,
+        },
+      );
+    });
+
+    return {
+      ...existing,
+      subtotal_cents: computed.subtotalCents,
+      discount_cents: computed.discountCents,
+      tax_cents: computed.taxCents,
+      total_cents: computed.totalCents,
+      customer_id: input.customerId ?? existing.customer_id,
+      store_id: input.storeId ?? existing.store_id,
+      updated_at: now,
+      lines: newLines,
+    };
+  }
+
+  /**
+   * Transition an order to 'completed' (on payment.captured). No-op if missing
+   * or already in a terminal/non-open state, so a late event can't resurrect it.
+   */
+  async markCompleted(orderId: string, tenantId: string): Promise<void> {
+    const order = await this.db.one<{ status: OrderStatus }>(
+      "SELECT status FROM orders WHERE id = @id AND tenant_id = @tenantId",
+      { id: orderId, tenantId },
+    );
+    if (!order || order.status !== "open") return;
+    await this.db.query(
+      "UPDATE orders SET status = @status, updated_at = @updated_at WHERE id = @id AND tenant_id = @tenantId",
+      { status: "completed", updated_at: Date.now(), id: orderId, tenantId },
+    );
+  }
+
+  async get(id: string, tenantId: string): Promise<OrderWithLines | undefined> {
+    const order = await this.db.one<OrderRow>(
+      "SELECT * FROM orders WHERE id = @id AND tenant_id = @tenantId",
+      { id, tenantId },
+    );
+    if (!order) return undefined;
+    const lines = await this.db.query<OrderLineRow>(
+      "SELECT * FROM order_lines WHERE order_id = @orderId AND tenant_id = @tenantId ORDER BY id ASC",
+      { orderId: id, tenantId },
+    );
+    return { ...order, lines };
+  }
+
+  async getOrThrow(id: string, tenantId: string): Promise<OrderWithLines> {
+    const order = await this.get(id, tenantId);
+    if (!order) throw notFound(`order '${id}' not found`);
+    return order;
+  }
+
+  async customerEmail(customerId: string, tenantId: string): Promise<string | null> {
+    const row = await this.db.one<{ email: string | null }>(
+      "SELECT email FROM customers WHERE id = @id AND tenant_id = @t",
+      { id: customerId, t: tenantId },
+    );
+    return row?.email ?? null;
+  }
+
+  async list(query: ListOrdersQuery = {}, tenantId: string): Promise<CursorPage<OrderRow>> {
+    const limit = clampLimit(query.limit);
+
+    // Decode cursor if provided.
+    const cur = query.cursor
+      ? (JSON.parse(Buffer.from(query.cursor, "base64url").toString()) as { at: number; id: string })
+      : null;
+
+    const where: string[] = ["tenant_id = @tenantId"];
+    const params: Record<string, unknown> = { tenantId };
+    if (query.status) {
+      where.push("status = @status");
+      params.status = query.status;
+    }
+    if (query.storeId) {
+      where.push("store_id = @storeId");
+      params.storeId = query.storeId;
+    }
+    if (cur) {
+      where.push("(created_at, id) < (@curAt, @curId)");
+      params.curAt = cur.at;
+      params.curId = cur.id;
+    }
+    const whereSql = `WHERE ${where.join(" AND ")}`;
+
+    const items = await this.db.query<OrderRow>(
+      `SELECT * FROM orders ${whereSql}
+       ORDER BY created_at DESC, id DESC
+       LIMIT @limit`,
+      { ...params, limit },
+    );
+
+    const lastItem = items[items.length - 1];
+    const nextCursor =
+      items.length === limit && lastItem
+        ? Buffer.from(JSON.stringify({ at: lastItem.created_at, id: lastItem.id })).toString("base64url")
+        : null;
+
+    return { items, nextCursor, limit };
+  }
+
+  async refund(id: string, tenantId: string, actorId = "system"): Promise<OrderWithLines> {
+    const order = await this.getOrThrow(id, tenantId);
+    if (order.status === "refunded") {
+      throw conflict(`order '${id}' is already refunded`);
+    }
+    if (order.status === "voided") {
+      throw conflict(`voided order '${id}' cannot be refunded`);
+    }
+
+    const updatedAt = Date.now();
+    await this.db.query(
+      "UPDATE orders SET status = @status, updated_at = @updated_at WHERE id = @id AND tenant_id = @tenantId",
+      { status: "refunded", updated_at: updatedAt, id, tenantId },
+    );
+
+    await this.events.publish(
+      "order.refunded",
+      {
+        id: order.id,
+        tenantId,
+        orderNumber: order.order_number,
+        totalCents: order.total_cents,
+      },
+      order.id,
+    );
+
+    await writeAudit(this.db, {
+      tenantId,
+      actorId,
+      action: "order.refunded",
+      entityType: "order",
+      entityId: order.id,
+      before: { status: order.status },
+      after: { status: "refunded", totalCents: order.total_cents },
+    });
+
+    return { ...order, status: "refunded", updated_at: updatedAt };
+  }
+
+  async void(id: string, tenantId: string, actorId = "system"): Promise<OrderWithLines> {
+    const order = await this.getOrThrow(id, tenantId);
+    if (!VOIDABLE_STATUSES.has(order.status)) {
+      throw conflict(`order '${id}' is ${order.status} and cannot be voided`);
+    }
+
+    const updatedAt = Date.now();
+    await this.db.query(
+      "UPDATE orders SET status = @status, updated_at = @updated_at WHERE id = @id AND tenant_id = @tenantId",
+      { status: "voided", updated_at: updatedAt, id, tenantId },
+    );
+
+    await writeAudit(this.db, {
+      tenantId,
+      actorId,
+      action: "order.voided",
+      entityType: "order",
+      entityId: order.id,
+      before: { status: order.status },
+      after: { status: "voided" },
+    });
+
+    return { ...order, status: "voided", updated_at: updatedAt };
+  }
+
+  // ── BE-R3: Course assignment ──────────────────────────────────────────────
+
+  async assignCourse(
+    orderId: string,
+    lineId: string,
+    course: CourseValue,
+    tenantId: string,
+  ): Promise<OrderCourse> {
+    const line = await this.db.one<{ id: string }>(
+      "SELECT id FROM order_lines WHERE id = @lineId AND order_id = @orderId AND tenant_id = @t",
+      { lineId, orderId, t: tenantId },
+    );
+    if (!line) throw notFound(`order line '${lineId}' in order '${orderId}'`);
+
+    const now = Date.now();
+    const existing = await this.db.one<OrderCourse>(
+      "SELECT * FROM order_courses WHERE order_id = @orderId AND line_id = @lineId",
+      { orderId, lineId },
+    );
+
+    if (existing) {
+      await this.db.query(
+        "UPDATE order_courses SET course = @course, updated_at = @now WHERE order_id = @orderId AND line_id = @lineId",
+        { course, now, orderId, lineId },
+      );
+      return { ...existing, course, updated_at: now };
+    }
+
+    const id = `ocrse_${uuidv7()}`;
+    const row: OrderCourse = { id, order_id: orderId, line_id: lineId, course, status: "pending", created_at: now, updated_at: now };
+    await this.db.query(
+      `INSERT INTO order_courses (id, order_id, line_id, course, status, created_at, updated_at)
+       VALUES (@id, @order_id, @line_id, @course, @status, @created_at, @updated_at)`,
+      row as unknown as Record<string, unknown>,
+    );
+    return row;
+  }
+
+  // ── BE-R5: Split check ────────────────────────────────────────────────────
+
+  async splitOrder(
+    orderId: string,
+    input: SplitOrderInput,
+    tenantId: string,
+  ): Promise<OrderWithLines[]> {
+    const original = await this.getOrThrow(orderId, tenantId);
+    if (original.status !== "open") throw badRequest("only open orders can be split");
+
+    let partitions: OrderLineRow[][];
+    if (input.lineIds) {
+      partitions = input.lineIds.map((ids) =>
+        ids.map((lineId) => {
+          const found = original.lines.find((l) => l.id === lineId);
+          if (!found) throw badRequest(`line '${lineId}' not found in order '${orderId}'`);
+          return found;
+        }),
+      );
+    } else {
+      const n = input.splitCount ?? 2;
+      if (n < 2 || n > 20) throw badRequest("splitCount must be between 2 and 20");
+      partitions = Array.from({ length: n }, (): OrderLineRow[] => []);
+      original.lines.forEach((line, i) => partitions[i % n]!.push(line));
+    }
+
+    const now = Date.now();
+    const children: OrderWithLines[] = [];
+
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
+      await tdb.query(
+        "UPDATE orders SET status = 'voided', updated_at = @now WHERE id = @id AND tenant_id = @t",
+        { now, id: orderId, t: tenantId },
+      );
+
+      for (const partition of partitions) {
+        if (partition.length === 0) continue;
+        const childId = `ord_${uuidv7()}`;
+        const childNumber = `FP-${childId.slice(-8).toUpperCase()}`;
+        const subtotal = partition.reduce((s, l) => s + Number(l.line_cents), 0);
+        const tax = partition.reduce((s, l) => s + Number(l.tax_cents), 0);
+
+        await tdb.query(
+          `INSERT INTO orders
+             (id, tenant_id, order_number, state_code, status, subtotal_cents, discount_cents,
+              tax_cents, total_cents, customer_id, store_id, created_by, parent_order_id, created_at, updated_at)
+           VALUES
+             (@id, @tenant_id, @order_number, @state_code, 'open', @subtotal_cents, 0,
+              @tax_cents, @total_cents, @customer_id, @store_id, @created_by, @parent_order_id, @created_at, @updated_at)`,
+          {
+            id: childId, tenant_id: tenantId, order_number: childNumber,
+            state_code: original.state_code,
+            subtotal_cents: subtotal, tax_cents: tax, total_cents: subtotal + tax,
+            customer_id: original.customer_id, store_id: original.store_id,
+            created_by: original.created_by,
+            parent_order_id: orderId, created_at: now, updated_at: now,
+          },
+        );
+
+        const childLines: OrderLineRow[] = [];
+        for (const line of partition) {
+          const newLine: OrderLineRow = { ...line, id: `oln_${uuidv7()}`, order_id: childId };
+          await tdb.query(
+            `INSERT INTO order_lines
+               (id, tenant_id, order_id, product_id, name, quantity, unit_cents, tax_cents, line_cents, taxable, unit_kind, unit_qty)
+             VALUES
+               (@id, @tenant_id, @order_id, @product_id, @name, @quantity, @unit_cents, @tax_cents, @line_cents, @taxable, @unit_kind, @unit_qty)`,
+            { ...newLine, unit_kind: newLine.unit_kind ?? null, unit_qty: newLine.unit_qty ?? null } as unknown as Record<string, unknown>,
+          );
+          childLines.push(newLine);
+        }
+
+        children.push({
+          id: childId, tenant_id: tenantId, order_number: childNumber,
+          state_code: original.state_code, status: "open",
+          subtotal_cents: subtotal, discount_cents: 0, tax_cents: tax, total_cents: subtotal + tax,
+          customer_id: original.customer_id, store_id: original.store_id,
+          created_by: original.created_by,
+          created_at: now, updated_at: now, lines: childLines,
+        });
+      }
+    });
+
+    void this.events.publish("order.split", { tenantId, originalOrderId: orderId, childCount: children.length }, orderId);
+    return children;
+  }
+
+  /**
+   * Derived order timeline for the order-detail page.
+   *
+   * There is no separate order_events table — events are reconstructed from
+   * what the schema actually records: the order row (created_at, terminal
+   * status + updated_at) and its payments. Consequences, stated honestly:
+   * the "completed" timestamp approximates to the last payment's time (the
+   * order row's updated_at moves again on refund/void), and the actor is
+   * "system" because orders/payments don't store the acting user yet. If a
+   * richer audit trail lands later, this derivation can switch to it without
+   * changing the response shape.
+   */
+  async timeline(
+    id: string,
+    tenantId: string,
+  ): Promise<{ items: Array<{ id: string; type: string; label: string; actor: string; ts: number; meta?: Record<string, unknown> }> }> {
+    const order = await this.getOrThrow(id, tenantId);
+    const items: Array<{ id: string; type: string; label: string; actor: string; ts: number; meta?: Record<string, unknown> }> = [
+      { id: `${id}_created`, type: "created", label: "Order created", actor: "system", ts: Number(order.created_at) },
+    ];
+
+    const payments = await this.db.query<{ id: string; method: string; amount_cents: number; status: string; created_at: number }>(
+      `SELECT id, method, amount_cents, status, created_at
+       FROM payments WHERE tenant_id = @t AND order_id = @id
+       ORDER BY created_at ASC`,
+      { t: tenantId, id },
+    );
+    for (const p of payments) {
+      items.push({
+        id: `${p.id}_payment`,
+        type: "payment",
+        label: `Payment ${p.status} (${p.method})`,
+        actor: "system",
+        ts: Number(p.created_at),
+        meta: { amount_cents: Number(p.amount_cents), method: p.method },
+      });
+    }
+
+    const lastPaymentTs = payments.length > 0 ? Number(payments[payments.length - 1]!.created_at) : Number(order.created_at);
+    if (order.status === "completed" || order.status === "refunded") {
+      items.push({ id: `${id}_completed`, type: "completed", label: "Order completed", actor: "system", ts: lastPaymentTs });
+    }
+    if (order.status === "refunded") {
+      items.push({ id: `${id}_refunded`, type: "refund", label: "Order refunded", actor: "system", ts: Number(order.updated_at) });
+    }
+    if (order.status === "voided") {
+      items.push({ id: `${id}_voided`, type: "voided", label: "Order voided", actor: "system", ts: Number(order.updated_at) });
+    }
+
+    items.sort((a, b) => a.ts - b.ts);
+    return { items };
+  }
+}
+
+function clampLimit(limit?: number): number {
+  if (!limit || limit <= 0) return 50;
+  return Math.min(Math.floor(limit), 200);
+}

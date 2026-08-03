@@ -1,0 +1,62 @@
+/**
+ * Ascend brand design tokens.
+ * Dark-first: both light and dark palettes use the same dark aesthetic
+ * so the app always feels on-brand regardless of system appearance.
+ */
+const colors = {
+  light: {
+    text: '#FFFFFF',
+    tint: '#5D5FEF',
+    background: '#0A0D17',
+    foreground: '#FFFFFF',
+    card: '#131829',
+    cardForeground: '#FFFFFF',
+    primary: '#5D5FEF',
+    primaryForeground: '#FFFFFF',
+    primaryMuted: 'rgba(93,95,239,0.15)',
+    secondary: '#1C2444',
+    secondaryForeground: '#FFFFFF',
+    muted: '#1C2444',
+    mutedForeground: 'rgba(255,255,255,0.55)',
+    accent: '#8B5CF6',
+    accentForeground: '#FFFFFF',
+    destructive: '#EF4444',
+    destructiveForeground: '#FFFFFF',
+    destructiveMuted: 'rgba(239,68,68,0.15)',
+    border: 'rgba(255,255,255,0.08)',
+    input: '#1C2444',
+    success: '#22C55E',
+    successMuted: 'rgba(34,197,94,0.15)',
+    warning: '#F59E0B',
+    warningMuted: 'rgba(245,158,11,0.15)',
+  },
+  dark: {
+    text: '#FFFFFF',
+    tint: '#5D5FEF',
+    background: '#0A0D17',
+    foreground: '#FFFFFF',
+    card: '#131829',
+    cardForeground: '#FFFFFF',
+    primary: '#5D5FEF',
+    primaryForeground: '#FFFFFF',
+    primaryMuted: 'rgba(93,95,239,0.15)',
+    secondary: '#1C2444',
+    secondaryForeground: '#FFFFFF',
+    muted: '#1C2444',
+    mutedForeground: 'rgba(255,255,255,0.55)',
+    accent: '#8B5CF6',
+    accentForeground: '#FFFFFF',
+    destructive: '#EF4444',
+    destructiveForeground: '#FFFFFF',
+    destructiveMuted: 'rgba(239,68,68,0.15)',
+    border: 'rgba(255,255,255,0.08)',
+    input: '#1C2444',
+    success: '#22C55E',
+    successMuted: 'rgba(34,197,94,0.15)',
+    warning: '#F59E0B',
+    warningMuted: 'rgba(245,158,11,0.15)',
+  },
+  radius: 12,
+};
+
+export default colors;
