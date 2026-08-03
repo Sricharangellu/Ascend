@@ -88,11 +88,13 @@ export function AllDocumentsTab({ refreshKey = 0, onUpload }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [filterType, filterStatus, q, refreshKey]);
+  }, [filterType, filterStatus, q]);
 
+  // refreshKey is a parent-driven reload signal (not used inside load). Keep it on
+  // the effect so uploads still re-fetch without an unnecessary useCallback dep.
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, refreshKey]);
 
   async function archive(doc: Doc) {
     if (!confirm(`Archive "${doc.name}"? It will be hidden from active views.`)) return;

@@ -1,4 +1,16 @@
 
+
+## Active Claim (Cursor Cloud — PR-A3 exhaustive-deps)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud `bc-ef8f489e` |
+| Queue item | PR-A3: fix 3 `react-hooks/exhaustive-deps` warnings (AllDocumentsTab refreshKey; ByTypeTab activeType; OfflineQueueBanner refreshCounts). Fix dep arrays — do not disable the rule. |
+| Files/areas expected | `web/app/(protected)/documents/_components/AllDocumentsTab.tsx`, `web/app/(protected)/documents/_components/ByTypeTab.tsx`, `web/components/terminal/OfflineQueueBanner.tsx`, `WORK/LOCK.md` |
+| Started | 2026-08-03T191000Z |
+| Status | RELEASED — `fix/web-exhaustive-deps`; lint/typecheck/build clean |
+| Blockers | none |
+
 ## Active Claim (Cursor Cloud — HOTFIX restore npm root after 5th Replit re-merge)
 
 | Field | Value |
