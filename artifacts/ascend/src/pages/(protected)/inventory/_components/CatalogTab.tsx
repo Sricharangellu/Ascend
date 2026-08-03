@@ -124,13 +124,23 @@ export function CatalogTab() {
   const allChecked = filteredProducts.length > 0 && selectedIds.size === filteredProducts.length;
   const someChecked = selectedIds.size > 0 && !allChecked;
 
+  const inputCls = "min-h-[44px] w-full rounded-md border px-3 text-sm outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950";
+  const inputStyle = {
+    borderColor: "var(--color-border)",
+    backgroundColor: "var(--color-surface)",
+    color: "var(--color-text-primary)",
+  };
+
   return (
     <Card className="overflow-hidden p-0">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+      <div
+        className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3"
+        style={{ borderColor: "var(--color-border)" }}
+      >
         <div>
-          <h2 className="text-base font-semibold text-slate-950">Product catalog</h2>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Product catalog</h2>
           {selectedIds.size > 0 && (
-            <p className="text-sm text-slate-900">
+            <p className="text-sm" style={{ color: "var(--color-text-primary)" }}>
               {selectedIds.size} product{selectedIds.size !== 1 ? "s" : ""} selected
             </p>
           )}
@@ -149,12 +159,15 @@ export function CatalogTab() {
               </svg>
             </Button>
             {actionsOpen && (
-              <div className="absolute right-0 z-20 mt-1 w-44 rounded-md border border-slate-200 bg-white shadow-lg">
+              <div
+                className="absolute right-0 z-20 mt-1 w-44 rounded-md border shadow-lg"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
+              >
                 <div className="py-1">
                   <DropdownItem onClick={() => void handleBulkStatus("active")}>Set Active</DropdownItem>
                   <DropdownItem onClick={() => void handleBulkStatus("draft")}>Set Draft</DropdownItem>
                   <DropdownItem onClick={() => void handleBulkStatus("archived")}>Set Archived</DropdownItem>
-                  <div className="my-1 border-t border-slate-100" />
+                  <div className="my-1 border-t" style={{ borderColor: "var(--color-border)" }} />
                   <DropdownItem onClick={handleExportCSV}>Export CSV</DropdownItem>
                 </div>
               </div>
@@ -166,7 +179,10 @@ export function CatalogTab() {
         </div>
       </div>
 
-      <div className="grid gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 lg:grid-cols-[minmax(16rem,1fr)_14rem_10rem]">
+      <div
+        className="grid gap-3 border-b px-4 py-3 lg:grid-cols-[minmax(16rem,1fr)_14rem_10rem]"
+        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}
+      >
         <label className="block">
           <span className="sr-only">Search catalog</span>
           <input
@@ -174,7 +190,8 @@ export function CatalogTab() {
             value={catalogQuery}
             onChange={(e) => setCatalogQuery(e.target.value)}
             placeholder="Search SKU or product name"
-            className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
+            className={inputCls}
+            style={inputStyle}
           />
         </label>
         <label className="block">
@@ -182,7 +199,8 @@ export function CatalogTab() {
           <select
             value={catalogCategory}
             onChange={(e) => setCatalogCategory(e.target.value)}
-            className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
+            className={inputCls}
+            style={inputStyle}
           >
             {catalogCategoryOptions.map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
@@ -192,7 +210,8 @@ export function CatalogTab() {
           <select
             value={catalogStatus}
             onChange={(e) => setCatalogStatus(e.target.value as CatalogStatusFilter)}
-            className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
+            className={inputCls}
+            style={inputStyle}
           >
             <option value="All">All statuses</option>
             <option value="active">Active</option>
@@ -203,15 +222,18 @@ export function CatalogTab() {
       </div>
 
       {catalogLoading ? (
-        <div className="p-6 text-sm text-slate-500" aria-busy="true">Loading...</div>
+        <div className="p-6 text-sm" style={{ color: "var(--color-text-muted)" }} aria-busy="true">Loading...</div>
       ) : catalogError ? (
         <div className="p-6 text-sm text-danger-700" role="alert">{catalogError}</div>
       ) : filteredProducts.length === 0 ? (
-        <div className="p-6 text-sm text-slate-500">No products match the current filters.</div>
+        <div className="p-6 text-sm" style={{ color: "var(--color-text-muted)" }}>No products match the current filters.</div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
+          <table className="min-w-full divide-y text-sm" style={{ borderColor: "var(--color-table-border)" }}>
+            <thead
+              className="text-left text-xs font-semibold uppercase"
+              style={{ backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}
+            >
               <tr>
                 <th className="px-4 py-3">
                   <input
@@ -231,11 +253,12 @@ export function CatalogTab() {
                 <th className="px-4 py-3">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
+            <tbody className="divide-y" style={{ borderColor: "var(--color-table-border)", backgroundColor: "var(--color-surface)" }}>
               {filteredProducts.map((product) => (
                 <tr
                   key={product.id}
-                  className={selectedIds.has(product.id) ? "bg-slate-100" : "hover:bg-slate-50"}
+                  style={selectedIds.has(product.id) ? { backgroundColor: "var(--color-surface-subtle)" } : undefined}
+                  className={selectedIds.has(product.id) ? undefined : "hover:bg-[var(--color-surface-subtle)]"}
                 >
                   <td className="px-4 py-3">
                     <input
@@ -249,20 +272,24 @@ export function CatalogTab() {
                   <td className="whitespace-nowrap px-4 py-3">
                     <Link
                       href={`/catalog/${product.id}`}
-                      className="font-mono text-xs font-semibold text-slate-900 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-950"
+                      className="font-mono text-xs font-semibold underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-950"
+                      style={{ color: "var(--color-text-primary)" }}
                     >
                       {product.sku}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 font-medium text-slate-950">
+                  <td className="px-4 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>
                     {product.name}
                     {product.parent_product_id && (
-                      <span className="ml-2 inline-flex rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">variant</span>
+                      <span
+                        className="ml-2 inline-flex rounded px-1.5 py-0.5 text-xs"
+                        style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }}
+                      >variant</span>
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">{product.brand ?? "-"}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">{product.category || "-"}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-950">{formatMoney(product.price_cents)}</td>
+                  <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{product.brand ?? "-"}</td>
+                  <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{product.category || "-"}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(product.price_cents)}</td>
                   <td className="whitespace-nowrap px-4 py-3"><StatusBadge status={product.status} /></td>
                 </tr>
               ))}

@@ -42,7 +42,10 @@ export default function InventoryErrorsPage() {
     >
       <div className="mx-auto w-full max-w-6xl space-y-5 px-4 py-5 sm:px-6">
         {/* Tab bar */}
-        <div className="flex gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 w-fit">
+        <div
+          className="flex gap-1 rounded-xl border p-1 w-fit"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}
+        >
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -51,9 +54,13 @@ export default function InventoryErrorsPage() {
               className={[
                 "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
                 tab === t.key
-                  ? "bg-white text-brand-600 shadow-sm"
-                  : "text-slate-500 hover:text-slate-800",
+                  ? "shadow-sm"
+                  : "hover:text-slate-800",
               ].join(" ")}
+              style={tab === t.key
+                ? { backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }
+                : { color: "var(--color-text-muted)" }
+              }
             >
               {t.label}
             </button>

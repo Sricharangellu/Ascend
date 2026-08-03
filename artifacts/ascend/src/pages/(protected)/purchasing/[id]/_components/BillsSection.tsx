@@ -138,7 +138,7 @@ export function BillsSection({
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase text-slate-500">Bills · 3-way match</p>
+        <p className="text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Bills · 3-way match</p>
         {canManage && !creating && (
           <Button variant="secondary" size="sm" onClick={openCreate}>New bill</Button>
         )}
@@ -155,15 +155,16 @@ export function BillsSection({
               type="button"
               onClick={() => void openBill(b.id)}
               className={`flex w-full items-center justify-between rounded-lg border px-4 py-2.5 text-left transition-colors ${
-                selected?.id === b.id ? "border-brand-400 bg-brand-50" : "border-slate-200 hover:bg-slate-50"
+                selected?.id === b.id ? "border-brand-400 bg-brand-50" : "hover:bg-[var(--color-surface-subtle)]"
               }`}
+              style={selected?.id === b.id ? undefined : { borderColor: "var(--color-border)" }}
             >
               <div>
-                <p className="text-sm font-medium text-slate-900">{b.invoice_number}</p>
-                <p className="text-xs text-slate-400">{fmtDate(b.invoice_date ?? b.created_at)}</p>
+                <p className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>{b.invoice_number}</p>
+                <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDate(b.invoice_date ?? b.created_at)}</p>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold tabular-nums text-slate-900">{formatMoney(b.total_cents)}</span>
+                <span className="text-sm font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{formatMoney(b.total_cents)}</span>
                 <StatusBadge status={b.status} />
               </div>
             </button>
@@ -172,32 +173,38 @@ export function BillsSection({
       )}
 
       {bills.length === 0 && !creating && (
-        <p className="mb-2 text-xs text-slate-400">No bills entered yet. Enter a supplier invoice to validate it against this PO.</p>
+        <p className="mb-2 text-xs" style={{ color: "var(--color-text-muted)" }}>No bills entered yet. Enter a supplier invoice to validate it against this PO.</p>
       )}
 
       {/* Create form */}
       {creating && (
-        <div className="mb-4 rounded-xl border border-slate-200 p-4">
+        <div className="mb-4 rounded-xl border p-4" style={{ borderColor: "var(--color-border)" }}>
           <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
-            <label className="flex flex-col text-xs text-slate-500">
+            <label className="flex flex-col text-xs" style={{ color: "var(--color-text-muted)" }}>
               Invoice #
               <input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)}
-                className="mt-1 rounded border border-slate-300 px-2 py-1 text-sm text-slate-900" placeholder="INV-1001" />
+                className="mt-1 rounded border px-2 py-1 text-sm"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
+                placeholder="INV-1001" />
             </label>
-            <label className="flex flex-col text-xs text-slate-500">
+            <label className="flex flex-col text-xs" style={{ color: "var(--color-text-muted)" }}>
               Invoice date
               <input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)}
-                className="mt-1 rounded border border-slate-300 px-2 py-1 text-sm text-slate-900" />
+                className="mt-1 rounded border px-2 py-1 text-sm"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }} />
             </label>
-            <label className="flex flex-col text-xs text-slate-500">
+            <label className="flex flex-col text-xs" style={{ color: "var(--color-text-muted)" }}>
               Tax ($)
               <input inputMode="decimal" value={tax} onChange={(e) => setTax(e.target.value)}
-                className="mt-1 rounded border border-slate-300 px-2 py-1 text-sm text-slate-900" placeholder="0.00" />
+                className="mt-1 rounded border px-2 py-1 text-sm"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
+                placeholder="0.00" />
             </label>
-            <label className="flex flex-col text-xs text-slate-500">
+            <label className="flex flex-col text-xs" style={{ color: "var(--color-text-muted)" }}>
               Invoice PDF
               <select value={documentId} onChange={(e) => setDocumentId(e.target.value)}
-                className="mt-1 rounded border border-slate-300 px-2 py-1 text-sm text-slate-900">
+                className="mt-1 rounded border px-2 py-1 text-sm"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}>
                 <option value="">— none —</option>
                 {documents.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
@@ -206,7 +213,7 @@ export function BillsSection({
 
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
-              <thead className="text-left text-xs font-semibold uppercase text-slate-400">
+              <thead className="text-left text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>
                 <tr>
                   <th className="py-2 pr-3">Product</th>
                   <th className="py-2 px-3 text-right">Ordered</th>
@@ -217,19 +224,21 @@ export function BillsSection({
               </thead>
               <tbody>
                 {draftLines.map((l, i) => (
-                  <tr key={l.lineId} className="border-t border-slate-100">
-                    <td className="py-2 pr-3 text-slate-900">{l.productName}</td>
-                    <td className="py-2 px-3 text-right tabular-nums text-slate-500">{l.orderedQty}</td>
-                    <td className="py-2 px-3 text-right tabular-nums text-slate-500">{l.receivedQty}</td>
+                  <tr key={l.lineId} className="border-t" style={{ borderColor: "var(--color-border)" }}>
+                    <td className="py-2 pr-3" style={{ color: "var(--color-text-primary)" }}>{l.productName}</td>
+                    <td className="py-2 px-3 text-right tabular-nums" style={{ color: "var(--color-text-muted)" }}>{l.orderedQty}</td>
+                    <td className="py-2 px-3 text-right tabular-nums" style={{ color: "var(--color-text-muted)" }}>{l.receivedQty}</td>
                     <td className="py-2 px-3 text-right">
                       <input type="number" min={0} value={l.invoicedQty}
                         onChange={(e) => patchLine(i, { invoicedQty: e.target.value })}
-                        className="w-20 rounded border border-slate-300 px-2 py-1 text-right text-sm tabular-nums" />
+                        className="w-20 rounded border px-2 py-1 text-right text-sm tabular-nums"
+                        style={{ borderColor: "var(--color-border)" }} />
                     </td>
                     <td className="py-2 px-3 text-right">
                       <input inputMode="decimal" value={l.invoicedUnitCost}
                         onChange={(e) => patchLine(i, { invoicedUnitCost: e.target.value })}
-                        className="w-24 rounded border border-slate-300 px-2 py-1 text-right text-sm tabular-nums" />
+                        className="w-24 rounded border px-2 py-1 text-right text-sm tabular-nums"
+                        style={{ borderColor: "var(--color-border)" }} />
                     </td>
                   </tr>
                 ))}
@@ -261,10 +270,10 @@ function MatchPanel({
   const m = bill.match;
   const variance = m.match_status === "variance";
   return (
-    <div className="rounded-xl border border-slate-200 p-4">
+    <div className="rounded-xl border p-4" style={{ borderColor: "var(--color-border)" }}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold text-slate-900">{bill.invoice_number}</p>
+          <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{bill.invoice_number}</p>
           <StatusBadge status={bill.status} />
         </div>
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${variance ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
@@ -274,7 +283,7 @@ function MatchPanel({
 
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
-          <thead className="text-left text-xs font-semibold uppercase text-slate-400">
+          <thead className="text-left text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>
             <tr>
               <th className="py-2 pr-3">Product</th>
               <th className="py-2 px-3 text-right">Ord</th>
@@ -288,14 +297,15 @@ function MatchPanel({
           </thead>
           <tbody>
             {m.lines.map((l, i) => (
-              <tr key={l.line_id ?? `x${i}`} className={`border-t border-slate-100 ${l.matched ? "" : "bg-red-50/40"}`}>
-                <td className="py-2 pr-3 text-slate-900">{l.product_name}</td>
-                <td className="py-2 px-3 text-right tabular-nums text-slate-500">{l.ordered_qty}</td>
-                <td className="py-2 px-3 text-right tabular-nums text-slate-500">{l.received_qty}</td>
-                <td className="py-2 px-3 text-right tabular-nums text-slate-900">{l.invoiced_qty}</td>
-                <td className="py-2 px-3 text-right tabular-nums text-slate-500">{formatMoney(l.po_unit_cost_cents)}</td>
-                <td className="py-2 px-3 text-right tabular-nums text-slate-900">{formatMoney(l.invoiced_unit_cost_cents)}</td>
-                <td className={`py-2 px-3 text-right tabular-nums ${l.variance_cents === 0 ? "text-slate-400" : l.variance_cents > 0 ? "text-red-600" : "text-emerald-600"}`}>
+              <tr key={l.line_id ?? `x${i}`} className={`border-t ${l.matched ? "" : "bg-red-50/40"}`} style={{ borderColor: "var(--color-border)" }}>
+                <td className="py-2 pr-3" style={{ color: "var(--color-text-primary)" }}>{l.product_name}</td>
+                <td className="py-2 px-3 text-right tabular-nums" style={{ color: "var(--color-text-muted)" }}>{l.ordered_qty}</td>
+                <td className="py-2 px-3 text-right tabular-nums" style={{ color: "var(--color-text-muted)" }}>{l.received_qty}</td>
+                <td className="py-2 px-3 text-right tabular-nums" style={{ color: "var(--color-text-primary)" }}>{l.invoiced_qty}</td>
+                <td className="py-2 px-3 text-right tabular-nums" style={{ color: "var(--color-text-muted)" }}>{formatMoney(l.po_unit_cost_cents)}</td>
+                <td className="py-2 px-3 text-right tabular-nums" style={{ color: "var(--color-text-primary)" }}>{formatMoney(l.invoiced_unit_cost_cents)}</td>
+                <td className={`py-2 px-3 text-right tabular-nums ${l.variance_cents === 0 ? "" : l.variance_cents > 0 ? "text-red-600" : "text-emerald-600"}`}
+                  style={l.variance_cents === 0 ? { color: "var(--color-text-muted)" } : undefined}>
                   {l.variance_cents === 0 ? "—" : `${l.variance_cents > 0 ? "+" : "−"}${formatMoney(Math.abs(l.variance_cents))}`}
                 </td>
                 <td className="py-2 pl-3">
@@ -311,12 +321,13 @@ function MatchPanel({
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t-2 border-slate-300">
-              <td colSpan={6} className="py-2 pr-3 text-right text-xs font-semibold uppercase text-slate-500">
+            <tr className="border-t-2" style={{ borderColor: "var(--color-border)" }}>
+              <td colSpan={6} className="py-2 pr-3 text-right text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>
                 Expected {formatMoney(m.expected_cents)} · Invoiced {formatMoney(bill.total_cents)}
                 {bill.tax_cents > 0 && ` (incl. tax ${formatMoney(bill.tax_cents)})`}
               </td>
-              <td className={`py-2 px-3 text-right font-bold tabular-nums ${m.total_variance_cents === 0 ? "text-slate-500" : "text-red-600"}`}>
+              <td className={`py-2 px-3 text-right font-bold tabular-nums ${m.total_variance_cents === 0 ? "" : "text-red-600"}`}
+                style={m.total_variance_cents === 0 ? { color: "var(--color-text-muted)" } : undefined}>
                 {m.total_variance_cents === 0 ? "—" : `${m.total_variance_cents > 0 ? "+" : "−"}${formatMoney(Math.abs(m.total_variance_cents))}`}
               </td>
               <td />

@@ -25,7 +25,7 @@ const TIMEOUT_OPTIONS = [
 
 function SectionCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+    <div className="rounded-xl px-4 py-4 shadow-sm" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
       {children}
     </div>
   );
@@ -45,8 +45,8 @@ function ToggleRow({
   return (
     <div className="flex items-center justify-between gap-4">
       <div>
-        <p className="text-sm font-medium text-[#111]">{label}</p>
-        {description && <p className="text-xs text-slate-400">{description}</p>}
+        <p className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>{label}</p>
+        {description && <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{description}</p>}
       </div>
       <button
         type="button"
@@ -54,7 +54,7 @@ function ToggleRow({
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 ${
-          checked ? "bg-brand-600" : "bg-slate-200"
+          checked ? "bg-brand-600" : "bg-[var(--color-surface-subtle)]"
         }`}
       >
         <span
@@ -111,8 +111,8 @@ export default function KioskSettingsPage() {
 
         {/* ── Header ──────────────────────────────────────────────────── */}
         <div className="mb-6">
-          <h1 className="text-lg font-semibold text-[#111]">Kiosk Mode</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>Kiosk Mode</h1>
+          <p className="mt-1 text-sm" style={{ color: "var(--color-text-muted)" }}>
             Configure a customer-facing self-checkout terminal on a dedicated tablet or touchscreen.
             Staff use a PIN to exit kiosk mode and return to the back office.
           </p>
@@ -133,22 +133,23 @@ export default function KioskSettingsPage() {
 
             {/* ── Kiosk URL ──────────────────────────────────────────── */}
             <SectionCard>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>
                 Kiosk URL
               </p>
-              <div className="mt-2 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2.5">
-                <span className="flex-1 select-all font-mono text-sm text-slate-700">
+              <div className="mt-2 flex items-center gap-2 rounded-lg px-3 py-2.5" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
+                <span className="flex-1 select-all font-mono text-sm" style={{ color: "var(--color-text-secondary)" }}>
                   {KIOSK_URL}
                 </span>
                 <button
                   type="button"
                   onClick={() => void navigator.clipboard.writeText(KIOSK_URL)}
-                  className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50"
+                  className="rounded-md px-2.5 py-1 text-xs font-medium shadow-sm transition-colors hover:bg-[var(--color-surface-subtle)]"
+                  style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}
                 >
                   Copy
                 </button>
               </div>
-              <p className="mt-2 text-xs text-slate-400">
+              <p className="mt-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
                 Open this URL on a dedicated tablet or customer-facing display.
               </p>
             </SectionCard>
@@ -156,12 +157,13 @@ export default function KioskSettingsPage() {
             {/* ── Exit PIN ───────────────────────────────────────────── */}
             <SectionCard>
               <label
-                className="block text-sm font-medium text-[#111]"
+                className="block text-sm font-medium"
+                style={{ color: "var(--color-text-primary)" }}
                 htmlFor="kiosk-pin"
               >
                 Exit PIN
               </label>
-              <p className="mt-0.5 text-xs text-slate-400">
+              <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>
                 Staff enter this PIN to exit kiosk mode and return to the back office.
               </p>
               <div className="mt-2 flex items-center gap-2">
@@ -172,12 +174,14 @@ export default function KioskSettingsPage() {
                   maxLength={8}
                   value={pin}
                   onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-                  className="w-32 rounded-lg border border-slate-200 px-3 py-2 font-mono text-lg tracking-widest focus:border-brand-600 focus:outline-none"
+                  className="w-32 rounded-lg px-3 py-2 font-mono text-lg tracking-widest focus:border-brand-600 focus:outline-none"
+                  style={{ border: "1px solid var(--color-border)" }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPin((v) => !v)}
-                  className="text-xs text-slate-400 hover:text-slate-600"
+                  className="text-xs hover:opacity-80"
+                  style={{ color: "var(--color-text-muted)" }}
                 >
                   {showPin ? "Hide" : "Show"}
                 </button>
@@ -187,19 +191,21 @@ export default function KioskSettingsPage() {
             {/* ── Idle timeout ────────────────────────────────────────── */}
             <SectionCard>
               <label
-                className="block text-sm font-medium text-[#111]"
+                className="block text-sm font-medium"
+                style={{ color: "var(--color-text-primary)" }}
                 htmlFor="kiosk-timeout"
               >
                 Idle Timeout
               </label>
-              <p className="mt-0.5 text-xs text-slate-400">
+              <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>
                 Return to the welcome screen after this period of inactivity.
               </p>
               <select
                 id="kiosk-timeout"
                 value={idleTimeout}
                 onChange={(e) => setIdleTimeout(e.target.value)}
-                className="mt-2 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
+                className="mt-2 rounded-lg px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
+                style={{ border: "1px solid var(--color-border)" }}
               >
                 {TIMEOUT_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -221,8 +227,8 @@ export default function KioskSettingsPage() {
 
             {/* ── Payment methods ─────────────────────────────────────── */}
             <SectionCard>
-              <p className="text-sm font-medium text-[#111]">Allowed Payment Methods</p>
-              <p className="mt-0.5 text-xs text-slate-400">
+              <p className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>Allowed Payment Methods</p>
+              <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>
                 Only selected methods will be offered to customers at checkout.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -236,8 +242,9 @@ export default function KioskSettingsPage() {
                       className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
                         active
                           ? "bg-brand-600 text-white"
-                          : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+                          : "hover:bg-[var(--color-surface-subtle)]"
                       }`}
+                      style={!active ? { border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" } : undefined}
                     >
                       {METHOD_LABELS[m]}
                     </button>
@@ -247,8 +254,8 @@ export default function KioskSettingsPage() {
             </SectionCard>
 
             {/* ── Enable mode notice ──────────────────────────────────── */}
-            <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-500">
-              <svg className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <div className="flex items-start gap-2 rounded-lg px-3 py-2.5 text-xs" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }}>
+              <svg className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--color-text-muted)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <p>

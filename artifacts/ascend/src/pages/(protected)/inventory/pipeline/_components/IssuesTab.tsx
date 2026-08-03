@@ -73,7 +73,7 @@ export function IssuesTab() {
     }
   }
 
-  if (loading) return <div className="py-12 text-center text-sm text-slate-400">Loading…</div>;
+  if (loading) return <div className="py-12 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>Loading…</div>;
   if (error) return <p role="alert" className="text-sm text-red-700 py-6">{error}</p>;
 
   const open = items.filter((i) => i.status !== "resolved");
@@ -81,23 +81,35 @@ export function IssuesTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4 text-sm text-slate-500">
+      <div className="flex items-center gap-4 text-sm" style={{ color: "var(--color-text-muted)" }}>
         <span><strong className="text-red-600">{open.length}</strong> open</span>
-        <span><strong className="text-slate-400">{resolved.length}</strong> resolved</span>
+        <span><strong style={{ color: "var(--color-text-muted)" }}>{resolved.length}</strong> resolved</span>
       </div>
 
       {[...open, ...resolved].map((item) => (
-        <div key={item.id} className={`rounded-lg border p-4 ${item.status === "resolved" ? "border-slate-200 bg-slate-50/50 opacity-70" : "border-slate-200 bg-white"}`}>
+        <div
+          key={item.id}
+          className={`rounded-lg border p-4 ${item.status === "resolved" ? "opacity-70" : ""}`}
+          style={{
+            borderColor: "var(--color-border)",
+            backgroundColor: item.status === "resolved" ? "var(--color-surface-subtle)" : "var(--color-surface)",
+          }}
+        >
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-medium text-slate-900">{item.po_number}</span>
+                <span className="font-medium" style={{ color: "var(--color-text-primary)" }}>{item.po_number}</span>
                 <Badge variant={SEVERITY_BADGE[item.severity]}>{item.severity}</Badge>
                 <Badge variant={STATUS_BADGE[item.status]}>{item.status}</Badge>
-                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">{ISSUE_TYPE_LABELS[item.issue_type]}</span>
+                <span
+                  className="rounded px-1.5 py-0.5 text-xs"
+                  style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}
+                >
+                  {ISSUE_TYPE_LABELS[item.issue_type]}
+                </span>
               </div>
-              <p className="mt-1 text-sm text-slate-700">{item.description}</p>
-              <p className="mt-1.5 text-xs text-slate-400">
+              <p className="mt-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>{item.description}</p>
+              <p className="mt-1.5 text-xs" style={{ color: "var(--color-text-muted)" }}>
                 {item.product_name} · {item.sku} · {item.supplier_name} · assigned to {item.assigned_to} · {fmtDate(item.created_at)}
               </p>
             </div>
@@ -109,7 +121,8 @@ export function IssuesTab() {
                     type="button"
                     disabled={updating === item.id}
                     onClick={() => updateStatus(item.id, "investigating")}
-                    className="rounded-md border border-slate-300 px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                    className="rounded-md border px-2.5 py-1 text-xs hover:bg-[var(--color-surface-subtle)] disabled:opacity-50"
+                    style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
                   >
                     Investigate
                   </button>
@@ -129,7 +142,10 @@ export function IssuesTab() {
       ))}
 
       {items.length === 0 && (
-        <div className="rounded-lg border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400">
+        <div
+          className="rounded-lg border border-dashed py-12 text-center text-sm"
+          style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
+        >
           No pipeline issues
         </div>
       )}

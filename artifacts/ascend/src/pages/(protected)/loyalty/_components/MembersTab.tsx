@@ -15,8 +15,8 @@ const TIER_BADGE: Record<LoyaltyTierLevel, "yellow" | "gray" | "green" | "purple
 };
 
 const inputCls =
-  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
-const labelCls = "mb-1 block text-sm font-medium text-slate-700";
+  "w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+const labelCls = "mb-1 block text-sm font-medium";
 
 // ── AdjustModal ────────────────────────────────────────────────────────────────
 
@@ -50,32 +50,33 @@ function AdjustModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="flex w-full max-w-sm flex-col rounded-xl bg-white shadow-xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-950">Adjust Points</h2>
-          <button type="button" onClick={onClose} className="text-xl leading-none text-slate-400 hover:text-slate-600">&times;</button>
+      <div className="flex w-full max-w-sm flex-col rounded-xl shadow-xl" style={{ backgroundColor: "var(--color-surface)" }} onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Adjust Points</h2>
+          <button type="button" onClick={onClose} className="text-xl leading-none" style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
         <form id="adjust-form" onSubmit={handleSubmit} className="space-y-4 px-5 py-4">
           {err && <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>}
-          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
-            <p className="font-medium text-slate-950">{member.customer_name}</p>
-            <p className="text-slate-500">Current balance: <span className="font-medium text-slate-700">{member.points_balance.toLocaleString()} pts</span></p>
+          <div className="rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
+            <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{member.customer_name}</p>
+            <p style={{ color: "var(--color-text-muted)" }}>Current balance: <span className="font-medium" style={{ color: "var(--color-text-secondary)" }}>{member.points_balance.toLocaleString()} pts</span></p>
           </div>
           <div>
-            <label className={labelCls}>Points adjustment <span className="text-red-500">*</span></label>
-            <input className={inputCls} type="number" value={delta} onChange={e => setDelta(e.target.value)}
+            <label className={labelCls} style={{ color: "var(--color-text-secondary)" }}>Points adjustment <span className="text-red-500">*</span></label>
+            <input className={inputCls} style={{ borderColor: "var(--color-border)" }} type="number" value={delta} onChange={e => setDelta(e.target.value)}
               placeholder="e.g. +50 to add, -20 to deduct" required />
-            <p className="mt-1 text-xs text-slate-400">Positive adds points · Negative deducts points</p>
+            <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>Positive adds points · Negative deducts points</p>
           </div>
           <div>
-            <label className={labelCls}>Reason <span className="font-normal text-slate-400">(optional)</span></label>
-            <input className={inputCls} value={reason} onChange={e => setReason(e.target.value)}
+            <label className={labelCls} style={{ color: "var(--color-text-secondary)" }}>Reason <span className="font-normal" style={{ color: "var(--color-text-muted)" }}>(optional)</span></label>
+            <input className={inputCls} style={{ borderColor: "var(--color-border)" }} value={reason} onChange={e => setReason(e.target.value)}
               placeholder="e.g. Goodwill adjustment, correction" />
           </div>
         </form>
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+        <div className="flex justify-end gap-2 px-5 py-3" style={{ borderTop: "1px solid var(--color-border)" }}>
           <button type="button" onClick={onClose}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            className="rounded-lg px-4 py-2 text-sm font-medium hover:bg-[var(--color-surface-subtle)]"
+            style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
             Cancel
           </button>
           <button type="submit" form="adjust-form" disabled={saving}
@@ -118,18 +119,19 @@ export function MembersTab({ tiers }: { tiers: LoyaltyTier[] }) {
   return (
     <>
       <Card className="overflow-hidden p-0">
-        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
           <div className="min-w-48 flex-1">
-            <input className={inputCls} placeholder="Search members…"
+            <input className={inputCls} style={{ borderColor: "var(--color-border)" }} placeholder="Search members…"
               value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <select
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            style={{ border: "1px solid var(--color-border)" }}
             value={filterTier} onChange={e => setFilterTier(e.target.value)}>
             <option value="all">All tiers</option>
             {tiers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
-          <span className="text-sm text-slate-500">{total} members</span>
+          <span className="text-sm" style={{ color: "var(--color-text-muted)" }}>{total} members</span>
         </div>
 
         {error && <p role="alert" className="border-b border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
@@ -143,7 +145,7 @@ export function MembersTab({ tiers }: { tiers: LoyaltyTier[] }) {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <tr className="border-b text-left text-xs font-semibold uppercase tracking-wide" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
                 <th className="px-4 py-3">Customer</th>
                 <th className="px-4 py-3">Tier</th>
                 <th className="px-4 py-3 text-right">Balance</th>
@@ -152,26 +154,27 @@ export function MembersTab({ tiers }: { tiers: LoyaltyTier[] }) {
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[var(--color-table-border)]">
               {members.map(m => (
-                <tr key={m.id} className="transition-colors hover:bg-slate-50">
+                <tr key={m.id} className="transition-colors hover:bg-[var(--color-table-row-hover)]">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-slate-950">{m.customer_name}</p>
-                    {m.customer_email && <p className="text-xs text-slate-400">{m.customer_email}</p>}
+                    <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{m.customer_name}</p>
+                    {m.customer_email && <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{m.customer_email}</p>}
                   </td>
                   <td className="px-4 py-3">
                     <Badge variant={TIER_BADGE[m.tier_level as LoyaltyTierLevel]}>{m.tier_name}</Badge>
                   </td>
-                  <td className="px-4 py-3 text-right font-medium tabular-nums text-slate-950">
+                  <td className="px-4 py-3 text-right font-medium tabular-nums" style={{ color: "var(--color-text-primary)" }}>
                     {m.points_balance.toLocaleString()} pts
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-slate-500">
+                  <td className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--color-text-muted)" }}>
                     {m.points_lifetime.toLocaleString()} pts
                   </td>
-                  <td className="px-4 py-3 text-slate-500">{fmtDate(m.joined_at)}</td>
+                  <td className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>{fmtDate(m.joined_at)}</td>
                   <td className="px-4 py-3">
                     <button onClick={() => setAdjustMember(m)}
-                      className="rounded border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100">
+                      className="rounded px-2 py-1 text-xs font-medium hover:bg-[var(--color-surface-subtle)]"
+                      style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
                       Adjust pts
                     </button>
                   </td>

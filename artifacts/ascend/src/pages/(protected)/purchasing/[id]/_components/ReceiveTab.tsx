@@ -101,8 +101,8 @@ export function ReceiveTab({
     <div className="space-y-4 p-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold text-slate-900">Receive incoming goods</p>
-          <p className="text-xs text-slate-500">Enter cases × units per case for each line</p>
+          <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Receive incoming goods</p>
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Enter cases × units per case for each line</p>
         </div>
         {canManage && order.status !== "received" && (
           <Button variant="primary" size="sm" onClick={() => setReceiveOpen(true)}>Open receive form</Button>
@@ -110,31 +110,34 @@ export function ReceiveTab({
       </div>
 
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase text-slate-500">Attached documents</p>
+        <p className="mb-2 text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Attached documents</p>
         <div className="mb-3 flex flex-wrap gap-2">
           {documents.map((doc) => (
-            <div key={doc.id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-              <svg aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <div key={doc.id} className="flex items-center gap-2 rounded-lg border px-3 py-2" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
+              <svg aria-hidden="true" className="h-4 w-4 shrink-0" style={{ color: "var(--color-text-muted)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                 <polyline points="14 2 14 8 20 8" />
               </svg>
               <div>
                 <p className="text-xs font-medium text-slate-800">{doc.name}</p>
-                <p className="text-xs text-slate-400">{docTypeLabel(doc.type)} · {fmtBytes(doc.size_bytes)}</p>
+                <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{docTypeLabel(doc.type)} · {fmtBytes(doc.size_bytes)}</p>
               </div>
             </div>
           ))}
-          {documents.length === 0 && <p className="text-xs text-slate-400">No documents attached.</p>}
+          {documents.length === 0 && <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>No documents attached.</p>}
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">File name</label>
+            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>File name</label>
             <input type="text" value={docName} onChange={(e) => setDocName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void uploadDoc(); }} placeholder="Invoice-2026.pdf"
-              className="w-52 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+              className="w-52 rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              style={{ borderColor: "var(--color-border)" }} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">Type</label>
-            <select value={docType} onChange={(e) => setDocType(e.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none">
+            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Type</label>
+            <select value={docType} onChange={(e) => setDocType(e.target.value)}
+              className="rounded-lg border px-3 py-2 text-sm focus:outline-none"
+              style={{ borderColor: "var(--color-border)" }}>
               <option value="invoice">Invoice</option>
               <option value="delivery_note">Delivery Note</option>
               <option value="excel">Excel / CSV</option>
@@ -146,8 +149,8 @@ export function ReceiveTab({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-100 text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+        <table className="min-w-full divide-y divide-[var(--color-table-border)] text-sm">
+          <thead className="text-left text-xs uppercase tracking-wide" style={{ backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
             <tr>
               <th className="px-4 py-2.5">Product</th>
               <th className="px-4 py-2.5 text-right">Ordered</th>
@@ -157,7 +160,7 @@ export function ReceiveTab({
               <th className="px-4 py-2.5">Lot / Expiry</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50 bg-white">
+          <tbody className="divide-y divide-[var(--color-table-border)]" style={{ backgroundColor: "var(--color-surface)" }}>
             {order.lines.map((l) => {
               const rem = remaining(l);
               const recvd = l.received_qty ?? 0;
@@ -165,8 +168,8 @@ export function ReceiveTab({
               return (
                 <tr key={l.id}>
                   <td className="px-4 py-3">
-                    <p className="font-medium text-slate-900">{l.product_name}</p>
-                    <p className="font-mono text-xs text-slate-400">{l.product_sku}</p>
+                    <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{l.product_name}</p>
+                    <p className="font-mono text-xs" style={{ color: "var(--color-text-muted)" }}>{l.product_sku}</p>
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">{l.quantity}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-emerald-700">{recvd}</td>
@@ -176,7 +179,7 @@ export function ReceiveTab({
                   <td className="px-4 py-3">
                     <Badge variant={status === "received" ? "green" : status === "partial" ? "yellow" : "gray"}>{status}</Badge>
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-500">
+                  <td className="px-4 py-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
                     <p>{l.lot_code ?? "—"}</p>
                     <p>{fmtDate(l.expiry_date)}</p>
                   </td>
@@ -198,45 +201,50 @@ export function ReceiveTab({
         }
       >
         {receiveError && <div className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{receiveError}</div>}
-        <p className="mb-4 text-sm text-slate-500">Enter cases × units/case for each line. Total is auto-calculated.</p>
+        <p className="mb-4 text-sm" style={{ color: "var(--color-text-muted)" }}>Enter cases × units/case for each line. Total is auto-calculated.</p>
         <div className="flex flex-col gap-4">
           {order.lines.filter((l) => remaining(l) > 0).map((line) => {
             const entry = receiveEntries.find((e) => e.lineId === line.id);
             if (!entry) return null;
             const rem = remaining(line);
             return (
-              <div key={line.id} className="space-y-3 rounded-xl border border-slate-200 px-4 py-3">
+              <div key={line.id} className="space-y-3 rounded-xl border px-4 py-3" style={{ borderColor: "var(--color-border)" }}>
                 <div className="flex justify-between">
                   <div>
-                    <p className="font-medium text-slate-900">{line.product_name}</p>
-                    <p className="font-mono text-xs text-slate-400">{line.product_sku} · remaining: {rem}</p>
+                    <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{line.product_name}</p>
+                    <p className="font-mono text-xs" style={{ color: "var(--color-text-muted)" }}>{line.product_sku} · remaining: {rem}</p>
                   </div>
-                  <span className="text-xs text-slate-400">{formatMoney(line.unit_cost_cents)}/unit</span>
+                  <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{formatMoney(line.unit_cost_cents)}/unit</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500">Cases</label>
+                    <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Cases</label>
                     <input type="number" min={0} value={entry.cases} onChange={(e) => updateEntry(line.id, { cases: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-center text-sm focus:border-blue-500 focus:outline-none" />
+                      className="w-full rounded-lg border px-2 py-1.5 text-center text-sm focus:border-blue-500 focus:outline-none"
+                      style={{ borderColor: "var(--color-border)" }} />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500">Units/case</label>
+                    <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Units/case</label>
                     <input type="number" min={1} value={entry.unitsPerCase} onChange={(e) => updateEntry(line.id, { unitsPerCase: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-center text-sm focus:border-blue-500 focus:outline-none" />
+                      className="w-full rounded-lg border px-2 py-1.5 text-center text-sm focus:border-blue-500 focus:outline-none"
+                      style={{ borderColor: "var(--color-border)" }} />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500">Total</label>
-                    <div className={`rounded-lg border px-2 py-1.5 text-center text-sm font-bold tabular-nums ${entry.totalQty > rem ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200 bg-slate-50"}`}>{entry.totalQty}</div>
+                    <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Total</label>
+                    <div className={`rounded-lg border px-2 py-1.5 text-center text-sm font-bold tabular-nums ${entry.totalQty > rem ? "border-red-300 bg-red-50 text-red-700" : ""}`}
+                      style={entry.totalQty > rem ? undefined : { borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)" }}>{entry.totalQty}</div>
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500">Expiry</label>
+                    <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Expiry</label>
                     <input type="date" value={entry.expiryDate} onChange={(e) => updateEntry(line.id, { expiryDate: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none" />
+                      className="w-full rounded-lg border px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
+                      style={{ borderColor: "var(--color-border)" }} />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500">Lot code</label>
+                    <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Lot code</label>
                     <input type="text" value={entry.lotCode} onChange={(e) => updateEntry(line.id, { lotCode: e.target.value })} placeholder="LOT-2026"
-                      className="w-full rounded-lg border border-slate-300 px-2 py-1.5 font-mono text-xs focus:border-blue-500 focus:outline-none" />
+                      className="w-full rounded-lg border px-2 py-1.5 font-mono text-xs focus:border-blue-500 focus:outline-none"
+                      style={{ borderColor: "var(--color-border)" }} />
                   </div>
                 </div>
               </div>

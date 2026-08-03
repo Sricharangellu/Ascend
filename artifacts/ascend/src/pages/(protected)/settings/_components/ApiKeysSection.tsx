@@ -110,10 +110,10 @@ export function ApiKeysSection({ canManage, addToast }: { canManage: boolean; ad
       />
 
       <Card className="overflow-hidden p-0">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
           <div>
-            <h2 className="text-base font-semibold text-slate-950">API Keys</h2>
-            <p className="text-sm text-slate-500">API keys grant programmatic access to Ascend. Only show the full key once at creation — it cannot be retrieved again.</p>
+            <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>API Keys</h2>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>API keys grant programmatic access to Ascend. Only show the full key once at creation — it cannot be retrieved again.</p>
           </div>
           {canManage && !showForm && (
             <Button variant="primary" size="sm" onClick={() => setShowForm(true)}>Create key</Button>
@@ -146,31 +146,34 @@ export function ApiKeysSection({ canManage, addToast }: { canManage: boolean; ad
         )}
 
         {showForm && canManage && (
-          <div className="border-b border-slate-200 bg-slate-50 px-4 py-4 space-y-3">
+          <div className="px-4 py-4 space-y-3" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
             <div className="flex flex-wrap gap-3">
               <input
                 value={form.name}
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                 placeholder="Key name (e.g. integration name)"
-                className="flex-1 min-w-48 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                className="flex-1 min-w-48 rounded-md px-3 py-2 text-sm outline-none"
+                style={{ border: "1px solid var(--color-border)" }}
               />
               <input
                 type="date"
                 value={form.expiresAt}
                 onChange={e => setForm(f => ({ ...f, expiresAt: e.target.value }))}
-                className="w-44 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                className="w-44 rounded-md px-3 py-2 text-sm outline-none"
+                style={{ border: "1px solid var(--color-border)" }}
                 title="Expiry date (optional)"
               />
             </div>
             <div className="flex flex-wrap items-center gap-4">
-              <span className="text-xs font-semibold uppercase text-slate-500">Scopes</span>
+              <span className="text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Scopes</span>
               {ALL_SCOPES.map(scope => (
                 <label key={scope} className="flex items-center gap-1.5 cursor-pointer text-sm">
                   <input
                     type="checkbox"
                     checked={form.scopes.includes(scope)}
                     onChange={() => toggleScope(scope)}
-                    className="h-4 w-4 rounded border-slate-300 accent-blue-600"
+                    className="h-4 w-4 rounded accent-blue-600"
+                    style={{ borderColor: "var(--color-border)" }}
                   />
                   <span className="capitalize">{scope}</span>
                 </label>
@@ -185,7 +188,7 @@ export function ApiKeysSection({ canManage, addToast }: { canManage: boolean; ad
 
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+            <tr className="text-left text-xs font-semibold uppercase tracking-[0.08em]" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
               <th className="px-4 py-3">Key name</th>
               <th className="px-4 py-3">Prefix</th>
               <th className="px-4 py-3">Scopes</th>
@@ -194,31 +197,31 @@ export function ApiKeysSection({ canManage, addToast }: { canManage: boolean; ad
               {canManage && <th className="px-4 py-3" />}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-[var(--color-table-border)]">
             {loading && (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">Loading…</td></tr>
+              <tr><td colSpan={6} className="px-4 py-6 text-center" style={{ color: "var(--color-text-muted)" }}>Loading…</td></tr>
             )}
             {!loading && items.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">No API keys. Create one to enable programmatic access.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-6 text-center" style={{ color: "var(--color-text-muted)" }}>No API keys. Create one to enable programmatic access.</td></tr>
             )}
             {items.map(key => {
               let parsedScopes: string[] = [];
               try { parsedScopes = JSON.parse(key.scopes ?? "[]"); } catch { parsedScopes = []; }
               return (
-                <tr key={key.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 font-medium text-slate-950">{key.name}</td>
+                <tr key={key.id} className="hover:bg-[var(--color-surface-subtle)]">
+                  <td className="px-4 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{key.name}</td>
                   <td className="px-4 py-3">
-                    <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700">
+                    <code className="rounded px-1.5 py-0.5 font-mono text-xs" style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
                       {key.key_prefix}{"••••••••"}
                     </code>
                   </td>
-                  <td className="px-4 py-3 text-slate-500">
+                  <td className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>
                     {parsedScopes.length > 0 ? parsedScopes.join(", ") : "all"}
                   </td>
-                  <td className="px-4 py-3 text-slate-500">
+                  <td className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>
                     {key.last_used_at ? relativeTime(key.last_used_at) : "Never"}
                   </td>
-                  <td className="px-4 py-3 text-slate-500">
+                  <td className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>
                     {key.expires_at ? fmtDate(new Date(key.expires_at).getTime()) : "Never"}
                   </td>
                   {canManage && (

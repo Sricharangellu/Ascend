@@ -71,69 +71,77 @@ function ReceiveModal({ onClose, onSaved }: ReceiveModalProps) {
     }
   }
 
+  const inputCls = "w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const inputStyle = { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-slate-900">Receive Serial Number</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+      <div className="rounded-xl shadow-2xl w-full max-w-md" style={{ backgroundColor: "var(--color-surface)" }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: "var(--color-border)" }}>
+          <h2 className="text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>Receive Serial Number</h2>
+          <button onClick={onClose} className="text-2xl leading-none" style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
         <form onSubmit={submit} className="p-6 space-y-4">
           {error && (
             <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>
           )}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Product ID <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Product ID <span className="text-red-500">*</span></label>
             <input
               type="text"
               value={productId}
               onChange={e => setProductId(e.target.value)}
               placeholder="e.g. prod_001"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={inputCls}
+              style={inputStyle}
               required
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Product Name</label>
+              <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Product Name</label>
               <input
                 type="text"
                 value={productName}
                 onChange={e => setProductName(e.target.value)}
                 placeholder="Optional"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={inputCls}
+                style={inputStyle}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">SKU</label>
+              <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>SKU</label>
               <input
                 type="text"
                 value={productSku}
                 onChange={e => setProductSku(e.target.value)}
                 placeholder="Optional"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={inputCls}
+                style={inputStyle}
               />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Serial Number <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Serial Number <span className="text-red-500">*</span></label>
             <input
               type="text"
               value={serial}
               onChange={e => setSerial(e.target.value)}
               placeholder="e.g. DMPXQ123ABC1"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={clsx(inputCls, "font-mono")}
+              style={inputStyle}
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Notes</label>
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={2}
               placeholder="Optional condition notes…"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className={clsx(inputCls, "resize-none")}
+              style={inputStyle}
             />
           </div>
           <div className="flex justify-end gap-3 pt-2">
@@ -183,58 +191,59 @@ function DetailModal({ sn, onClose, onUpdated }: DetailModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+      <div className="rounded-xl shadow-2xl w-full max-w-lg" style={{ backgroundColor: "var(--color-surface)" }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: "var(--color-border)" }}>
           <div>
-            <h2 className="text-lg font-semibold text-slate-900 font-mono">{sn.serial}</h2>
-            <p className="text-sm text-slate-500">{sn.product_name ?? sn.product_id}</p>
+            <h2 className="text-lg font-semibold font-mono" style={{ color: "var(--color-text-primary)" }}>{sn.serial}</h2>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>{sn.product_name ?? sn.product_id}</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+          <button onClick={onClose} className="text-2xl leading-none" style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
         <div className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-slate-500 text-xs uppercase tracking-wide mb-1">Status</p>
+              <p className="text-xs uppercase tracking-wide mb-1" style={{ color: "var(--color-text-muted)" }}>Status</p>
               <StatusBadge status={sn.status} />
             </div>
             <div>
-              <p className="text-slate-500 text-xs uppercase tracking-wide mb-1">SKU</p>
-              <p className="font-mono text-slate-800">{sn.product_sku ?? "—"}</p>
+              <p className="text-xs uppercase tracking-wide mb-1" style={{ color: "var(--color-text-muted)" }}>SKU</p>
+              <p className="font-mono" style={{ color: "var(--color-text-primary)" }}>{sn.product_sku ?? "—"}</p>
             </div>
             <div>
-              <p className="text-slate-500 text-xs uppercase tracking-wide mb-1">Received</p>
-              <p className="text-slate-800">{fmtDate(sn.received_at)}</p>
+              <p className="text-xs uppercase tracking-wide mb-1" style={{ color: "var(--color-text-muted)" }}>Received</p>
+              <p style={{ color: "var(--color-text-primary)" }}>{fmtDate(sn.received_at)}</p>
             </div>
             <div>
-              <p className="text-slate-500 text-xs uppercase tracking-wide mb-1">Sold At</p>
-              <p className="text-slate-800">{fmtDate(sn.sold_at)}</p>
+              <p className="text-xs uppercase tracking-wide mb-1" style={{ color: "var(--color-text-muted)" }}>Sold At</p>
+              <p style={{ color: "var(--color-text-primary)" }}>{fmtDate(sn.sold_at)}</p>
             </div>
             {sn.service_order_id && (
               <div className="col-span-2">
-                <p className="text-slate-500 text-xs uppercase tracking-wide mb-1">Service Order</p>
-                <p className="font-mono text-slate-800">{sn.service_order_id}</p>
+                <p className="text-xs uppercase tracking-wide mb-1" style={{ color: "var(--color-text-muted)" }}>Service Order</p>
+                <p className="font-mono" style={{ color: "var(--color-text-primary)" }}>{sn.service_order_id}</p>
               </div>
             )}
             {sn.notes && (
               <div className="col-span-2">
-                <p className="text-slate-500 text-xs uppercase tracking-wide mb-1">Notes</p>
-                <p className="text-slate-800">{sn.notes}</p>
+                <p className="text-xs uppercase tracking-wide mb-1" style={{ color: "var(--color-text-muted)" }}>Notes</p>
+                <p style={{ color: "var(--color-text-primary)" }}>{sn.notes}</p>
               </div>
             )}
           </div>
 
           {nextOpts.length > 0 && (
-            <div className="border-t border-slate-100 pt-4">
-              <p className="text-sm font-medium text-slate-700 mb-3">Update Status</p>
+            <div className="border-t pt-4" style={{ borderColor: "var(--color-border)" }}>
+              <p className="text-sm font-medium mb-3" style={{ color: "var(--color-text-secondary)" }}>Update Status</p>
               {nextOpts.includes("service") && (
                 <div className="mb-3">
-                  <label className="block text-xs text-slate-500 mb-1">Service Order ID (optional)</label>
+                  <label className="block text-xs mb-1" style={{ color: "var(--color-text-muted)" }}>Service Order ID (optional)</label>
                   <input
                     type="text"
                     value={serviceOrderId}
                     onChange={e => setServiceOrderId(e.target.value)}
                     placeholder="svo_…"
-                    className="w-full border border-slate-300 rounded px-2.5 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border rounded px-2.5 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
                   />
                 </div>
               )}
@@ -271,6 +280,9 @@ const STATUS_TABS: Array<{ label: string; value: SerialStatus | "all" }> = [
   { label: "Returned", value: "returned" },
   { label: "In Service", value: "service" },
 ];
+
+// Suppress unused-variable warning for ALL_STATUSES — it may be used in the future
+void ALL_STATUSES;
 
 export default function SerialsPage() {
   const [serials, setSerials] = useState<SerialNumber[]>([]);
@@ -320,10 +332,10 @@ export default function SerialsPage() {
   }
 
   const statCards = [
-    { label: "Total Units", value: total, color: "border-slate-200" },
-    { label: "In Stock", value: counts["in_stock"] ?? 0, color: "border-emerald-400" },
-    { label: "Sold", value: counts["sold"] ?? 0, color: "border-slate-400" },
-    { label: "In Service", value: counts["service"] ?? 0, color: "border-blue-400" },
+    { label: "Total Units", value: total, color: "border-l-4 border-l-[var(--color-border)]" },
+    { label: "In Stock", value: counts["in_stock"] ?? 0, color: "border-l-4 border-l-emerald-400" },
+    { label: "Sold", value: counts["sold"] ?? 0, color: "border-l-4 border-l-slate-400" },
+    { label: "In Service", value: counts["service"] ?? 0, color: "border-l-4 border-l-blue-400" },
   ];
 
   return (
@@ -337,9 +349,10 @@ export default function SerialsPage() {
         {/* Stat cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {statCards.map(c => (
-            <div key={c.label} className={clsx("bg-white rounded-xl border-l-4 p-4 shadow-sm", c.color)}>
-              <p className="text-xs text-slate-500 uppercase tracking-wide">{c.label}</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">{c.value}</p>
+            <div key={c.label} className={clsx("rounded-xl border p-4 shadow-sm", c.color)}
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+              <p className="text-xs uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>{c.label}</p>
+              <p className="text-2xl font-bold mt-1" style={{ color: "var(--color-text-primary)" }}>{c.value}</p>
             </div>
           ))}
         </div>
@@ -352,7 +365,8 @@ export default function SerialsPage() {
               value={query}
               onChange={e => setQuery(e.target.value)}
               placeholder="Search serial, product name, or SKU…"
-              className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
             />
             <Button variant="secondary" type="submit" size="sm">Search</Button>
             {search && (
@@ -365,7 +379,7 @@ export default function SerialsPage() {
         </div>
 
         {/* Status tabs */}
-        <div className="flex gap-1 border-b border-slate-200 overflow-x-auto">
+        <div className="flex gap-1 border-b overflow-x-auto" style={{ borderColor: "var(--color-border)" }}>
           {STATUS_TABS.map(t => (
             <button
               key={t.value}
@@ -374,8 +388,9 @@ export default function SerialsPage() {
                 "px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors",
                 tab === t.value
                   ? "border-blue-600 text-blue-700"
-                  : "border-transparent text-slate-500 hover:text-slate-700"
+                  : "border-transparent hover:text-[var(--color-text-secondary)]"
               )}
+              style={tab !== t.value ? { color: "var(--color-text-muted)" } : undefined}
             >
               {t.label}
             </button>
@@ -383,11 +398,12 @@ export default function SerialsPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="rounded-xl shadow-sm border overflow-hidden"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
           {loading ? (
-            <div className="flex items-center justify-center h-40 text-slate-400 text-sm">Loading…</div>
+            <div className="flex items-center justify-center h-40 text-sm" style={{ color: "var(--color-text-muted)" }}>Loading…</div>
           ) : serials.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-slate-400">
+            <div className="flex flex-col items-center justify-center h-40" style={{ color: "var(--color-text-muted)" }}>
               <p className="text-sm">No serial numbers found.</p>
               <button onClick={() => setShowReceive(true)} className="mt-2 text-sm text-blue-600 hover:underline">
                 Receive the first one
@@ -396,36 +412,37 @@ export default function SerialsPage() {
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Serial</th>
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Product</th>
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600">SKU</th>
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Received</th>
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Sold</th>
+                <tr className="border-b" style={{ borderColor: "var(--color-table-border)", backgroundColor: "var(--color-table-header)" }}>
+                  <th className="text-left px-4 py-3 font-semibold" style={{ color: "var(--color-text-secondary)" }}>Serial</th>
+                  <th className="text-left px-4 py-3 font-semibold" style={{ color: "var(--color-text-secondary)" }}>Product</th>
+                  <th className="text-left px-4 py-3 font-semibold" style={{ color: "var(--color-text-secondary)" }}>SKU</th>
+                  <th className="text-left px-4 py-3 font-semibold" style={{ color: "var(--color-text-secondary)" }}>Status</th>
+                  <th className="text-left px-4 py-3 font-semibold" style={{ color: "var(--color-text-secondary)" }}>Received</th>
+                  <th className="text-left px-4 py-3 font-semibold" style={{ color: "var(--color-text-secondary)" }}>Sold</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y" style={{ borderColor: "var(--color-table-border)" }}>
                 {serials.map(sn => (
                   <tr
                     key={sn.id}
                     onClick={() => setSelected(sn)}
-                    className="hover:bg-slate-50 cursor-pointer transition-colors"
+                    className="hover:bg-[var(--color-surface-subtle)] cursor-pointer transition-colors"
                   >
-                    <td className="px-4 py-3 font-mono text-slate-800 text-xs">{sn.serial}</td>
-                    <td className="px-4 py-3 text-slate-700 max-w-[200px] truncate">
+                    <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--color-text-primary)" }}>{sn.serial}</td>
+                    <td className="px-4 py-3 max-w-[200px] truncate" style={{ color: "var(--color-text-secondary)" }}>
                       {sn.product_name ?? sn.product_id}
                     </td>
-                    <td className="px-4 py-3 font-mono text-slate-500 text-xs">{sn.product_sku ?? "—"}</td>
+                    <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--color-text-muted)" }}>{sn.product_sku ?? "—"}</td>
                     <td className="px-4 py-3"><StatusBadge status={sn.status} /></td>
-                    <td className="px-4 py-3 text-slate-500">{fmtDate(sn.received_at)}</td>
-                    <td className="px-4 py-3 text-slate-500">{fmtDate(sn.sold_at)}</td>
+                    <td className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>{fmtDate(sn.received_at)}</td>
+                    <td className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>{fmtDate(sn.sold_at)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
         </div>
+
       </div>
 
       {showReceive && <ReceiveModal onClose={() => setShowReceive(false)} onSaved={handleReceived} />}

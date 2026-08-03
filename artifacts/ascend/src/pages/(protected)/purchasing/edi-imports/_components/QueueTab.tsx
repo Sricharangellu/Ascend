@@ -127,7 +127,7 @@ export function QueueTab({ refreshKey }: { refreshKey: number }) {
     setTimeout(() => setToast(null), 5000);
   }
 
-  if (loading) return <div className="py-12 text-center text-sm text-slate-400">Loading queue…</div>;
+  if (loading) return <div className="py-12 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>Loading queue…</div>;
   if (error) return <p role="alert" className="text-sm text-red-700 py-6">{error}</p>;
 
   return (
@@ -137,13 +137,14 @@ export function QueueTab({ refreshKey }: { refreshKey: number }) {
       )}
 
       {items.length === 0 && (
-        <div className="rounded-lg border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400">
+        <div className="rounded-lg border border-dashed py-12 text-center text-sm" style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>
           Queue is empty — upload a file to get started
         </div>
       )}
 
       {items.map((item) => (
-        <div key={item.id} className={`rounded-lg border bg-white p-4 ${item.status === "invalid" ? "border-red-200" : "border-slate-200"}`}>
+        <div key={item.id} className={`rounded-lg border p-4 ${item.status === "invalid" ? "border-red-200" : ""}`}
+          style={item.status === "invalid" ? { backgroundColor: "var(--color-surface)" } : { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
@@ -153,7 +154,7 @@ export function QueueTab({ refreshKey }: { refreshKey: number }) {
                 </button>
                 <Badge variant={STATUS_BADGE[item.status]}>{STATUS_LABEL[item.status]}</Badge>
               </div>
-              <p className="mt-0.5 text-xs text-slate-400">
+              <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>
                 {item.supplier_name} · {item.format.toUpperCase().replace("_", " ")} · {fmtBytes(item.file_size_bytes)} · uploaded {fmtTime(item.uploaded_at)}
               </p>
               {item.warnings.length > 0 && (
@@ -172,7 +173,8 @@ export function QueueTab({ refreshKey }: { refreshKey: number }) {
             <div className="flex flex-shrink-0 items-center gap-2">
               {item.status === "queued" && (
                 <button type="button" disabled={acting === item.id} onClick={() => validate(item.id)}
-                  className="rounded-md border border-slate-300 px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+                  className="rounded-md border px-2.5 py-1 text-xs hover:bg-[var(--color-surface-subtle)] disabled:opacity-50"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
                   {acting === item.id ? "…" : "Validate"}
                 </button>
               )}
@@ -190,13 +192,13 @@ export function QueueTab({ refreshKey }: { refreshKey: number }) {
       {/* Detail drawer */}
       {detail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDetail(null)}>
-          <div className="w-full max-w-2xl rounded-xl bg-white shadow-xl flex flex-col max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <div className="w-full max-w-2xl rounded-xl shadow-xl flex flex-col max-h-[85vh]" style={{ backgroundColor: "var(--color-surface)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--color-border)" }}>
               <div>
-                <h2 className="text-sm font-semibold text-slate-900">{detail.filename}</h2>
-                <p className="text-xs text-slate-400">{detail.format_label} · {detail.supplier_name}</p>
+                <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{detail.filename}</h2>
+                <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{detail.format_label} · {detail.supplier_name}</p>
               </div>
-              <button type="button" onClick={() => setDetail(null)} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+              <button type="button" onClick={() => setDetail(null)} className="text-xl hover:text-slate-600" style={{ color: "var(--color-text-muted)" }}>&times;</button>
             </div>
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
               {/* Stats */}
@@ -207,9 +209,10 @@ export function QueueTab({ refreshKey }: { refreshKey: number }) {
                   { label: "Lines", value: detail.line_count },
                   { label: "Errors", value: detail.error_count },
                 ].map((s) => (
-                  <div key={s.label} className="rounded-lg bg-slate-50 py-2">
-                    <p className={`text-lg font-bold ${s.label === "Errors" && s.value > 0 ? "text-red-600" : "text-slate-900"}`}>{s.value}</p>
-                    <p className="text-xs text-slate-400">{s.label}</p>
+                  <div key={s.label} className="rounded-lg py-2" style={{ backgroundColor: "var(--color-table-header)" }}>
+                    <p className={`text-lg font-bold ${s.label === "Errors" && s.value > 0 ? "text-red-600" : ""}`}
+                      style={s.label === "Errors" && s.value > 0 ? undefined : { color: "var(--color-text-primary)" }}>{s.value}</p>
+                    <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{s.label}</p>
                   </div>
                 ))}
               </div>
@@ -217,7 +220,7 @@ export function QueueTab({ refreshKey }: { refreshKey: number }) {
               {/* Raw preview */}
               {detail.preview_lines.length > 0 && (
                 <div>
-                  <p className="mb-2 text-xs font-semibold text-slate-600">File preview</p>
+                  <p className="mb-2 text-xs font-semibold" style={{ color: "var(--color-text-secondary)" }}>File preview</p>
                   <div className="rounded-lg bg-slate-900 p-3 font-mono text-xs text-green-300 overflow-x-auto space-y-2">
                     {detail.preview_lines.map((line) => (
                       <div key={line.line}>
@@ -255,9 +258,10 @@ export function QueueTab({ refreshKey }: { refreshKey: number }) {
               )}
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+            <div className="flex justify-end gap-2 border-t px-5 py-3" style={{ borderColor: "var(--color-border)" }}>
               <button type="button" onClick={() => setDetail(null)}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Close</button>
+                className="rounded-lg border px-4 py-2 text-sm hover:bg-[var(--color-surface-subtle)]"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Close</button>
               {detail.status === "queued" && (
                 <button type="button" disabled={acting === detail.id} onClick={() => { validate(detail.id); }}
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50">

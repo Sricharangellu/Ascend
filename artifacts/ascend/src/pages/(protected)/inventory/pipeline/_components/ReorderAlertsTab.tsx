@@ -62,7 +62,7 @@ export function ReorderAlertsTab() {
     }
   }
 
-  if (loading) return <div className="py-12 text-center text-sm text-slate-400">Loading…</div>;
+  if (loading) return <div className="py-12 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>Loading…</div>;
   if (error) return <p role="alert" className="text-sm text-red-700 py-6">{error}</p>;
 
   return (
@@ -73,13 +73,16 @@ export function ReorderAlertsTab() {
         </div>
       )}
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-slate-500">
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           {items.filter((i) => i.urgency === "critical").length} critical · {items.filter((i) => i.urgency === "warning").length} warning
         </p>
       </div>
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-lg border" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <thead
+            className="text-xs font-semibold uppercase tracking-wide"
+            style={{ backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}
+          >
             <tr>
               <th className="px-4 py-3 text-left">Product</th>
               <th className="px-4 py-3 text-right">Stock</th>
@@ -92,31 +95,38 @@ export function ReorderAlertsTab() {
               <th className="px-4 py-3" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y" style={{ borderColor: "var(--color-table-border)" }}>
             {items.map((item) => (
-              <tr key={item.id} className={item.urgency === "critical" ? "bg-red-50/40 hover:bg-red-50" : "hover:bg-slate-50"}>
+              <tr
+                key={item.id}
+                className={item.urgency === "critical" ? "bg-red-50/40 hover:bg-red-50" : "hover:bg-[var(--color-surface-subtle)]"}
+              >
                 <td className="px-4 py-3">
-                  <p className="font-medium text-slate-900">{item.product_name}</p>
-                  <p className="text-xs text-slate-400">{item.sku}</p>
+                  <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{item.product_name}</p>
+                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{item.sku}</p>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <span className={`font-semibold ${item.current_stock === 0 ? "text-red-600" : "text-slate-900"}`}>
+                  <span className={`font-semibold ${item.current_stock === 0 ? "text-red-600" : ""}`}
+                    style={item.current_stock !== 0 ? { color: "var(--color-text-primary)" } : undefined}>
                     {item.current_stock}
                   </span>
                   {item.open_po_qty > 0 && (
                     <p className="text-xs text-blue-500">+{item.open_po_qty} on order</p>
                   )}
                 </td>
-                <td className="px-4 py-3 text-right text-slate-600">{item.reorder_point}</td>
+                <td className="px-4 py-3 text-right" style={{ color: "var(--color-text-secondary)" }}>{item.reorder_point}</td>
                 <td className="px-4 py-3 text-right">
                   {item.days_until_stockout === 0
                     ? <span className="font-semibold text-red-600">Out of stock</span>
-                    : <span className={item.days_until_stockout <= 3 ? "text-red-600 font-medium" : "text-slate-700"}>{item.days_until_stockout}d</span>
+                    : <span className={item.days_until_stockout <= 3 ? "text-red-600 font-medium" : ""}
+                        style={item.days_until_stockout > 3 ? { color: "var(--color-text-secondary)" } : undefined}>
+                        {item.days_until_stockout}d
+                      </span>
                   }
                 </td>
-                <td className="px-4 py-3 text-slate-700">{item.preferred_supplier}</td>
-                <td className="px-4 py-3 text-right text-slate-700">{item.suggested_qty}</td>
-                <td className="px-4 py-3 text-right font-medium text-slate-900">{formatMoney(item.estimated_cost_cents)}</td>
+                <td className="px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{item.preferred_supplier}</td>
+                <td className="px-4 py-3 text-right" style={{ color: "var(--color-text-secondary)" }}>{item.suggested_qty}</td>
+                <td className="px-4 py-3 text-right font-medium" style={{ color: "var(--color-text-primary)" }}>{formatMoney(item.estimated_cost_cents)}</td>
                 <td className="px-4 py-3">
                   <Badge variant={URGENCY_BADGE[item.urgency]}>{item.urgency}</Badge>
                 </td>
@@ -134,7 +144,7 @@ export function ReorderAlertsTab() {
             ))}
             {items.length === 0 && (
               <tr>
-                <td colSpan={9} className="py-12 text-center text-sm text-slate-400">No reorder alerts — all products above reorder points</td>
+                <td colSpan={9} className="py-12 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No reorder alerts — all products above reorder points</td>
               </tr>
             )}
           </tbody>

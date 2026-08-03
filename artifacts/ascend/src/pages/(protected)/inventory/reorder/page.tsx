@@ -6,10 +6,10 @@ import type { ReorderSuggestion, ReorderSuggestionsResponse } from "@/api-client
 // ── Stat card ──────────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-slate-950">{value}</p>
-      {sub && <p className="mt-0.5 text-xs text-slate-400">{sub}</p>}
+    <div className="rounded-xl border p-5 shadow-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+      <p className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>{label}</p>
+      <p className="mt-1 text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>{value}</p>
+      {sub && <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{sub}</p>}
     </div>
   );
 }
@@ -37,30 +37,34 @@ function ConfirmModal({
   const totalLines = [...groups.values()].reduce((s, g) => s + g.lines.length, 0);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-xl bg-white shadow-xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-950">Confirm Draft Purchase Orders</h2>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+      <div
+        className="w-full max-w-lg rounded-xl shadow-xl flex flex-col max-h-[90vh]"
+        style={{ backgroundColor: "var(--color-surface)" }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--color-border)" }}>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Confirm Draft Purchase Orders</h2>
+          <button type="button" onClick={onClose} className="text-xl" style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          <p className="text-sm text-slate-600">
+          <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
             This will create <strong>{groups.size} draft PO{groups.size !== 1 ? "s" : ""}</strong> covering{" "}
             <strong>{totalLines} SKU{totalLines !== 1 ? "s" : ""}</strong>.
           </p>
           {[...groups.entries()].map(([vendorId, g]) => (
-            <div key={vendorId} className="rounded-lg border border-slate-200 overflow-hidden">
-              <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
-                <p className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
+            <div key={vendorId} className="rounded-lg border overflow-hidden" style={{ borderColor: "var(--color-border)" }}>
+              <div className="px-4 py-2 border-b" style={{ backgroundColor: "var(--color-table-header)", borderColor: "var(--color-border)" }}>
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-secondary)" }}>
                   {g.vendorName} ({g.lines.length} line{g.lines.length !== 1 ? "s" : ""})
                 </p>
               </div>
               <table className="w-full text-xs">
                 <tbody>
                   {g.lines.map(l => (
-                    <tr key={l.product_id} className="border-b border-slate-100 last:border-0">
-                      <td className="px-4 py-2 text-slate-800">{l.product_name}</td>
-                      <td className="px-4 py-2 text-slate-500">{l.sku ?? "—"}</td>
-                      <td className="px-4 py-2 text-right font-semibold text-slate-700">×{l.qty}</td>
+                    <tr key={l.product_id} className="border-b last:border-0" style={{ borderColor: "var(--color-table-border)" }}>
+                      <td className="px-4 py-2" style={{ color: "var(--color-text-primary)" }}>{l.product_name}</td>
+                      <td className="px-4 py-2" style={{ color: "var(--color-text-muted)" }}>{l.sku ?? "—"}</td>
+                      <td className="px-4 py-2 text-right font-semibold" style={{ color: "var(--color-text-secondary)" }}>×{l.qty}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -68,9 +72,10 @@ function ConfirmModal({
             </div>
           ))}
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+        <div className="flex justify-end gap-2 border-t px-5 py-3" style={{ borderColor: "var(--color-border)" }}>
           <button onClick={onClose} disabled={saving}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40">
+            className="rounded-lg border px-4 py-2 text-sm disabled:opacity-40 hover:bg-[var(--color-surface-subtle)]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
             Cancel
           </button>
           <button onClick={onConfirm} disabled={saving}
@@ -211,11 +216,12 @@ export default function ReorderPage() {
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <button onClick={toggleAll}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
+              className="rounded-lg border px-3 py-2 text-sm hover:bg-[var(--color-surface-subtle)]"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)", backgroundColor: "var(--color-surface)" }}>
               {selected.size === items.length && items.length > 0 ? "Deselect All" : "Select All"}
             </button>
             {selected.size > 0 && (
-              <span className="text-sm text-slate-600">{selected.size} selected</span>
+              <span className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{selected.size} selected</span>
             )}
           </div>
           <button
@@ -229,20 +235,23 @@ export default function ReorderPage() {
 
         {/* Grouped tables */}
         {loading ? (
-          <div className="flex items-center justify-center py-20 text-slate-400 text-sm">Loading…</div>
+          <div className="flex items-center justify-center py-20 text-sm" style={{ color: "var(--color-text-muted)" }}>Loading…</div>
         ) : items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white py-16 text-center">
-            <p className="text-slate-500 font-medium">All products are well-stocked</p>
-            <p className="mt-1 text-xs text-slate-400">No items currently at or below reorder point</p>
+          <div className="flex flex-col items-center justify-center rounded-xl border py-16 text-center"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+            <p className="font-medium" style={{ color: "var(--color-text-secondary)" }}>All products are well-stocked</p>
+            <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>No items currently at or below reorder point</p>
           </div>
         ) : (
           <div className="space-y-4">
             {[...byVendor.entries()].map(([vendorId, group]) => (
-              <div key={vendorId} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                <div className="flex items-center justify-between bg-slate-50 border-b border-slate-200 px-5 py-3">
+              <div key={vendorId} className="overflow-hidden rounded-xl border shadow-sm"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+                <div className="flex items-center justify-between border-b px-5 py-3"
+                  style={{ backgroundColor: "var(--color-table-header)", borderColor: "var(--color-border)" }}>
                   <div>
-                    <p className="text-sm font-semibold text-slate-800">{group.vendorName}</p>
-                    <p className="text-xs text-slate-500">{group.items.length} SKU{group.items.length !== 1 ? "s" : ""}</p>
+                    <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{group.vendorName}</p>
+                    <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{group.items.length} SKU{group.items.length !== 1 ? "s" : ""}</p>
                   </div>
                   <button
                     onClick={() => {
@@ -261,7 +270,7 @@ export default function ReorderPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-slate-100 text-left text-xs text-slate-500">
+                      <tr className="border-b text-left text-xs" style={{ borderColor: "var(--color-table-border)", color: "var(--color-text-muted)" }}>
                         <th className="w-10 px-4 py-2"></th>
                         <th className="px-4 py-2 font-medium">Product</th>
                         <th className="px-4 py-2 font-medium">SKU</th>
@@ -275,24 +284,27 @@ export default function ReorderPage() {
                       {group.items.map(item => (
                         <tr key={item.product_id}
                           onClick={() => toggleItem(item.product_id)}
-                          className={`cursor-pointer border-b border-slate-100 last:border-0 transition-colors ${
-                            selected.has(item.product_id) ? "bg-blue-50" : "hover:bg-slate-50"
-                          }`}>
+                          className={`cursor-pointer border-b last:border-0 transition-colors ${
+                            selected.has(item.product_id) ? "bg-blue-50" : "hover:bg-[var(--color-surface-subtle)]"
+                          }`}
+                          style={{ borderColor: "var(--color-table-border)" }}>
                           <td className="px-4 py-3">
                             <input type="checkbox" readOnly
                               checked={selected.has(item.product_id)}
-                              className="h-4 w-4 rounded border-slate-300 accent-blue-600" />
+                              className="h-4 w-4 rounded accent-blue-600"
+                              style={{ borderColor: "var(--color-border)" }} />
                           </td>
-                          <td className="px-4 py-3 font-medium text-slate-900">{item.product_name}</td>
-                          <td className="px-4 py-3 text-slate-500">{item.sku ?? "—"}</td>
-                          <td className="px-4 py-3 text-right font-semibold text-slate-800">{item.stock_qty}</td>
-                          <td className="px-4 py-3 text-right text-slate-600">{item.reorder_pt}</td>
+                          <td className="px-4 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{item.product_name}</td>
+                          <td className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>{item.sku ?? "—"}</td>
+                          <td className="px-4 py-3 text-right font-semibold" style={{ color: "var(--color-text-primary)" }}>{item.stock_qty}</td>
+                          <td className="px-4 py-3 text-right" style={{ color: "var(--color-text-secondary)" }}>{item.reorder_pt}</td>
                           <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
                             <input
                               type="number" min={1}
                               value={qtys[item.product_id] ?? item.suggested_qty}
                               onChange={e => setQtys(prev => ({ ...prev, [item.product_id]: Math.max(1, Number(e.target.value)) }))}
-                              className="w-20 rounded border border-slate-300 px-2 py-1 text-right text-sm focus:border-blue-500 focus:outline-none"
+                              className="w-20 rounded border px-2 py-1 text-right text-sm focus:border-blue-500 focus:outline-none"
+                              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
                             />
                           </td>
                           <td className="px-4 py-3">

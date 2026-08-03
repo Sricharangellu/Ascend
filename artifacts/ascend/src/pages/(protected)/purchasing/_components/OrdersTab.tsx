@@ -91,15 +91,15 @@ export function OrdersTab() {
     } finally { setBusy(false); }
   };
 
-  const INPUT = "mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950";
+  const INPUT = "mt-1 min-h-[44px] w-full rounded-md border px-3 text-sm outline-none focus:ring-2";
 
   return (
     <div className="flex flex-col gap-5 p-4">
       {error && <p role="alert" className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
 
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200 text-sm">
-          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+        <table className="min-w-full divide-y divide-[var(--color-table-border)] text-sm">
+          <thead className="text-left text-xs font-semibold uppercase tracking-[0.08em]" style={{ backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
             <tr>
               <th className="px-4 py-3">PO</th>
               <th className="px-4 py-3">Supplier</th>
@@ -108,22 +108,22 @@ export function OrdersTab() {
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 bg-white">
+          <tbody className="divide-y divide-[var(--color-table-border)]" style={{ backgroundColor: "var(--color-surface)" }}>
             {orders.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-slate-400">No purchase orders yet.</td>
+                <td colSpan={5} className="px-4 py-6 text-center" style={{ color: "var(--color-text-muted)" }}>No purchase orders yet.</td>
               </tr>
             ) : (
               orders.map((order) => (
-                <tr key={order.id} className="transition-colors hover:bg-slate-50">
-                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{order.id}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-950">{supplierName(order.supplier_id)}</td>
+                <tr key={order.id} className="transition-colors hover:bg-[var(--color-surface-subtle)]">
+                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs" style={{ color: "var(--color-text-secondary)" }}>{order.id}</td>
+                  <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-primary)" }}>{supplierName(order.supplier_id)}</td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <span className={`inline-flex rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${STATUS_STYLE[order.status] ?? "bg-slate-100 text-slate-700 ring-slate-200"}`}>
                       {order.status}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-950">{formatMoney(order.total_cost_cents)}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(order.total_cost_cents)}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
                     {order.status === "ordered" && canManage && (
                       <Button size="sm" variant="primary" disabled={busy} onClick={() => void receiveOrder(order.id)}>
@@ -139,39 +139,51 @@ export function OrdersTab() {
       </div>
 
       {canManage && (
-        <div className="border-t border-slate-200 pt-4">
-          <h3 className="mb-3 text-sm font-semibold text-slate-950">Create purchase order</h3>
+        <div className="border-t pt-4" style={{ borderColor: "var(--color-border)" }}>
+          <h3 className="mb-3 text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Create purchase order</h3>
           <label className="mb-3 block max-w-sm">
-            <span className="text-xs font-medium uppercase text-slate-500">Supplier</span>
-            <select value={poSupplierId} onChange={(e) => setPoSupplierId(e.target.value)} className={INPUT}>
+            <span className="text-xs font-medium uppercase" style={{ color: "var(--color-text-muted)" }}>Supplier</span>
+            <select value={poSupplierId} onChange={(e) => setPoSupplierId(e.target.value)}
+              className={INPUT}
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}>
               {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </label>
           <div className="flex flex-col gap-3">
             {lines.map((line, index) => (
-              <div key={index} className="grid grid-cols-1 gap-2 rounded-md border border-slate-200 p-3 sm:grid-cols-5">
+              <div key={index} className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-5" style={{ borderColor: "var(--color-border)" }}>
                 <label className="block sm:col-span-2">
-                  <span className="text-xs font-medium uppercase text-slate-500">Product</span>
-                  <select value={line.productId} onChange={(e) => updateLine(index, { productId: e.target.value })} className={INPUT}>
+                  <span className="text-xs font-medium uppercase" style={{ color: "var(--color-text-muted)" }}>Product</span>
+                  <select value={line.productId} onChange={(e) => updateLine(index, { productId: e.target.value })}
+                    className={INPUT}
+                    style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}>
                     <option value="">Select product</option>
                     {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
                   </select>
                 </label>
                 <label className="block">
-                  <span className="text-xs font-medium uppercase text-slate-500">Quantity</span>
-                  <input type="number" min="1" value={line.quantity} onChange={(e) => updateLine(index, { quantity: e.target.value })} className={INPUT} />
+                  <span className="text-xs font-medium uppercase" style={{ color: "var(--color-text-muted)" }}>Quantity</span>
+                  <input type="number" min="1" value={line.quantity} onChange={(e) => updateLine(index, { quantity: e.target.value })}
+                    className={INPUT}
+                    style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} />
                 </label>
                 <label className="block">
-                  <span className="text-xs font-medium uppercase text-slate-500">Unit cost</span>
-                  <input type="text" inputMode="decimal" value={line.unitCost} onChange={(e) => updateLine(index, { unitCost: e.target.value })} placeholder="0.00" className={INPUT} />
+                  <span className="text-xs font-medium uppercase" style={{ color: "var(--color-text-muted)" }}>Unit cost</span>
+                  <input type="text" inputMode="decimal" value={line.unitCost} onChange={(e) => updateLine(index, { unitCost: e.target.value })} placeholder="0.00"
+                    className={INPUT}
+                    style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} />
                 </label>
                 <label className="block">
-                  <span className="text-xs font-medium uppercase text-slate-500">Expiry date</span>
-                  <input type="date" value={line.expiryDate} onChange={(e) => updateLine(index, { expiryDate: e.target.value })} className={INPUT} />
+                  <span className="text-xs font-medium uppercase" style={{ color: "var(--color-text-muted)" }}>Expiry date</span>
+                  <input type="date" value={line.expiryDate} onChange={(e) => updateLine(index, { expiryDate: e.target.value })}
+                    className={INPUT}
+                    style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} />
                 </label>
                 <label className="block">
-                  <span className="text-xs font-medium uppercase text-slate-500">Lot code</span>
-                  <input type="text" value={line.lotCode} onChange={(e) => updateLine(index, { lotCode: e.target.value })} placeholder="Optional" className={INPUT} />
+                  <span className="text-xs font-medium uppercase" style={{ color: "var(--color-text-muted)" }}>Lot code</span>
+                  <input type="text" value={line.lotCode} onChange={(e) => updateLine(index, { lotCode: e.target.value })} placeholder="Optional"
+                    className={INPUT}
+                    style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} />
                 </label>
                 {lines.length > 1 && (
                   <div className="sm:col-span-5">

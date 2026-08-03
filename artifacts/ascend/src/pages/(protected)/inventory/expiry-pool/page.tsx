@@ -50,25 +50,31 @@ function UpcomingTab() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-[var(--erp-text-muted)]">Stock approaching expiry within 30 days — still sellable.</p>
+      <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Stock approaching expiry within 30 days — still sellable.</p>
       {error && <div role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
       {loading ? <TableSkeleton headers={["Product", "Lot", "Expiry", "Days left", "Qty"]} rows={6} /> : (
         <Card noPadding>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
-              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
-                <tr><th className="px-4 py-3">Product</th><th className="px-4 py-3">Lot</th><th className="px-4 py-3">Expiry</th><th className="px-4 py-3">Days left</th><th className="px-4 py-3 text-right">Qty</th></tr>
+            <table className="min-w-full divide-y text-sm" style={{ borderColor: "var(--color-table-border)" }}>
+              <thead style={{ backgroundColor: "var(--color-table-header)" }}>
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Product</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Lot</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Expiry</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Days left</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Qty</th>
+                </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
+              <tbody className="divide-y" style={{ borderColor: "var(--color-table-border)", backgroundColor: "var(--color-surface)" }}>
                 {rows.length === 0 ? (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">Nothing expiring in the next 30 days.</td></tr>
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>Nothing expiring in the next 30 days.</td></tr>
                 ) : rows.map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 text-slate-950">{r.name}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-600">{r.lot_code ?? "—"}</td>
-                    <td className="px-4 py-3 text-slate-500">{fmtDate(r.expiry_date)}</td>
+                  <tr key={r.id} className="hover:bg-[var(--color-surface-subtle)]">
+                    <td className="px-4 py-3" style={{ color: "var(--color-text-primary)" }}>{r.name}</td>
+                    <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--color-text-secondary)" }}>{r.lot_code ?? "—"}</td>
+                    <td className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>{fmtDate(r.expiry_date)}</td>
                     <td className="px-4 py-3"><Badge variant={dayBadge(r.days_to_expiry)}>{r.days_to_expiry}d</Badge></td>
-                    <td className="px-4 py-3 text-right tabular-nums">{r.qty_on_hand}</td>
+                    <td className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{r.qty_on_hand}</td>
                   </tr>
                 ))}
               </tbody>
@@ -126,7 +132,7 @@ function PoolTab() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-[var(--erp-text-muted)]">Expired stock pulled from active inventory, pending disposition.</p>
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Expired stock pulled from active inventory, pending disposition.</p>
         <Button size="sm" onClick={() => void runSweep()} disabled={busy === "sweep"}>
           {busy === "sweep" ? "Sweeping…" : "Run expiry sweep"}
         </Button>
@@ -136,19 +142,26 @@ function PoolTab() {
       {loading ? <TableSkeleton headers={["Product", "Lot", "Expired", "Qty", "Loss", ""]} rows={6} /> : (
         <Card noPadding>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
-              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
-                <tr><th className="px-4 py-3">Product</th><th className="px-4 py-3">Lot</th><th className="px-4 py-3">Expired</th><th className="px-4 py-3 text-right">Qty</th><th className="px-4 py-3 text-right">Loss</th><th className="px-4 py-3 text-right">Disposition</th></tr>
+            <table className="min-w-full divide-y text-sm" style={{ borderColor: "var(--color-table-border)" }}>
+              <thead style={{ backgroundColor: "var(--color-table-header)" }}>
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Product</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Lot</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Expired</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Qty</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Loss</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Disposition</th>
+                </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
+              <tbody className="divide-y" style={{ borderColor: "var(--color-table-border)", backgroundColor: "var(--color-surface)" }}>
                 {rows.length === 0 ? (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">The expiry pool is empty. Run a sweep to pull in expired stock.</td></tr>
+                  <tr><td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>The expiry pool is empty. Run a sweep to pull in expired stock.</td></tr>
                 ) : rows.map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 text-slate-950">{r.product_name ?? r.product_id}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-600">{r.lot_code ?? "—"}</td>
-                    <td className="px-4 py-3 text-slate-500">{fmtDate(r.expiry_date)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{r.qty}</td>
+                  <tr key={r.id} className="hover:bg-[var(--color-surface-subtle)]">
+                    <td className="px-4 py-3" style={{ color: "var(--color-text-primary)" }}>{r.product_name ?? r.product_id}</td>
+                    <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--color-text-secondary)" }}>{r.lot_code ?? "—"}</td>
+                    <td className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>{fmtDate(r.expiry_date)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{r.qty}</td>
                     <td className="px-4 py-3 text-right font-semibold tabular-nums text-red-700">{formatMoney(r.loss_cents)}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
@@ -171,7 +184,7 @@ export default function ExpiryPoolPage() {
   const [tab, setTab] = useState<Tab>("pool");
   return (
     <EnterpriseShell active="inventory" title="Expiry" subtitle="Expired stock pool, disposition, and upcoming expiry" contentClassName="overflow-y-auto">
-      <div className="mb-4 border-b border-slate-200">
+      <div className="mb-4 border-b px-4 pt-4" style={{ borderColor: "var(--color-border)" }}>
         <nav className="-mb-px flex gap-6" aria-label="Expiry tabs">
           {(["pool", "upcoming"] as Tab[]).map((id) => (
             <button
@@ -179,14 +192,22 @@ export default function ExpiryPoolPage() {
               type="button"
               onClick={() => setTab(id)}
               aria-current={tab === id ? "page" : undefined}
-              className={["whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition-colors", tab === id ? "border-slate-950 text-slate-950" : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"].join(" ")}
+              className={[
+                "whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition-colors",
+                tab === id
+                  ? "border-blue-600 text-blue-600"
+                  : "border-transparent hover:border-[var(--color-border)]",
+              ].join(" ")}
+              style={tab !== id ? { color: "var(--color-text-muted)" } : undefined}
             >
               {id === "pool" ? "Expiry Pool" : "Upcoming Expiry"}
             </button>
           ))}
         </nav>
       </div>
-      {tab === "pool" ? <PoolTab /> : <UpcomingTab />}
+      <div className="px-4 pb-6">
+        {tab === "pool" ? <PoolTab /> : <UpcomingTab />}
+      </div>
     </EnterpriseShell>
   );
 }

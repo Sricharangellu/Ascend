@@ -108,9 +108,10 @@ interface ProgressPanelViewProps {
 
 function BucketTile({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-3 text-center shadow-sm">
-      <p className="text-xl font-semibold tabular-nums text-slate-950">{value}</p>
-      <p className="mt-0.5 text-[11px] font-medium leading-tight text-slate-500">{label}</p>
+    <div className="rounded-xl border p-3 text-center shadow-[var(--shadow-sm)]"
+      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+      <p className="text-xl font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{value}</p>
+      <p className="mt-0.5 text-[11px] font-medium leading-tight" style={{ color: "var(--color-text-secondary)" }}>{label}</p>
     </div>
   );
 }
@@ -172,8 +173,8 @@ export function ProgressPanelView({
     <Card>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Progress &amp; verification</h2>
-          <p className="mt-0.5 text-sm text-slate-500">
+          <h2 className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Progress &amp; verification</h2>
+          <p className="mt-0.5 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
             Track work from self-reported to evidence-backed to system-verified — Ascend only
             marks a task verified when it can prove it from your real data.
           </p>
@@ -184,7 +185,7 @@ export function ProgressPanelView({
       {loading && !summary ? (
         <div role="status" aria-label="Loading progress summary" className="grid grid-cols-2 gap-2 sm:grid-cols-5">
           {SUMMARY_BUCKETS.map((b) => (
-            <div key={b} className="h-16 animate-pulse rounded-md border border-slate-100 bg-slate-50" />
+            <div key={b} className="h-16 animate-skeleton rounded-xl border" style={{ borderColor: "var(--color-border)" }} />
           ))}
         </div>
       ) : (
@@ -203,9 +204,9 @@ export function ProgressPanelView({
 
       {/* ── Create task ───────────────────────────────────────────────────── */}
       {canManage && (
-        <form onSubmit={submitCreate} className="mt-4 flex flex-wrap items-end gap-2 border-t border-slate-100 pt-4">
+        <form onSubmit={submitCreate} className="mt-4 flex flex-wrap items-end gap-2 border-t pt-4" style={{ borderColor: "var(--color-border)" }}>
           <div className="min-w-[200px] flex-1">
-            <label htmlFor="progress-title" className="mb-1 block text-xs font-medium text-slate-600">
+            <label htmlFor="progress-title" className="mb-1 block text-[11px] font-medium" style={{ color: "var(--color-text-secondary)" }}>
               New task
             </label>
             <input
@@ -213,18 +214,20 @@ export function ProgressPanelView({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Receive first purchase order"
-              className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-brand-600"
+              className="h-9 w-full rounded-lg border px-3 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
             />
           </div>
           <div>
-            <label htmlFor="progress-source" className="mb-1 block text-xs font-medium text-slate-600">
+            <label htmlFor="progress-source" className="mb-1 block text-[11px] font-medium" style={{ color: "var(--color-text-secondary)" }}>
               Verify from (optional)
             </label>
             <select
               id="progress-source"
               value={verificationSource}
               onChange={(e) => setVerificationSource(e.target.value)}
-              className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm outline-none focus:border-brand-600"
+              className="h-9 rounded-lg border px-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
             >
               <option value="">Manual only</option>
               {VERIFICATION_SOURCES.map((s) => (
@@ -246,16 +249,16 @@ export function ProgressPanelView({
         {loading && tasks.length === 0 ? (
           <div role="status" aria-label="Loading tasks" className="space-y-2">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded-md border border-slate-100 bg-slate-50" />
+              <div key={i} className="h-14 animate-skeleton rounded-xl border" style={{ borderColor: "var(--color-border)" }} />
             ))}
           </div>
         ) : tasks.length === 0 ? (
-          <p className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-4 text-sm text-slate-500">
+          <p className="rounded-xl border px-3 py-4 text-[13px]" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
             No progress tasks yet. {canManage ? "Add one above" : "A manager can add one"} to start tracking
             what still needs to be proven.
           </p>
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-[var(--color-table-border)]">
             {tasks.map((task) => {
               const vLabel = verificationLabel(task.verification_source);
               const verifiable = canSystemVerify(task);
@@ -263,12 +266,12 @@ export function ProgressPanelView({
                 <li key={task.id} className="py-3">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-[180px] flex-1">
-                      <p className="text-sm font-semibold text-slate-950">{task.title}</p>
+                      <p className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>{task.title}</p>
                       {task.description && (
-                        <p className="mt-0.5 line-clamp-2 text-xs text-slate-600">{task.description}</p>
+                        <p className="mt-0.5 line-clamp-2 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{task.description}</p>
                       )}
                       {vLabel && (
-                        <p className="mt-1 text-[11px] text-slate-500">
+                        <p className="mt-1 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
                           Verifiable from: <span className="font-medium">{vLabel}</span>
                         </p>
                       )}
@@ -286,7 +289,8 @@ export function ProgressPanelView({
                           const next = e.target.value as ProgressStatus;
                           if (next) void onAdvanceStatus(task.id, next);
                         }}
-                        className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs outline-none focus:border-brand-600"
+                        className="h-8 rounded-lg border px-2 text-[11px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
                       >
                         <option value="">Set status…</option>
                         {MANUAL_PROGRESS_STATUSES.map((s) => (
@@ -328,10 +332,11 @@ export function ProgressPanelView({
                   {canManage && evidenceFor === task.id && (
                     <form
                       onSubmit={(e) => submitEvidence(e, task.id)}
-                      className="mt-2 flex flex-wrap items-end gap-2 rounded-md border border-slate-200 bg-slate-50 p-2"
+                      className="mt-2 flex flex-wrap items-end gap-2 rounded-xl border p-3"
+                      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}
                     >
                       <div className="min-w-[160px] flex-1">
-                        <label htmlFor={`ev-title-${task.id}`} className="mb-1 block text-[11px] font-medium text-slate-600">
+                        <label htmlFor={`ev-title-${task.id}`} className="mb-1 block text-[11px] font-medium" style={{ color: "var(--color-text-secondary)" }}>
                           Evidence title
                         </label>
                         <input
@@ -339,11 +344,12 @@ export function ProgressPanelView({
                           value={evidenceTitle}
                           onChange={(e) => setEvidenceTitle(e.target.value)}
                           placeholder="e.g. PO #1042 received"
-                          className="h-8 w-full rounded-md border border-slate-300 px-2 text-xs outline-none focus:border-brand-600"
+                          className="h-8 w-full rounded-lg border px-2 text-[11px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
                         />
                       </div>
                       <div className="min-w-[140px]">
-                        <label htmlFor={`ev-url-${task.id}`} className="mb-1 block text-[11px] font-medium text-slate-600">
+                        <label htmlFor={`ev-url-${task.id}`} className="mb-1 block text-[11px] font-medium" style={{ color: "var(--color-text-secondary)" }}>
                           Link (optional)
                         </label>
                         <input
@@ -351,7 +357,8 @@ export function ProgressPanelView({
                           value={evidenceUrl}
                           onChange={(e) => setEvidenceUrl(e.target.value)}
                           placeholder="https://…"
-                          className="h-8 w-full rounded-md border border-slate-300 px-2 text-xs outline-none focus:border-brand-600"
+                          className="h-8 w-full rounded-lg border px-2 text-[11px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
                         />
                       </div>
                       <Button type="submit" variant="primary" size="sm" loading={busy}>

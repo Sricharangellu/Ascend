@@ -30,7 +30,7 @@ export default function InventoryPipelinePage() {
     >
       <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6">
         {/* Tab bar */}
-        <div className="border-b border-slate-200">
+        <div className="border-b" style={{ borderColor: "var(--color-border)" }}>
           <nav className="-mb-px flex gap-1 overflow-x-auto" aria-label="Pipeline tabs">
             {TABS.map((t) => (
               <button
@@ -41,8 +41,9 @@ export default function InventoryPipelinePage() {
                   "whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
                   tab === t.key
                     ? "border-blue-600 text-blue-600"
-                    : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700",
+                    : "border-transparent hover:border-[var(--color-border)]",
                 ].join(" ")}
+                style={tab !== t.key ? { color: "var(--color-text-muted)" } : undefined}
                 aria-selected={tab === t.key}
                 role="tab"
               >

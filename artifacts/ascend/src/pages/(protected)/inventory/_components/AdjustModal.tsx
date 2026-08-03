@@ -35,6 +35,13 @@ export function AdjustModal({ product, onClose, onSaved }: AdjustModalProps) {
   const delta = sign * (parseInt(amount, 10) || 0);
   const newQty = product.onHand + delta;
 
+  const inputCls = "mt-1 min-h-[44px] w-full rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-950";
+  const inputStyle = {
+    borderColor: "var(--color-border)",
+    backgroundColor: "var(--color-surface)",
+    color: "var(--color-text-primary)",
+  };
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!amount || parseInt(amount, 10) <= 0) return;
@@ -67,18 +74,20 @@ export function AdjustModal({ product, onClose, onSaved }: AdjustModalProps) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl"
+        className="w-full max-w-md rounded-lg p-6 shadow-xl"
+        style={{ backgroundColor: "var(--color-surface)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h2 className="text-base font-semibold text-slate-950">Adjust stock</h2>
-            <p className="text-sm text-slate-500">{product.name} · {product.sku}</p>
+            <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Adjust stock</h2>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>{product.name} · {product.sku}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded p-1 text-slate-400 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-950"
+            className="rounded p-1 focus:outline-none focus:ring-2 focus:ring-slate-950"
+            style={{ color: "var(--color-text-muted)" }}
             aria-label="Close"
           >
             <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -89,11 +98,12 @@ export function AdjustModal({ product, onClose, onSaved }: AdjustModalProps) {
 
         <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-4">
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Reason</span>
+            <span className="text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>Reason</span>
             <select
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-950"
+              className={inputCls}
+              style={inputStyle}
             >
               <option value="cycle_count">Cycle count</option>
               <option value="damage">Damage</option>
@@ -105,19 +115,21 @@ export function AdjustModal({ product, onClose, onSaved }: AdjustModalProps) {
           </label>
 
           <div>
-            <span className="text-sm font-medium text-slate-700">Adjustment</span>
+            <span className="text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>Adjustment</span>
             <div className="mt-1 flex gap-2">
               <button
                 type="button"
                 onClick={() => setSign(1)}
-                className={`min-h-[44px] rounded-md border px-4 text-sm font-semibold transition-colors ${sign === 1 ? "border-success-600 bg-success-50 text-success-700" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"}`}
+                className={`min-h-[44px] rounded-md border px-4 text-sm font-semibold transition-colors ${sign === 1 ? "border-success-600 bg-success-50 text-success-700" : "hover:bg-[var(--color-surface-subtle)]"}`}
+                style={sign !== 1 ? { borderColor: "var(--color-border)", color: "var(--color-text-secondary)", backgroundColor: "var(--color-surface)" } : undefined}
               >
                 +
               </button>
               <button
                 type="button"
                 onClick={() => setSign(-1)}
-                className={`min-h-[44px] rounded-md border px-4 text-sm font-semibold transition-colors ${sign === -1 ? "border-danger-600 bg-danger-50 text-danger-700" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"}`}
+                className={`min-h-[44px] rounded-md border px-4 text-sm font-semibold transition-colors ${sign === -1 ? "border-danger-600 bg-danger-50 text-danger-700" : "hover:bg-[var(--color-surface-subtle)]"}`}
+                style={sign !== -1 ? { borderColor: "var(--color-border)", color: "var(--color-text-secondary)", backgroundColor: "var(--color-surface)" } : undefined}
               >
                 −
               </button>
@@ -127,23 +139,25 @@ export function AdjustModal({ product, onClose, onSaved }: AdjustModalProps) {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0"
-                className="min-h-[44px] flex-1 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-950"
+                className="min-h-[44px] flex-1 rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-950"
+                style={inputStyle}
                 required
               />
             </div>
             {amount && parseInt(amount, 10) > 0 && (
-              <p className="mt-1 text-xs text-slate-500">
-                New quantity: <span className="font-semibold text-slate-950">{newQty}</span>
+              <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
+                New quantity: <span className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{newQty}</span>
               </p>
             )}
           </div>
 
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Location</span>
+            <span className="text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>Location</span>
             <select
               value={locationId}
               onChange={(e) => setLocationId(e.target.value)}
-              className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-950"
+              className={inputCls}
+              style={inputStyle}
             >
               {locationOptions.map((l) => (
                 <option key={l.id} value={l.id}>{l.name}</option>
@@ -152,14 +166,15 @@ export function AdjustModal({ product, onClose, onSaved }: AdjustModalProps) {
           </label>
 
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Note (optional)</span>
+            <span className="text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>Note (optional)</span>
             <input
               type="text"
               maxLength={255}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="e.g. Broken in transit"
-              className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-950"
+              className={inputCls}
+              style={inputStyle}
             />
           </label>
 

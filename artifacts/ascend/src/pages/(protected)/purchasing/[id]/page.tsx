@@ -105,7 +105,8 @@ export default function PurchaseOrderDetailPage() {
         <button
           type="button"
           onClick={() => router.push("/purchasing")}
-          className="inline-flex self-start items-center gap-1.5 text-sm text-slate-500 hover:text-slate-950"
+          className="inline-flex self-start items-center gap-1.5 text-sm hover:text-slate-950"
+          style={{ color: "var(--color-text-muted)" }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M19 12H5M12 5l-7 7 7 7" />
@@ -114,7 +115,7 @@ export default function PurchaseOrderDetailPage() {
         </button>
 
         {error && <div className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700" role="alert">{error}</div>}
-        {loading && !order && <div className="py-16 text-center text-sm text-slate-400">Loading…</div>}
+        {loading && !order && <div className="py-16 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>Loading…</div>}
 
         {order && (
           <>
@@ -129,35 +130,35 @@ export default function PurchaseOrderDetailPage() {
                   </div>
                   <dl className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm sm:grid-cols-4">
                     <div>
-                      <dt className="text-xs font-medium uppercase text-slate-500">Supplier</dt>
-                      <dd className="mt-0.5 font-semibold text-slate-950">{supplierName(order.supplier_id)}</dd>
+                      <dt className="text-xs font-medium uppercase" style={{ color: "var(--color-text-muted)" }}>Supplier</dt>
+                      <dd className="mt-0.5 font-semibold" style={{ color: "var(--color-text-primary)" }}>{supplierName(order.supplier_id)}</dd>
                     </div>
                     <div>
-                      <dt className="text-xs font-medium uppercase text-slate-500">Goods total</dt>
-                      <dd className="mt-0.5 font-semibold text-slate-950">{formatMoney(goodsTotal)}</dd>
+                      <dt className="text-xs font-medium uppercase" style={{ color: "var(--color-text-muted)" }}>Goods total</dt>
+                      <dd className="mt-0.5 font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(goodsTotal)}</dd>
                     </div>
                     {extraCharges > 0 && (
                       <div>
-                        <dt className="text-xs font-medium uppercase text-slate-500">Landed costs</dt>
-                        <dd className="mt-0.5 font-semibold text-slate-950">+{formatMoney(extraCharges)}</dd>
+                        <dt className="text-xs font-medium uppercase" style={{ color: "var(--color-text-muted)" }}>Landed costs</dt>
+                        <dd className="mt-0.5 font-semibold" style={{ color: "var(--color-text-primary)" }}>+{formatMoney(extraCharges)}</dd>
                       </div>
                     )}
                     <div>
-                      <dt className="text-xs font-medium uppercase text-slate-500">Grand total</dt>
-                      <dd className="mt-0.5 font-bold text-slate-950">{formatMoney(goodsTotal + extraCharges)}</dd>
+                      <dt className="text-xs font-medium uppercase" style={{ color: "var(--color-text-muted)" }}>Grand total</dt>
+                      <dd className="mt-0.5 font-bold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(goodsTotal + extraCharges)}</dd>
                     </div>
                     <div>
-                      <dt className="text-xs font-medium uppercase text-slate-500">Created</dt>
-                      <dd className="mt-0.5 text-slate-700">{fmtDate(order.created_at)}</dd>
+                      <dt className="text-xs font-medium uppercase" style={{ color: "var(--color-text-muted)" }}>Created</dt>
+                      <dd className="mt-0.5" style={{ color: "var(--color-text-secondary)" }}>{fmtDate(order.created_at)}</dd>
                     </div>
                     {order.received_at && (
                       <div>
-                        <dt className="text-xs font-medium uppercase text-slate-500">Received</dt>
-                        <dd className="mt-0.5 text-slate-700">{fmtDate(order.received_at)}</dd>
+                        <dt className="text-xs font-medium uppercase" style={{ color: "var(--color-text-muted)" }}>Received</dt>
+                        <dd className="mt-0.5" style={{ color: "var(--color-text-secondary)" }}>{fmtDate(order.received_at)}</dd>
                       </div>
                     )}
                   </dl>
-                  {order.notes && <p className="max-w-prose text-xs italic text-slate-500">{order.notes}</p>}
+                  {order.notes && <p className="max-w-prose text-xs italic" style={{ color: "var(--color-text-muted)" }}>{order.notes}</p>}
                 </div>
                 {canManage && order.status !== "received" && (
                   <div className="flex gap-2">
@@ -169,7 +170,7 @@ export default function PurchaseOrderDetailPage() {
             </Card>
 
             <Card className="overflow-hidden p-0">
-              <div className="border-b border-slate-200">
+              <div className="border-b" style={{ borderColor: "var(--color-border)" }}>
                 <nav className="-mb-px flex gap-0 px-4" aria-label="PO detail tabs">
                   {TABS.map((t) => (
                     <button key={t.key} type="button" onClick={() => setActiveTab(t.key)}
@@ -177,8 +178,9 @@ export default function PurchaseOrderDetailPage() {
                         "min-h-[44px] border-b-2 px-4 text-sm font-medium transition-colors",
                         activeTab === t.key
                           ? "border-blue-600 text-blue-600"
-                          : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700",
+                          : "border-transparent hover:border-slate-300",
                       )}
+                      style={activeTab === t.key ? undefined : { color: "var(--color-text-muted)" }}
                       aria-current={activeTab === t.key ? "page" : undefined}
                     >
                       {t.label}

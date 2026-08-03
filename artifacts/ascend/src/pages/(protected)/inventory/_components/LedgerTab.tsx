@@ -56,14 +56,24 @@ export function LedgerTab({
     [rows, selectedSku, filteredRows],
   );
 
+  const inputCls = "min-h-[44px] w-full rounded-md border px-3 text-sm outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950";
+  const inputStyle = {
+    borderColor: "var(--color-border)",
+    backgroundColor: "var(--color-surface)",
+    color: "var(--color-text-primary)",
+  };
+
   return (
     <>
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
         <Card className="overflow-hidden p-0">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+          <div
+            className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3"
+            style={{ borderColor: "var(--color-border)" }}
+          >
             <div>
-              <h2 className="text-base font-semibold text-slate-950">Stock ledger</h2>
-              <p className="text-sm text-slate-500">Operational view for counts, receiving, and reorder decisions.</p>
+              <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Stock ledger</h2>
+              <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Operational view for counts, receiving, and reorder decisions.</p>
             </div>
             <div className="flex gap-2">
               <Button variant="secondary" size="sm">Count</Button>
@@ -71,7 +81,10 @@ export function LedgerTab({
             </div>
           </div>
 
-          <div className="grid gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 lg:grid-cols-[minmax(16rem,1fr)_12rem_10rem]">
+          <div
+            className="grid gap-3 border-b px-4 py-3 lg:grid-cols-[minmax(16rem,1fr)_12rem_10rem]"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}
+          >
             <label className="block">
               <span className="sr-only">Search inventory</span>
               <input
@@ -79,7 +92,8 @@ export function LedgerTab({
                 value={ledgerQuery}
                 onChange={(e) => setLedgerQuery(e.target.value)}
                 placeholder="Search SKU or product"
-                className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
+                className={inputCls}
+                style={inputStyle}
               />
             </label>
             <label className="block">
@@ -87,7 +101,8 @@ export function LedgerTab({
               <select
                 value={ledgerCategory}
                 onChange={(e) => setLedgerCategory(e.target.value)}
-                className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
+                className={inputCls}
+                style={inputStyle}
               >
                 {ledgerCategories.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
@@ -97,7 +112,8 @@ export function LedgerTab({
               <select
                 value={ledgerStatus}
                 onChange={(e) => setLedgerStatus(e.target.value as StockStatusFilter)}
-                className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
+                className={inputCls}
+                style={inputStyle}
               >
                 <option value="All">All statuses</option>
                 <option value="Healthy">Healthy</option>
@@ -113,13 +129,16 @@ export function LedgerTab({
             <div className="p-6 text-sm text-danger-700" role="alert">{error}</div>
           ) : filteredRows.length === 0 ? (
             <div className="flex flex-col items-center py-16 text-center">
-              <p className="text-sm font-medium text-[var(--color-text-primary)]">No inventory rows match the current filters.</p>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Try clearing the search or category filter.</p>
+              <p className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>No inventory rows match the current filters.</p>
+              <p className="mt-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>Try clearing the search or category filter.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
+              <table className="min-w-full divide-y text-sm" style={{ borderColor: "var(--color-table-border)" }}>
+                <thead
+                  className="text-left text-xs font-semibold uppercase"
+                  style={{ backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}
+                >
                   <tr>
                     <th className="px-4 py-3">SKU</th>
                     <th className="px-4 py-3">Product</th>
@@ -133,42 +152,46 @@ export function LedgerTab({
                     <th className="px-4 py-3">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
+                <tbody className="divide-y" style={{ borderColor: "var(--color-table-border)", backgroundColor: "var(--color-surface)" }}>
                   {filteredRows.map((row) => (
                     <tr
                       key={row.sku}
-                      className={selectedRow?.sku === row.sku ? "bg-slate-100" : "hover:bg-slate-50"}
+                      style={selectedRow?.sku === row.sku ? { backgroundColor: "var(--color-surface-subtle)" } : undefined}
+                      className={selectedRow?.sku === row.sku ? undefined : "hover:bg-[var(--color-surface-subtle)]"}
                     >
                       <td className="whitespace-nowrap px-4 py-3">
                         <button
                           type="button"
                           onClick={() => setSelectedSku(row.sku)}
-                          className="font-mono text-xs font-semibold text-slate-900 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-950"
+                          className="font-mono text-xs font-semibold underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-950"
+                          style={{ color: "var(--color-text-primary)" }}
                         >
                           {row.sku}
                         </button>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-950">{row.name}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">{row.category}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-950">{row.available}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">{row.onHand}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">{row.committed}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">{formatCost(row.costCents)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">{formatMargin(row.priceCents, row.costCents)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{row.name}</td>
+                      <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{row.category}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold" style={{ color: "var(--color-text-primary)" }}>{row.available}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right" style={{ color: "var(--color-text-secondary)" }}>{row.onHand}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right" style={{ color: "var(--color-text-secondary)" }}>{row.committed}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right" style={{ color: "var(--color-text-secondary)" }}>{formatCost(row.costCents)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right" style={{ color: "var(--color-text-secondary)" }}>{formatMargin(row.priceCents, row.costCents)}</td>
                       <td className="whitespace-nowrap px-4 py-3"><LedgerStatus label={row.stockStatus} /></td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex gap-1">
                           <button
                             type="button"
                             onClick={() => setAdjustProduct({ id: row.id, name: row.name, sku: row.sku, onHand: row.onHand })}
-                            className="inline-flex min-h-[32px] items-center rounded border border-slate-200 bg-white px-2 text-xs font-medium text-slate-600 hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-950"
+                            className="inline-flex min-h-[32px] items-center rounded border px-2 text-xs font-medium hover:bg-[var(--color-surface-subtle)] focus:outline-none focus:ring-2 focus:ring-slate-950"
+                            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}
                           >
                             Adjust
                           </button>
                           <button
                             type="button"
                             onClick={() => setMovementsProduct({ id: row.id, name: row.name, sku: row.sku })}
-                            className="inline-flex min-h-[32px] items-center gap-1 rounded border border-slate-200 bg-white px-2 text-xs font-medium text-slate-600 hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-950"
+                            className="inline-flex min-h-[32px] items-center gap-1 rounded border px-2 text-xs font-medium hover:bg-[var(--color-surface-subtle)] focus:outline-none focus:ring-2 focus:ring-slate-950"
+                            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}
                             aria-label={`View movement history for ${row.name}`}
                           >
                             <ClockIcon />
@@ -188,9 +211,9 @@ export function LedgerTab({
           {selectedRow ? (
             <div className="flex flex-col gap-5">
               <div>
-                <p className="text-xs font-semibold uppercase text-slate-500">Selected SKU</p>
-                <h2 className="mt-1 text-xl font-bold text-slate-950">{selectedRow.name}</h2>
-                <p className="font-mono text-xs text-slate-500">{selectedRow.sku}</p>
+                <p className="text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Selected SKU</p>
+                <h2 className="mt-1 text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>{selectedRow.name}</h2>
+                <p className="font-mono text-xs" style={{ color: "var(--color-text-muted)" }}>{selectedRow.sku}</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Detail label="Available" value={String(selectedRow.available)} />
@@ -198,22 +221,22 @@ export function LedgerTab({
                 <Detail label="Committed" value={String(selectedRow.committed)} />
                 <Detail label="Reorder at" value={String(selectedRow.reorderPoint)} />
               </div>
-              <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-md border p-4" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">Sell price</span>
-                  <span className="font-semibold text-slate-950">{formatMoney(selectedRow.priceCents)}</span>
+                  <span style={{ color: "var(--color-text-muted)" }}>Sell price</span>
+                  <span className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(selectedRow.priceCents)}</span>
                 </div>
                 <div className="mt-2 flex items-center justify-between text-sm">
-                  <span className="text-slate-500">Average cost</span>
-                  <span className="font-semibold text-slate-950">{formatCost(selectedRow.costCents)}</span>
+                  <span style={{ color: "var(--color-text-muted)" }}>Average cost</span>
+                  <span className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatCost(selectedRow.costCents)}</span>
                 </div>
                 <div className="mt-2 flex items-center justify-between text-sm">
-                  <span className="text-slate-500">Margin</span>
-                  <span className="font-semibold text-slate-950">{formatMargin(selectedRow.priceCents, selectedRow.costCents)}</span>
+                  <span style={{ color: "var(--color-text-muted)" }}>Margin</span>
+                  <span className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMargin(selectedRow.priceCents, selectedRow.costCents)}</span>
                 </div>
                 <div className="mt-2 flex items-center justify-between text-sm">
-                  <span className="text-slate-500">Velocity</span>
-                  <span className="font-semibold text-slate-950">{formatVelocity(selectedRow.velocity)}</span>
+                  <span style={{ color: "var(--color-text-muted)" }}>Velocity</span>
+                  <span className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatVelocity(selectedRow.velocity)}</span>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -232,7 +255,7 @@ export function LedgerTab({
               </div>
             </div>
           ) : (
-            <p className="text-sm text-slate-500">Select a SKU to inspect stock details.</p>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Select a SKU to inspect stock details.</p>
           )}
         </Card>
       </div>

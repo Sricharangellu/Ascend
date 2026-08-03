@@ -79,11 +79,11 @@ function BackupCodesCard({
     <Card className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-slate-950">Backup codes</h2>
-          <p className="text-sm text-slate-500">One-time recovery codes to sign in if you lose access to your authenticator app.</p>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Backup codes</h2>
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>One-time recovery codes to sign in if you lose access to your authenticator app.</p>
         </div>
         {mfaEnabled && (
-          <span className="flex items-center gap-1.5 text-xs font-medium text-slate-600" aria-live="polite">
+          <span className="flex items-center gap-1.5 text-xs font-medium" style={{ color: "var(--color-text-secondary)" }} aria-live="polite">
             <span className={`h-2 w-2 rounded-full ${remaining > 0 ? "bg-blue-500" : "bg-amber-500"}`} />
             {remaining} {remaining === 1 ? "code" : "codes"} remaining
           </span>
@@ -91,17 +91,17 @@ function BackupCodesCard({
       </div>
 
       {!mfaEnabled && (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           Backup codes are generated when MFA is enabled. Enable MFA above to receive your recovery codes.
         </p>
       )}
 
       {mfaEnabled && codesState === "revealed" && (
         <>
-          <p className="text-sm text-slate-500">Save these somewhere safe. Each code can only be used once, and generating new codes invalidates any previous set.</p>
-          <div className="grid grid-cols-4 gap-2 rounded-md border border-slate-200 bg-slate-50 p-4">
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Save these somewhere safe. Each code can only be used once, and generating new codes invalidates any previous set.</p>
+          <div className="grid grid-cols-4 gap-2 rounded-md p-4" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
             {codes.map((c) => (
-              <span key={c} className="font-mono text-sm font-semibold tracking-wider text-slate-950 select-all">
+              <span key={c} className="font-mono text-sm font-semibold tracking-wider select-all" style={{ color: "var(--color-text-primary)" }}>
                 {c}
               </span>
             ))}
@@ -134,9 +134,9 @@ function BackupCodesCard({
 
 function SecurityRow({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
-      <span className="text-slate-600">{label}</span>
-      <span className={`font-semibold ${ok ? "text-emerald-700" : "text-slate-500"}`}>{value}</span>
+    <div className="flex items-center justify-between gap-3 rounded-md px-3 py-2" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
+      <span style={{ color: "var(--color-text-secondary)" }}>{label}</span>
+      <span className={`font-semibold ${ok ? "text-emerald-700" : ""}`} style={!ok ? { color: "var(--color-text-muted)" } : undefined}>{value}</span>
     </div>
   );
 }
@@ -212,7 +212,7 @@ export function SecuritySection() {
       setMfaStatus((s) => (s ? { ...s, backupCodesRemaining: result.backupCodes.length } : s));
       addToast({ title: "Backup codes regenerated", description: "Your previous codes no longer work. Save the new ones.", variant: "success" });
     } catch (e) {
-      addToast({ title: "Couldn’t regenerate codes", description: e instanceof Error ? e.message : "Unknown error", variant: "error" });
+      addToast({ title: "Couldn't regenerate codes", description: e instanceof Error ? e.message : "Unknown error", variant: "error" });
     } finally {
       setRegenerating(false);
     }
@@ -243,8 +243,8 @@ export function SecuritySection() {
       <Card className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-slate-950">Multi-factor authentication</h2>
-            <p className="text-sm text-slate-500">Add an extra layer of sign-in security to your account.</p>
+            <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Multi-factor authentication</h2>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Add an extra layer of sign-in security to your account.</p>
           </div>
           {mfaStatus?.enabled ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
@@ -254,7 +254,7 @@ export function SecuritySection() {
               MFA is active
             </span>
           ) : (
-            <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Not enabled</span>
+            <span className="rounded px-2 py-1 text-xs font-semibold" style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>Not enabled</span>
           )}
         </div>
 
@@ -264,8 +264,8 @@ export function SecuritySection() {
 
         {mfaStatus === null && !statusError && (
           <div className="flex items-center gap-2" role="status" aria-label="Loading MFA status">
-            <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
-            <p className="text-sm text-[var(--color-text-secondary)]">Loading MFA status…</p>
+            <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-t-slate-600" style={{ borderColor: "var(--color-border)", borderTopColor: "var(--color-text-secondary)" }} />
+            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>Loading MFA status…</p>
           </div>
         )}
 
@@ -276,18 +276,18 @@ export function SecuritySection() {
         )}
 
         {setupData && (
-          <div className="flex flex-col gap-4 rounded-md border border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm text-slate-700">
+          <div className="flex flex-col gap-4 rounded-md p-4" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
+            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
               Enter this code in your authenticator app (Google Authenticator, Authy, etc.), then enter the 6-digit code below to confirm.
             </p>
             <div>
-              <p className="mb-1 text-xs font-semibold uppercase text-slate-500">Manual entry secret</p>
-              <code className="block rounded-md border border-slate-200 bg-white px-3 py-2 font-mono text-sm tracking-widest text-slate-950 select-all">
+              <p className="mb-1 text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Manual entry secret</p>
+              <code className="block rounded-md px-3 py-2 font-mono text-sm tracking-widest select-all" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}>
                 {setupData.secret}
               </code>
             </div>
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold uppercase text-slate-500">
+              <label className="text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>
                 6-digit verification code
               </label>
               <div className="flex gap-2">
@@ -299,7 +299,8 @@ export function SecuritySection() {
                   value={verifyCode}
                   onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, ""))}
                   placeholder="000000"
-                  className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm font-mono tracking-widest outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                  className="w-36 rounded-md px-3 py-2 text-sm font-mono tracking-widest outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                  style={{ border: "1px solid var(--color-border)" }}
                 />
                 <Button
                   variant="primary"
@@ -341,7 +342,7 @@ export function SecuritySection() {
       />
 
       <Card className="flex flex-col gap-3">
-        <h2 className="text-base font-semibold text-slate-950">Security posture</h2>
+        <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Security posture</h2>
         <div className="flex flex-col gap-2 text-sm">
           <SecurityRow label="Role-based access" value="Enabled" ok />
           <SecurityRow label="Access token TTL" value="15 minutes" ok />

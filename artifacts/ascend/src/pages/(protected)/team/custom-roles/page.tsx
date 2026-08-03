@@ -83,30 +83,32 @@ function PermissionPicker({
         const allOn = perms.every((p) => selected.includes(p.key));
         const someOn = perms.some((p) => selected.includes(p.key));
         return (
-          <div key={group} className="rounded-lg border border-slate-200 overflow-hidden">
+          <div key={group} className="rounded-lg border overflow-hidden" style={{ borderColor: "var(--color-border)" }}>
             <button
               type="button"
               onClick={() => toggleGroup(group)}
-              className="flex w-full items-center justify-between bg-slate-50 px-3 py-2 text-left"
+              className="flex w-full items-center justify-between px-3 py-2 text-left"
+              style={{ backgroundColor: "var(--color-table-header)" }}
             >
-              <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+              <span className="text-xs font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-secondary)" }}>
                 {group}
               </span>
-              <span className={`text-xs font-medium ${allOn ? "text-blue-600" : someOn ? "text-slate-500" : "text-slate-400"}`}>
+              <span className={`text-xs font-medium ${allOn ? "text-blue-600" : someOn ? "" : ""}`}
+                style={!allOn ? { color: "var(--color-text-muted)" } : {}}>
                 {allOn ? "All" : someOn ? "Some" : "None"}
               </span>
             </button>
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-[var(--color-table-border)]">
               {perms.map((p) => (
-                <label key={p.key} className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-slate-50">
+                <label key={p.key} className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-[var(--color-surface-subtle)]">
                   <input
                     type="checkbox"
                     checked={selected.includes(p.key)}
                     onChange={() => toggle(p.key)}
                     className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="flex-1 text-sm text-slate-700">{p.label}</span>
-                  <code className="text-xs text-slate-400">{p.key}</code>
+                  <span className="flex-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>{p.label}</span>
+                  <code className="text-xs" style={{ color: "var(--color-text-muted)" }}>{p.key}</code>
                 </label>
               ))}
             </div>
@@ -152,15 +154,16 @@ function RoleFormModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg rounded-xl bg-white shadow-xl flex flex-col max-h-[90vh]"
+        className="w-full max-w-lg rounded-xl shadow-xl flex flex-col max-h-[90vh]"
+        style={{ backgroundColor: "var(--color-surface)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-950">
+        <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--color-border)" }}>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>
             {initial ? "Edit role" : "New custom role"}
           </h2>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+          <button type="button" onClick={onClose} className="text-xl leading-none" style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
 
         {/* Body */}
@@ -172,7 +175,7 @@ function RoleFormModal({
           )}
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
+            <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
               Role name <span className="text-red-500">*</span>
             </label>
             <input
@@ -180,28 +183,30 @@ function RoleFormModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Sales Rep"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
               required
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Description <span className="text-slate-400 font-normal">(optional)</span>
+            <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
+              Description <span className="font-normal" style={{ color: "var(--color-text-muted)" }}>(optional)</span>
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What can this role do?"
               rows={2}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
+            <label className="mb-2 block text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
               Permissions <span className="text-red-500">*</span>
-              <span className="ml-2 font-normal text-slate-400">
+              <span className="ml-2 font-normal" style={{ color: "var(--color-text-muted)" }}>
                 {permissions.length}/{ALL_PERMISSIONS.length} selected
               </span>
             </label>
@@ -210,11 +215,12 @@ function RoleFormModal({
         </form>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+        <div className="flex justify-end gap-2 border-t px-5 py-3" style={{ borderColor: "var(--color-border)" }}>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-[var(--color-surface-subtle)]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
           >
             Cancel
           </button>
@@ -305,20 +311,20 @@ export default function CustomRolesPage() {
       <div className="mx-auto w-full max-w-5xl space-y-5 px-4 py-5 sm:px-6">
 
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-1.5 text-sm text-slate-500">
-          <Link href="/team" className="hover:text-slate-700 hover:underline">Team</Link>
+        <nav className="flex items-center gap-1.5 text-sm" style={{ color: "var(--color-text-muted)" }}>
+          <Link href="/team" className="hover:underline" style={{ color: "var(--color-text-muted)" }}>Team</Link>
           <span>/</span>
-          <span className="text-slate-950 font-medium">Custom Roles</span>
+          <span className="font-medium" style={{ color: "var(--color-text-primary)" }}>Custom Roles</span>
         </nav>
 
         {!isOwner ? (
           <Card>
-            <p role="alert" className="text-sm text-slate-700">
+            <p role="alert" className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
               Custom role management is restricted to owners.
             </p>
           </Card>
         ) : loading ? (
-          <p className="text-sm text-slate-500" aria-busy="true">Loading…</p>
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }} aria-busy="true">Loading…</p>
         ) : error ? (
           <Card>
             <p role="alert" className="text-sm text-red-700">{error}</p>
@@ -326,10 +332,10 @@ export default function CustomRolesPage() {
         ) : (
           <>
             <Card className="overflow-hidden p-0">
-              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+              <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--color-border)" }}>
                 <div>
-                  <h2 className="text-base font-semibold text-slate-950">Custom roles</h2>
-                  <p className="text-sm text-slate-500">
+                  <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Custom roles</h2>
+                  <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
                     {roles.length} {roles.length === 1 ? "role" : "roles"} defined
                   </p>
                 </div>
@@ -350,40 +356,42 @@ export default function CustomRolesPage() {
 
               {roles.length === 0 ? (
                 <div className="px-4 py-12 text-center">
-                  <p className="text-sm text-slate-500">No custom roles yet.</p>
-                  <p className="mt-1 text-xs text-slate-400">
+                  <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No custom roles yet.</p>
+                  <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
                     Create a role to assign a specific permission set to team members.
                   </p>
                 </div>
               ) : (
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-[var(--color-table-border)]">
                   {roles.map((r) => (
-                    <div key={r.id} className="flex items-start justify-between gap-4 px-4 py-4 hover:bg-slate-50 transition-colors">
+                    <div key={r.id} className="flex items-start justify-between gap-4 px-4 py-4 hover:bg-[var(--color-surface-subtle)] transition-colors">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-sm font-semibold text-slate-950">{r.name}</h3>
+                          <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{r.name}</h3>
                           <Badge variant="blue">{r.permissions.length} permissions</Badge>
                         </div>
                         {r.description && (
-                          <p className="mt-0.5 text-sm text-slate-500 truncate">{r.description}</p>
+                          <p className="mt-0.5 text-sm truncate" style={{ color: "var(--color-text-muted)" }}>{r.description}</p>
                         )}
                         {/* Permission chips */}
                         <div className="mt-2 flex flex-wrap gap-1">
                           {r.permissions.slice(0, 8).map((perm) => (
                             <span
                               key={perm}
-                              className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600"
+                              className="inline-flex items-center rounded-md px-2 py-0.5 text-xs"
+                              style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}
                             >
                               {perm}
                             </span>
                           ))}
                           {r.permissions.length > 8 && (
-                            <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-400">
+                            <span className="inline-flex items-center rounded-md px-2 py-0.5 text-xs"
+                              style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }}>
                               +{r.permissions.length - 8} more
                             </span>
                           )}
                         </div>
-                        <p className="mt-1.5 text-xs text-slate-400">
+                        <p className="mt-1.5 text-xs" style={{ color: "var(--color-text-muted)" }}>
                           Updated {fmtDate(r.updatedAt)}
                         </p>
                       </div>
@@ -391,7 +399,8 @@ export default function CustomRolesPage() {
                         <button
                           type="button"
                           onClick={() => { setEditTarget(r); setActionError(null); }}
-                          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                          className="rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-[var(--color-surface-subtle)]"
+                          style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
                         >
                           Edit
                         </button>
@@ -410,7 +419,7 @@ export default function CustomRolesPage() {
             </Card>
 
             {/* Info callout */}
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            <div className="rounded-lg border px-4 py-3 text-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
               <span className="font-medium">Assigning roles: </span>
               Go to the{" "}
               <Link href="/team" className="text-blue-600 hover:underline">Team directory</Link>
@@ -441,11 +450,12 @@ export default function CustomRolesPage() {
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDeleteTarget(null)}>
           <div
-            className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl"
+            className="w-full max-w-sm rounded-xl p-6 shadow-xl"
+            style={{ backgroundColor: "var(--color-surface)" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-base font-semibold text-slate-950">Delete &ldquo;{deleteTarget.name}&rdquo;?</h2>
-            <p className="mt-2 text-sm text-slate-600">
+            <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Delete &ldquo;{deleteTarget.name}&rdquo;?</h2>
+            <p className="mt-2 text-sm" style={{ color: "var(--color-text-secondary)" }}>
               This will permanently remove the role. Any team members assigned to it will lose
               this permission set. This action cannot be undone.
             </p>
@@ -456,7 +466,8 @@ export default function CustomRolesPage() {
               <button
                 type="button"
                 onClick={() => setDeleteTarget(null)}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-[var(--color-surface-subtle)]"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
               >
                 Cancel
               </button>

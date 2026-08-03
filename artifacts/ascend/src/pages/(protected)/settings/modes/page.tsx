@@ -61,22 +61,23 @@ function RecentProfileChanges({ refreshToken }: { refreshToken: number }) {
 
   return (
     <section aria-label="Recent business profile changes" className="mt-6">
-      <h2 className="mb-1 text-sm font-semibold text-[#111]">Recent changes</h2>
-      <p className="mb-3 text-xs text-slate-500">
+      <h2 className="mb-1 text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Recent changes</h2>
+      <p className="mb-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
         Business-type and module changes, with who made them and when.
       </p>
-      <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-sm">
+      <ul className="divide-y divide-[var(--color-table-border)] rounded-xl shadow-sm" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         {events.map((event) => (
           <li key={event.id} className="flex items-start justify-between gap-4 px-4 py-3">
             <div className="min-w-0">
-              <p className="truncate text-sm text-[#111]">{describeChange(event)}</p>
-              <p className="mt-0.5 text-xs text-slate-400">
+              <p className="truncate text-sm" style={{ color: "var(--color-text-primary)" }}>{describeChange(event)}</p>
+              <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>
                 by {event.actor.email ?? event.actor.id}
               </p>
             </div>
             <time
               dateTime={new Date(event.created_at).toISOString()}
-              className="shrink-0 text-xs text-slate-400"
+              className="shrink-0 text-xs"
+              style={{ color: "var(--color-text-muted)" }}
             >
               {new Date(event.created_at).toLocaleString()}
             </time>
@@ -103,7 +104,7 @@ function Toggle({
   label: string;
 }) {
   if (loading) {
-    return <div className="h-6 w-11 animate-pulse rounded-full bg-slate-200" aria-hidden="true" />;
+    return <div className="h-6 w-11 animate-skeleton rounded-full" aria-hidden="true" />;
   }
   return (
     <button
@@ -115,7 +116,7 @@ function Toggle({
       onClick={() => !disabled && onChange(!enabled)}
       className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 ${
         disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"
-      } ${enabled ? "bg-brand-600" : "bg-slate-200"}`}
+      } ${enabled ? "bg-brand-600" : "bg-[var(--color-surface-subtle)]"}`}
     >
       <span
         className={`block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
@@ -230,27 +231,27 @@ export default function BusinessProfilePage() {
         )}
 
         {/* ── Current profile summary ─────────────────────────────────── */}
-        <section aria-label="Current business profile" className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section aria-label="Current business profile" className="mb-6 rounded-xl p-5 shadow-sm" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
           {loading && !capabilities ? (
-            <div className="h-16 animate-pulse rounded-lg bg-slate-100" aria-hidden="true" />
+            <div className="h-16 animate-skeleton rounded-lg" aria-hidden="true" />
           ) : capabilities && business ? (
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Business type</p>
-                <p className="mt-1 text-lg font-semibold text-[#111]">
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Business type</p>
+                <p className="mt-1 text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>
                   <span className="mr-2" role="img" aria-hidden="true">{business.icon}</span>
                   {business.label}
                 </p>
-                <p className="mt-1 text-xs text-slate-500">{business.description}</p>
+                <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>{business.description}</p>
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Plan</p>
-                <p className="mt-1 text-sm font-medium text-[#111]">{plan?.name ?? "—"}</p>
-                <p className="mt-1 max-w-xs text-xs text-slate-400">{capabilities.entitlements.note}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Plan</p>
+                <p className="mt-1 text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>{plan?.name ?? "—"}</p>
+                <p className="mt-1 max-w-xs text-xs" style={{ color: "var(--color-text-muted)" }}>{capabilities.entitlements.note}</p>
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Enabled modules</p>
-                <p className="mt-1 text-sm font-medium text-[#111]">
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Enabled modules</p>
+                <p className="mt-1 text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>
                   {capabilities.modules.filter((m) => m.enabled).length} of {capabilities.modules.length}
                 </p>
                 <Link href="/settings/permissions" className="mt-1 inline-block text-xs font-medium text-brand-600 hover:underline">
@@ -259,15 +260,15 @@ export default function BusinessProfilePage() {
               </div>
             </div>
           ) : (
-            <p className="text-sm text-slate-500">Capabilities are unavailable — module gating is inactive and all navigation is shown.</p>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Capabilities are unavailable — module gating is inactive and all navigation is shown.</p>
           )}
         </section>
 
         {/* ── Business type switcher ──────────────────────────────────── */}
         {capabilities && (
           <section aria-label="Business type" className="mb-6">
-            <h2 className="mb-1 text-sm font-semibold text-[#111]">Business type</h2>
-            <p className="mb-3 text-xs text-slate-500">
+            <h2 className="mb-1 text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Business type</h2>
+            <p className="mb-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
               Switching applies that pack&apos;s module defaults. Changes are previewed before anything is applied.
             </p>
             <div className="grid gap-2 sm:grid-cols-3">
@@ -284,16 +285,17 @@ export default function BusinessProfilePage() {
                         ? "border-brand-600 bg-brand-600/5"
                         : switchTarget === bt.key
                           ? "border-amber-400 bg-amber-50"
-                          : "border-slate-200 bg-white hover:border-slate-300"
+                          : "hover:border-slate-300"
                     }`}
+                    style={!current && switchTarget !== bt.key ? { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" } : undefined}
                   >
-                    <span className="font-medium text-[#111]">{bt.name}</span>
+                    <span className="font-medium" style={{ color: "var(--color-text-primary)" }}>{bt.name}</span>
                     {current && (
                       <span className="ml-2 rounded-full bg-brand-600/10 px-2 py-0.5 text-[10px] font-semibold text-brand-600">
                         Current
                       </span>
                     )}
-                    <p className="mt-1 text-[11px] text-slate-400">{bt.modules.length} bundled modules</p>
+                    <p className="mt-1 text-[11px]" style={{ color: "var(--color-text-muted)" }}>{bt.modules.length} bundled modules</p>
                   </button>
                 );
               })}
@@ -350,24 +352,24 @@ export default function BusinessProfilePage() {
         {/* ── Modules by group ────────────────────────────────────────── */}
         {capabilities && (
           <section aria-label="Modules">
-            <h2 className="mb-1 text-sm font-semibold text-[#111]">Modules</h2>
-            <p className="mb-3 text-xs text-slate-500">
+            <h2 className="mb-1 text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Modules</h2>
+            <p className="mb-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
               Core modules are always active. Others follow the business pack and can be overridden per tenant.
             </p>
             <div className="space-y-4">
               {groups.map((group) => (
-                <div key={group.key} className="rounded-xl border border-slate-200 bg-white shadow-sm">
-                  <p className="border-b border-slate-100 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-500">
+                <div key={group.key} className="rounded-xl shadow-sm" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+                  <p className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider" style={{ borderBottom: "1px solid var(--color-border)", color: "var(--color-text-muted)" }}>
                     {group.label}
                   </p>
-                  <ul className="divide-y divide-slate-100">
+                  <ul className="divide-y divide-[var(--color-table-border)]">
                     {group.modules.map((mod) => {
                       const badge = SOURCE_LABEL[mod.source] ?? SOURCE_LABEL["not_in_business_pack"]!;
                       return (
                         <li key={mod.key} className="flex items-center justify-between gap-4 px-4 py-3">
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-[#111]">{mod.name}</p>
-                            <p className="truncate text-xs text-slate-500">{mod.description}</p>
+                            <p className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>{mod.name}</p>
+                            <p className="truncate text-xs" style={{ color: "var(--color-text-muted)" }}>{mod.description}</p>
                             <p className={`mt-0.5 text-[11px] font-medium ${badge.cls}`}>{badge.text}</p>
                           </div>
                           <Toggle

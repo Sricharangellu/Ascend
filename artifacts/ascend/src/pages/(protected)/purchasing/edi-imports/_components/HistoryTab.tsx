@@ -56,17 +56,17 @@ export function HistoryTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <div className="py-12 text-center text-sm text-slate-400">Loading…</div>;
+  if (loading) return <div className="py-12 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>Loading…</div>;
   if (error) return <p role="alert" className="text-sm text-red-700 py-6">{error}</p>;
 
   return (
     <div>
-      <div className="mb-4 text-sm text-slate-500">
+      <div className="mb-4 text-sm" style={{ color: "var(--color-text-muted)" }}>
         {items.length} completed import{items.length !== 1 ? "s" : ""}
       </div>
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-lg border" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <thead className="text-xs font-semibold uppercase tracking-wide" style={{ backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
             <tr>
               <th className="px-4 py-3 text-left">File</th>
               <th className="px-4 py-3 text-left">Supplier</th>
@@ -77,27 +77,27 @@ export function HistoryTab() {
               <th className="px-4 py-3 text-left">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-[var(--color-table-border)]">
             {items.map((item) => (
-              <tr key={item.id} className="hover:bg-slate-50">
+              <tr key={item.id} className="hover:bg-[var(--color-surface-subtle)]">
                 <td className="px-4 py-3">
-                  <p className="font-medium text-slate-900 truncate max-w-[200px]">{item.filename}</p>
-                  <p className="text-xs text-slate-400">{fmtBytes(item.file_size_bytes)}</p>
+                  <p className="font-medium truncate max-w-[200px]" style={{ color: "var(--color-text-primary)" }}>{item.filename}</p>
+                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtBytes(item.file_size_bytes)}</p>
                 </td>
-                <td className="px-4 py-3 text-slate-700">{item.supplier_name}</td>
-                <td className="px-4 py-3 text-slate-500 text-xs uppercase">{item.format.replace("_", " ")}</td>
+                <td className="px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{item.supplier_name}</td>
+                <td className="px-4 py-3 text-xs uppercase" style={{ color: "var(--color-text-muted)" }}>{item.format.replace("_", " ")}</td>
                 <td className="px-4 py-3 text-right">
                   {item.created_po_ids.length > 0 ? (
                     <div>
-                      <p className="font-medium text-slate-900">{item.created_po_ids.length}</p>
-                      <p className="text-xs text-slate-400">{item.created_po_ids.slice(0, 2).join(", ")}{item.created_po_ids.length > 2 ? "…" : ""}</p>
+                      <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{item.created_po_ids.length}</p>
+                      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{item.created_po_ids.slice(0, 2).join(", ")}{item.created_po_ids.length > 2 ? "…" : ""}</p>
                     </div>
                   ) : (
-                    <span className="text-slate-400">—</span>
+                    <span style={{ color: "var(--color-text-muted)" }}>—</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-right text-slate-700">{item.line_count || "—"}</td>
-                <td className="px-4 py-3 text-slate-600">{fmtDate(item.uploaded_at)}</td>
+                <td className="px-4 py-3 text-right" style={{ color: "var(--color-text-secondary)" }}>{item.line_count || "—"}</td>
+                <td className="px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{fmtDate(item.uploaded_at)}</td>
                 <td className="px-4 py-3">
                   <Badge variant={STATUS_BADGE[item.status] ?? "gray"}>
                     {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
@@ -107,7 +107,7 @@ export function HistoryTab() {
             ))}
             {items.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-sm text-slate-400">No imports processed yet</td>
+                <td colSpan={7} className="py-12 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No imports processed yet</td>
               </tr>
             )}
           </tbody>

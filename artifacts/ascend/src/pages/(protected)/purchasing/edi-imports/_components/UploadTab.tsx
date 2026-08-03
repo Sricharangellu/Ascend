@@ -88,7 +88,7 @@ export function UploadTab({ onUploaded }: Props) {
 
   return (
     <div className="max-w-lg">
-      <h3 className="mb-4 text-sm font-semibold text-slate-700">Upload EDI File</h3>
+      <h3 className="mb-4 text-sm font-semibold" style={{ color: "var(--color-text-secondary)" }}>Upload EDI File</h3>
 
       {success && (
         <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700">{success}</div>
@@ -100,7 +100,7 @@ export function UploadTab({ onUploaded }: Props) {
       <form id="edi-upload-form" onSubmit={handleSubmit} className="space-y-4">
         {/* File picker */}
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-slate-600" htmlFor="edi-file">
+          <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }} htmlFor="edi-file">
             EDI file <span className="text-red-500">*</span>
           </label>
           <input
@@ -109,16 +109,17 @@ export function UploadTab({ onUploaded }: Props) {
             type="file"
             accept=".edi,.x12,.csv,.json,.xml,.txt"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-blue-50 file:px-2.5 file:py-1 file:text-xs file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+            className="w-full rounded-lg border px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-blue-50 file:px-2.5 file:py-1 file:text-xs file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+            style={{ borderColor: "var(--color-border)" }}
           />
           {file && (
-            <p className="mt-1 text-xs text-slate-400">{file.name} — {(file.size / 1024).toFixed(1)} KB</p>
+            <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>{file.name} — {(file.size / 1024).toFixed(1)} KB</p>
           )}
         </div>
 
         {/* Format selector */}
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-slate-600" htmlFor="edi-format">
+          <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }} htmlFor="edi-format">
             EDI format <span className="text-red-500">*</span>
           </label>
           <select
@@ -126,7 +127,8 @@ export function UploadTab({ onUploaded }: Props) {
             value={selectedFormat}
             onFocus={loadFormats}
             onChange={(e) => setSelectedFormat(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            style={{ borderColor: "var(--color-border)" }}
           >
             <option value="">Select format…</option>
             {formats.map((f) => (
@@ -137,14 +139,15 @@ export function UploadTab({ onUploaded }: Props) {
 
         {/* Supplier selector */}
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-slate-600" htmlFor="edi-supplier">
+          <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }} htmlFor="edi-supplier">
             Supplier <span className="text-red-500">*</span>
           </label>
           <select
             id="edi-supplier"
             value={selectedSupplier}
             onChange={(e) => setSelectedSupplier(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            style={{ borderColor: "var(--color-border)" }}
           >
             <option value="">Select supplier…</option>
             {MOCK_SUPPLIERS.map((s) => (
@@ -164,9 +167,9 @@ export function UploadTab({ onUploaded }: Props) {
       </form>
 
       {/* Supported formats info */}
-      <div className="mt-8 rounded-lg border border-slate-200 bg-slate-50 p-4">
-        <p className="mb-2 text-xs font-semibold text-slate-600">Supported formats</p>
-        <div className="grid grid-cols-2 gap-1 text-xs text-slate-500">
+      <div className="mt-8 rounded-lg border p-4" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
+        <p className="mb-2 text-xs font-semibold" style={{ color: "var(--color-text-secondary)" }}>Supported formats</p>
+        <div className="grid grid-cols-2 gap-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
           <span>X12 850 — Purchase Orders</span>
           <span>X12 855 — PO Acknowledgments</span>
           <span>X12 856 — Ship Notices (ASN)</span>
@@ -174,7 +177,7 @@ export function UploadTab({ onUploaded }: Props) {
           <span>EDIFACT ORDERS</span>
           <span>CSV / JSON / XML</span>
         </div>
-        <p className="mt-3 text-xs text-slate-400">Max file size: 25 MB. Files are queued and validated automatically.</p>
+        <p className="mt-3 text-xs" style={{ color: "var(--color-text-muted)" }}>Max file size: 25 MB. Files are queued and validated automatically.</p>
       </div>
     </div>
   );

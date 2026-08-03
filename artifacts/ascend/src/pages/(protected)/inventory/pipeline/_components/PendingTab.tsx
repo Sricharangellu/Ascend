@@ -49,17 +49,20 @@ export function PendingTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <div className="py-12 text-center text-sm text-slate-400">Loading…</div>;
+  if (loading) return <div className="py-12 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>Loading…</div>;
   if (error) return <p role="alert" className="text-sm text-red-700 py-6">{error}</p>;
 
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-slate-500">{items.length} purchase order{items.length !== 1 ? "s" : ""} pending receipt</p>
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>{items.length} purchase order{items.length !== 1 ? "s" : ""} pending receipt</p>
       </div>
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-lg border" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <thead
+            className="text-xs font-semibold uppercase tracking-wide"
+            style={{ backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}
+          >
             <tr>
               <th className="px-4 py-3 text-left">PO / Supplier</th>
               <th className="px-4 py-3 text-left">Product</th>
@@ -70,22 +73,23 @@ export function PendingTab() {
               <th className="px-4 py-3 text-left">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y" style={{ borderColor: "var(--color-table-border)" }}>
             {items.map((item) => (
-              <tr key={item.id} className="hover:bg-slate-50">
+              <tr key={item.id} className="hover:bg-[var(--color-surface-subtle)]">
                 <td className="px-4 py-3">
-                  <p className="font-medium text-slate-900">{item.po_number}</p>
-                  <p className="text-xs text-slate-400">{item.supplier_name}</p>
+                  <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{item.po_number}</p>
+                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{item.supplier_name}</p>
                 </td>
                 <td className="px-4 py-3">
-                  <p className="text-slate-800">{item.product_name}</p>
-                  <p className="text-xs text-slate-400">{item.sku} · {item.outlet}</p>
+                  <p style={{ color: "var(--color-text-primary)" }}>{item.product_name}</p>
+                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{item.sku} · {item.outlet}</p>
                 </td>
-                <td className="px-4 py-3 text-right text-slate-700">{item.qty_ordered}</td>
-                <td className="px-4 py-3 text-right text-slate-700">{item.qty_received}</td>
-                <td className="px-4 py-3 text-right font-medium text-slate-900">{formatMoney(item.total_cost_cents)}</td>
+                <td className="px-4 py-3 text-right" style={{ color: "var(--color-text-secondary)" }}>{item.qty_ordered}</td>
+                <td className="px-4 py-3 text-right" style={{ color: "var(--color-text-secondary)" }}>{item.qty_received}</td>
+                <td className="px-4 py-3 text-right font-medium" style={{ color: "var(--color-text-primary)" }}>{formatMoney(item.total_cost_cents)}</td>
                 <td className="px-4 py-3">
-                  <p className={item.days_overdue > 0 ? "text-red-600 font-medium" : "text-slate-700"}>
+                  <p className={item.days_overdue > 0 ? "text-red-600 font-medium" : ""}
+                    style={item.days_overdue === 0 ? { color: "var(--color-text-secondary)" } : undefined}>
                     {fmtDate(item.expected_date)}
                   </p>
                   {item.days_overdue > 0 && (
@@ -99,7 +103,7 @@ export function PendingTab() {
             ))}
             {items.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-sm text-slate-400">No pending items</td>
+                <td colSpan={7} className="py-12 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No pending items</td>
               </tr>
             )}
           </tbody>

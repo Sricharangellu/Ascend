@@ -21,10 +21,10 @@ export default function LoyaltyPage() {
   }, []);
 
   const tabCls = (t: Tab) =>
-    `px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+    `px-4 py-2.5 text-[13px] font-medium border-b-2 transition-colors ${
       tab === t
-        ? "border-blue-600 text-blue-600"
-        : "border-transparent text-slate-500 hover:text-slate-700"
+        ? "border-brand-600 text-brand-600"
+        : "border-transparent hover:border-[var(--color-border)]"
     }`;
 
   const totalMembers = tiers.reduce((s, t) => s + t.member_count, 0);
@@ -49,7 +49,7 @@ export default function LoyaltyPage() {
         </div>
 
         {/* Tab bar */}
-        <div className="flex gap-1 border-b border-slate-200">
+        <div className="flex gap-1 border-b" style={{ borderColor: "var(--color-border)" }}>
           <button type="button" onClick={() => setTab("tiers")} className={tabCls("tiers")}>Tiers</button>
           <button type="button" onClick={() => setTab("members")} className={tabCls("members")}>Members</button>
           <button type="button" onClick={() => setTab("rewards")} className={tabCls("rewards")}>Rewards</button>

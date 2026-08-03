@@ -55,7 +55,7 @@ export function HistoryTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <div className="py-12 text-center text-sm text-slate-400">Loading…</div>;
+  if (loading) return <div className="py-12 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>Loading…</div>;
   if (error) return <p role="alert" className="text-sm text-red-700 py-6">{error}</p>;
 
   const avgLead = items.length
@@ -64,13 +64,16 @@ export function HistoryTab() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center gap-6 text-sm text-slate-500">
-        <span><strong className="text-slate-900">{items.length}</strong> completed POs</span>
-        <span>Avg lead time: <strong className="text-slate-900">{avgLead}d</strong></span>
+      <div className="mb-4 flex items-center gap-6 text-sm" style={{ color: "var(--color-text-muted)" }}>
+        <span><strong style={{ color: "var(--color-text-primary)" }}>{items.length}</strong> completed POs</span>
+        <span>Avg lead time: <strong style={{ color: "var(--color-text-primary)" }}>{avgLead}d</strong></span>
       </div>
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-lg border" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <thead
+            className="text-xs font-semibold uppercase tracking-wide"
+            style={{ backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}
+          >
             <tr>
               <th className="px-4 py-3 text-left">PO / Supplier</th>
               <th className="px-4 py-3 text-left">Product</th>
@@ -83,30 +86,30 @@ export function HistoryTab() {
               <th className="px-4 py-3 text-left">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y" style={{ borderColor: "var(--color-table-border)" }}>
             {items.map((item) => (
-              <tr key={item.id} className="hover:bg-slate-50">
+              <tr key={item.id} className="hover:bg-[var(--color-surface-subtle)]">
                 <td className="px-4 py-3">
-                  <p className="font-medium text-slate-900">{item.po_number}</p>
-                  <p className="text-xs text-slate-400">{item.supplier_name}</p>
+                  <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{item.po_number}</p>
+                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{item.supplier_name}</p>
                 </td>
                 <td className="px-4 py-3">
-                  <p className="text-slate-800">{item.product_name}</p>
-                  <p className="text-xs text-slate-400">{item.sku} · {item.receiver}</p>
+                  <p style={{ color: "var(--color-text-primary)" }}>{item.product_name}</p>
+                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{item.sku} · {item.receiver}</p>
                 </td>
-                <td className="px-4 py-3 text-right text-slate-700">{item.qty_ordered}</td>
-                <td className="px-4 py-3 text-right text-slate-700">{item.qty_received}</td>
-                <td className="px-4 py-3 text-right font-medium text-slate-900">{formatMoney(item.total_cost_cents)}</td>
+                <td className="px-4 py-3 text-right" style={{ color: "var(--color-text-secondary)" }}>{item.qty_ordered}</td>
+                <td className="px-4 py-3 text-right" style={{ color: "var(--color-text-secondary)" }}>{item.qty_received}</td>
+                <td className="px-4 py-3 text-right font-medium" style={{ color: "var(--color-text-primary)" }}>{formatMoney(item.total_cost_cents)}</td>
                 <td className="px-4 py-3 text-right">
                   {item.cost_variance_cents === 0
-                    ? <span className="text-slate-400">—</span>
+                    ? <span style={{ color: "var(--color-text-muted)" }}>—</span>
                     : <span className={item.cost_variance_cents > 0 ? "text-red-600" : "text-green-600"}>
                         {item.cost_variance_cents > 0 ? "+" : ""}{formatMoney(Math.abs(item.cost_variance_cents))}
                       </span>
                   }
                 </td>
-                <td className="px-4 py-3 text-right text-slate-700">{item.lead_time_days}d</td>
-                <td className="px-4 py-3 text-slate-700">{fmtDate(item.received_at)}</td>
+                <td className="px-4 py-3 text-right" style={{ color: "var(--color-text-secondary)" }}>{item.lead_time_days}d</td>
+                <td className="px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{fmtDate(item.received_at)}</td>
                 <td className="px-4 py-3">
                   <Badge variant={STATUS_BADGE[item.status]}>{STATUS_LABEL[item.status]}</Badge>
                 </td>
@@ -114,7 +117,7 @@ export function HistoryTab() {
             ))}
             {items.length === 0 && (
               <tr>
-                <td colSpan={9} className="py-12 text-center text-sm text-slate-400">No history yet</td>
+                <td colSpan={9} className="py-12 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No history yet</td>
               </tr>
             )}
           </tbody>

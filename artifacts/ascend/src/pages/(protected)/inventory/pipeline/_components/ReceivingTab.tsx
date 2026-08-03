@@ -60,44 +60,53 @@ export function ReceivingTab() {
     }
   }
 
-  if (loading) return <div className="py-12 text-center text-sm text-slate-400">Loading…</div>;
+  if (loading) return <div className="py-12 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>Loading…</div>;
   if (error) return <p role="alert" className="text-sm text-red-700 py-6">{error}</p>;
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-slate-500">{items.length} active receiving session{items.length !== 1 ? "s" : ""}</p>
+      <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>{items.length} active receiving session{items.length !== 1 ? "s" : ""}</p>
       {items.length === 0 && (
-        <div className="rounded-lg border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400">
+        <div
+          className="rounded-lg border border-dashed py-12 text-center text-sm"
+          style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
+        >
           No active receiving sessions
         </div>
       )}
       {items.map((item) => {
         const pct = Math.round((item.qty_received / item.qty_ordered) * 100);
         return (
-          <div key={item.id} className="rounded-lg border border-slate-200 bg-white p-4">
+          <div
+            key={item.id}
+            className="rounded-lg border p-4"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
+          >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-medium text-slate-900">{item.product_name}</p>
-                <p className="text-xs text-slate-400">{item.sku} · {item.supplier_name} · {item.outlet}</p>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{item.product_name}</p>
+                <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{item.sku} · {item.supplier_name} · {item.outlet}</p>
+                <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
                   {item.po_number} · {item.batch_id} · receiver: {item.receiver} · started {elapsed(item.started_at)}
                 </p>
               </div>
               <div className="text-right flex-shrink-0">
-                <p className="text-2xl font-bold text-slate-900">{item.qty_received}<span className="text-sm text-slate-400">/{item.qty_ordered}</span></p>
-                <p className="text-xs text-slate-400">{item.qty_remaining} remaining</p>
+                <p className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
+                  {item.qty_received}<span className="text-sm" style={{ color: "var(--color-text-muted)" }}>/{item.qty_ordered}</span>
+                </p>
+                <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{item.qty_remaining} remaining</p>
               </div>
             </div>
 
             {/* Progress bar */}
             <div className="mt-3">
-              <div className="h-2 w-full rounded-full bg-slate-100">
+              <div className="h-2 w-full rounded-full" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
                 <div
                   className="h-2 rounded-full bg-blue-500 transition-all"
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              <p className="mt-1 text-right text-xs text-slate-400">{pct}% received</p>
+              <p className="mt-1 text-right text-xs" style={{ color: "var(--color-text-muted)" }}>{pct}% received</p>
             </div>
 
             {/* Scan input */}
@@ -108,7 +117,8 @@ export function ReceivingTab() {
                 placeholder="Enter qty scanned"
                 value={scanQty[item.id] ?? ""}
                 onChange={(e) => setScanQty((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                className="w-40 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                className="w-40 rounded-lg border px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
               />
               <button
                 type="button"

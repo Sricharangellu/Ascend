@@ -78,47 +78,47 @@ export function BillingTab({
 
   return (
     <div className="space-y-5 p-4">
-      <div className="rounded-xl border border-slate-200 p-4">
+      <div className="rounded-xl border p-4" style={{ borderColor: "var(--color-border)" }}>
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-sm font-semibold text-slate-900">Landed costs</p>
+          <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Landed costs</p>
           {canManage && <Button variant="secondary" size="sm" onClick={() => setLandedOpen(true)}>Edit</Button>}
         </div>
         <dl className="grid grid-cols-3 gap-4 text-sm">
           <div>
-            <dt className="text-xs text-slate-400">Goods</dt>
-            <dd className="font-semibold text-slate-900">{formatMoney(goodsTotal)}</dd>
+            <dt className="text-xs" style={{ color: "var(--color-text-muted)" }}>Goods</dt>
+            <dd className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(goodsTotal)}</dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-400">Freight</dt>
-            <dd className="font-semibold text-slate-900">{formatMoney(order.freight_cost_cents)}</dd>
+            <dt className="text-xs" style={{ color: "var(--color-text-muted)" }}>Freight</dt>
+            <dd className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(order.freight_cost_cents)}</dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-400">Other charges</dt>
-            <dd className="font-semibold text-slate-900">{formatMoney(order.other_charges_cents)}</dd>
+            <dt className="text-xs" style={{ color: "var(--color-text-muted)" }}>Other charges</dt>
+            <dd className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(order.other_charges_cents)}</dd>
           </div>
         </dl>
-        <div className="mt-3 flex justify-between border-t border-slate-100 pt-3">
-          <span className="text-xs font-semibold uppercase text-slate-500">Total landed</span>
-          <span className="font-bold text-slate-900">{formatMoney(goodsTotal + extraCharges)}</span>
+        <div className="mt-3 flex justify-between border-t pt-3" style={{ borderColor: "var(--color-border)" }}>
+          <span className="text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Total landed</span>
+          <span className="font-bold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(goodsTotal + extraCharges)}</span>
         </div>
       </div>
 
       <div>
-        <p className="mb-3 text-xs font-semibold uppercase text-slate-500">Price adjustments</p>
+        <p className="mb-3 text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Price adjustments</p>
         {adjError && <p className="mb-2 text-xs text-red-600">{adjError}</p>}
         <div className="mb-4 space-y-2">
           {billingAdjs.map((adj) => (
-            <div key={adj.id} className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-2.5">
+            <div key={adj.id} className="flex items-center justify-between rounded-lg border px-4 py-2.5" style={{ borderColor: "var(--color-border)" }}>
               <div>
-                <p className="text-sm font-medium text-slate-900">{adj.reason}</p>
-                <p className="text-xs text-slate-400">{fmtDate(adj.created_at)}{adj.line_id ? ` · Line ${adj.line_id}` : ""}</p>
+                <p className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>{adj.reason}</p>
+                <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDate(adj.created_at)}{adj.line_id ? ` · Line ${adj.line_id}` : ""}</p>
               </div>
               <span className={`text-sm font-semibold tabular-nums ${adj.amount_cents < 0 ? "text-red-600" : "text-emerald-700"}`}>
                 {adj.amount_cents < 0 ? "−" : "+"}{formatMoney(Math.abs(adj.amount_cents))}
               </span>
             </div>
           ))}
-          {billingAdjs.length === 0 && <p className="text-xs text-slate-400">No adjustments.</p>}
+          {billingAdjs.length === 0 && <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>No adjustments.</p>}
         </div>
 
         {canManage && (
@@ -126,20 +126,24 @@ export function BillingTab({
             <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">New adjustment</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="sm:col-span-2">
-                <label className="mb-1 block text-xs font-medium text-slate-500">Reason</label>
+                <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Reason</label>
                 <input type="text" value={adjReason} onChange={(e) => setAdjReason(e.target.value)} placeholder="e.g. Overcharge correction"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+                  className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  style={{ borderColor: "var(--color-border)" }} />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-500">Amount ($, use − for deductions)</label>
+                <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Amount ($, use − for deductions)</label>
                 <input type="text" value={adjAmount} onChange={(e) => setAdjAmount(e.target.value)} placeholder="-5.00"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+                  className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  style={{ borderColor: "var(--color-border)" }} />
               </div>
             </div>
             <div className="flex items-center gap-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-500">Applies to line (optional)</label>
-                <select value={adjLineId} onChange={(e) => setAdjLineId(e.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none">
+                <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Applies to line (optional)</label>
+                <select value={adjLineId} onChange={(e) => setAdjLineId(e.target.value)}
+                  className="rounded-lg border px-3 py-2 text-sm focus:outline-none"
+                  style={{ borderColor: "var(--color-border)" }}>
                   <option value="">Whole PO</option>
                   {order.lines.map((l) => <option key={l.id} value={l.id}>{l.product_sku} — {l.product_name}</option>)}
                 </select>
@@ -152,26 +156,26 @@ export function BillingTab({
         )}
 
         {(billingAdjs.length > 0 || extraCharges > 0) && (
-          <div className="mt-4 flex justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-            <span className="font-semibold text-slate-700">Net billing total</span>
-            <span className="font-bold text-slate-950">{formatMoney(goodsTotal + extraCharges + adjTotal)}</span>
+          <div className="mt-4 flex justify-between rounded-lg border px-4 py-3 text-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
+            <span className="font-semibold" style={{ color: "var(--color-text-secondary)" }}>Net billing total</span>
+            <span className="font-bold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(goodsTotal + extraCharges + adjTotal)}</span>
           </div>
         )}
       </div>
 
       {documents.filter((d) => d.type === "invoice").length > 0 && (
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase text-slate-500">Billing documents</p>
+          <p className="mb-2 text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Billing documents</p>
           <div className="flex flex-wrap gap-2">
             {documents.filter((d) => d.type === "invoice").map((doc) => (
-              <div key={doc.id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-                <svg aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <div key={doc.id} className="flex items-center gap-2 rounded-lg border px-3 py-2" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+                <svg aria-hidden="true" className="h-4 w-4 shrink-0" style={{ color: "var(--color-text-muted)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <polyline points="14 2 14 8 20 8" />
                 </svg>
                 <div>
                   <p className="text-xs font-medium text-slate-800">{doc.name}</p>
-                  <p className="text-xs text-slate-400">{fmtBytes(doc.size_bytes)} · {fmtDate(doc.uploaded_at)}</p>
+                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtBytes(doc.size_bytes)} · {fmtDate(doc.uploaded_at)}</p>
                 </div>
               </div>
             ))}
@@ -179,7 +183,7 @@ export function BillingTab({
         </div>
       )}
 
-      <div className="rounded-xl border border-slate-200 p-4">
+      <div className="rounded-xl border p-4" style={{ borderColor: "var(--color-border)" }}>
         <BillsSection order={order} canManage={canManage} documents={documents} />
       </div>
 
@@ -191,17 +195,19 @@ export function BillingTab({
           </div>
         }
       >
-        <p className="mb-4 text-sm text-slate-500">Extra charges distributed proportionally across all lines.</p>
+        <p className="mb-4 text-sm" style={{ color: "var(--color-text-muted)" }}>Extra charges distributed proportionally across all lines.</p>
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">Freight ($)</label>
+            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Freight ($)</label>
             <input type="text" value={freight} onChange={(e) => setFreight(e.target.value)} placeholder="0.00"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              style={{ borderColor: "var(--color-border)" }} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">Other charges ($)</label>
+            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Other charges ($)</label>
             <input type="text" value={otherCharges} onChange={(e) => setOtherCharges(e.target.value)} placeholder="0.00"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              style={{ borderColor: "var(--color-border)" }} />
           </div>
         </div>
       </Modal>

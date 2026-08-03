@@ -178,7 +178,7 @@ export default function VendorsPage() {
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
           <Card className="overflow-hidden p-0">
-            <div className="grid gap-3 border-b border-slate-200 px-4 py-3 lg:grid-cols-[minmax(220px,1fr)_auto]">
+            <div className="grid gap-3 border-b px-4 py-3 lg:grid-cols-[minmax(220px,1fr)_auto]" style={{ borderColor: "var(--color-border)" }}>
               <label className="min-w-0">
                 <span className="sr-only">Search vendors</span>
                 <input
@@ -186,7 +186,8 @@ export default function VendorsPage() {
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search vendors by name, email, type..."
-                  className="min-h-[40px] w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                  className="min-h-[40px] w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                  style={{ borderColor: "var(--color-border)" }}
                 />
               </label>
               <div className="flex gap-1 overflow-x-auto" role="group" aria-label="Vendor filters">
@@ -197,8 +198,9 @@ export default function VendorsPage() {
                     onClick={() => setFilter(item)}
                     aria-pressed={filter === item}
                     className={`min-h-[40px] whitespace-nowrap rounded-md px-3 text-sm font-medium capitalize transition-colors ${
-                      filter === item ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      filter === item ? "bg-slate-950 text-white" : "hover:bg-[var(--color-surface-subtle)]"
                     }`}
+                    style={filter !== item ? { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" } : {}}
                   >
                     {item === "compliance" ? "Gaps" : item === "credits" ? "Credits" : item}
                   </button>
@@ -214,7 +216,7 @@ export default function VendorsPage() {
                 <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Add a vendor to get started.</p>
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-[var(--color-table-border)]">
                 {filteredVendors.map((vendor) => (
                   <VendorRow key={vendor.id} vendor={vendor} onSelect={() => setSelectedVendorId(vendor.id)} selected={vendor.id === selectedVendorId} onViewDetail={() => router.push(`/vendors/${vendor.id}`)} />
                 ))}
@@ -227,11 +229,12 @@ export default function VendorsPage() {
               {canManage ? (
                 <div className="space-y-3">
                   <label className="block">
-                    <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Vendor</span>
+                    <span className="text-xs font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-muted)" }}>Vendor</span>
                     <select
                       value={selectedVendorId}
                       onChange={(event) => setSelectedVendorId(event.target.value)}
-                      className="mt-1 min-h-[40px] w-full rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                      className="mt-1 min-h-[40px] w-full rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                      style={{ borderColor: "var(--color-border)" }}
                     >
                       {vendors.map((vendor) => (
                         <option key={vendor.id} value={vendor.id}>{vendor.name}</option>
@@ -239,35 +242,38 @@ export default function VendorsPage() {
                     </select>
                   </label>
                   <label className="block">
-                    <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Type</span>
+                    <span className="text-xs font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-muted)" }}>Type</span>
                     <select
                       value={creditType}
                       onChange={(event) => setCreditType(event.target.value as "chargeback" | "credit_memo")}
-                      className="mt-1 min-h-[40px] w-full rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                      className="mt-1 min-h-[40px] w-full rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                      style={{ borderColor: "var(--color-border)" }}
                     >
                       <option value="credit_memo">Credit memo</option>
                       <option value="chargeback">Chargeback</option>
                     </select>
                   </label>
                   <label className="block">
-                    <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Amount</span>
+                    <span className="text-xs font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-muted)" }}>Amount</span>
                     <input
                       type="text"
                       inputMode="decimal"
                       value={creditAmount}
                       onChange={(event) => setCreditAmount(event.target.value)}
                       placeholder="0.00"
-                      className="mt-1 min-h-[40px] w-full rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                      className="mt-1 min-h-[40px] w-full rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                      style={{ borderColor: "var(--color-border)" }}
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Reason</span>
+                    <span className="text-xs font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-muted)" }}>Reason</span>
                     <textarea
                       value={creditReason}
                       onChange={(event) => setCreditReason(event.target.value)}
                       rows={3}
                       placeholder="Damaged case, price variance, expired return..."
-                      className="mt-1 w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                      className="mt-1 w-full resize-none rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                      style={{ borderColor: "var(--color-border)" }}
                     />
                   </label>
                   <Button variant="primary" size="sm" fullWidth disabled={busy || !selectedVendorId || !creditAmount} onClick={() => void createCredit()}>
@@ -275,7 +281,7 @@ export default function VendorsPage() {
                   </Button>
                 </div>
               ) : (
-                <p className="text-sm text-slate-500">Manager access is required to create vendor credits.</p>
+                <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Manager access is required to create vendor credits.</p>
               )}
             </Card>
 
@@ -283,8 +289,8 @@ export default function VendorsPage() {
               {selectedVendor ? (
                 <div className="space-y-3 text-sm">
                   <div>
-                    <p className="font-semibold text-slate-950">{selectedVendor.name}</p>
-                    <p className="text-slate-500">{selectedVendor.company ?? selectedVendor.dba ?? "No company profile"}</p>
+                    <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{selectedVendor.name}</p>
+                    <p style={{ color: "var(--color-text-muted)" }}>{selectedVendor.company ?? selectedVendor.dba ?? "No company profile"}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <MiniStat label="Terms" value={selectedVendor.terms_days != null ? `${selectedVendor.terms_days} days` : "Unset"} />
@@ -294,7 +300,7 @@ export default function VendorsPage() {
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-slate-500">Select a vendor to inspect details.</p>
+                <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Select a vendor to inspect details.</p>
               )}
             </Card>
           </div>
@@ -350,9 +356,9 @@ function Metric({
   }[tone];
   return (
     <div className={`rounded-md border p-4 shadow-sm ${toneClass}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-slate-950">{value}</p>
-      <p className="mt-1 text-xs text-slate-500">{helper}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--color-text-muted)" }}>{label}</p>
+      <p className="mt-1 text-xl font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{value}</p>
+      <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>{helper}</p>
     </div>
   );
 }
@@ -364,27 +370,27 @@ function VendorRow({ vendor, selected, onSelect, onViewDetail }: { vendor: Vendo
       type="button"
       onClick={() => { onSelect(); onViewDetail(); }}
       className={`grid w-full gap-3 border-l-4 px-4 py-4 text-left transition-colors lg:grid-cols-[minmax(0,1.2fr)_0.8fr_0.8fr_auto] ${
-        selected ? "border-l-brand-600 bg-brand-50/50" : hasComplianceGap ? "border-l-warning-500 hover:bg-warning-50/40" : "border-l-success-500 hover:bg-slate-50"
+        selected ? "border-l-brand-600 bg-brand-50/50" : hasComplianceGap ? "border-l-warning-500 hover:bg-warning-50/40" : "border-l-success-500 hover:bg-[var(--color-surface-subtle)]"
       }`}
     >
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="truncate text-sm font-semibold text-slate-950">{vendor.name}</p>
+          <p className="truncate text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{vendor.name}</p>
           <Badge variant={vendor.status === "active" ? "green" : "gray"}>{vendor.status}</Badge>
           {hasComplianceGap && <Badge variant="yellow">compliance gap</Badge>}
         </div>
-        <p className="mt-1 truncate text-xs text-slate-500">{vendor.company ?? vendor.dba ?? vendor.email ?? "No company profile"}</p>
+        <p className="mt-1 truncate text-xs" style={{ color: "var(--color-text-muted)" }}>{vendor.company ?? vendor.dba ?? vendor.email ?? "No company profile"}</p>
       </div>
       <div className="text-sm">
-        <p className="font-medium text-slate-700">{vendor.vendor_type ?? "Type unset"}</p>
-        <p className="text-xs text-slate-500">{vendor.msa_type ?? "MSA unset"}</p>
+        <p className="font-medium" style={{ color: "var(--color-text-secondary)" }}>{vendor.vendor_type ?? "Type unset"}</p>
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{vendor.msa_type ?? "MSA unset"}</p>
       </div>
       <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">
         <MiniStat label="POs" value={String(vendor.poCount)} />
         <MiniStat label="Credits" value={formatMoney(vendor.openCreditsCents)} />
         <MiniStat label="Due" value={formatMoney(vendor.due_amount_cents)} />
       </div>
-      <div className="text-right text-xs text-slate-500">
+      <div className="text-right text-xs" style={{ color: "var(--color-text-muted)" }}>
         <p>{vendor.contact_name ?? "No contact"}</p>
         <p>{[vendor.city, vendor.state].filter(Boolean).join(", ") || vendor.phone || "No location"}</p>
       </div>
@@ -394,9 +400,9 @@ function VendorRow({ vendor, selected, onSelect, onViewDetail }: { vendor: Vendo
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-slate-100 px-2 py-1.5">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{label}</p>
-      <p className="mt-0.5 truncate text-xs font-semibold tabular-nums text-slate-800">{value}</p>
+    <div className="rounded-md px-2 py-1.5" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-muted)" }}>{label}</p>
+      <p className="mt-0.5 truncate text-xs font-semibold tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{value}</p>
     </div>
   );
 }
@@ -405,9 +411,9 @@ function ActivityCard({ title, empty, children }: { title: string; empty: string
   return (
     <Card title={title} noPadding>
       {children.length === 0 ? (
-        <p className="px-5 py-4 text-sm text-slate-500">{empty}</p>
+        <p className="px-5 py-4 text-sm" style={{ color: "var(--color-text-muted)" }}>{empty}</p>
       ) : (
-        <div className="divide-y divide-slate-100">{children}</div>
+        <div className="divide-y divide-[var(--color-table-border)]">{children}</div>
       )}
     </Card>
   );
@@ -417,10 +423,10 @@ function ActivityItem({ title, subtitle, meta }: { title: string; subtitle: stri
   return (
     <div className="flex items-start justify-between gap-3 px-5 py-3">
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-slate-950">{title}</p>
-        <p className="mt-1 truncate text-xs text-slate-500">{subtitle}</p>
+        <p className="truncate text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{title}</p>
+        <p className="mt-1 truncate text-xs" style={{ color: "var(--color-text-muted)" }}>{subtitle}</p>
       </div>
-      <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{meta}</span>
+      <span className="rounded-full px-2 py-1 text-xs font-medium" style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>{meta}</span>
     </div>
   );
 }

@@ -39,10 +39,10 @@ export function NewRoleModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-[#111]">Create Custom Role</h2>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
+      <div className="w-full max-w-md rounded-2xl shadow-2xl" style={{ backgroundColor: "var(--color-surface)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Create Custom Role</h2>
+          <button type="button" onClick={onClose} className="hover:opacity-70" style={{ color: "var(--color-text-muted)" }} aria-label="Close">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
@@ -51,21 +51,23 @@ export function NewRoleModal({
           {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
           <div>
-            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">Role Name *</label>
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Role Name *</label>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Floor Supervisor"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none" />
+              className="w-full rounded-lg px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
+              style={{ border: "1px solid var(--color-border)" }} />
           </div>
 
           <div>
-            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">Description</label>
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Description</label>
             <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
               placeholder="What does this role do?"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none" />
+              className="w-full rounded-lg px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
+              style={{ border: "1px solid var(--color-border)" }} />
           </div>
 
           <div>
-            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">Color</label>
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Color</label>
             <div className="flex flex-wrap gap-2">
               {COLOR_OPTIONS.map((c) => (
                 <button key={c} type="button" onClick={() => setColor(c)}
@@ -76,21 +78,23 @@ export function NewRoleModal({
           </div>
 
           <div>
-            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">Copy permissions from</label>
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Copy permissions from</label>
             <select value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none">
+              className="w-full rounded-lg px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
+              style={{ border: "1px solid var(--color-border)" }}>
               <option value="">— Start empty —</option>
               {allRoles.map((r) => (
                 <option key={r.id} value={r.id}>{r.name}</option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-slate-400">You can fine-tune permissions after creating the role.</p>
+            <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>You can fine-tune permissions after creating the role.</p>
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+        <div className="flex justify-end gap-2 px-5 py-3" style={{ borderTop: "1px solid var(--color-border)" }}>
           <button type="button" onClick={onClose}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+            className="rounded-lg px-4 py-2 text-sm font-medium hover:bg-[var(--color-surface-subtle)]"
+            style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
             Cancel
           </button>
           <button type="button" onClick={() => void handleCreate()} disabled={saving}

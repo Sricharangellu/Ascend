@@ -136,69 +136,75 @@ function ProfileTab({ emp, onSaved }: { emp: Employee; onSaved: (e: Employee) =>
   return (
     <form onSubmit={handleSave} className="space-y-6">
       <Card className="p-6">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">Basic information</h3>
+        <h3 className="mb-4 text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Basic information</h3>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-600">Full name</label>
+            <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Full name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              style={{ borderColor: "var(--color-border)" }}
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-600">Email</label>
+            <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Email</label>
             <input
               type="email"
               value={emp.email}
               disabled
-              className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400"
+              className="w-full rounded-md border px-3 py-2 text-sm"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }}
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-600">Phone</label>
+            <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Phone</label>
             <input
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+1 (555) 000-0000"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              style={{ borderColor: "var(--color-border)" }}
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-600">Department</label>
+            <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Department</label>
             <select
               value={dept}
               onChange={(e) => setDept(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              style={{ borderColor: "var(--color-border)" }}
             >
               <option value="">No department</option>
               {DEPT_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-600">Hire date</label>
+            <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Hire date</label>
             <input
               type="date"
               value={hireDate}
               onChange={(e) => setHireDate(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              style={{ borderColor: "var(--color-border)" }}
             />
           </div>
         </div>
       </Card>
 
       <Card className="p-6">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">Role & employment</h3>
+        <h3 className="mb-4 text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Role &amp; employment</h3>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-600">Role</label>
+            <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Role</label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value as RoleId)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              style={{ borderColor: "var(--color-border)" }}
             >
               {ROLES.map((r) => (
                 <option key={r} value={r}>{ROLE_LABELS[r]}</option>
@@ -206,11 +212,12 @@ function ProfileTab({ emp, onSaved }: { emp: Employee; onSaved: (e: Employee) =>
             </select>
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-600">Employment type</label>
+            <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Employment type</label>
             <select
               value={empType}
               onChange={(e) => setEmpType(e.target.value as Employee["employment_type"])}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              style={{ borderColor: "var(--color-border)" }}
             >
               <option value="full_time">Full-time</option>
               <option value="part_time">Part-time</option>
@@ -218,9 +225,9 @@ function ProfileTab({ emp, onSaved }: { emp: Employee; onSaved: (e: Employee) =>
             </select>
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-600">Hourly rate (USD)</label>
+            <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Hourly rate (USD)</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "var(--color-text-muted)" }}>$</span>
               <input
                 type="number"
                 min="0"
@@ -228,7 +235,8 @@ function ProfileTab({ emp, onSaved }: { emp: Employee; onSaved: (e: Employee) =>
                 value={rate}
                 onChange={(e) => setRate(e.target.value)}
                 placeholder="0.00"
-                className="w-full rounded-md border border-slate-300 py-2 pl-7 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                className="w-full rounded-md border py-2 pl-7 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                style={{ borderColor: "var(--color-border)" }}
               />
             </div>
           </div>
@@ -298,27 +306,27 @@ function TimeClockTab({ emp, onUpdated }: { emp: Employee; onUpdated: (e: Employ
       <Card className="p-5">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium text-slate-500">Status today</p>
+            <p className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Status today</p>
             <div className="mt-1 flex items-center gap-2">
               <span className={`inline-flex h-2.5 w-2.5 rounded-full ${emp.clocked_in ? "bg-emerald-500" : "bg-slate-300"}`} />
-              <span className="text-sm font-semibold text-slate-900">
+              <span className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
                 {emp.clocked_in
                   ? `Clocked in at ${fmtTime(emp.clocked_in_at!)}`
                   : "Not clocked in"}
               </span>
             </div>
             {emp.clocked_in && (
-              <p className="mt-0.5 text-xs text-slate-500">
+              <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>
                 Current session: {formatHours(elapsed)}
               </p>
             )}
           </div>
           <div className="text-right">
-            <p className="text-xs font-medium text-slate-500">Today&rsquo;s total</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900">{formatHours(totalToday)}</p>
+            <p className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Today&rsquo;s total</p>
+            <p className="mt-1 text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>{formatHours(totalToday)}</p>
           </div>
         </div>
-        <div className="mt-4 border-t border-slate-100 pt-4">
+        <div className="mt-4 border-t pt-4" style={{ borderColor: "var(--color-border)" }}>
           <button
             type="button"
             onClick={handleClock}
@@ -337,30 +345,30 @@ function TimeClockTab({ emp, onUpdated }: { emp: Employee; onUpdated: (e: Employ
 
       {/* Today's entries */}
       <Card className="overflow-hidden p-0">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h3 className="text-sm font-semibold text-slate-900">Today&rsquo;s entries</h3>
+        <div className="border-b px-4 py-3" style={{ borderColor: "var(--color-border)" }}>
+          <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Today&rsquo;s entries</h3>
         </div>
         {loading ? (
-          <div className="px-4 py-6 text-sm text-slate-400">Loading...</div>
+          <div className="px-4 py-6 text-sm" style={{ color: "var(--color-text-muted)" }}>Loading...</div>
         ) : entries.length === 0 ? (
-          <div className="px-4 py-6 text-sm text-slate-400">No clock-in entries today.</div>
+          <div className="px-4 py-6 text-sm" style={{ color: "var(--color-text-muted)" }}>No clock-in entries today.</div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50">
+            <thead className="border-b" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
               <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-slate-500">Clock in</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-slate-500">Clock out</th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-slate-500">Duration</th>
+                <th className="px-4 py-2 text-left text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Clock in</th>
+                <th className="px-4 py-2 text-left text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Clock out</th>
+                <th className="px-4 py-2 text-right text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Duration</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[var(--color-table-border)]">
               {entries.map((e) => (
-                <tr key={e.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 text-slate-700">{fmtTime(e.clock_in)}</td>
-                  <td className="px-4 py-3 text-slate-700">
+                <tr key={e.id} className="hover:bg-[var(--color-surface-subtle)]">
+                  <td className="px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{fmtTime(e.clock_in)}</td>
+                  <td className="px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>
                     {e.clock_out ? fmtTime(e.clock_out) : <span className="text-emerald-600">Active</span>}
                   </td>
-                  <td className="px-4 py-3 text-right font-medium text-slate-900">
+                  <td className="px-4 py-3 text-right font-medium" style={{ color: "var(--color-text-primary)" }}>
                     {fmtDuration(e.duration_mins)}
                   </td>
                 </tr>
@@ -451,8 +459,8 @@ function PermissionsTab({ emp, onRequestClick }: { emp: Employee; onRequestClick
             {ROLE_LABELS[emp.role].charAt(0)}
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-slate-900">{ROLE_LABELS[emp.role]}</p>
-            <p className="text-xs text-slate-500">{roleInfo?.description ?? "Custom role"}</p>
+            <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{ROLE_LABELS[emp.role]}</p>
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{roleInfo?.description ?? "Custom role"}</p>
           </div>
           {isFullAccess && (
             <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-semibold text-violet-700">Full access</span>
@@ -460,7 +468,7 @@ function PermissionsTab({ emp, onRequestClick }: { emp: Employee; onRequestClick
         </div>
 
         {/* Legend */}
-        <div className="mt-4 flex flex-wrap gap-3 border-t border-slate-100 pt-3">
+        <div className="mt-4 flex flex-wrap gap-3 border-t pt-3" style={{ borderColor: "var(--color-border)" }}>
           {[
             { color: "bg-emerald-500", label: "Role permission" },
             { color: "bg-blue-500",    label: "Temporary override" },
@@ -469,7 +477,7 @@ function PermissionsTab({ emp, onRequestClick }: { emp: Employee; onRequestClick
           ].map((l) => (
             <div key={l.label} className="flex items-center gap-1.5">
               <span className={`h-2.5 w-2.5 rounded-full ${l.color}`} />
-              <span className="text-xs text-slate-500">{l.label}</span>
+              <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{l.label}</span>
             </div>
           ))}
         </div>
@@ -486,13 +494,15 @@ function PermissionsTab({ emp, onRequestClick }: { emp: Employee; onRequestClick
           <button
             type="button"
             onClick={onRequestClick}
-            className="rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-[var(--color-surface-subtle)]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
           >
             View Request History
           </button>
           <Link
             href="/settings/permissions"
-            className="inline-flex items-center rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-[var(--color-surface-subtle)]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
           >
             Settings › Permissions
           </Link>
@@ -524,20 +534,20 @@ function PermissionsTab({ emp, onRequestClick }: { emp: Employee; onRequestClick
 
       {/* Feature grid */}
       {loading ? (
-        <Card className="p-5 text-sm text-slate-400">Loading permissions...</Card>
+        <Card className="p-5 text-sm" style={{ color: "var(--color-text-muted)" }}>Loading permissions...</Card>
       ) : (
         <div className="space-y-3">
           {FEATURE_GROUPS.map((group) => (
             <Card key={group.label} className="overflow-hidden p-0">
-              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-2.5">
-                <span className="text-xs font-semibold text-slate-600">{group.label}</span>
-                <span className="text-xs text-slate-400">
+              <div className="flex items-center justify-between border-b px-4 py-2.5" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
+                <span className="text-xs font-semibold" style={{ color: "var(--color-text-secondary)" }}>{group.label}</span>
+                <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                   {isFullAccess
                     ? `${group.features.length}/${group.features.length}`
                     : `${group.features.filter((f) => roleSet.has(f.id) || activeOverrideSet.has(f.id)).length}/${group.features.length}`}
                 </span>
               </div>
-              <ul className="divide-y divide-slate-50">
+              <ul className="divide-y divide-[var(--color-table-border)]">
                 {group.features.map((feat) => {
                   const fromRole     = isFullAccess || roleSet.has(feat.id);
                   const fromOverride = !fromRole && activeOverrideSet.has(feat.id);
@@ -568,7 +578,7 @@ function PermissionsTab({ emp, onRequestClick }: { emp: Employee; onRequestClick
                   }
 
                   return (
-                    <li key={feat.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50/50">
+                    <li key={feat.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--color-surface-subtle)]">
                       <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${bgColor}`}>
                         {iconEl}
                       </span>
@@ -577,7 +587,7 @@ function PermissionsTab({ emp, onRequestClick }: { emp: Employee; onRequestClick
                           <p className={`text-sm ${labelColor}`}>{feat.label}</p>
                           {badge}
                         </div>
-                        <p className="text-xs text-slate-400">{feat.description}</p>
+                        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{feat.description}</p>
                       </div>
                     </li>
                   );
@@ -634,25 +644,26 @@ function RequestPermissionModal({ emp, onClose, onSubmitted }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+      <div className="w-full max-w-lg rounded-xl shadow-2xl" style={{ backgroundColor: "var(--color-surface)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--color-border)" }}>
           <div>
-            <h2 className="text-base font-semibold text-slate-900">Request permission</h2>
-            <p className="text-xs text-slate-500">For {emp.name} &middot; {ROLE_LABELS[emp.role]}</p>
+            <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Request permission</h2>
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>For {emp.name} &middot; {ROLE_LABELS[emp.role]}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100">
+          <button type="button" onClick={onClose} className="rounded-md p-1.5 hover:bg-[var(--color-surface-subtle)]" style={{ color: "var(--color-text-muted)" }}>
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-600">Permission <span className="text-red-500">*</span></label>
+            <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Permission <span className="text-red-500">*</span></label>
             <select
               value={permCode}
               onChange={(e) => setPermCode(e.target.value)}
               required
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              style={{ borderColor: "var(--color-border)" }}
             >
               <option value="">Select a permission…</option>
               {FEATURE_GROUPS.map((g) => (
@@ -666,40 +677,43 @@ function RequestPermissionModal({ emp, onClose, onSubmitted }: {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-600">Reason <span className="text-red-500">*</span></label>
+            <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Reason <span className="text-red-500">*</span></label>
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               required
               rows={2}
               placeholder="Why is this permission needed?"
-              className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              className="w-full resize-none rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              style={{ borderColor: "var(--color-border)" }}
             />
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-600">Business justification</label>
+            <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Business justification</label>
             <textarea
               value={justification}
               onChange={(e) => setJustification(e.target.value)}
               rows={2}
               placeholder="How will this benefit the business?"
-              className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              className="w-full resize-none rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              style={{ borderColor: "var(--color-border)" }}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-600">Access type</label>
-              <div className="flex rounded-md border border-slate-300 p-0.5">
+              <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Access type</label>
+              <div className="flex rounded-md border p-0.5" style={{ borderColor: "var(--color-border)" }}>
                 {(["temporary", "permanent"] as const).map((t) => (
                   <button
                     key={t}
                     type="button"
                     onClick={() => setAccessType(t)}
                     className={`flex-1 rounded py-1.5 text-xs font-medium transition-colors ${
-                      accessType === t ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-50"
+                      accessType === t ? "bg-brand-600 text-white" : "hover:bg-[var(--color-surface-subtle)]"
                     }`}
+                    style={accessType !== t ? { color: "var(--color-text-secondary)" } : {}}
                   >
                     {t === "temporary" ? "Temporary" : "Permanent"}
                   </button>
@@ -707,11 +721,12 @@ function RequestPermissionModal({ emp, onClose, onSubmitted }: {
               </div>
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-600">Urgency</label>
+              <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Urgency</label>
               <select
                 value={urgency}
                 onChange={(e) => setUrgency(e.target.value as Urgency)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                style={{ borderColor: "var(--color-border)" }}
               >
                 <option value="low">Low</option>
                 <option value="normal">Normal</option>
@@ -724,23 +739,26 @@ function RequestPermissionModal({ emp, onClose, onSubmitted }: {
           {accessType === "temporary" && (
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Start date</label>
+                <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Start date</label>
                 <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600" />
+                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                  style={{ borderColor: "var(--color-border)" }} />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">End date</label>
+                <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>End date</label>
                 <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600" />
+                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                  style={{ borderColor: "var(--color-border)" }} />
               </div>
             </div>
           )}
 
           {error && <p className="text-sm text-red-700">{error}</p>}
 
-          <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+          <div className="flex justify-end gap-2 border-t pt-4" style={{ borderColor: "var(--color-border)" }}>
             <button type="button" onClick={onClose}
-              className="rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-[var(--color-surface-subtle)]"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
               Cancel
             </button>
             <button type="submit" disabled={submitting}
@@ -779,7 +797,7 @@ function PermissionRequestsTab({ emp }: { emp: Employee }) {
       {/* Header actions */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">Permission requests</h3>
+          <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Permission requests</h3>
           {pending.length > 0 && (
             <p className="text-xs text-amber-600">{pending.length} pending review</p>
           )}
@@ -794,16 +812,16 @@ function PermissionRequestsTab({ emp }: { emp: Employee }) {
       </div>
 
       {loading ? (
-        <Card className="p-5 text-sm text-slate-400">Loading requests…</Card>
+        <Card className="p-5 text-sm" style={{ color: "var(--color-text-muted)" }}>Loading requests…</Card>
       ) : requests.length === 0 ? (
         <Card className="flex flex-col items-center py-12 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100">
-            <svg className="h-6 w-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
+            <svg className="h-6 w-6" style={{ color: "var(--color-text-muted)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
           </div>
-          <p className="mt-3 text-sm font-medium text-slate-700">No requests yet</p>
-          <p className="mt-1 text-xs text-slate-400">Click Request Permission to submit a new access request.</p>
+          <p className="mt-3 text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>No requests yet</p>
+          <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>Click Request Permission to submit a new access request.</p>
         </Card>
       ) : (
         <>
@@ -830,10 +848,10 @@ function PermissionRequestsTab({ emp }: { emp: Employee }) {
 function RequestList({ title, requests }: { title: string; requests: PermissionRequest[] }) {
   return (
     <Card className="overflow-hidden p-0">
-      <div className="border-b border-slate-200 bg-slate-50 px-4 py-2.5">
-        <span className="text-xs font-semibold text-slate-600">{title}</span>
+      <div className="border-b px-4 py-2.5" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
+        <span className="text-xs font-semibold" style={{ color: "var(--color-text-secondary)" }}>{title}</span>
       </div>
-      <ul className="divide-y divide-slate-100">
+      <ul className="divide-y divide-[var(--color-table-border)]">
         {requests.map((req) => {
           const urg = URGENCY_STYLES[req.urgency];
           return (
@@ -841,7 +859,7 @@ function RequestList({ title, requests }: { title: string; requests: PermissionR
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-slate-900">{featLabel(req.permission_code)}</p>
+                    <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{featLabel(req.permission_code)}</p>
                     <PRStatusBadge status={req.status} />
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${urg.bg} ${urg.text}`}>{urg.label}</span>
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
@@ -850,13 +868,13 @@ function RequestList({ title, requests }: { title: string; requests: PermissionR
                       {req.access_type === "permanent" ? "Permanent" : "Temporary"}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-slate-600">{req.reason}</p>
+                  <p className="mt-1 text-xs" style={{ color: "var(--color-text-secondary)" }}>{req.reason}</p>
                   {req.review_notes && (
-                    <p className="mt-1 text-xs text-slate-500 italic">
+                    <p className="mt-1 text-xs italic" style={{ color: "var(--color-text-muted)" }}>
                       <span className="font-medium not-italic">Reviewer note:</span> {req.review_notes}
                     </p>
                   )}
-                  <div className="mt-1 flex items-center gap-3 text-[11px] text-slate-400">
+                  <div className="mt-1 flex items-center gap-3 text-[11px]" style={{ color: "var(--color-text-muted)" }}>
                     <span>Requested by {req.requested_by_name}</span>
                     <span>{new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(req.created_at))}</span>
                     {req.end_at && (
@@ -866,8 +884,8 @@ function RequestList({ title, requests }: { title: string; requests: PermissionR
                 </div>
                 {req.reviewed_by_name && (
                   <div className="shrink-0 text-right">
-                    <p className="text-[11px] text-slate-400">Reviewed by</p>
-                    <p className="text-xs font-medium text-slate-600">{req.reviewed_by_name}</p>
+                    <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>Reviewed by</p>
+                    <p className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>{req.reviewed_by_name}</p>
                   </div>
                 )}
               </div>
@@ -923,13 +941,13 @@ function SecurityTab({ emp, onUpdated }: { emp: Employee; onUpdated: (e: Employe
     <div className="space-y-4">
       {/* Account status */}
       <Card className="p-5">
-        <h3 className="mb-3 text-sm font-semibold text-slate-900">Account status</h3>
+        <h3 className="mb-3 text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Account status</h3>
         <div className="flex items-center gap-3">
           <span className={`rounded-full px-3 py-1 text-sm font-semibold ${statusColors[emp.status]}`}>
             {emp.status.charAt(0).toUpperCase() + emp.status.slice(1)}
           </span>
           {emp.suspend_reason && (
-            <span className="text-sm text-slate-500">&mdash; {emp.suspend_reason}</span>
+            <span className="text-sm" style={{ color: "var(--color-text-muted)" }}>&mdash; {emp.suspend_reason}</span>
           )}
         </div>
 
@@ -968,8 +986,8 @@ function SecurityTab({ emp, onUpdated }: { emp: Employee; onUpdated: (e: Employe
 
       {/* PIN management */}
       <Card className="p-5">
-        <h3 className="mb-3 text-sm font-semibold text-slate-900">POS PIN</h3>
-        <p className="mb-3 text-xs text-slate-500">
+        <h3 className="mb-3 text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>POS PIN</h3>
+        <p className="mb-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
           Used for quick-login at the terminal. Leave blank to disable PIN access.
         </p>
         <form onSubmit={savePin} className="flex gap-2">
@@ -980,7 +998,8 @@ function SecurityTab({ emp, onUpdated }: { emp: Employee; onUpdated: (e: Employe
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
             placeholder="4-6 digits"
-            className="w-40 rounded-md border border-slate-300 px-3 py-2 text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-brand-600"
+            className="w-40 rounded-md border px-3 py-2 text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-brand-600"
+            style={{ borderColor: "var(--color-border)" }}
           />
           <button
             type="submit"
@@ -993,7 +1012,8 @@ function SecurityTab({ emp, onUpdated }: { emp: Employee; onUpdated: (e: Employe
             <button
               type="button"
               onClick={() => { setPin(""); }}
-              className="rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-[var(--color-surface-subtle)]"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
             >
               Clear
             </button>
@@ -1004,26 +1024,28 @@ function SecurityTab({ emp, onUpdated }: { emp: Employee; onUpdated: (e: Employe
       {/* Confirm action modal */}
       {confirmAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-sm rounded-xl p-6 shadow-2xl" style={{ backgroundColor: "var(--color-surface)" }}>
             {confirmAction === "suspend" && (
               <>
-                <h2 className="text-base font-semibold text-slate-900">Suspend {emp.name}?</h2>
-                <p className="mt-2 text-sm text-slate-600">
+                <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Suspend {emp.name}?</h2>
+                <p className="mt-2 text-sm" style={{ color: "var(--color-text-secondary)" }}>
                   They will not be able to log in until reactivated.
                 </p>
                 <div className="mt-3">
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Reason (optional)</label>
+                  <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Reason (optional)</label>
                   <input
                     type="text"
                     value={suspendReason}
                     onChange={(e) => setSuspendReason(e.target.value)}
                     placeholder="Policy violation, leave of absence..."
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                    className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                    style={{ borderColor: "var(--color-border)" }}
                   />
                 </div>
                 <div className="mt-4 flex justify-end gap-2">
                   <button type="button" onClick={() => setConfirmAction(null)}
-                    className="rounded-md border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
+                    className="rounded-md border px-4 py-2 text-sm hover:bg-[var(--color-surface-subtle)]"
+                    style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Cancel</button>
                   <button type="button" onClick={() => changeStatus("suspended", suspendReason)} disabled={saving}
                     className="rounded-md bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-60">
                     {saving ? "..." : "Suspend"}
@@ -1033,13 +1055,14 @@ function SecurityTab({ emp, onUpdated }: { emp: Employee; onUpdated: (e: Employe
             )}
             {confirmAction === "terminate" && (
               <>
-                <h2 className="text-base font-semibold text-slate-900">Terminate {emp.name}?</h2>
-                <p className="mt-2 text-sm text-slate-600">
+                <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Terminate {emp.name}?</h2>
+                <p className="mt-2 text-sm" style={{ color: "var(--color-text-secondary)" }}>
                   This will permanently end their employment. This action cannot be undone.
                 </p>
                 <div className="mt-4 flex justify-end gap-2">
                   <button type="button" onClick={() => setConfirmAction(null)}
-                    className="rounded-md border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
+                    className="rounded-md border px-4 py-2 text-sm hover:bg-[var(--color-surface-subtle)]"
+                    style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Cancel</button>
                   <button type="button" onClick={() => changeStatus("terminated")} disabled={saving}
                     className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60">
                     {saving ? "..." : "Terminate"}
@@ -1049,13 +1072,14 @@ function SecurityTab({ emp, onUpdated }: { emp: Employee; onUpdated: (e: Employe
             )}
             {confirmAction === "reactivate" && (
               <>
-                <h2 className="text-base font-semibold text-slate-900">Reactivate {emp.name}?</h2>
-                <p className="mt-2 text-sm text-slate-600">
+                <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Reactivate {emp.name}?</h2>
+                <p className="mt-2 text-sm" style={{ color: "var(--color-text-secondary)" }}>
                   They will regain access to log in with their assigned permissions.
                 </p>
                 <div className="mt-4 flex justify-end gap-2">
                   <button type="button" onClick={() => setConfirmAction(null)}
-                    className="rounded-md border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
+                    className="rounded-md border px-4 py-2 text-sm hover:bg-[var(--color-surface-subtle)]"
+                    style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Cancel</button>
                   <button type="button" onClick={() => changeStatus("active")} disabled={saving}
                     className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60">
                     {saving ? "..." : "Reactivate"}
@@ -1115,7 +1139,8 @@ export default function UserDetailPage() {
           <button
             type="button"
             onClick={() => router.push("/team")}
-            className="mt-4 rounded-md border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            className="mt-4 rounded-md border px-4 py-2 text-sm hover:bg-[var(--color-surface-subtle)]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
           >
             Back to team
           </button>
@@ -1128,10 +1153,10 @@ export default function UserDetailPage() {
     <EnterpriseShell active="team" title="Team" subtitle={emp.name}>
       <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6">
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-1.5 text-xs text-slate-400">
-          <Link href="/team" className="hover:text-slate-700">Team</Link>
+        <nav className="flex items-center gap-1.5 text-xs" style={{ color: "var(--color-text-muted)" }}>
+          <Link href="/team" className="hover:text-[var(--color-text-primary)]">Team</Link>
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 16 16"><path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          <span className="text-slate-700">{emp.name}</span>
+          <span style={{ color: "var(--color-text-secondary)" }}>{emp.name}</span>
         </nav>
 
         {/* Header */}
@@ -1140,7 +1165,7 @@ export default function UserDetailPage() {
             {initials(emp.name)}
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-bold text-slate-900">{emp.name}</h1>
+            <h1 className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>{emp.name}</h1>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${ROLE_COLORS[emp.role]}`}>
                 {ROLE_LABELS[emp.role]}
@@ -1153,10 +1178,10 @@ export default function UserDetailPage() {
                 {emp.status.charAt(0).toUpperCase() + emp.status.slice(1)}
               </span>
               {emp.department && (
-                <span className="text-xs text-slate-500">{emp.department}</span>
+                <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{emp.department}</span>
               )}
             </div>
-            <p className="mt-0.5 text-sm text-slate-500">
+            <p className="mt-0.5 text-sm" style={{ color: "var(--color-text-muted)" }}>
               {emp.email}
               {emp.phone && <> &middot; {emp.phone}</>}
               &middot; {employmentLabel(emp.employment_type)}
@@ -1166,7 +1191,7 @@ export default function UserDetailPage() {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-slate-200">
+        <div className="border-b" style={{ borderColor: "var(--color-border)" }}>
           <nav className="-mb-px flex gap-1 overflow-x-auto">
             {TABS.map((t) => (
               <button
@@ -1177,8 +1202,9 @@ export default function UserDetailPage() {
                   "flex shrink-0 items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors",
                   tab === t.id
                     ? "border-b-2 border-brand-600 text-brand-600"
-                    : "text-slate-500 hover:text-slate-700",
+                    : "hover:text-[var(--color-text-primary)]",
                 ].join(" ")}
+                style={tab !== t.id ? { color: "var(--color-text-muted)" } : {}}
               >
                 {t.label}
                 {t.id === "requests" && pendingCount > 0 && (

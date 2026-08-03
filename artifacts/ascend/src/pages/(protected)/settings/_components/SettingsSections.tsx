@@ -15,9 +15,9 @@ type AddToast = ReturnType<typeof useToast>["addToast"];
 
 function ReadField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-      <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
-      <p className="mt-1 break-words font-semibold text-slate-950">{value}</p>
+    <div className="rounded-md p-3" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
+      <p className="text-xs font-medium uppercase" style={{ color: "var(--color-text-muted)" }}>{label}</p>
+      <p className="mt-1 break-words font-semibold" style={{ color: "var(--color-text-primary)" }}>{value}</p>
     </div>
   );
 }
@@ -73,8 +73,8 @@ export function StoreSection({ canManage, addToast }: { canManage: boolean; addT
       {error && <div role="alert" className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-slate-950">Store profile</h2>
-          <p className="text-sm text-slate-500">Business identity used on receipts, invoices, and reports.</p>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Store profile</h2>
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Business identity used on receipts, invoices, and reports.</p>
         </div>
         {canManage && !editing && (
           <Button variant="secondary" size="sm" onClick={() => setEditing({ ...data })}>Edit</Button>
@@ -90,12 +90,13 @@ export function StoreSection({ canManage, addToast }: { canManage: boolean; addT
         {BUSINESS_FIELDS.map(({ key, label, type }) =>
           editing ? (
             <div key={key}>
-              <label className="mb-1 block text-xs font-medium text-slate-500">{label}</label>
+              <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>{label}</label>
               <input
                 type={type ?? "text"}
                 value={String(editing[key] ?? "")}
                 onChange={(e) => setEditing((prev) => ({ ...prev!, [key]: e.target.value }))}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
+                className="w-full rounded-md px-3 py-2 text-sm outline-none focus:ring-2"
+                style={{ border: "1px solid var(--color-border)" }}
               />
             </div>
           ) : (
@@ -161,24 +162,24 @@ export function ShippingSection({ canManage, addToast }: { canManage: boolean; a
         onCancel={() => setDeleteTarget(null)}
       />
       <Card className="overflow-hidden p-0">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
           <div>
-            <h2 className="text-base font-semibold text-slate-950">Shipping methods</h2>
-            <p className="text-sm text-slate-500">Available options at checkout and on invoices.</p>
+            <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Shipping methods</h2>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Available options at checkout and on invoices.</p>
           </div>
           {canManage && !form && (
             <Button variant="primary" size="sm" onClick={() => setForm({ name: "", amountCents: "0", freeLimit: "" })}>Add method</Button>
           )}
         </div>
         {form && canManage && (
-          <div className="border-b border-slate-200 bg-slate-50 px-4 py-4">
+          <div className="px-4 py-4" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
             <div className="flex flex-wrap gap-3">
               <input value={form.name} onChange={(e) => setForm((f) => ({ ...f!, name: e.target.value }))} placeholder="Name"
-                className="min-w-32 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+                className="min-w-32 flex-1 rounded-md px-3 py-2 text-sm outline-none" style={{ border: "1px solid var(--color-border)" }} />
               <input value={form.amountCents} onChange={(e) => setForm((f) => ({ ...f!, amountCents: e.target.value }))} placeholder="Rate ($)" type="number" min="0" step="0.01"
-                className="w-28 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+                className="w-28 rounded-md px-3 py-2 text-sm outline-none" style={{ border: "1px solid var(--color-border)" }} />
               <input value={form.freeLimit} onChange={(e) => setForm((f) => ({ ...f!, freeLimit: e.target.value }))} placeholder="Free above ($)" type="number" min="0" step="0.01"
-                className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+                className="w-36 rounded-md px-3 py-2 text-sm outline-none" style={{ border: "1px solid var(--color-border)" }} />
               <div className="flex gap-2">
                 <Button size="sm" variant="secondary" onClick={() => setForm(null)}>Cancel</Button>
                 <Button size="sm" variant="primary" loading={busy} disabled={!form.name.trim()} onClick={add}>Add</Button>
@@ -188,13 +189,13 @@ export function ShippingSection({ canManage, addToast }: { canManage: boolean; a
         )}
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+            <tr className="text-left text-xs font-semibold uppercase tracking-[0.08em]" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
               <th className="px-4 py-3">Name</th><th className="px-4 py-3">Rate</th><th className="px-4 py-3">Free above</th>
               {canManage && <th className="px-4 py-3" />}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
-            {items.length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400">No shipping methods yet</td></tr>}
+          <tbody className="divide-y divide-[var(--color-table-border)]">
+            {items.length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center" style={{ color: "var(--color-text-muted)" }}>No shipping methods yet</td></tr>}
             {items.map((m) => (
               <tr key={m.id}>
                 <td className="px-4 py-3 font-medium">{m.name}</td>
@@ -237,22 +238,22 @@ export function TermsSection({ canManage, addToast }: { canManage: boolean; addT
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
         <div>
-          <h2 className="text-base font-semibold text-slate-950">Payment terms</h2>
-          <p className="text-sm text-slate-500">Net terms available on invoices and sales orders.</p>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Payment terms</h2>
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Net terms available on invoices and sales orders.</p>
         </div>
         {canManage && !form && <Button variant="primary" size="sm" onClick={() => setForm({ name: "", daysDue: "30", description: "" })}>Add term</Button>}
       </div>
       {form && canManage && (
-        <div className="border-b border-slate-200 bg-slate-50 px-4 py-4">
+        <div className="px-4 py-4" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
           <div className="flex flex-wrap gap-3">
             <input value={form.name} onChange={(e) => setForm((f) => ({ ...f!, name: e.target.value }))} placeholder='e.g. "Net 30"'
-              className="min-w-32 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              className="min-w-32 flex-1 rounded-md px-3 py-2 text-sm outline-none" style={{ border: "1px solid var(--color-border)" }} />
             <input value={form.daysDue} onChange={(e) => setForm((f) => ({ ...f!, daysDue: e.target.value }))} placeholder="Days due" type="number" min="0"
-              className="w-28 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              className="w-28 rounded-md px-3 py-2 text-sm outline-none" style={{ border: "1px solid var(--color-border)" }} />
             <input value={form.description} onChange={(e) => setForm((f) => ({ ...f!, description: e.target.value }))} placeholder="Description (optional)"
-              className="min-w-48 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              className="min-w-48 flex-1 rounded-md px-3 py-2 text-sm outline-none" style={{ border: "1px solid var(--color-border)" }} />
             <div className="flex gap-2">
               <Button size="sm" variant="secondary" onClick={() => setForm(null)}>Cancel</Button>
               <Button size="sm" variant="primary" loading={busy} disabled={!form.name.trim()} onClick={add}>Add</Button>
@@ -262,17 +263,17 @@ export function TermsSection({ canManage, addToast }: { canManage: boolean; addT
       )}
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+          <tr className="text-left text-xs font-semibold uppercase tracking-[0.08em]" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
             <th className="px-4 py-3">Name</th><th className="px-4 py-3">Days due</th><th className="px-4 py-3">Description</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
-          {items.length === 0 && <tr><td colSpan={3} className="px-4 py-6 text-center text-slate-400">No payment terms yet</td></tr>}
+        <tbody className="divide-y divide-[var(--color-table-border)]">
+          {items.length === 0 && <tr><td colSpan={3} className="px-4 py-6 text-center" style={{ color: "var(--color-text-muted)" }}>No payment terms yet</td></tr>}
           {items.map((t) => (
             <tr key={t.id}>
               <td className="px-4 py-3 font-medium">{t.name}</td>
               <td className="px-4 py-3">{t.days_due}</td>
-              <td className="px-4 py-3 text-slate-500">{t.description ?? "—"}</td>
+              <td className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>{t.description ?? "—"}</td>
             </tr>
           ))}
         </tbody>
@@ -309,23 +310,23 @@ export function ModesSection({ canManage, addToast }: { canManage: boolean; addT
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
         <div>
-          <h2 className="text-base font-semibold text-slate-950">Payment modes</h2>
-          <p className="text-sm text-slate-500">Tender types accepted at checkout (cash, card, etc.).</p>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Payment modes</h2>
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Tender types accepted at checkout (cash, card, etc.).</p>
         </div>
         {canManage && !adding && <Button variant="primary" size="sm" onClick={() => setAdding(true)}>Add mode</Button>}
       </div>
       {adding && canManage && (
-        <div className="flex gap-3 border-b border-slate-200 bg-slate-50 px-4 py-4">
+        <div className="flex gap-3 px-4 py-4" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder='e.g. "Bank transfer"'
-            className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+            className="flex-1 rounded-md px-3 py-2 text-sm outline-none" style={{ border: "1px solid var(--color-border)" }} />
           <Button size="sm" variant="secondary" onClick={() => { setAdding(false); setName(""); }}>Cancel</Button>
           <Button size="sm" variant="primary" loading={busy} disabled={!name.trim()} onClick={add}>Add</Button>
         </div>
       )}
-      <ul className="divide-y divide-slate-100">
-        {items.length === 0 && <li className="px-4 py-6 text-center text-sm text-slate-400">No payment modes yet</li>}
+      <ul className="divide-y divide-[var(--color-table-border)]">
+        {items.length === 0 && <li className="px-4 py-6 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No payment modes yet</li>}
         {items.map((m) => <li key={m.id} className="flex items-center gap-3 px-4 py-3 text-sm"><span className="font-medium">{m.name}</span></li>)}
       </ul>
     </Card>
@@ -364,24 +365,24 @@ export function TaxSection({ canManage, addToast }: { canManage: boolean; addToa
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
         <div>
-          <h2 className="text-base font-semibold text-slate-950">Tax rates</h2>
-          <p className="text-sm text-slate-500">Configured rates applied to line items at checkout.</p>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Tax rates</h2>
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Configured rates applied to line items at checkout.</p>
         </div>
         {canManage && !form && <Button variant="primary" size="sm" onClick={() => setForm({ name: "", ratePct: "", category: "", state: "" })}>Add rate</Button>}
       </div>
       {form && canManage && (
-        <div className="border-b border-slate-200 bg-slate-50 px-4 py-4">
+        <div className="px-4 py-4" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
           <div className="flex flex-wrap gap-3">
             <input value={form.name} onChange={(e) => setForm((f) => ({ ...f!, name: e.target.value }))} placeholder='e.g. "CA Sales Tax"'
-              className="min-w-32 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              className="min-w-32 flex-1 rounded-md px-3 py-2 text-sm outline-none" style={{ border: "1px solid var(--color-border)" }} />
             <input value={form.ratePct} onChange={(e) => setForm((f) => ({ ...f!, ratePct: e.target.value }))} placeholder="Rate %" type="number" min="0" step="0.01"
-              className="w-24 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              className="w-24 rounded-md px-3 py-2 text-sm outline-none" style={{ border: "1px solid var(--color-border)" }} />
             <input value={form.category} onChange={(e) => setForm((f) => ({ ...f!, category: e.target.value }))} placeholder="Category (optional)"
-              className="min-w-32 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              className="min-w-32 flex-1 rounded-md px-3 py-2 text-sm outline-none" style={{ border: "1px solid var(--color-border)" }} />
             <input value={form.state} onChange={(e) => setForm((f) => ({ ...f!, state: e.target.value }))} placeholder="State (optional)"
-              className="w-28 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
+              className="w-28 rounded-md px-3 py-2 text-sm outline-none" style={{ border: "1px solid var(--color-border)" }} />
             <div className="flex gap-2">
               <Button size="sm" variant="secondary" onClick={() => setForm(null)}>Cancel</Button>
               <Button size="sm" variant="primary" loading={busy} disabled={!form.name.trim() || !form.ratePct} onClick={add}>Add</Button>
@@ -391,18 +392,18 @@ export function TaxSection({ canManage, addToast }: { canManage: boolean; addToa
       )}
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+          <tr className="text-left text-xs font-semibold uppercase tracking-[0.08em]" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
             <th className="px-4 py-3">Name</th><th className="px-4 py-3">Rate</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">State</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
-          {items.length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400">No tax rates yet</td></tr>}
+        <tbody className="divide-y divide-[var(--color-table-border)]">
+          {items.length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center" style={{ color: "var(--color-text-muted)" }}>No tax rates yet</td></tr>}
           {items.map((t) => (
             <tr key={t.id}>
               <td className="px-4 py-3 font-medium">{t.name}</td>
               <td className="px-4 py-3">{(t.rate_bps / 100).toFixed(2)}%</td>
-              <td className="px-4 py-3 text-slate-500">{t.apply_to_category ?? "All"}</td>
-              <td className="px-4 py-3 text-slate-500">{t.state ?? "—"}</td>
+              <td className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>{t.apply_to_category ?? "All"}</td>
+              <td className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>{t.state ?? "—"}</td>
             </tr>
           ))}
         </tbody>
@@ -445,10 +446,10 @@ export function FlagsSection({ canManage, addToast }: { canManage: boolean; addT
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
         <div>
-          <h2 className="text-base font-semibold text-slate-950">Feature flags</h2>
-          <p className="text-sm text-slate-500">Per-tenant toggles. Manager or owner required to change.</p>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Feature flags</h2>
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Per-tenant toggles. Manager or owner required to change.</p>
         </div>
         {canManage && hasDirty && (
           <div className="flex gap-2">
@@ -457,17 +458,18 @@ export function FlagsSection({ canManage, addToast }: { canManage: boolean; addT
           </div>
         )}
       </div>
-      <ul className="divide-y divide-slate-100">
-        {Object.entries(merged).length === 0 && <li className="px-4 py-6 text-center text-sm text-slate-400">No feature flags configured</li>}
+      <ul className="divide-y divide-[var(--color-table-border)]">
+        {Object.entries(merged).length === 0 && <li className="px-4 py-6 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No feature flags configured</li>}
         {Object.entries(merged).sort(([a], [b]) => a.localeCompare(b)).map(([key, enabled]) => (
           <li key={key} className="flex items-center justify-between gap-4 px-4 py-3">
-            <span className="font-mono text-sm font-semibold text-slate-950">{key}</span>
+            <span className="font-mono text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{key}</span>
             <button
               type="button"
               disabled={!canManage}
               aria-pressed={enabled}
               onClick={() => toggle(key)}
-              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${enabled ? "bg-slate-950" : "bg-slate-300"} ${!canManage ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${!canManage ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+              style={{ backgroundColor: enabled ? "var(--color-sidebar-bg)" : "var(--color-surface-subtle)" }}
             >
               <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-6" : "translate-x-1"}`} />
               <span className="sr-only">{key}</span>
@@ -504,13 +506,13 @@ export function CurrenciesSection() {
   return (
     <div className="flex flex-col gap-4">
       <Card className="overflow-hidden p-0">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="text-base font-semibold text-slate-950">Currencies</h2>
-          <p className="text-sm text-slate-500">Exchange rates and supported currencies for multi-currency orders</p>
+        <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Currencies</h2>
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Exchange rates and supported currencies for multi-currency orders</p>
         </div>
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+            <tr className="text-left text-xs font-semibold uppercase tracking-[0.08em]" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
               <th className="px-4 py-3">Symbol</th>
               <th className="px-4 py-3">Code</th>
               <th className="px-4 py-3">Name</th>
@@ -519,21 +521,21 @@ export function CurrenciesSection() {
               <th className="px-4 py-3">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
-            {loading && <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">Loading…</td></tr>}
-            {!loading && items.length === 0 && <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">No currencies configured</td></tr>}
+          <tbody className="divide-y divide-[var(--color-table-border)]">
+            {loading && <tr><td colSpan={6} className="px-4 py-6 text-center" style={{ color: "var(--color-text-muted)" }}>Loading…</td></tr>}
+            {!loading && items.length === 0 && <tr><td colSpan={6} className="px-4 py-6 text-center" style={{ color: "var(--color-text-muted)" }}>No currencies configured</td></tr>}
             {items.map((c) => (
-              <tr key={c.currency_code} className="hover:bg-slate-50">
-                <td className="px-4 py-3 font-semibold text-slate-950">{c.symbol}</td>
-                <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-700">{c.currency_code}</td>
-                <td className="px-4 py-3 text-slate-700">{c.currency_name}</td>
-                <td className="px-4 py-3 text-slate-600">
+              <tr key={c.currency_code} className="hover:bg-[var(--color-surface-subtle)]">
+                <td className="px-4 py-3 font-semibold" style={{ color: "var(--color-text-primary)" }}>{c.symbol}</td>
+                <td className="px-4 py-3 font-mono text-xs font-semibold" style={{ color: "var(--color-text-secondary)" }}>{c.currency_code}</td>
+                <td className="px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{c.currency_name}</td>
+                <td className="px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>
                   {c.is_base
-                    ? <span className="text-slate-400">Base currency</span>
+                    ? <span style={{ color: "var(--color-text-muted)" }}>Base currency</span>
                     : `1 ${items.find((x) => x.is_base)?.currency_code ?? "USD"} = ${c.exchange_rate} ${c.currency_code}`}
                 </td>
                 <td className="px-4 py-3">
-                  {c.is_base ? <Badge variant="green">Base</Badge> : <span className="text-slate-400">—</span>}
+                  {c.is_base ? <Badge variant="green">Base</Badge> : <span style={{ color: "var(--color-text-muted)" }}>—</span>}
                 </td>
                 <td className="px-4 py-3">
                   {c.is_active ? <Badge variant="green">Active</Badge> : <Badge variant="gray">Inactive</Badge>}

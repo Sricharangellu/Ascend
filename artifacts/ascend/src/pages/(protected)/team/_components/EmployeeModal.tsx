@@ -99,20 +99,20 @@ export function EmployeeModal({ employee, onClose, onUpdated }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
-        className="flex w-full max-w-xl flex-col rounded-2xl bg-white shadow-2xl"
-        style={{ maxHeight: "90vh" }}
+        className="flex w-full max-w-xl flex-col rounded-2xl shadow-2xl"
+        style={{ maxHeight: "90vh", backgroundColor: "var(--color-surface)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex shrink-0 items-center gap-3 border-b border-slate-200 px-5 py-4">
+        <div className="flex shrink-0 items-center gap-3 border-b px-5 py-4" style={{ borderColor: "var(--color-border)" }}>
           <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${AVATAR_COLORS[employee.role]}`}>
             {initials(employee.name)}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate font-semibold text-[#111]">{employee.name}</p>
-            <p className="truncate text-xs text-slate-400">{employee.email}</p>
+            <p className="truncate font-semibold" style={{ color: "var(--color-text-primary)" }}>{employee.name}</p>
+            <p className="truncate text-xs" style={{ color: "var(--color-text-muted)" }}>{employee.email}</p>
           </div>
-          <button type="button" onClick={onClose} className="shrink-0 text-slate-400 hover:text-slate-600" aria-label="Close">
+          <button type="button" onClick={onClose} className="shrink-0" style={{ color: "var(--color-text-muted)" }} aria-label="Close">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -120,10 +120,11 @@ export function EmployeeModal({ employee, onClose, onUpdated }: Props) {
         </div>
 
         {/* Tab nav */}
-        <div className="flex shrink-0 border-b border-slate-100 px-5">
+        <div className="flex shrink-0 border-b px-5" style={{ borderColor: "var(--color-border)" }}>
           {tabs.map(({ key, label }) => (
             <button key={key} type="button" onClick={() => setTab(key)}
-              className={`mr-4 border-b-2 py-2.5 text-sm font-medium transition-colors ${tab === key ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-[#111]"}`}>
+              className={`mr-4 border-b-2 py-2.5 text-sm font-medium transition-colors ${tab === key ? "border-brand-600 text-brand-600" : "border-transparent hover:text-[var(--color-text-primary)]"}`}
+              style={tab !== key ? { color: "var(--color-text-muted)" } : {}}>
               {label}
             </button>
           ))}
@@ -160,9 +161,11 @@ export function EmployeeModal({ employee, onClose, onUpdated }: Props) {
           {/* Time Clock tab */}
           {tab === "timeclock" && (
             <div className="space-y-4">
-              <div className={`flex items-center justify-between rounded-xl border px-4 py-3 ${isClockedIn ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}>
+              <div className={`flex items-center justify-between rounded-xl border px-4 py-3 ${isClockedIn ? "border-emerald-200 bg-emerald-50" : ""}`}
+                style={!isClockedIn ? { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" } : {}}>
                 <div>
-                  <p className={`text-sm font-semibold ${isClockedIn ? "text-emerald-700" : "text-slate-600"}`}>
+                  <p className={`text-sm font-semibold ${isClockedIn ? "text-emerald-700" : ""}`}
+                    style={!isClockedIn ? { color: "var(--color-text-secondary)" } : {}}>
                     {isClockedIn ? "Currently Clocked IN" : "Currently Off"}
                   </p>
                   {isClockedIn && clockedInAt && (
@@ -170,7 +173,7 @@ export function EmployeeModal({ employee, onClose, onUpdated }: Props) {
                       Since {fmtTime(clockedInAt)} · {formatHours(elapsedMins(clockedInAt))} elapsed
                     </p>
                   )}
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
                     Today total: <span className="font-semibold">
                       {formatHours(isClockedIn && clockedInAt ? todayMins + elapsedMins(clockedInAt) : todayMins)}
                     </span>
@@ -191,33 +194,33 @@ export function EmployeeModal({ employee, onClose, onUpdated }: Props) {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white">
-                <div className="border-b border-slate-100 px-4 py-2.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Today's Punches</p>
+              <div className="rounded-xl border" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+                <div className="border-b px-4 py-2.5" style={{ borderColor: "var(--color-border)" }}>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Today's Punches</p>
                 </div>
                 {entriesLoading ? (
                   <div className="space-y-2 px-4 py-3">
-                    {[1, 2].map((i) => <div key={i} className="h-7 animate-pulse rounded bg-slate-100" />)}
+                    {[1, 2].map((i) => <div key={i} className="h-7 animate-skeleton rounded" />)}
                   </div>
                 ) : timeEntries.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-slate-400">No time entries recorded today.</p>
+                  <p className="py-6 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No time entries recorded today.</p>
                 ) : (
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      <tr className="text-left text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>
                         <th className="px-4 pb-2 pt-2.5">Clock In</th>
                         <th className="px-4 pb-2 pt-2.5">Clock Out</th>
                         <th className="px-4 pb-2 pt-2.5 text-right">Duration</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50">
+                    <tbody className="divide-y divide-[var(--color-table-border)]">
                       {timeEntries.map((e) => (
-                        <tr key={e.id} className="hover:bg-slate-50">
-                          <td className="px-4 py-2.5 font-mono text-xs text-[#111]">{fmtTime(e.clock_in)}</td>
-                          <td className="px-4 py-2.5 font-mono text-xs text-slate-500">
+                        <tr key={e.id} className="hover:bg-[var(--color-surface-subtle)]">
+                          <td className="px-4 py-2.5 font-mono text-xs" style={{ color: "var(--color-text-primary)" }}>{fmtTime(e.clock_in)}</td>
+                          <td className="px-4 py-2.5 font-mono text-xs" style={{ color: "var(--color-text-muted)" }}>
                             {e.clock_out ? fmtTime(e.clock_out) : <span className="text-emerald-600">In progress</span>}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-xs font-semibold text-[#111]">
+                          <td className="px-4 py-2.5 text-right text-xs font-semibold" style={{ color: "var(--color-text-primary)" }}>
                             {e.duration_mins != null ? formatHours(e.duration_mins) : "—"}
                           </td>
                         </tr>
@@ -233,11 +236,12 @@ export function EmployeeModal({ employee, onClose, onUpdated }: Props) {
           {tab === "account" && (
             <div className="space-y-4">
               <div>
-                <label className="mb-1.5 block text-xs font-semibold text-slate-400">Role</label>
+                <label className="mb-1.5 block text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Role</label>
                 <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
                   {ROLES.map((r) => (
                     <button key={r} type="button" onClick={() => setRole(r)}
-                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${role === r ? "border-brand-600 bg-brand-600/5 text-brand-600" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${role === r ? "border-brand-600 bg-brand-600/5 text-brand-600" : "hover:bg-[var(--color-surface-subtle)]"}`}
+                      style={role !== r ? { borderColor: "var(--color-border)", color: "var(--color-text-secondary)" } : {}}>
                       <span className={`h-2 w-2 rounded-full ${ROLE_COLORS[r].split(" ")[0]}`} />
                       {ROLE_LABELS[r]}
                     </button>
@@ -246,7 +250,7 @@ export function EmployeeModal({ employee, onClose, onUpdated }: Props) {
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-semibold text-slate-400">Account Status</label>
+                <label className="mb-1.5 block text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Account Status</label>
                 <div className="flex gap-2">
                   {(["active", "suspended", "terminated"] as AccountStatus[]).map((s) => {
                     const styles = {
@@ -256,7 +260,8 @@ export function EmployeeModal({ employee, onClose, onUpdated }: Props) {
                     };
                     return (
                       <button key={s} type="button" onClick={() => setStatus(s)}
-                        className={`flex-1 rounded-lg border py-2.5 text-sm font-semibold capitalize transition-colors ${status === s ? styles[s] : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}>
+                        className={`flex-1 rounded-lg border py-2.5 text-sm font-semibold capitalize transition-colors ${status === s ? styles[s] : "hover:bg-[var(--color-surface-subtle)]"}`}
+                        style={status !== s ? { borderColor: "var(--color-border)", color: "var(--color-text-muted)" } : {}}>
                         {s}
                       </button>
                     );
@@ -268,24 +273,25 @@ export function EmployeeModal({ employee, onClose, onUpdated }: Props) {
                     value={suspendReason}
                     onChange={(e) => setSuspendReason(e.target.value)}
                     placeholder={status === "suspended" ? "Reason for suspension…" : "Reason for termination…"}
-                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
+                    className="mt-2 w-full rounded-lg border px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
+                    style={{ borderColor: "var(--color-border)" }}
                   />
                 )}
               </div>
 
-              <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+              <div className="rounded-lg border px-4 py-3 text-xs" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }}>
                 <div className="flex justify-between">
                   <span>Hired</span>
-                  <span className="font-medium text-slate-700">{fmtDate(employee.hire_date)}</span>
+                  <span className="font-medium" style={{ color: "var(--color-text-secondary)" }}>{fmtDate(employee.hire_date)}</span>
                 </div>
                 <div className="mt-1.5 flex justify-between">
                   <span>Employment</span>
-                  <span className="font-medium text-slate-700">{EMPLOYMENT_LABELS[employee.employment_type]}</span>
+                  <span className="font-medium" style={{ color: "var(--color-text-secondary)" }}>{EMPLOYMENT_LABELS[employee.employment_type]}</span>
                 </div>
                 {employee.hourly_rate_cents && (
                   <div className="mt-1.5 flex justify-between">
                     <span>Rate</span>
-                    <span className="font-medium text-slate-700">{formatMoney(employee.hourly_rate_cents)} / hr</span>
+                    <span className="font-medium" style={{ color: "var(--color-text-secondary)" }}>{formatMoney(employee.hourly_rate_cents)} / hr</span>
                   </div>
                 )}
               </div>
@@ -299,9 +305,10 @@ export function EmployeeModal({ employee, onClose, onUpdated }: Props) {
             {saveError}
           </p>
         )}
-        <div className="flex shrink-0 justify-end gap-2 border-t border-slate-200 px-5 py-3">
+        <div className="flex shrink-0 justify-end gap-2 border-t px-5 py-3" style={{ borderColor: "var(--color-border)" }}>
           <button type="button" onClick={onClose}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+            className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-[var(--color-surface-subtle)]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
             Cancel
           </button>
           <button type="button" onClick={() => void handleSave()} disabled={saving}

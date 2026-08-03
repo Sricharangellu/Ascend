@@ -16,7 +16,7 @@ const AISLE_COLORS: Record<string, string> = {
   Freezer: "bg-cyan-50 border-cyan-200",
 };
 function aisleColor(aisle: string): string {
-  return AISLE_COLORS[aisle] ?? "bg-slate-50 border-slate-200";
+  return AISLE_COLORS[aisle] ?? "border-[var(--color-border)]";
 }
 
 // ── CreateLocationModal ───────────────────────────────────────────────────────
@@ -44,44 +44,48 @@ function CreateLocationModal({ onClose, onSaved }: { onClose: () => void; onSave
     finally { setSaving(false); }
   };
 
+  const inputCls = "w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const inputStyle = { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-950">Add Store Location</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+      <div
+        className="w-full max-w-md rounded-xl shadow-xl"
+        style={{ backgroundColor: "var(--color-surface)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--color-border)" }}>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Add Store Location</h2>
+          <button onClick={onClose} className="text-xl" style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
         <form id="create-loc-form" onSubmit={(e) => void handleSubmit(e)} className="px-5 py-4 space-y-4">
           {err && <p className="text-sm text-red-600">{err}</p>}
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Aisle <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Aisle <span className="text-red-500">*</span></label>
               <input required value={form.aisle} onChange={(e) => f("aisle", e.target.value)}
-                placeholder="A"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                placeholder="A" className={inputCls} style={inputStyle} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Shelf</label>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Shelf</label>
               <input value={form.shelf} onChange={(e) => f("shelf", e.target.value)}
-                placeholder="1"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                placeholder="1" className={inputCls} style={inputStyle} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Bin</label>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Bin</label>
               <input value={form.bin} onChange={(e) => f("bin", e.target.value)}
-                placeholder="A"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                placeholder="A" className={inputCls} style={inputStyle} />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
+            <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Description</label>
             <input value={form.description} onChange={(e) => f("description", e.target.value)}
               placeholder="e.g. Beverages — water & soda"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className={inputCls} style={inputStyle} />
           </div>
-          <p className="text-xs text-slate-400">Label will be auto-generated: <strong>{[form.aisle, form.shelf, form.bin].filter(Boolean).join("-").toUpperCase() || "—"}</strong></p>
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Label will be auto-generated: <strong>{[form.aisle, form.shelf, form.bin].filter(Boolean).join("-").toUpperCase() || "—"}</strong></p>
         </form>
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+        <div className="flex justify-end gap-2 border-t px-5 py-3" style={{ borderColor: "var(--color-border)" }}>
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
           <Button variant="primary" type="submit" form="create-loc-form" disabled={saving}>
             {saving ? "Saving…" : "Create Location"}
@@ -122,41 +126,47 @@ function BulkAssignModal({ locations, onClose, onSaved }: {
     finally { setSaving(false); }
   };
 
+  const inputCls = "rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const inputStyle = { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-2xl rounded-xl bg-white shadow-xl flex flex-col max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+      <div
+        className="w-full max-w-2xl rounded-xl shadow-xl flex flex-col max-h-[85vh]"
+        style={{ backgroundColor: "var(--color-surface)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--color-border)" }}>
           <div>
-            <h2 className="text-base font-semibold text-slate-950">Bulk Product Location Assignment</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Assign multiple products to store locations at once</p>
+            <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Bulk Product Location Assignment</h2>
+            <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>Assign multiple products to store locations at once</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+          <button onClick={onClose} className="text-xl" style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
         <form id="bulk-form" onSubmit={(e) => void handleSubmit(e)} className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
           {err && <p className="text-sm text-red-600">{err}</p>}
-          <div className="grid grid-cols-[1fr_1fr_auto] gap-2 text-xs font-medium text-slate-500 uppercase tracking-wide">
+          <div className="grid grid-cols-[1fr_1fr_auto] gap-2 text-xs font-medium uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>
             <span>Product SKU / UPC</span><span>Location</span><span />
           </div>
           {entries.map((row, i) => (
             <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
               <input value={row.sku} onChange={(e) => updateRow(i, "sku", e.target.value)}
-                placeholder="SKU or UPC"
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                placeholder="SKU or UPC" className={inputCls} style={inputStyle} />
               <select value={row.location_id} onChange={(e) => updateRow(i, "location_id", e.target.value)}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className={inputCls} style={inputStyle}>
                 <option value="">— Select —</option>
                 {locations.map((l) => (
                   <option key={l.id} value={l.id}>{l.label} {l.description ? `· ${l.description}` : ""}</option>
                 ))}
               </select>
               <button type="button" onClick={() => removeRow(i)}
-                className="text-slate-400 hover:text-red-500 px-2 py-1 text-lg leading-none">&times;</button>
+                className="px-2 py-1 text-lg leading-none hover:text-red-500" style={{ color: "var(--color-text-muted)" }}>&times;</button>
             </div>
           ))}
           <button type="button" onClick={addRow}
             className="text-sm text-blue-600 hover:underline">+ Add row</button>
         </form>
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+        <div className="flex justify-end gap-2 border-t px-5 py-3" style={{ borderColor: "var(--color-border)" }}>
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
           <Button variant="primary" type="submit" form="bulk-form" disabled={saving}>
             {saving ? "Assigning…" : `Assign ${entries.filter(r => r.sku && r.location_id).length} Product(s)`}
@@ -222,23 +232,27 @@ export default function InventoryLocationsPage() {
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex gap-4">
             <div className="text-center">
-              <p className="text-2xl font-bold text-slate-900">{totalLocations}</p>
-              <p className="text-xs text-slate-500">Locations</p>
+              <p className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>{totalLocations}</p>
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Locations</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-blue-700">{assignedLocations}</p>
-              <p className="text-xs text-slate-500">In Use</p>
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>In Use</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-emerald-700">{totalProducts}</p>
-              <p className="text-xs text-slate-500">Assignments</p>
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Assignments</p>
             </div>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <div className="flex rounded-lg border border-slate-200 bg-white p-1">
+            <div
+              className="flex rounded-lg border p-1"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
+            >
               {(["map", "list"] as const).map((v) => (
                 <button key={v} onClick={() => setView(v)}
-                  className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors ${view === v ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}>
+                  className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors ${view === v ? "bg-blue-600 text-white" : "hover:bg-[var(--color-surface-subtle)]"}`}
+                  style={view !== v ? { color: "var(--color-text-secondary)" } : undefined}>
                   {v === "map" ? "Store Map" : "Product List"}
                 </button>
               ))}
@@ -249,14 +263,14 @@ export default function InventoryLocationsPage() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-20 text-sm text-slate-400">Loading store map…</div>
+          <div className="flex items-center justify-center py-20 text-sm" style={{ color: "var(--color-text-muted)" }}>Loading store map…</div>
         ) : view === "map" ? (
           /* ── Store Map View ── */
           <div className="space-y-3">
             {map?.aisles.length === 0 && (
               <Card className="py-16 text-center">
-                <p className="text-sm font-medium text-slate-700">No locations yet</p>
-                <p className="text-xs text-slate-400 mt-1">Add your first aisle, shelf, and bin to build your store map.</p>
+                <p className="text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>No locations yet</p>
+                <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>Add your first aisle, shelf, and bin to build your store map.</p>
               </Card>
             )}
             {map?.aisles.map((aisle) => (
@@ -266,17 +280,20 @@ export default function InventoryLocationsPage() {
                   className="flex w-full items-center justify-between px-5 py-3 text-left"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-white border border-current/20 flex items-center justify-center font-bold text-slate-800 text-sm shadow-sm">
+                    <div
+                      className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm shadow-sm"
+                      style={{ backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+                    >
                       {aisle.name.substring(0, 2)}
                     </div>
                     <div>
-                      <p className="font-semibold text-slate-900">Aisle {aisle.name}</p>
-                      <p className="text-xs text-slate-500">{aisle.shelves.length} shelf/shelves · {aisle.shelves.reduce((s, sh) => s + sh.bins.length, 0)} bins</p>
+                      <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>Aisle {aisle.name}</p>
+                      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{aisle.shelves.length} shelf/shelves · {aisle.shelves.reduce((s, sh) => s + sh.bins.length, 0)} bins</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="gray">{aisle.shelves.reduce((s, sh) => s + sh.bins.reduce((ss, b) => ss + b.products.length, 0), 0)} products</Badge>
-                    <span className="text-slate-400 text-sm">{expandedAisle === aisle.name ? "▲" : "▼"}</span>
+                    <span className="text-sm" style={{ color: "var(--color-text-muted)" }}>{expandedAisle === aisle.name ? "▲" : "▼"}</span>
                   </div>
                 </button>
 
@@ -284,30 +301,33 @@ export default function InventoryLocationsPage() {
                   <div className="border-t border-current/10 px-5 py-4 space-y-4">
                     {aisle.shelves.map((shelf) => (
                       <div key={shelf.name}>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--color-text-muted)" }}>
                           Shelf {shelf.name || "(none)"}
                         </p>
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                           {shelf.bins.map((binSlot) => (
-                            <div key={binSlot.location.id}
-                              className="rounded-lg border border-white bg-white p-3 shadow-sm">
+                            <div
+                              key={binSlot.location.id}
+                              className="rounded-lg border p-3 shadow-sm"
+                              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
+                            >
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-bold text-slate-700 font-mono">{binSlot.location.label}</span>
+                                <span className="text-xs font-bold font-mono" style={{ color: "var(--color-text-secondary)" }}>{binSlot.location.label}</span>
                                 {binSlot.location.bin && (
-                                  <span className="text-[10px] text-slate-400">bin {binSlot.location.bin}</span>
+                                  <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>bin {binSlot.location.bin}</span>
                                 )}
                               </div>
                               {binSlot.location.description && (
-                                <p className="text-[11px] text-slate-500 mb-2 leading-tight">{binSlot.location.description}</p>
+                                <p className="text-[11px] mb-2 leading-tight" style={{ color: "var(--color-text-muted)" }}>{binSlot.location.description}</p>
                               )}
                               {binSlot.products.length === 0 ? (
-                                <p className="text-[11px] text-slate-300 italic">Empty</p>
+                                <p className="text-[11px] italic" style={{ color: "var(--color-text-muted)" }}>Empty</p>
                               ) : (
                                 <ul className="space-y-1">
                                   {binSlot.products.slice(0, 3).map((p) => (
-                                    <li key={p.id} className="text-[11px] text-slate-700 flex justify-between">
+                                    <li key={p.id} className="text-[11px] flex justify-between" style={{ color: "var(--color-text-secondary)" }}>
                                       <span className="truncate">{p.product_name}</span>
-                                      <span className="text-slate-400 ml-1 shrink-0">×{p.qty_at_location}</span>
+                                      <span className="ml-1 shrink-0" style={{ color: "var(--color-text-muted)" }}>×{p.qty_at_location}</span>
                                     </li>
                                   ))}
                                   {binSlot.products.length > 3 && (
@@ -333,36 +353,41 @@ export default function InventoryLocationsPage() {
               placeholder="Search by product name, SKU, or location…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full max-w-md rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full max-w-md rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
             />
             <Card className="overflow-hidden p-0">
               {filteredLocs.length === 0 ? (
-                <div className="py-16 text-center text-sm text-slate-400">No products assigned to locations yet.</div>
+                <div className="py-16 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No products assigned to locations yet.</div>
               ) : (
                 <table className="w-full text-sm">
-                  <thead className="border-b border-slate-200 bg-slate-50">
+                  <thead style={{ borderBottom: "1px solid var(--color-table-border)", backgroundColor: "var(--color-table-header)" }}>
                     <tr>
-                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Product</th>
-                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">SKU</th>
-                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Location</th>
-                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Aisle</th>
-                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Shelf</th>
-                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Bin</th>
-                      <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Qty Here</th>
-                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Product</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>SKU</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Location</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Aisle</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Shelf</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Bin</th>
+                      <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Qty Here</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Notes</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-[var(--color-table-border)]" style={{ borderColor: "var(--color-table-border)" }}>
                     {filteredLocs.map((pl) => (
-                      <tr key={pl.id} className="hover:bg-slate-50">
-                        <td className="px-5 py-3 font-medium text-slate-900">{pl.product_name}</td>
-                        <td className="px-5 py-3 font-mono text-slate-600 text-xs">{pl.product_sku}</td>
+                      <tr
+                        key={pl.id}
+                        className="hover:bg-[var(--color-surface-subtle)]"
+                        style={{ borderBottom: "1px solid var(--color-table-border)" }}
+                      >
+                        <td className="px-5 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{pl.product_name}</td>
+                        <td className="px-5 py-3 font-mono text-xs" style={{ color: "var(--color-text-secondary)" }}>{pl.product_sku}</td>
                         <td className="px-5 py-3"><Badge variant="blue">{pl.label}</Badge></td>
-                        <td className="px-5 py-3 text-slate-700">{pl.aisle}</td>
-                        <td className="px-5 py-3 text-slate-700">{pl.shelf || "—"}</td>
-                        <td className="px-5 py-3 text-slate-700">{pl.bin || "—"}</td>
-                        <td className="px-5 py-3 text-right font-mono text-slate-700">{pl.qty_at_location}</td>
-                        <td className="px-5 py-3 text-slate-500 text-xs">{pl.notes ?? "—"}</td>
+                        <td className="px-5 py-3" style={{ color: "var(--color-text-secondary)" }}>{pl.aisle}</td>
+                        <td className="px-5 py-3" style={{ color: "var(--color-text-secondary)" }}>{pl.shelf || "—"}</td>
+                        <td className="px-5 py-3" style={{ color: "var(--color-text-secondary)" }}>{pl.bin || "—"}</td>
+                        <td className="px-5 py-3 text-right font-mono" style={{ color: "var(--color-text-secondary)" }}>{pl.qty_at_location}</td>
+                        <td className="px-5 py-3 text-xs" style={{ color: "var(--color-text-muted)" }}>{pl.notes ?? "—"}</td>
                       </tr>
                     ))}
                   </tbody>

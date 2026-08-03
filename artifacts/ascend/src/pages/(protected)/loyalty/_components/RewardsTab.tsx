@@ -14,8 +14,8 @@ const REWARD_STATUS_BADGE: Record<LoyaltyRewardStatus, "green" | "yellow" | "gra
 };
 
 const inputCls =
-  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
-const labelCls = "mb-1 block text-sm font-medium text-slate-700";
+  "w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+const labelCls = "mb-1 block text-sm font-medium";
 
 // ── RewardModal ────────────────────────────────────────────────────────────────
 
@@ -61,38 +61,39 @@ function RewardModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="flex w-full max-w-md flex-col rounded-xl bg-white shadow-xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-950">{reward ? "Edit Reward" : "New Reward"}</h2>
-          <button type="button" onClick={onClose} className="text-xl leading-none text-slate-400 hover:text-slate-600">&times;</button>
+      <div className="flex w-full max-w-md flex-col rounded-xl shadow-xl" style={{ backgroundColor: "var(--color-surface)" }} onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>{reward ? "Edit Reward" : "New Reward"}</h2>
+          <button type="button" onClick={onClose} className="text-xl leading-none" style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
         <form id="reward-form" onSubmit={handleSubmit} className="space-y-4 px-5 py-4">
           {err && <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>}
           <div>
-            <label className={labelCls}>Reward name <span className="text-red-500">*</span></label>
-            <input className={inputCls} value={name} onChange={e => setName(e.target.value)} required placeholder="e.g. $10 Off Next Purchase" />
+            <label className={labelCls} style={{ color: "var(--color-text-secondary)" }}>Reward name <span className="text-red-500">*</span></label>
+            <input className={inputCls} style={{ borderColor: "var(--color-border)" }} value={name} onChange={e => setName(e.target.value)} required placeholder="e.g. $10 Off Next Purchase" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelCls}>Points cost <span className="text-red-500">*</span></label>
-              <input className={inputCls} type="number" min="1"
+              <label className={labelCls} style={{ color: "var(--color-text-secondary)" }}>Points cost <span className="text-red-500">*</span></label>
+              <input className={inputCls} style={{ borderColor: "var(--color-border)" }} type="number" min="1"
                 value={pointsCost} onChange={e => setPointsCost(e.target.value)} required />
             </div>
             <div>
-              <label className={labelCls}>Discount value ($)</label>
-              <input className={inputCls} type="number" min="0" step="0.01"
+              <label className={labelCls} style={{ color: "var(--color-text-secondary)" }}>Discount value ($)</label>
+              <input className={inputCls} style={{ borderColor: "var(--color-border)" }} type="number" min="0" step="0.01"
                 value={discountDollars} onChange={e => setDiscountDollars(e.target.value)} placeholder="0.00" />
             </div>
           </div>
           <div>
-            <label className={labelCls}>Description <span className="font-normal text-slate-400">(optional)</span></label>
-            <textarea className={`${inputCls} resize-none`} rows={2} value={description}
+            <label className={labelCls} style={{ color: "var(--color-text-secondary)" }}>Description <span className="font-normal" style={{ color: "var(--color-text-muted)" }}>(optional)</span></label>
+            <textarea className={`${inputCls} resize-none`} style={{ borderColor: "var(--color-border)" }} rows={2} value={description}
               onChange={e => setDescription(e.target.value)} placeholder="What the member receives" />
           </div>
         </form>
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+        <div className="flex justify-end gap-2 px-5 py-3" style={{ borderTop: "1px solid var(--color-border)" }}>
           <button type="button" onClick={onClose}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            className="rounded-lg px-4 py-2 text-sm font-medium hover:bg-[var(--color-surface-subtle)]"
+            style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
             Cancel
           </button>
           <button type="submit" form="reward-form" disabled={saving}
@@ -152,14 +153,15 @@ export function RewardsTab() {
   return (
     <>
       <Card className="overflow-hidden p-0">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
           <div className="flex items-center gap-3">
             <div>
-              <h2 className="text-base font-semibold text-slate-950">Rewards Catalogue</h2>
-              <p className="text-sm text-slate-500">{activeCount} active rewards</p>
+              <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Rewards Catalogue</h2>
+              <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>{activeCount} active rewards</p>
             </div>
             <select
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ border: "1px solid var(--color-border)" }}
               value={filterStatus}
               onChange={e => setFilterStatus(e.target.value as LoyaltyRewardStatus | "all")}>
               <option value="all">All statuses</option>
@@ -184,7 +186,7 @@ export function RewardsTab() {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <tr className="border-b text-left text-xs font-semibold uppercase tracking-wide" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
                 <th className="px-4 py-3">Reward</th>
                 <th className="px-4 py-3 text-right">Points cost</th>
                 <th className="px-4 py-3 text-right">Value</th>
@@ -193,20 +195,20 @@ export function RewardsTab() {
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[var(--color-table-border)]">
               {rewards.map(r => (
-                <tr key={r.id} className="transition-colors hover:bg-slate-50">
+                <tr key={r.id} className="transition-colors hover:bg-[var(--color-table-row-hover)]">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-slate-950">{r.name}</p>
-                    {r.description && <p className="text-xs text-slate-400">{r.description}</p>}
+                    <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{r.name}</p>
+                    {r.description && <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{r.description}</p>}
                   </td>
-                  <td className="px-4 py-3 text-right font-medium tabular-nums text-slate-950">
+                  <td className="px-4 py-3 text-right font-medium tabular-nums" style={{ color: "var(--color-text-primary)" }}>
                     {r.points_cost.toLocaleString()} pts
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-slate-700">
+                  <td className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--color-text-secondary)" }}>
                     {r.discount_cents > 0 ? formatMoney(r.discount_cents) : "—"}
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-slate-500">
+                  <td className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--color-text-muted)" }}>
                     {r.redemption_count.toLocaleString()}×
                   </td>
                   <td className="px-4 py-3">
@@ -217,11 +219,13 @@ export function RewardsTab() {
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
                       <button onClick={() => handleToggle(r)}
-                        className="rounded border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100">
+                        className="rounded px-2 py-1 text-xs font-medium hover:bg-[var(--color-surface-subtle)]"
+                        style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
                         {r.status === "active" ? "Deactivate" : "Activate"}
                       </button>
                       <button onClick={() => setEditReward(r)}
-                        className="rounded border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100">
+                        className="rounded px-2 py-1 text-xs font-medium hover:bg-[var(--color-surface-subtle)]"
+                        style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
                         Edit
                       </button>
                       <button onClick={() => handleArchive(r)}

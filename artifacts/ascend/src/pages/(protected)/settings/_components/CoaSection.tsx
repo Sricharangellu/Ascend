@@ -52,19 +52,19 @@ export function CoaSection({ canManage }: { canManage: boolean }) {
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
         <div>
-          <h2 className="text-base font-semibold text-slate-950">Chart of Accounts</h2>
-          <p className="text-sm text-slate-500">General ledger accounts grouped by type.</p>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Chart of Accounts</h2>
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>General ledger accounts grouped by type.</p>
         </div>
         {canManage && !showAdd && <Button variant="primary" size="sm" onClick={() => setShowAdd(true)}>Add account</Button>}
       </div>
       {showAdd && canManage && (
-        <div className="border-b border-slate-200 bg-slate-50 px-4 py-4">
+        <div className="px-4 py-4" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
           <div className="flex flex-wrap gap-3">
-            <input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder="Code (e.g. 1000)" className="w-28 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
-            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Account name" className="flex-1 min-w-40 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950" />
-            <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950">
+            <input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder="Code (e.g. 1000)" className="w-28 rounded-md px-3 py-2 text-sm outline-none" style={{ border: "1px solid var(--color-border)" }} />
+            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Account name" className="flex-1 min-w-40 rounded-md px-3 py-2 text-sm outline-none" style={{ border: "1px solid var(--color-border)" }} />
+            <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} className="rounded-md px-3 py-2 text-sm outline-none" style={{ border: "1px solid var(--color-border)" }}>
               <option value="asset">Asset</option>
               <option value="liability">Liability</option>
               <option value="income">Income</option>
@@ -78,23 +78,23 @@ export function CoaSection({ canManage }: { canManage: boolean }) {
         </div>
       )}
       {loading ? (
-        <div className="px-4 py-8 text-center text-sm text-slate-400">Loading accounts…</div>
+        <div className="px-4 py-8 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>Loading accounts…</div>
       ) : accounts.length === 0 ? (
-        <div className="px-4 py-8 text-center text-sm text-slate-400">No accounts yet. Add your first account above.</div>
+        <div className="px-4 py-8 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No accounts yet. Add your first account above.</div>
       ) : (
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-[var(--color-table-border)]">
           {Object.entries(grouped).filter(([, rows]) => rows.length > 0).map(([type, rows]) => (
             <div key={type}>
-              <div className="bg-slate-50 px-4 py-2">
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{type}</span>
+              <div className="px-4 py-2" style={{ backgroundColor: "var(--color-table-header)" }}>
+                <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>{type}</span>
               </div>
               <table className="w-full text-sm">
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-[var(--color-table-border)]">
                   {rows.sort((a, b) => a.code.localeCompare(b.code)).map(account => (
-                    <tr key={account.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 w-24"><span className="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded">{account.code}</span></td>
-                      <td className="px-4 py-3 font-medium text-slate-900">{account.name}</td>
-                      <td className="px-4 py-3 text-slate-500 capitalize">{account.type}</td>
+                    <tr key={account.id} className="hover:bg-[var(--color-surface-subtle)]">
+                      <td className="px-4 py-3 w-24"><span className="font-mono text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--color-surface-subtle)" }}>{account.code}</span></td>
+                      <td className="px-4 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{account.name}</td>
+                      <td className="px-4 py-3 capitalize" style={{ color: "var(--color-text-muted)" }}>{account.type}</td>
                     </tr>
                   ))}
                 </tbody>

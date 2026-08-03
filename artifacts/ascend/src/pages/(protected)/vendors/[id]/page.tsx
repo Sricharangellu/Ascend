@@ -115,18 +115,18 @@ function useVendorSub<T>(vendorId: string, path: string, enabled: boolean) {
 
 function ProfileTab({ vendor }: { vendor: Vendor }) {
   const infoRow = (label: string, value: React.ReactNode) => (
-    <div className="flex items-start gap-2 py-2.5 border-b border-slate-100 last:border-0">
-      <span className="w-40 shrink-0 text-xs text-slate-400">{label}</span>
-      <span className="text-sm text-slate-900">{value ?? <span className="text-slate-300">—</span>}</span>
+    <div className="flex items-start gap-2 py-2.5 border-b last:border-0" style={{ borderColor: "var(--color-border)" }}>
+      <span className="w-40 shrink-0 text-xs" style={{ color: "var(--color-text-muted)" }}>{label}</span>
+      <span className="text-sm" style={{ color: "var(--color-text-primary)" }}>{value ?? <span style={{ color: "var(--color-text-muted)" }}>—</span>}</span>
     </div>
   );
 
   const perfMetric = (label: string, value: number, good: number, bad: number, suffix = "%") => {
     const color = value >= good ? "text-emerald-700" : value >= bad ? "text-amber-600" : "text-red-600";
     return (
-      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-center shadow-sm">
+      <div className="rounded-xl border px-4 py-3 text-center shadow-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         <p className={`text-xl font-black ${color}`}>{value}{suffix}</p>
-        <p className="mt-0.5 text-[11px] text-slate-400">{label}</p>
+        <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-muted)" }}>{label}</p>
       </div>
     );
   };
@@ -137,22 +137,22 @@ function ProfileTab({ vendor }: { vendor: Vendor }) {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {perfMetric("On-time delivery", vendor.on_time_delivery_pct, 90, 75)}
         {perfMetric("Fill rate", vendor.fill_rate_pct, 95, 80)}
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-center shadow-sm">
+        <div className="rounded-xl border px-4 py-3 text-center shadow-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
           <p className={`text-xl font-black ${vendor.dispute_rate_pct <= 2 ? "text-emerald-700" : vendor.dispute_rate_pct <= 5 ? "text-amber-600" : "text-red-600"}`}>
             {vendor.dispute_rate_pct}%
           </p>
-          <p className="mt-0.5 text-[11px] text-slate-400">Dispute rate</p>
+          <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-muted)" }}>Dispute rate</p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-center shadow-sm">
-          <p className="text-xl font-black text-slate-900">{vendor.lead_time_days ?? "—"} <span className="text-sm font-normal text-slate-400">days</span></p>
-          <p className="mt-0.5 text-[11px] text-slate-400">Lead time</p>
+        <div className="rounded-xl border px-4 py-3 text-center shadow-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+          <p className="text-xl font-black" style={{ color: "var(--color-text-primary)" }}>{vendor.lead_time_days ?? "—"} <span className="text-sm font-normal" style={{ color: "var(--color-text-muted)" }}>days</span></p>
+          <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-muted)" }}>Lead time</p>
         </div>
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2">
         {/* Contact */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Contact</h3>
+        <div className="rounded-xl border p-5 shadow-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Contact</h3>
           {infoRow("Company", vendor.company ?? vendor.name)}
           {infoRow("DBA", vendor.dba)}
           {infoRow("Contact", vendor.contact_name)}
@@ -163,8 +163,8 @@ function ProfileTab({ vendor }: { vendor: Vendor }) {
         </div>
 
         {/* Commercial */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Commercial Terms</h3>
+        <div className="rounded-xl border p-5 shadow-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Commercial Terms</h3>
           {infoRow("Vendor type", vendor.vendor_type ? <span className="capitalize">{vendor.vendor_type}</span> : null)}
           {infoRow("MSA type", vendor.msa_type ? <span className="capitalize">{vendor.msa_type}</span> : null)}
           {infoRow("Payment terms", vendor.terms_days != null ? `Net ${vendor.terms_days}` : null)}
@@ -176,8 +176,8 @@ function ProfileTab({ vendor }: { vendor: Vendor }) {
       </div>
 
       {/* Financials */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Financial summary</h3>
+      <div className="rounded-xl border p-5 shadow-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Financial summary</h3>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
             { label: "Total spend",    value: formatMoney(vendor.totalSpentCents), color: "text-slate-900" },
@@ -185,8 +185,8 @@ function ProfileTab({ vendor }: { vendor: Vendor }) {
             { label: "Avg PO value",   value: formatMoney(vendor.avg_po_value_cents), color: "text-slate-900" },
             { label: "Open credits",   value: formatMoney(vendor.openCreditsCents),  color: vendor.openCreditsCents > 0 ? "text-emerald-700" : "text-slate-400" },
           ].map(({ label, value, color }) => (
-            <div key={label} className="rounded-lg bg-slate-50 px-3 py-2.5">
-              <p className="text-[11px] text-slate-400">{label}</p>
+            <div key={label} className="rounded-lg px-3 py-2.5" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
+              <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{label}</p>
               <p className={`mt-0.5 text-base font-bold ${color}`}>{value}</p>
             </div>
           ))}
@@ -208,33 +208,33 @@ function ProductsTab({ vendorId }: { vendorId: string }) {
   const router = useRouter();
   const { data: products, loading, error } = useVendorSub<VendorProduct>(vendorId, "products", true);
 
-  if (loading) return <div className="space-y-2">{[1,2,3].map((i) => <div key={i} className="h-14 animate-pulse rounded-lg bg-slate-100" />)}</div>;
+  if (loading) return <div className="space-y-2">{[1,2,3].map((i) => <div key={i} className="h-14 animate-skeleton rounded-lg" />)}</div>;
   if (error) return <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>;
   if (products.length === 0) return (
-    <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400">
+    <div className="rounded-xl border border-dashed py-12 text-center text-sm" style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>
       No products linked to this vendor.
     </div>
   );
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border shadow-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
       <table className="w-full text-sm">
-        <thead className="border-b border-slate-200 bg-slate-50">
+        <thead className="border-b" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
           <tr className="text-left">
-            <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Product</th>
-            <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Vendor SKU</th>
-            <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-right">Cost</th>
-            <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-right">Retail</th>
-            <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-right">Margin</th>
-            <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-right">MOQ</th>
-            <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-right">Lead</th>
-            <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Last ordered</th>
+            <th className="px-5 py-2.5 text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Product</th>
+            <th className="px-5 py-2.5 text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Vendor SKU</th>
+            <th className="px-5 py-2.5 text-xs font-semibold text-right" style={{ color: "var(--color-text-muted)" }}>Cost</th>
+            <th className="px-5 py-2.5 text-xs font-semibold text-right" style={{ color: "var(--color-text-muted)" }}>Retail</th>
+            <th className="px-5 py-2.5 text-xs font-semibold text-right" style={{ color: "var(--color-text-muted)" }}>Margin</th>
+            <th className="px-5 py-2.5 text-xs font-semibold text-right" style={{ color: "var(--color-text-muted)" }}>MOQ</th>
+            <th className="px-5 py-2.5 text-xs font-semibold text-right" style={{ color: "var(--color-text-muted)" }}>Lead</th>
+            <th className="px-5 py-2.5 text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Last ordered</th>
             <th className="px-5 py-2.5" />
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-[var(--color-table-border)]">
           {products.map((p) => (
-            <tr key={p.id} className="group hover:bg-slate-50 transition-colors">
+            <tr key={p.id} className="group hover:bg-[var(--color-surface-subtle)] transition-colors">
               <td className="px-5 py-3.5">
                 <div className="flex items-center gap-2">
                   {p.is_preferred && <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-blue-700">Preferred</span>}
@@ -243,29 +243,30 @@ function ProductsTab({ vendorId }: { vendorId: string }) {
                     {p.product_name}
                   </button>
                 </div>
-                <p className="mt-0.5 text-[11px] text-slate-400">{p.sku}</p>
+                <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-muted)" }}>{p.sku}</p>
               </td>
-              <td className="px-5 py-3.5 text-xs font-mono text-slate-500">{p.vendor_sku ?? "—"}</td>
+              <td className="px-5 py-3.5 text-xs font-mono" style={{ color: "var(--color-text-muted)" }}>{p.vendor_sku ?? "—"}</td>
               <td className="px-5 py-3.5 text-right">
-                <span className="text-sm font-semibold text-slate-900">{formatMoney(p.cost_cents)}</span>
+                <span className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(p.cost_cents)}</span>
                 {p.cost_cents !== p.last_cost_cents && (
                   <span className={`ml-1 text-[10px] ${p.cost_cents > p.last_cost_cents ? "text-red-500" : "text-emerald-600"}`}>
                     {p.cost_cents > p.last_cost_cents ? "↑" : "↓"}
                   </span>
                 )}
               </td>
-              <td className="px-5 py-3.5 text-right text-sm text-slate-700">{formatMoney(p.retail_price_cents)}</td>
+              <td className="px-5 py-3.5 text-right text-sm" style={{ color: "var(--color-text-secondary)" }}>{formatMoney(p.retail_price_cents)}</td>
               <td className="px-5 py-3.5 text-right">
                 <span className={`text-xs font-semibold ${p.margin_pct >= 35 ? "text-emerald-700" : p.margin_pct >= 20 ? "text-amber-600" : "text-red-600"}`}>
                   {p.margin_pct.toFixed(1)}%
                 </span>
               </td>
-              <td className="px-5 py-3.5 text-right text-xs text-slate-600">{p.moq ?? "—"}</td>
-              <td className="px-5 py-3.5 text-right text-xs text-slate-600">{p.lead_time_days != null ? `${p.lead_time_days}d` : "—"}</td>
-              <td className="px-5 py-3.5 text-xs text-slate-500">{p.last_ordered_at ? fmtDate(p.last_ordered_at) : "—"}</td>
+              <td className="px-5 py-3.5 text-right text-xs" style={{ color: "var(--color-text-secondary)" }}>{p.moq ?? "—"}</td>
+              <td className="px-5 py-3.5 text-right text-xs" style={{ color: "var(--color-text-secondary)" }}>{p.lead_time_days != null ? `${p.lead_time_days}d` : "—"}</td>
+              <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{p.last_ordered_at ? fmtDate(p.last_ordered_at) : "—"}</td>
               <td className="px-5 py-3.5">
                 <button type="button" onClick={() => router.push(`/purchasing/new?supplier=${vendorId}&product=${p.product_id}`)}
-                  className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 opacity-0 group-hover:opacity-100 hover:bg-slate-50 transition-all whitespace-nowrap">
+                  className="rounded-md border px-2.5 py-1 text-xs font-medium opacity-0 group-hover:opacity-100 hover:bg-[var(--color-surface-subtle)] transition-all whitespace-nowrap"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
                   Create PO
                 </button>
               </td>
@@ -281,10 +282,10 @@ function PurchaseOrdersTab({ vendorId }: { vendorId: string }) {
   const router = useRouter();
   const { data: pos, loading, error } = useVendorSub<VendorPO>(vendorId, "purchase-orders", true);
 
-  if (loading) return <div className="space-y-2">{[1,2,3].map((i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-slate-100" />)}</div>;
+  if (loading) return <div className="space-y-2">{[1,2,3].map((i) => <div key={i} className="h-12 animate-skeleton rounded-lg" />)}</div>;
   if (error) return <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>;
   if (pos.length === 0) return (
-    <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400">
+    <div className="rounded-xl border border-dashed py-12 text-center text-sm" style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>
       No purchase orders for this vendor.
       <button type="button" onClick={() => router.push(`/purchasing/new?supplier=${vendorId}`)}
         className="mt-2 block mx-auto text-sm text-brand-600 hover:underline">Create PO</button>
@@ -295,23 +296,23 @@ function PurchaseOrdersTab({ vendorId }: { vendorId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border shadow-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         <table className="w-full text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50">
+          <thead className="border-b" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
             <tr className="text-left">
-              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">PO #</th>
-              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Status</th>
-              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Lines</th>
-              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-right">Total</th>
-              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Created</th>
-              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Received</th>
+              <th className="px-5 py-2.5 text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>PO #</th>
+              <th className="px-5 py-2.5 text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Status</th>
+              <th className="px-5 py-2.5 text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Lines</th>
+              <th className="px-5 py-2.5 text-xs font-semibold text-right" style={{ color: "var(--color-text-muted)" }}>Total</th>
+              <th className="px-5 py-2.5 text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Created</th>
+              <th className="px-5 py-2.5 text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Received</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-[var(--color-table-border)]">
             {pos.map((po) => {
               const st = PO_STATUS_STYLES[po.status] ?? PO_STATUS_STYLES.draft;
               return (
-                <tr key={po.id} className="group cursor-pointer hover:bg-slate-50 transition-colors"
+                <tr key={po.id} className="group cursor-pointer hover:bg-[var(--color-surface-subtle)] transition-colors"
                   onClick={() => router.push(`/purchasing/${po.id}`)}>
                   <td className="px-5 py-3.5">
                     <span className="text-sm font-semibold text-brand-600">{po.po_number}</span>
@@ -321,21 +322,21 @@ function PurchaseOrdersTab({ vendorId }: { vendorId: string }) {
                       {po.status}
                     </span>
                     {po.receive_status !== po.status && po.receive_status && (
-                      <span className="ml-1.5 text-[10px] text-slate-400 capitalize">{po.receive_status}</span>
+                      <span className="ml-1.5 text-[10px] capitalize" style={{ color: "var(--color-text-muted)" }}>{po.receive_status}</span>
                     )}
                   </td>
-                  <td className="px-5 py-3.5 text-xs text-slate-600">{po.line_count} line{po.line_count !== 1 ? "s" : ""}</td>
-                  <td className="px-5 py-3.5 text-right font-semibold text-slate-900">{formatMoney(po.total_cost_cents)}</td>
-                  <td className="px-5 py-3.5 text-xs text-slate-500">{fmtDate(po.created_at)}</td>
-                  <td className="px-5 py-3.5 text-xs text-slate-500">{po.received_at ? fmtDate(po.received_at) : "—"}</td>
+                  <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-secondary)" }}>{po.line_count} line{po.line_count !== 1 ? "s" : ""}</td>
+                  <td className="px-5 py-3.5 text-right font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(po.total_cost_cents)}</td>
+                  <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDate(po.created_at)}</td>
+                  <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{po.received_at ? fmtDate(po.received_at) : "—"}</td>
                 </tr>
               );
             })}
           </tbody>
-          <tfoot className="border-t border-slate-200 bg-slate-50">
+          <tfoot className="border-t" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
             <tr>
-              <td colSpan={3} className="px-5 py-2.5 text-xs text-slate-400">{pos.length} POs</td>
-              <td className="px-5 py-2.5 text-right text-sm font-bold text-slate-900">{formatMoney(totalSpend)}</td>
+              <td colSpan={3} className="px-5 py-2.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{pos.length} POs</td>
+              <td className="px-5 py-2.5 text-right text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(totalSpend)}</td>
               <td colSpan={2} />
             </tr>
           </tfoot>
@@ -355,10 +356,10 @@ function InvoicesTab({ vendorId }: { vendorId: string }) {
   const router = useRouter();
   const { data: invoices, loading, error } = useVendorSub<VendorInvoice>(vendorId, "invoices", true);
 
-  if (loading) return <div className="space-y-2">{[1,2].map((i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-slate-100" />)}</div>;
+  if (loading) return <div className="space-y-2">{[1,2].map((i) => <div key={i} className="h-12 animate-skeleton rounded-lg" />)}</div>;
   if (error) return <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>;
   if (invoices.length === 0) return (
-    <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400">
+    <div className="rounded-xl border border-dashed py-12 text-center text-sm" style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>
       No invoices on record.
     </div>
   );
@@ -375,50 +376,50 @@ function InvoicesTab({ vendorId }: { vendorId: string }) {
           <span><strong>{formatMoney(totalOwed)}</strong> outstanding balance across {invoices.filter((i) => i.status !== "void" && i.status !== "paid").length} invoice{invoices.length !== 1 ? "s" : ""}</span>
         </div>
       )}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border shadow-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         <table className="w-full text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50">
+          <thead className="border-b" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
             <tr className="text-left">
-              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Invoice #</th>
-              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">PO</th>
-              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Status</th>
-              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-right">Total</th>
-              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-right">Paid</th>
-              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-right">Balance</th>
-              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Due date</th>
-              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500">Issued</th>
+              <th className="px-5 py-2.5 text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Invoice #</th>
+              <th className="px-5 py-2.5 text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>PO</th>
+              <th className="px-5 py-2.5 text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Status</th>
+              <th className="px-5 py-2.5 text-xs font-semibold text-right" style={{ color: "var(--color-text-muted)" }}>Total</th>
+              <th className="px-5 py-2.5 text-xs font-semibold text-right" style={{ color: "var(--color-text-muted)" }}>Paid</th>
+              <th className="px-5 py-2.5 text-xs font-semibold text-right" style={{ color: "var(--color-text-muted)" }}>Balance</th>
+              <th className="px-5 py-2.5 text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Due date</th>
+              <th className="px-5 py-2.5 text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Issued</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-[var(--color-table-border)]">
             {invoices.map((inv) => {
               const st = INVOICE_STATUS_STYLES[inv.status] ?? INVOICE_STATUS_STYLES.open;
               const balance = inv.total_cents - inv.paid_cents;
               const isOverdue = inv.status !== "paid" && inv.status !== "void" && inv.due_date < Date.now();
               return (
-                <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-5 py-3.5 text-sm font-mono font-medium text-slate-900">{inv.bill_number}</td>
+                <tr key={inv.id} className="hover:bg-[var(--color-surface-subtle)] transition-colors">
+                  <td className="px-5 py-3.5 text-sm font-mono font-medium" style={{ color: "var(--color-text-primary)" }}>{inv.bill_number}</td>
                   <td className="px-5 py-3.5">
                     {inv.po_number ? (
                       <button type="button" onClick={() => router.push(`/purchasing/${inv.po_id}`)}
                         className="text-xs text-brand-600 hover:underline">{inv.po_number}</button>
-                    ) : <span className="text-xs text-slate-300">—</span>}
+                    ) : <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>—</span>}
                   </td>
                   <td className="px-5 py-3.5">
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${st.bg} ${st.text}`}>{st.label}</span>
                   </td>
-                  <td className="px-5 py-3.5 text-right font-semibold text-slate-900">{formatMoney(inv.total_cents)}</td>
-                  <td className="px-5 py-3.5 text-right text-xs text-slate-600">{inv.paid_cents > 0 ? formatMoney(inv.paid_cents) : "—"}</td>
+                  <td className="px-5 py-3.5 text-right font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(inv.total_cents)}</td>
+                  <td className="px-5 py-3.5 text-right text-xs" style={{ color: "var(--color-text-secondary)" }}>{inv.paid_cents > 0 ? formatMoney(inv.paid_cents) : "—"}</td>
                   <td className="px-5 py-3.5 text-right">
                     {balance > 0 ? (
                       <span className={`text-sm font-bold ${isOverdue ? "text-red-600" : "text-amber-700"}`}>{formatMoney(balance)}</span>
-                    ) : <span className="text-xs text-slate-300">—</span>}
+                    ) : <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>—</span>}
                   </td>
                   <td className="px-5 py-3.5 text-xs">
-                    <span className={isOverdue ? "font-semibold text-red-600" : "text-slate-500"}>
+                    <span className={isOverdue ? "font-semibold text-red-600" : ""} style={!isOverdue ? { color: "var(--color-text-muted)" } : {}}>
                       {fmtDate(inv.due_date)}{isOverdue ? " ⚠" : ""}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 text-xs text-slate-400">{fmtDate(inv.issued_at)}</td>
+                  <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDate(inv.issued_at)}</td>
                 </tr>
               );
             })}
@@ -432,10 +433,10 @@ function InvoicesTab({ vendorId }: { vendorId: string }) {
 function CreditsTab({ vendorId }: { vendorId: string }) {
   const { data: credits, loading, error } = useVendorSub<VendorCredit>(vendorId, "credits", true);
 
-  if (loading) return <div className="space-y-2">{[1,2].map((i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-slate-100" />)}</div>;
+  if (loading) return <div className="space-y-2">{[1,2].map((i) => <div key={i} className="h-12 animate-skeleton rounded-lg" />)}</div>;
   if (error) return <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>;
   if (credits.length === 0) return (
-    <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400">No credits on record.</div>
+    <div className="rounded-xl border border-dashed py-12 text-center text-sm" style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>No credits on record.</div>
   );
 
   const openBalance = credits.filter((c) => c.status === "open").reduce((s, c) => s + c.amount_cents, 0);
@@ -451,17 +452,17 @@ function CreditsTab({ vendorId }: { vendorId: string }) {
         {credits.map((c) => {
           const st = CREDIT_STATUS_STYLES[c.status] ?? CREDIT_STATUS_STYLES.open;
           return (
-            <div key={c.id} className="flex items-start justify-between rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+            <div key={c.id} className="flex items-start justify-between rounded-xl border px-5 py-4 shadow-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
               <div>
                 <div className="flex items-center gap-2">
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold capitalize ${st.bg} ${st.text}`}>{c.status}</span>
-                  <span className="text-sm font-semibold capitalize text-slate-900">{c.type.replace(/_/g, " ")}</span>
+                  <span className="text-sm font-semibold capitalize" style={{ color: "var(--color-text-primary)" }}>{c.type.replace(/_/g, " ")}</span>
                 </div>
-                <p className="mt-0.5 text-xs text-slate-500">{c.reason ?? "No reason provided"}</p>
-                {c.po_number && <p className="mt-0.5 text-[11px] text-slate-400">PO: {c.po_number}</p>}
-                <p className="mt-0.5 text-[11px] text-slate-300">{fmtDateTime(c.created_at)}</p>
+                <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{c.reason ?? "No reason provided"}</p>
+                {c.po_number && <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-muted)" }}>PO: {c.po_number}</p>}
+                <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-muted)" }}>{fmtDateTime(c.created_at)}</p>
               </div>
-              <span className="text-base font-black text-slate-900">{formatMoney(c.amount_cents)}</span>
+              <span className="text-base font-black" style={{ color: "var(--color-text-primary)" }}>{formatMoney(c.amount_cents)}</span>
             </div>
           );
         })}
@@ -474,10 +475,10 @@ function ReceivingTab({ vendorId }: { vendorId: string }) {
   const router = useRouter();
   const { data: events, loading, error } = useVendorSub<ReceivingEvent>(vendorId, "receiving", true);
 
-  if (loading) return <div className="space-y-2">{[1,2].map((i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-slate-100" />)}</div>;
+  if (loading) return <div className="space-y-2">{[1,2].map((i) => <div key={i} className="h-16 animate-skeleton rounded-lg" />)}</div>;
   if (error) return <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>;
   if (events.length === 0) return (
-    <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400">No receiving history.</div>
+    <div className="rounded-xl border border-dashed py-12 text-center text-sm" style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>No receiving history.</div>
   );
 
   return (
@@ -485,7 +486,8 @@ function ReceivingTab({ vendorId }: { vendorId: string }) {
       {events.map((ev) => {
         const hasIssues = ev.short_qty > 0 || ev.damage_qty > 0;
         return (
-          <div key={ev.id} className={`rounded-xl border bg-white px-5 py-4 shadow-sm ${hasIssues ? "border-amber-200" : "border-slate-200"}`}>
+          <div key={ev.id} className={`rounded-xl border px-5 py-4 shadow-sm`}
+            style={{ borderColor: hasIssues ? undefined : "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
@@ -493,11 +495,11 @@ function ReceivingTab({ vendorId }: { vendorId: string }) {
                     className="text-sm font-semibold text-brand-600 hover:underline">{ev.po_number}</button>
                   {hasIssues && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Issues</span>}
                 </div>
-                <p className="mt-0.5 text-xs text-slate-400">Received by {ev.received_by} · {fmtDateTime(ev.received_at)}</p>
+                <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>Received by {ev.received_by} · {fmtDateTime(ev.received_at)}</p>
               </div>
               <div className="text-right">
-                <p className="text-sm font-bold text-slate-900">{ev.qty_received} / {ev.qty_ordered}</p>
-                <p className="text-[11px] text-slate-400">received / ordered</p>
+                <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>{ev.qty_received} / {ev.qty_ordered}</p>
+                <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>received / ordered</p>
               </div>
             </div>
             {hasIssues && (
@@ -514,7 +516,7 @@ function ReceivingTab({ vendorId }: { vendorId: string }) {
                 )}
               </div>
             )}
-            {ev.notes && <p className="mt-2 text-xs text-slate-600 italic">{ev.notes}</p>}
+            {ev.notes && <p className="mt-2 text-xs italic" style={{ color: "var(--color-text-secondary)" }}>{ev.notes}</p>}
           </div>
         );
       })}
@@ -549,7 +551,7 @@ export default function VendorDetailPage() {
     return (
       <EnterpriseShell active="vendors" title="Vendor" subtitle="Loading…" contentClassName="overflow-y-auto">
         <div className="mx-auto max-w-4xl space-y-4 px-4 py-5 sm:px-6">
-          {[1,2,3].map((i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-100" />)}
+          {[1,2,3].map((i) => <div key={i} className="h-24 animate-skeleton rounded-xl" />)}
         </div>
       </EnterpriseShell>
     );
@@ -574,7 +576,8 @@ export default function VendorDetailPage() {
 
         {/* Back */}
         <button type="button" onClick={() => router.push("/vendors")}
-          className="mb-4 flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900">
+          className="mb-4 flex items-center gap-1 text-sm hover:text-[var(--color-text-primary)]"
+          style={{ color: "var(--color-text-muted)" }}>
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 19l-7-7 7-7"/>
           </svg>
@@ -585,13 +588,14 @@ export default function VendorDetailPage() {
         <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
           <div className="flex flex-col gap-1.5">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-bold text-slate-900">{vendor.name}</h1>
+              <h1 className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>{vendor.name}</h1>
               <Badge variant={vendor.status === "active" ? "green" : "gray"}>{vendor.status}</Badge>
               {vendor.vendor_type && (
-                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 capitalize">{vendor.vendor_type}</span>
+                <span className="rounded-full px-2.5 py-0.5 text-xs font-medium capitalize"
+                  style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>{vendor.vendor_type}</span>
               )}
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
               {vendor.contact_name && <span>👤 {vendor.contact_name}</span>}
               {vendor.email && <a href={`mailto:${vendor.email}`} className="text-brand-600 hover:underline">{vendor.email}</a>}
               {vendor.city && <span>📍 {vendor.city}, {vendor.state}</span>}
@@ -614,8 +618,8 @@ export default function VendorDetailPage() {
             { label: "Open credits",  value: formatMoney(vendor.openCreditsCents), color: vendor.openCreditsCents > 0 ? "text-emerald-700" : "text-slate-400" },
             { label: "Lead time",     value: vendor.lead_time_days != null ? `${vendor.lead_time_days} days` : "—", color: "text-slate-900" },
           ].map(({ label, value, color }) => (
-            <div key={label} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-              <p className="text-[11px] text-slate-400">{label}</p>
+            <div key={label} className="rounded-xl border px-4 py-3 shadow-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+              <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{label}</p>
               <p className={`mt-0.5 text-base font-bold ${color}`}>{value}</p>
             </div>
           ))}
@@ -623,14 +627,15 @@ export default function VendorDetailPage() {
 
         {/* Tabs */}
         <div className="-mx-1 mb-5 overflow-x-auto">
-          <div className="flex min-w-max gap-0 border-b border-slate-200 px-1">
+          <div className="flex min-w-max gap-0 border-b px-1" style={{ borderColor: "var(--color-border)" }}>
             {TABS.map(({ key, label }) => (
               <button key={key} type="button" onClick={() => setActiveTab(key)}
                 className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
                   activeTab === key
                     ? "border-b-2 border-brand-600 text-brand-600"
-                    : "border-b-2 border-transparent text-slate-500 hover:text-slate-800"
-                }`}>
+                    : "border-b-2 border-transparent hover:text-[var(--color-text-primary)]"
+                }`}
+                style={activeTab !== key ? { color: "var(--color-text-muted)" } : {}}>
                 {label}
               </button>
             ))}

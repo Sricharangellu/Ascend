@@ -30,7 +30,7 @@ export default function EdiImportsPage() {
     >
       <div className="mx-auto w-full max-w-5xl space-y-5 px-4 py-5 sm:px-6">
         {/* Tab bar */}
-        <div className="border-b border-slate-200">
+        <div className="border-b" style={{ borderColor: "var(--color-border)" }}>
           <nav className="-mb-px flex gap-1" aria-label="EDI tabs">
             {TABS.map((t) => (
               <button
@@ -41,8 +41,9 @@ export default function EdiImportsPage() {
                   "whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
                   tab === t.key
                     ? "border-blue-600 text-blue-600"
-                    : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700",
+                    : "border-transparent hover:border-slate-300",
                 ].join(" ")}
+                style={tab === t.key ? undefined : { color: "var(--color-text-muted)" }}
                 aria-selected={tab === t.key}
                 role="tab"
               >

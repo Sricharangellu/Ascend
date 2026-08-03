@@ -49,15 +49,21 @@ export function TransfersTab() {
 
   const totalQty = useMemo(() => transfers.reduce((s, t) => s + t.qty, 0), [transfers]);
 
+  const ctrlCls = "w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600";
+  const ctrlStyle = {
+    borderColor: "var(--color-border)",
+    backgroundColor: "var(--color-surface)",
+    color: "var(--color-text-primary)",
+  };
+
   return (
     <>
       {/* Filter bar */}
-      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="rounded-lg border shadow-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         <div className="flex flex-wrap items-end gap-3 px-4 py-4">
           <div className="w-36">
-            <label className="mb-1 block text-xs font-medium text-slate-500">Show</label>
-            <select value={show} onChange={(e) => setShow(e.target.value)}
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600">
+            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Show</label>
+            <select value={show} onChange={(e) => setShow(e.target.value)} className={ctrlCls} style={ctrlStyle}>
               <option value="All">All transfers</option>
               <option value="pending">Pending</option>
               <option value="in_transit">In transit</option>
@@ -65,15 +71,14 @@ export function TransfersTab() {
             </select>
           </div>
           <div className="min-w-[160px] flex-1">
-            <label className="mb-1 block text-xs font-medium text-slate-500">Search</label>
+            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Search</label>
             <input type="search" value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="Transfer # or location…"
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600" />
+              className={ctrlCls} style={ctrlStyle} />
           </div>
           <div className="w-40">
-            <label className="mb-1 block text-xs font-medium text-slate-500">Outlet</label>
-            <select value={outlet} onChange={(e) => setOutlet(e.target.value)}
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600">
+            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Outlet</label>
+            <select value={outlet} onChange={(e) => setOutlet(e.target.value)} className={ctrlCls} style={ctrlStyle}>
               <option value="All">All outlets</option>
               <option value="Main Store">Main Store</option>
               <option value="Warehouse">Warehouse</option>
@@ -83,7 +88,7 @@ export function TransfersTab() {
           <div className="ml-auto flex items-center gap-4 pb-0.5">
             <button type="button" onClick={() => { setShow("All"); setSearch(""); setOutlet("All"); }}
               className="text-sm text-brand-600 hover:underline">Clear filters</button>
-            <button type="button" className="text-sm text-slate-500 hover:text-slate-700">More filters</button>
+            <button type="button" className="text-sm hover:underline" style={{ color: "var(--color-text-muted)" }}>More filters</button>
             <button type="button"
               className="rounded-md bg-brand-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0]">
               Search
@@ -93,9 +98,12 @@ export function TransfersTab() {
       </div>
 
       {/* Table card */}
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
-          <span className="text-sm text-slate-500">
+      <div className="overflow-hidden rounded-lg border shadow-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <div
+          className="flex items-center justify-between border-b px-4 py-2.5"
+          style={{ borderColor: "var(--color-table-border)" }}
+        >
+          <span className="text-sm" style={{ color: "var(--color-text-muted)" }}>
             Displaying {transfers.length} transfers · {totalQty.toLocaleString()} total qty
           </span>
           <button type="button"
@@ -109,10 +117,13 @@ export function TransfersTab() {
         ) : error ? (
           <div className="p-6 text-sm text-red-600" role="alert">{error}</div>
         ) : transfers.length === 0 ? (
-          <div className="py-16 text-center text-sm text-slate-500">No transfers match the current filters.</div>
+          <div className="py-16 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No transfers match the current filters.</div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <thead
+              className="border-b text-xs font-semibold uppercase tracking-wide"
+              style={{ borderColor: "var(--color-table-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}
+            >
               <tr>
                 <th className="px-4 py-3 text-left">Transfer # / Due</th>
                 <th className="px-4 py-3 text-left">From</th>
@@ -122,22 +133,25 @@ export function TransfersTab() {
                 <th className="px-4 py-3 text-right">Qty</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y" style={{ borderColor: "var(--color-table-border)" }}>
               {transfers.map((t) => (
-                <tr key={t.id} className="cursor-pointer hover:bg-[#FAFAFA]">
+                <tr key={t.id} className="cursor-pointer hover:bg-[var(--color-surface-subtle)]">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-[#111]">{t.transfer_number}</div>
-                    <div className="text-xs text-[#666]">Due {fmt(t.due_date)}</div>
+                    <div className="font-medium" style={{ color: "var(--color-text-primary)" }}>{t.transfer_number}</div>
+                    <div className="text-xs" style={{ color: "var(--color-text-muted)" }}>Due {fmt(t.due_date)}</div>
                   </td>
-                  <td className="px-4 py-3 text-[#111]">{t.from_location}</td>
-                  <td className="px-4 py-3 text-[#666]">{t.to_location}</td>
+                  <td className="px-4 py-3" style={{ color: "var(--color-text-primary)" }}>{t.from_location}</td>
+                  <td className="px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{t.to_location}</td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[t.status] ?? "bg-slate-100 text-slate-600"}`}>
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[t.status] ?? ""}`}
+                      style={!STATUS_COLORS[t.status] ? { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" } : undefined}
+                    >
                       {t.status.replace("_", " ")}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-[#666]">{fmt(t.created_at)}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-[#111]">{t.qty}</td>
+                  <td className="px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{fmt(t.created_at)}</td>
+                  <td className="px-4 py-3 text-right font-semibold" style={{ color: "var(--color-text-primary)" }}>{t.qty}</td>
                 </tr>
               ))}
             </tbody>

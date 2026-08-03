@@ -26,7 +26,7 @@ interface Summary {
 }
 
 const STAGE_COLORS: Record<string, string> = {
-  suggested: "bg-slate-100 text-slate-700 border-slate-200",
+  suggested: "",
   draft: "bg-blue-50 text-blue-700 border-blue-200",
   sent: "bg-indigo-50 text-indigo-700 border-indigo-200",
   confirmed: "bg-violet-50 text-violet-700 border-violet-200",
@@ -57,7 +57,7 @@ export function PipelineOverviewTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <div className="py-12 text-center text-sm text-slate-400">Loading pipeline…</div>;
+  if (loading) return <div className="py-12 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>Loading pipeline…</div>;
   if (error) return <p role="alert" className="text-sm text-red-700 py-6">{error}</p>;
   if (!data) return null;
 
@@ -73,10 +73,16 @@ export function PipelineOverviewTab() {
           { label: "Avg Lead Time", value: `${kpis.avg_lead_time_days}d`, sub: "days supplier→shelf" },
           { label: "On-Time Delivery", value: `${kpis.on_time_delivery_pct}%`, sub: "last 90 days", alert: kpis.on_time_delivery_pct < 90 },
         ].map((k) => (
-          <div key={k.label} className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-            <p className="text-xs text-slate-500">{k.label}</p>
-            <p className={`mt-1 text-xl font-semibold ${k.alert ? "text-red-600" : "text-slate-900"}`}>{k.value}</p>
-            <p className="text-xs text-slate-400">{k.sub}</p>
+          <div
+            key={k.label}
+            className="rounded-lg border px-4 py-3"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
+          >
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{k.label}</p>
+            <p className={`mt-1 text-xl font-semibold ${k.alert ? "text-red-600" : ""}`}
+              style={!k.alert ? { color: "var(--color-text-primary)" } : undefined}
+            >{k.value}</p>
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{k.sub}</p>
           </div>
         ))}
       </div>
@@ -107,17 +113,20 @@ export function PipelineOverviewTab() {
 
       {/* Stage flow */}
       <div>
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Pipeline Stages</h3>
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Pipeline Stages</h3>
         <div className="flex flex-wrap gap-2">
           {stages.map((stage, i) => (
             <div key={stage.key} className="flex items-center gap-2">
-              <div className={`rounded-lg border px-3 py-2.5 min-w-[110px] ${STAGE_COLORS[stage.key] ?? "bg-slate-50 text-slate-700 border-slate-200"}`}>
+              <div
+                className={`rounded-lg border px-3 py-2.5 min-w-[110px] ${STAGE_COLORS[stage.key] ?? ""}`}
+                style={!STAGE_COLORS[stage.key] ? { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" } : undefined}
+              >
                 <p className="text-[11px] font-medium leading-tight">{stage.label}</p>
                 <p className="mt-0.5 text-lg font-bold leading-none">{stage.count}</p>
                 <p className="text-[10px] opacity-70">{formatMoney(stage.value_cents)}</p>
               </div>
               {i < stages.length - 1 && (
-                <svg className="h-4 w-4 flex-shrink-0 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" style={{ color: "var(--color-border)" }}>
                   <path d="M9 18l6-6-6-6" />
                 </svg>
               )}

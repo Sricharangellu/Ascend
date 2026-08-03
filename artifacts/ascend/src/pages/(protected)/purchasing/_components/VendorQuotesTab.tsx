@@ -63,12 +63,12 @@ export function VendorQuotesTab() {
   if (!enabled) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 px-4 py-16 text-center">
-        <svg aria-hidden="true" className="h-10 w-10 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg aria-hidden="true" className="h-10 w-10" style={{ color: "var(--color-text-muted)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
           <rect x="9" y="3" width="6" height="4" rx="1" />
         </svg>
-        <p className="text-base font-semibold text-slate-700">Vendor Quotes — Coming Soon</p>
-        <p className="max-w-sm text-sm text-slate-500">Enable the <span className="font-mono font-semibold">vendor_quotations</span> feature flag to manage supplier quotes.</p>
+        <p className="text-base font-semibold" style={{ color: "var(--color-text-secondary)" }}>Vendor Quotes — Coming Soon</p>
+        <p className="max-w-sm text-sm" style={{ color: "var(--color-text-muted)" }}>Enable the <span className="font-mono font-semibold">vendor_quotations</span> feature flag to manage supplier quotes.</p>
       </div>
     );
   }
@@ -77,15 +77,15 @@ export function VendorQuotesTab() {
     <>
       <NewQuoteModal open={showNewQuoteModal} busy={busy} onClose={() => setShowNewQuoteModal(false)} onSubmit={(p) => void createQuote(p)} />
 
-      <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-        <p className="text-sm text-slate-500">Quotes received from vendors. Click a row to see line items.</p>
+      <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--color-border)" }}>
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Quotes received from vendors. Click a row to see line items.</p>
         {canManage && <Button variant="primary" size="sm" onClick={() => setShowNewQuoteModal(true)}>New Quote</Button>}
       </div>
 
       <div className="overflow-x-auto">
         {loading ? (
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+          <table className="min-w-full divide-y divide-[var(--color-table-border)] text-sm">
+            <thead className="text-left text-xs font-semibold uppercase tracking-[0.08em]" style={{ backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
               <tr>
                 <th className="px-4 py-3">Vendor</th>
                 <th className="px-4 py-3 text-right">Total</th>
@@ -94,21 +94,21 @@ export function VendorQuotesTab() {
                 {canManage && <th className="px-4 py-3 text-right">Actions</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
+            <tbody className="divide-y divide-[var(--color-table-border)]" style={{ backgroundColor: "var(--color-surface)" }}>
               {[0, 1, 2].map((i) => (
                 <tr key={i}>
-                  <td className="px-4 py-3"><div className="h-4 w-32 animate-pulse rounded bg-slate-200" /></td>
-                  <td className="px-4 py-3"><div className="ml-auto h-4 w-16 animate-pulse rounded bg-slate-200" /></td>
-                  <td className="px-4 py-3"><div className="h-4 w-20 animate-pulse rounded bg-slate-200" /></td>
-                  <td className="px-4 py-3"><div className="h-4 w-14 animate-pulse rounded bg-slate-200" /></td>
+                  <td className="px-4 py-3"><div className="h-4 w-32 animate-skeleton rounded" /></td>
+                  <td className="px-4 py-3"><div className="ml-auto h-4 w-16 animate-skeleton rounded" /></td>
+                  <td className="px-4 py-3"><div className="h-4 w-20 animate-skeleton rounded" /></td>
+                  <td className="px-4 py-3"><div className="h-4 w-14 animate-skeleton rounded" /></td>
                   {canManage && <td className="px-4 py-3" />}
                 </tr>
               ))}
             </tbody>
           </table>
         ) : (
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+          <table className="min-w-full divide-y divide-[var(--color-table-border)] text-sm">
+            <thead className="text-left text-xs font-semibold uppercase tracking-[0.08em]" style={{ backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
               <tr>
                 <th className="px-4 py-3">Vendor</th>
                 <th className="px-4 py-3 text-right">Total</th>
@@ -117,10 +117,10 @@ export function VendorQuotesTab() {
                 {canManage && <th className="px-4 py-3 text-right">Actions</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
+            <tbody className="divide-y divide-[var(--color-table-border)]" style={{ backgroundColor: "var(--color-surface)" }}>
               {quotes.length === 0 ? (
                 <tr>
-                  <td colSpan={canManage ? 5 : 4} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={canManage ? 5 : 4} className="px-4 py-8 text-center" style={{ color: "var(--color-text-muted)" }}>
                     No vendor quotes yet. Create one with &ldquo;New Quote&rdquo;.
                   </td>
                 </tr>
@@ -128,19 +128,19 @@ export function VendorQuotesTab() {
                 quotes.map((q) => (
                   <Fragment key={q.id}>
                     <tr
-                      className="cursor-pointer transition-colors hover:bg-slate-50"
+                      className="cursor-pointer transition-colors hover:bg-[var(--color-surface-subtle)]"
                       onClick={() => setExpandedId((cur) => (cur === q.id ? null : q.id))}
                     >
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-950">
+                      <td className="whitespace-nowrap px-4 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>
                         <div className="flex items-center gap-2">
-                          <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`shrink-0 text-slate-400 transition-transform ${expandedId === q.id ? "rotate-90" : ""}`}>
+                          <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`shrink-0 transition-transform ${expandedId === q.id ? "rotate-90" : ""}`} style={{ color: "var(--color-text-muted)" }}>
                             <polyline points="9 18 15 12 9 6" />
                           </svg>
                           {q.vendor}
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-950">{formatMoney(q.total_cents)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">{fmtDate(q.expires_at)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(q.total_cents)}</td>
+                      <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-muted)" }}>{fmtDate(q.expires_at)}</td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <Badge variant={VQ_BADGE[q.status]}>
                           {q.status.charAt(0).toUpperCase() + q.status.slice(1)}
@@ -159,28 +159,28 @@ export function VendorQuotesTab() {
                     </tr>
                     {expandedId === q.id && (
                       <tr key={`${q.id}-detail`}>
-                        <td colSpan={canManage ? 5 : 4} className="bg-slate-50 px-8 py-3">
+                        <td colSpan={canManage ? 5 : 4} className="px-8 py-3" style={{ backgroundColor: "var(--color-table-header)" }}>
                           <table className="w-full text-xs">
                             <thead>
-                              <tr className="text-left uppercase tracking-wide text-slate-500">
+                              <tr className="text-left uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>
                                 <th className="pb-1 pr-4">Product</th>
                                 <th className="pb-1 pr-4 text-right">Qty</th>
                                 <th className="pb-1 pr-4 text-right">Unit price</th>
                                 <th className="pb-1 text-right">Subtotal</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-200">
+                            <tbody className="divide-y divide-[var(--color-table-border)]">
                               {q.line_items.map((li, idx) => (
                                 <tr key={idx}>
-                                  <td className="py-1 pr-4 font-medium text-slate-900">{li.product}</td>
-                                  <td className="py-1 pr-4 text-right text-slate-600">{li.qty}</td>
-                                  <td className="py-1 pr-4 text-right text-slate-600">{formatMoney(li.unit_price_cents)}</td>
-                                  <td className="py-1 text-right font-semibold text-slate-900">{formatMoney(li.qty * li.unit_price_cents)}</td>
+                                  <td className="py-1 pr-4 font-medium" style={{ color: "var(--color-text-primary)" }}>{li.product}</td>
+                                  <td className="py-1 pr-4 text-right" style={{ color: "var(--color-text-secondary)" }}>{li.qty}</td>
+                                  <td className="py-1 pr-4 text-right" style={{ color: "var(--color-text-secondary)" }}>{formatMoney(li.unit_price_cents)}</td>
+                                  <td className="py-1 text-right font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(li.qty * li.unit_price_cents)}</td>
                                 </tr>
                               ))}
                             </tbody>
                           </table>
-                          <p className="mt-2 text-xs text-slate-400">Created {fmtDateTime(q.created_at)}</p>
+                          <p className="mt-2 text-xs" style={{ color: "var(--color-text-muted)" }}>Created {fmtDateTime(q.created_at)}</p>
                         </td>
                       </tr>
                     )}

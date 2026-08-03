@@ -61,7 +61,7 @@ const TIMELINE_ICONS: Record<string, string> = {
 };
 
 const TIMELINE_COLORS: Record<string, string> = {
-  created: "bg-slate-100 text-slate-500", payment: "bg-blue-100 text-blue-600",
+  created: "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]", payment: "bg-blue-100 text-blue-600",
   completed: "bg-emerald-100 text-emerald-600", refunded: "bg-amber-100 text-amber-600",
   voided: "bg-red-100 text-red-600",
 };
@@ -85,10 +85,11 @@ function ConfirmModal({
   if (!open) return null;
   return (
     <Modal open title={title} onClose={onClose}>
-      <p className="text-sm text-slate-600">{description}</p>
+      <p className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>{description}</p>
       <div className="mt-5 flex justify-end gap-2">
         <button type="button" onClick={onClose} disabled={loading}
-          className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+          className="rounded-lg border px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)] disabled:opacity-50"
+          style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}>
           Cancel
         </button>
         <button type="button" onClick={onConfirm} disabled={loading}
@@ -177,7 +178,7 @@ export default function OrderDetailPage() {
     return (
       <EnterpriseShell active="sales" title="Order" subtitle="Loading…" contentClassName="overflow-y-auto">
         <div className="mx-auto max-w-4xl space-y-4 px-4 py-5 sm:px-6">
-          {[1, 2, 3].map((i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-100" />)}
+          {[1, 2, 3].map((i) => <div key={i} className="h-24 animate-skeleton rounded-xl" />)}
         </div>
       </EnterpriseShell>
     );
@@ -207,7 +208,7 @@ export default function OrderDetailPage() {
 
         {/* ── Back ──────────────────────────────────────────────────────────── */}
         <button type="button" onClick={() => router.push("/orders")}
-          className="mb-4 flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900">
+          className="mb-4 flex items-center gap-1 text-[13px] text-brand-600 hover:underline">
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 19l-7-7 7-7"/>
           </svg>
@@ -230,12 +231,12 @@ export default function OrderDetailPage() {
         )}
 
         {/* ── Header card ───────────────────────────────────────────────────── */}
-        <div className="mb-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="mb-5 overflow-hidden rounded-2xl border shadow-[var(--shadow-sm)]" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
           <div className="flex flex-wrap items-start justify-between gap-4 px-6 py-5">
             {/* Order info */}
             <div className="flex flex-col gap-1.5">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-lg font-bold text-slate-900">{order.orderNumber}</h1>
+                <h1 className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>{order.orderNumber}</h1>
                 <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${st.bg} ${st.text}`}>
                   {st.label}
                 </span>
@@ -245,7 +246,7 @@ export default function OrderDetailPage() {
                   </span>
                 )}
               </div>
-              <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
+              <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
                 <span>{fmtDateTime(order.createdAt)}</span>
                 {order.outlet_name && <span>📍 {order.outlet_name}</span>}
                 {order.cashier_name && <span>👤 {order.cashier_name}</span>}
@@ -260,8 +261,8 @@ export default function OrderDetailPage() {
 
             {/* Totals */}
             <div className="text-right">
-              <p className="text-2xl font-black text-slate-900">{formatMoney(order.totalCents)}</p>
-              <div className="mt-0.5 flex flex-col gap-0.5 text-xs text-slate-400">
+              <p className="text-2xl font-black" style={{ color: "var(--color-text-primary)" }}>{formatMoney(order.totalCents)}</p>
+              <div className="mt-0.5 flex flex-col gap-0.5 text-[11px]" style={{ color: "var(--color-text-muted)" }}>
                 <span>Subtotal: {formatMoney(order.subtotalCents)}</span>
                 {order.discountCents > 0 && <span className="text-red-500">Discount: −{formatMoney(order.discountCents)}</span>}
                 <span>Tax: {formatMoney(order.taxCents)}</span>
@@ -271,14 +272,14 @@ export default function OrderDetailPage() {
 
           {/* Customer strip */}
           {(order.customer_name || order.customerId) && (
-            <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-6 py-3">
+            <div className="flex items-center justify-between border-t px-6 py-3" style={{ borderColor: "var(--color-table-border)", backgroundColor: "var(--color-surface-subtle)" }}>
               <div className="flex items-center gap-2.5">
                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-brand-600">
                   {(order.customer_name ?? "?")[0]!.toUpperCase()}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-slate-900">{order.customer_name ?? "Guest"}</p>
-                  {order.customerId && <p className="text-[11px] text-slate-400">Customer ID: {order.customerId}</p>}
+                  <p className="text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>{order.customer_name ?? "Guest"}</p>
+                  {order.customerId && <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>Customer ID: {order.customerId}</p>}
                 </div>
               </div>
               {order.customerId && (
@@ -294,16 +295,18 @@ export default function OrderDetailPage() {
           )}
 
           {/* Action bar */}
-          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-6 py-3">
+          <div className="flex flex-wrap items-center gap-2 border-t px-6 py-3" style={{ borderColor: "var(--color-table-border)" }}>
             <button type="button" onClick={doEmailReceipt}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+              className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
               </svg>
               Email Receipt
             </button>
             <button type="button" onClick={() => router.push(`/returns?order=${order.id}`)}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+              className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
               </svg>
@@ -336,14 +339,15 @@ export default function OrderDetailPage() {
 
         {/* ── Tabs ──────────────────────────────────────────────────────────── */}
         <div className="-mx-1 mb-4 overflow-x-auto">
-          <div className="flex min-w-max gap-0 border-b border-slate-200 px-1">
+          <div className="flex min-w-max gap-0 border-b px-1" style={{ borderColor: "var(--color-border)" }}>
             {TABS.map(({ key, label }) => (
               <button key={key} type="button" onClick={() => setActiveTab(key)}
-                className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
+                className={`px-4 py-2.5 text-[13px] font-medium whitespace-nowrap transition-colors ${
                   activeTab === key
                     ? "border-b-2 border-brand-600 text-brand-600"
-                    : "border-b-2 border-transparent text-slate-500 hover:text-slate-800"
-                }`}>
+                    : "border-b-2 border-transparent hover:border-[var(--color-border)]"
+                }`}
+                style={activeTab !== key ? { color: "var(--color-text-secondary)" } : {}}>
                 {label}
               </button>
             ))}
@@ -352,47 +356,47 @@ export default function OrderDetailPage() {
 
         {/* ── Order Lines ───────────────────────────────────────────────────── */}
         {activeTab === "lines" && (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50">
-                <tr className="text-left">
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500">Product</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-right">Qty</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-right">Unit Price</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-right">Tax</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-right">Line Total</th>
+          <div className="overflow-hidden rounded-xl border shadow-[var(--shadow-sm)]" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+            <table className="w-full text-[13px]">
+              <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+                <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ color: "var(--color-text-secondary)" }}>
+                  <th className="px-5 py-3">Product</th>
+                  <th className="px-5 py-3 text-right">Qty</th>
+                  <th className="px-5 py-3 text-right">Unit Price</th>
+                  <th className="px-5 py-3 text-right">Tax</th>
+                  <th className="px-5 py-3 text-right">Line Total</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[var(--color-table-border)]">
                 {order.lines.map((line) => (
-                  <tr key={line.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={line.id} className="transition-colors hover:bg-[var(--color-table-row-hover)]">
                     <td className="px-5 py-3.5">
                       <button type="button" onClick={() => router.push(`/catalog/${line.productId}`)}
-                        className="text-sm font-medium text-brand-600 hover:underline text-left">
+                        className="font-medium text-brand-600 hover:underline text-left">
                         {line.name}
                       </button>
                       <div className="flex gap-2 mt-0.5">
-                        <span className="text-[11px] text-slate-400">{line.productId}</span>
-                        {!line.taxable && <span className="text-[10px] text-slate-400 bg-slate-100 px-1 rounded">Tax exempt</span>}
+                        <span className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{line.productId}</span>
+                        {!line.taxable && <span className="text-[10px] px-1 rounded" style={{ color: "var(--color-text-muted)", backgroundColor: "var(--color-surface-subtle)" }}>Tax exempt</span>}
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 text-right font-semibold text-slate-900">{line.quantity}</td>
-                    <td className="px-5 py-3.5 text-right text-slate-700">{formatMoney(line.unitCents)}</td>
-                    <td className="px-5 py-3.5 text-right text-slate-500">{line.taxable ? formatMoney(line.taxCents) : "—"}</td>
-                    <td className="px-5 py-3.5 text-right font-bold text-slate-900">{formatMoney(line.lineCents)}</td>
+                    <td className="px-5 py-3.5 text-right font-semibold" style={{ color: "var(--color-text-primary)" }}>{line.quantity}</td>
+                    <td className="px-5 py-3.5 text-right" style={{ color: "var(--color-text-secondary)" }}>{formatMoney(line.unitCents)}</td>
+                    <td className="px-5 py-3.5 text-right" style={{ color: "var(--color-text-secondary)" }}>{line.taxable ? formatMoney(line.taxCents) : "—"}</td>
+                    <td className="px-5 py-3.5 text-right font-bold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(line.lineCents)}</td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="border-t border-slate-200 bg-slate-50">
+              <tfoot style={{ borderTop: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
                 <tr>
-                  <td colSpan={3} className="px-5 py-3 text-xs text-slate-400">{order.lines.length} line{order.lines.length !== 1 ? "s" : ""}</td>
-                  <td className="px-5 py-3 text-right text-xs text-slate-500">Tax: {formatMoney(order.taxCents)}</td>
-                  <td className="px-5 py-3 text-right text-sm font-bold text-slate-900">{formatMoney(order.totalCents)}</td>
+                  <td colSpan={3} className="px-5 py-3 text-[11px]" style={{ color: "var(--color-text-muted)" }}>{order.lines.length} line{order.lines.length !== 1 ? "s" : ""}</td>
+                  <td className="px-5 py-3 text-right text-[11px]" style={{ color: "var(--color-text-secondary)" }}>Tax: {formatMoney(order.taxCents)}</td>
+                  <td className="px-5 py-3 text-right text-[13px] font-bold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(order.totalCents)}</td>
                 </tr>
               </tfoot>
             </table>
             {order.discountCents > 0 && (
-              <div className="border-t border-slate-100 bg-emerald-50 px-5 py-2.5 text-xs text-emerald-700">
+              <div className="border-t border-success-100 bg-success-50 px-5 py-2.5 text-[11px] text-success-700">
                 Discount applied: −{formatMoney(order.discountCents)}
               </div>
             )}
@@ -403,29 +407,31 @@ export default function OrderDetailPage() {
         {activeTab === "payments" && (
           <div className="space-y-3">
             {(!order.payments || order.payments.length === 0) ? (
-              <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-400">
+              <div className="rounded-xl border border-dashed py-10 text-center text-[13px]"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>
                 {order.status === "open" ? "No payment collected yet." : "No payment records."}
               </div>
             ) : (
               order.payments.map((p) => (
-                <div key={p.id} className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+                <div key={p.id} className="rounded-xl border px-5 py-4 shadow-[var(--shadow-sm)]"
+                  style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-slate-900">{METHOD_LABELS[p.method] ?? p.method}</p>
+                        <p className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>{METHOD_LABELS[p.method] ?? p.method}</p>
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
                           p.status === "captured" ? "bg-emerald-100 text-emerald-700"
                           : p.status === "refunded" ? "bg-amber-100 text-amber-700"
                           : "bg-red-100 text-red-600"
                         }`}>{p.status}</span>
                       </div>
-                      <div className="mt-1 flex flex-wrap gap-x-4 text-xs text-slate-400">
+                      <div className="mt-1 flex flex-wrap gap-x-4 text-[11px]" style={{ color: "var(--color-text-muted)" }}>
                         {p.cardLast4 && <span>Card ending {p.cardLast4}</span>}
                         {p.authCode && <span>Auth: {p.authCode}</span>}
                         <span>{fmtDateTime(p.createdAt)}</span>
                       </div>
                     </div>
-                    <p className="text-base font-black text-slate-900">{formatMoney(p.amountCents)}</p>
+                    <p className="text-base font-black" style={{ color: "var(--color-text-primary)" }}>{formatMoney(p.amountCents)}</p>
                   </div>
                 </div>
               ))
@@ -433,16 +439,16 @@ export default function OrderDetailPage() {
 
             {/* Payment summary */}
             {order.payments && order.payments.length > 0 && (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">Total collected</span>
-                  <span className="font-bold text-slate-900">
+              <div className="rounded-xl border px-5 py-3" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
+                <div className="flex items-center justify-between text-[13px]">
+                  <span style={{ color: "var(--color-text-secondary)" }}>Total collected</span>
+                  <span className="font-bold" style={{ color: "var(--color-text-primary)" }}>
                     {formatMoney(order.payments.reduce((s, p) => s + p.amountCents, 0))}
                   </span>
                 </div>
-                <div className="mt-0.5 flex items-center justify-between text-xs">
-                  <span className="text-slate-400">Order total</span>
-                  <span className="text-slate-600">{formatMoney(order.totalCents)}</span>
+                <div className="mt-0.5 flex items-center justify-between text-[11px]">
+                  <span style={{ color: "var(--color-text-muted)" }}>Order total</span>
+                  <span style={{ color: "var(--color-text-secondary)" }}>{formatMoney(order.totalCents)}</span>
                 </div>
               </div>
             )}
@@ -451,11 +457,11 @@ export default function OrderDetailPage() {
 
         {/* ── Returns ───────────────────────────────────────────────────────── */}
         {activeTab === "returns" && (
-          <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center">
-            <svg className="mx-auto h-8 w-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="rounded-xl border border-dashed py-12 text-center" style={{ borderColor: "var(--color-border)" }}>
+            <svg className="mx-auto h-8 w-8" style={{ color: "var(--color-text-muted)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
             </svg>
-            <p className="mt-2 text-sm text-slate-400">No returns for this order.</p>
+            <p className="mt-2 text-[13px]" style={{ color: "var(--color-text-muted)" }}>No returns for this order.</p>
             <button type="button" onClick={() => router.push(`/returns?order=${order.id}`)}
               className="mt-2 text-sm text-brand-600 hover:underline">
               Create return
@@ -466,7 +472,7 @@ export default function OrderDetailPage() {
         {/* ── Activity ──────────────────────────────────────────────────────── */}
         {activeTab === "activity" && (
           <div className="relative pl-4">
-            <div className="absolute left-7 top-0 h-full w-px bg-slate-200" />
+            <div className="absolute left-7 top-0 h-full w-px" style={{ backgroundColor: "var(--color-border)" }} />
             <ul className="space-y-4">
               {[...timeline].reverse().map((ev, i) => {
                 const colorClass = TIMELINE_COLORS[ev.type] ?? "bg-slate-100 text-slate-500";
@@ -479,14 +485,14 @@ export default function OrderDetailPage() {
                       </svg>
                     </div>
                     <div className="pb-1 pt-0.5">
-                      <p className="text-sm font-medium text-slate-900">{ev.label}</p>
-                      <p className="text-xs text-slate-400">{ev.actor} · {fmtDateTime(ev.ts)}</p>
+                      <p className="text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>{ev.label}</p>
+                      <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{ev.actor} · {fmtDateTime(ev.ts)}</p>
                     </div>
                   </li>
                 );
               })}
               {timeline.length === 0 && (
-                <li className="text-sm text-slate-400">No activity recorded.</li>
+                <li className="text-[13px]" style={{ color: "var(--color-text-muted)" }}>No activity recorded.</li>
               )}
             </ul>
           </div>

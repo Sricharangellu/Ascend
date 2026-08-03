@@ -27,10 +27,10 @@ const TERM_LABELS: Record<PaymentTerm, string> = {
 
 function SectionCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-100 px-4 py-3">
-        <p className="text-sm font-semibold text-[#111]">{title}</p>
-        {subtitle && <p className="mt-0.5 text-xs text-slate-400">{subtitle}</p>}
+    <div className="rounded-xl shadow-sm" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+      <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
+        <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{title}</p>
+        {subtitle && <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{subtitle}</p>}
       </div>
       <div className="px-4 py-4">{children}</div>
     </div>
@@ -45,7 +45,7 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: b
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 ${
-        checked ? "bg-brand-600" : "bg-slate-200"
+        checked ? "bg-brand-600" : "bg-[var(--color-surface-subtle)]"
       }`}
     >
       <span
@@ -112,17 +112,17 @@ export default function B2BSettingsPage() {
 
         {/* ── Header ──────────────────────────────────────────────────── */}
         <div className="mb-6">
-          <h1 className="text-lg font-semibold text-[#111]">B2B / Wholesale Portal</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>B2B / Wholesale Portal</h1>
+          <p className="mt-1 text-sm" style={{ color: "var(--color-text-muted)" }}>
             Configure customer pricing tiers, credit terms, and order approval for wholesale buyers.
           </p>
         </div>
 
         {/* ── Enable ────────────────────────────────────────────────────── */}
-        <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+        <div className="mb-4 flex items-center justify-between rounded-xl px-4 py-4 shadow-sm" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
           <div>
-            <p className="font-semibold text-[#111]">Enable B2B Portal</p>
-            <p className="text-sm text-slate-500">
+            <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>Enable B2B Portal</p>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
               Activates wholesale pricing, quotes, and the buyer-facing portal.
             </p>
           </div>
@@ -137,19 +137,20 @@ export default function B2BSettingsPage() {
               title="Buyer Portal URL"
               subtitle="Share this link with your wholesale customers."
             >
-              <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2.5">
-                <span className="flex-1 select-all font-mono text-sm text-slate-700">
+              <div className="flex items-center gap-2 rounded-lg px-3 py-2.5" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
+                <span className="flex-1 select-all font-mono text-sm" style={{ color: "var(--color-text-secondary)" }}>
                   {PORTAL_URL}
                 </span>
                 <button
                   type="button"
                   onClick={() => void navigator.clipboard.writeText(PORTAL_URL)}
-                  className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50"
+                  className="rounded-md px-2.5 py-1 text-xs font-medium shadow-sm transition-colors hover:bg-[var(--color-surface-subtle)]"
+                  style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}
                 >
                   Copy
                 </button>
               </div>
-              <p className="mt-2 text-xs text-slate-400">
+              <p className="mt-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
                 Buyers log in with their account credentials to browse products and place orders.
               </p>
             </SectionCard>
@@ -161,16 +162,16 @@ export default function B2BSettingsPage() {
             >
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  <tr className="text-left text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>
                     <th className="pb-2 pr-3">Group</th>
                     <th className="pb-2 pr-3 text-right">Discount off retail</th>
                     <th className="pb-2 text-right">Min. order</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-[var(--color-table-border)]">
                   {groups.map((group) => (
                     <tr key={group.id} className="align-middle">
-                      <td className="py-2 pr-3 font-semibold text-[#111]">{group.name}</td>
+                      <td className="py-2 pr-3 font-semibold" style={{ color: "var(--color-text-primary)" }}>{group.name}</td>
                       <td className="py-2 pr-3 text-right">
                         <div className="inline-flex items-center gap-1">
                           <input
@@ -182,14 +183,15 @@ export default function B2BSettingsPage() {
                             onChange={(e) =>
                               updateGroup(group.id, "discountPct", Number(e.target.value))
                             }
-                            className="w-16 rounded border border-slate-200 px-2 py-1 text-right text-sm focus:border-brand-600 focus:outline-none"
+                            className="w-16 rounded px-2 py-1 text-right text-sm focus:border-brand-600 focus:outline-none"
+                            style={{ border: "1px solid var(--color-border)" }}
                           />
-                          <span className="text-slate-400">%</span>
+                          <span style={{ color: "var(--color-text-muted)" }}>%</span>
                         </div>
                       </td>
                       <td className="py-2 text-right">
                         <div className="inline-flex items-center gap-1">
-                          <span className="text-slate-400">$</span>
+                          <span style={{ color: "var(--color-text-muted)" }}>$</span>
                           <input
                             type="number"
                             min={0}
@@ -202,7 +204,8 @@ export default function B2BSettingsPage() {
                                 Math.round(Number(e.target.value) * 100),
                               )
                             }
-                            className="w-20 rounded border border-slate-200 px-2 py-1 text-right text-sm focus:border-brand-600 focus:outline-none"
+                            className="w-20 rounded px-2 py-1 text-right text-sm focus:border-brand-600 focus:outline-none"
+                            style={{ border: "1px solid var(--color-border)" }}
                           />
                         </div>
                       </td>
@@ -226,8 +229,9 @@ export default function B2BSettingsPage() {
                     className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
                       paymentTerm === t
                         ? "bg-brand-600 text-white"
-                        : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+                        : "hover:bg-[var(--color-surface-subtle)]"
                     }`}
+                    style={paymentTerm !== t ? { border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" } : undefined}
                   >
                     {TERM_LABELS[t]}
                   </button>
@@ -246,17 +250,18 @@ export default function B2BSettingsPage() {
                     key={mode}
                     type="button"
                     onClick={() => setApproval(mode)}
-                    className={`flex-1 rounded-lg border py-2.5 text-sm font-medium transition-colors ${
+                    className={`flex-1 rounded-lg py-2.5 text-sm font-medium transition-colors ${
                       approval === mode
                         ? "border-brand-600 bg-brand-600/5 text-brand-600"
-                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                        : "hover:bg-[var(--color-surface-subtle)]"
                     }`}
+                    style={approval !== mode ? { border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" } : { border: "1px solid" }}
                   >
                     {mode === "auto" ? "Automatic" : "Manual review"}
                   </button>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-slate-400">
+              <p className="mt-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
                 {approval === "auto"
                   ? "Orders are confirmed immediately and sent to fulfilment."
                   : "A manager must approve each order before it moves to fulfilment."}
@@ -268,17 +273,17 @@ export default function B2BSettingsPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-[#111]">Show prices to guests</p>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>Show prices to guests</p>
+                    <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                       Allow non-logged-in visitors to see wholesale prices.
                     </p>
                   </div>
                   <ToggleSwitch checked={showPricesToGuests} onChange={setShowPricesToGuests} />
                 </div>
-                <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+                <div className="flex items-center justify-between pt-4" style={{ borderTop: "1px solid var(--color-border)" }}>
                   <div>
-                    <p className="text-sm font-medium text-[#111]">Enforce credit limits</p>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>Enforce credit limits</p>
+                    <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                       Block checkout when a buyer exceeds their account credit limit.
                     </p>
                   </div>
@@ -291,8 +296,8 @@ export default function B2BSettingsPage() {
             </SectionCard>
 
             {/* ── Mode link notice ────────────────────────────────────── */}
-            <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-500">
-              <svg className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <div className="flex items-start gap-2 rounded-lg px-3 py-2.5 text-xs" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }}>
+              <svg className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--color-text-muted)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <p>

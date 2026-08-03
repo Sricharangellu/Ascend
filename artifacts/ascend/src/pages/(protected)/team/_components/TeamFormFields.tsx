@@ -8,7 +8,7 @@ export function FieldInput({
 }) {
   return (
     <div>
-      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>
         {label}
       </label>
       <input
@@ -19,7 +19,8 @@ export function FieldInput({
         readOnly={readOnly}
         inputMode={inputMode}
         maxLength={maxLength}
-        className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none ${readOnly ? "bg-slate-50 text-slate-400" : ""}`}
+        className={`w-full rounded-lg border px-3 py-2 text-sm focus:border-brand-600 focus:outline-none ${readOnly ? "text-[var(--color-text-muted)]" : ""}`}
+        style={{ borderColor: "var(--color-border)", ...(readOnly ? { backgroundColor: "var(--color-surface-subtle)" } : {}) }}
       />
     </div>
   );
@@ -32,13 +33,14 @@ export function FieldSelect({
 }) {
   return (
     <div>
-      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>
         {label}
       </label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
+        className="w-full rounded-lg border px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
+        style={{ borderColor: "var(--color-border)" }}
       >
         {children}
       </select>

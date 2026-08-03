@@ -86,8 +86,8 @@ export function CreditsTab({
     <div className="space-y-5 p-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold text-slate-900">Vendor credits for this PO</p>
-          <p className="text-xs text-slate-500">Chargebacks reduce what you owe; credit memos come from vendor-initiated adjustments.</p>
+          <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Vendor credits for this PO</p>
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Chargebacks reduce what you owe; credit memos come from vendor-initiated adjustments.</p>
         </div>
         {canManage && (
           <div className="flex gap-2">
@@ -98,9 +98,9 @@ export function CreditsTab({
       </div>
 
       {credits.length === 0 ? (
-        <p className="text-sm text-slate-400">No credits for this PO yet.</p>
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No credits for this PO yet.</p>
       ) : (
-        <div className="overflow-hidden divide-y divide-slate-100 rounded-xl border border-slate-200">
+        <div className="overflow-hidden divide-y divide-[var(--color-table-border)] rounded-xl border" style={{ borderColor: "var(--color-border)" }}>
           {credits.map((vc) => (
             <div key={vc.id} className="flex items-center justify-between gap-4 px-4 py-3">
               <div className="flex items-center gap-3">
@@ -108,8 +108,8 @@ export function CreditsTab({
                   {vc.type === "chargeback" ? "Chargeback" : "Credit memo"}
                 </Badge>
                 <div>
-                  <p className="text-sm font-medium text-slate-900">{vc.reason ?? "—"}</p>
-                  <p className="text-xs text-slate-400">{fmtDate(vc.created_at)}</p>
+                  <p className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>{vc.reason ?? "—"}</p>
+                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDate(vc.created_at)}</p>
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-3">
@@ -143,11 +143,12 @@ export function CreditsTab({
         <div className="space-y-4">
           {creditType === "credit_memo" && (
             <div>
-              <label className="mb-2 block text-xs font-medium text-slate-500">Source of credit</label>
+              <label className="mb-2 block text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Source of credit</label>
               <div className="flex gap-2">
                 {(["manual", "expired", "damaged"] as const).map((s) => (
                   <button key={s} type="button" onClick={() => setCreditSource(s)}
-                    className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${creditSource === s ? "bg-blue-600 text-white" : "border border-slate-300 text-slate-600 hover:border-blue-300"}`}>
+                    className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${creditSource === s ? "bg-blue-600 text-white" : "hover:border-blue-300"}`}
+                    style={creditSource === s ? undefined : { border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
                     {s.charAt(0).toUpperCase() + s.slice(1)}
                   </button>
                 ))}
@@ -174,14 +175,16 @@ export function CreditsTab({
             </div>
           )}
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">Amount ($)</label>
+            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Amount ($)</label>
             <input type="text" value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} placeholder="0.00"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              style={{ borderColor: "var(--color-border)" }} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">Reason</label>
+            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Reason</label>
             <input type="text" value={creditReason} onChange={(e) => setCreditReason(e.target.value)} placeholder="Reason for credit"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              style={{ borderColor: "var(--color-border)" }} />
           </div>
         </div>
       </Modal>

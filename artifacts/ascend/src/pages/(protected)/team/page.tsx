@@ -125,8 +125,8 @@ export default function TeamPage() {
             { label: "Hours Today",    value: formatHours(totalHoursMins), color: "text-blue-600" },
             { label: "Suspended",      value: String(employees.filter((e) => e.status !== "active").length), color: "text-amber-600" },
           ].map(({ label, value, color }) => (
-            <div key={label} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-              <p className="text-xs text-slate-400">{label}</p>
+            <div key={label} className="rounded-xl border px-4 py-3 shadow-[var(--shadow-sm)]" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+              <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{label}</p>
               <p className={`mt-0.5 text-xl font-bold ${color}`}>{value}</p>
             </div>
           ))}
@@ -134,10 +134,11 @@ export default function TeamPage() {
 
         {/* Filter + search + add */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1">
+          <div className="flex gap-1 rounded-lg border p-1" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
             {FILTERS.map(({ key, label }) => (
               <button key={key} type="button" onClick={() => setFilter(key)}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${filter === key ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}>
+                className={`rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors ${filter === key ? "bg-brand-600 text-white" : "hover:bg-[var(--color-surface-subtle)]"}`}
+                style={filter !== key ? { color: "var(--color-text-secondary)" } : {}}>
                 {label}
               </button>
             ))}
@@ -148,7 +149,8 @@ export default function TeamPage() {
               placeholder="Search name or email…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-brand-600 focus:outline-none"
+              className="rounded-lg border px-3 py-1.5 text-[13px] focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
             />
             <button
               type="button"
@@ -159,7 +161,8 @@ export default function TeamPage() {
             </button>
             <Link
               href="/team/custom-roles"
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              className="rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
             >
               Custom roles
             </Link>
@@ -170,7 +173,7 @@ export default function TeamPage() {
         {loading ? (
           <div className="space-y-2">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded-xl bg-slate-100" />
+              <div key={i} className="h-14 animate-skeleton rounded-xl" />
             ))}
           </div>
         ) : error ? (
@@ -178,14 +181,14 @@ export default function TeamPage() {
             <p role="alert" className="text-sm text-red-700">{error}</p>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="rounded-xl border border-slate-200 bg-white px-4 py-12 text-center shadow-sm">
-            <p className="text-sm text-slate-400">No employees match this filter.</p>
+          <div className="rounded-xl border px-4 py-12 text-center shadow-[var(--shadow-sm)]" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+            <p className="text-[13px]" style={{ color: "var(--color-text-muted)" }}>No employees match this filter.</p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full text-sm">
+          <div className="overflow-hidden rounded-xl border shadow-[var(--shadow-sm)]" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+            <table className="w-full text-[13px]">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ borderBottom: "1px solid var(--color-table-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-secondary)" }}>
                   <th className="px-4 py-3">Employee</th>
                   <th className="px-4 py-3">Role</th>
                   <th className="hidden px-4 py-3 md:table-cell">Status</th>
@@ -194,7 +197,7 @@ export default function TeamPage() {
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[var(--color-table-border)]">
                 {filtered.map((emp) => {
                   const isClocking = clockingId === emp.id;
                   const isSuspended = emp.status !== "active";
@@ -210,19 +213,19 @@ export default function TeamPage() {
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${isSuspended ? "bg-slate-200 text-slate-400" : AVATAR_COLORS[emp.role]}`}>
+                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${isSuspended ? "text-[var(--color-text-muted)] bg-[var(--color-surface-subtle)]" : AVATAR_COLORS[emp.role]}`}>
                             {initials(emp.name)}
                           </div>
                           <div>
-                            <p className="font-semibold text-[#111]">{emp.name}</p>
-                            <p className="text-[11px] text-slate-400">{emp.email}</p>
+                            <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{emp.name}</p>
+                            <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{emp.email}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-3">
                         <RoleBadge role={emp.role} />
                         {emp.department && (
-                          <p className="mt-0.5 text-[11px] text-slate-400">{emp.department}</p>
+                          <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-muted)" }}>{emp.department}</p>
                         )}
                       </td>
                       <td className="hidden px-4 py-3 md:table-cell">
@@ -230,7 +233,7 @@ export default function TeamPage() {
                       </td>
                       <td className="px-4 py-3">
                         {isSuspended ? (
-                          <span className="text-slate-300">—</span>
+                          <span style={{ color: "var(--color-text-muted)" }}>—</span>
                         ) : emp.clocked_in && emp.clocked_in_at ? (
                           <div className="flex items-center gap-1.5">
                             <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -238,12 +241,12 @@ export default function TeamPage() {
                           </div>
                         ) : (
                           <div className="flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-full bg-slate-300" />
-                            <span className="text-xs text-slate-400">Off</span>
+                            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--color-border)" }} />
+                            <span className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>Off</span>
                           </div>
                         )}
                       </td>
-                      <td className="hidden px-4 py-3 text-sm font-medium text-[#111] sm:table-cell">
+                      <td className="hidden px-4 py-3 text-[13px] font-medium sm:table-cell" style={{ color: "var(--color-text-primary)" }}>
                         {isSuspended ? "—" : formatHours(elapsedToday)}
                       </td>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
@@ -265,7 +268,8 @@ export default function TeamPage() {
                           <Link
                             href={`/team/${emp.id}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                            className="rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+                            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
                           >
                             View
                           </Link>

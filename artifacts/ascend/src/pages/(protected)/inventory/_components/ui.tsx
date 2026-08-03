@@ -20,8 +20,9 @@ export function TabButton({
         "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
         active
           ? "border-slate-950 text-slate-950"
-          : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300",
+          : "border-transparent hover:border-[var(--color-border)]",
       ].join(" ")}
+      style={active ? undefined : { color: "var(--color-text-muted)" }}
     >
       {children}
     </button>
@@ -39,7 +40,8 @@ export function DropdownItem({
     <button
       type="button"
       onClick={onClick}
-      className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+      className="w-full px-4 py-2 text-left text-sm hover:bg-[var(--color-surface-subtle)]"
+      style={{ color: "var(--color-text-secondary)" }}
     >
       {children}
     </button>
@@ -48,9 +50,9 @@ export function DropdownItem({
 
 export function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-slate-200 p-3">
-      <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
-      <p className="mt-1 text-lg font-bold text-slate-950">{value}</p>
+    <div className="rounded-md border p-3" style={{ borderColor: "var(--color-border)" }}>
+      <p className="text-xs font-medium uppercase" style={{ color: "var(--color-text-muted)" }}>{label}</p>
+      <p className="mt-1 text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>{value}</p>
     </div>
   );
 }
@@ -68,17 +70,18 @@ export function Metric({
 }) {
   return (
     <Card className="flex flex-col gap-1">
-      <span className="text-xs font-medium uppercase text-slate-500">{label}</span>
+      <span className="text-xs font-medium uppercase" style={{ color: "var(--color-text-muted)" }}>{label}</span>
       <span
         className={
           tone === "warning"
             ? "text-2xl font-bold text-warning-700"
-            : "text-2xl font-bold text-slate-950"
+            : "text-2xl font-bold"
         }
+        style={tone === "warning" ? undefined : { color: "var(--color-text-primary)" }}
       >
         {value}
       </span>
-      <span className="text-xs text-slate-500">{detail}</span>
+      <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{detail}</span>
     </Card>
   );
 }
@@ -112,9 +115,12 @@ export function StatusBadge({ status }: { status: string }) {
       ? "bg-success-100 text-success-700"
       : status === "archived"
       ? "bg-danger-100 text-danger-700"
-      : "bg-slate-100 text-slate-600";
+      : undefined;
   return (
-    <span className={`inline-flex rounded px-2 py-1 text-xs font-semibold capitalize ${classes}`}>
+    <span
+      className={`inline-flex rounded px-2 py-1 text-xs font-semibold capitalize ${classes ?? ""}`}
+      style={!classes ? { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" } : undefined}
+    >
       {status}
     </span>
   );

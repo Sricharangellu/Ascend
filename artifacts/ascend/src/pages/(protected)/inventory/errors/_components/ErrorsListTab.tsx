@@ -121,19 +121,23 @@ function ActionModal({ error, onClose, onDone }: ActionModalProps) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-xl bg-white shadow-xl"
+        className="w-full max-w-md rounded-xl shadow-xl"
+        style={{ backgroundColor: "var(--color-surface)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-900">Resolve Error</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">✕</button>
+        <div
+          className="flex items-center justify-between border-b px-5 py-4"
+          style={{ borderColor: "var(--color-border)" }}
+        >
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Resolve Error</h2>
+          <button onClick={onClose} style={{ color: "var(--color-text-muted)" }} aria-label="Close">✕</button>
         </div>
         <div className="space-y-4 px-5 py-4">
-          <p className="text-sm font-medium text-slate-800">{error.title}</p>
-          <p className="text-xs text-slate-500">{error.description}</p>
+          <p className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>{error.title}</p>
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{error.description}</p>
 
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-600">Action</label>
+            <label className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Action</label>
             <div className="grid grid-cols-2 gap-2">
               {(["review", "resolve", "ignore", "escalate"] as const).map((a) => (
                 <button
@@ -144,8 +148,9 @@ function ActionModal({ error, onClose, onDone }: ActionModalProps) {
                     "rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
                     action === a
                       ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                      : "border-slate-200 text-slate-600 hover:border-slate-300",
+                      : "hover:border-slate-300",
                   ].join(" ")}
+                  style={action !== a ? { borderColor: "var(--color-border)", color: "var(--color-text-secondary)" } : undefined}
                 >
                   {ACTION_LABELS[a]}
                 </button>
@@ -155,7 +160,7 @@ function ActionModal({ error, onClose, onDone }: ActionModalProps) {
 
           {(action === "resolve" || action === "ignore") && (
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600">
+              <label className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>
                 {action === "resolve" ? "Resolution notes" : "Reason for ignoring"}
               </label>
               <textarea
@@ -163,26 +168,32 @@ function ActionModal({ error, onClose, onDone }: ActionModalProps) {
                 onChange={(e) => setResolution(e.target.value)}
                 placeholder="Describe what was done or why this is being ignored…"
                 rows={3}
-                className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full resize-none rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
               />
             </div>
           )}
 
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-600">Notes (optional)</label>
+            <label className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Notes (optional)</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Any additional context…"
               rows={2}
-              className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full resize-none rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
             />
           </div>
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+        <div
+          className="flex justify-end gap-2 border-t px-5 py-3"
+          style={{ borderColor: "var(--color-border)" }}
+        >
           <button
             onClick={onClose}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-[var(--color-surface-subtle)]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
           >
             Cancel
           </button>
@@ -240,6 +251,9 @@ export function ErrorsListTab({ category = "all", showResolved = false }: Props)
   const openCount  = errors.filter((e) => e.status === "open").length;
   const criticalCount = errors.filter((e) => e.severity === "critical" && e.status === "open").length;
 
+  const inputCls = "h-8 rounded-lg border px-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500";
+  const inputStyle = { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" };
+
   return (
     <div className="space-y-4">
       {/* Stats banner */}
@@ -261,12 +275,14 @@ export function ErrorsListTab({ category = "all", showResolved = false }: Props)
           placeholder="Search errors…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          className="h-8 w-52 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+          className={`w-52 ${inputCls}`}
+          style={inputStyle}
         />
         <select
           value={filterCat}
           onChange={(e) => setFilterCat(e.target.value)}
-          className="h-8 rounded-lg border border-slate-200 px-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+          className={`px-2 ${inputCls}`}
+          style={inputStyle}
         >
           <option value="all">All categories</option>
           {(Object.keys(CATEGORY_LABELS) as ErrCategory[]).map((c) => (
@@ -276,7 +292,8 @@ export function ErrorsListTab({ category = "all", showResolved = false }: Props)
         <select
           value={filterSev}
           onChange={(e) => setFilterSev(e.target.value)}
-          className="h-8 rounded-lg border border-slate-200 px-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+          className={`px-2 ${inputCls}`}
+          style={inputStyle}
         >
           <option value="all">All severities</option>
           <option value="critical">Critical</option>
@@ -287,7 +304,8 @@ export function ErrorsListTab({ category = "all", showResolved = false }: Props)
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
-          className="h-8 rounded-lg border border-slate-200 px-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+          className={`px-2 ${inputCls}`}
+          style={inputStyle}
         >
           <option value="open">Open</option>
           <option value="in_review">In Review</option>
@@ -301,9 +319,9 @@ export function ErrorsListTab({ category = "all", showResolved = false }: Props)
       {err && <p role="alert" className="text-sm text-red-700">{err}</p>}
 
       {loading ? (
-        <div className="flex items-center justify-center py-16 text-sm text-slate-400">Loading…</div>
+        <div className="flex items-center justify-center py-16 text-sm" style={{ color: "var(--color-text-muted)" }}>Loading…</div>
       ) : errors.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-16 text-slate-400">
+        <div className="flex flex-col items-center gap-3 py-16" style={{ color: "var(--color-text-muted)" }}>
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
             <polyline points="22 4 12 14.01 9 11.01" />
@@ -317,11 +335,15 @@ export function ErrorsListTab({ category = "all", showResolved = false }: Props)
             <div
               key={e.id}
               className={[
-                "rounded-xl border bg-white p-4 transition-shadow hover:shadow-sm",
+                "rounded-xl border p-4 transition-shadow hover:shadow-sm",
                 e.severity === "critical" && e.status === "open"
                   ? "border-red-300"
-                  : "border-slate-200",
+                  : "",
               ].join(" ")}
+              style={!(e.severity === "critical" && e.status === "open")
+                ? { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }
+                : { backgroundColor: "var(--color-surface)" }
+              }
             >
               <div className="flex items-start gap-3">
                 <span className="mt-0.5 text-xl" aria-hidden="true">
@@ -329,15 +351,18 @@ export function ErrorsListTab({ category = "all", showResolved = false }: Props)
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-slate-900">{e.title}</p>
+                    <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{e.title}</p>
                     <Badge variant={SEVERITY_BADGE[e.severity]}>{e.severity}</Badge>
                     <Badge variant={STATUS_BADGE[e.status]}>{e.status.replace("_", " ")}</Badge>
-                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
+                    <span
+                      className="rounded px-1.5 py-0.5 text-[10px]"
+                      style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }}
+                    >
                       {CATEGORY_LABELS[e.category]}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500 leading-relaxed">{e.description}</p>
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
+                  <p className="mt-1 text-xs leading-relaxed" style={{ color: "var(--color-text-muted)" }}>{e.description}</p>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
                     <span>{e.affected_entity_name}</span>
                     {e.po_number && <span>PO: {e.po_number}</span>}
                     {e.supplier_name && <span>Supplier: {e.supplier_name}</span>}
@@ -346,7 +371,7 @@ export function ErrorsListTab({ category = "all", showResolved = false }: Props)
                     {e.resolved_by && <span>By {e.resolved_by}</span>}
                   </div>
                   {e.notes && (
-                    <p className="mt-1 text-xs italic text-slate-400">{e.notes}</p>
+                    <p className="mt-1 text-xs italic" style={{ color: "var(--color-text-muted)" }}>{e.notes}</p>
                   )}
                   {e.resolution && (
                     <p className="mt-1 text-xs text-green-700">✓ {e.resolution}</p>
@@ -356,7 +381,8 @@ export function ErrorsListTab({ category = "all", showResolved = false }: Props)
                   <button
                     type="button"
                     onClick={() => setActing(e)}
-                    className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-indigo-400 hover:text-indigo-700 transition-colors"
+                    className="shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium hover:border-indigo-400 hover:text-indigo-700 transition-colors"
+                    style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
                   >
                     Resolve
                   </button>

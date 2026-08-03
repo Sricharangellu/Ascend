@@ -61,28 +61,30 @@ export function NewQuoteModal({
     >
       <div className="flex flex-col gap-4">
         <div>
-          <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Vendor</label>
+          <label className="mb-1 block text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Vendor</label>
           <input
             type="text"
             value={vendor}
             onChange={(e) => setVendor(e.target.value)}
             placeholder="e.g. Supplier Co"
-            className="min-h-[44px] w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+            className="min-h-[44px] w-full rounded-md border px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+            style={{ borderColor: "var(--color-border)" }}
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Expires on</label>
+          <label className="mb-1 block text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Expires on</label>
           <input
             type="date"
             value={expiresOn}
             onChange={(e) => setExpiresOn(e.target.value)}
-            className="min-h-[44px] rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+            className="min-h-[44px] rounded-md border px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+            style={{ borderColor: "var(--color-border)" }}
           />
         </div>
         <div>
-          <label className="mb-2 block text-xs font-semibold uppercase text-slate-500">Line items</label>
+          <label className="mb-2 block text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>Line items</label>
           <table className="w-full text-sm">
-            <thead className="text-left text-xs font-semibold uppercase text-slate-500">
+            <thead className="text-left text-xs font-semibold uppercase" style={{ color: "var(--color-text-muted)" }}>
               <tr>
                 <th className="pb-1 pr-2">Product</th>
                 <th className="pb-1 pr-2 w-16">Qty</th>
@@ -90,7 +92,7 @@ export function NewQuoteModal({
                 <th className="pb-1 w-8" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[var(--color-table-border)]">
               {draftLines.map((l, i) => (
                 <tr key={i}>
                   <td className="py-1 pr-2">
@@ -99,7 +101,8 @@ export function NewQuoteModal({
                       value={l.product}
                       onChange={(e) => updateDraftLine(i, { product: e.target.value })}
                       placeholder="Product name"
-                      className="min-h-[36px] w-full rounded border border-slate-300 px-2 text-sm outline-none focus:border-blue-500"
+                      className="min-h-[36px] w-full rounded border px-2 text-sm outline-none focus:border-blue-500"
+                      style={{ borderColor: "var(--color-border)" }}
                     />
                   </td>
                   <td className="py-1 pr-2">
@@ -108,7 +111,8 @@ export function NewQuoteModal({
                       min="1"
                       value={l.qty}
                       onChange={(e) => updateDraftLine(i, { qty: e.target.value })}
-                      className="min-h-[36px] w-full rounded border border-slate-300 px-2 text-sm outline-none focus:border-blue-500"
+                      className="min-h-[36px] w-full rounded border px-2 text-sm outline-none focus:border-blue-500"
+                      style={{ borderColor: "var(--color-border)" }}
                     />
                   </td>
                   <td className="py-1 pr-2">
@@ -118,7 +122,8 @@ export function NewQuoteModal({
                       value={l.unit_price}
                       onChange={(e) => updateDraftLine(i, { unit_price: e.target.value })}
                       placeholder="0.00"
-                      className="min-h-[36px] w-full rounded border border-slate-300 px-2 text-sm outline-none focus:border-blue-500"
+                      className="min-h-[36px] w-full rounded border px-2 text-sm outline-none focus:border-blue-500"
+                      style={{ borderColor: "var(--color-border)" }}
                     />
                   </td>
                   <td className="py-1">
@@ -126,7 +131,8 @@ export function NewQuoteModal({
                       <button
                         type="button"
                         onClick={() => setDraftLines((cur) => cur.filter((_, idx) => idx !== i))}
-                        className="rounded p-1 text-slate-400 hover:text-red-500"
+                        className="rounded p-1 hover:text-red-500"
+                        style={{ color: "var(--color-text-muted)" }}
                         aria-label="Remove line"
                       >
                         <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -10,7 +10,7 @@ const MOVEMENT_TYPE_BADGE: Record<StockMovement["type"], { label: string; color:
   adjustment: { label: "Adjustment", color: "bg-warning-50 text-warning-700 ring-warning-200" },
   receive:    { label: "PO Receive", color: "bg-success-50 text-success-700 ring-success-200" },
   transfer:   { label: "Transfer",   color: "bg-purple-50 text-purple-700 ring-purple-200" },
-  return:     { label: "Return",     color: "bg-slate-100 text-slate-600 ring-slate-200" },
+  return:     { label: "Return",     color: "" },
 };
 
 
@@ -43,16 +43,23 @@ export function MovementsDrawer({
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} aria-hidden="true" />
-      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col bg-white shadow-2xl">
-        <div className="flex flex-none items-center justify-between border-b border-slate-200 px-5 py-4">
+      <div
+        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col shadow-2xl"
+        style={{ backgroundColor: "var(--color-surface)" }}
+      >
+        <div
+          className="flex flex-none items-center justify-between border-b px-5 py-4"
+          style={{ borderColor: "var(--color-border)" }}
+        >
           <div>
-            <h2 className="text-base font-semibold text-slate-950">Stock movements</h2>
-            <p className="text-sm text-slate-500">{product.name} · {product.sku}</p>
+            <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Stock movements</h2>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>{product.name} · {product.sku}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded p-1 text-slate-400 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-950"
+            className="rounded p-1 focus:outline-none focus:ring-2 focus:ring-slate-950"
+            style={{ color: "var(--color-text-muted)" }}
             aria-label="Close drawer"
           >
             <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -67,10 +74,13 @@ export function MovementsDrawer({
           ) : error ? (
             <div className="p-6 text-sm text-danger-700" role="alert">{error}</div>
           ) : movements.length === 0 ? (
-            <div className="p-6 text-center text-sm text-[var(--color-text-secondary)]">No movements recorded yet.</div>
+            <div className="p-6 text-center text-sm" style={{ color: "var(--color-text-secondary)" }}>No movements recorded yet.</div>
           ) : (
-            <table className="min-w-full divide-y divide-slate-100 text-sm">
-              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
+            <table className="min-w-full divide-y text-sm" style={{ borderColor: "var(--color-table-border)" }}>
+              <thead
+                className="text-left text-xs font-semibold uppercase"
+                style={{ backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}
+              >
                 <tr>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Type</th>
@@ -80,23 +90,33 @@ export function MovementsDrawer({
                   <th className="px-4 py-3">Note</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
+              <tbody className="divide-y" style={{ borderColor: "var(--color-table-border)", backgroundColor: "var(--color-surface)" }}>
                 {movements.map((m) => {
                   const badge = MOVEMENT_TYPE_BADGE[m.type as StockMovement["type"]];
+                  const isReturn = m.type === "return";
                   return (
-                    <tr key={m.id} className="hover:bg-slate-50">
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">{fmtDateTime(m.created_at)}</td>
+                    <tr key={m.id} className="hover:bg-[var(--color-surface-subtle)]">
+                      <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-muted)" }}>{fmtDateTime(m.created_at)}</td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        <span className={`inline-flex rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${badge.color}`}>
-                          {badge.label}
-                        </span>
+                        {isReturn ? (
+                          <span
+                            className="inline-flex rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset"
+                            style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)", ringColor: "var(--color-border)" }}
+                          >
+                            {badge.label}
+                          </span>
+                        ) : (
+                          <span className={`inline-flex rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${badge.color}`}>
+                            {badge.label}
+                          </span>
+                        )}
                       </td>
                       <td className={`whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums ${m.delta < 0 ? "text-danger-600" : "text-success-600"}`}>
                         {m.delta > 0 ? `+${m.delta}` : String(m.delta)}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">{m.location}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">{m.actor}</td>
-                      <td className="px-4 py-3 text-slate-500">{m.note ?? "—"}</td>
+                      <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{m.location}</td>
+                      <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{m.actor}</td>
+                      <td className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>{m.note ?? "—"}</td>
                     </tr>
                   );
                 })}

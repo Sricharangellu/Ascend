@@ -57,15 +57,20 @@ function NewSessionModal({ onClose, onCreated }: NewSessionModalProps) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-xl bg-white shadow-xl"
+        className="w-full max-w-md rounded-xl shadow-xl"
+        style={{ backgroundColor: "var(--color-surface)" }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-950">New Count Session</h2>
+        <div
+          className="flex items-center justify-between border-b px-5 py-4"
+          style={{ borderColor: "var(--color-border)" }}
+        >
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>New Count Session</h2>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 text-xl leading-none"
+            className="text-xl leading-none"
+            style={{ color: "var(--color-text-muted)" }}
           >
             &times;
           </button>
@@ -73,26 +78,31 @@ function NewSessionModal({ onClose, onCreated }: NewSessionModalProps) {
         <form id="new-session-form" onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
           {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Note <span className="text-slate-400 font-normal">(optional)</span>
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>
+              Note <span className="font-normal" style={{ color: "var(--color-text-muted)" }}>(optional)</span>
             </label>
             <input
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
               placeholder="e.g. Weekly count — main stockroom"
               value={note}
               onChange={e => setNote(e.target.value)}
             />
           </div>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             A new session will be seeded with the current on-hand quantity for every
             active SKU as the expected count.
           </p>
         </form>
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+        <div
+          className="flex justify-end gap-2 border-t px-5 py-3"
+          style={{ borderColor: "var(--color-border)" }}
+        >
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50"
+            className="rounded-lg border px-4 py-2 text-sm hover:bg-[var(--color-surface-subtle)]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
           >
             Cancel
           </button>
@@ -145,12 +155,16 @@ function CloseSessionModal({ session, lines, onClose, onClosed }: CloseModalProp
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-xl bg-white shadow-xl"
+        className="w-full max-w-md rounded-xl shadow-xl"
+        style={{ backgroundColor: "var(--color-surface)" }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-950">Close Count Session</h2>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+        <div
+          className="flex items-center justify-between border-b px-5 py-4"
+          style={{ borderColor: "var(--color-border)" }}
+        >
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Close Count Session</h2>
+          <button type="button" onClick={onClose} className="text-xl leading-none" style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
         <div className="px-5 py-4 space-y-3">
           {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
@@ -159,13 +173,18 @@ function CloseSessionModal({ session, lines, onClose, onClosed }: CloseModalProp
               <strong>{uncounted}</strong> SKU{uncounted !== 1 ? "s" : ""} still uncounted. Their variance will be recorded as 0.
             </div>
           )}
-          <p className="text-sm text-slate-600">
+          <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
             Closing will post <strong>{withVariance}</strong> inventory adjustment{withVariance !== 1 ? "s" : ""} for
             SKUs with a non-zero variance. This cannot be undone.
           </p>
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50">
+        <div
+          className="flex justify-end gap-2 border-t px-5 py-3"
+          style={{ borderColor: "var(--color-border)" }}
+        >
+          <button type="button" onClick={onClose}
+            className="rounded-lg border px-4 py-2 text-sm hover:bg-[var(--color-surface-subtle)]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
             Cancel
           </button>
           <button
@@ -250,8 +269,8 @@ function SessionDetail({ session, onBack, onSessionClosed }: SessionDetailProps)
         >
           ← Sessions
         </button>
-        <span className="text-slate-300">/</span>
-        <span className="text-sm text-slate-600 truncate max-w-xs">
+        <span style={{ color: "var(--color-border)" }}>/</span>
+        <span className="text-sm truncate max-w-xs" style={{ color: "var(--color-text-secondary)" }}>
           {session.note ?? "Count session"}
         </span>
         <Badge variant={session.status === "open" ? "blue" : "gray"}>
@@ -268,8 +287,8 @@ function SessionDetail({ session, onBack, onSessionClosed }: SessionDetailProps)
           { label: "Variances", value: varianceCount },
         ].map(c => (
           <Card key={c.label} className="px-4 py-3">
-            <p className="text-xs text-slate-500 uppercase tracking-wide">{c.label}</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900">{c.value}</p>
+            <p className="text-xs uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>{c.label}</p>
+            <p className="mt-1 text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>{c.value}</p>
           </Card>
         ))}
       </div>
@@ -283,22 +302,28 @@ function SessionDetail({ session, onBack, onSessionClosed }: SessionDetailProps)
       )}
 
       <Card className="overflow-hidden p-0">
-        <div className="border-b border-slate-200 px-5 py-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-800">Count Lines</h3>
-          <span className="text-xs text-slate-500">
+        <div
+          className="border-b px-5 py-3 flex items-center justify-between"
+          style={{ borderColor: "var(--color-border)" }}
+        >
+          <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Count Lines</h3>
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             {session.status === "open"
               ? "Enter counted quantities and press Enter or Tab to save"
               : `Closed ${session.closed_at ? fmtDateTime(session.closed_at) : ""}`}
           </span>
         </div>
         {loading ? (
-          <div className="px-5 py-10 text-center text-sm text-slate-500">Loading…</div>
+          <div className="px-5 py-10 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>Loading…</div>
         ) : error ? (
           <div className="px-5 py-10 text-center text-sm text-red-600">{error}</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide">
+              <thead
+                className="text-xs uppercase tracking-wide"
+                style={{ backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}
+              >
                 <tr>
                   <th className="px-5 py-3 text-left">Product</th>
                   <th className="px-5 py-3 text-left">SKU</th>
@@ -307,14 +332,14 @@ function SessionDetail({ session, onBack, onSessionClosed }: SessionDetailProps)
                   <th className="px-5 py-3 text-right">Variance</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y" style={{ borderColor: "var(--color-table-border)" }}>
                 {lines.map(line => (
-                  <tr key={line.product_id} className="hover:bg-slate-50">
-                    <td className="px-5 py-3 font-medium text-slate-900">
+                  <tr key={line.product_id} className="hover:bg-[var(--color-surface-subtle)]">
+                    <td className="px-5 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>
                       {line.product_name ?? line.product_id}
                     </td>
-                    <td className="px-5 py-3 text-slate-500">{line.sku ?? "—"}</td>
-                    <td className="px-5 py-3 text-right text-slate-700">{line.expected_qty}</td>
+                    <td className="px-5 py-3" style={{ color: "var(--color-text-muted)" }}>{line.sku ?? "—"}</td>
+                    <td className="px-5 py-3 text-right" style={{ color: "var(--color-text-secondary)" }}>{line.expected_qty}</td>
                     <td className="px-5 py-3 text-right">
                       {session.status === "open" ? (
                         <input
@@ -326,10 +351,11 @@ function SessionDetail({ session, onBack, onSessionClosed }: SessionDetailProps)
                           onBlur={() => submitCount(line.product_id)}
                           onKeyDown={e => { if (e.key === "Enter") submitCount(line.product_id); }}
                           disabled={saving === line.product_id}
-                          className="w-20 rounded border border-slate-300 px-2 py-1 text-right text-sm focus:border-blue-500 focus:outline-none disabled:opacity-50"
+                          className="w-20 rounded border px-2 py-1 text-right text-sm focus:border-blue-500 focus:outline-none disabled:opacity-50"
+                          style={{ borderColor: "var(--color-border)" }}
                         />
                       ) : (
-                        <span className="text-slate-700">{line.counted_qty ?? "—"}</span>
+                        <span style={{ color: "var(--color-text-secondary)" }}>{line.counted_qty ?? "—"}</span>
                       )}
                     </td>
                     <td className="px-5 py-3 text-right">
@@ -339,7 +365,7 @@ function SessionDetail({ session, onBack, onSessionClosed }: SessionDetailProps)
                 ))}
                 {lines.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-5 py-10 text-center text-slate-400">No lines</td>
+                    <td colSpan={5} className="px-5 py-10 text-center" style={{ color: "var(--color-text-muted)" }}>No lines</td>
                   </tr>
                 )}
               </tbody>
@@ -422,27 +448,33 @@ export default function CycleCountsPage() {
                 { label: "Total Sessions",  value: sessions.length },
               ].map(c => (
                 <Card key={c.label} className="px-4 py-3">
-                  <p className="text-xs text-slate-500 uppercase tracking-wide">{c.label}</p>
-                  <p className="mt-1 text-2xl font-bold text-slate-900">{c.value}</p>
+                  <p className="text-xs uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>{c.label}</p>
+                  <p className="mt-1 text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>{c.value}</p>
                 </Card>
               ))}
             </div>
 
             {/* Sessions list */}
             <Card className="overflow-hidden p-0">
-              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-                <h2 className="text-sm font-semibold text-slate-800">Count Sessions</h2>
+              <div
+                className="flex items-center justify-between border-b px-5 py-3"
+                style={{ borderColor: "var(--color-border)" }}
+              >
+                <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Count Sessions</h2>
                 <Button variant="primary" onClick={() => setShowNew(true)}>
                   + New Session
                 </Button>
               </div>
 
               {loading ? (
-                <div className="px-5 py-10 text-center text-sm text-slate-500">Loading…</div>
+                <div className="px-5 py-10 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>Loading…</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide">
+                    <thead
+                      className="text-xs uppercase tracking-wide"
+                      style={{ backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}
+                    >
                       <tr>
                         <th className="px-5 py-3 text-left">Started</th>
                         <th className="px-5 py-3 text-left">Note</th>
@@ -452,24 +484,24 @@ export default function CycleCountsPage() {
                         <th className="px-5 py-3"></th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y" style={{ borderColor: "var(--color-table-border)" }}>
                       {sessions.map(session => (
                         <tr
                           key={session.id}
-                          className="hover:bg-slate-50 cursor-pointer"
+                          className="hover:bg-[var(--color-surface-subtle)] cursor-pointer"
                           onClick={() => setSelected(session)}
                         >
-                          <td className="px-5 py-3 text-slate-700">{fmtDateTime(session.opened_at)}</td>
-                          <td className="px-5 py-3 text-slate-600 max-w-xs truncate">
-                            {session.note ?? <span className="text-slate-400">—</span>}
+                          <td className="px-5 py-3" style={{ color: "var(--color-text-secondary)" }}>{fmtDateTime(session.opened_at)}</td>
+                          <td className="px-5 py-3 max-w-xs truncate" style={{ color: "var(--color-text-secondary)" }}>
+                            {session.note ?? <span style={{ color: "var(--color-text-muted)" }}>—</span>}
                           </td>
-                          <td className="px-5 py-3 text-slate-500">{session.opened_by}</td>
+                          <td className="px-5 py-3" style={{ color: "var(--color-text-muted)" }}>{session.opened_by}</td>
                           <td className="px-5 py-3">
                             <Badge variant={session.status === "open" ? "blue" : "gray"}>
                               {session.status}
                             </Badge>
                           </td>
-                          <td className="px-5 py-3 text-slate-500 text-xs">
+                          <td className="px-5 py-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
                             {session.closed_at ? fmtDateTime(session.closed_at) : "—"}
                           </td>
                           <td className="px-5 py-3 text-right">
@@ -479,7 +511,7 @@ export default function CycleCountsPage() {
                       ))}
                       {sessions.length === 0 && (
                         <tr>
-                          <td colSpan={6} className="px-5 py-12 text-center text-slate-400">
+                          <td colSpan={6} className="px-5 py-12 text-center" style={{ color: "var(--color-text-muted)" }}>
                             No count sessions yet. Start one to begin counting.
                           </td>
                         </tr>

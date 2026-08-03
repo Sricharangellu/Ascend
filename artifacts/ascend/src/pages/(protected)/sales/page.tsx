@@ -120,11 +120,12 @@ export default function SalesHistoryPage() {
       <div className="flex flex-col min-h-full">
 
         {/* ── Page header ──────────────────────────────────────────────────── */}
-        <div className="bg-white border-b border-[#E8E8E8] px-6 py-4 flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-[#111]">Sales history</h1>
+        <div className="border-b px-6 py-4 flex items-center justify-between" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+          <h1 className="text-[20px] font-bold tracking-tight" style={{ color: "var(--color-text-primary)" }}>Sales history</h1>
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded border border-[#D9D9D9] bg-white px-3 py-1.5 text-sm text-[#555] hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] transition-colors hover:bg-[var(--color-surface-subtle)]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)", backgroundColor: "var(--color-surface)" }}
           >
             <DownloadIcon />
             Export list
@@ -132,51 +133,55 @@ export default function SalesHistoryPage() {
         </div>
 
         {/* ── Filter bar (reference pattern) ───────────────────────────────── */}
-        <div className="bg-white border-b border-[#E8E8E8] px-6 py-3">
+        <div className="border-b px-6 py-3" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
           <div className="flex flex-wrap items-end gap-3">
             {/* Date */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[#555]">Date</label>
+              <label className="text-[11px] font-medium" style={{ color: "var(--color-text-secondary)" }}>Date</label>
               <input
                 type="date"
                 value={filterDate}
                 onChange={e => setFilterDate(e.target.value)}
-                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
+                className="h-8 rounded-lg border px-2 text-[13px] focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)", backgroundColor: "var(--color-surface)" }}
               />
             </div>
 
             {/* Customer */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[#555]">Customer</label>
+              <label className="text-[11px] font-medium" style={{ color: "var(--color-text-secondary)" }}>Customer</label>
               <input
                 type="text"
                 placeholder="Search customer"
                 value={filterCustomer}
                 onChange={e => setFilterCustomer(e.target.value)}
-                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600 w-36"
+                className="h-8 w-36 rounded-lg border px-2 text-[13px] focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)", backgroundColor: "var(--color-surface)" }}
               />
             </div>
 
             {/* Receipt or note */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[#555]">Receipt or note</label>
+              <label className="text-[11px] font-medium" style={{ color: "var(--color-text-secondary)" }}>Receipt or note</label>
               <input
                 type="text"
                 placeholder="Receipt #, note…"
                 value={filterReceipt}
                 onChange={e => setFilterReceipt(e.target.value)}
-                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600 w-36"
+                className="h-8 w-36 rounded-lg border px-2 text-[13px] focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)", backgroundColor: "var(--color-surface)" }}
               />
             </div>
 
             {/* More filters toggle */}
             {moreFilters && (
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-[#555]">Status</label>
+                <label className="text-[11px] font-medium" style={{ color: "var(--color-text-secondary)" }}>Status</label>
                 <select
                   value={filterStatus}
                   onChange={e => setFilterStatus(e.target.value)}
-                  className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none"
+                  className="h-8 rounded-lg border px-2 text-[13px] focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)", backgroundColor: "var(--color-surface)" }}
                 >
                   <option value="all">All statuses</option>
                   <option value="completed">Completed</option>
@@ -207,7 +212,7 @@ export default function SalesHistoryPage() {
 
           {/* Results count */}
           {!loading && (
-            <p className="mt-2 text-xs text-[#666]">
+            <p className="mt-2 text-[11px]" style={{ color: "var(--color-text-muted)" }}>
               Showing <strong>{visible.length}</strong> sale{visible.length !== 1 ? "s" : ""}
             </p>
           )}
@@ -216,12 +221,13 @@ export default function SalesHistoryPage() {
         {/* ── Table ─────────────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-x-auto">
           {error && (
-            <div role="alert" className="m-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+            <div role="alert" className="m-4 rounded-lg border px-4 py-3 text-[13px]"
+              style={{ borderColor: "var(--color-danger-border)", backgroundColor: "var(--color-danger-bg)", color: "var(--color-danger-text)" }}>{error}</div>
           )}
 
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#F0F0F0] bg-[#FAFAFA] text-left text-xs font-semibold text-[#888] uppercase tracking-wider">
+              <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ borderBottom: "1px solid var(--color-table-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-secondary)" }}>
                 <th className="w-6 px-4 py-3" />
                 <th className="px-4 py-3">Receipt # &amp; date</th>
                 <th className="px-4 py-3">Customer</th>
@@ -234,20 +240,21 @@ export default function SalesHistoryPage() {
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-[#888]">
+                  <td colSpan={7} className="px-4 py-12 text-center" style={{ color: "var(--color-text-muted)" }}>
                     <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
                   </td>
                 </tr>
               )}
               {!loading && visible.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-[#888]">No sales found for the selected filters.</td>
+                  <td colSpan={7} className="px-4 py-12 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>No sales found for the selected filters.</td>
                 </tr>
               )}
               {visible.map(sale => (
                 <Fragment key={sale.id}>
                   <tr
-                    className="border-b border-[#F5F5F5] hover:bg-[#FAFAFA] cursor-pointer"
+                    className="cursor-pointer transition-colors hover:bg-[var(--color-table-row-hover)]"
+                    style={{ borderBottom: "1px solid var(--color-table-border)" }}
                     onClick={() => setExpandedId(expandedId === sale.id ? null : sale.id)}
                   >
                     {/* Expand chevron */}
@@ -255,7 +262,8 @@ export default function SalesHistoryPage() {
                       <svg
                         width="14" height="14" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                        className={`text-[#999] transition-transform ${expandedId === sale.id ? "rotate-90" : ""}`}
+                        className={`transition-transform ${expandedId === sale.id ? "rotate-90" : ""}`}
+                        style={{ color: "var(--color-text-muted)" }}
                         aria-hidden="true"
                       >
                         <polyline points="9 18 15 12 9 6" />
@@ -265,12 +273,12 @@ export default function SalesHistoryPage() {
                     {/* Receipt # + date */}
                     <td className="px-4 py-3">
                       <p className="font-medium text-brand-600">{sale.receipt_number}</p>
-                      <p className="text-xs text-[#888]">{fmt(sale.created_at)}</p>
+                      <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{fmt(sale.created_at)}</p>
                     </td>
 
                     {/* Customer */}
-                    <td className="px-4 py-3 text-[#555]">
-                      {sale.customer_name ?? <span className="text-[#bbb]">—</span>}
+                    <td className="px-4 py-3 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
+                      {sale.customer_name ?? <span style={{ color: "var(--color-text-muted)" }}>—</span>}
                     </td>
 
                     {/* Sold by — avatar + name + outlet */}
@@ -284,19 +292,19 @@ export default function SalesHistoryPage() {
                           {initials(sale.sold_by)}
                         </div>
                         <div>
-                          <p className="text-xs font-medium text-[#111]">{sale.sold_by}</p>
-                          <p className="text-[11px] text-[#888]">{sale.outlet}</p>
+                          <p className="text-[11px] font-medium" style={{ color: "var(--color-text-primary)" }}>{sale.sold_by}</p>
+                          <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{sale.outlet}</p>
                         </div>
                       </div>
                     </td>
 
                     {/* Note */}
-                    <td className="px-4 py-3 text-[#888] italic text-xs max-w-[160px] truncate">
+                    <td className="px-4 py-3 italic text-[11px] max-w-[160px] truncate" style={{ color: "var(--color-text-muted)" }}>
                       {sale.note ?? "—"}
                     </td>
 
                     {/* Total */}
-                    <td className="px-4 py-3 text-right font-semibold tabular-nums text-[#111]">
+                    <td className="px-4 py-3 text-right font-semibold tabular-nums text-[13px]" style={{ color: "var(--color-text-primary)" }}>
                       {formatMoney(sale.total_cents)}
                     </td>
 

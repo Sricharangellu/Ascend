@@ -66,8 +66,8 @@ export function DashboardRecommendations({
     <Card>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">What to do next</h2>
-          <p className="mt-0.5 text-sm text-slate-500">
+          <h2 className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>What to do next</h2>
+          <p className="mt-0.5 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
             Ranked actions from real setup, inventory, sales, expense, and profit signals.
           </p>
         </div>
@@ -83,7 +83,7 @@ export function DashboardRecommendations({
       {loading && (
         <div role="status" aria-label="Loading recommendations" className="grid gap-2 md:grid-cols-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-24 animate-pulse rounded-lg border border-slate-100 bg-slate-50" />
+            <div key={i} className="h-24 animate-skeleton rounded-lg border" style={{ borderColor: "var(--color-border)" }} />
           ))}
         </div>
       )}
@@ -107,7 +107,7 @@ export function DashboardRecommendations({
             return (
               <li key={rec.id} className={`flex min-h-[132px] flex-col rounded-lg border p-3 ${styles.row}`}>
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-2 text-xs font-semibold uppercase text-slate-500">
+                  <span className="flex items-center gap-2 text-[10px] font-semibold uppercase" style={{ color: "var(--color-text-secondary)" }}>
                     <span className={`h-2 w-2 rounded-full ${styles.dot}`} aria-hidden="true" />
                     #{rec.rank} {rec.category}
                   </span>
@@ -115,10 +115,10 @@ export function DashboardRecommendations({
                     {styles.label}
                   </span>
                 </div>
-                <p className="text-sm font-semibold text-slate-950">{rec.title}</p>
-                <p className="mt-1 line-clamp-2 text-xs text-slate-600">{rec.detail}</p>
+                <p className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>{rec.title}</p>
+                <p className="mt-1 line-clamp-2 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{rec.detail}</p>
                 <div className="mt-auto flex items-center justify-between gap-2 pt-3">
-                  <Link href={rec.href} className="text-sm font-semibold text-blue-700 hover:underline">
+                  <Link href={rec.href} className="text-[13px] font-semibold text-brand-600 hover:underline">
                     {rec.action}
                   </Link>
                   {onTrackTask && (
@@ -126,7 +126,8 @@ export function DashboardRecommendations({
                       type="button"
                       onClick={() => onTrackTask(rec)}
                       aria-label={`Track "${rec.title}" as a progress task`}
-                      className="shrink-0 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      className="shrink-0 rounded-lg border px-2 py-1 text-[11px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+                      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
                     >
                       Track as task
                     </button>
