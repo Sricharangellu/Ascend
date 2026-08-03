@@ -211,44 +211,66 @@ export default function DashboardPage() {
       subtitle={`Overview · Demo Store · ${rangeLabel(range)}`}
       contentClassName="overflow-y-auto"
     >
-      <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6">
+      <div className="mx-auto w-full max-w-7xl space-y-5 px-5 py-5 sm:px-6">
 
         {/* ── Retail setup checklist (auto-hides when complete or dismissed) ── */}
         <RetailSetupChecklist />
 
-        {/* ── Filter bar ───────────────────────────────────────────────────── */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-table-border)] pb-4">
+        {/* ── Page header + filter bar ──────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--color-border)] pb-4">
           <div>
-            <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">Business Overview</h1>
-            <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">
+            <h1 className="text-[20px] font-bold tracking-tight text-[var(--color-text-primary)]">
+              Business Overview
+            </h1>
+            <p className="mt-0.5 text-[13px] text-[var(--color-text-secondary)]">
               Revenue, orders, inventory movement, and tender mix.
             </p>
           </div>
+
           <div className="flex flex-wrap items-center gap-2">
+            {/* Outlet filter */}
             {outlets.length > 0 && (
               <select
                 aria-label="Filter by outlet"
                 value={selectedOutletId}
                 onChange={(e) => setSelectedOutletId(e.target.value)}
-                className="h-8 rounded border border-slate-200 bg-white px-3 text-[13px] text-[var(--color-text-primary)] outline-none focus:border-brand-600"
+                className="h-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-[13px] text-[var(--color-text-primary)] shadow-[var(--shadow-xs)] outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
               >
                 <option value="">All Outlets</option>
                 {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
               </select>
             )}
-            <div role="group" aria-label="Report granularity" className="inline-flex rounded-md border border-slate-200 bg-white p-1">
+
+            {/* Granularity toggle */}
+            <div
+              role="group"
+              aria-label="Report granularity"
+              className="inline-flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-0.5 shadow-[var(--shadow-xs)]"
+            >
               {(["day", "week", "month"] as const).map((value) => (
-                <button key={value} type="button" onClick={() => setGranularity(value)} aria-pressed={granularity === value}
-                  className={`min-h-[28px] rounded px-3 text-[12px] font-medium capitalize transition-colors ${granularity === value ? "bg-brand-600 text-white" : "text-[var(--color-text-secondary)] hover:bg-gray-50"}`}>
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setGranularity(value)}
+                  aria-pressed={granularity === value}
+                  className={[
+                    "h-7 rounded-md px-3 text-[12px] font-medium capitalize transition-all duration-150",
+                    granularity === value
+                      ? "bg-brand-600 text-white shadow-[var(--shadow-xs)]"
+                      : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]",
+                  ].join(" ")}
+                >
                   {value}
                 </button>
               ))}
             </div>
+
+            {/* Date range */}
             <select
               aria-label="Date range"
               value={dateRange.preset === "custom" ? "current_week" : dateRange.preset}
               onChange={(e) => setDateRange(dateRangeForPreset(e.target.value as FinderDateRange["preset"]))}
-              className="h-8 rounded border border-slate-200 bg-white px-3 text-[13px] text-[var(--color-text-primary)] outline-none focus:border-brand-600"
+              className="h-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-[13px] text-[var(--color-text-primary)] shadow-[var(--shadow-xs)] outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
             >
               <option value="today">Today</option>
               <option value="current_week">This Week</option>
@@ -258,7 +280,12 @@ export default function DashboardPage() {
         </div>
 
         {errorSummary && !loading && (
-          <Card><p role="alert" className="text-sm text-danger-500">{errorSummary}</p></Card>
+          <div
+            role="alert"
+            className="rounded-xl border border-[var(--color-danger-border)] bg-[var(--color-danger-bg)] px-4 py-3 text-[13px] text-[var(--color-danger-text)]"
+          >
+            {errorSummary}
+          </div>
         )}
 
         <DashboardKpiSection

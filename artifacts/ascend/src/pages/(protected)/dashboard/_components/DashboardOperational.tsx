@@ -1,7 +1,6 @@
 
 import Link from "@/lib/link";
 import { Card } from "@/components/Card";
-import { formatMoney } from "@/lib/money";
 
 interface LowStockItem {
   id: string; sku: string; name: string; category: string;
@@ -12,6 +11,26 @@ interface DashNotification {
   id: string; severity: string; title: string; body: string; read: boolean;
 }
 
+function SeverityDot({ severity }: { severity: string }) {
+  const colors: Record<string, string> = {
+    critical: "bg-danger-500",
+    warning:  "bg-warning-500",
+    info:     "bg-info-400",
+  };
+  return (
+    <span
+      className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${colors[severity] ?? "bg-[var(--color-border-strong)]"}`}
+      aria-hidden="true"
+    />
+  );
+}
+
+const SeverityRowBg: Record<string, string> = {
+  critical: "bg-[var(--color-danger-bg)] border-[var(--color-danger-border)]",
+  warning:  "bg-[var(--color-warning-bg)] border-[var(--color-warning-border)]",
+  info:     "bg-[var(--color-info-bg)] border-[var(--color-info-border)]",
+};
+
 export function DashboardOperational({
   lowStock,
   recentNotifs,
@@ -20,25 +39,36 @@ export function DashboardOperational({
   recentNotifs: DashNotification[];
 }) {
   return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-      <Card>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-900">Low Stock Alerts</h2>
-          <Link href="/inventory" className="text-xs text-blue-600 hover:underline">View all →</Link>
-        </div>
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {/* Low Stock */}
+      <Card
+        title="Low Stock Alerts"
+        action={
+          <Link href="/inventory" className="text-[12px] font-medium text-brand-600 hover:text-brand-700 hover:underline transition-colors">
+            View all →
+          </Link>
+        }
+      >
         {lowStock.length === 0 ? (
-          <p className="py-4 text-center text-sm text-slate-400">All stock levels are healthy.</p>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-success-50">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-success-600">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+            <p className="text-[13px] font-medium text-[var(--color-text-secondary)]">All stock levels are healthy</p>
+          </div>
         ) : (
           <ul className="space-y-2">
             {lowStock.map((item) => (
-              <li key={item.id} className="flex items-center justify-between rounded-lg border border-amber-100 bg-amber-50 px-3 py-2.5">
+              <li key={item.id} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-3 py-2.5">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-900">{item.name}</p>
-                  <p className="font-mono text-xs text-slate-500">{item.sku} · {item.category}</p>
+                  <p className="truncate text-[13px] font-semibold text-[var(--color-text-primary)]">{item.name}</p>
+                  <p className="font-mono text-[11px] text-[var(--color-text-secondary)]">{item.sku} · {item.category}</p>
                 </div>
-                <div className="ml-3 shrink-0 text-right">
-                  <p className="text-sm font-semibold text-amber-700">{item.onHand} left</p>
-                  <p className="text-xs text-slate-400">reorder at {item.reorderPoint}</p>
+                <div className="shrink-0 text-right">
+                  <p className="text-[13px] font-bold text-[var(--color-warning-text)]">{item.onHand} left</p>
+                  <p className="text-[11px] text-[var(--color-text-muted)]">reorder at {item.reorderPoint}</p>
                 </div>
               </li>
             ))}
@@ -46,24 +76,36 @@ export function DashboardOperational({
         )}
       </Card>
 
-      <Card>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-900">Recent Alerts</h2>
-          <Link href="/notifications" className="text-xs text-blue-600 hover:underline">View all →</Link>
-        </div>
+      {/* Recent Alerts */}
+      <Card
+        title="Recent Alerts"
+        action={
+          <Link href="/notifications" className="text-[12px] font-medium text-brand-600 hover:text-brand-700 hover:underline transition-colors">
+            View all →
+          </Link>
+        }
+      >
         {recentNotifs.length === 0 ? (
-          <p className="py-4 text-center text-sm text-slate-400">No recent alerts.</p>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-surface-subtle)]">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-[var(--color-text-muted)]">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+            </div>
+            <p className="text-[13px] font-medium text-[var(--color-text-secondary)]">No recent alerts</p>
+          </div>
         ) : (
           <ul className="space-y-2">
             {recentNotifs.map((n) => {
-              const sevColor = n.severity === "critical" ? "bg-red-50 border-red-100" : n.severity === "warning" ? "bg-amber-50 border-amber-100" : "bg-blue-50 border-blue-100";
-              const dotColor = n.severity === "critical" ? "bg-red-500" : n.severity === "warning" ? "bg-amber-400" : "bg-blue-400";
+              const rowBg = SeverityRowBg[n.severity] ?? "bg-[var(--color-surface-subtle)] border-[var(--color-border)]";
               return (
-                <li key={n.id} className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 ${sevColor}`}>
-                  <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dotColor}`} aria-hidden="true" />
+                <li key={n.id} className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 ${rowBg}`}>
+                  <SeverityDot severity={n.severity} />
                   <div className="min-w-0">
-                    <p className={`text-sm font-medium ${n.read ? "text-slate-600" : "text-slate-900"}`}>{n.title}</p>
-                    <p className="truncate text-xs text-slate-500">{n.body}</p>
+                    <p className={`text-[13px] font-semibold leading-snug ${n.read ? "text-[var(--color-text-secondary)]" : "text-[var(--color-text-primary)]"}`}>
+                      {n.title}
+                    </p>
+                    <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-secondary)]">{n.body}</p>
                   </div>
                 </li>
               );

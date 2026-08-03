@@ -4,34 +4,82 @@ import { cn } from '@/lib/utils';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0' +
-    ' hover-elevate active-elevate-2',
+  // Base — enterprise style: clean, precise, no decoration noise
+  [
+    'inline-flex items-center justify-center gap-2 whitespace-nowrap',
+    'font-medium text-sm transition-all duration-150',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
+    'disabled:pointer-events-none disabled:opacity-50',
+    '[&_svg]:pointer-events-none [&_svg]:shrink-0',
+    'select-none',
+  ].join(' '),
   {
     variants: {
       variant: {
-        default:
-          // @replit: no hover, and add primary border
-          'bg-primary text-primary-foreground border border-primary-border',
-        destructive:
-          'bg-destructive text-destructive-foreground shadow-sm border-destructive-border',
-        outline:
-          // @replit Shows the background color of whatever card / sidebar / accent background it is inside of.
-          // Inherits the current text color. Uses shadow-xs. no shadow on active
-          // No hover state
-          ' border [border-color:var(--button-outline)] shadow-xs active:shadow-none ',
-        secondary:
-          // @replit border, no hover, no shadow, secondary border.
-          'border bg-secondary text-secondary-foreground border border-secondary-border ',
-        // @replit no hover, transparent border
-        ghost: 'border border-transparent',
-        link: 'text-primary underline-offset-4 hover:underline',
+        // Primary CTA — brand purple, Stripe-style
+        default: [
+          'bg-brand-600 text-white border border-brand-700/40',
+          'hover:bg-brand-700 active:bg-brand-800 active:scale-[0.99]',
+          'focus-visible:ring-brand-400',
+          'shadow-xs',
+        ].join(' '),
+
+        // Secondary — neutral outlined
+        secondary: [
+          'bg-white text-[#1A1F36] border',
+          'hover:bg-[#F8FAFC] active:bg-[#F0F4F8] active:scale-[0.99]',
+          'focus-visible:ring-brand-400',
+          'shadow-xs',
+          '[border-color:var(--color-border)]',
+        ].join(' '),
+
+        // Outline — ghost with border
+        outline: [
+          'bg-transparent text-[color:var(--color-text-primary)] border',
+          'hover:bg-[color:var(--color-surface-subtle)] active:scale-[0.99]',
+          'focus-visible:ring-brand-400',
+          '[border-color:var(--color-border)]',
+        ].join(' '),
+
+        // Ghost — no border, no background
+        ghost: [
+          'bg-transparent text-[color:var(--color-text-secondary)] border border-transparent',
+          'hover:bg-[color:var(--color-surface-subtle)] hover:text-[color:var(--color-text-primary)]',
+          'active:scale-[0.99]',
+          'focus-visible:ring-brand-400',
+        ].join(' '),
+
+        // Destructive — danger red
+        destructive: [
+          'bg-danger-600 text-white border border-danger-700/40',
+          'hover:bg-danger-700 active:bg-danger-700 active:scale-[0.99]',
+          'focus-visible:ring-danger-400',
+          'shadow-xs',
+        ].join(' '),
+
+        // Destructive outline
+        'destructive-outline': [
+          'bg-transparent border text-danger-600 border-danger-200',
+          'hover:bg-danger-50 active:scale-[0.99]',
+          'focus-visible:ring-danger-400',
+        ].join(' '),
+
+        // Link style
+        link: [
+          'text-brand-600 underline-offset-4 hover:underline border border-transparent',
+          'focus-visible:ring-brand-400',
+        ].join(' '),
       },
+
       size: {
-        // @replit changed sizes
-        default: 'min-h-9 px-4 py-2',
-        sm: 'min-h-8 rounded-md px-3 text-xs',
-        lg: 'min-h-10 rounded-md px-8',
-        icon: 'h-9 w-9',
+        xs:      'h-7 px-2.5 text-xs rounded-md [&_svg]:size-3',
+        sm:      'h-8 px-3 text-[13px] rounded-md [&_svg]:size-3.5',
+        default: 'h-9 px-4 text-sm rounded-lg [&_svg]:size-4',
+        lg:      'h-10 px-5 text-[15px] rounded-lg [&_svg]:size-4',
+        xl:      'h-11 px-6 text-base rounded-lg [&_svg]:size-5',
+        icon:    'h-9 w-9 rounded-lg [&_svg]:size-4',
+        'icon-sm':'h-8 w-8 rounded-md [&_svg]:size-3.5',
+        'icon-xs':'h-7 w-7 rounded-md [&_svg]:size-3',
       },
     },
     defaultVariants: {

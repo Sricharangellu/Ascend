@@ -6,6 +6,7 @@ export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   description?: string;
   footer?: React.ReactNode;
   noPadding?: boolean;
+  action?: React.ReactNode;
 }
 
 export function Card({
@@ -15,23 +16,31 @@ export function Card({
   noPadding = false,
   children,
   className,
+  action,
   ...props
 }: CardProps) {
   return (
     <div
       className={clsx(
-        "rounded-md border border-[#F0F0F0] bg-white",
+        "rounded-xl border",
+        "bg-[var(--color-surface)] border-[var(--color-border)]",
+        "shadow-[var(--shadow-sm)]",
         className
       )}
       {...props}
     >
       {(title || description) && (
-        <div className="border-b border-[#F0F0F0] px-5 py-4">
-          {title && (
-            <h3 className="text-sm font-semibold text-[rgba(0,0,0,0.88)]">{title}</h3>
-          )}
-          {description && (
-            <p className="mt-1 text-[13px] text-[rgba(0,0,0,0.45)]">{description}</p>
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--color-border)] px-5 py-4">
+          <div className="min-w-0">
+            {title && (
+              <h3 className="text-[15px] font-semibold text-[var(--color-text-primary)] leading-snug">{title}</h3>
+            )}
+            {description && (
+              <p className="mt-0.5 text-[13px] text-[var(--color-text-secondary)]">{description}</p>
+            )}
+          </div>
+          {action && (
+            <div className="shrink-0">{action}</div>
           )}
         </div>
       )}
@@ -39,7 +48,7 @@ export function Card({
       <div className={clsx(!noPadding && "px-5 py-4")}>{children}</div>
 
       {footer && (
-        <div className="rounded-b-md border-t border-[#F0F0F0] bg-[#FAFAFA] px-5 py-3">
+        <div className="rounded-b-xl border-t border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-5 py-3">
           {footer}
         </div>
       )}
@@ -57,7 +66,7 @@ export function CardSection({
   return (
     <section
       className={clsx(
-        "border-t border-[#F0F0F0] px-5 py-4 first:border-0",
+        "border-t border-[var(--color-border)] px-5 py-4 first:border-0",
         className
       )}
     >
