@@ -5,7 +5,7 @@
 | Date (UTC) | 2026-08-03T04:43:31Z |
 | Parent | Wave 2 hubs + original Wave 1 “delete reporting tree” leftover |
 | Stacks on | `cursor/ponytail-wave2-hubs-72bc` |
-| Status | `built_unverified` — gates in progress |
+| Status | `built_verified` — web typecheck/lint PASS; vitest 158/158; `next build` PASS (111 routes) |
 
 ## What changed
 
