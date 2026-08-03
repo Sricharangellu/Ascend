@@ -203,10 +203,10 @@ const NAV_TREE: NavSection[] = [
   },
   {
     section: "setup",
-    label: "Setup",
+    label: "Settings",
     icon: <SetupIcon />,
     children: [
-      { label: "Settings",        href: "/settings",             featureGate: "settings" },
+      { label: "General",         href: "/settings",             featureGate: "settings" },
       { label: "Permissions",     href: "/settings/permissions", featureGate: "settings" },
       { label: "Business Modes",  href: "/settings/modes",       featureGate: "settings" },
       // Outlets/registers (Wave 2 dissolved Operations mega-page)
@@ -406,10 +406,10 @@ function TopBar({
                 <p className="text-xs text-slate-500 truncate">{user?.email}</p>
               </div>
               <Link
-                href="/setup"
+                href="/settings"
                 className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
               >
-                Account settings
+                Settings
               </Link>
               <button
                 type="button"

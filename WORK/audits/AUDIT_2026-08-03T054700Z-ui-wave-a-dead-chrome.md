@@ -16,6 +16,7 @@ dead-chrome / Quick Sell href leftovers were still live on `develop` tip `0a437b
 1. **Catalog Quick Sell** — `/register?product=` → `/terminal?product=` (handler on #163)
 2. **Shell** — remove Help → `/help` 404 link; remove Register Switch noop
 3. **Customers** — remove Import CTA (no API); remove fake row checkboxes; edit pencil → `/customers/:id`
+4. **Settings naming (Wave C #13 start)** — nav section `Setup` → `Settings`; child hub label `Settings` → `General`; user-menu `Account settings` → `Settings` → `/settings`
 
 ## Companion PRs (other leftovers)
 
