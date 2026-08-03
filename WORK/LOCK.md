@@ -1169,6 +1169,79 @@ note recommended: **PR #120** into `develop`. CI not yet observed on this PR.
 | Status | RELEASED — all five listed consumers addressed (four migrated, one confirmed to have nothing to migrate). Migrating `insights.reorderRecommendations()` and `purchasing.priceHistory()` fixed two real, independently-introduced bugs, not just relocated code: `insights`'s old query had its date filter inside a `LEFT JOIN`'s `ON` clause (never actually excludes on a LEFT JOIN, so `lookbackDays` had zero effect) and no `o.status = 'completed'` filter at all (refunded/open/cancelled orders counted as "sold"); `purchasing`'s old subquery was missing the same status filter independently. Both are fixed by the shared service, which has neither bug. Deliberately did NOT unify the *lookback-day number* itself (30 for the three Phase-6 surfaces, 90 for the other two, preserved) — only the implementation, per the exact wording of the approved scope ("one lookback-window convention" read as one function, not one universal number); flagged as a follow-up decision for Sri. Gates: `npm run typecheck` clean, `npm run gap:scan` clean (456/381, 21 allowlisted — unchanged), `npm run table:scan` clean (161 names, no new tables), `npm run hygiene` clean (1084 files). Real-Postgres targeted runs: `sales-velocity.test.ts` 9/9 (new — batching, product/location/category filters, status/date correctness, all 3 bucket types, convenience wrapper), `catalog/detail-views.test.ts` 25/25 regression, `inventory/pipeline-views.test.ts` 7/7 regression, `insights/insights.test.ts` 8/8 (regression + 1 new bug-fix test), `purchasing/purchasing.test.ts` targeted price-history subset 5/5 (regression + 1 new bug-fix test; did not re-run the full 30+-test file since no other method was touched). Full details and file-by-file breakdown: `WORK/audits/AUDIT_2026-07-28T210834Z-phase7-item1-sales-velocity-consolidation.md`. **NOT committed/pushed** — no GitHub credentials in this sandbox, same as every other entry here. |
 | Blockers | none |
 
+## Parallel Non-Overlapping Claim (Claude, Cowork/Sonnet 5 — UI Ponytail fix sequence, Phase D + E) — retroactive + new
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude (Cowork, Sonnet 5) — continuing the Ponytail-audit fix sequence started 2026-07-31 (`AUDIT_2026-07-31T200054Z-ui-ponytail-retail-core.md` + `AUDIT_2026-07-31T212601Z-ui-ponytail-remaining-scope.md`). Phases A (sales-history, PR #135), B (returns-refund-confirmation, PR #136), and C (terminal cleanup, PR #137) were already merged to `develop` before this session started. Phase D (KpiCard dedupe on returns/payments) was already committed as `e8c2add` on `feature/pos-shared-metric-cleanup` when this session picked up the branch, with no corresponding LOCK.md entry — recording it retroactively here rather than leaving the gap. This session added Phase E on the same branch. |
+| Queue item | **Phase D (retroactive, not authored this session):** dedupe the near-identical local `Metric` stat-card component duplicated in `returns/page.tsx` and `payments/page.tsx` into the shared `KpiCard` (extended with an optional `helper` caption prop); also surfaced the missing `store_credit` filter option on Payments. **Phase E (this session):** fix two High-priority "orphaned page" findings from the retail-core audit — #5 (`workforce/page.tsx` fully built, zero nav links anywhere) and #10 (`notifications/page.tsx` fully built, missing from the sidebar; only reachable via a small dashboard link). Added nav entries for both in `EnterpriseShell.tsx`; registered `"notifications"` as a proper `FeatureId`/`FEATURE_GROUPS` entry (it was missing entirely — `"workforce"` already existed); added a "Manage notifications →" link to `NotificationBell.tsx`'s dropdown footer per the audit's suggested fix. |
+| Files/areas expected | Phase D (already committed): `web/app/(protected)/{returns,payments}/page.tsx`, `web/components/KpiCard.tsx`. Phase E (this session): `web/lib/features.ts`, `web/components/EnterpriseShell.tsx`, `web/components/NotificationBell.tsx`. **Explicitly not touched:** `returns/page.tsx` beyond what Phase D already changed, `sales/page.tsx`, `inventory/pipeline/page.tsx`, `terminal/**` — all currently in flight, unmerged, on `chore/reporting-reports-dedup`, `cursor/ui-wave-a-trust-leftovers-604f`, and `cursor/ui-wave-b-cashier-trust-604f` (see coordination note below). |
+| Started | 2026-08-02 |
+| Status | Phase D + E both committed locally on `feature/pos-shared-metric-cleanup` (`e8c2add` + a new commit this session). **NOT pushed** — this sandbox has no GitHub push credentials (`git push` fails with "could not read Username for 'https://github.com'"), the same limitation recorded against nearly every other entry in this file. Verification: `npx eslint` on the 3 touched files clean; `navPartialGate.test.ts` 4/4 passing; full `web` typecheck/lint/build could not be run in this sandbox (documented pre-existing environment limit — a single call cannot outlast the 45s tool-call ceiling, and background processes do not survive between calls, confirmed directly this session with a `nohup`+poll test). Full detail: `WORK/audits/AUDIT_2026-08-02T201744Z-nav-reachability-workforce-notifications.md`. |
+| Coordination note | As of this session, **four other branches independently touch overlapping retail-core files** without having merged into `develop` yet: `chore/reporting-reports-dedup` (a4799d1/5aed9e1 — `/reporting` dedup + the two Ponytail audit docs), `cursor/ui-wave-a-trust-leftovers-604f`, and `cursor/ui-wave-b-cashier-trust-604f` (both touch `sales/page.tsx`, `returns/page.tsx`, `terminal/**`, `EnterpriseShell.tsx`, and duplicate an identical-looking `src/modules/orders/{index,service}.ts` + `src/modules/sales/routes.ts` diff between themselves — worth Sri diffing those two branches against each other before merging either, they may be near-duplicates or one may supersede the other). None of those four files/branches were touched by this claim. Recommend reconciling/merging the already-complete branches (Phase D+E here, the reporting dedup, and whichever of Wave A/B is not redundant) in the order AGENTS.md prescribes — one at a time, gates re-run after each — rather than letting more branches accumulate on top of increasingly stale bases. |
+| Blockers | git push needs to happen from a machine with GitHub credentials (see above) |
+
+## Parallel Non-Overlapping Claim (Claude, Cowork/Sonnet 5 — UI Ponytail fix sequence, Phase F)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude (Cowork, Sonnet 5) — continuing directly from the Phase D+E claim above on the same branch. |
+| Queue item | Retail-core finding #2: `setup/loyalty/page.tsx` re-exported the wrong page (the top-level `/loyalty` app instead of `../../settings/page`, the pattern all 7 sibling `setup/*` shims use) — a real navigation bug, not just clutter. Fixed the one-line re-export. Retail-core finding #12 (partial): deleted the two truly orphaned `finance/*` shims (`payment-made`, `settings` — zero inbound references anywhere in `web/`) and the now-dead path-matcher branch in `finance/page.tsx` referencing the deleted route. Left `finance/bills` alone — it's still wired up via the AP tab's redirect, and removing that redirect-hop is finding #8's job (a bigger, separate refactor), not bundled here. |
+| Files/areas expected | `web/app/(protected)/setup/loyalty/page.tsx`, `web/app/(protected)/finance/page.tsx`, deletions of `web/app/(protected)/finance/{payment-made,settings}/page.tsx`. Zero overlap with `chore/reporting-reports-dedup` or either Cursor wave branch — none of them touch `setup/loyalty` or any `finance/*` file. |
+| Started | 2026-08-02 |
+| Status | Committed locally on `feature/pos-shared-metric-cleanup`. **NOT pushed** — same missing-GitHub-credentials limitation as every other entry here. Verification: `npx eslint` clean on all touched files; repo-wide grep (via the Grep tool — raw recursive `grep -r` over `web/` timed out choking on `.next`/`node_modules`, worth remembering for next time) confirmed zero remaining references to the deleted routes before deleting; no existing test covers any of these three files. Full `web` typecheck/lint/build still not run — same 45s-per-call sandbox ceiling documented on the Phase D+E claim above. Full detail: `WORK/audits/AUDIT_2026-08-02T230650Z-loyalty-nav-bug-finance-dead-shims.md`. |
+| File-deletion note | Deleting under the connected `Ascend` folder initially failed with `Operation not permitted` (the mount blocks unlink by default) — resolved by calling `allow_cowork_file_delete` for both target files, which enabled deletion for the rest of this session. |
+| Blockers | git push needs to happen from a machine with GitHub credentials (see above) |
+
+## Update 2026-08-02 (later): Phase E+F rebased clean onto current develop, ready to push
+
+Sri asked to get Phase E/F into `develop` and asked about pushing to `staging`. Status:
+
+- **Rebased and verified.** Cherry-picked `3144537` (Phase E) + `0225106` (Phase F) onto
+  current `origin/develop` (`498beee`, includes PR #138 which already absorbed Phase D
+  independently — so Phase D is intentionally dropped here, not re-proposed) as local
+  branch `pos-shared-metric-cleanup-rebased`. Both cherry-picks applied clean, including
+  an auto-merge in `EnterpriseShell.tsx` against PR #134's unrelated Shipping-section nav
+  change — no conflicts. Confirmed `origin/develop` is a strict ancestor of this branch,
+  so it is a clean fast-forward candidate: whoever has push access can merge it with zero
+  conflict resolution needed. Re-ran the fast gates on the rebased tip: `hygiene` clean
+  (1094 files), `table:scan` clean (161 names, 0 collisions), `gap:scan` clean (456/381,
+  21 allowlisted, unchanged), backend `typecheck` clean, `eslint` clean on all 5 touched
+  files, `navPartialGate.test.ts` 4/4. Full `web` typecheck/lint/build still can't
+  complete in this sandbox (same 45s-per-call ceiling as every prior entry).
+- **Still cannot push.** `git push origin pos-shared-metric-cleanup-rebased` fails with
+  the same "could not read Username for 'https://github.com'" this sandbox has hit on
+  every prior attempt. **Sri: from a machine with GitHub credentials**, the branch
+  exists locally in this checkout — push it and open a PR (or, since it's a verified
+  clean fast-forward onto `develop`'s current tip, a direct
+  `git push origin pos-shared-metric-cleanup-rebased:develop` would also work with no
+  merge needed, if you're comfortable skipping the PR step for a change this small).
+- **Did not touch `staging` or `master`.** Per `AGENTS.md`'s branch rules ("master
+  merges are Sri-only") and this repo's own consistent practice throughout `LOCK.md`
+  (every `staging`/`master` promotion in this file's history was Sri's own action, never
+  an agent's), this was left for Sri's explicit call rather than done automatically —
+  and this sandbox has no push access to do it even if policy allowed it. `staging` and
+  `master` are currently identical (`e55e743`, PR #116, 2026-07-23) and **30 commits
+  behind `develop`** as of this update. If a promotion is wanted, the standard flow per
+  `docs/architecture/PIPELINE.md` is `develop → staging` (verify, smoke-test), then
+  `staging → master` — happy to help prep/verify that promotion PR on request, but not
+  executing it unasked given the explicit Sri-only rule.
+- **Branch hygiene ("clear stale branches"):** confirmed via `git rev-list --count`
+  that 5 remote branches are fully merged already (0 unique commits ahead of `develop`):
+  `feature/reliability-phase4a`, `fix/finance-aging-dead-tab`,
+  `fix/reports-unbounded-queries`, `fix/dashboard-kpi-metric-links`,
+  `fix/reports-sales-broken-tabs` — plus ~18 old `worktree-agent-*`/
+  `Sricharangellu-patch-*` branches from June/early July. Deleting a *remote* branch
+  needs push access too (`git push origin --delete <branch>`), so this is also queued
+  for Sri rather than done here.
+- **New since the last audit:** `cursor/ponytail-enterprise-ui-audit-72bc` pushed a
+  second, independent 142-route Ponytail-style audit today (docs only, no code) —
+  overlaps heavily with the 128-page audit that fed Phases A-F here. Worth reconciling
+  the two backlogs before either side implements more findings, to avoid duplicate/
+  conflicting fix commits on top of an already-crowded set of in-flight branches
+  (`cursor/ui-wave-a-trust-leftovers-604f`, `cursor/ui-wave-b-cashier-trust-604f`,
+  `chore/reporting-reports-dedup`, this branch).
+
 ## Rules
 
 - Claim one queue item before editing code.
