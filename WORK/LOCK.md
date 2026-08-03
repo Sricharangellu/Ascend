@@ -1,4 +1,16 @@
 
+## Active Claim (Cursor cloud — Ponytail Wave 2 hubs)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor cloud agent (Ponytail Wave 2) |
+| Queue item | Wave 2: Finance hub simplify; Accounting drop duplicate AR/AP pay grids; Shipping list → Delivery tab; Operations dissolve to Outlets + deep links. |
+| Files/areas expected | `web/app/(protected)/{finance,accounting,delivery,shipping,operations}/**`; `web/next.config.mjs`; `web/components/EnterpriseShell.tsx`; checklist; WORK audit + LOCK. |
+| Started | 2026-08-03 |
+| Status | ACTIVE — commit/gates/PR |
+| Blockers | none |
+
+
 ## Active Claim (Cursor cloud — Ponytail Wave 1 consolidation)
 
 | Field | Value |

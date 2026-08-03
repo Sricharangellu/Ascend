@@ -221,7 +221,7 @@ const _BP_CATALOG: _BPMod[] = [
   { key: "online_store",      name: "Online Store",        description: "Product visibility, SEO fields, meta title/description",    group: "ecommerce" },
   { key: "order_fulfillment", name: "Order Fulfillment",   description: "Pick-pack-ship for online orders, tracking integration",    group: "ecommerce" },
   { key: "marketplace",       name: "Marketplace Sync",    description: "Sync inventory/orders with external marketplaces",          group: "ecommerce" },
-  { key: "shipping_mgmt",     name: "Shipping Management", description: "Carrier integrations, label printing, tracking numbers",    group: "ecommerce", route: "/shipping" },
+  { key: "shipping_mgmt",     name: "Shipping Management", description: "Carrier integrations, label printing, tracking numbers",    group: "ecommerce", route: "/delivery?tab=shipments" },
   { key: "vehicle_history", name: "Vehicle History",    description: "VIN/license lookup, service history per vehicle, notes",    group: "automotive", route: "/automotive/vehicles" },
   { key: "parts_inventory", name: "Parts Inventory",    description: "Auto parts with OEM/aftermarket codes, supplier ordering",  group: "automotive" },
   { key: "work_orders",     name: "Work Orders",        description: "Job cards, technician assignment, time tracking, parts",    group: "automotive", route: "/automotive/work-orders" },

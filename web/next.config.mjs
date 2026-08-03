@@ -62,6 +62,10 @@ const nextConfig = {
       { source: "/inventory/reorder", destination: "/purchasing?tab=reorder", permanent: true },
       // Ecommerce: customers child was a misleading re-export of /customers
       { source: "/ecommerce/customers", destination: "/customers", permanent: true },
+      // Ponytail Wave 2 — shipping registry folds into Delivery Shipments tab
+      { source: "/shipping", destination: "/delivery?tab=shipments", permanent: true },
+      // Operations mega-page dissolved to Outlets (+ deep links on that page)
+      { source: "/operations", destination: "/setup/outlets", permanent: true },
     ];
   },
 };

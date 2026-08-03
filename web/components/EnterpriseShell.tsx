@@ -208,6 +208,8 @@ const NAV_TREE: NavSection[] = [
       { label: "Settings",        href: "/settings",             featureGate: "settings" },
       { label: "Permissions",     href: "/settings/permissions", featureGate: "settings" },
       { label: "Business Modes",  href: "/settings/modes",       featureGate: "settings" },
+      // Outlets/registers (Wave 2 dissolved Operations mega-page)
+      { label: "Outlets",         href: "/setup/outlets",        featureGate: "settings" },
       // Kiosk settings UI has no persistence API yet (Preview) — hide by default
       { label: "Kiosk Mode",      href: "/settings/kiosk",       featureGate: "settings", partial: true },
       { label: "B2B Portal",      href: "/settings/b2b",         featureGate: "settings" },
