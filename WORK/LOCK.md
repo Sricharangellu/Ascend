@@ -2,6 +2,17 @@
 
 Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0 wave-dispatch coordination claim (started 2026-07-18) was closed 2026-07-30 as superseded — see its entry below; work since has shipped as independent claims rather than through that coordinator. Latest substantive work: Phase 7 items 1-2 (sales-velocity consolidation, demand-snapshot foundation) RELEASED; four-environment AI coordination workflow (Claude Code/Cursor/Replit) adopted 2026-07-30, see `docs/architecture/ORCHESTRATION.md` "Environment routing" + `tools/AGENT_PROMPT.md`. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B, RELEASED); Clean Architecture pilot (quotes + gateway auth) (session C, ABANDONED — see entry); SSO OIDC hardening (session D)
 
+## Active Claim (Cursor Cloud — HOTFIX develop Replit merge CI)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud `bc-c564feef` — Ascend UI ponytail audit |
+| Queue item | HOTFIX: `74f7d91` re-introduced Replit pnpm-workspace root onto `develop` (same class as #145). Restore Ascend `package.json`/`tsconfig.json`, delete tracked `.migration-backup/` (duplicate AGENTS.md), gitignore it — unblock CI for audit PRs. Keep `artifacts/` / Replit monorepo trees intact (Sri-authored merge intent). |
+| Files/areas expected | `package.json`, `tsconfig.json`, `.npmrc`, `.gitignore`, `.migration-backup/**`, `WORK/**` |
+| Started | 2026-08-03T050536Z |
+| Status | RELEASED — hotfix branch `cursor/hotfix-develop-replit-merge-ci-604f`; see AUDIT_2026-08-03T050600Z-hotfix-develop-replit-merge-ci.md |
+| Blockers | none |
+
 ## Active Claim (Cursor Cloud — Phase 7 item 3: forecast accuracy framework)
 
 | Field | Value |

@@ -51,3 +51,6 @@ web/.next.stuck-*
 
 # Local DB backup dumps
 artifacts/backups/
+
+# Replit/pnpm migration scaffold leftovers — never track a second AGENTS.md tree
+.migration-backup/
