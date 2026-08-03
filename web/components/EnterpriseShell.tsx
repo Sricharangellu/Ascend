@@ -161,22 +161,19 @@ const NAV_TREE: NavSection[] = [
     label: "Inventory",
     icon: <InventoryIcon />,
     children: [
-      { label: "Overview",      href: "/inventory",               featureGate: "inventory" },
-      { label: "Pipeline",      href: "/inventory/pipeline",      featureGate: "inventory" },
-      { label: "Receive Stock", href: "/inventory/receive-stock", featureGate: "inventory" },
-      { label: "Cost Entry",    href: "/purchase",                featureGate: "purchasing" },
-      { label: "Expiry",        href: "/inventory/expiry-pool",   featureGate: "inventory" },
-      { label: "Warehouse",     href: "/warehouse",               featureGate: "inventory", partial: true },
+      // Ponytail Wave 1 — trimmed IA. Pipeline / Cost Entry / EDI / Reorder nest
+      // under Purchasing hub links. Shipping section keeps Delivery/Shipments.
+      { label: "Movements",     href: "/inventory",               featureGate: "inventory" },
       { label: "Purchasing",    href: "/purchasing",              featureGate: "purchasing" },
-      { label: "EDI Imports",   href: "/purchasing/edi-imports",  featureGate: "purchasing" },
-      // Mock/missing detection engine — hidden unless SHOW_PARTIAL_PAGES
-      { label: "Error Center",  href: "/inventory/errors",        featureGate: "inventory", partial: true },
+      { label: "Receive Stock", href: "/inventory/receive-stock", featureGate: "inventory" },
+      { label: "Expiry",        href: "/inventory/expiry-pool",   featureGate: "inventory" },
       { label: "Cycle Counts",  href: "/inventory/counts",        featureGate: "inventory" },
-      { label: "Reorder",       href: "/inventory/reorder",       featureGate: "inventory" },
-      { label: "Serial Numbers", href: "/inventory/serials",      featureGate: "inventory" },
       { label: "Locations",     href: "/inventory/locations",     featureGate: "inventory" },
       { label: "Vendors",       href: "/vendors",                 featureGate: "vendors" },
-      { label: "Operations",    href: "/operations",              featureGate: "operations" },
+      { label: "Serial Numbers", href: "/inventory/serials",      featureGate: "inventory" },
+      { label: "Warehouse",     href: "/warehouse",               featureGate: "inventory", partial: true },
+      // Mock/missing detection engine — hidden unless SHOW_PARTIAL_PAGES
+      { label: "Error Center",  href: "/inventory/errors",        featureGate: "inventory", partial: true },
       { label: "Workforce",     href: "/workforce",               featureGate: "workforce" },
     ],
   },
