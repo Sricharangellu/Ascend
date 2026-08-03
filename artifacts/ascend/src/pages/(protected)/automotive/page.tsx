@@ -144,14 +144,15 @@ export default function AutomotivePage() {
               value={q}
               onChange={e => handleSearch(e.target.value)}
               placeholder="Search make, model, plate, VIN…"
-              className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
+              className="flex-1 rounded-lg border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
             />
             <Button variant="primary" size="sm" onClick={() => setVehicleModal(true)}>+ Vehicle</Button>
           </div>
 
           {loading ? (
             <div className="space-y-2">
-              {[1,2,3,4].map(i => <div key={i} className="h-16 animate-pulse rounded-xl bg-gray-100" />)}
+              {[1,2,3,4].map(i => <div key={i} className="h-16 animate-skeleton rounded-xl" />)}
             </div>
           ) : vehicles.length === 0 ? (
             <Card>
@@ -163,7 +164,7 @@ export default function AutomotivePage() {
                 <button key={v.id} type="button"
                   onClick={() => openDetail(v.id)}
                   className={`w-full rounded-xl border p-3 text-left transition-colors hover:border-brand-400 hover:bg-brand-50 ${
-                    selected?.id === v.id ? "border-brand-600 bg-brand-50" : "border-[var(--color-table-border)] bg-white"
+                    selected?.id === v.id ? "border-brand-600 bg-brand-50" : ""
                   }`}>
                   <p className="text-sm font-semibold text-[var(--color-text-primary)]">
                     {v.year ? `${v.year} ` : ""}{v.make} {v.model}
@@ -187,7 +188,7 @@ export default function AutomotivePage() {
               </div>
             </Card>
           )}
-          {detailLoading && <div className="h-64 animate-pulse rounded-xl bg-gray-100" />}
+          {detailLoading && <div className="h-64 animate-skeleton rounded-xl" />}
           {selected && !detailLoading && (
             <div className="space-y-4">
               <Card>
@@ -220,7 +221,8 @@ export default function AutomotivePage() {
                   <div className="space-y-2">
                     {selected.workOrders.map(wo => (
                       <div key={wo.id}
-                        className="rounded-xl border border-[var(--color-table-border)] bg-white p-4">
+                        className="rounded-xl border p-4"
+                        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold text-[var(--color-text-primary)]">{wo.description}</p>
@@ -276,7 +278,8 @@ export default function AutomotivePage() {
               <input type="text" placeholder={placeholder}
                 value={vForm[key as keyof typeof vForm]}
                 onChange={e => setVForm(f => ({ ...f, [key]: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
+                className="w-full rounded-lg border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
               />
             </div>
           ))}
@@ -298,7 +301,8 @@ export default function AutomotivePage() {
             <textarea rows={2} value={woForm.description}
               onChange={e => setWoForm(f => ({ ...f, description: e.target.value }))}
               placeholder="e.g. Oil change + filter replacement"
-              className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
+              className="w-full resize-none rounded-lg border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -306,14 +310,16 @@ export default function AutomotivePage() {
               <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Labour (cents)</label>
               <input type="number" min={0} value={woForm.labourCents}
                 onChange={e => setWoForm(f => ({ ...f, labourCents: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
+                className="w-full rounded-lg border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
               />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Parts (cents)</label>
               <input type="number" min={0} value={woForm.partsCents}
                 onChange={e => setWoForm(f => ({ ...f, partsCents: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
+                className="w-full rounded-lg border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
               />
             </div>
           </div>

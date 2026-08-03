@@ -6,13 +6,13 @@ import type { CatalogProduct } from "@/api-client/types";
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
-const FIELD = "w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600";
+const FIELD = "w-full rounded-lg border px-3 py-2 text-[13px] outline-none transition-all focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500";
 
 function Label({ children, hint }: { children: React.ReactNode; hint?: string }) {
   return (
     <div className="mb-1">
-      <label className="block text-xs font-medium text-slate-500">{children}</label>
-      {hint && <p className="text-[11px] text-slate-400 mt-0.5">{hint}</p>}
+      <label className="block text-[12px] font-medium" style={{ color: "var(--color-text-secondary)" }}>{children}</label>
+      {hint && <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>{hint}</p>}
     </div>
   );
 }
@@ -27,9 +27,10 @@ function Section({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
-        <h3 className="text-sm font-semibold text-[#111]">{title}</h3>
+    <div className="rounded-xl border shadow-[var(--shadow-sm)]"
+      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+      <div className="flex items-center justify-between border-b px-5 py-3.5" style={{ borderColor: "var(--color-border)" }}>
+        <h3 className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>{title}</h3>
         {action}
       </div>
       <div className="p-5">{children}</div>
@@ -67,7 +68,8 @@ function TagInput({
   }
 
   return (
-    <div className="flex min-h-[2.5rem] flex-wrap items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 focus-within:border-brand-600 focus-within:ring-1 focus-within:ring-brand-600">
+    <div className="flex min-h-[2.5rem] flex-wrap items-center gap-1.5 rounded-lg border px-2.5 py-1.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 transition-all"
+      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
       {tags.map((t) => (
         <span
           key={t}
@@ -85,7 +87,8 @@ function TagInput({
         </span>
       ))}
       <input
-        className="min-w-[120px] flex-1 bg-transparent text-sm text-[#111] outline-none placeholder:text-slate-400"
+        className="min-w-[120px] flex-1 bg-transparent text-[13px] outline-none"
+        style={{ color: "var(--color-text-primary)" }}
         placeholder={tags.length === 0 ? "Type a tag and press Enter or comma…" : "Add more…"}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
@@ -125,7 +128,8 @@ function ImageUploadArea({
             <img
               src={imageUrl}
               alt="Product"
-              className="h-20 w-20 rounded-lg border border-slate-200 object-cover"
+              className="h-20 w-20 rounded-lg border object-cover"
+              style={{ borderColor: "var(--color-border)" }}
             />
             <button
               type="button"
@@ -149,19 +153,19 @@ function ImageUploadArea({
           const url = e.dataTransfer.getData("text/plain");
           if (url) onUrlChange(url);
         }}
-        className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6 transition-colors ${
+        className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-6 transition-colors ${
           dragging
             ? "border-brand-600 bg-brand-600/5"
-            : "border-slate-200 bg-slate-50 hover:border-slate-300"
+            : "hover:border-[var(--color-primary-hover)]"
         }`}
       >
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400" aria-hidden="true">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--color-text-muted)" }} aria-hidden="true">
           <rect x="3" y="3" width="18" height="18" rx="2" />
           <circle cx="8.5" cy="8.5" r="1.5" />
           <polyline points="21 15 16 10 5 21" />
         </svg>
         <div className="text-center">
-          <p className="text-xs text-slate-500">Drag images here, or</p>
+          <p className="text-[11px]" style={{ color: "var(--color-text-secondary)" }}>Drag images here, or</p>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -171,14 +175,15 @@ function ImageUploadArea({
           </button>
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" multiple />
         </div>
-        <p className="text-[11px] text-slate-400">Drag outside thumbnail to delete</p>
+        <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>Drag outside thumbnail to delete</p>
       </div>
 
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => setShowUrl((v) => !v)}
-          className="text-[11px] text-slate-400 hover:text-slate-600"
+          className="text-[11px] transition-colors hover:text-brand-600"
+          style={{ color: "var(--color-text-muted)" }}
         >
           {showUrl ? "Hide URL field" : "Or paste image URL"}
         </button>
@@ -228,15 +233,17 @@ function CustomerInputFields() {
         <p className="text-sm text-slate-400">This product has no customer input fields</p>
       )}
       {fields.map((f) => (
-        <div key={f.id} className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
+        <div key={f.id} className="flex items-center gap-3 rounded-lg border px-3 py-2.5"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
           <div className="flex-1">
-            <p className="text-sm font-medium text-[#111]">{f.label}</p>
-            <p className="text-[11px] text-slate-400 capitalize">{f.type} field</p>
+            <p className="text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>{f.label}</p>
+            <p className="text-[11px] capitalize" style={{ color: "var(--color-text-muted)" }}>{f.type} field</p>
           </div>
-          <label className="flex items-center gap-1.5 text-xs text-slate-500">
+          <label className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
             <input
               type="checkbox"
-              className="h-3.5 w-3.5 rounded border-slate-300 text-brand-600"
+              className="h-3.5 w-3.5 rounded text-brand-600"
+              style={{ borderColor: "var(--color-border)" }}
               checked={f.required}
               onChange={(e) => setFields((prev) => prev.map((x) => x.id === f.id ? { ...x, required: e.target.checked } : x))}
             />
@@ -410,7 +417,8 @@ export function GeneralTab({
   return (
     <div className="space-y-4">
       {error && (
-        <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+        <p role="alert" className="rounded-xl border px-4 py-3 text-[13px]"
+          style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>
           {error}
         </p>
       )}
@@ -445,10 +453,11 @@ export function GeneralTab({
           {/* Description + AI button */}
           <div>
             <div className="mb-1 flex items-center justify-between">
-              <label className="text-xs font-medium text-slate-500">Description</label>
+              <label className="text-[12px] font-medium" style={{ color: "var(--color-text-secondary)" }}>Description</label>
               <button
                 type="button"
-                className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 shadow-sm hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-medium shadow-[var(--shadow-sm)] transition-colors hover:bg-[var(--color-surface-subtle)]"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3L14.5 8.5 20 11 14.5 13.5 12 19 9.5 13.5 4 11 9.5 8.5Z"/></svg>
                 Generate with AI
@@ -489,16 +498,17 @@ export function GeneralTab({
                 checked={form.sell_pos}
                 onChange={(e) => set("sell_pos", e.target.checked)}
               />
-              <span className="text-sm text-[#111]">Sell on point-of-sale</span>
+              <span className="text-[13px]" style={{ color: "var(--color-text-primary)" }}>Sell on point-of-sale</span>
             </label>
             <label className="flex cursor-pointer items-center gap-2.5">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600"
+                className="h-4 w-4 rounded text-brand-600 focus:ring-brand-600"
+                style={{ borderColor: "var(--color-border)" }}
                 checked={form.sell_online}
                 onChange={(e) => set("sell_online", e.target.checked)}
               />
-              <span className="text-sm text-[#111]">Sell online</span>
+              <span className="text-[13px]" style={{ color: "var(--color-text-primary)" }}>Sell online</span>
             </label>
           </div>
 
@@ -517,8 +527,8 @@ export function GeneralTab({
       <Section title="Price">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-400">
-              <tr>
+            <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+              <tr className="text-[10px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--color-text-secondary)" }}>
                 <th className="px-3 py-2.5 text-left">Price point</th>
                 <th className="px-3 py-2.5 text-right">Supply price</th>
                 <th className="px-3 py-2.5 text-right">Markup %</th>
@@ -527,53 +537,40 @@ export function GeneralTab({
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b border-slate-50">
-                <td className="px-3 py-3 text-slate-500 text-xs">General Price Book (All Products)</td>
+              <tr className="border-b last:border-0" style={{ borderColor: "var(--color-table-border)" }}>
+                <td className="px-3 py-3 text-[12px]" style={{ color: "var(--color-text-secondary)" }}>General Price Book (All Products)</td>
                 <td className="px-3 py-3">
                   <div className="flex items-center justify-end gap-1">
-                    <span className="text-slate-400 text-xs">$</span>
-                    <input
-                      type="number" step="0.01" min="0"
-                      className="w-24 rounded border border-slate-200 px-2 py-1.5 text-right text-sm outline-none focus:border-brand-600"
-                      value={form.cost}
-                      onChange={(e) => onCostChange(e.target.value)}
-                    />
+                    <span className="text-[12px]" style={{ color: "var(--color-text-muted)" }}>$</span>
+                    <input type="number" step="0.01" min="0"
+                      className="w-24 rounded-lg border px-2 py-1.5 text-right text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+                      value={form.cost} onChange={(e) => onCostChange(e.target.value)} />
                   </div>
                 </td>
                 <td className="px-3 py-3">
                   <div className="flex items-center justify-end gap-1">
-                    <input
-                      type="number" step="0.01" min="0"
-                      className="w-20 rounded border border-slate-200 px-2 py-1.5 text-right text-sm outline-none focus:border-brand-600"
-                      value={form.markup}
-                      onChange={(e) => onMarkupChange(e.target.value)}
-                      placeholder="0.00"
-                    />
-                    <span className="text-slate-400 text-xs">%</span>
+                    <input type="number" step="0.01" min="0"
+                      className="w-20 rounded-lg border px-2 py-1.5 text-right text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+                      value={form.markup} onChange={(e) => onMarkupChange(e.target.value)} placeholder="0.00" />
+                    <span className="text-[12px]" style={{ color: "var(--color-text-muted)" }}>%</span>
                   </div>
                 </td>
                 <td className="px-3 py-3 text-right">
-                  <span
-                    className={`text-sm font-semibold ${
-                      marginNum >= 30
-                        ? "text-emerald-600"
-                        : marginNum > 0
-                        ? "text-amber-600"
-                        : "text-slate-400"
-                    }`}
-                  >
+                  <span className={`text-[13px] font-semibold ${
+                    marginNum >= 30 ? "text-success-600" : marginNum > 0 ? "text-warning-600" : ""
+                  }`} style={marginNum === 0 ? { color: "var(--color-text-muted)" } : {}}>
                     {form.margin ? `${parseFloat(form.margin).toFixed(1)}%` : "—"}
                   </span>
                 </td>
                 <td className="px-3 py-3">
                   <div className="flex items-center justify-end gap-1">
-                    <span className="text-slate-400 text-xs">$</span>
-                    <input
-                      type="number" step="0.01" min="0"
-                      className="w-24 rounded border border-slate-200 px-2 py-1.5 text-right text-sm font-semibold outline-none focus:border-brand-600"
-                      value={form.retail}
-                      onChange={(e) => onRetailChange(e.target.value)}
-                    />
+                    <span className="text-[12px]" style={{ color: "var(--color-text-muted)" }}>$</span>
+                    <input type="number" step="0.01" min="0"
+                      className="w-24 rounded-lg border px-2 py-1.5 text-right text-[13px] font-semibold outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+                      value={form.retail} onChange={(e) => onRetailChange(e.target.value)} />
                   </div>
                 </td>
               </tr>
@@ -587,21 +584,22 @@ export function GeneralTab({
         <div className="space-y-5">
           {/* Non-delivery sales */}
           <div>
-            <p className="mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Non-delivery sales</p>
-            <div className="overflow-hidden rounded-lg border border-slate-100">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 border-b border-slate-100">
-                  <tr className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-secondary)" }}>Non-delivery sales</p>
+            <div className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--color-border)" }}>
+              <table className="w-full text-[13px]">
+                <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+                  <tr className="text-[10px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--color-text-secondary)" }}>
                     <th className="px-4 py-2.5 text-left">Outlet</th>
                     <th className="px-4 py-2.5 text-left">Tax</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="px-4 py-3 text-sm text-slate-700">Main Outlet</td>
+                    <td className="px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>Main Outlet</td>
                     <td className="px-4 py-3">
                       <select
-                        className="rounded-md border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-brand-600"
+                        className="rounded-lg border px-3 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
                         value={form.tax_class}
                         onChange={(e) => set("tax_class", e.target.value as "standard" | "exempt")}
                       >
@@ -617,11 +615,12 @@ export function GeneralTab({
 
           {/* Delivery sales */}
           <div>
-            <p className="mb-1 text-xs font-semibold text-slate-500 uppercase tracking-wide">Delivery sales</p>
-            <p className="mb-2 text-[11px] text-slate-400">
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-secondary)" }}>Delivery sales</p>
+            <p className="mb-2 text-[11px]" style={{ color: "var(--color-text-muted)" }}>
               If a product has no tax category assigned, it is subject to the default tax rate of the destination.
             </p>
-            <select className="w-64 rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600">
+            <select className="w-64 rounded-lg border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}>
               <option value="">No tax category</option>
               <option value="standard">Standard tax rate</option>
               <option value="reduced">Reduced rate</option>
@@ -638,7 +637,7 @@ export function GeneralTab({
 
       {/* ── Weight and Dimensions ─────────────────────────────────────────── */}
       <Section title="Weight and Dimensions">
-        <p className="mb-3 text-xs text-slate-400">Used to calculate shipping costs at checkout.</p>
+        <p className="mb-3 text-[11px]" style={{ color: "var(--color-text-muted)" }}>Used to calculate shipping costs at checkout.</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {(
             [
