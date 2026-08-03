@@ -1,4 +1,16 @@
 
+## Active Claim (Cursor cloud — Ponytail Wave 1 consolidation)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor cloud agent (Ponytail Wave 1) |
+| Queue item | Wave 1 from AUDIT_2026-08-02T230500Z-ponytail-enterprise-ui.md: reporting/sell/finance redirects; setup profile/modules → settings/modes; Purchasing hub (?tab=) + nav trim; Delivery under Sell; inventory/reorder redirect; finance/dashboard link fixes. |
+| Files/areas expected | `web/next.config.mjs`; `web/components/EnterpriseShell.tsx`; `web/app/(protected)/{purchasing,finance,setup,sell,inventory/reorder,dashboard,shipping}/**`; `web/components/setup/RetailSetupChecklist.tsx`; tests; WORK audit + LOCK. |
+| Started | 2026-08-03 |
+| Status | RELEASED — Wave 1 consolidation shipped; AUDIT_2026-08-03T042850Z-ponytail-wave1-consolidation.md |
+| Blockers | none |
+
+
 ## Active Claim (Cursor cloud — Ponytail Wave 0 honesty)
 
 | Field | Value |

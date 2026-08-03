@@ -254,7 +254,10 @@ export default function FinancePage() {
               key={t.id}
                 onClick={() => {
                   setTab(t.id);
-                  router.replace(t.id === "ap" ? "/finance/bills" : t.id === "aging" ? "/reporting/ar-aging" : "/finance", { scroll: false });
+                  router.replace(
+                    t.id === "ap" ? "/bills" : t.id === "aging" ? "/reports/ar-aging" : "/finance",
+                    { scroll: false },
+                  );
                 }}
                 aria-current={tab === t.id ? "page" : undefined}
               className={`px-4 py-2 text-sm font-medium transition-colors ${
@@ -404,11 +407,7 @@ export default function FinancePage() {
         {tab === "expenses" && <ExpensesPanel />}
 
         {/* "Aging" isn't rendered here — clicking it navigates straight to
-            /reporting/ar-aging (see the tab bar's onClick above). It used to
-            also set local tab state and render an inline AR+AP block, but
-            the router.replace in the same click handler always fired first,
-            so that block could never actually be seen by a user — removed
-            rather than left as unreachable dead code. */}
+            /reports/ar-aging. AP navigates to /bills (canonical). */}
       </div>
 
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
@@ -416,10 +415,8 @@ export default function FinancePage() {
   );
 }
 
-function financeTabFromPath(pathname: string): TabId {
-  // "/finance/payment-made" was a dead, unreferenced route shim (deleted —
-  // see WORK/audits — nothing ever linked to it); this matcher only needs
-  // to recognize the one real path that still redirects here.
-  if (pathname.endsWith("/bills")) return "ap";
+function financeTabFromPath(_pathname: string): TabId {
+  // Legacy /finance/bills and /finance/payment-made now redirect away from
+  // this page, so path sniffing for "ap" is unused — default AR.
   return "ar";
 }

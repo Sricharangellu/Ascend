@@ -47,10 +47,12 @@ const SECTION_MAP: Record<NavKey, RailSection> = {
   loyalty: "catalog", promotions: "catalog", pricing: "catalog",
   inventory: "inventory", operations: "inventory", purchasing: "inventory",
   "edi-imports": "inventory",
-  vendors: "inventory", shipping: "shipping", "inventory-locations": "inventory",
+  vendors: "inventory", shipping: "sell", "inventory-locations": "inventory",
   "inventory-expiry": "inventory", "inventory-serials": "inventory",
   "inventory-reorder": "inventory", "inventory-counts": "inventory", "inventory-pipeline": "inventory", "inventory-errors": "inventory", workforce: "inventory",
-  warehouse: "inventory", delivery: "shipping",
+  warehouse: "inventory",
+  // Delivery lives under Sell (Wave 1) — still uses fulfillment/shipping APIs
+  delivery: "sell",
   customers: "customers", appointments: "customers", healthcare: "customers",
   finance: "finance", accounting: "finance", invoicing: "finance", bills: "finance",
   settings: "setup", team: "setup", workflows: "setup", integrations: "setup",
@@ -121,6 +123,7 @@ const NAV_TREE: NavSection[] = [
       { label: "Quotes",         href: "/quotes",         featureGate: "quotes" },
       { label: "Returns",        href: "/returns",        featureGate: "returns" },
       { label: "Payments",       href: "/payments",       featureGate: "payments" },
+      { label: "Delivery",       href: "/delivery",       featureGate: "shipping" },
       { label: "Service Orders", href: "/service-orders", featureGate: "service-orders" },
     ],
   },
@@ -161,32 +164,20 @@ const NAV_TREE: NavSection[] = [
     label: "Inventory",
     icon: <InventoryIcon />,
     children: [
-      { label: "Overview",      href: "/inventory",               featureGate: "inventory" },
-      { label: "Pipeline",      href: "/inventory/pipeline",      featureGate: "inventory" },
-      { label: "Receive Stock", href: "/inventory/receive-stock", featureGate: "inventory" },
-      { label: "Cost Entry",    href: "/purchase",                featureGate: "purchasing" },
-      { label: "Expiry",        href: "/inventory/expiry-pool",   featureGate: "inventory" },
-      { label: "Warehouse",     href: "/warehouse",               featureGate: "inventory", partial: true },
+      // Ponytail Wave 1 — trimmed IA. Pipeline / Cost Entry / EDI / Reorder nest
+      // under Purchasing hub links; Delivery moved to Sell; Operations reachable
+      // via setup checklist aliases but not a peer Inventory item.
+      { label: "Movements",     href: "/inventory",               featureGate: "inventory" },
       { label: "Purchasing",    href: "/purchasing",              featureGate: "purchasing" },
-      { label: "EDI Imports",   href: "/purchasing/edi-imports",  featureGate: "purchasing" },
-      // Mock/missing detection engine — hidden unless SHOW_PARTIAL_PAGES
-      { label: "Error Center",  href: "/inventory/errors",        featureGate: "inventory", partial: true },
+      { label: "Receive Stock", href: "/inventory/receive-stock", featureGate: "inventory" },
+      { label: "Expiry",        href: "/inventory/expiry-pool",   featureGate: "inventory" },
       { label: "Cycle Counts",  href: "/inventory/counts",        featureGate: "inventory" },
-      { label: "Reorder",       href: "/inventory/reorder",       featureGate: "inventory" },
-      { label: "Serial Numbers", href: "/inventory/serials",      featureGate: "inventory" },
       { label: "Locations",     href: "/inventory/locations",     featureGate: "inventory" },
       { label: "Vendors",       href: "/vendors",                 featureGate: "vendors" },
-      { label: "Operations",    href: "/operations",              featureGate: "operations" },
-      { label: "Workforce",     href: "/workforce",               featureGate: "workforce" },
-    ],
-  },
-  {
-    section: "shipping",
-    label: "Shipping",
-    icon: <ShippingIcon />,
-    children: [
-      { label: "Delivery", href: "/delivery", featureGate: "shipping" },
-      { label: "Shipments", href: "/shipping", featureGate: "shipping" },
+      { label: "Serial Numbers", href: "/inventory/serials",      featureGate: "inventory" },
+      { label: "Warehouse",     href: "/warehouse",               featureGate: "inventory", partial: true },
+      // Mock/missing detection engine — hidden unless SHOW_PARTIAL_PAGES
+      { label: "Error Center",  href: "/inventory/errors",        featureGate: "inventory", partial: true },
     ],
   },
   {
