@@ -171,8 +171,8 @@ export function RetailSetupChecklist() {
               href={task.href}
               className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
                 task.done
-                  ? "border-emerald-100 bg-emerald-50/50"
-                  : "border-slate-200 bg-white hover:border-brand-600/40"
+                  ? "border-success-500/30 bg-success-500/10"
+                  : "border-[var(--color-border)] bg-[var(--color-surface)] hover:border-brand-600/40"
               }`}
             >
               <span

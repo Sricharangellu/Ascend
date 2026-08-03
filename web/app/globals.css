@@ -4,27 +4,132 @@
 
 /* ── Design System Tokens ────────────────────────────────────────────────── */
 :root {
-  /* Primary brand — reference spec #5D5FEF */
-  --color-primary:        #5D5FEF;
+  /* Brand — Ascend purple (#5D5FEF), WCAG AA on white */
+  --color-primary:         #5D5FEF;
+  --color-primary-hover:   #4F51D9;
+  --color-primary-active:  #4345C3;
+  --color-primary-subtle:  #EEEFFE;
+  --color-primary-border:  #C7C8FA;
+
   /* Shell — always dark per reference spec */
-  --color-topbar-bg:      #1a1a1a;
-  --color-sidebar-bg:     #1a1a1a;
-  --color-sidebar-flyout: #2a2a2a;
-  --color-sidebar-active: rgba(255,255,255,0.15);
-  --color-sidebar-hover:  rgba(255,255,255,0.08);
-  /* Content area */
-  --color-header-bg:      #ffffff;
-  --color-header-border:  #E8E8E8;
-  --color-page-bg:        #F5F5F5;
-  --color-table-header:   #FAFAFA;
-  --color-table-border:   #F0F0F0;
-  --color-text-primary:   #111111;
-  --color-text-secondary: #666666;
-  --color-link:           #5D5FEF;
-  --color-billed:         #1890FF;
-  --color-not-billed:     #FA8C16;
-  --color-danger:         #FF4D4F;
-  --color-success:        #52C41A;
+  --color-topbar-bg:       #1a1a1a;
+  --color-sidebar-bg:      #1a1a1a;
+  --color-sidebar-flyout:  #2a2a2a;
+  --color-sidebar-active:  rgba(255,255,255,0.15);
+  --color-sidebar-hover:   rgba(255,255,255,0.08);
+  --color-sidebar-border:  rgba(255,255,255,0.08);
+
+  /* Content surfaces */
+  --color-page-bg:         #F5F5F5;
+  --color-surface:         #FFFFFF;
+  --color-surface-raised:  #FFFFFF;
+  --color-surface-subtle:  #F8FAFC;
+  --color-surface-overlay: rgba(0,0,0,0.4);
+
+  /* Borders */
+  --color-border:          #E3E8EF;
+  --color-border-strong:   #C6CDD8;
+  --color-border-subtle:   #F0F4F8;
+
+  /* Header / tables */
+  --color-header-bg:       #ffffff;
+  --color-header-border:   #E8E8E8;
+  --color-table-header:    #FAFAFA;
+  --color-table-border:    #F0F0F0;
+  --color-table-row-hover: #F8FAFC;
+
+  /* Typography */
+  --color-text-primary:    #111111;
+  --color-text-secondary:  #666666;
+  --color-text-muted:      #9BA8B8;
+  --color-text-inverse:    #FFFFFF;
+  --color-link:            #5D5FEF;
+
+  /* Status — semantic */
+  --color-success:         #389E0D;
+  --color-success-text:    #237804;
+  --color-success-bg:      #F6FFED;
+  --color-success-border:  #B7EB8F;
+
+  --color-warning:         #D48806;
+  --color-warning-text:    #874D00;
+  --color-warning-bg:      #FFFBE6;
+  --color-warning-border:  #FFE58F;
+
+  --color-danger:          #CF1322;
+  --color-danger-text:     #820014;
+  --color-danger-bg:       #FFF1F0;
+  --color-danger-border:   #FFA39E;
+
+  --color-info:            #096DD9;
+  --color-info-text:       #003A8C;
+  --color-info-bg:         #E6F7FF;
+  --color-info-border:     #91D5FF;
+
+  /* Domain */
+  --color-billed:          #1890FF;
+  --color-not-billed:      #FA8C16;
+}
+
+/* ── Dark mode (html.dark from web/lib/theme.ts) ─────────────────────────── */
+.dark {
+  --color-primary:         #6366F1;
+  --color-primary-hover:   #818CF8;
+  --color-primary-active:  #A5B4FC;
+  --color-primary-subtle:  rgba(99,102,241,0.15);
+  --color-primary-border:  rgba(99,102,241,0.3);
+
+  --color-topbar-bg:       #071929;
+  --color-sidebar-bg:      #071929;
+  --color-sidebar-hover:   rgba(255,255,255,0.07);
+  --color-sidebar-active:  rgba(255,255,255,0.12);
+  --color-sidebar-border:  rgba(255,255,255,0.07);
+  --color-sidebar-flyout:  #0A2035;
+
+  --color-page-bg:         #0D1B2A;
+  --color-surface:         #132035;
+  --color-surface-raised:  #1A2D45;
+  --color-surface-subtle:  #0F1F30;
+  --color-surface-overlay: rgba(0,0,0,0.6);
+
+  --color-border:          #1E3A5A;
+  --color-border-strong:   #2A4F73;
+  --color-border-subtle:   #122033;
+
+  --color-header-bg:       #132035;
+  --color-header-border:   #1E3A5A;
+  --color-table-header:    #0F1F30;
+  --color-table-border:    #1A3050;
+  --color-table-row-hover: #0F1F30;
+
+  --color-text-primary:    #E2EEFF;
+  --color-text-secondary:  #7BA4C8;
+  --color-text-muted:      #4A7494;
+  --color-text-inverse:    #0A2540;
+  --color-link:            #818CF8;
+
+  --color-success:         #48BB78;
+  --color-success-text:    #9AE6B4;
+  --color-success-bg:      rgba(72,187,120,0.12);
+  --color-success-border:  rgba(72,187,120,0.25);
+
+  --color-warning:         #FBBF24;
+  --color-warning-text:    #FDE68A;
+  --color-warning-bg:      rgba(251,191,36,0.12);
+  --color-warning-border:  rgba(251,191,36,0.25);
+
+  --color-danger:          #FC8181;
+  --color-danger-text:     #FEB2B2;
+  --color-danger-bg:       rgba(252,129,129,0.12);
+  --color-danger-border:   rgba(252,129,129,0.25);
+
+  --color-info:            #60A5FA;
+  --color-info-text:       #BFDBFE;
+  --color-info-bg:         rgba(96,165,250,0.12);
+  --color-info-border:     rgba(96,165,250,0.25);
+
+  --color-billed:          #60A5FA;
+  --color-not-billed:      #FBBF24;
 }
 
 /* ── Print receipt ────────────────────────────────────────────────────────── */
@@ -75,7 +180,6 @@
     outline-offset: 2px;
   }
 
-  /* Links */
   a {
     color: var(--color-link);
   }
@@ -94,7 +198,14 @@
     min-width: 44px;
   }
 
-  /* ERP table styles */
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   .erp-table thead {
     background-color: var(--color-table-header);
     font-size: 13px;
@@ -114,7 +225,6 @@
     color: var(--color-text-primary);
   }
 
-  /* ERP link style */
   .erp-link {
     color: var(--color-link);
     cursor: pointer;
@@ -143,5 +253,20 @@
   @keyframes fadeIn {
     from { opacity: 0; }
     to   { opacity: 1; }
+  }
+
+  .animate-skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--color-border-subtle) 25%,
+      var(--color-border) 50%,
+      var(--color-border-subtle) 75%
+    );
+    background-size: 200% 100%;
+    animation: skeleton 1.5s ease-in-out infinite;
+  }
+  @keyframes skeleton {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
   }
 }
