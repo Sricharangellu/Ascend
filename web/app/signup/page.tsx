@@ -204,7 +204,7 @@ export default function SignupPage() {
 
         {/* Header */}
         <div className="mb-6 text-center">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950 text-white text-xl font-bold mb-3">F</div>
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950 text-white text-xl font-bold mb-3" aria-hidden="true">A</div>
           <h1 className="text-2xl font-bold text-slate-900">Create your account</h1>
           <p className="mt-1 text-sm text-slate-500">
             {step === 1 ? "Set up your workspace in under a minute." : "Choose your business type — this shapes your entire interface."}

@@ -1,3 +1,51 @@
+## Active Claim (Cursor cloud — Ponytail implement Waves 2b–3)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor cloud agent (`cursor/ponytail-implement-4fe7`) |
+| Queue item | Continue Ponytail page-by-page on develop: fix Wave 0 sales conflict markers; Payments → Orders; catalog/[id] tab collapse (~6 sections); delete orphan ReorderSuggestionsTab. |
+| Files/areas expected | `web/app/(protected)/{sales,payments,catalog/[id],orders}/**`; `web/next.config.mjs`; `web/components/EnterpriseShell.tsx`; WORK audit + LOCK. |
+| Started | 2026-08-03 |
+| Status | RELEASED — Wave 2b–3 shipped; AUDIT_2026-08-03T044200Z-ponytail-wave2b3-payments-catalog.md |
+| Blockers | none |
+
+
+
+## Active Claim (Cursor cloud — Ponytail Wave 2 hubs)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor cloud agent (Ponytail Wave 2) |
+| Queue item | Wave 2: Finance hub simplify; Accounting drop duplicate AR/AP pay grids; Shipping list → Delivery tab; Operations dissolve to Outlets + deep links. |
+| Files/areas expected | `web/app/(protected)/{finance,accounting,delivery,shipping,operations}/**`; `web/next.config.mjs`; `web/components/EnterpriseShell.tsx`; checklist; WORK audit + LOCK. |
+| Started | 2026-08-03 |
+| Status | RELEASED — Wave 2 hubs shipped; AUDIT_2026-08-03T043540Z-ponytail-wave2-hubs.md |
+| Blockers | none |
+
+
+## Active Claim (Cursor cloud — Ponytail Wave 1 consolidation)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor cloud agent (Ponytail Wave 1) |
+| Queue item | Wave 1 from AUDIT_2026-08-02T230500Z-ponytail-enterprise-ui.md: reporting/sell/finance redirects; setup profile/modules → settings/modes; Purchasing hub (?tab=) + nav trim; Delivery under Sell; inventory/reorder redirect; finance/dashboard link fixes. |
+| Files/areas expected | `web/next.config.mjs`; `web/components/EnterpriseShell.tsx`; `web/app/(protected)/{purchasing,finance,setup,sell,inventory/reorder,dashboard,shipping}/**`; `web/components/setup/RetailSetupChecklist.tsx`; tests; WORK audit + LOCK. |
+| Started | 2026-08-03 |
+| Status | RELEASED — Wave 1 consolidation shipped; AUDIT_2026-08-03T042850Z-ponytail-wave1-consolidation.md |
+| Blockers | none |
+
+
+## Active Claim (Cursor cloud — Ponytail Wave 0 honesty)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor cloud agent (Ponytail Wave 0) |
+| Queue item | Wave 0 from AUDIT_2026-08-02T230500Z-ponytail-enterprise-ui.md: (1) partial-gate Error Center + hide Pipeline mock tabs; (2) rewire/hide mocked /sales → /orders; (3) fix finder-pos brand strings + signup/onboarding "F" mark; (4) kiosk honesty (Preview / no fake save). |
+| Files/areas expected | `web/components/EnterpriseShell.tsx`; `web/app/(protected)/{sales,inventory/pipeline,settings/kiosk,settings/b2b,onboarding}/**`; `web/app/signup/**`; related vitest; WORK audit + LOCK. NO backend src modules. |
+| Started | 2026-08-02 |
+| Status | RELEASED — Wave 0 honesty shipped; AUDIT_2026-08-02T232920Z-ponytail-wave0-honesty.md |
+| Blockers | none |
+
 # Ascend — Multi-Agent Work Lock
 
 Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0 wave-dispatch coordination claim (started 2026-07-18) was closed 2026-07-30 as superseded — see its entry below; work since has shipped as independent claims rather than through that coordinator. Latest substantive work: Phase 7 items 1-2 (sales-velocity consolidation, demand-snapshot foundation) RELEASED; four-environment AI coordination workflow (Claude Code/Cursor/Replit) adopted 2026-07-30, see `docs/architecture/ORCHESTRATION.md` "Environment routing" + `tools/AGENT_PROMPT.md`. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B, RELEASED); Clean Architecture pilot (quotes + gateway auth) (session C, ABANDONED — see entry); SSO OIDC hardening (session D)

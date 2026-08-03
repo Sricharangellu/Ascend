@@ -308,7 +308,7 @@ export default function InventoryPage() {
   const tabLabel  = activeTab === "orders" ? "orders" : activeTab === "transfers" ? "transfers" : "returns";
 
   return (
-    <EnterpriseShell active="inventory" title="Inventory" subtitle="Stock movements — orders, transfers, and returns">
+    <EnterpriseShell active="inventory" title="Movements" subtitle="Stock movements — orders, transfers, and returns">
 
       {/* ── Spec tab bar ─────────────────────────────────────────────────────── */}
       <div className="bg-white border-b border-[#E8E8E8] px-6 flex items-end justify-between">
