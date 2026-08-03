@@ -10,6 +10,7 @@ Parent: `AUDIT_2026-07-30T222326Z-product-experience-review.md` Wave B item 6
 1. **Customer attach (FE)** — Terminal search modal (`CustomerAttachModal`) via `GET /api/v1/customers/search`; selected `customerId` synced on order create/update; status strip + action bar entry; clears on new sale. Unlocks existing store-credit tender tab.
 2. **Gift-card tender (BE+FE)** — `PaymentMethod` + capture schema include `gift_card` + `giftCardCode`. Capture redeems the card **inside the payment transaction** (full order amount v1), then publishes `gift_card.redeemed` after commit. TenderScreen adds Gift card tab (lookup + pay).
 3. **Trust cleanup** — Fake Return mode toggle removed from action bar / status strip; ShortcutsOverlay no longer advertises unimplemented F1–F4 / Ctrl+P / Ctrl+Z.
+4. **Quick Sell deep-link (#133 leftover)** — Terminal honors `/terminal?product=<id>` (Suspense + one-shot add via catalog GET). Catalog Quick Sell href fix lands in the companion dead-chrome PR (still points at `/register` on `develop`).
 
 ## Status labels
 
@@ -19,6 +20,7 @@ Parent: `AUDIT_2026-07-30T222326Z-product-experience-review.md` Wave B item 6
 | Gift-card payment method | `built_verified` (backend) | New payments tests for capture / insufficient / missing code |
 | Gift-card tender UI | `built_unverified` | Wired to real capture; no Playwright yet |
 | Return stub removal | `built_verified` | Code removal only |
+| Quick Sell deep-link | `built_unverified` | Terminal handler + Suspense; catalog href still `/register` until companion PR |
 
 ## Honest limits
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import { useOffline } from "@/lib/useOffline";
 import { useCart } from "@/lib/useCart";
@@ -32,10 +33,12 @@ import { TerminalActionBar } from "./TerminalActionBar";
 export function TerminalInner() {
   const { user } = useAuth();
   const { registerId } = useFinderContext();
+  const searchParams = useSearchParams();
   const { isOffline } = useOffline();
   const cart = useCart();
   const { addToast } = useToast();
   const splitTenderEnabled = useFlag("checkout_split_tender");
+  const quickSellConsumed = useRef(false);
 
   const [screen, setScreen] = useState<"terminal" | "tender" | "receipt">("terminal");
   const [completedPayment, setCompletedPayment] = useState<Payment | null>(null);
@@ -165,6 +168,30 @@ export function TerminalInner() {
     },
     [cart, outletState, addToast]
   );
+
+  // Catalog "Quick Sell" deep-link: /terminal?product=<id> — add once on mount.
+  useEffect(() => {
+    const productId = searchParams.get("product");
+    if (!productId || quickSellConsumed.current) return;
+    quickSellConsumed.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = await apiGet<Product>(`/api/v1/catalog/${encodeURIComponent(productId)}`);
+        if (cancelled) return;
+        const product = normalizeTerminalProduct(raw);
+        handleAddProduct(product);
+        addToast({ title: `Added ${product.name}`, variant: "success" });
+      } catch {
+        if (!cancelled) {
+          addToast({ title: "Could not add product to cart", variant: "error" });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, handleAddProduct, addToast]);
 
   const handleBarcodeScan = useCallback(async (code: string) => {
     if (screen !== "terminal") return;

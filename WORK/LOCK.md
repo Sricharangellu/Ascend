@@ -111,10 +111,21 @@ Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0
 | Field | Value |
 |---|---|
 | Agent/session | Cursor Cloud `bc-c564feef` — Ascend UI ponytail audit (Wave B cashier speed) |
-| Queue item | POS customer attach + gift-card tender: attach customer on terminal (sync customerId), Gift Card payment method that redeems atomically with capture; remove fake Return mode stub; honest shortcuts. |
-| Files/areas expected | `src/modules/payments/{service,routes,payments.test}.ts`; `web/api-client/types.ts`; `web/components/terminal/{TenderScreen,CustomerAttachModal,ShortcutsOverlay}.tsx`; `web/app/(protected)/terminal/_components/{TerminalInner,CheckoutStatusStrip,TerminalActionBar}.tsx`; `WORK/**` |
+| Queue item | POS customer attach + gift-card tender: attach customer on terminal (sync customerId), Gift Card payment method that redeems atomically with capture; remove fake Return mode stub; honest shortcuts. Plus #133 leftover: Catalog Quick Sell → `/terminal?product=` deep-link. |
+| Files/areas expected | `src/modules/payments/{service,routes,payments.test}.ts`; `web/api-client/types.ts`; `web/components/terminal/{TenderScreen,CustomerAttachModal,ShortcutsOverlay}.tsx`; `web/app/(protected)/terminal/{page.tsx,_components/{TerminalInner,CheckoutStatusStrip,TerminalActionBar}.tsx}`; `WORK/**` |
 | Started | 2026-08-03T044716Z |
-| Status | RELEASED — POS customer attach + gift_card tender on `cursor/ui-wave-b-pos-customer-giftcard-604f`; see AUDIT_2026-08-03T044900Z-ui-wave-b-pos-customer-giftcard.md |
+| Status | ACTIVE — adding Quick Sell deep-link on same PR #163; prior slices already on branch. |
+| Blockers | none |
+
+## Active Claim (Cursor Cloud — HOTFIX develop Replit merge CI)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud `bc-c564feef` — Ascend UI ponytail audit |
+| Queue item | HOTFIX: restore Ascend root after Replit develop merge (`74f7d91`). |
+| Files/areas expected | `package.json`, `tsconfig.json`, `.npmrc`, `.gitignore`, `.migration-backup/**`, `WORK/**` |
+| Started | 2026-08-03T050536Z |
+| Status | RELEASED — SUPERSEDED. `develop` tip `0a437bd` already has Ascend `package.json` (`8519c72`+) and no tracked `.migration-backup/`; PR #165 closed without merge. |
 | Blockers | none |
 
 ## Active Claim (Cursor Cloud — Ascend UI ponytail audit / Wave B aging party names)
