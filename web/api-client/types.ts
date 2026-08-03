@@ -603,6 +603,8 @@ export interface AgingBuckets {
 
 export interface AgingRow {
   partyId: string;
+  /** Customer or supplier display name from the aging join. */
+  partyName: string;
   buckets: AgingBuckets;
 }
 
