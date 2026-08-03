@@ -11,46 +11,48 @@ import { fmtDateTime } from "@/lib/date";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ACTION_BADGE: Record<AuditAction, "blue" | "green" | "red" | "yellow" | "gray" | "purple"> = {
-  created: "green",
-  updated: "blue",
-  deleted: "red",
-  login: "gray",
-  logout: "gray",
+  created:  "green",
+  updated:  "blue",
+  deleted:  "red",
+  login:    "gray",
+  logout:   "gray",
   exported: "purple",
   refunded: "yellow",
-  voided: "red",
+  voided:   "red",
   approved: "green",
   rejected: "red",
 };
 
 const RESOURCE_TYPE_LABELS: Record<string, string> = {
-  product: "Product",
-  order: "Order",
-  purchase_order: "Purchase Order",
-  discount: "Discount",
-  custom_role: "Custom Role",
-  report: "Report",
-  settings: "Settings",
-  session: "Session",
+  product:       "Product",
+  order:         "Order",
+  purchase_order:"Purchase Order",
+  discount:      "Discount",
+  custom_role:   "Custom Role",
+  report:        "Report",
+  settings:      "Settings",
+  session:       "Session",
 };
 
 const RESOURCE_TYPES = ["", "product", "order", "purchase_order", "discount", "custom_role", "report", "settings", "session"];
 const ACTIONS: Array<"" | AuditAction> = ["", "created", "updated", "deleted", "login", "logout", "exported", "refunded", "voided", "approved", "rejected"];
 
+const ctrlCls = "h-8 rounded-lg border px-3 text-[13px] outline-none transition-all focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500";
+const ctrlStyle = { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" };
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AuditLogPage() {
-  const [items, setItems] = useState<AuditEvent[]>([]);
-  const [total, setTotal] = useState(0);
+  const [items, setItems]     = useState<AuditEvent[]>([]);
+  const [total, setTotal]     = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError]     = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  // Filters
-  const [actorQ, setActorQ] = useState("");
+  const [actorQ, setActorQ]           = useState("");
   const [resourceType, setResourceType] = useState("");
-  const [action, setAction] = useState<"" | AuditAction>("");
-  const [offset, setOffset] = useState(0);
+  const [action, setAction]           = useState<"" | AuditAction>("");
+  const [offset, setOffset]           = useState(0);
   const LIMIT = 20;
 
   const load = useCallback(async () => {
@@ -74,131 +76,178 @@ export default function AuditLogPage() {
 
   return (
     <EnterpriseShell active="audit-log" title="Audit Log" subtitle="Full history of user actions" contentClassName="overflow-y-auto">
-      <div className="mx-auto w-full max-w-5xl space-y-5 px-4 py-5 sm:px-6">
+      <div className="mx-auto w-full max-w-5xl space-y-4 px-5 py-5 sm:px-6">
 
-        {/* Filter bar */}
-        <div className="flex flex-wrap gap-3 items-end">
+        {/* ── Page header ──────────────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4" style={{ borderColor: "var(--color-border)" }}>
+          <div>
+            <h1 className="text-[20px] font-bold tracking-tight" style={{ color: "var(--color-text-primary)" }}>Audit Log</h1>
+            <p className="mt-0.5 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>Complete history of user actions across the system.</p>
+          </div>
+          <span className="text-[13px] tabular-nums" style={{ color: "var(--color-text-secondary)" }}>
+            {total.toLocaleString()} events
+          </span>
+        </div>
+
+        {/* ── Filter bar ────────────────────────────────────────────────── */}
+        <div
+          className="flex flex-wrap items-end gap-3 rounded-xl border p-4"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}
+        >
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-500">Actor (email)</label>
+            <label className="text-[11px] font-semibold uppercase tracking-[0.04em]" style={{ color: "var(--color-text-secondary)" }}>
+              Actor (email)
+            </label>
             <input
               value={actorQ}
-              onChange={e => setActorQ(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") applyFilters(); }}
+              onChange={(e) => setActorQ(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") applyFilters(); }}
               placeholder="Filter by email…"
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm w-52 focus:border-blue-500 focus:outline-none"
+              className={`${ctrlCls} w-52`}
+              style={ctrlStyle}
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-500">Resource type</label>
+            <label className="text-[11px] font-semibold uppercase tracking-[0.04em]" style={{ color: "var(--color-text-secondary)" }}>
+              Resource type
+            </label>
             <select
               value={resourceType}
-              onChange={e => { setResourceType(e.target.value); setOffset(0); }}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              onChange={(e) => { setResourceType(e.target.value); setOffset(0); }}
+              className={ctrlCls}
+              style={ctrlStyle}
             >
               <option value="">All types</option>
-              {RESOURCE_TYPES.filter(Boolean).map(t => (
+              {RESOURCE_TYPES.filter(Boolean).map((t) => (
                 <option key={t} value={t}>{RESOURCE_TYPE_LABELS[t] ?? t}</option>
               ))}
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-500">Action</label>
+            <label className="text-[11px] font-semibold uppercase tracking-[0.04em]" style={{ color: "var(--color-text-secondary)" }}>
+              Action
+            </label>
             <select
               value={action}
-              onChange={e => { setAction(e.target.value as "" | AuditAction); setOffset(0); }}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              onChange={(e) => { setAction(e.target.value as "" | AuditAction); setOffset(0); }}
+              className={ctrlCls}
+              style={ctrlStyle}
             >
               <option value="">All actions</option>
-              {ACTIONS.filter(Boolean).map(a => (
+              {ACTIONS.filter(Boolean).map((a) => (
                 <option key={a} value={a}>{a}</option>
               ))}
             </select>
           </div>
-          <Button size="sm" variant="primary" onClick={applyFilters}>Apply</Button>
-          <Button size="sm" variant="secondary" onClick={() => { setActorQ(""); setResourceType(""); setAction(""); setOffset(0); }}>Reset</Button>
-          <span className="ml-auto text-sm text-gray-500 self-center">{total} events</span>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="primary" onClick={applyFilters}>Apply</Button>
+            <Button size="sm" variant="secondary" onClick={() => { setActorQ(""); setResourceType(""); setAction(""); setOffset(0); }}>
+              Reset
+            </Button>
+          </div>
         </div>
 
-        {error && <p role="alert" className="text-sm text-red-700 bg-red-50 rounded-lg px-4 py-3">{error}</p>}
+        {/* ── Error ────────────────────────────────────────────────────── */}
+        {error && (
+          <div role="alert" className="rounded-xl border px-4 py-3 text-[13px]"
+            style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>
+            {error}
+          </div>
+        )}
 
-        {/* Table */}
+        {/* ── Table ────────────────────────────────────────────────────── */}
         {loading ? (
           <TableSkeleton headers={["When", "Actor", "Action", "Resource", "IP", ""]} rows={10} />
         ) : items.length === 0 ? (
-          <div className="rounded-xl border border-[var(--color-table-border)] py-16 text-center">
-            <p className="text-sm font-medium text-[var(--color-text-primary)]">No events match the current filters.</p>
-            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Try resetting the filters.</p>
+          <div className="rounded-xl border py-16 text-center" style={{ borderColor: "var(--color-border)" }}>
+            <p className="text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>No events match the current filters.</p>
+            <p className="mt-1 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>Try resetting the filters.</p>
           </div>
         ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
-                <th className="px-4 py-3">When</th>
-                <th className="px-4 py-3">Actor</th>
-                <th className="px-4 py-3">Action</th>
-                <th className="px-4 py-3">Resource</th>
-                <th className="px-4 py-3">IP</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {items.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">No events match the current filters.</td></tr>
-              )}
-              {!loading && items.map(ev => (
-                <>
-                  <tr
-                    key={ev.id}
-                    className={`hover:bg-gray-50 cursor-pointer ${expanded === ev.id ? "bg-blue-50" : ""}`}
-                    onClick={() => setExpanded(expanded === ev.id ? null : ev.id)}
-                  >
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmtDateTime(ev.created_at)}</td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900 text-xs">{ev.actor.email}</div>
-                      <div className="text-gray-400 text-xs capitalize">{ev.actor.role}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={ACTION_BADGE[ev.action as AuditAction] ?? "gray"}>{ev.action}</Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900">{ev.resource_label}</div>
-                      <div className="text-gray-400 text-xs">{RESOURCE_TYPE_LABELS[ev.resource_type] ?? ev.resource_type}</div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-400 text-xs font-mono">{ev.ip_address ?? "—"}</td>
-                    <td className="px-4 py-3 text-gray-400 text-xs">{ev.changes ? "▾ details" : ""}</td>
-                  </tr>
-                  {expanded === ev.id && ev.changes && (
-                    <tr key={`${ev.id}-details`} className="bg-blue-50">
-                      <td colSpan={6} className="px-6 py-3">
-                        <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Changes</p>
-                        <div className="space-y-1">
-                          {Object.entries(ev.changes).map(([field, { from, to }]) => (
-                            <div key={field} className="flex items-center gap-3 text-xs">
-                              <span className="font-mono text-gray-700 w-32 shrink-0">{field}</span>
-                              <span className="text-red-600 line-through">{JSON.stringify(from)}</span>
-                              <span className="text-gray-400">→</span>
-                              <span className="text-green-700">{JSON.stringify(to)}</span>
-                            </div>
-                          ))}
+          <div className="overflow-x-auto rounded-xl border shadow-[var(--shadow-sm)]"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+            <table className="w-full text-[13px]">
+              <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+                <tr>
+                  {["When", "Actor", "Action", "Resource", "IP", ""].map((h) => (
+                    <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em]"
+                      style={{ color: "var(--color-text-secondary)" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((ev) => (
+                  <>
+                    <tr
+                      key={ev.id}
+                      className="cursor-pointer border-b transition-colors duration-75"
+                      style={{ borderColor: "var(--color-table-border)" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-table-row-hover)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = expanded === ev.id ? "var(--color-primary-subtle)" : "")}
+                      onClick={() => setExpanded(expanded === ev.id ? null : ev.id)}
+                    >
+                      <td className="whitespace-nowrap px-4 py-3 text-[12px]" style={{ color: "var(--color-text-secondary)" }}>
+                        {fmtDateTime(ev.created_at)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>{ev.actor.email}</div>
+                        <div className="text-[11px] capitalize" style={{ color: "var(--color-text-muted)" }}>{ev.actor.role}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant={ACTION_BADGE[ev.action as AuditAction] ?? "gray"}>{ev.action}</Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>{ev.resource_label}</div>
+                        <div className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>
+                          {RESOURCE_TYPE_LABELS[ev.resource_type] ?? ev.resource_type}
                         </div>
                       </td>
+                      <td className="px-4 py-3 font-mono text-[11px]" style={{ color: "var(--color-text-muted)" }}>
+                        {ev.ip_address ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-[11px]" style={{ color: "var(--color-text-muted)" }}>
+                        {ev.changes ? "▾ details" : ""}
+                      </td>
                     </tr>
-                  )}
-                </>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    {expanded === ev.id && ev.changes && (
+                      <tr key={`${ev.id}-details`} style={{ backgroundColor: "var(--color-primary-subtle)" }}>
+                        <td colSpan={6} className="px-6 py-3">
+                          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--color-text-secondary)" }}>
+                            Changes
+                          </p>
+                          <div className="space-y-1">
+                            {Object.entries(ev.changes).map(([field, { from, to }]) => (
+                              <div key={field} className="flex items-center gap-3 text-[11px]">
+                                <span className="w-32 shrink-0 font-mono font-medium" style={{ color: "var(--color-text-primary)" }}>{field}</span>
+                                <span className="text-danger-600 line-through">{JSON.stringify(from)}</span>
+                                <span style={{ color: "var(--color-text-muted)" }}>→</span>
+                                <span className="text-success-700">{JSON.stringify(to)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
 
-        {/* Pagination */}
+        {/* ── Pagination ────────────────────────────────────────────────── */}
         {total > LIMIT && (
-          <div className="flex items-center justify-between text-sm text-gray-500">
-            <span>{offset + 1}–{Math.min(offset + LIMIT, total)} of {total}</span>
+          <div className="flex items-center justify-between">
+            <span className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
+              {offset + 1}–{Math.min(offset + LIMIT, total)} of {total.toLocaleString()}
+            </span>
             <div className="flex gap-2">
-              <Button size="sm" variant="secondary" disabled={offset === 0} onClick={() => setOffset(o => Math.max(0, o - LIMIT))}>← Prev</Button>
-              <Button size="sm" variant="secondary" disabled={offset + LIMIT >= total} onClick={() => setOffset(o => o + LIMIT)}>Next →</Button>
+              <Button size="sm" variant="secondary" disabled={offset === 0} onClick={() => setOffset((o) => Math.max(0, o - LIMIT))}>
+                ← Prev
+              </Button>
+              <Button size="sm" variant="secondary" disabled={offset + LIMIT >= total} onClick={() => setOffset((o) => o + LIMIT)}>
+                Next →
+              </Button>
             </div>
           </div>
         )}
