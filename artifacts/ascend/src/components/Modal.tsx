@@ -32,27 +32,58 @@ export function Modal({ open, onClose, title, children, size = "md", footer }: M
     <dialog
       ref={dialogRef}
       className={clsx(
-        "w-full rounded-xl bg-white shadow-2xl p-0 m-auto backdrop:bg-black/40",
+        "w-full rounded-2xl p-0 m-auto backdrop:bg-black/50 backdrop:backdrop-blur-sm",
         "open:flex open:flex-col",
+        "shadow-[var(--shadow-xl)]",
         sizeClass
       )}
-      style={{ border: "none" }}
+      style={{
+        border: "1px solid var(--color-border)",
+        backgroundColor: "var(--color-surface)",
+      }}
     >
-      <div className="flex items-center justify-between border-b border-[var(--color-table-border)] px-6 py-4">
-        <h2 className="text-base font-semibold text-[var(--color-text-primary)]">{title}</h2>
+      {/* Header */}
+      <div
+        className="flex items-center justify-between border-b px-6 py-4"
+        style={{ borderColor: "var(--color-border)" }}
+      >
+        <h2 className="text-[15px] font-semibold" style={{ color: "var(--color-text-primary)" }}>
+          {title}
+        </h2>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="flex h-8 w-8 items-center justify-center rounded text-[var(--color-text-secondary)] hover:bg-[var(--color-page-bg)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+          className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30"
+          style={{ color: "var(--color-text-muted)" }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = "var(--color-surface-subtle)";
+            (e.currentTarget as HTMLButtonElement).style.color = "var(--color-text-primary)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = "";
+            (e.currentTarget as HTMLButtonElement).style.color = "var(--color-text-muted)";
+          }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto px-6 py-4">{children}</div>
-      {footer && <div className="border-t border-[var(--color-table-border)] px-6 py-4">{footer}</div>}
+
+      {/* Body */}
+      <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+
+      {/* Footer */}
+      {footer && (
+        <div
+          className="border-t px-6 py-4"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}
+        >
+          {footer}
+        </div>
+      )}
     </dialog>
   );
 }
