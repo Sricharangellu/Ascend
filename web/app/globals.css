@@ -145,3 +145,32 @@
     to   { opacity: 1; }
   }
 }
+
+/* ── Help article (MDX) — minimal prose styling for rendered .mdx content.
+   Scoped to one class rather than pulling in @tailwindcss/typography for a
+   handful of static help pages. ─────────────────────────────────────────── */
+@layer components {
+  .help-article h2 {
+    margin-top: 2rem;
+    margin-bottom: 0.5rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+  .help-article p {
+    margin-top: 0.75rem;
+    line-height: 1.7;
+  }
+  .help-article ul {
+    margin-top: 0.75rem;
+    padding-left: 1.25rem;
+    list-style: disc;
+  }
+  .help-article li {
+    margin-top: 0.25rem;
+  }
+  .help-article a {
+    color: var(--color-link, #5D5FEF);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
