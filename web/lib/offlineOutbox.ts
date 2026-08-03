@@ -191,11 +191,25 @@ export function isTransientClientStatus(status: number): boolean {
   return status === 408 || status === 429;
 }
 
+/** Pure decision helper — unit-tested without IndexedDB / network. */
+export type OutboxReplayAction = "success" | "permanent_fail" | "retry" | "retry_and_stop";
+
+export function decideOutboxReplay(status: number): OutboxReplayAction {
+  if (status >= 200 && status < 300) return "success";
+  // Rate-limited: keep the item, and stop draining so we don't stampede the
+  // remaining queue into the same exhausted bucket.
+  if (status === 429) return "retry_and_stop";
+  if (status === 408 || status >= 500) return "retry";
+  if (status >= 400 && status < 500) return "permanent_fail";
+  return "retry";
+}
+
 /**
  * Drain the outbox from the main thread (fallback when Background Sync unavailable).
  * Replays each item in order, removes on 2xx, retries on network error / 5xx /
  * transient 4xx (429 rate-limit, 408 timeout), removes on permanent 4xx
- * (the backend has already rejected it).
+ * (the backend has already rejected it). On 429 the drain stops early so later
+ * items aren't hammered into the same exhausted limiter.
  */
 export async function drainOutboxMainThread(
   getToken: () => string | null,
@@ -217,20 +231,22 @@ export async function drainOutboxMainThread(
         body: item.body,
       });
 
-      if (res.ok) {
+      const decision = decideOutboxReplay(res.status);
+      if (decision === "success") {
         await removeItem(item.id);
         succeeded++;
-      } else if (res.status >= 400 && res.status < 500 && !isTransientClientStatus(res.status)) {
-        // Permanent client error — don't retry, remove with failure log
+      } else if (decision === "permanent_fail") {
         console.warn(`[outbox] permanent failure for ${item.id}: ${res.status}`);
         await removeItem(item.id);
         failed++;
       } else {
-        // Server / rate-limit / timeout — leave in queue for next attempt
+        // retry / retry_and_stop — leave in queue for next attempt
         await incrementRetry(item.id);
+        if (decision === "retry_and_stop") break;
       }
     } catch {
-      // Network error — leave in queue
+      // Network error — leave in queue; keep draining later items (they may
+      // already be local-only failures unrelated to connectivity).
       await incrementRetry(item.id);
     }
   }

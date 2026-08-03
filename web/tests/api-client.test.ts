@@ -16,7 +16,7 @@ import {
 import type { LoginResponse } from "@/api-client/types";
 import { clearSession, setSession, hasSessionHint } from "@/lib/auth";
 import { server } from "@/mocks/server";
-import { isTransientClientStatus } from "@/lib/offlineOutbox";
+import { decideOutboxReplay, isTransientClientStatus } from "@/lib/offlineOutbox";
 
 beforeEach(() => {
   clearSession();
@@ -87,6 +87,17 @@ describe("retryAfterMs + outbox transient status", () => {
     expect(isTransientClientStatus(401)).toBe(false);
     expect(isTransientClientStatus(404)).toBe(false);
   });
+
+  it("decideOutboxReplay keeps 429 queued and stops the drain", () => {
+    expect(decideOutboxReplay(200)).toBe("success");
+    expect(decideOutboxReplay(201)).toBe("success");
+    expect(decideOutboxReplay(429)).toBe("retry_and_stop");
+    expect(decideOutboxReplay(408)).toBe("retry");
+    expect(decideOutboxReplay(500)).toBe("retry");
+    expect(decideOutboxReplay(400)).toBe("permanent_fail");
+    expect(decideOutboxReplay(401)).toBe("permanent_fail");
+    expect(decideOutboxReplay(422)).toBe("permanent_fail");
+  });
 });
 
 describe("apiFetch — 429 Retry-After", () => {
@@ -150,6 +161,34 @@ describe("apiFetch — 429 Retry-After", () => {
     expect((err as ApiResponseError).code).toBe("rate_limit_exceeded");
     expect((err as ApiResponseError).retryAfterSec).toBe(1);
     vi.useRealTimers();
+  });
+
+  it("does NOT auto-retry account_locked 429s (no Retry-After header)", async () => {
+    let calls = 0;
+    server.use(
+      http.post("*/api/identity/login", () => {
+        calls += 1;
+        return HttpResponse.json(
+          {
+            error: {
+              code: "account_locked",
+              message: "Account is temporarily locked after too many failed attempts. Try again in 15 minutes.",
+              requestId: "lock_1",
+            },
+          },
+          { status: 429 },
+        );
+      }),
+    );
+
+    await expect(
+      apiPost("/api/identity/login", { email: "a@b.com", password: "x" }, { anonymous: true }),
+    ).rejects.toMatchObject({
+      name: "ApiResponseError",
+      code: "account_locked",
+      status: 429,
+    });
+    expect(calls).toBe(1);
   });
 
   it("wraps fetch network failures as network_error", async () => {

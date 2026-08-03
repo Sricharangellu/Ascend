@@ -7,11 +7,12 @@
  * transparently. If it fails the session is cleared and the user is sent to
  * /login.
  *
- * 429 handling: one automatic retry after honouring `Retry-After` (capped).
- * Matches docs/api/rate-limits.md — capacity blips should not surface as hard
- * failures when a single wait-and-retry would succeed. Network failures
- * (TypeError from fetch) are wrapped as `network_error` so callers can treat
- * connectivity the same way as other ApiResponseError codes.
+ * 429 handling: one automatic retry ONLY when the gateway sent `Retry-After`
+ * (rate_limit_exceeded). Other 429s — notably identity `account_locked` — do
+ * not carry that header and must surface immediately; retrying a lockout is
+ * pointless and confuses login UX. Network failures (TypeError from fetch)
+ * are wrapped as `network_error` so callers can treat connectivity the same
+ * way as other ApiResponseError codes.
  */
 
 import type { ApiError, ApiFieldIssue } from "./types";
@@ -208,9 +209,11 @@ export async function apiFetch<TResponse>(
     throw new ApiResponseError("unauthenticated", "Session expired. Please sign in again.", "", 401);
   }
 
-  // 429 — honour Retry-After once, then surface the error if still limited.
-  if (response.status === 429 && !_rateLimitRetry) {
-    await sleep(retryAfterMs(response.headers.get("Retry-After")));
+  // Gateway rate limits always set Retry-After. Identity account_locked is
+  // also a 429 but without that header — do not auto-retry lockouts.
+  const retryAfterHeader = response.headers.get("Retry-After");
+  if (response.status === 429 && !_rateLimitRetry && retryAfterHeader !== null) {
+    await sleep(retryAfterMs(retryAfterHeader));
     return apiFetch<TResponse>(method, path, { ...options, _rateLimitRetry: true });
   }
 
@@ -234,9 +237,8 @@ export async function apiFetch<TResponse>(
   if (!response.ok) {
     const envelope = json as Partial<ApiError>;
     const err = envelope?.error;
-    const retryHeader = response.headers.get("Retry-After");
-    const retrySec = retryHeader !== null && Number.isFinite(Number(retryHeader))
-      ? Number(retryHeader)
+    const retrySec = retryAfterHeader !== null && Number.isFinite(Number(retryAfterHeader))
+      ? Number(retryAfterHeader)
       : undefined;
     throw new ApiResponseError(
       err?.code ?? "UNKNOWN_ERROR",
@@ -309,8 +311,9 @@ export async function apiDownload(
     throw new ApiResponseError("unauthenticated", "Session expired. Please sign in again.", "", 401);
   }
 
-  if (response.status === 429 && !_rateLimitRetry) {
-    await sleep(retryAfterMs(response.headers.get("Retry-After")));
+  const retryAfterHeader = response.headers.get("Retry-After");
+  if (response.status === 429 && !_rateLimitRetry && retryAfterHeader !== null) {
+    await sleep(retryAfterMs(retryAfterHeader));
     return apiDownload(path, { ...options, _rateLimitRetry: true });
   }
 
@@ -326,9 +329,8 @@ export async function apiDownload(
     } catch {
       // Non-JSON download errors still surface with status and method context.
     }
-    const retryHeader = response.headers.get("Retry-After");
-    const retrySec = retryHeader !== null && Number.isFinite(Number(retryHeader))
-      ? Number(retryHeader)
+    const retrySec = retryAfterHeader !== null && Number.isFinite(Number(retryAfterHeader))
+      ? Number(retryAfterHeader)
       : undefined;
     throw new ApiResponseError(code, message, requestId, response.status, undefined, undefined, retrySec);
   }

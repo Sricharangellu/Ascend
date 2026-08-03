@@ -44,9 +44,22 @@ Code-verified audit of gaps and bugs in three areas Sri named:
 | Production heartbeat probing dead URLs | Ops / NEEDS-SRI | `docs/architecture/DEPLOYMENTS.md` P0 |
 | In-memory rate limits without `REDIS_URL` across replicas | Known prod warning in `src/app.ts` | Infra config, not a code bug |
 
-## Verification plan
+## Follow-up hardening (same PR, 2026-08-03T02:19Z)
 
-- `node tools/hygiene-check.mjs`
-- `npm run gap:scan`
-- Backend: `npx tsx --test src/gateway/rateLimit.test.ts` (+ typecheck)
-- Frontend: `vitest` on `web/tests/api-client.test.ts` + web typecheck/lint
+Found while working the first pass further:
+
+| # | Bug | Fix |
+|---|---|---|
+| 8 | Auto-retry on **every** 429 would also retry identity `account_locked` (same status, no `Retry-After`) | Only auto-retry when `Retry-After` header is present |
+| 9 | Outbox drain kept hammering later queue items after a 429 | `decideOutboxReplay` → `retry_and_stop`; SW + main-thread drain `break` on 429 |
+
+New regression coverage: `account_locked` single-call assert; `decideOutboxReplay` table.
+
+## Verification
+
+- `node tools/hygiene-check.mjs` — pass
+- `npm run gap:scan` — 456/381/21 clean
+- Backend: `npx tsx --test src/gateway/rateLimit.test.ts` — 8/8
+- Frontend: `vitest run tests/api-client.test.ts` — 19/19
+- Backend + web typecheck — clean
+- eslint on touched web files — clean

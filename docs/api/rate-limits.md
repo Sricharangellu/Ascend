@@ -31,19 +31,26 @@
 ## Handling 429
 
 The web API client (`web/api-client/client.ts`) automatically waits for
-`Retry-After` (capped at 10s) and retries **once**. Callers that bypass the
-client should do the same:
+`Retry-After` (capped at 10s) and retries **once — but only when the
+`Retry-After` header is present**. Gateway rate limits always set that header.
+Identity `account_locked` is also HTTP 429 but **without** `Retry-After`; the
+client surfaces it immediately (retrying a lockout is pointless).
 
 ```javascript
 if (response.status === 429) {
-  const retryAfter = parseInt(response.headers.get("retry-after") ?? "1", 10);
-  await sleep(Math.min(Math.max(retryAfter, 0), 10) * 1000);
-  return retry(request); // once
+  const retryAfter = response.headers.get("retry-after");
+  if (retryAfter !== null) {
+    await sleep(Math.min(Math.max(parseInt(retryAfter, 10) || 0, 0), 10) * 1000);
+    return retry(request); // once
+  }
+  // No Retry-After → not a gateway rate limit (e.g. account_locked). Surface it.
 }
 ```
 
 Offline checkout outbox / service-worker replay treat 429 (and 408) as
-**transient** — the item stays queued. Do not classify 429 as a permanent 4xx.
+**transient** — the item stays queued, and a 429 **stops the drain early** so
+remaining items don't stampede the same exhausted bucket. Do not classify 429
+as a permanent 4xx.
 
 ## Backend implementation
 

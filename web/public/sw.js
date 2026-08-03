@@ -188,6 +188,8 @@ async function drainOutbox() {
         } else {
           // Server / rate-limit / timeout — increment retry, leave in queue.
           await idbPut(db, { ...item, retryCount: (item.retryCount ?? 0) + 1 });
+          // Stop the drain on 429 so remaining items don't stampede the bucket.
+          if (res.status === 429) break;
         }
       } catch {
         // Network error — leave item in queue for next sync event.
