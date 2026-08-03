@@ -382,7 +382,14 @@ function TopBar({
             Offline
           </span>
         )}
-        {/* Help link removed — /help has no route. Re-add when a help center ships. */}
+        <Link
+          href="/help"
+          className="flex h-8 w-8 items-center justify-center rounded-md text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+          aria-label="Help Center"
+          title="Help Center"
+        >
+          <HelpIcon />
+        </Link>
         <NotificationBell />
         <div className="relative" ref={menuRef}>
           <button
@@ -770,6 +777,16 @@ function SearchIcon() {
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="11" cy="11" r="8" />
       <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+function HelpIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
     </svg>
   );
 }

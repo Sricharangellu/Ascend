@@ -285,6 +285,14 @@ export class DemandPlanningService {
     if (!Number.isFinite(input.periodStart)) {
       throw badRequest("periodStart must be a finite epoch ms");
     }
+    // getForecastAccuracy always compares at day granularity (it sums daily
+    // demand_snapshots rows in [periodStart, periodEnd)) regardless of
+    // periodType. An unaligned periodStart silently drops the first day's
+    // actuals from that sum instead of erroring — require day-alignment so a
+    // wrong-but-quiet accuracy number can't happen.
+    if (input.periodStart % DAY_MS !== 0) {
+      throw badRequest("periodStart must be aligned to a UTC day boundary (a multiple of 86400000ms)");
+    }
     const storeId = input.storeId ?? "";
     const method = (input.method?.trim() || "manual").slice(0, 64);
     const now = Date.now();
