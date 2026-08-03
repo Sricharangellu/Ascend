@@ -47,6 +47,22 @@ export async function getStoredUser(): Promise<UserProfile | null> {
   }
 }
 
+// ─── 401 interception ─────────────────────────────────────────────────────────
+type UnauthorizedHandler = () => void;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+/**
+ * Register a handler invoked when the server rejects a token (401 on an
+ * authenticated request). The session is cleared before the handler runs.
+ * Returns an unsubscribe function.
+ */
+export function setUnauthorizedHandler(handler: UnauthorizedHandler): () => void {
+  unauthorizedHandler = handler;
+  return () => {
+    if (unauthorizedHandler === handler) unauthorizedHandler = null;
+  };
+}
+
 // ─── Error class ──────────────────────────────────────────────────────────────
 export class ApiRequestError extends Error {
   constructor(
@@ -88,6 +104,12 @@ export async function apiFetch<T>(
       code = body?.error?.code ?? code;
     } catch {
       // ignore JSON parse failure
+    }
+    if (res.status === 401 && !anonymous) {
+      // Token rejected: clear the stale session so restore attempts cannot
+      // loop, then notify the app (AuthContext) to log the user out.
+      await clearSession();
+      unauthorizedHandler?.();
     }
     throw new ApiRequestError(code, msg, res.status);
   }

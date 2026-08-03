@@ -5,7 +5,13 @@ import React, {
   useEffect,
   useState,
 } from 'react';
-import { apiFetch, clearSession, getStoredUser, saveSession } from '@/lib/api';
+import {
+  apiFetch,
+  clearSession,
+  getStoredUser,
+  saveSession,
+  setUnauthorizedHandler,
+} from '@/lib/api';
 import type { UserProfile } from '@/lib/api';
 
 interface AuthContextValue {
@@ -42,6 +48,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
+  }, []);
+
+  // Log the user out when the server rejects a token (session already
+  // cleared by the interceptor). Clearing `user` unmounts protected screens,
+  // so no further authenticated requests fire — no redirect loop.
+  useEffect(() => {
+    return setUnauthorizedHandler(() => {
+      setUser(null);
+    });
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

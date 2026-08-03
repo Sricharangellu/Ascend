@@ -22,12 +22,20 @@ const mockApiFetch = jest.fn();
 const mockSaveSession = jest.fn();
 const mockClearSession = jest.fn();
 const mockGetStoredUser = jest.fn();
+let capturedUnauthorizedHandler: (() => void) | null = null;
+const mockSetUnauthorizedHandler = jest.fn((handler: () => void) => {
+  capturedUnauthorizedHandler = handler;
+  return () => {
+    if (capturedUnauthorizedHandler === handler) capturedUnauthorizedHandler = null;
+  };
+});
 
 jest.mock('../lib/api', () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
   saveSession: (...args: unknown[]) => mockSaveSession(...args),
   clearSession: () => mockClearSession(),
   getStoredUser: () => mockGetStoredUser(),
+  setUnauthorizedHandler: (handler: () => void) => mockSetUnauthorizedHandler(handler),
 }));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -61,6 +69,7 @@ async function renderAuthHook() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  capturedUnauthorizedHandler = null;
   // Default: no stored session resolves immediately
   mockGetStoredUser.mockResolvedValue(null);
 });
@@ -212,6 +221,35 @@ describe('logout', () => {
 
     expect(mockClearSession).toHaveBeenCalledTimes(1);
     expect(result.current.user).toBeNull();
+  });
+});
+
+// ─── 401 → logout via unauthorized handler ────────────────────────────────────
+
+describe('unauthorized handler (expired token)', () => {
+  it('registers a handler on mount that logs the user out when invoked', async () => {
+    mockGetStoredUser.mockResolvedValue(mockUser);
+
+    const { result } = await renderAuthHook();
+    expect(result.current.user).toEqual(mockUser);
+    expect(mockSetUnauthorizedHandler).toHaveBeenCalledTimes(1);
+    expect(capturedUnauthorizedHandler).not.toBeNull();
+
+    // Simulate apiFetch hitting a 401 → interceptor fires the handler
+    await act(async () => {
+      capturedUnauthorizedHandler!();
+    });
+
+    expect(result.current.user).toBeNull();
+  });
+
+  it('unregisters the handler on unmount', async () => {
+    const { unmount } = await renderAuthHook();
+    expect(capturedUnauthorizedHandler).not.toBeNull();
+    await act(async () => {
+      unmount();
+    });
+    expect(capturedUnauthorizedHandler).toBeNull();
   });
 });
 

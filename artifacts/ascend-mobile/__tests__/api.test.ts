@@ -16,6 +16,7 @@ import {
   clearSession,
   getStoredUser,
   saveSession,
+  setUnauthorizedHandler,
 } from '../lib/api';
 
 // AsyncStorage is auto-mocked via jest-expo setup; the mock module provides
@@ -129,6 +130,64 @@ describe('apiFetch – error handling', () => {
     fetchSpy.mockRejectedValueOnce(new TypeError('Network request failed'));
 
     await expect(apiFetch('/api/test')).rejects.toThrow('Network request failed');
+  });
+});
+
+// ─── 401 interceptor – logout, not loop ───────────────────────────────────────
+
+describe('apiFetch – 401 interceptor', () => {
+  it('clears the session and notifies the unauthorized handler on 401', async () => {
+    await saveSession('expired-tok', 'ref', mockUser);
+    const onUnauthorized = jest.fn();
+    const unsubscribe = setUnauthorizedHandler(onUnauthorized);
+
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: { code: 'UNAUTHORIZED', message: 'Token expired' } }),
+        { status: 401 },
+      ),
+    );
+
+    await expect(apiFetch('/api/protected')).rejects.toMatchObject({ status: 401 });
+
+    // Session fully cleared → no stale token to retry with (no loop)
+    expect(await AsyncStorage.getItem(TOKEN_KEY)).toBeNull();
+    expect(await AsyncStorage.getItem(REFRESH_KEY)).toBeNull();
+    expect(await AsyncStorage.getItem(USER_KEY)).toBeNull();
+    // Handler invoked exactly once → app logs the user out
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+  });
+
+  it('does NOT trigger the handler for anonymous requests (e.g. failed login)', async () => {
+    const onUnauthorized = jest.fn();
+    const unsubscribe = setUnauthorizedHandler(onUnauthorized);
+
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: { code: 'INVALID_CREDENTIALS', message: 'Bad password' } }),
+        { status: 401 },
+      ),
+    );
+
+    await expect(
+      apiFetch('/api/identity/login', { method: 'POST', anonymous: true }),
+    ).rejects.toMatchObject({ status: 401 });
+
+    expect(onUnauthorized).not.toHaveBeenCalled();
+    unsubscribe();
+  });
+
+  it('does NOT trigger the handler on non-401 errors', async () => {
+    const onUnauthorized = jest.fn();
+    const unsubscribe = setUnauthorizedHandler(onUnauthorized);
+
+    fetchSpy.mockResolvedValueOnce(new Response('oops', { status: 500 }));
+
+    await expect(apiFetch('/api/test')).rejects.toMatchObject({ status: 500 });
+    expect(onUnauthorized).not.toHaveBeenCalled();
+    unsubscribe();
   });
 });
 
