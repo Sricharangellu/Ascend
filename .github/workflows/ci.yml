@@ -246,6 +246,12 @@ jobs:
       # untouched.
       IDENTITY_RATE_LIMIT_CAPACITY: "1000"
       IDENTITY_RATE_LIMIT_REFILL: "100"
+      # Same single-IP cascade risk for register + SSO handshake paths
+      # (defaults are even tighter than login). Keep prod defaults unchanged.
+      IDENTITY_REGISTER_RATE_CAPACITY: "1000"
+      IDENTITY_REGISTER_RATE_REFILL: "100"
+      SSO_RATE_LIMIT_CAPACITY: "1000"
+      SSO_RATE_LIMIT_REFILL: "100"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
