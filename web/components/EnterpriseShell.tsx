@@ -40,7 +40,7 @@ type RailSection =
 const SECTION_MAP: Record<NavKey, RailSection> = {
   dashboard: "home",
   register: "sell", sales: "sell", orders: "sell", quotes: "sell",
-  returns: "sell", payments: "sell", "service-orders": "sell",
+  returns: "sell", "service-orders": "sell",
   ecommerce: "online",
   reports: "reporting", insights: "reporting", "ai-assistant": "reporting", "tax-compliance": "reporting",
   catalog: "catalog", discounts: "catalog", "gift-cards": "catalog",
