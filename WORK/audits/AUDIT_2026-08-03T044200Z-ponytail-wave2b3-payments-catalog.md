@@ -5,7 +5,7 @@
 | Date (UTC) | 2026-08-03T04:42:00Z |
 | Parent | Ponytail master index Waves 2–3; stacks on Waves 0–2 ported to `develop` |
 | Branch | `cursor/ponytail-implement-4fe7` |
-| Status | `built_unverified` — gates pending in this audit snapshot |
+| Status | `built_verified` — web typecheck/lint PASS; vitest 174/174; `next build` PASS |
 
 ## What changed
 
@@ -29,6 +29,6 @@
 
 | Surface | Status |
 |---|---|
-| `/payments` redirect | `built_unverified` |
-| `/catalog/[id]` 6-tab IA | `built_unverified` |
-| `/sales` clean redirect | `built_unverified` |
+| `/payments` redirect | `built_verified` |
+| `/catalog/[id]` 6-tab IA | `built_verified` |
+| `/sales` clean redirect | `built_verified` |
