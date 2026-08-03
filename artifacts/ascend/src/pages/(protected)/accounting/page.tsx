@@ -10,26 +10,26 @@ import type { AgingReport, Bill, Invoice, BillingStatus, Account, Deposit } from
 import { fmtDate } from "@/lib/date";
 
 const TYPE_STYLE: Record<string, string> = {
-  asset: "bg-blue-50 text-blue-700 ring-blue-200",
-  liability: "bg-amber-50 text-amber-700 ring-amber-200",
-  income: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  expense: "bg-red-50 text-red-700 ring-red-200",
+  asset:     "bg-info-50 text-info-700 border border-info-200",
+  liability: "bg-warning-50 text-warning-700 border border-warning-200",
+  income:    "bg-success-50 text-success-700 border border-success-200",
+  expense:   "bg-danger-50 text-danger-700 border border-danger-200",
 };
 const DEP_STYLE: Record<string, string> = {
-  pending_approval: "bg-amber-50 text-amber-700 ring-amber-200",
-  approved: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  rejected: "bg-red-50 text-red-700 ring-red-200",
+  pending_approval: "bg-warning-50 text-warning-700 border border-warning-200",
+  approved:         "bg-success-50 text-success-700 border border-success-200",
+  rejected:         "bg-danger-50 text-danger-700 border border-danger-200",
 };
 const BILLING_STYLE: Record<BillingStatus, string> = {
-  open: "bg-blue-50 text-blue-700 ring-blue-200",
-  partial: "bg-amber-50 text-amber-700 ring-amber-200",
-  paid: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  void: "bg-slate-100 text-slate-500 ring-slate-200",
+  open:    "bg-info-50 text-info-700 border border-info-200",
+  partial: "bg-warning-50 text-warning-700 border border-warning-200",
+  paid:    "bg-success-50 text-success-700 border border-success-200",
+  void:    "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)] border border-[var(--color-border)]",
 };
 const DUNNING_STYLE: Record<number, string> = {
-  1: "bg-yellow-50 text-yellow-700 ring-yellow-200",
-  2: "bg-orange-50 text-orange-700 ring-orange-200",
-  3: "bg-red-50 text-red-700 ring-red-200",
+  1: "bg-warning-50 text-warning-700 border border-warning-200",
+  2: "bg-warning-50 text-warning-800 border border-warning-300",
+  3: "bg-danger-50 text-danger-700 border border-danger-200",
 };
 const DUNNING_LABEL: Record<number, string> = {
   1: "30d",
@@ -128,35 +128,40 @@ export default function AccountingPage() {
 
   return (
     <EnterpriseShell active="accounting" title="Accounting" subtitle="Chart of Accounts & Batch Deposits" contentClassName="overflow-y-auto">
-      <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6">
-        <div className="border-b border-slate-200 pb-4">
-          <h1 className="text-lg font-semibold text-slate-950">Accounting operations</h1>
-          <p className="mt-1 text-sm text-slate-500">Manage account mapping, deposit approvals, receivables, and payables.</p>
+      <div className="mx-auto w-full max-w-7xl space-y-5 px-5 py-5 sm:px-6">
+        <div className="border-b pb-4" style={{ borderColor: "var(--color-border)" }}>
+          <h1 className="text-[20px] font-bold tracking-tight" style={{ color: "var(--color-text-primary)" }}>Accounting operations</h1>
+          <p className="mt-0.5 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>Manage account mapping, deposit approvals, receivables, and payables.</p>
         </div>
-        {error && <div role="alert" className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
+        {error && <div role="alert" className="rounded-xl border px-4 py-3 text-[13px]"
+          style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>{error}</div>}
 
-        <Card
-          title="Chart of Accounts"
-          description="Typed account tree used across products, shipping, and bills."
-          noPadding
-        >
-          <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
+        <Card title="Chart of Accounts" description="Typed account tree used across products, shipping, and bills." noPadding>
+          <div className="border-b px-5 py-3" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
             {accounts.length === 0 && <Button size="sm" disabled={busy} onClick={seed}>Seed standard COA</Button>}
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                  <th className="px-4 py-3">Code</th><th className="px-4 py-3">Name</th><th className="px-4 py-3">Type</th>
+            <table className="w-full text-[13px]">
+              <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+                <tr>
+                  {["Code", "Name", "Type"].map((h) => (
+                    <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em]"
+                      style={{ color: "var(--color-text-secondary)" }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {accounts.length === 0 && <tr><td colSpan={3} className="px-4 py-8 text-center text-slate-500">No accounts — seed to get started</td></tr>}
+                {accounts.length === 0 && <tr><td colSpan={3} className="px-4 py-8 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>No accounts — seed to get started</td></tr>}
                 {accounts.map((a) => (
-                  <tr key={a.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                    <td className="px-4 py-3 font-mono text-xs text-slate-700">{a.code}</td>
-                    <td className="px-4 py-3">{a.name}</td>
-                    <td className="px-4 py-3"><span className={`rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${TYPE_STYLE[a.type] ?? "bg-slate-100 text-slate-700 ring-slate-200"}`}>{a.type}</span></td>
+                  <tr key={a.id} className="border-b last:border-0 transition-colors duration-75"
+                    style={{ borderColor: "var(--color-table-border)" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-table-row-hover)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "")}>
+                    <td className="px-4 py-3 font-mono text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{a.code}</td>
+                    <td className="px-4 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{a.name}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold capitalize ${TYPE_STYLE[a.type] ?? "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)] border border-[var(--color-border)]"}`}>{a.type}</span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -166,20 +171,27 @@ export default function AccountingPage() {
 
         <Card title="Batch Deposits" description="Group received payments into bank deposits for approval." noPadding>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                  <th className="px-4 py-3">Batch #</th><th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Actions</th>
+            <table className="w-full text-[13px]">
+              <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+                <tr>
+                  {["Batch #", "Status", "Total", "Actions"].map((h, i) => (
+                    <th key={h} className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.05em] ${i >= 2 ? "text-right" : "text-left"}`}
+                      style={{ color: "var(--color-text-secondary)" }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {deposits.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">No batch deposits</td></tr>}
+                {deposits.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>No batch deposits</td></tr>}
                 {deposits.map((d) => (
-                  <tr key={d.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-950">{d.batch_number}</td>
-                    <td className="px-4 py-3"><span className={`rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${DEP_STYLE[d.status] ?? "bg-slate-100 text-slate-700 ring-slate-200"}`}>{d.status.replace(/_/g, " ")}</span></td>
-                    <td className="px-4 py-3 text-right">{formatMoney(d.total_cents)}</td>
+                  <tr key={d.id} className="border-b last:border-0 transition-colors duration-75"
+                    style={{ borderColor: "var(--color-table-border)" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-table-row-hover)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "")}>
+                    <td className="px-4 py-3 font-semibold" style={{ color: "var(--color-text-primary)" }}>{d.batch_number}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold capitalize ${DEP_STYLE[d.status] ?? "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)] border border-[var(--color-border)]"}`}>{d.status.replace(/_/g, " ")}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums font-medium" style={{ color: "var(--color-text-primary)" }}>{formatMoney(d.total_cents)}</td>
                     <td className="px-4 py-3 text-right">
                       {d.status === "pending_approval" && (
                         <span className="flex justify-end gap-1">
@@ -219,40 +231,34 @@ export default function AccountingPage() {
           )}
 
           <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                  <th className="px-4 py-3">Invoice #</th><th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Overdue</th>
-                  <th className="px-4 py-3">Due</th>
-                  <th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Paid</th>
-                  <th className="px-4 py-3 text-right">Due amount</th><th className="px-4 py-3 text-right">Actions</th>
+            <table className="w-full text-[13px]">
+              <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+                <tr>
+                  {["Invoice #", "Status", "Overdue", "Due", "Total", "Paid", "Due Amount", "Actions"].map((h, i) => (
+                    <th key={h} className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.05em] ${i >= 4 ? "text-right" : "text-left"}`}
+                      style={{ color: "var(--color-text-secondary)" }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {invoices.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">No invoices</td></tr>}
+                {invoices.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>No invoices</td></tr>}
                 {invoices.map((inv) => (
-                  <tr key={inv.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-950">{inv.invoice_number}</td>
-                    <td className="px-4 py-3"><span className={`rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${BILLING_STYLE[inv.status]}`}>{inv.status}</span></td>
+                  <tr key={inv.id} className="border-b last:border-0 transition-colors duration-75"
+                    style={{ borderColor: "var(--color-table-border)" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-table-row-hover)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "")}>
+                    <td className="px-4 py-3 font-semibold" style={{ color: "var(--color-text-primary)" }}>{inv.invoice_number}</td>
+                    <td className="px-4 py-3"><span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold capitalize ${BILLING_STYLE[inv.status]}`}>{inv.status}</span></td>
                     <td className="px-4 py-3">
                       {inv.dunning_level ? (
-                        <span className={`rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${DUNNING_STYLE[inv.dunning_level]}`}>
-                          {DUNNING_LABEL[inv.dunning_level]}
-                        </span>
-                      ) : (
-                        <span className="text-slate-300">—</span>
-                      )}
+                        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold ${DUNNING_STYLE[inv.dunning_level]}`}>{DUNNING_LABEL[inv.dunning_level]}</span>
+                      ) : <span style={{ color: "var(--color-text-muted)" }}>—</span>}
                     </td>
-                    <td className="px-4 py-3 text-slate-500">{fmtDate(inv.due_date)}</td>
-                    <td className="px-4 py-3 text-right">{formatMoney(inv.total_cents)}</td>
-                    <td className="px-4 py-3 text-right">{formatMoney(inv.paid_cents)}</td>
-                    <td className="px-4 py-3 text-right">{formatMoney(inv.total_cents - inv.paid_cents)}</td>
-                    <td className="px-4 py-3 text-right">
-                      {canPay && inv.status !== "paid" && inv.status !== "void" && (
-                        <PayControl busy={busy} max={inv.total_cents - inv.paid_cents} onPay={(cents) => payInvoice(inv.id, cents)} />
-                      )}
-                    </td>
+                    <td className="px-4 py-3 text-[12px]" style={{ color: "var(--color-text-secondary)" }}>{fmtDate(inv.due_date)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{formatMoney(inv.total_cents)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{formatMoney(inv.paid_cents)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(inv.total_cents - inv.paid_cents)}</td>
+                    <td className="px-4 py-3 text-right">{canPay && inv.status !== "paid" && inv.status !== "void" && (<PayControl busy={busy} max={inv.total_cents - inv.paid_cents} onPay={(cents) => payInvoice(inv.id, cents)} />)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -263,30 +269,29 @@ export default function AccountingPage() {
         <Card title="Accounts Payable" description="Supplier bills and aging by days outstanding.">
           {apAging && <AgingSummary report={apAging} />}
           <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                  <th className="px-4 py-3">Bill #</th><th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Due</th>
-                  <th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Paid</th>
-                  <th className="px-4 py-3 text-right">Due amount</th><th className="px-4 py-3 text-right">Actions</th>
+            <table className="w-full text-[13px]">
+              <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+                <tr>
+                  {["Bill #", "Status", "Due", "Total", "Paid", "Due Amount", "Actions"].map((h, i) => (
+                    <th key={h} className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.05em] ${i >= 3 ? "text-right" : "text-left"}`}
+                      style={{ color: "var(--color-text-secondary)" }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {bills.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No bills</td></tr>}
+                {bills.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>No bills</td></tr>}
                 {bills.map((bill) => (
-                  <tr key={bill.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-950">{bill.bill_number}</td>
-                    <td className="px-4 py-3"><span className={`rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${BILLING_STYLE[bill.status]}`}>{bill.status}</span></td>
-                    <td className="px-4 py-3 text-slate-500">{fmtDate(bill.due_date)}</td>
-                    <td className="px-4 py-3 text-right">{formatMoney(bill.total_cents)}</td>
-                    <td className="px-4 py-3 text-right">{formatMoney(bill.paid_cents)}</td>
-                    <td className="px-4 py-3 text-right">{formatMoney(bill.total_cents - bill.paid_cents)}</td>
-                    <td className="px-4 py-3 text-right">
-                      {canPay && bill.status !== "paid" && bill.status !== "void" && (
-                        <PayControl busy={busy} max={bill.total_cents - bill.paid_cents} onPay={(cents) => payBill(bill.id, cents)} />
-                      )}
-                    </td>
+                  <tr key={bill.id} className="border-b last:border-0 transition-colors duration-75"
+                    style={{ borderColor: "var(--color-table-border)" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-table-row-hover)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "")}>
+                    <td className="px-4 py-3 font-semibold" style={{ color: "var(--color-text-primary)" }}>{bill.bill_number}</td>
+                    <td className="px-4 py-3"><span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold capitalize ${BILLING_STYLE[bill.status]}`}>{bill.status}</span></td>
+                    <td className="px-4 py-3 text-[12px]" style={{ color: "var(--color-text-secondary)" }}>{fmtDate(bill.due_date)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{formatMoney(bill.total_cents)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{formatMoney(bill.paid_cents)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(bill.total_cents - bill.paid_cents)}</td>
+                    <td className="px-4 py-3 text-right">{canPay && bill.status !== "paid" && bill.status !== "void" && (<PayControl busy={busy} max={bill.total_cents - bill.paid_cents} onPay={(cents) => payBill(bill.id, cents)} />)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -308,16 +313,18 @@ const AGING_BUCKETS: { key: keyof Omit<AgingReport["totals"], "total">; label: s
 
 function AgingSummary({ report }: { report: AgingReport }) {
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+    <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
       {AGING_BUCKETS.map(({ key, label }) => (
-        <div key={key} className="rounded-md border border-slate-200 bg-slate-50 p-3">
-          <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
-          <p className="mt-1 text-sm font-semibold text-slate-950">{formatMoney(report.totals[key])}</p>
+        <div key={key} className="rounded-lg border p-3"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--color-text-secondary)" }}>{label}</p>
+          <p className="mt-1 text-[14px] font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{formatMoney(report.totals[key])}</p>
         </div>
       ))}
-      <div className="col-span-2 rounded-md border border-slate-200 bg-slate-100 p-3 sm:col-span-5">
-        <p className="text-xs font-medium uppercase text-slate-500">Total outstanding</p>
-        <p className="mt-1 text-sm font-semibold text-slate-950">{formatMoney(report.totals.total)}</p>
+      <div className="col-span-2 rounded-lg border p-3 sm:col-span-5"
+        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-primary-subtle)" }}>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-brand-600">Total outstanding</p>
+        <p className="mt-1 text-[14px] font-bold tabular-nums text-brand-700">{formatMoney(report.totals.total)}</p>
       </div>
     </div>
   );
@@ -343,7 +350,8 @@ function PayControl({ max, busy, onPay }: { max: number; busy: boolean; onPay: (
         onChange={(e) => setAmount(e.target.value)}
         disabled={busy}
         aria-label="Payment amount"
-        className="w-20 rounded border border-slate-300 px-1.5 py-1 text-right text-xs outline-none focus:border-slate-950 focus:ring-1 focus:ring-slate-950"
+        className="w-20 rounded-md border px-1.5 py-1 text-right text-[12px] outline-none focus:ring-1 focus:ring-brand-500"
+        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
       />
       <Button
         size="sm"

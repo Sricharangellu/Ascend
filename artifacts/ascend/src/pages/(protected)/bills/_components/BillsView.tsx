@@ -46,9 +46,12 @@ function balanceOf(b: Bill): number {
 
 function SummaryTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-slate-950">{value}</p>
+    <div
+      className="rounded-xl border p-4 shadow-[var(--shadow-sm)]"
+      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-secondary)" }}>{label}</p>
+      <p className="mt-1.5 text-[20px] font-bold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{value}</p>
     </div>
   );
 }
@@ -77,29 +80,30 @@ export function BillsView({
       </div>
 
       {/* Filters */}
-      <Card>
+      <div
+        className="rounded-xl border p-4"
+        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}
+      >
         <div className="flex flex-wrap items-end gap-3">
-          <div>
-            <label htmlFor="bill-supplier" className="mb-1 block text-xs font-medium text-slate-600">Supplier</label>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="bill-supplier" className="text-[11px] font-semibold uppercase tracking-[0.04em]"
+              style={{ color: "var(--color-text-secondary)" }}>Supplier</label>
             <select
-              id="bill-supplier"
-              value={supplierFilter}
-              onChange={(e) => onSupplierChange(e.target.value)}
-              className="h-9 min-w-[200px] rounded-md border border-slate-300 bg-white px-2 text-sm outline-none focus:border-brand-600"
+              id="bill-supplier" value={supplierFilter} onChange={(e) => onSupplierChange(e.target.value)}
+              className="h-8 min-w-[200px] rounded-lg border px-3 text-[13px] outline-none transition-all focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
             >
               <option value="">All suppliers</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
+              {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
-          <div>
-            <label htmlFor="bill-status" className="mb-1 block text-xs font-medium text-slate-600">Status</label>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="bill-status" className="text-[11px] font-semibold uppercase tracking-[0.04em]"
+              style={{ color: "var(--color-text-secondary)" }}>Status</label>
             <select
-              id="bill-status"
-              value={statusFilter}
-              onChange={(e) => onStatusChange(e.target.value)}
-              className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm outline-none focus:border-brand-600"
+              id="bill-status" value={statusFilter} onChange={(e) => onStatusChange(e.target.value)}
+              className="h-8 rounded-lg border px-3 text-[13px] outline-none transition-all focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
             >
               <option value="">All statuses</option>
               <option value="open">Open</option>
@@ -109,53 +113,57 @@ export function BillsView({
             </select>
           </div>
         </div>
-      </Card>
+      </div>
 
       {error && (
-        <p role="alert" className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        <div role="alert" className="rounded-xl border px-4 py-3 text-[13px]"
+          style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>
+          {error}
+        </div>
       )}
 
       {/* Table */}
-      <Card className="overflow-hidden p-0">
+      <div className="overflow-hidden rounded-xl border shadow-[var(--shadow-sm)]"
+        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         {loading ? (
           <div role="status" aria-label="Loading bills" className="space-y-2 p-4">
-            {[0, 1, 2, 3].map((i) => <div key={i} className="h-10 animate-pulse rounded bg-slate-50" />)}
+            {[0, 1, 2, 3].map((i) => <div key={i} className="h-10 animate-skeleton rounded" />)}
           </div>
         ) : bills.length === 0 ? (
-          <p className="px-4 py-10 text-center text-sm text-slate-500">
+          <p className="px-4 py-10 text-center text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
             No bills match these filters. Bills are created automatically when a purchase order is received.
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="px-4 py-3 font-semibold">Bill #</th>
-                  <th className="px-4 py-3 font-semibold">Supplier</th>
-                  <th className="px-4 py-3 font-semibold">PO</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="px-4 py-3 text-right font-semibold">Amount</th>
-                  <th className="px-4 py-3 text-right font-semibold">Balance</th>
-                  <th className="px-4 py-3 font-semibold">Due</th>
+            <table className="w-full text-[13px]">
+              <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+                <tr>
+                  {["Bill #", "Supplier", "PO", "Status", "Amount", "Balance", "Due"].map((h, i) => (
+                    <th key={h} className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.05em] ${i >= 4 ? "text-right" : "text-left"}`}
+                      style={{ color: "var(--color-text-secondary)" }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {bills.map((b) => (
-                  <tr key={b.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-900">{b.bill_number}</td>
-                    <td className="px-4 py-3 text-slate-700">{b.supplier_name ?? b.supplier_id}</td>
-                    <td className="px-4 py-3 text-slate-500">{b.po_id ? "Linked" : "—"}</td>
+                  <tr key={b.id} className="border-b last:border-0 transition-colors duration-75"
+                    style={{ borderColor: "var(--color-table-border)" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-table-row-hover)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "")}>
+                    <td className="px-4 py-3 font-semibold" style={{ color: "var(--color-text-primary)" }}>{b.bill_number}</td>
+                    <td className="px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{b.supplier_name ?? b.supplier_id}</td>
+                    <td className="px-4 py-3 text-[12px]" style={{ color: "var(--color-text-muted)" }}>{b.po_id ? "Linked" : "—"}</td>
                     <td className="px-4 py-3"><Badge variant={STATUS_BADGE[b.status]}>{STATUS_LABEL[b.status]}</Badge></td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-900">{formatMoney(b.total_cents)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-900">{formatMoney(balanceOf(b))}</td>
-                    <td className="px-4 py-3 text-slate-500">{fmtDate(b.due_date)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-medium" style={{ color: "var(--color-text-primary)" }}>{formatMoney(b.total_cents)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(balanceOf(b))}</td>
+                    <td className="px-4 py-3 text-[12px]" style={{ color: "var(--color-text-secondary)" }}>{fmtDate(b.due_date)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-      </Card>
+      </div>
     </div>
   );
 }
