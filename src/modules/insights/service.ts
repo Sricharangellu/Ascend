@@ -1,6 +1,8 @@
 import { v7 as uuidv7 } from "uuid";
 import { HttpError } from "../../shared/http.js";
 import type { DB } from "../../shared/db.js";
+import type { PurchasingService, POLineInput, Actor } from "../purchasing/index.js";
+import { computeSalesVelocity } from "../../shared/sales-velocity.js";
 
 // ── Scheduled Reports ─────────────────────────────────────────────────────────
 
@@ -82,7 +84,10 @@ export interface ReorderRecommendation {
   daysOfStock: number;
   /** True when stock ≤ reorder_point. */
   belowReorderPoint: boolean;
+  /** The product's preferred supplier (product_suppliers.is_preferred), or null if none is configured. */
   supplierId: string | null;
+  /** The preferred supplier's configured unit cost, or null if unconfigured/no preferred supplier. */
+  preferredCostCents: number | null;
 }
 
 export interface OrderRecommendation {
@@ -141,7 +146,10 @@ export interface HealthScores {
 }
 
 export class InsightsService {
-  constructor(private readonly db: DB) {}
+  constructor(
+    private readonly db: DB,
+    private readonly purchasing: PurchasingService,
+  ) {}
 
   /**
    * Segmented business health scores (0–100 each, deterministic/rule-based — no
@@ -343,14 +351,33 @@ export class InsightsService {
   /**
    * Reorder recommendations: products where stock ≤ reorder_point, or projected
    * to reach zero within lead_time_days at current velocity.
-   * Velocity is computed from order_lines over the last 90 days.
+   *
+   * Phase 7 item 1 (WORK/FORWARD_PLAN.md): velocity now comes from the shared
+   * `computeSalesVelocity()` (src/shared/sales-velocity.ts) instead of a
+   * locally-duplicated LEFT JOIN. The old query had two real correctness
+   * bugs, both fixed by this migration, not just moved: its date filter
+   * lived in the LEFT JOIN's ON clause, which a LEFT JOIN never actually
+   * excludes on (the `order_lines` row survives with `orders` columns NULL
+   * either way) — so `lookbackDays` had no effect and `units_sold` always
+   * summed every sale ever; and it had no `o.status = 'completed'` filter,
+   * so refunded/open/cancelled orders counted as "sold" units. Both are
+   * fixed by the shared service, which every other consumer already relied
+   * on being correct. See `WORK/audits/
+   * AUDIT_2026-07-28T203748Z-phase7-demand-planning-foundation-gap.md`
+   * Finding 1 for the full before/after per surface.
+   *
+   * supplierId/preferredCostCents (bug fix, WORK/LOCK.md "standalone bug fix:
+   * insights.createReorderPOs()") now resolve the real preferred supplier via
+   * product_suppliers — previously `supplier_id` was hardcoded `NULL::text`,
+   * silently making createReorderPOs()'s per-supplier grouping meaningless.
+   * Both are null when no preferred supplier is configured; a product's
+   * is_preferred link is unique (see catalog's exclusive-preferred-supplier
+   * invariant), so this LEFT JOIN adds at most one row per product.
    */
   async reorderRecommendations(
     tenantId: string,
     lookbackDays = 90,
   ): Promise<ReorderRecommendation[]> {
-    const sinceMs = Date.now() - lookbackDays * 86_400_000;
-
     const rows = await this.db.query<{
       product_id: string;
       sku: string;
@@ -359,8 +386,8 @@ export class InsightsService {
       reorder_point: number;
       reorder_quantity: number;
       lead_time_days: number;
-      units_sold: number;
       supplier_id: string | null;
+      preferred_cost_cents: number | null;
     }>(
       `SELECT
          p.id                                          AS product_id,
@@ -370,49 +397,52 @@ export class InsightsService {
          COALESCE(p.reorder_point, 0)                  AS reorder_point,
          COALESCE(p.reorder_quantity, 0)               AS reorder_quantity,
          COALESCE(p.lead_time_days, 7)                 AS lead_time_days,
-         COALESCE(SUM(ol.quantity), 0)                 AS units_sold,
-         NULL::text                                    AS supplier_id
+         ps.supplier_id                                 AS supplier_id,
+         ps.cost_cents                                  AS preferred_cost_cents
        FROM products p
        LEFT JOIN inventory inv
          ON inv.product_id = p.id AND inv.tenant_id = p.tenant_id
-       LEFT JOIN order_lines ol
-         ON ol.product_id = p.id AND ol.tenant_id = p.tenant_id
-       LEFT JOIN orders o
-         ON o.id = ol.order_id AND o.created_at >= @sinceMs
+       LEFT JOIN product_suppliers ps
+         ON ps.tenant_id = p.tenant_id AND ps.product_id = p.id AND ps.is_preferred = true
        WHERE p.tenant_id = @tenantId
-         AND p.status    = 'active'
-       GROUP BY p.id, p.sku, p.name, inv.stock_qty,
-                p.reorder_point, p.reorder_quantity, p.lead_time_days
-       HAVING
-         COALESCE(inv.stock_qty, 0) <= COALESCE(p.reorder_point, 0)
-         OR (
-           @lookbackDays > 0
-           AND COALESCE(SUM(ol.quantity), 0) > 0
-           AND (COALESCE(inv.stock_qty, 0)::float
-                / (COALESCE(SUM(ol.quantity), 0)::float / @lookbackDays))
-               <= COALESCE(p.lead_time_days, 7)
-         )
-       ORDER BY current_stock ASC`,
-      { tenantId, sinceMs, lookbackDays },
+         AND p.status    = 'active'`,
+      { tenantId },
     );
+    if (rows.length === 0) return [];
 
-    return rows.map((r) => {
-      const velocityPerDay = lookbackDays > 0 ? r.units_sold / lookbackDays : 0;
-      const daysOfStock = velocityPerDay > 0 ? r.current_stock / velocityPerDay : Infinity;
-      return {
+    const velocity = await computeSalesVelocity(this.db, {
+      tenantId, lookbackDays, productIds: rows.map((r) => r.product_id),
+    });
+
+    const out: ReorderRecommendation[] = [];
+    for (const r of rows) {
+      const unitsSold = velocity.get(r.product_id)?.unitsSold ?? 0;
+      const velocityPerDay = lookbackDays > 0 ? unitsSold / lookbackDays : 0;
+      const currentStock = Number(r.current_stock);
+      const reorderPoint = Number(r.reorder_point);
+      const belowReorderPoint = currentStock <= reorderPoint;
+      const projectedStockoutWithinLeadTime =
+        lookbackDays > 0 && unitsSold > 0 && velocityPerDay > 0 &&
+        currentStock / velocityPerDay <= Number(r.lead_time_days);
+      if (!belowReorderPoint && !projectedStockoutWithinLeadTime) continue;
+      const daysOfStock = velocityPerDay > 0 ? currentStock / velocityPerDay : Infinity;
+      out.push({
         productId: r.product_id,
         sku: r.sku,
         name: r.name,
-        currentStock: r.current_stock,
-        reorderPoint: r.reorder_point,
-        reorderQuantity: r.reorder_quantity,
-        leadTimeDays: r.lead_time_days,
+        currentStock,
+        reorderPoint,
+        reorderQuantity: Number(r.reorder_quantity),
+        leadTimeDays: Number(r.lead_time_days),
         velocityPerDay,
         daysOfStock: isFinite(daysOfStock) ? Math.round(daysOfStock) : 9999,
-        belowReorderPoint: r.current_stock <= r.reorder_point,
+        belowReorderPoint,
         supplierId: r.supplier_id,
-      };
-    });
+        preferredCostCents: r.preferred_cost_cents != null ? Number(r.preferred_cost_cents) : null,
+      });
+    }
+    out.sort((a, b) => a.currentStock - b.currentStock);
+    return out;
   }
 
   // ── Order Recommendations ───────────────────────────────────────────────────
@@ -474,57 +504,66 @@ export class InsightsService {
   // ── Auto-create draft POs from reorder recommendations ──────────────────────
 
   /**
-   * Groups all below-reorder-point products by preferred_vendor_id and creates
-   * one draft PO per vendor group. Returns the list of created PO IDs.
-   * Products with no preferred vendor go into a single "unassigned" PO.
+   * Groups all below-reorder-point products by preferred supplier and creates
+   * one PO per supplier group via the real `purchasing.createOrder()` — not
+   * hand-rolled INSERTs. Bug fix (WORK/LOCK.md "standalone bug fix:
+   * insights.createReorderPOs()"): the prior version inserted directly into
+   * `po_lines`, a table that does not exist anywhere in this schema (the real
+   * table is `purchase_order_lines`), so every call 500'd; it also wrote
+   * `purchase_orders` columns (`supplier_name`, `notes`, `created_by`) absent
+   * from the real table, minted its own `AUTO-...` PO number instead of the
+   * shared race-free doc-number sequence, hardcoded `unit_cost_cents = 0` for
+   * every line, and bypassed approval-tier gating and the audit trail
+   * entirely. Routing through `createOrder()` fixes all of that for free.
+   *
+   * Products with no preferred supplier configured can no longer be silently
+   * lumped into a fake "Unassigned" PO — `purchase_orders.supplier_id` is
+   * `NOT NULL` on the real table, so there is no such thing as an unassigned
+   * PO. Those products are skipped and reported back in `skipped` instead
+   * (additive to the response shape; existing callers reading `created`/`pos`
+   * are unaffected).
    */
-  async createReorderPOs(tenantId: string, createdBy: string): Promise<{ created: number; pos: Array<{ id: string; supplierId: string | null; lineCount: number }> }> {
+  async createReorderPOs(
+    tenantId: string,
+    createdBy: string,
+    actor?: Actor,
+  ): Promise<{
+    created: number;
+    pos: Array<{ id: string; supplierId: string | null; lineCount: number; poNumber: string }>;
+    skipped: Array<{ productId: string; sku: string; name: string; reason: string }>;
+  }> {
     const recs = await this.reorderRecommendations(tenantId, 90);
     const belowPoint = recs.filter((r) => r.belowReorderPoint && (r.reorderQuantity ?? 0) > 0);
-    if (belowPoint.length === 0) return { created: 0, pos: [] };
+    if (belowPoint.length === 0) return { created: 0, pos: [], skipped: [] };
 
-    // Group by supplierId (null = unassigned)
-    const groups = new Map<string | null, typeof belowPoint>();
+    // Group by real preferred-supplier id; products with none configured
+    // cannot become a PO (supplier_id is NOT NULL) and are reported skipped.
+    const groups = new Map<string, typeof belowPoint>();
+    const skipped: Array<{ productId: string; sku: string; name: string; reason: string }> = [];
     for (const rec of belowPoint) {
-      const key = rec.supplierId ?? null;
-      const list = groups.get(key) ?? [];
+      if (!rec.supplierId) {
+        skipped.push({ productId: rec.productId, sku: rec.sku, name: rec.name, reason: "no_preferred_supplier" });
+        continue;
+      }
+      const list = groups.get(rec.supplierId) ?? [];
       list.push(rec);
-      groups.set(key, list);
+      groups.set(rec.supplierId, list);
     }
 
-    const now = Date.now();
-    const result: Array<{ id: string; supplierId: string | null; lineCount: number }> = [];
+    const result: Array<{ id: string; supplierId: string | null; lineCount: number; poNumber: string }> = [];
+    const effectiveActor = actor ?? { id: createdBy, role: "manager" };
 
     for (const [supplierId, lines] of groups) {
-      const poId = uuidv7();
-      const poNumber = `AUTO-${now.toString(36).toUpperCase().slice(-6)}`;
-
-      // Fetch supplier name if available
-      let supplierName = "Unassigned";
-      if (supplierId) {
-        const s = await this.db.one<{ name: string }>("SELECT name FROM suppliers WHERE id = @id AND tenant_id = @t", { id: supplierId, t: tenantId });
-        if (s) supplierName = s.name;
-      }
-
-      await this.db.query(
-        `INSERT INTO purchase_orders (id, tenant_id, po_number, supplier_id, supplier_name, status, notes, created_by, expected_date, created_at, updated_at)
-         VALUES (@id, @t, @num, @sid, @sname, 'draft', @notes, @by, @exp, @now, @now)`,
-        { id: poId, t: tenantId, num: poNumber, sid: supplierId, sname: supplierName, notes: "Auto-generated from reorder recommendations", by: createdBy, exp: now + 14 * 86_400_000, now },
-      );
-
-      for (const line of lines) {
-        const lineId = uuidv7();
-        const qty = line.reorderQuantity ?? Math.max(1, line.reorderPoint - line.currentStock);
-        await this.db.query(
-          `INSERT INTO po_lines (id, tenant_id, po_id, product_id, sku, name, ordered_qty, received_qty, unit_cost_cents, line_cost_cents, status)
-           VALUES (@id, @t, @po, @pid, @sku, @name, @qty, 0, 0, 0, 'pending')`,
-          { id: lineId, t: tenantId, po: poId, pid: line.productId, sku: line.sku, name: line.name, qty },
-        );
-      }
-
-      result.push({ id: poId, supplierId, lineCount: lines.length });
+      const poLines: POLineInput[] = lines.map((line) => ({
+        productId: line.productId,
+        productName: line.name,
+        quantity: line.reorderQuantity ?? Math.max(1, line.reorderPoint - line.currentStock),
+        unitCostCents: line.preferredCostCents ?? 0,
+      }));
+      const po = await this.purchasing.createOrder(supplierId, poLines, tenantId, effectiveActor);
+      result.push({ id: po.id, supplierId, lineCount: lines.length, poNumber: String(po.po_number ?? "") });
     }
 
-    return { created: result.length, pos: result };
+    return { created: result.length, pos: result, skipped };
   }
 }

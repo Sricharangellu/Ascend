@@ -31,7 +31,7 @@ export function CartPanel({ cart, onCharge, onClear, role, ageVerified, onAgeVer
   const { state, setQty, removeProduct, itemCount, localSubtotalCents } = cart;
   const { lines, order, syncing } = state;
 
-  const [numpadTarget, setNumpadTarget] = useState<{ productId: string; qty: number; name: string } | null>(null);
+  const [numpadTarget, setNumpadTarget] = useState<{ lineId: string; qty: number; name: string } | null>(null);
 
   const isEmpty = lines.length === 0;
 
@@ -52,11 +52,13 @@ export function CartPanel({ cart, onCharge, onClear, role, ageVerified, onAgeVer
     ch.postMessage({
       type: "cart_update",
       lines: lines.map((l) => ({
-        id: l.product.id,
+        id: l.id,
         name: l.product.name,
         quantity: l.quantity,
         unitCents: l.product.priceCents,
         lineCents: l.product.priceCents * l.quantity,
+        unitKind: l.product.unitKind,
+        unitDisplayName: l.product.unitDisplayName,
       })),
       subtotalCents: subtotal,
       discountCents: discount,
@@ -117,11 +119,11 @@ export function CartPanel({ cart, onCharge, onClear, role, ageVerified, onAgeVer
           <ul aria-label="Cart items" className="divide-y divide-gray-100">
             {lines.map((line) => (
               <CartLineItem
-                key={line.product.id}
+                key={line.id}
                 line={line}
-                onQtyChange={(qty) => setQty(line.product.id, qty)}
-                onRemove={() => removeProduct(line.product.id)}
-                onNumpad={() => setNumpadTarget({ productId: line.product.id, qty: line.quantity, name: line.product.name })}
+                onQtyChange={(qty) => setQty(line.id, qty)}
+                onRemove={() => removeProduct(line.id)}
+                onNumpad={() => setNumpadTarget({ lineId: line.id, qty: line.quantity, name: line.product.name })}
               />
             ))}
           </ul>
@@ -205,7 +207,7 @@ export function CartPanel({ cart, onCharge, onClear, role, ageVerified, onAgeVer
           initialValue={numpadTarget.qty}
           productName={numpadTarget.name}
           onConfirm={(qty) => {
-            setQty(numpadTarget.productId, qty);
+            setQty(numpadTarget.lineId, qty);
             setNumpadTarget(null);
           }}
           onClose={() => setNumpadTarget(null)}
@@ -227,6 +229,9 @@ interface CartLineItemProps {
 function CartLineItem({ line, onQtyChange, onRemove, onNumpad }: CartLineItemProps) {
   const { product, quantity } = line;
   const lineCents = product.priceCents * quantity;
+  // A case/box line shows "$54.00 / Case", not "$4.50 each" — priceCents is
+  // already the scanned unit's price (see normalizeTerminalProduct).
+  const unitLabel = product.unitKind ? (product.unitDisplayName ?? product.unitKind) : "each";
 
   const decrement = useCallback(() => {
     if (quantity === 1) {
@@ -245,20 +250,20 @@ function CartLineItem({ line, onQtyChange, onRemove, onNumpad }: CartLineItemPro
       {/* Name + unit price */}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
-        <p className="text-xs text-gray-400">{formatMoney(product.priceCents)} each</p>
+        <p className="text-xs text-gray-400">{formatMoney(product.priceCents)} / {unitLabel}</p>
       </div>
 
       {/* Qty controls */}
       <div
         className="flex items-center gap-1"
         role="group"
-        aria-label={`${product.name} quantity`}
+        aria-label={`${product.name} ${unitLabel} quantity`}
       >
         <button
           type="button"
           onClick={decrement}
-          aria-label={quantity === 1 ? `Remove ${product.name}` : `Decrease ${product.name} quantity`}
-          title={quantity === 1 ? `Remove ${product.name}` : `Decrease ${product.name} quantity`}
+          aria-label={quantity === 1 ? `Remove ${product.name}` : `Decrease ${product.name} ${unitLabel} quantity`}
+          title={quantity === 1 ? `Remove ${product.name}` : `Decrease ${product.name} ${unitLabel} quantity`}
           className={clsx(
             "flex h-8 w-8 items-center justify-center rounded text-sm font-bold transition-colors",
             "bg-gray-100 text-gray-600 hover:bg-danger-100 hover:text-danger-700",
@@ -272,7 +277,7 @@ function CartLineItem({ line, onQtyChange, onRemove, onNumpad }: CartLineItemPro
         <button
           type="button"
           onClick={onNumpad}
-          aria-label={`${product.name} quantity: ${quantity}. Tap to edit.`}
+          aria-label={`${product.name} ${unitLabel} quantity: ${quantity}. Tap to edit.`}
           title="Tap to edit quantity"
           className={clsx(
             "w-11 min-h-[44px] rounded border border-transparent text-center text-sm font-semibold text-gray-900",
@@ -287,8 +292,8 @@ function CartLineItem({ line, onQtyChange, onRemove, onNumpad }: CartLineItemPro
         <button
           type="button"
           onClick={increment}
-          aria-label={`Increase ${product.name} quantity`}
-          title={`Increase ${product.name} quantity`}
+          aria-label={`Increase ${product.name} ${unitLabel} quantity`}
+          title={`Increase ${product.name} ${unitLabel} quantity`}
           className={clsx(
             "flex h-8 w-8 items-center justify-center rounded text-sm font-bold transition-colors",
             "bg-gray-100 text-gray-600 hover:bg-brand-100 hover:text-brand-700",

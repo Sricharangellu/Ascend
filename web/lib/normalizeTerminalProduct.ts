@@ -15,11 +15,18 @@ export function normalizeTerminalProduct(raw: unknown): TerminalProduct {
   const pick = <T>(...vals: unknown[]): T | undefined =>
     vals.find((v) => v !== undefined && v !== null) as T | undefined;
 
+  // POS barcode resolution (GET /catalog/barcode/:code/pos) nests packaging/
+  // pricing on top of the flat product fields above — when present, the
+  // scanned unit's price replaces the each price, so downstream cart math
+  // (priceCents × quantity) is correct for any unit without special-casing.
+  const packaging = r.packaging as { unit?: string; displayName?: string; packSize?: number } | undefined;
+  const pricing = r.pricing as { unitPriceCents?: number } | undefined;
+
   return {
     id: String(r.id ?? ""),
     sku: String(r.sku ?? ""),
     name: String(r.name ?? ""),
-    priceCents: Number(pick(r.priceCents, r.price_cents) ?? 0),
+    priceCents: Number(pricing?.unitPriceCents ?? pick(r.priceCents, r.price_cents) ?? 0),
     category: String(pick(r.category) ?? "general"),
     taxClass: (pick<string>(r.taxClass, r.tax_class) ?? "standard") as TerminalProduct["taxClass"],
     barcode: pick<string>(r.barcode) ?? undefined,
@@ -33,6 +40,9 @@ export function normalizeTerminalProduct(raw: unknown): TerminalProduct {
     lotTracked: Boolean(pick(r.lotTracked, r.lot_tracked) ?? false),
     createdAt: Number(pick(r.createdAt, r.created_at) ?? 0),
     updatedAt: Number(pick(r.updatedAt, r.updated_at) ?? 0),
+    ...(packaging && packaging.unit && packaging.unit !== "each"
+      ? { unitKind: packaging.unit, unitDisplayName: packaging.displayName, packSize: packaging.packSize }
+      : {}),
   };
 }
 
@@ -54,6 +64,8 @@ export function normalizeTerminalOrder(raw: unknown): Order {
     unitCents: Number(pickField(l.unitCents, l.unit_cents) ?? 0),
     taxCents: Number(pickField(l.taxCents, l.tax_cents) ?? 0),
     lineCents: Number(pickField(l.lineCents, l.line_cents) ?? 0),
+    unitKind: pickField<string>(l.unitKind, l.unit_kind) ?? null,
+    unitQty: pickField<number>(l.unitQty, l.unit_qty) ?? null,
   } as OrderLine));
 
   return {

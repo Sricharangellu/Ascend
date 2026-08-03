@@ -13,6 +13,10 @@ function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
 
+function role(res: Response): string {
+  return (res.locals["auth"] as AuthPayload).role;
+}
+
 const REPORT_TYPES = [
   "sales_summary", "top_products", "inventory_valuation", "p_l", "ar_aging", "ap_aging",
 ] as const;
@@ -145,7 +149,7 @@ export function registerRoutes(router: Router, service: InsightsService): void {
     "/create-reorder-pos",
     requireRole("manager"),
     handler(async (_req, res) => {
-      const result = await service.createReorderPOs(tenantId(res), userId(res));
+      const result = await service.createReorderPOs(tenantId(res), userId(res), { id: userId(res), role: role(res) });
       res.status(result.created > 0 ? 201 : 200).json(result);
     }),
   );

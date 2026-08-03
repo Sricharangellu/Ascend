@@ -29,6 +29,9 @@ export interface DraftLine {
   unitCost: string;
   expiryDate: string;
   lotCode: string;
+  /** Purchasing unit this line is entered in ("each" | "case" | "box" | ...).
+   *  "each" means quantity/unitCost are already base units — no conversion. */
+  unitKind: string;
 }
 
 export interface QuoteLine {
@@ -59,5 +62,5 @@ export const VQ_STATUS_BADGE: Record<VendorQuote["status"], "yellow" | "green" |
 };
 
 export function emptyLine(): DraftLine {
-  return { productId: "", quantity: "1", unitCost: "", expiryDate: "", lotCode: "" };
+  return { productId: "", quantity: "1", unitCost: "", expiryDate: "", lotCode: "", unitKind: "each" };
 }

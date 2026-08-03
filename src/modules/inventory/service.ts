@@ -4,8 +4,11 @@ import type { EventBus } from "../../shared/events.js";
 import { HttpError } from "../../shared/http.js";
 import { clampLimit as clampCursorLimit, decodeCursor, toPage, type CursorPage } from "../../shared/pagination.js";
 import { nextDocNumber } from "../../shared/docnumber.js";
+import { roundToOrderQuantity } from "../../shared/reorder-quantity.js";
 
 export type MovementReason = "receiving" | "sale" | "adjustment" | "return" | "cycle_count";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface InventoryLocation {
   id: string;
@@ -42,6 +45,9 @@ export interface InventoryRow {
   tenant_id: string;
   stock_qty: number;
   reorder_pt: number;
+  /** Phase 6 item 2: a dedicated buffer distinct from reorder_pt, defaulting
+   *  to 0 (no buffer configured) so existing rows are unaffected. */
+  safety_stock: number;
   updated_at: number;
 }
 
@@ -503,7 +509,7 @@ export class InventoryService {
       "SELECT * FROM inventory WHERE tenant_id = @tenantId AND product_id = @productId",
       { tenantId, productId },
     );
-    return row ?? { product_id: productId, tenant_id: tenantId, stock_qty: 0, reorder_pt: 0, updated_at: 0 };
+    return row ?? { product_id: productId, tenant_id: tenantId, stock_qty: 0, reorder_pt: 0, safety_stock: 0, updated_at: 0 };
   }
 
   /**
@@ -554,11 +560,20 @@ export class InventoryService {
   // to the gap-scanner (the path itself was never missing). Fixed to join the
   // real tables; suggested_qty falls back to reorder_pt since no distinct
   // "reorder quantity" concept exists yet (honest approximation, not invented).
+  // Phase 6 item 1 (WORK/FORWARD_PLAN.md): suggested_qty is now rounded up to
+  // the preferred supplier's MOQ/case_pack via shared/reorder-quantity.ts —
+  // this is the third of three reorder-suggestion surfaces found to need the
+  // same fix (the other two are catalog/detail-views.ts's reorderSuggestions
+  // and inventory/pipeline-views.ts's reorderAlerts); rounding is a no-op when
+  // the preferred supplier has no MOQ/case_pack configured, preserving prior
+  // behavior exactly.
   async getReorderSuggestions(tenantId: string): Promise<ReorderSuggestion[]> {
     const rows = await this.db.query<{
       product_id: string; name: string; sku: string | null;
-      stock_qty: number; reorder_pt: number;
+      stock_qty: number; reorder_pt: number; safety_stock: number;
       preferred_vendor_id: string | null; preferred_vendor_name: string | null;
+      preferred_moq: number | null; preferred_case_pack: number | null;
+      preferred_lead_time_days: number | null;
       last_unit_cost_cents: number | null; last_ordered_at: number | null; last_ordered_qty: number | null;
     }>(
       `SELECT i.product_id,
@@ -566,8 +581,12 @@ export class InventoryService {
               p.sku,
               COALESCE(i.stock_qty, 0) AS stock_qty,
               i.reorder_pt,
+              COALESCE(i.safety_stock, 0) AS safety_stock,
               ps.supplier_id AS preferred_vendor_id,
               s.name AS preferred_vendor_name,
+              ps.moq AS preferred_moq,
+              ps.case_pack AS preferred_case_pack,
+              COALESCE(ps.lead_time_days, p.lead_time_days) AS preferred_lead_time_days,
               lastpo.unit_cost_cents AS last_unit_cost_cents,
               lastpo.created_at AS last_ordered_at,
               lastpo.quantity AS last_ordered_qty
@@ -600,9 +619,21 @@ export class InventoryService {
       sku: r.sku,
       stock_qty: Number(r.stock_qty),
       reorder_pt: Number(r.reorder_pt),
-      suggested_qty: Number(r.reorder_pt),
+      safety_stock: Number(r.safety_stock ?? 0),
+      // Phase 6 item 2: safety_stock is additive to the raw target before MOQ/
+      // case_pack rounding — 0 (the default for anything unconfigured) is a
+      // no-op, so this preserves prior behavior exactly for existing data.
+      suggested_qty: roundToOrderQuantity(Number(r.reorder_pt) + Number(r.safety_stock ?? 0), {
+        moq: r.preferred_moq, casePack: r.preferred_case_pack,
+      }),
       preferred_vendor_id: r.preferred_vendor_id,
       preferred_vendor_name: r.preferred_vendor_name,
+      preferred_supplier_moq: r.preferred_moq ?? null,
+      preferred_supplier_case_pack: r.preferred_case_pack ?? null,
+      // Phase 6 item 3: "if I ordered today, when would this arrive" — only
+      // promised when there's an actual preferred supplier; 7-day default
+      // matches the other two reorder-suggestion surfaces' fallback.
+      expected_delivery_date: r.preferred_vendor_id ? Date.now() + (r.preferred_lead_time_days ?? 7) * DAY_MS : null,
       last_unit_cost_cents: r.last_unit_cost_cents != null ? Number(r.last_unit_cost_cents) : null,
       last_ordered_at: r.last_ordered_at != null ? Number(r.last_ordered_at) : null,
       last_ordered_qty: r.last_ordered_qty != null ? Number(r.last_ordered_qty) : null,
@@ -626,6 +657,35 @@ export class InventoryService {
         await tdb.query(
           "INSERT INTO inventory (product_id, tenant_id, stock_qty, reorder_pt, updated_at) VALUES (@product_id, @tenant_id, 0, @reorder_pt, @updated_at)",
           { product_id: productId, tenant_id: tenantId, reorder_pt: reorderPt, updated_at: now },
+        );
+      }
+
+      return (await tdb.one<InventoryRow>(
+        "SELECT * FROM inventory WHERE tenant_id = @tenantId AND product_id = @productId",
+        { tenantId, productId },
+      ))!;
+    });
+  }
+
+  /** Phase 6 item 2: set a product's safety-stock buffer, independent of its
+   *  reorder point. Mirrors setReorderPoint()'s upsert shape exactly. */
+  async setSafetyStock(productId: string, safetyStock: number, tenantId: string): Promise<InventoryRow> {
+    return this.db.withTenant(tenantId).tx(async (tdb) => {
+      const now = Date.now();
+      const existing = await tdb.one<InventoryRow>(
+        "SELECT * FROM inventory WHERE tenant_id = @tenantId AND product_id = @productId",
+        { tenantId, productId },
+      );
+
+      if (existing) {
+        await tdb.query(
+          "UPDATE inventory SET safety_stock = @safety_stock, updated_at = @updated_at WHERE tenant_id = @tenant_id AND product_id = @product_id",
+          { tenant_id: tenantId, product_id: productId, safety_stock: safetyStock, updated_at: now },
+        );
+      } else {
+        await tdb.query(
+          "INSERT INTO inventory (product_id, tenant_id, stock_qty, reorder_pt, safety_stock, updated_at) VALUES (@product_id, @tenant_id, 0, 0, @safety_stock, @updated_at)",
+          { product_id: productId, tenant_id: tenantId, safety_stock: safetyStock, updated_at: now },
         );
       }
 
@@ -685,6 +745,7 @@ export class InventoryService {
 
     const currentQty = existing ? existing.stock_qty : 0;
     const reorderPt = existing ? existing.reorder_pt : 0;
+    const safetyStock = existing ? existing.safety_stock : 0;
     // Clamp at >= 0 so stock never goes negative.
     const nextQty = Math.max(0, currentQty + delta);
     // The movement ledger and event record the delta ACTUALLY applied, which
@@ -729,7 +790,7 @@ export class InventoryService {
     );
 
     return {
-      row: { product_id: productId, tenant_id: tenantId, stock_qty: nextQty, reorder_pt: reorderPt, updated_at: now },
+      row: { product_id: productId, tenant_id: tenantId, stock_qty: nextQty, reorder_pt: reorderPt, safety_stock: safetyStock, updated_at: now },
       appliedDelta,
       nextQty,
     };
@@ -1194,9 +1255,13 @@ export interface ReorderSuggestion {
   sku: string | null;
   stock_qty: number;
   reorder_pt: number;
+  safety_stock: number;
   suggested_qty: number;
   preferred_vendor_id: string | null;
   preferred_vendor_name: string | null;
+  preferred_supplier_moq: number | null;
+  preferred_supplier_case_pack: number | null;
+  expected_delivery_date: number | null;
   last_unit_cost_cents: number | null;
   last_ordered_at: number | null;
   last_ordered_qty: number | null;

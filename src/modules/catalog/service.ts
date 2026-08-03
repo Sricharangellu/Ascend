@@ -5,6 +5,7 @@ import type { Cents } from "../../shared/money.js";
 import type { Page } from "../../shared/types.js";
 import { notFound, conflict, badRequest } from "../../shared/http.js";
 import { writeAudit } from "../../shared/audit.js";
+import { recordUomBarcodeLookupFailed, recordPosBarcodeScan, recordPosBarcodeScanFailure, recordPosScanUnit } from "../../gateway/metrics.js";
 
 export type TaxClass = "standard" | "exempt";
 export type ProductStatus = "active" | "draft" | "archived";
@@ -58,6 +59,8 @@ function variantOrderBy(mode: VariantSortMode, orderCol: string): string {
     default: return "variant_label ASC, sku ASC";
   }
 }
+
+const UNIT_DISPLAY_NAME: Record<string, string> = { each: "Each", box: "Box", case: "Case", pallet: "Pallet", alt: "Alternate" };
 
 export interface Product {
   id: string;
@@ -609,20 +612,78 @@ export class CatalogService {
   }
 
   /** Look up a sellable product by ANY of its UPCs (each/single/box/case/vendor),
-   *  falling back to the legacy products.barcode column. Active products only. */
-  async getByBarcode(barcode: string, tenantId: string): Promise<Product | undefined> {
-    const viaTable = await this.db.one<Product>(
-      `SELECT p.* FROM products p
+   *  falling back to the legacy products.barcode column. Active products only.
+   *  Includes which unit the scanned code was (`kind`) and its pack size, so a
+   *  caller (e.g. the POS terminal) can multiply the sale quantity by pack size
+   *  instead of always selling 1 each — a scan of a case barcode previously
+   *  resolved to the right product but discarded the fact it was a case. */
+  async getByBarcode(barcode: string, tenantId: string): Promise<(Product & { scanned_unit_kind: string; scanned_pack_size: number }) | undefined> {
+    const viaTable = await this.db.one<Product & { scanned_unit_kind: string; scanned_pack_size: number }>(
+      `SELECT p.*, pb.kind AS scanned_unit_kind, pb.pack_size AS scanned_pack_size
+         FROM products p
          JOIN product_barcodes pb ON pb.product_id = p.id AND pb.tenant_id = p.tenant_id
         WHERE pb.tenant_id = @tenantId AND pb.barcode = @barcode AND p.status = 'active'
         LIMIT 1`,
       { tenantId, barcode },
     );
     if (viaTable) return viaTable;
-    return this.db.one<Product>(
+    const viaLegacy = await this.db.one<Product>(
       "SELECT * FROM products WHERE tenant_id = @tenantId AND barcode = @barcode AND status = 'active' LIMIT 1",
       { tenantId, barcode },
     );
+    if (viaLegacy) return { ...viaLegacy, scanned_unit_kind: "each", scanned_pack_size: 1 };
+    recordUomBarcodeLookupFailed();
+    return undefined;
+  }
+
+  /**
+   * POS scan resolution (ADR-006/POS-v1): everything the terminal needs to
+   * add a cart line and price it, fully resolved server-side — the terminal
+   * does no conversion or pricing math itself. Wraps getByBarcode (product +
+   * scanned unit) with the unit's selling price (each price × pack size —
+   * no tiered/promotional pricing here, that's explicitly out of scope) and
+   * current stock (a cross-domain read of `inventory`, the accepted ADR-002
+   * pattern). When no packaging unit was scanned (legacy/each barcode), this
+   * reduces to today's implicit behavior: packaging.unit "each", packSize 1,
+   * pricing = the product's normal price — existing barcode workflows are
+   * unaffected.
+   */
+  async resolvePosBarcode(barcode: string, tenantId: string): Promise<(Product & {
+    packaging: { unit: string; displayName: string; packSize: number };
+    pricing: { unitPriceCents: number };
+    inventory: { baseQuantityPerUnit: number; stockOnHandEach: number; availableForSale: boolean };
+  }) | undefined> {
+    recordPosBarcodeScan();
+    const product = await this.getByBarcode(barcode, tenantId);
+    if (!product) {
+      recordPosBarcodeScanFailure();
+      return undefined;
+    }
+    recordPosScanUnit(product.scanned_unit_kind);
+    const stockRow = await this.db.one<{ stock_qty: number }>(
+      "SELECT stock_qty FROM inventory WHERE tenant_id = @tenantId AND product_id = @productId",
+      { tenantId, productId: product.id },
+    );
+    const stockOnHandEach = stockRow ? Number(stockRow.stock_qty) : 0;
+    // Full product fields (age/tax/status/etc.) stay flat, exactly like the
+    // plain /barcode/:code response the terminal already knows how to read —
+    // packaging/pricing/inventory are additive, POS-specific enrichment.
+    return {
+      ...product,
+      packaging: {
+        unit: product.scanned_unit_kind,
+        displayName: UNIT_DISPLAY_NAME[product.scanned_unit_kind] ?? product.scanned_unit_kind,
+        packSize: product.scanned_pack_size,
+      },
+      pricing: {
+        unitPriceCents: product.price_cents * product.scanned_pack_size,
+      },
+      inventory: {
+        baseQuantityPerUnit: product.scanned_pack_size,
+        stockOnHandEach,
+        availableForSale: stockOnHandEach >= product.scanned_pack_size,
+      },
+    };
   }
 
   private async assertBarcodeAvailable(barcode: string, tenantId: string, exceptProductId?: string): Promise<void> {

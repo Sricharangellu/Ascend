@@ -3,10 +3,12 @@ import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import { HttpError } from "../../shared/http.js";
 import { nextDocSeq, nextDocNumber } from "../../shared/docnumber.js";
+import { computeSalesVelocityForProduct } from "../../shared/sales-velocity.js";
 
 import { clampLimit, decodeCursor, toPage } from "../../shared/pagination.js";
 export type { CursorPage } from "../../shared/pagination.js";
 import type { CursorPage } from "../../shared/pagination.js";
+import { recordUomUnitNotConfigured } from "../../gateway/metrics.js";
 
 /** Purchasing — suppliers + purchase orders + receiving. Tenant-scoped.
  *  Receiving publishes `purchase_order.received`; the inventory module listens
@@ -218,6 +220,28 @@ export class PurchasingService {
     private readonly db: DB,
     private readonly events: EventBus,
   ) {}
+
+  /** Resolves a purchasing/receiving unit ("case", "box", ...) to its pack size
+   *  via the product's matching `product_barcodes` row, so PO creation and
+   *  receiving can convert a human-entered quantity/cost into the base (each)
+   *  units `purchase_order_lines` always stores. Reads catalog's
+   *  product_barcodes directly — an accepted cross-domain SQL read (ADR-002),
+   *  not a service import. */
+  async resolveUnitPackSize(productId: string, kind: string, tenantId: string): Promise<number> {
+    const row = await this.db.one<{ pack_size: number }>(
+      `SELECT pack_size FROM product_barcodes WHERE tenant_id = @tenantId AND product_id = @productId AND kind = @kind LIMIT 1`,
+      { tenantId, productId, kind },
+    );
+    if (!row) {
+      recordUomUnitNotConfigured(kind);
+      throw new HttpError(
+        400,
+        "unit_not_configured",
+        `No '${kind}' unit is configured for this product — add a '${kind}' barcode with a pack size first.`,
+      );
+    }
+    return Number(row.pack_size);
+  }
 
   async createSupplier(
     name: string,
@@ -1272,7 +1296,6 @@ export class PurchasingService {
     const to = opts.to ?? Number.MAX_SAFE_INTEGER;
     const qtyBreak = opts.qtyBreak ?? 0;
     const lookbackDays = 90;
-    const since = Date.now() - lookbackDays * 86_400_000;
 
     const items = await Promise.all(
       lines.map(async (l) => {
@@ -1300,25 +1323,26 @@ export class PurchasingService {
         }, null);
 
         // Suggested purchase qty from reorder point + recent sales velocity.
-        const stats = await this.db.one<{ current_stock: number; reorder_point: number; reorder_quantity: number; lead_time_days: number; units_sold: number }>(
+        // Phase 7 item 1 (WORK/FORWARD_PLAN.md): velocity now comes from the
+        // shared computeSalesVelocity() (src/shared/sales-velocity.ts)
+        // instead of an inline subquery — the old one never filtered by
+        // order status (refunded/open/cancelled orders counted as "sold"),
+        // unlike every other velocity surface in the codebase. Fixed by
+        // routing through the shared, correct implementation.
+        const stats = await this.db.one<{ current_stock: number; reorder_point: number; reorder_quantity: number; lead_time_days: number }>(
           `SELECT COALESCE(inv.stock_qty, 0)        AS current_stock,
                   COALESCE(p.reorder_point, 0)      AS reorder_point,
                   COALESCE(p.reorder_quantity, 0)   AS reorder_quantity,
-                  COALESCE(p.lead_time_days, 7)     AS lead_time_days,
-                  COALESCE((
-                    SELECT SUM(ol.quantity)
-                    FROM order_lines ol
-                    JOIN orders o ON o.id = ol.order_id
-                    WHERE ol.product_id = p.id AND ol.tenant_id = p.tenant_id
-                      AND o.created_at >= @since
-                  ), 0)                             AS units_sold
+                  COALESCE(p.lead_time_days, 7)     AS lead_time_days
            FROM products p
            LEFT JOIN inventory inv ON inv.product_id = p.id AND inv.tenant_id = p.tenant_id
            WHERE p.id = @productId AND p.tenant_id = @t`,
-          { productId: l.product_id, t: tenantId, since },
+          { productId: l.product_id, t: tenantId },
         );
-
-        const velocityPerDay = stats ? stats.units_sold / lookbackDays : 0;
+        const velocity = await computeSalesVelocityForProduct(this.db, {
+          tenantId, productId: l.product_id, lookbackDays,
+        });
+        const velocityPerDay = stats ? velocity.velocityPerDay : 0;
         // Target on-hand = reorder point + expected demand over the lead time.
         let suggestedQty = 0;
         if (stats) {

@@ -138,6 +138,94 @@ test("reorder-suggestions: incoming_stock reflects true remaining after a partia
   assert.equal(after.json.incoming_stock, 12);
 });
 
+test("reorder-suggestions: suggested_qty rounds up to the preferred supplier's case_pack and MOQ (Phase 6 item 1)", async () => {
+  const app = await freshApp();
+  const id = await makeProduct(app, "DV-REORDER-MOQ-1");
+
+  // Case pack of 12, MOQ of 50 — a raw 14-day-cover target of 1 unit (no
+  // sales velocity yet, no reorder_quantity configured) must round up to a
+  // multiple of 12 that also clears the 50-unit MOQ: ceil(50/12)*12 = 60.
+  const supplier = await call(app, "POST", `/api/catalog/${id}/suppliers`, {
+    vendor_name: "Case Pack Vendor", is_preferred: true, cost_cents: 200, moq: 50, case_pack: 12,
+  });
+  assert.equal(supplier.status, 201, JSON.stringify(supplier.json));
+
+  const r = await call(app, "GET", `/api/catalog/${id}/reorder-suggestions`);
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  assert.equal(r.json.status, "critical"); // available <= 0, so a suggestion is generated
+  assert.equal(r.json.suggested_qty, 60);
+  assert.equal(r.json.suggested_qty % 12, 0, "must be a whole number of cases");
+  assert.ok(r.json.suggested_qty >= 50, "must clear the MOQ");
+  assert.equal(r.json.preferred_supplier_moq, 50);
+  assert.equal(r.json.preferred_supplier_case_pack, 12);
+});
+
+test("reorder-suggestions: no MOQ/case_pack configured leaves suggested_qty unrounded (regression — prior behavior preserved)", async () => {
+  const app = await freshApp();
+  const id = await makeProduct(app, "DV-REORDER-NOMOQ-1");
+  const supplier = await call(app, "POST", `/api/catalog/${id}/suppliers`, {
+    vendor_name: "Plain Vendor", is_preferred: true, cost_cents: 200,
+  });
+  assert.equal(supplier.status, 201);
+
+  const r = await call(app, "GET", `/api/catalog/${id}/reorder-suggestions`);
+  assert.equal(r.status, 200);
+  // No configured reorder_quantity/velocity → falls back to 14 days of cover
+  // at zero velocity, floored to the 1-unit minimum — same as before this change.
+  assert.equal(r.json.suggested_qty, 1);
+  assert.equal(r.json.preferred_supplier_moq, null);
+  assert.equal(r.json.preferred_supplier_case_pack, null);
+});
+
+test("reorder-suggestions: safety_stock (Phase 6 item 2) is additive to suggested_qty and reflects the real configured value", async () => {
+  const app = await freshApp();
+  const id = await makeProduct(app, "DV-SAFETY-1");
+  const supplier = await call(app, "POST", `/api/catalog/${id}/suppliers`, {
+    vendor_name: "Safety Vendor", is_preferred: true, cost_cents: 200,
+  });
+  assert.equal(supplier.status, 201);
+
+  const setSafety = await call(app, "PUT", `/api/inventory/${id}/safety-stock`, { safetyStock: 25 });
+  assert.equal(setSafety.status, 200, JSON.stringify(setSafety.json));
+
+  const r = await call(app, "GET", `/api/catalog/${id}/reorder-suggestions`);
+  assert.equal(r.status, 200);
+  assert.equal(r.json.safety_stock, 25, "must report the real configured value, not a fake mirror of reorder_point");
+  // No reorder_quantity/velocity configured → base target is the 1-unit floor
+  // (14 days of cover at zero velocity); + 25 safety stock, no MOQ/case_pack.
+  assert.equal(r.json.suggested_qty, 26);
+});
+
+test("reorder-suggestions: safety_stock defaults to 0 when never configured (regression — no fake mirror of reorder_point)", async () => {
+  const app = await freshApp();
+  const id = await makeProduct(app, "DV-NOSAFETY-1");
+  const r = await call(app, "GET", `/api/catalog/${id}/reorder-suggestions`);
+  assert.equal(r.status, 200);
+  assert.equal(r.json.safety_stock, 0);
+});
+
+test("reorder-suggestions: expected_delivery_date (Phase 6 item 3) is now + the preferred supplier's lead time, null with no preferred supplier", async () => {
+  const app = await freshApp();
+  const id = await makeProduct(app, "DV-ETA-1");
+
+  const noSupplier = await call(app, "GET", `/api/catalog/${id}/reorder-suggestions`);
+  assert.equal(noSupplier.status, 200);
+  assert.equal(noSupplier.json.expected_delivery_date, null, "no preferred supplier to promise against");
+
+  const before = Date.now();
+  const supplier = await call(app, "POST", `/api/catalog/${id}/suppliers`, {
+    vendor_name: "ETA Vendor", is_preferred: true, cost_cents: 200, lead_time_days: 9,
+  });
+  assert.equal(supplier.status, 201);
+
+  const r = await call(app, "GET", `/api/catalog/${id}/reorder-suggestions`);
+  assert.equal(r.status, 200);
+  assert.equal(r.json.preferred_supplier_lead_days, 9);
+  const nineDaysMs = 9 * 24 * 60 * 60 * 1000;
+  assert.ok(r.json.expected_delivery_date >= before + nineDaysMs, "must be roughly now + 9 days");
+  assert.ok(r.json.expected_delivery_date <= Date.now() + nineDaysMs + 5000, "must not be far in excess of now + 9 days");
+});
+
 test("supplier-price-comparison: empty when no suppliers are linked", async () => {
   const app = await freshApp();
   const id = await makeProduct(app, "DV-SPC-1");

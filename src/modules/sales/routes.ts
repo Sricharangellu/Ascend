@@ -5,6 +5,7 @@ import type { AuthPayload } from "../../gateway/auth.js";
 import { requireRole } from "../../gateway/auth.js";
 import type { SalesService, QuoteStatus, SOStatus, SOFulfillmentStatus } from "./service.js";
 import type { DB } from "../../shared/db.js";
+import { clampLimit, decodeCursor, toPage } from "../../shared/pagination.js";
 
 const repSchema = z.object({
   name: z.string().min(1),
@@ -55,43 +56,87 @@ export function registerRoutes(router: Router, service: SalesService, db?: DB): 
   const mgr = requireRole("manager");
 
   // ── POS sales history (retail receipt list) ────────────────────────────
-  // GET /history?status=&q= — maps POS orders → SaleRecord shape for the
-  // Sales History page (filter bar + expandable receipt rows).
+  // GET /history?status=&q=&date=&limit=&cursor= — maps POS orders → SaleRecord
+  // shape for the Sales History page (filter bar + expandable receipt rows).
+  // Real customer/cashier/outlet names (LEFT JOIN customers/users/inventory_locations
+  // — same pattern reports.salesByRep() already uses for actor-id → name), real
+  // lines/payments per order, keyset-paginated instead of a flat LIMIT 200.
   if (db) {
     router.get("/history", handler(async (req, res) => {
       const tid    = tenantId(res);
       const status = typeof req.query.status === "string" && req.query.status ? req.query.status : null;
-      const q      = typeof req.query.q === "string" ? req.query.q.toLowerCase() : "";
+      const q      = typeof req.query.q === "string" && req.query.q ? `%${req.query.q.toLowerCase()}%` : null;
+      const date   = typeof req.query.date === "string" && req.query.date ? req.query.date : null; // YYYY-MM-DD, local calendar day
+      const limit  = clampLimit(Number(req.query.limit) || undefined);
+      const cursor = decodeCursor(typeof req.query.cursor === "string" ? req.query.cursor : undefined);
+
+      const dateStart = date ? new Date(`${date}T00:00:00.000Z`).getTime() : null;
+      const dateEnd   = dateStart !== null ? dateStart + 24 * 60 * 60 * 1000 : null;
 
       const rows = await db.query<{
-        id: string; order_number: string; status: string;
-        subtotal_cents: number; discount_cents: number; tax_cents: number; total_cents: number;
-        customer_id: string | null; created_at: number;
+        id: string; order_number: string; status: string; total_cents: number; created_at: number;
+        customer_name: string | null; sold_by: string; outlet: string;
       }>(
-        `SELECT id, order_number, status, subtotal_cents, discount_cents, tax_cents, total_cents,
-                customer_id, created_at
-           FROM orders
-          WHERE tenant_id = @tid ${status ? "AND status = @status" : ""}
-          ORDER BY created_at DESC
-          LIMIT 200`,
-        { tid, status },
+        `SELECT o.id, o.order_number, o.status, o.total_cents, o.created_at,
+                c.name AS customer_name,
+                COALESCE(u.name, o.created_by, 'Staff') AS sold_by,
+                COALESCE(il.name, 'Unassigned') AS outlet
+           FROM orders o
+           LEFT JOIN customers c ON c.id = o.customer_id AND c.tenant_id = o.tenant_id
+           LEFT JOIN users u ON u.id = o.created_by AND u.tenant_id = o.tenant_id
+           LEFT JOIN inventory_locations il ON il.id = o.store_id AND il.tenant_id = o.tenant_id
+          WHERE o.tenant_id = @tid
+            ${status ? "AND o.status = @status" : ""}
+            ${q ? "AND (LOWER(o.order_number) LIKE @q OR LOWER(c.name) LIKE @q)" : ""}
+            ${dateStart !== null ? "AND o.created_at >= @dateStart AND o.created_at < @dateEnd" : ""}
+            ${cursor ? "AND (o.created_at, o.id) < (@cursorAt, @cursorId)" : ""}
+          ORDER BY o.created_at DESC, o.id DESC
+          LIMIT @limit`,
+        { tid, status, q, dateStart, dateEnd, cursorAt: cursor?.at ?? null, cursorId: cursor?.id ?? null, limit },
       );
 
-      const items = rows
-        .filter(r => !q || r.order_number.toLowerCase().includes(q) || (r.customer_id ?? "").toLowerCase().includes(q))
-        .map(r => ({
-          id:             r.id,
-          receipt_number: r.order_number,
-          created_at:     r.created_at,
-          customer_name:  r.customer_id ?? null,
-          sold_by:        "Staff",
-          outlet:         "Main Outlet",
-          note:           null as string | null,
-          total_cents:    r.total_cents,
-          status:         r.status as "completed" | "open" | "voided" | "returned",
-        }));
+      const orderIds = rows.map((r) => r.id);
+      const [lineRows, paymentRows] = orderIds.length > 0
+        ? await Promise.all([
+            db.query<{ order_id: string; quantity: number; name: string; unit_cents: number; tax_cents: number; line_cents: number }>(
+              `SELECT order_id, quantity, name, unit_cents, tax_cents, line_cents
+                 FROM order_lines WHERE tenant_id = @tid AND order_id = ANY(@orderIds)`,
+              { tid, orderIds },
+            ),
+            db.query<{ order_id: string; method: string; amount_cents: number; created_at: number }>(
+              `SELECT order_id, method, amount_cents, created_at
+                 FROM payments WHERE tenant_id = @tid AND order_id = ANY(@orderIds)`,
+              { tid, orderIds },
+            ),
+          ])
+        : [[], []];
 
-      res.json({ items });
+      const linesByOrder = new Map<string, typeof lineRows>();
+      for (const l of lineRows) linesByOrder.set(l.order_id, [...(linesByOrder.get(l.order_id) ?? []), l]);
+      const paymentsByOrder = new Map<string, typeof paymentRows>();
+      for (const p of paymentRows) paymentsByOrder.set(p.order_id, [...(paymentsByOrder.get(p.order_id) ?? []), p]);
+
+      const paged = toPage(rows, limit, "created_at");
+      const items = paged.items.map((r) => ({
+        id:             r.id,
+        receipt_number: r.order_number,
+        created_at:     r.created_at,
+        customer_name:  r.customer_name,
+        sold_by:        r.sold_by,
+        outlet:         r.outlet,
+        note:           null as string | null,
+        total_cents:    r.total_cents,
+        status:         r.status as "completed" | "open" | "voided" | "returned",
+        lines: (linesByOrder.get(r.id) ?? []).map((l) => ({
+          qty: l.quantity, name: l.name, unit_price_cents: l.unit_cents,
+          tax_cents: l.tax_cents, total_cents: l.line_cents,
+        })),
+        payments: (paymentsByOrder.get(r.id) ?? []).map((p) => ({
+          method: p.method, amount_cents: p.amount_cents, date: p.created_at,
+        })),
+      }));
+
+      res.json({ items, nextCursor: paged.nextCursor });
     }));
   }
 
