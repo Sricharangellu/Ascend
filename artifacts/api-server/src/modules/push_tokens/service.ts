@@ -18,6 +18,67 @@ export interface PushNotificationPayload {
   data?: Record<string, unknown>;
 }
 
+export interface QuietHoursConfig {
+  enabled: boolean;
+  /** Local wall-clock start, "HH:MM" (24h). */
+  start: string;
+  /** Local wall-clock end, "HH:MM" (24h). */
+  end: string;
+  /** IANA timezone, e.g. "America/New_York". */
+  timezone: string;
+}
+
+export const DEFAULT_QUIET_HOURS: QuietHoursConfig = {
+  enabled: false,
+  start: "22:00",
+  end: "07:00",
+  timezone: "UTC",
+};
+
+/** "HH:MM" → minutes since midnight. Returns null when malformed. */
+export function parseHHMM(value: string): number | null {
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+/** True when the given IANA timezone name is usable in this runtime. */
+export function isValidTimezone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Current minutes-since-midnight in the given timezone. */
+function minutesNowIn(timezone: string, now: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+  return hour * 60 + minute;
+}
+
+/**
+ * Pure quiet-window check. Handles overnight windows (start > end, e.g.
+ * 22:00–07:00). A window where start === end is treated as inactive.
+ */
+export function isWithinQuietWindow(config: QuietHoursConfig, now: Date = new Date()): boolean {
+  if (!config.enabled) return false;
+  const start = parseHHMM(config.start);
+  const end = parseHHMM(config.end);
+  if (start === null || end === null || start === end) return false;
+  if (!isValidTimezone(config.timezone)) return false;
+  const m = minutesNowIn(config.timezone, now);
+  return start < end ? m >= start && m < end : m >= start || m < end;
+}
+
 export class PushTokensService {
   constructor(private readonly db: DB) {}
 
@@ -48,6 +109,54 @@ export class PushTokensService {
       `DELETE FROM push_tokens WHERE tenant_id = @tenantId AND token = @token`,
       { tenantId, token },
     );
+  }
+
+  async getQuietHours(tenantId: string): Promise<QuietHoursConfig> {
+    const row = await this.db.one<{
+      enabled: boolean;
+      start_time: string;
+      end_time: string;
+      timezone: string;
+    }>(
+      `SELECT enabled, start_time, end_time, timezone
+         FROM push_quiet_hours WHERE tenant_id = @tenantId`,
+      { tenantId },
+    );
+    if (!row) return { ...DEFAULT_QUIET_HOURS };
+    return {
+      enabled: row.enabled,
+      start: row.start_time,
+      end: row.end_time,
+      timezone: row.timezone,
+    };
+  }
+
+  async setQuietHours(tenantId: string, config: QuietHoursConfig): Promise<QuietHoursConfig> {
+    await this.db.query(
+      `INSERT INTO push_quiet_hours (tenant_id, enabled, start_time, end_time, timezone, updated_at)
+       VALUES (@tenant_id, @enabled, @start_time, @end_time, @timezone, @updated_at)
+       ON CONFLICT (tenant_id)
+       DO UPDATE SET enabled = EXCLUDED.enabled,
+                     start_time = EXCLUDED.start_time,
+                     end_time = EXCLUDED.end_time,
+                     timezone = EXCLUDED.timezone,
+                     updated_at = EXCLUDED.updated_at`,
+      {
+        tenant_id: tenantId,
+        enabled: config.enabled,
+        start_time: config.start,
+        end_time: config.end,
+        timezone: config.timezone,
+        updated_at: Date.now(),
+      },
+    );
+    return config;
+  }
+
+  /** True when the tenant's quiet-hours window is active right now. */
+  async isQuietNow(tenantId: string, now: Date = new Date()): Promise<boolean> {
+    const config = await this.getQuietHours(tenantId);
+    return isWithinQuietWindow(config, now);
   }
 
   async sendToTenant(

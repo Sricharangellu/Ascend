@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { apiFetch } from '@/lib/api';
 import type { Order, OrdersListResponse, SalesSummary } from '@/lib/api';
+import { QuietHoursSheet } from '@/components/QuietHoursSheet';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtCents(cents: number): string {
@@ -123,6 +124,7 @@ export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
+  const [quietHoursOpen, setQuietHoursOpen] = useState(false);
 
   const summaryQ = useQuery({
     queryKey: ['reports', 'summary'],
@@ -165,6 +167,19 @@ export default function DashboardScreen() {
           <Text style={s.greetText}>{greeting()},</Text>
           <Text style={s.nameText}>{user?.name ?? 'Store Owner'}</Text>
         </View>
+        <View style={s.headerActions}>
+        {user?.role === 'owner' ? (
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.selectionAsync();
+              setQuietHoursOpen(true);
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={[s.logoutBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+          >
+            <Feather name="moon" size={18} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        ) : null}
         <TouchableOpacity
           onPress={handleLogout}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -172,7 +187,10 @@ export default function DashboardScreen() {
         >
           <Feather name="log-out" size={18} color={colors.mutedForeground} />
         </TouchableOpacity>
+        </View>
       </View>
+
+      <QuietHoursSheet visible={quietHoursOpen} onClose={() => setQuietHoursOpen(false)} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -301,6 +319,10 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
       fontSize: 22,
       color: colors.foreground,
       letterSpacing: -0.5,
+    },
+    headerActions: {
+      flexDirection: 'row',
+      gap: 8,
     },
     logoutBtn: {
       width: 38,

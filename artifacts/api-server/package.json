@@ -8,6 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test 'src/**/*.test.ts'",
+    "test:quiet-hours": "tsx --test src/modules/push_tokens/*.test.ts",
     "db:backup": "bash scripts/backup.sh",
     "db:restore": "bash scripts/restore.sh",
     "db:backup:remote-list": "tsx src/scripts/remote-backups.ts list",

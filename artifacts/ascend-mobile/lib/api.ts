@@ -207,6 +207,25 @@ export async function unregisterPushToken(token: string): Promise<void> {
   });
 }
 
+// ─── Quiet hours ──────────────────────────────────────────────────────────────
+export interface QuietHours {
+  enabled: boolean;
+  start: string; // "HH:MM" 24h
+  end: string; // "HH:MM" 24h
+  timezone: string; // IANA name
+}
+
+export async function getQuietHours(): Promise<QuietHours> {
+  return apiFetch<QuietHours>('/api/v1/push-tokens/quiet-hours');
+}
+
+export async function updateQuietHours(config: QuietHours): Promise<QuietHours> {
+  return apiFetch<QuietHours>('/api/v1/push-tokens/quiet-hours', {
+    method: 'PUT',
+    body: JSON.stringify(config),
+  });
+}
+
 // ─── Order mutations ──────────────────────────────────────────────────────────
 export async function completeOrder(orderId: string): Promise<Order> {
   return apiFetch<Order>(`/api/v1/orders/${orderId}/complete`, {
