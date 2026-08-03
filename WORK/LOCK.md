@@ -21,8 +21,8 @@ Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0
 | Queue item | Phase 7 item 3 — forecast accuracy framework (measurement layer before prediction models): persist forecast qty + compare to `demand_snapshots` actuals → variance / accuracy %. Depends on item 2 (PR #121, rebased onto post-#150 develop). |
 | Files/areas expected | `src/modules/demand_planning/{index,service,routes,demand-planning.test}.ts`, `WORK/**` |
 | Started | 2026-08-03T03:00:35Z |
-| Status | ACTIVE — implementing |
-| Blockers | PR #121 CI in progress (rebased); building item 3 on top of the rebased tip |
+| Status | RELEASED — merged to `develop` via PR #152 (`895e45c`). Phase 7 items 1–3 complete. |
+| Blockers | none |
 
 ## Active Claim (Claude session G — Phase 0 coordinator: finish end-to-end + deployment readiness)
 
