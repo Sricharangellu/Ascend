@@ -10,7 +10,7 @@ Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0
 | Queue item | Port Phase 13/14 enterprise command-center dashboard from Replit `artifacts/ascend/` into canonical `web/`; honest KPIs only (omit fake CSAT/capacity/active-users); icon system (no emoji); real routes for modules/pipeline/quick actions; range-scoped cash flow; sparkline fix from live orders; dark-mode tokens. |
 | Files/areas expected | `web/app/(protected)/dashboard/**`, `web/app/globals.css`, `web/components/setup/RetailSetupChecklist.tsx`, `src/modules/reports/{service,reports.test}.ts`, `WORK/**` |
 | Started | 2026-08-03T05:09:16Z |
-| Status | ACTIVE — verified locally; committing/pushing PR |
+| Status | RELEASED — pushed `cursor/dashboard-display-data-45ad` (`b649acb`); audit AUDIT_2026-08-03T051700Z-dashboard-command-center-port.md |
 | Blockers | none |
 
 ## Active Claim (Cursor Cloud — Phase 7 item 3: forecast accuracy framework)
