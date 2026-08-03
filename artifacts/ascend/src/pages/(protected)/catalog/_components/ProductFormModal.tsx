@@ -113,29 +113,35 @@ export function ProductFormModal({
     }
   };
 
-  const inputCls = "w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-600";
-  const labelCls = "mb-1 block text-sm font-medium text-slate-700";
+  const inputCls = "w-full rounded-lg border px-3 py-2 text-[13px] outline-none transition-all focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500";
+  const inputStyle = { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" };
+  const labelCls = "mb-1 block text-[12px] font-medium";
   const kindOptions: Array<{ value: ProductKind; label: string }> = [
     { value: "standalone", label: "Standalone" },
     { value: "master", label: "Master" },
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-md bg-white shadow-xl"
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
+        style={{ backgroundColor: "var(--color-surface)" }}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-950">
+        <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--color-border)" }}>
+          <h2 className="text-[15px] font-semibold" style={{ color: "var(--color-text-primary)" }}>
             {initial ? "Edit product" : "New product"}
           </h2>
-          <button type="button" onClick={onClose} aria-label="Close product form" className="flex h-9 w-9 items-center justify-center rounded-md text-xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-600">&times;</button>
+          <button type="button" onClick={onClose} aria-label="Close product form"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-xl leading-none transition-colors hover:bg-[var(--color-surface-subtle)]"
+            style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
 
-        <form id="product-form" onSubmit={handleSubmit} className="flex-1 space-y-4 overflow-y-auto bg-slate-50 px-5 py-4">
+        <form id="product-form" onSubmit={handleSubmit} className="flex-1 space-y-4 overflow-y-auto px-5 py-4"
+          style={{ backgroundColor: "var(--color-surface-subtle)" }}>
           {err && (
-            <p role="alert" className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>
+            <p role="alert" className="mb-4 rounded-xl border px-3 py-2 text-[13px]"
+              style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>{err}</p>
           )}
 
           <FormSection

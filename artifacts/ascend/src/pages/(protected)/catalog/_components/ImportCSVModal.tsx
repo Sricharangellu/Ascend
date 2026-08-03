@@ -71,53 +71,69 @@ export function ImportCSVModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-md bg-white shadow-xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-950">Import products from CSV</h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-md text-xl text-slate-400 hover:bg-slate-100">&times;</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}
+        style={{ backgroundColor: "var(--color-surface)" }}>
+        {/* Header */}
+        <div className="flex items-center justify-between border-b px-5 py-4"
+          style={{ borderColor: "var(--color-border)" }}>
+          <h2 className="text-[15px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Import products from CSV</h2>
+          <button type="button" onClick={onClose} aria-label="Close"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-xl transition-colors hover:bg-[var(--color-surface-subtle)]"
+            style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
           {!result ? (
             <>
-              <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-5 text-center">
-                <p className="mb-1 text-sm font-semibold text-slate-700">Upload a CSV file</p>
-                <p className="mb-3 text-xs text-slate-400">
+              <div className="rounded-xl border-2 border-dashed p-5 text-center"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
+                <p className="mb-1 text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Upload a CSV file</p>
+                <p className="mb-3 text-[12px]" style={{ color: "var(--color-text-muted)" }}>
                   Required: <code className="font-mono">name, sku, price</code><br />
                   Optional: <code className="font-mono">category, brand, barcode, cost, tax_class, description</code>
                 </p>
                 <input type="file" accept=".csv,text/csv" onChange={handleFile}
-                  className="mx-auto block text-sm text-slate-600 file:mr-2 file:cursor-pointer file:rounded-md file:border file:border-slate-200 file:bg-white file:px-3 file:py-1 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-50" />
+                  className="mx-auto block text-[13px] file:mr-2 file:cursor-pointer file:rounded-lg file:border file:px-3 file:py-1 file:text-[11px] file:font-medium"
+                  style={{ color: "var(--color-text-secondary)" }} />
               </div>
 
               {parseError && (
-                <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{parseError}</p>
+                <div className="rounded-xl border px-3 py-2 text-[13px]"
+                  style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>
+                  {parseError}
+                </div>
               )}
 
               {parsed && (
                 <div>
-                  <p className="mb-2 text-sm font-medium text-slate-700">
+                  <p className="mb-2 text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>
                     Preview — {parsed.rows.length} row{parsed.rows.length !== 1 ? "s" : ""} detected
                   </p>
-                  <div className="overflow-x-auto rounded-md border border-slate-200">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="bg-slate-50 text-left">
-                          {parsed.headers.map(h => <th key={h} className="px-3 py-2 font-semibold text-slate-500">{h}</th>)}
+                  <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--color-border)" }}>
+                    <table className="w-full text-[12px]">
+                      <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+                        <tr>
+                          {parsed.headers.map((h) => (
+                            <th key={h} className="px-3 py-2 text-left font-semibold" style={{ color: "var(--color-text-secondary)" }}>{h}</th>
+                          ))}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody>
                         {parsed.rows.slice(0, 8).map((row, i) => (
-                          <tr key={i} className="hover:bg-slate-50">
-                            {parsed.headers.map(h => (
-                              <td key={h} className="max-w-[140px] truncate px-3 py-1.5 text-slate-700">{row[h] ?? ""}</td>
+                          <tr key={i} className="border-b last:border-0 transition-colors duration-75"
+                            style={{ borderColor: "var(--color-table-border)" }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-table-row-hover)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "")}>
+                            {parsed.headers.map((h) => (
+                              <td key={h} className="max-w-[140px] truncate px-3 py-1.5" style={{ color: "var(--color-text-secondary)" }}>{row[h] ?? ""}</td>
                             ))}
                           </tr>
                         ))}
                         {parsed.rows.length > 8 && (
                           <tr>
-                            <td colSpan={parsed.headers.length} className="px-3 py-2 text-center text-slate-400">
+                            <td colSpan={parsed.headers.length} className="px-3 py-2 text-center text-[12px]"
+                              style={{ color: "var(--color-text-muted)" }}>
                               +{parsed.rows.length - 8} more rows…
                             </td>
                           </tr>
@@ -131,29 +147,29 @@ export function ImportCSVModal({
           ) : (
             <div className="space-y-4">
               <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="rounded-md bg-green-50 p-4">
-                  <p className="text-2xl font-bold text-green-700">{result.imported}</p>
-                  <p className="text-xs text-green-600 mt-0.5">Imported</p>
+                <div className="rounded-xl bg-success-50 p-4 border border-success-200">
+                  <p className="text-[20px] font-bold text-success-700">{result.imported}</p>
+                  <p className="mt-0.5 text-[11px] text-success-600">Imported</p>
                 </div>
-                <div className="rounded-md bg-slate-50 p-4">
-                  <p className="text-2xl font-bold text-slate-700">{result.skipped}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">Skipped</p>
+                <div className="rounded-xl border p-4" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
+                  <p className="text-[20px] font-bold" style={{ color: "var(--color-text-primary)" }}>{result.skipped}</p>
+                  <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>Skipped</p>
                 </div>
-                <div className="rounded-md bg-red-50 p-4">
-                  <p className="text-2xl font-bold text-red-700">{result.errors.length}</p>
-                  <p className="text-xs text-red-600 mt-0.5">Errors</p>
+                <div className="rounded-xl border border-danger-200 bg-danger-50 p-4">
+                  <p className="text-[20px] font-bold text-danger-700">{result.errors.length}</p>
+                  <p className="mt-0.5 text-[11px] text-danger-600">Errors</p>
                 </div>
               </div>
               {result.errors.length > 0 && (
-                <div className="rounded-md border border-red-200 bg-red-50 p-3">
-                  <p className="mb-1 text-xs font-semibold text-red-700">Row errors:</p>
-                  <ul className="space-y-0.5 text-xs text-red-600">
+                <div className="rounded-xl border border-danger-200 bg-danger-50 p-3">
+                  <p className="mb-1 text-[11px] font-semibold text-danger-700">Row errors:</p>
+                  <ul className="space-y-0.5 text-[11px] text-danger-600">
                     {result.errors.map((e, i) => <li key={i}>Row {e.row}: {e.message}</li>)}
                   </ul>
                 </div>
               )}
               {result.imported > 0 && (
-                <p className="text-sm text-green-700">
+                <p className="text-[13px] text-success-700">
                   {result.imported} product{result.imported !== 1 ? "s" : ""} imported as &ldquo;Draft&rdquo; — activate them from the catalog list.
                 </p>
               )}
@@ -161,14 +177,15 @@ export function ImportCSVModal({
           )}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+        <div className="flex justify-end gap-2 border-t px-5 py-3" style={{ borderColor: "var(--color-border)" }}>
           <button type="button" onClick={onClose}
-            className="min-h-[40px] rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            className="h-8 rounded-lg border px-4 text-[13px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
             {result ? "Close" : "Cancel"}
           </button>
           {!result && (
             <button type="button" disabled={!parsed || importing} onClick={() => void handleImport()}
-              className="min-h-[40px] rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+              className="h-8 rounded-lg bg-brand-600 px-4 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-50">
               {importing ? "Importing…" : `Import ${parsed?.rows.length ?? 0} products`}
             </button>
           )}

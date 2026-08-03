@@ -214,7 +214,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   return (
     // Backdrop
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/60 pt-[10vh] backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-[10vh] backdrop-blur-sm"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -222,24 +222,16 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     >
       {/* Panel */}
       <div
-        className="mx-4 w-full max-w-xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl"
+        className="mx-4 w-full max-w-xl overflow-hidden rounded-2xl border shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
+        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
       >
         {/* Search input */}
-        <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
-          <svg
-            aria-hidden="true"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.25"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="shrink-0 text-slate-400"
-          >
+        <div className="flex items-center gap-3 border-b px-4 py-3" style={{ borderColor: "var(--color-border)" }}>
+          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round"
+            className="shrink-0" style={{ color: "var(--color-text-muted)" }}>
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
@@ -249,14 +241,17 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             placeholder="Search products, orders, customers…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 placeholder-slate-400 outline-none"
+            className="min-w-0 flex-1 bg-transparent text-[13px] outline-none"
+            style={{ color: "var(--color-text-primary)" }}
             autoComplete="off"
             spellCheck={false}
           />
           {loading && (
-            <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-slate-200 border-t-slate-600" />
+            <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-2"
+              style={{ borderColor: "var(--color-border)", borderTopColor: "var(--color-text-secondary)" }} />
           )}
-          <kbd className="hidden shrink-0 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-xs text-slate-400 sm:block">
+          <kbd className="hidden shrink-0 rounded-md border px-1.5 py-0.5 text-[11px] sm:block"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }}>
             Esc
           </kbd>
         </div>
@@ -265,17 +260,17 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         <div ref={listRef} className="max-h-[420px] overflow-y-auto">
           {!query.trim() ? (
             <div className="px-4 py-8 text-center">
-              <p className="text-sm text-slate-400">
+              <p className="text-[13px]" style={{ color: "var(--color-text-muted)" }}>
                 Type to search across products, orders, customers, and more.
               </p>
             </div>
           ) : error ? (
             <div className="px-4 py-6 text-center">
-              <p className="text-sm text-red-600">{error}</p>
+              <p className="text-[13px]" style={{ color: "var(--color-danger-text)" }}>{error}</p>
             </div>
           ) : !loading && !hasResults ? (
             <div className="px-4 py-8 text-center">
-              <p className="text-sm text-slate-400">
+              <p className="text-[13px]" style={{ color: "var(--color-text-muted)" }}>
                 No results for &ldquo;{query}&rdquo;
               </p>
             </div>
@@ -284,7 +279,8 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
               {groupEntries.map(([group, hits]) => (
                 <div key={group}>
                   <div className="px-4 pb-1 pt-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em]"
+                      style={{ color: "var(--color-text-muted)" }}>
                       {GROUP_LABELS[group] ?? group}
                     </p>
                   </div>
@@ -298,32 +294,26 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                         data-hit-idx={idx}
                         onClick={() => navigate(hit)}
                         onMouseEnter={() => setActiveIdx(idx)}
-                        className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                          isActive
-                            ? "bg-slate-950 text-white"
-                            : "text-slate-700 hover:bg-slate-50"
-                        }`}
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors"
+                        style={{
+                          backgroundColor: isActive ? "var(--color-primary)" : "",
+                          color: isActive ? "white" : "var(--color-text-primary)",
+                        }}
                       >
-                        <span
-                          className={`shrink-0 ${isActive ? "text-slate-300" : "text-slate-400"}`}
-                        >
+                        <span className="shrink-0" style={{ color: isActive ? "rgba(255,255,255,0.7)" : "var(--color-text-muted)" }}>
                           <HitIcon type={hit.type} />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium">
-                            {hit.label}
-                          </span>
+                          <span className="block truncate text-[13px] font-medium">{hit.label}</span>
                           {hit.sublabel && (
-                            <span
-                              className={`block truncate text-xs ${isActive ? "text-slate-400" : "text-slate-400"}`}
-                            >
+                            <span className="block truncate text-[11px]"
+                              style={{ color: isActive ? "rgba(255,255,255,0.6)" : "var(--color-text-muted)" }}>
                               {hit.sublabel}
                             </span>
                           )}
                         </span>
-                        <span
-                          className={`shrink-0 text-xs ${isActive ? "text-slate-400" : "text-slate-300"}`}
-                        >
+                        <span className="shrink-0 text-[11px]"
+                          style={{ color: isActive ? "rgba(255,255,255,0.5)" : "var(--color-text-muted)" }}>
                           ↵
                         </span>
                       </button>
@@ -336,19 +326,22 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2">
-          <div className="flex items-center gap-3 text-[11px] text-slate-400">
+        <div className="flex items-center justify-between border-t px-4 py-2" style={{ borderColor: "var(--color-border)" }}>
+          <div className="flex items-center gap-3 text-[11px]" style={{ color: "var(--color-text-muted)" }}>
             <span className="flex items-center gap-1">
-              <kbd className="rounded border border-slate-200 bg-slate-50 px-1 py-0.5">↑</kbd>
-              <kbd className="rounded border border-slate-200 bg-slate-50 px-1 py-0.5">↓</kbd>
+              <kbd className="rounded border px-1 py-0.5"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>↑</kbd>
+              <kbd className="rounded border px-1 py-0.5"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>↓</kbd>
               navigate
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="rounded border border-slate-200 bg-slate-50 px-1 py-0.5">↵</kbd>
+              <kbd className="rounded border px-1 py-0.5"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>↵</kbd>
               open
             </span>
           </div>
-          <span className="text-[11px] text-slate-400">Ascend Search</span>
+          <span className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>Ascend Search</span>
         </div>
       </div>
     </div>
