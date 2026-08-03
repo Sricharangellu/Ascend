@@ -20,7 +20,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
-import { apiFetch, completeOrder, voidOrder } from '@/lib/api';
+import { apiFetch, completeOrder, refundOrder, voidOrder } from '@/lib/api';
 import type { Order, OrderLine, OrdersListResponse } from '@/lib/api';
 
 type StatusFilter = 'all' | Order['status'];
@@ -308,6 +308,20 @@ function OrderDetailSheet({
     },
   });
 
+  const refundMutation = useMutation({
+    mutationFn: () => refundOrder(order!.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      onClose();
+      onToast('Order refunded', 'success');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    onError: (err: Error) => {
+      onToast(err.message || 'Could not refund order', 'error');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    },
+  });
+
   const voidMutation = useMutation({
     mutationFn: () => voidOrder(order!.id),
     onSuccess: () => {
@@ -322,7 +336,8 @@ function OrderDetailSheet({
     },
   });
 
-  const isBusy = completeMutation.isPending || voidMutation.isPending;
+  const isBusy =
+    completeMutation.isPending || refundMutation.isPending || voidMutation.isPending;
 
   function confirmComplete() {
     Alert.alert(
@@ -333,6 +348,21 @@ function OrderDetailSheet({
         {
           text: 'Mark Complete',
           onPress: () => completeMutation.mutate(),
+        },
+      ],
+    );
+  }
+
+  function confirmRefund() {
+    Alert.alert(
+      'Issue Refund?',
+      `Order #${order?.orderNumber} will be fully refunded. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Issue Refund',
+          style: 'destructive',
+          onPress: () => refundMutation.mutate(),
         },
       ],
     );
@@ -357,6 +387,7 @@ function OrderDetailSheet({
   const chip = chipColors(order.status, colors);
   const canComplete = order.status === 'open';
   const canVoid = order.status === 'open' || order.status === 'completed';
+  const canRefund = order.status === 'completed';
 
   return (
     <Modal
@@ -436,7 +467,7 @@ function OrderDetailSheet({
         </ScrollView>
 
         {/* Action buttons */}
-        {(canComplete || canVoid) && (
+        {(canComplete || canRefund || canVoid) && (
           <View
             style={[
               sheetStyles.actions,
@@ -457,6 +488,25 @@ function OrderDetailSheet({
                     <Feather name="check-circle" size={16} color={colors.primaryForeground} style={sheetStyles.btnIcon} />
                     <Text style={[sheetStyles.actionBtnText, { color: colors.primaryForeground }]}>
                       Mark Complete
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+            {canRefund && (
+              <TouchableOpacity
+                onPress={confirmRefund}
+                disabled={isBusy}
+                style={[sheetStyles.actionBtn, { backgroundColor: colors.primary, opacity: isBusy ? 0.6 : 1 }]}
+                activeOpacity={0.8}
+              >
+                {refundMutation.isPending ? (
+                  <ActivityIndicator color={colors.primaryForeground} size="small" />
+                ) : (
+                  <>
+                    <Feather name="rotate-ccw" size={16} color={colors.primaryForeground} style={sheetStyles.btnIcon} />
+                    <Text style={[sheetStyles.actionBtnText, { color: colors.primaryForeground }]}>
+                      Issue Refund
                     </Text>
                   </>
                 )}

@@ -238,3 +238,9 @@ export async function voidOrder(orderId: string): Promise<Order> {
     method: 'POST',
   });
 }
+
+export async function refundOrder(orderId: string): Promise<Order> {
+  return apiFetch<Order>(`/api/v1/orders/${orderId}/refund`, {
+    method: 'POST',
+  });
+}
