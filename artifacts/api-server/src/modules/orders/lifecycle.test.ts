@@ -154,6 +154,73 @@ test("a late payment.captured event does NOT resurrect a refunded order", async 
   assert.equal(after.json.status, "refunded"); // unchanged, not resurrected
 });
 
+test("a replayed payment.captured after refund does not feed NaN into the ledger", async () => {
+  const app = await freshApp();
+  const widget = await makeProduct(app, {
+    sku: "LC-REFUND-LEDGER",
+    name: "Widget",
+    price_cents: 1500,
+  });
+  const order = await makeOrder(app, widget);
+
+  const refunded = await call(app, "POST", `/api/orders/${order.id}/refund`);
+  assert.equal(refunded.status, 200);
+
+  // Spy on logger.warn: the accounting handler swallows ledger failures and
+  // logs "ledger posting failed" — before the fix, a partial replayed payload
+  // produced a NaN-balance error on this exact path.
+  const { logger } = await import("../../shared/logger.js");
+  const warns: string[] = [];
+  const origWarn = logger.warn.bind(logger);
+  (logger as { warn: unknown }).warn = (...args: unknown[]) => {
+    warns.push(JSON.stringify(args));
+  };
+  try {
+    // Redelivered event with the partial payload real replays carry.
+    await app.events.publish("payment.captured", { orderId: order.id }, order.id);
+  } finally {
+    (logger as { warn: unknown }).warn = origWarn;
+  }
+
+  const ledgerFailures = warns.filter((w) => w.includes("ledger posting failed"));
+  assert.deepEqual(ledgerFailures, [], `ledger posting must not fail on replay: ${ledgerFailures[0] ?? ""}`);
+
+  // Order state stays terminal and untouched.
+  const after = await call(app, "GET", `/api/orders/${order.id}`);
+  assert.equal(after.json.status, "refunded");
+});
+
+test("a replayed payment.captured after void does not feed NaN into the ledger", async () => {
+  const app = await freshApp();
+  const widget = await makeProduct(app, {
+    sku: "LC-VOID-LEDGER",
+    name: "Widget",
+    price_cents: 1500,
+  });
+  const order = await makeOrder(app, widget);
+
+  const voided = await call(app, "POST", `/api/orders/${order.id}/void`);
+  assert.equal(voided.status, 200);
+
+  const { logger } = await import("../../shared/logger.js");
+  const warns: string[] = [];
+  const origWarn = logger.warn.bind(logger);
+  (logger as { warn: unknown }).warn = (...args: unknown[]) => {
+    warns.push(JSON.stringify(args));
+  };
+  try {
+    await app.events.publish("payment.captured", { orderId: order.id }, order.id);
+  } finally {
+    (logger as { warn: unknown }).warn = origWarn;
+  }
+
+  const ledgerFailures = warns.filter((w) => w.includes("ledger posting failed"));
+  assert.deepEqual(ledgerFailures, [], `ledger posting must not fail on replay: ${ledgerFailures[0] ?? ""}`);
+
+  const after = await call(app, "GET", `/api/orders/${order.id}`);
+  assert.equal(after.json.status, "voided");
+});
+
 test("a late payment.captured event does NOT resurrect a voided order", async () => {
   const app = await freshApp();
   const widget = await makeProduct(app, {
