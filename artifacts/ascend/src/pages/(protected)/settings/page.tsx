@@ -69,7 +69,13 @@ function SectionButton({ active, label, onClick }: { active: boolean; label: str
       type="button"
       onClick={onClick}
       aria-current={active ? "page" : undefined}
-      className={`min-h-[44px] rounded-md px-3 text-left text-sm font-medium transition-colors ${active ? "bg-slate-950 text-white" : "text-slate-700 hover:bg-slate-100"}`}
+      className={[
+        "min-h-[36px] rounded-lg px-3 text-left text-[13px] font-medium transition-all duration-150",
+        active
+          ? "bg-[var(--color-primary-subtle)] text-brand-600 font-semibold"
+          : "hover:bg-[var(--color-surface-subtle)]",
+      ].join(" ")}
+      style={{ color: active ? undefined : "var(--color-text-secondary)" }}
     >
       {label}
     </button>

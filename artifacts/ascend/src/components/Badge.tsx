@@ -1,14 +1,6 @@
 import { clsx } from "clsx";
 
 // ─── Variant types ────────────────────────────────────────────────────────────
-// Spec:
-//   Billed / active  → #1890FF solid (blue)
-//   Not Billed / pending → #FA8C16 solid (orange)
-//   Completed / paid  → green outlined
-//   Draft / voided    → gray outlined
-//   Danger / error    → #FF4D4F solid (red)
-//   Purple            → purple solid
-
 export type BadgeVariant =
   | "gray"
   | "blue"
@@ -22,31 +14,22 @@ interface BadgeProps {
   children: React.ReactNode;
   variant?: BadgeVariant;
   size?: "sm" | "md";
-  /** Use outlined style instead of solid fill */
   outlined?: boolean;
 }
 
-// Solid fills (default — matches Ascend ERP status tags)
+// Solid fills — using CSS vars for theme compatibility
 const solidClass: Record<BadgeVariant, string> = {
-  blue:   "bg-[#1890FF] text-white",          // Billed
-  orange: "bg-[#FA8C16] text-white",          // Not Billed / Pending
-  yellow: "bg-[#FA8C16] text-white",          // alias for orange
-  green:  "bg-[#52C41A] text-white",          // Completed / Paid
-  gray:   "bg-gray-400 text-white",           // Draft / Voided
-  red:    "bg-[#FF4D4F] text-white",          // Error / Overdue
-  purple: "bg-purple-500 text-white",
+  blue:   "bg-info-50 text-info-600 border border-info-200",
+  orange: "bg-warning-50 text-warning-600 border border-warning-200",
+  yellow: "bg-warning-50 text-warning-600 border border-warning-200",
+  green:  "bg-success-50 text-success-600 border border-success-200",
+  gray:   "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] border border-[var(--color-border)]",
+  red:    "bg-danger-50 text-danger-600 border border-danger-200",
+  purple: "bg-[var(--color-primary-subtle)] text-brand-600 border border-[var(--color-primary-border)]",
 };
 
-// Outlined style (spec uses for "Completed", "Pending Shipment")
-const outlinedClass: Record<BadgeVariant, string> = {
-  blue:   "bg-transparent border border-[#1890FF] text-[#1890FF]",
-  orange: "bg-transparent border border-[#FA8C16] text-[#FA8C16]",
-  yellow: "bg-transparent border border-[#FA8C16] text-[#FA8C16]",
-  green:  "bg-transparent border border-[#52C41A] text-[#52C41A]",
-  gray:   "bg-transparent border border-gray-400 text-gray-500",
-  red:    "bg-transparent border border-[#FF4D4F] text-[#FF4D4F]",
-  purple: "bg-transparent border border-purple-500 text-purple-600",
-};
+// Outlined — same as solid in new system (already uses light bg + colored text)
+const outlinedClass: Record<BadgeVariant, string> = solidClass;
 
 export function Badge({
   children,
@@ -57,10 +40,8 @@ export function Badge({
   return (
     <span
       className={clsx(
-        "inline-flex items-center font-medium whitespace-nowrap",
-        // Spec: border-radius 4px, padding 0 7px, font-size 12px
-        "rounded-[4px] text-[12px] leading-[20px]",
-        size === "sm" ? "px-1.5" : "px-[7px]",
+        "inline-flex items-center font-semibold whitespace-nowrap rounded-md leading-none tracking-[0.02em]",
+        size === "sm" ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-1 text-[11px]",
         outlined ? outlinedClass[variant] : solidClass[variant]
       )}
     >
@@ -70,7 +51,6 @@ export function Badge({
 }
 
 // ─── Status → variant mapping ─────────────────────────────────────────────────
-
 export function statusBadge(status: string): BadgeVariant {
   const map: Record<string, BadgeVariant> = {
     open:               "blue",
@@ -103,8 +83,6 @@ export function statusBadge(status: string): BadgeVariant {
   return map[status.toLowerCase()] ?? "gray";
 }
 
-// ─── Outlined status badge (for Completed, Pending Shipment per spec) ─────────
-
 export function OutlinedStatusBadge({
   status,
   label,
@@ -113,11 +91,8 @@ export function OutlinedStatusBadge({
   label?: string;
 }) {
   const variant = statusBadge(status);
-  const outlineVariants: BadgeVariant[] = ["green", "orange", "blue"];
-  const useOutline = outlineVariants.includes(variant);
-
   return (
-    <Badge variant={variant} outlined={useOutline}>
+    <Badge variant={variant} outlined>
       {label ?? status}
     </Badge>
   );

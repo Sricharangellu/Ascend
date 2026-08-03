@@ -4,7 +4,6 @@
  *
  * Lists all tenant orders with status-tab filtering (all / open / completed /
  * refunded / voided). Managers and owners can refund or void orders inline.
- * Clicking a row expands order lines for detail.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -34,52 +33,67 @@ interface OrdersResponse {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_TABS: Array<{ label: string; value: OrderStatus | "all" }> = [
-  { label: "All", value: "all" },
-  { label: "Open", value: "open" },
+  { label: "All",       value: "all" },
+  { label: "Open",      value: "open" },
   { label: "Completed", value: "completed" },
-  { label: "Refunded", value: "refunded" },
-  { label: "Voided", value: "voided" },
+  { label: "Refunded",  value: "refunded" },
+  { label: "Voided",    value: "voided" },
 ];
 
-const STATUS_BADGE: Record<
-  OrderStatus,
-  "green" | "blue" | "red" | "gray" | "yellow"
-> = {
-  open: "blue",
+const STATUS_BADGE: Record<OrderStatus, "green" | "blue" | "red" | "gray" | "yellow" | "purple"> = {
+  open:      "blue",
   completed: "green",
-  refunded: "yellow",
-  voided: "gray",
+  refunded:  "purple",
+  voided:    "gray",
 };
 
+// Status label counts (total per tab — populated when API supports it)
+// For now maps to display label
+const STATUS_LABEL: Record<OrderStatus | "all", string> = {
+  all:       "All",
+  open:      "Open",
+  completed: "Completed",
+  refunded:  "Refunded",
+  voided:    "Voided",
+};
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Order lines detail table ─────────────────────────────────────────────────
 
 function OrderLinesTable({ lines }: { lines: OrderLine[] }) {
   return (
-    <table className="w-full text-left text-sm">
+    <table className="w-full text-left">
       <thead>
-        <tr className="border-b border-slate-100 text-xs font-medium uppercase text-slate-400">
-          <th className="py-2 pr-4">Product</th>
-          <th className="py-2 pr-4 text-right">Qty</th>
-          <th className="py-2 pr-4 text-right">Unit</th>
-          <th className="py-2 pr-4 text-right">Tax</th>
-          <th className="py-2 text-right">Line total</th>
+        <tr
+          className="border-b"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}
+        >
+          {["Product", "Qty", "Unit Price", "Tax", "Line Total"].map((h, i) => (
+            <th
+              key={h}
+              className={`py-2.5 px-3 text-[11px] font-semibold uppercase tracking-[0.05em] ${i > 0 ? "text-right" : "text-left"}`}
+              style={{ color: "var(--color-text-secondary)" }}
+            >
+              {h}
+            </th>
+          ))}
         </tr>
       </thead>
       <tbody>
         {lines.map((l) => (
-          <tr key={l.id} className="border-b border-slate-50 last:border-0">
-            <td className="py-2 pr-4 font-medium text-slate-800">{l.name}</td>
-            <td className="py-2 pr-4 text-right text-slate-600">{l.quantity}</td>
-            <td className="py-2 pr-4 text-right text-slate-600">{formatMoney(l.unitCents)}</td>
-            <td className="py-2 pr-4 text-right text-slate-500 text-xs">{formatMoney(l.taxCents)}</td>
-            <td className="py-2 text-right font-medium text-slate-800">{formatMoney(l.lineCents)}</td>
+          <tr key={l.id} className="border-b last:border-0" style={{ borderColor: "var(--color-border-subtle)" }}>
+            <td className="py-2.5 px-3 text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>{l.name}</td>
+            <td className="py-2.5 px-3 text-[13px] text-right tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{l.quantity}</td>
+            <td className="py-2.5 px-3 text-[13px] text-right tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{formatMoney(l.unitCents)}</td>
+            <td className="py-2.5 px-3 text-[12px] text-right tabular-nums" style={{ color: "var(--color-text-muted)" }}>{formatMoney(l.taxCents)}</td>
+            <td className="py-2.5 px-3 text-[13px] text-right font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{formatMoney(l.lineCents)}</td>
           </tr>
         ))}
       </tbody>
     </table>
   );
 }
+
+// ─── Order detail modal ───────────────────────────────────────────────────────
 
 function OrderDetailModal({
   order,
@@ -96,7 +110,7 @@ function OrderDetailModal({
 }) {
   const canAct = hasRole("manager");
   const canRefund = canAct && order.status === "completed";
-  const canVoid = canAct && order.status === "open";
+  const canVoid   = canAct && order.status === "open";
 
   return (
     <Modal
@@ -107,75 +121,70 @@ function OrderDetailModal({
         <div className="flex items-center justify-between w-full gap-2">
           <div className="flex gap-2">
             {canRefund && (
-              <Button
-                variant="danger"
-                size="sm"
-                loading={actionBusy}
-                onClick={() => void onRefund(order.id)}
-              >
-                Refund
+              <Button variant="danger" size="sm" loading={actionBusy} onClick={() => void onRefund(order.id)}>
+                Refund order
               </Button>
             )}
             {canVoid && (
-              <Button
-                variant="danger"
-                size="sm"
-                loading={actionBusy}
-                onClick={() => void onVoid(order.id)}
-              >
-                Void
+              <Button variant="danger" size="sm" loading={actionBusy} onClick={() => void onVoid(order.id)}>
+                Void order
               </Button>
             )}
           </div>
-          <Button variant="secondary" onClick={onClose}>
-            Close
-          </Button>
+          <Button variant="secondary" onClick={onClose}>Close</Button>
         </div>
       }
     >
       <div className="space-y-5">
-        {/* Status row */}
-        <div className="flex flex-wrap items-center gap-4 text-sm">
-          <div>
-            <span className="text-slate-400">Status</span>
-            <span className="ml-2">
-              <Badge variant={STATUS_BADGE[order.status]}>
-                {order.status}
-              </Badge>
-            </span>
+        {/* Meta row */}
+        <div
+          className="flex flex-wrap items-center gap-4 rounded-lg px-4 py-3"
+          style={{ backgroundColor: "var(--color-surface-subtle)", border: "1px solid var(--color-border)" }}
+        >
+          <div className="flex items-center gap-2 text-[13px]">
+            <span style={{ color: "var(--color-text-muted)" }}>Status</span>
+            <Badge variant={STATUS_BADGE[order.status]}>{STATUS_LABEL[order.status]}</Badge>
           </div>
-          <div>
-            <span className="text-slate-400">State</span>
-            <span className="ml-2 font-medium text-slate-700">{order.stateCode}</span>
+          <div className="flex items-center gap-2 text-[13px]">
+            <span style={{ color: "var(--color-text-muted)" }}>State</span>
+            <span className="font-medium" style={{ color: "var(--color-text-primary)" }}>{order.stateCode}</span>
           </div>
-          <div>
-            <span className="text-slate-400">Created</span>
-            <span className="ml-2 text-slate-700">{fmtDateTime(order.createdAt)}</span>
+          <div className="flex items-center gap-2 text-[13px]">
+            <span style={{ color: "var(--color-text-muted)" }}>Created</span>
+            <span style={{ color: "var(--color-text-secondary)" }}>{fmtDateTime(order.createdAt)}</span>
           </div>
         </div>
 
         {/* Lines */}
-        <OrderLinesTable lines={order.lines} />
+        <div className="overflow-hidden rounded-lg border" style={{ borderColor: "var(--color-border)" }}>
+          <OrderLinesTable lines={order.lines} />
+        </div>
 
         {/* Totals */}
-        <div className="space-y-1 border-t border-slate-100 pt-3 text-sm">
-          <div className="flex justify-between text-slate-600">
-            <span>Subtotal</span>
-            <span>{formatMoney(order.subtotalCents)}</span>
+        <div
+          className="space-y-2 rounded-lg px-4 py-3"
+          style={{ backgroundColor: "var(--color-surface-subtle)", border: "1px solid var(--color-border)" }}
+        >
+          <div className="flex justify-between text-[13px]">
+            <span style={{ color: "var(--color-text-secondary)" }}>Subtotal</span>
+            <span className="tabular-nums" style={{ color: "var(--color-text-primary)" }}>{formatMoney(order.subtotalCents)}</span>
           </div>
           {order.discountCents > 0 && (
-            <div className="flex justify-between text-emerald-600">
-              <span>Discount</span>
-              <span>−{formatMoney(order.discountCents)}</span>
+            <div className="flex justify-between text-[13px]">
+              <span className="text-success-600">Discount</span>
+              <span className="tabular-nums text-success-600">−{formatMoney(order.discountCents)}</span>
             </div>
           )}
-          <div className="flex justify-between text-slate-600">
-            <span>Tax</span>
-            <span>{formatMoney(order.taxCents)}</span>
+          <div className="flex justify-between text-[13px]">
+            <span style={{ color: "var(--color-text-secondary)" }}>Tax</span>
+            <span className="tabular-nums" style={{ color: "var(--color-text-primary)" }}>{formatMoney(order.taxCents)}</span>
           </div>
-          <div className="flex justify-between border-t border-slate-200 pt-2 font-semibold text-slate-900">
+          <div
+            className="flex justify-between border-t pt-2 text-[14px] font-bold"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
+          >
             <span>Total</span>
-            <span>{formatMoney(order.totalCents)}</span>
+            <span className="tabular-nums">{formatMoney(order.totalCents)}</span>
           </div>
         </div>
       </div>
@@ -187,16 +196,16 @@ function OrderDetailModal({
 
 export default function OrdersPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<OrderStatus | "all">("all");
+  const [tab, setTab]       = useState<OrderStatus | "all">("all");
   const [orders, setOrders] = useState<Order[]>([]);
-  const [total, setTotal] = useState(0);
+  const [total, setTotal]   = useState(0);
   const [offset, setOffset] = useState(0);
   const LIMIT = 25;
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading]             = useState(true);
+  const [error, setError]                 = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [actionBusy, setActionBusy] = useState(false);
+  const [actionBusy, setActionBusy]       = useState(false);
 
   const load = useCallback(
     async (tabValue: OrderStatus | "all", off: number) => {
@@ -217,14 +226,9 @@ export default function OrdersPage() {
     [],
   );
 
-  useEffect(() => {
-    void load(tab, offset);
-  }, [load, tab, offset]);
+  useEffect(() => { void load(tab, offset); }, [load, tab, offset]);
 
-  const changeTab = (t: OrderStatus | "all") => {
-    setTab(t);
-    setOffset(0);
-  };
+  const changeTab = (t: OrderStatus | "all") => { setTab(t); setOffset(0); };
 
   const handleRefund = useCallback(
     async (id: string) => {
@@ -268,93 +272,135 @@ export default function OrdersPage() {
       subtitle="Order history & management"
       contentClassName="overflow-y-auto"
     >
-      <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6">
-        {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+      <div className="mx-auto w-full max-w-7xl space-y-4 px-5 py-5 sm:px-6">
+
+        {/* ── Page header ──────────────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4" style={{ borderColor: "var(--color-border)" }}>
           <div>
-            <h1 className="text-lg font-semibold text-slate-950">Orders</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              {total > 0 ? `${total} order${total !== 1 ? "s" : ""}` : "All orders across the tenant"}
+            <h1 className="text-[20px] font-bold tracking-tight" style={{ color: "var(--color-text-primary)" }}>Orders</h1>
+            <p className="mt-0.5 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
+              {total > 0 ? `${total.toLocaleString()} order${total !== 1 ? "s" : ""}` : "All orders across the tenant"}
             </p>
           </div>
         </div>
 
-        {/* Status tabs */}
-        <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1 w-fit shadow-sm">
+        {/* ── Status tab bar ────────────────────────────────────────────── */}
+        <div
+          className="flex gap-0.5 rounded-xl border p-1 w-fit shadow-[var(--shadow-xs)]"
+          role="tablist"
+          aria-label="Filter orders by status"
+          style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+        >
           {STATUS_TABS.map((t) => (
             <button
               key={t.value}
               type="button"
+              role="tab"
+              aria-selected={tab === t.value}
               onClick={() => changeTab(t.value)}
-              className={`min-h-[36px] rounded px-4 text-sm font-medium transition-colors ${
+              className={[
+                "min-h-[34px] rounded-lg px-4 text-[13px] font-medium transition-all duration-150",
                 tab === t.value
-                  ? "bg-slate-950 text-white"
-                  : "text-slate-600 hover:bg-slate-100"
-              }`}
+                  ? "bg-brand-600 text-white shadow-[var(--shadow-xs)]"
+                  : "hover:bg-[var(--color-surface-subtle)]",
+              ].join(" ")}
+              style={{ color: tab === t.value ? undefined : "var(--color-text-secondary)" }}
             >
               {t.label}
             </button>
           ))}
         </div>
 
-        {/* Error */}
+        {/* ── Error ────────────────────────────────────────────────────── */}
         {error && (
-          <Card>
-            <p role="alert" className="text-sm text-red-700">
-              {error}
-            </p>
-          </Card>
+          <div
+            role="alert"
+            className="rounded-xl border px-4 py-3 text-[13px]"
+            style={{
+              backgroundColor: "var(--color-danger-bg)",
+              borderColor: "var(--color-danger-border)",
+              color: "var(--color-danger-text)",
+            }}
+          >
+            {error}
+          </div>
         )}
 
-        {/* Table */}
+        {/* ── Table ────────────────────────────────────────────────────── */}
         {loading ? (
-          <TableSkeleton headers={["Order #", "Status", "State", "Total", "Date", ""]} rows={8} />
+          <TableSkeleton headers={["Order #", "Status", "Customer", "Outlet", "Total", "Date", ""]} rows={8} />
         ) : orders.length === 0 ? (
           <EmptyState
             title={tab === "all" ? "No orders yet" : `No ${tab} orders`}
             description={tab === "all" ? "Ring up your first sale on the Register." : undefined}
           />
         ) : (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50">
+          <div
+            className="overflow-hidden rounded-xl border shadow-[var(--shadow-sm)]"
+            style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+          >
+            <table className="w-full text-left">
+              <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
                 <tr>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Order #</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Customer</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Outlet</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Total</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Date</th>
-                  <th className="px-4 py-3" />
+                  {[
+                    { label: "Order #",   cls: "" },
+                    { label: "Status",    cls: "" },
+                    { label: "Customer",  cls: "" },
+                    { label: "Outlet",    cls: "" },
+                    { label: "Total",     cls: "text-right" },
+                    { label: "Date",      cls: "" },
+                    { label: "",          cls: "" },
+                  ].map(({ label, cls }) => (
+                    <th
+                      key={label}
+                      className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.05em] ${cls}`}
+                      style={{ color: "var(--color-text-secondary)" }}
+                    >
+                      {label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody style={{ borderColor: "var(--color-table-border)" }}>
                 {orders.map((order) => (
                   <tr
                     key={order.id}
-                    className="group cursor-pointer hover:bg-slate-50 transition-colors"
+                    className="group cursor-pointer transition-colors duration-100 border-b last:border-0"
+                    style={{ borderColor: "var(--color-table-border)" }}
                     onClick={() => router.push(`/orders/${order.id}`)}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-table-row-hover)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "")}
                   >
-                    <td className="px-4 py-3 font-mono text-xs font-semibold text-brand-600">
-                      {order.orderNumber}
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-[12px] font-bold text-brand-600">
+                        {order.orderNumber}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
-                      <Badge variant={STATUS_BADGE[order.status]}>{order.status}</Badge>
+                      <Badge variant={STATUS_BADGE[order.status]}>
+                        {STATUS_LABEL[order.status]}
+                      </Badge>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      {(order as unknown as { customer_name?: string }).customer_name ?? <span className="text-slate-400">Guest</span>}
+                    <td className="px-4 py-3 text-[13px]" style={{ color: "var(--color-text-primary)" }}>
+                      {(order as unknown as { customer_name?: string }).customer_name
+                        ?? <span style={{ color: "var(--color-text-muted)" }}>Guest</span>}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-600">
+                    <td className="px-4 py-3 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
                       {(order as unknown as { outlet_name?: string }).outlet_name ?? "—"}
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-900">
+                    <td className="px-4 py-3 text-right text-[13px] font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>
                       {formatMoney(order.totalCents)}
                     </td>
-                    <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
+                    <td className="px-4 py-3 text-[12px] whitespace-nowrap" style={{ color: "var(--color-text-secondary)" }}>
                       {fmtDateTime(order.createdAt)}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-xs font-medium text-slate-400 group-hover:text-brand-600 transition-colors">
+                      <span
+                        className="text-[12px] font-medium transition-colors"
+                        style={{ color: "var(--color-text-muted)" }}
+                        onMouseEnter={(e) => ((e.target as HTMLElement).style.color = "var(--color-primary)")}
+                        onMouseLeave={(e) => ((e.target as HTMLElement).style.color = "var(--color-text-muted)")}
+                      >
                         View →
                       </span>
                     </td>
@@ -365,11 +411,11 @@ export default function OrdersPage() {
           </div>
         )}
 
-        {/* Pagination */}
+        {/* ── Pagination ────────────────────────────────────────────────── */}
         {total > LIMIT && (
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-500">
-              Showing {offset + 1}–{Math.min(offset + LIMIT, total)} of {total}
+          <div className="flex items-center justify-between">
+            <span className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
+              Showing {offset + 1}–{Math.min(offset + LIMIT, total)} of {total.toLocaleString()}
             </span>
             <div className="flex gap-2">
               <Button
@@ -378,7 +424,7 @@ export default function OrdersPage() {
                 disabled={!hasPrev}
                 onClick={() => setOffset((o) => Math.max(0, o - LIMIT))}
               >
-                ← Prev
+                ← Previous
               </Button>
               <Button
                 variant="secondary"
@@ -393,7 +439,7 @@ export default function OrdersPage() {
         )}
       </div>
 
-      {/* Detail modal */}
+      {/* ── Detail modal ──────────────────────────────────────────────── */}
       {selectedOrder && (
         <OrderDetailModal
           order={selectedOrder}

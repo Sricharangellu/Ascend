@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@/lib/useQuery";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
+import { Button } from "@/components/Button";
 import { apiGet } from "@/api-client/client";
 import type { CustomerSummary, CustomersResponse, RetailCustomer } from "@/api-client/types";
 import { CustomerTable } from "./_components/CustomerTable";
@@ -26,26 +27,26 @@ function segmentFor(summary: CustomerSummary): Segment {
 
 function noteFor(customer: RetailCustomer, segment: Segment) {
   if (segment === "At risk") return `${customer.name} has not visited recently. Consider a win-back offer.`;
-  if (segment === "Loyal") return `${customer.name} is a high-value loyalty member. Keep checkout recognition fast.`;
-  if (segment === "New") return `${customer.name} is early in the relationship. Capture preferences during the next sale.`;
+  if (segment === "Loyal")   return `${customer.name} is a high-value loyalty member. Keep checkout recognition fast.`;
+  if (segment === "New")     return `${customer.name} is early in the relationship. Capture preferences during the next sale.`;
   return `${customer.name} has repeat purchase history. Review recent orders before recommending add-ons.`;
 }
 
 function toCustomerView(summary: CustomerSummary): CustomerView {
   const segment = segmentFor(summary);
   return {
-    id: summary.customer.id,
-    name: summary.customer.name,
-    email: summary.customer.email,
-    phone: summary.customer.phone,
-    visits: summary.visits,
-    spendCents: summary.totalSpentCents,
-    avgOrderCents: summary.avgOrderCents,
+    id:             summary.customer.id,
+    name:           summary.customer.name,
+    email:          summary.customer.email,
+    phone:          summary.customer.phone,
+    visits:         summary.visits,
+    spendCents:     summary.totalSpentCents,
+    avgOrderCents:  summary.avgOrderCents,
     segment,
-    loyaltyPoints: summary.customer.points,
-    lastVisitAt: summary.lastVisitAt,
-    recentOrders: summary.recentOrders,
-    notes: noteFor(summary.customer, segment),
+    loyaltyPoints:  summary.customer.points,
+    lastVisitAt:    summary.lastVisitAt,
+    recentOrders:   summary.recentOrders,
+    notes:          noteFor(summary.customer, segment),
   };
 }
 
@@ -75,22 +76,30 @@ export default function CustomersPage() {
       subtitle="Profiles · loyalty · purchase history"
       contentClassName="overflow-y-auto"
     >
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-6">
-        {/* Header actions */}
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            className="rounded-md border border-brand-600 px-4 py-2 text-sm font-semibold text-brand-600 transition-colors hover:bg-brand-600/5"
-          >
-            Import customers
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowNewCustomer(true)}
-            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0]"
-          >
-            Add customer
-          </button>
+      <div className="mx-auto w-full max-w-7xl space-y-4 px-5 py-5 sm:px-6">
+
+        {/* ── Page header ──────────────────────────────────────────────── */}
+        <div
+          className="flex flex-wrap items-center justify-between gap-3 border-b pb-4"
+          style={{ borderColor: "var(--color-border)" }}
+        >
+          <div>
+            <h1 className="text-[20px] font-bold tracking-tight" style={{ color: "var(--color-text-primary)" }}>
+              Customers
+            </h1>
+            <p className="mt-0.5 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
+              Profiles, loyalty points, and purchase history.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm">
+              Import customers
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => setShowNewCustomer(true)}>
+              Add customer
+            </Button>
+          </div>
         </div>
 
         <CustomerTable customers={customers} loading={loading} error={error} />

@@ -152,12 +152,12 @@ export default function ReportsPage() {
       subtitle={`Analytics · Demo Store · ${rangeLabel}`}
       contentClassName="overflow-y-auto"
     >
-      <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-5 sm:px-6">
-        {/* Header + sub-nav */}
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-4">
+      <div className="mx-auto w-full max-w-7xl space-y-6 px-5 py-5 sm:px-6">
+        {/* ── Page header + sub-nav ──────────────────────────────────────── */}
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-4" style={{ borderColor: "var(--color-border)" }}>
           <div>
-            <h1 className="text-lg font-semibold text-slate-950">Analytics</h1>
-            <p className="mt-0.5 text-sm text-slate-500">
+            <h1 className="text-[20px] font-bold tracking-tight" style={{ color: "var(--color-text-primary)" }}>Analytics</h1>
+            <p className="mt-0.5 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
               Sales performance, margins, and inventory health.
             </p>
           </div>
@@ -165,43 +165,68 @@ export default function ReportsPage() {
         </div>
 
         {!allowed ? (
-          <Card>
-            <p role="alert" className="text-sm text-slate-700">
-              You don&apos;t have access to reports. Ask an owner or manager.
-            </p>
-          </Card>
+          <div className="rounded-xl border px-4 py-3 text-[13px]" style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)", backgroundColor: "var(--color-surface)" }}>
+            You don&apos;t have access to reports. Ask an owner or manager.
+          </div>
         ) : (
           <>
-            {/* ── Spec: Day/Week/Month pill toggle | ← date nav → | Outlet ─ */}
-            <div className="bg-white border-b border-[#E8E8E8] -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 flex flex-wrap items-center gap-3">
-              {/* Day / Week / Month pills */}
-              <div className="inline-flex rounded border border-[#D9D9D9] bg-white overflow-hidden">
+            {/* ── Range + date nav + outlet filter bar ──────────────────── */}
+            <div
+              className="-mx-5 sm:-mx-6 border-b px-5 sm:px-6 py-3 flex flex-wrap items-center gap-3"
+              style={{ backgroundColor: "var(--color-surface-subtle)", borderColor: "var(--color-border)" }}
+            >
+              {/* 7d / 30d / 90d toggle */}
+              <div
+                className="inline-flex overflow-hidden rounded-lg border shadow-[var(--shadow-xs)]"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
+              >
                 {(["7d", "30d", "90d"] as Range[]).map((r, i) => (
-                  <button key={r} type="button" onClick={() => applyRange(r)}
-                    className={`px-4 py-1.5 text-sm font-medium transition-colors border-r border-[#D9D9D9] last:border-r-0 ${
-                      range === r ? "bg-brand-600 text-white" : "text-[#555] hover:bg-gray-50"
-                    }`}
-                    aria-pressed={range === r}>
-                    {["Day", "Week", "Month"][i]}
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => applyRange(r)}
+                    aria-pressed={range === r}
+                    className={[
+                      "px-4 py-1.5 text-[13px] font-medium transition-colors border-r last:border-r-0",
+                      range === r ? "bg-brand-600 text-white" : "hover:bg-[var(--color-surface-subtle)]",
+                    ].join(" ")}
+                    style={{
+                      borderRightColor: "var(--color-border)",
+                      color: range === r ? undefined : "var(--color-text-secondary)",
+                    }}
+                  >
+                    {["7 days", "30 days", "90 days"][i]}
                   </button>
                 ))}
               </div>
 
-              {/* Date navigator ← [label] → */}
-              <div className="flex items-center gap-1 rounded border border-[#D9D9D9] bg-white overflow-hidden">
-                <button type="button"
-                  onClick={() => applyRange(range === "7d" ? "7d" : range === "30d" ? "30d" : "90d")}
-                  className="px-2.5 py-1.5 text-[#555] hover:bg-gray-50 transition-colors text-sm border-r border-[#D9D9D9]"
-                  aria-label="Previous period">←</button>
-                <span className="px-3 py-1.5 text-sm font-medium text-[#111]">{rangeLabel}</span>
-                <button type="button"
+              {/* ← date label → */}
+              <div
+                className="flex items-center overflow-hidden rounded-lg border shadow-[var(--shadow-xs)]"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
+              >
+                <button
+                  type="button"
                   onClick={() => applyRange(range)}
-                  className="px-2.5 py-1.5 text-[#555] hover:bg-gray-50 transition-colors text-sm border-l border-[#D9D9D9]"
-                  aria-label="Next period">→</button>
+                  className="border-r px-2.5 py-1.5 text-[13px] transition-colors hover:bg-[var(--color-surface-subtle)]"
+                  style={{ borderRightColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+                  aria-label="Previous period"
+                >←</button>
+                <span className="px-3 py-1.5 text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>{rangeLabel}</span>
+                <button
+                  type="button"
+                  onClick={() => applyRange(range)}
+                  className="border-l px-2.5 py-1.5 text-[13px] transition-colors hover:bg-[var(--color-surface-subtle)]"
+                  style={{ borderLeftColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+                  aria-label="Next period"
+                >→</button>
               </div>
 
-              {/* Outlet dropdown */}
-              <select className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] bg-white focus:border-brand-600 focus:outline-none">
+              {/* Outlet */}
+              <select
+                className="h-8 rounded-lg border px-3 text-[13px] outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 shadow-[var(--shadow-xs)]"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+              >
                 <option>All outlets</option>
                 <option>Main Outlet</option>
               </select>
@@ -215,11 +240,9 @@ export default function ReportsPage() {
                 ))}
               </div>
             ) : kpiError ? (
-              <Card>
-                <p role="alert" className="text-sm text-red-600">
-                  {kpiError}
-                </p>
-              </Card>
+              <div className="rounded-xl border px-4 py-3 text-[13px]" style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>
+                {kpiError}
+              </div>
             ) : summary ? (
               <ReportsDashboard
                 summary={summary}
