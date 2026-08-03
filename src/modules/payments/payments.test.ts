@@ -443,3 +443,54 @@ test("reusing an idempotency key with a DIFFERENT request is rejected (409) and 
   assert.equal(replay.body.id, first.body.id);
   assert.equal(await paymentCount(app, "ord_idem3a"), 1);
 });
+
+test("gift_card tender captures and draws down balance atomically", async () => {
+  const app = await buildApp({ schema: __schema() });
+  await seedOrder(app, { id: "ord_gc_ok", totalCents: 1500 });
+
+  const issued = await request(app, "POST", "/api/v1/giftcards/", { amountCents: 5000 }, "manager");
+  assert.equal(issued.status, 201);
+  const code = issued.body.code as string;
+
+  const res = await capture(app, {
+    orderId: "ord_gc_ok",
+    method: "gift_card",
+    giftCardCode: code,
+  });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.method, "gift_card");
+  assert.equal(res.body.amount_cents, 1500);
+  assert.equal(res.body.status, "captured");
+
+  const card = await request(app, "GET", `/api/v1/giftcards/${code}`, undefined, "cashier");
+  assert.equal(card.status, 200);
+  assert.equal(card.body.balance_cents, 3500);
+  assert.equal(card.body.status, "active");
+});
+
+test("gift_card tender rejects insufficient balance without creating a payment", async () => {
+  const app = await buildApp({ schema: __schema() });
+  await seedOrder(app, { id: "ord_gc_short", totalCents: 5000 });
+
+  const issued = await request(app, "POST", "/api/v1/giftcards/", { amountCents: 1000 }, "manager");
+  assert.equal(issued.status, 201);
+  const code = issued.body.code as string;
+
+  const res = await capture(app, {
+    orderId: "ord_gc_short",
+    method: "gift_card",
+    giftCardCode: code,
+  });
+  assert.equal(res.status, 400);
+  assert.equal(await paymentCount(app, "ord_gc_short"), 0);
+
+  const card = await request(app, "GET", `/api/v1/giftcards/${code}`, undefined, "cashier");
+  assert.equal(card.body.balance_cents, 1000);
+});
+
+test("gift_card tender requires giftCardCode", async () => {
+  const app = await buildApp({ schema: __schema() });
+  await seedOrder(app, { id: "ord_gc_nocode", totalCents: 1000 });
+  const res = await capture(app, { orderId: "ord_gc_nocode", method: "gift_card" });
+  assert.equal(res.status, 400);
+});

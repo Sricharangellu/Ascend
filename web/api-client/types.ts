@@ -205,7 +205,7 @@ export interface Order {
 }
 
 // ─── Payments (Wave 1, pre-typed for MSW mocks) ───────────────────────────────
-export type PaymentMethod = "cash" | "card" | "split" | "store_credit";
+export type PaymentMethod = "cash" | "card" | "split" | "store_credit" | "gift_card";
 export type PaymentStatus = "captured" | "declined";
 
 export interface Payment {
@@ -224,6 +224,17 @@ export interface Payment {
   authCode?: string;
   status: PaymentStatus;
   createdAt: number;
+}
+
+/** Gift card lookup response (backend returns snake_case). */
+export interface GiftCard {
+  id: string;
+  code: string;
+  initial_cents: number;
+  balance_cents: number;
+  status: "active" | "redeemed" | "void";
+  created_at: number;
+  updated_at: number;
 }
 
 // ─── Catalog (Wave 1) ─────────────────────────────────────────────────────────
@@ -268,6 +279,8 @@ export interface CapturePaymentRequest {
   stripePaymentIntentId?: string;
   /** Required for store_credit payments — the customer whose balance is deducted. */
   customerId?: string;
+  /** Required for gift_card payments — human-readable card code. */
+  giftCardCode?: string;
 }
 
 export interface StoreCreditBalance {
