@@ -60,17 +60,22 @@ export function NumpadModal({ initialValue, productName, onConfirm, onClose }: N
     >
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" aria-hidden="true" onClick={onClose} />
 
-      <div className="relative flex w-full max-w-xs flex-col gap-4 rounded-2xl bg-white p-5 shadow-2xl">
+      <div className="relative flex w-full max-w-xs flex-col gap-4 rounded-2xl p-5 shadow-2xl" style={{ backgroundColor: "var(--color-surface)" }}>
         {/* Header */}
         <div className="flex items-center justify-between gap-2">
-          <h3 className="max-w-[200px] truncate text-sm font-semibold text-gray-900" title={productName}>
+          <h3
+            className="max-w-[200px] truncate text-sm font-semibold"
+            title={productName}
+            style={{ color: "var(--color-text-primary)" }}
+          >
             {productName}
           </h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close numpad"
-            className="flex h-8 w-8 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 min-h-[44px] min-w-[44px]"
+            className="flex h-8 w-8 items-center justify-center rounded hover:bg-[var(--color-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 min-h-[44px] min-w-[44px]"
+            style={{ color: "var(--color-text-muted)" }}
           >
             <CloseIcon />
           </button>
@@ -84,7 +89,12 @@ export function NumpadModal({ initialValue, productName, onConfirm, onClose }: N
           aria-live="polite"
           aria-atomic="true"
           aria-label={`Quantity: ${digits}`}
-          className="flex h-14 items-center justify-end rounded-lg border border-gray-300 bg-gray-50 px-4 text-3xl font-bold tabular-nums text-gray-900 focus:outline-none"
+          className="flex h-14 items-center justify-end rounded-lg px-4 text-3xl font-bold tabular-nums focus:outline-none"
+          style={{
+            border: "1px solid var(--color-border)",
+            backgroundColor: "var(--color-surface-subtle)",
+            color: "var(--color-text-primary)",
+          }}
         >
           {digits}
         </div>
@@ -101,9 +111,18 @@ export function NumpadModal({ initialValue, productName, onConfirm, onClose }: N
                 aria-label={key === "⌫" ? "Backspace" : key === "C" ? "Clear" : key}
                 className={`flex min-h-[52px] items-center justify-center rounded-xl border text-lg font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 ${
                   isAction
-                    ? "border-gray-200 bg-gray-100 text-gray-500 hover:bg-gray-200 active:bg-gray-300"
-                    : "border-gray-200 bg-white text-gray-900 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 active:bg-brand-100"
+                    ? "hover:bg-[var(--color-surface-subtle)] active:opacity-70"
+                    : "hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 active:bg-brand-100"
                 }`}
+                style={isAction ? {
+                  borderColor: "var(--color-border)",
+                  backgroundColor: "var(--color-surface-subtle)",
+                  color: "var(--color-text-muted)",
+                } : {
+                  borderColor: "var(--color-border)",
+                  backgroundColor: "var(--color-surface)",
+                  color: "var(--color-text-primary)",
+                }}
               >
                 {key}
               </button>
@@ -116,7 +135,7 @@ export function NumpadModal({ initialValue, productName, onConfirm, onClose }: N
           type="button"
           disabled={!valid}
           onClick={() => onConfirm(qty)}
-          className="flex min-h-[48px] w-full items-center justify-center rounded-xl bg-brand-600 text-base font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+          className="flex min-h-[48px] w-full items-center justify-center rounded-xl bg-brand-600 text-base font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-[var(--color-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
           aria-label={valid ? `Set quantity to ${qty}` : "Enter a valid quantity"}
         >
           {valid ? `Set Qty — ${qty}` : "Enter quantity"}

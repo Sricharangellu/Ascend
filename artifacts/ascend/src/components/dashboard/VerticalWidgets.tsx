@@ -375,7 +375,7 @@ export function VerticalWidgets() {
 
   return (
     <section aria-label="Vertical operations">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--color-text-muted)" }}>
         Operations
       </h2>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

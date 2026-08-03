@@ -47,15 +47,18 @@ function MetricCard({
   href?: string;
 }) {
   return (
-    <div className="bg-white rounded-lg border border-[#F0F0F0] shadow-sm p-4 flex flex-col gap-2">
+    <div
+      className="rounded-lg border shadow-sm p-4 flex flex-col gap-2"
+      style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+    >
       {/* ALL-CAPS label */}
-      <p className="text-[10px] font-bold uppercase tracking-widest text-[#888]">{label}</p>
+      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>{label}</p>
 
       {/* Large value */}
-      <p className="text-2xl font-bold tabular-nums text-[#111] leading-none">{value}</p>
+      <p className="text-2xl font-bold tabular-nums leading-none" style={{ color: "var(--color-text-primary)" }}>{value}</p>
 
       {/* Context note (e.g. cost-coverage confidence) */}
-      {note && <p className="text-[11px] text-[#aaa]">{note}</p>}
+      {note && <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{note}</p>}
 
       {/* Sparkline (only when the endpoint provides a real series) */}
       {trend && <Sparkline data={trend} />}
@@ -108,30 +111,39 @@ export function ReportsDashboard({
       <div className="grid grid-cols-1 gap-5">
 
         {/* Products sold */}
-        <div className="bg-white rounded-lg border border-[#F0F0F0] shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#F5F5F5] flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-[#111]">Products sold</h2>
-            <span className="text-xs text-[#888]">{topProducts.reduce((s, p) => s + p.units, 0)} units total</span>
+        <div
+          className="rounded-lg border shadow-sm overflow-hidden"
+          style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+        >
+          <div
+            className="px-5 py-4 border-b flex items-center justify-between"
+            style={{ borderColor: "var(--color-border)" }}
+          >
+            <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Products sold</h2>
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{topProducts.reduce((s, p) => s + p.units, 0)} units total</span>
           </div>
           {topProducts.length === 0 ? (
-            <p className="px-5 py-6 text-sm text-[#888]">No product sales yet.</p>
+            <p className="px-5 py-6 text-sm" style={{ color: "var(--color-text-muted)" }}>No product sales yet.</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[#F5F5F5] bg-[#FAFAFA] text-left text-xs font-semibold text-[#888] uppercase tracking-wider">
+                <tr
+                  className="border-b text-left text-xs font-semibold uppercase tracking-wider"
+                  style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}
+                >
                   <th className="px-4 py-2.5 w-7">#</th>
                   <th className="px-4 py-2.5">Product</th>
                   <th className="px-4 py-2.5 text-right">Units</th>
                   <th className="px-4 py-2.5 text-right">Revenue</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#F5F5F5]">
+              <tbody className="divide-y divide-[var(--color-table-border)]">
                 {topProducts.slice(0, 8).map((p, i) => (
-                  <tr key={p.productId} className="hover:bg-[#FAFAFA]">
-                    <td className="px-4 py-2.5 text-xs font-bold text-[#ccc]">#{i + 1}</td>
-                    <td className="px-4 py-2.5 font-medium text-[#111] truncate max-w-[180px]">{p.name}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-[#555]">{p.units}</td>
-                    <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-[#111]">{formatMoney(p.revenueCents)}</td>
+                  <tr key={p.productId} className="hover:bg-[var(--color-surface-subtle)]">
+                    <td className="px-4 py-2.5 text-xs font-bold" style={{ color: "var(--color-text-muted)" }}>#{i + 1}</td>
+                    <td className="px-4 py-2.5 font-medium truncate max-w-[180px]" style={{ color: "var(--color-text-primary)" }}>{p.name}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{p.units}</td>
+                    <td className="px-4 py-2.5 text-right font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{formatMoney(p.revenueCents)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -142,20 +154,23 @@ export function ReportsDashboard({
       </div>
 
       {/* ── Payment breakdown ─────────────────────────────────────────────── */}
-      <div className="bg-white rounded-lg border border-[#F0F0F0] shadow-sm p-5">
-        <h2 className="text-sm font-semibold text-[#111] mb-4">Payment methods</h2>
+      <div
+        className="rounded-lg border shadow-sm p-5"
+        style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+      >
+        <h2 className="text-sm font-semibold mb-4" style={{ color: "var(--color-text-primary)" }}>Payment methods</h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {Object.entries(payments.byMethod).map(([method, cents]) => {
             const pct = payments.capturedCents > 0
               ? Math.round((cents / payments.capturedCents) * 100) : 0;
             return (
               <div key={method}>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-[#888] capitalize">{method}</p>
-                <p className="text-lg font-bold text-[#111] tabular-nums mt-1">{formatMoney(cents)}</p>
-                <div className="mt-2 h-1.5 rounded-full bg-[#F0F0F0]">
+                <p className="text-[10px] font-bold uppercase tracking-widest capitalize" style={{ color: "var(--color-text-muted)" }}>{method}</p>
+                <p className="text-lg font-bold tabular-nums mt-1" style={{ color: "var(--color-text-primary)" }}>{formatMoney(cents)}</p>
+                <div className="mt-2 h-1.5 rounded-full" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
                   <div className="h-1.5 rounded-full bg-brand-600" style={{ width: `${pct}%` }} />
                 </div>
-                <p className="text-[11px] text-[#aaa] mt-1">{pct}% of total</p>
+                <p className="text-[11px] mt-1" style={{ color: "var(--color-text-muted)" }}>{pct}% of total</p>
               </div>
             );
           })}

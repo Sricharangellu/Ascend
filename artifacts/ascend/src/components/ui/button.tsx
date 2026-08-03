@@ -26,10 +26,11 @@ const buttonVariants = cva(
 
         // Secondary — neutral outlined
         secondary: [
-          'bg-white text-[#1A1F36] border',
-          'hover:bg-[#F8FAFC] active:bg-[#F0F4F8] active:scale-[0.99]',
+          'text-[#1A1F36] border',
+          'hover:bg-[var(--color-surface-subtle)] active:bg-[var(--color-surface-subtle)] active:scale-[0.99]',
           'focus-visible:ring-brand-400',
           'shadow-xs',
+          '[background-color:var(--color-surface)]',
           '[border-color:var(--color-border)]',
         ].join(' '),
 

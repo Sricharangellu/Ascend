@@ -207,17 +207,17 @@ export function TenderScreen({
 
       {/* Modal */}
       <div className={clsx(
-        "relative flex max-h-[95vh] w-full max-w-lg flex-col overflow-hidden rounded-t-lg bg-white shadow-2xl sm:rounded-lg",
-      )}>
+        "relative flex max-h-[95vh] w-full max-w-lg flex-col overflow-hidden rounded-t-lg shadow-2xl sm:rounded-lg",
+      )} style={{ backgroundColor: "var(--color-surface)" }}>
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
           <div>
-            <h2 id="tender-title" className="text-lg font-bold text-gray-900">
+            <h2 id="tender-title" className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>
               Tender Payment
             </h2>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
               Total due:{" "}
-              <span className="font-semibold text-gray-900">{formatMoney(totalCents)}</span>
+              <span className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(totalCents)}</span>
             </p>
           </div>
           <button
@@ -227,11 +227,12 @@ export function TenderScreen({
             disabled={submitting}
             aria-label="Close tender screen"
             className={clsx(
-              "flex h-10 w-10 items-center justify-center rounded text-gray-400",
-              "hover:bg-gray-100 hover:text-gray-600 transition-colors",
+              "flex h-10 w-10 items-center justify-center rounded transition-colors",
+              "hover:bg-[var(--color-surface-subtle)]",
               "focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:outline-none",
               "min-h-[44px] min-w-[44px]"
             )}
+            style={{ color: "var(--color-text-muted)" }}
           >
             <CloseIcon />
           </button>
@@ -252,7 +253,8 @@ export function TenderScreen({
         <div
           role="tablist"
           aria-label="Payment method"
-          className="flex border-b border-gray-200 px-6 pt-4"
+          className="flex px-6 pt-4"
+          style={{ borderBottom: "1px solid var(--color-border)" }}
         >
           <TabButton active={tab === "cash"} id="tender-tab-cash" panelId="tender-panel-cash" onClick={() => setTab("cash")} label="Cash" icon={<CashIcon />} />
           <TabButton active={tab === "card"} id="tender-tab-card" panelId="tender-panel-card" onClick={() => setTab("card")} label="Card" icon={<CardIcon />} />
@@ -272,11 +274,12 @@ export function TenderScreen({
               <button
                 type="button"
                 onClick={() => setShowCashNumpad(true)}
-                className="mb-3 w-full rounded-lg border border-[#D9D9D9] bg-gray-50 px-4 py-3 text-left text-sm text-[var(--color-text-secondary)] hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-1"
+                className="mb-3 w-full rounded-lg px-4 py-3 text-left text-sm hover:bg-[var(--color-surface-subtle)] focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-1"
+                style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}
                 aria-label="Open cash numpad"
               >
-                <span className="block text-xs font-medium uppercase tracking-wider text-[var(--color-text-secondary)]">Cash tendered</span>
-                <span className="mt-1 block text-2xl font-bold text-[var(--color-text-primary)]">
+                <span className="block text-xs font-medium uppercase tracking-wider" style={{ color: "var(--color-text-secondary)" }}>Cash tendered</span>
+                <span className="mt-1 block text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
                   {cashInput ? formatMoney(Math.round(parseFloat(cashInput) * 100)) : "Tap to enter amount"}
                 </span>
               </button>
@@ -335,7 +338,7 @@ export function TenderScreen({
         )}
 
         {/* Action button */}
-        <div className="flex-none px-6 pb-6 pt-2 border-t border-gray-100">
+        <div className="flex-none px-6 pb-6 pt-2" style={{ borderTop: "1px solid var(--color-border)" }}>
           {tab === "cash" && (
             <Button
               variant="primary"
@@ -429,8 +432,9 @@ function TabButton({
         "min-h-[44px]",
         active
           ? "border-brand-600 text-brand-700"
-          : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+          : "border-transparent hover:border-[var(--color-border)]"
       )}
+      style={!active ? { color: "var(--color-text-muted)" } : undefined}
     >
       <span aria-hidden="true">{icon}</span>
       {label}
@@ -464,11 +468,11 @@ function CashTab({
   return (
     <div className="space-y-5">
       <div>
-        <label htmlFor="cash-amount" className="block text-sm font-medium text-gray-700 mb-1.5">
+        <label htmlFor="cash-amount" className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-text-secondary)" }}>
           Cash tendered
         </label>
         <div className="relative">
-          <span className="absolute inset-y-0 left-3.5 flex items-center text-gray-500 font-medium pointer-events-none">
+          <span className="absolute inset-y-0 left-3.5 flex items-center font-medium pointer-events-none" style={{ color: "var(--color-text-muted)" }}>
             $
           </span>
           <input
@@ -481,11 +485,12 @@ function CashTab({
             value={cashInput}
             onChange={(e) => onCashChange(e.target.value)}
             placeholder={(totalCents / 100).toFixed(2)}
-          className={clsx(
-            "w-full rounded-lg border border-gray-300 py-3 pl-8 pr-4 text-xl font-semibold",
+            className={clsx(
+              "w-full rounded-lg py-3 pl-8 pr-4 text-xl font-semibold",
               "focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-brand-600",
               "min-h-[56px]"
             )}
+            style={{ border: "1px solid var(--color-border)" }}
             aria-label="Cash tendered amount"
           />
         </div>
@@ -493,7 +498,7 @@ function CashTab({
 
       {/* Quick amounts */}
       <div>
-        <p className="text-xs text-gray-400 mb-2">Quick amounts</p>
+        <p className="text-xs mb-2" style={{ color: "var(--color-text-muted)" }}>Quick amounts</p>
         <div className="grid grid-cols-4 gap-2">
           {quickAmounts.map((cents) => (
             <button
@@ -501,11 +506,12 @@ function CashTab({
               type="button"
               onClick={() => onQuickAmount(cents)}
               className={clsx(
-                "rounded-lg border bg-gray-50 py-2 text-sm font-semibold text-gray-700",
+                "rounded-lg border py-2 text-sm font-semibold",
                 "hover:bg-brand-50 hover:border-brand-300 hover:text-brand-700 transition-colors",
                 "focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:outline-none",
                 "min-h-[44px]"
               )}
+              style={{ backgroundColor: "var(--color-surface-subtle)", borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
             >
               {formatMoney(cents)}
             </button>
@@ -544,6 +550,7 @@ function CashTab({
 function CardTab({ totalCents }: { totalCents: number }) {
   return (
     <div className="space-y-5">
+      {/* bg-slate-900 is intentional: dark card graphic */}
       <div className="flex aspect-[1.6/1] flex-col justify-between rounded-lg bg-slate-900 p-5 text-white shadow-lg">
         <div className="flex justify-between items-start">
           <div className="flex gap-1">
@@ -558,7 +565,7 @@ function CardTab({ totalCents }: { totalCents: number }) {
         </div>
       </div>
 
-      <p className="text-center text-sm text-gray-500 rounded-lg bg-blue-50 border border-blue-100 p-3">
+      <p className="text-center text-sm rounded-lg bg-blue-50 border border-blue-100 p-3" style={{ color: "var(--color-text-muted)" }}>
         Press <strong>Charge</strong> to present this amount to the card reader.
         The customer then taps or inserts their card.
       </p>
@@ -582,16 +589,16 @@ function SplitTab({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500">
+      <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
         Enter the cash portion; the remainder will be charged to the card reader.
       </p>
 
       <div>
-        <label htmlFor="split-cash" className="block text-sm font-medium text-gray-700 mb-1.5">
+        <label htmlFor="split-cash" className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-text-secondary)" }}>
           Cash portion
         </label>
         <div className="relative">
-          <span className="absolute inset-y-0 left-3.5 flex items-center text-gray-500 font-medium pointer-events-none">
+          <span className="absolute inset-y-0 left-3.5 flex items-center font-medium pointer-events-none" style={{ color: "var(--color-text-muted)" }}>
             $
           </span>
           <input
@@ -604,26 +611,30 @@ function SplitTab({
             onChange={(e) => onSplitCashChange(e.target.value)}
             placeholder="0.00"
             className={clsx(
-              "w-full rounded-lg border border-gray-300 py-3 pl-8 pr-4 text-xl font-semibold",
+              "w-full rounded-lg py-3 pl-8 pr-4 text-xl font-semibold",
               "focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-brand-600",
               "min-h-[56px]"
             )}
+            style={{ border: "1px solid var(--color-border)" }}
           />
         </div>
       </div>
 
       {cardCents !== null && cardCents >= 0 && (
-        <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 space-y-2">
+        <div
+          className="rounded-xl p-4 space-y-2"
+          style={{ backgroundColor: "var(--color-surface-subtle)", border: "1px solid var(--color-border)" }}
+        >
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Cash</span>
+            <span style={{ color: "var(--color-text-muted)" }}>Cash</span>
             <span className="font-semibold">{formatMoney(cashCents)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Card reader</span>
+            <span style={{ color: "var(--color-text-muted)" }}>Card reader</span>
             <span className="font-semibold">{formatMoney(cardCents)}</span>
           </div>
-          <div className="flex justify-between text-sm border-t border-gray-200 pt-2 mt-2">
-            <span className="text-gray-900 font-medium">Total</span>
+          <div className="flex justify-between text-sm pt-2 mt-2" style={{ borderTop: "1px solid var(--color-border)" }}>
+            <span className="font-medium" style={{ color: "var(--color-text-primary)" }}>Total</span>
             <span className="font-bold text-brand-700">{formatMoney(totalCents)}</span>
           </div>
         </div>
@@ -704,18 +715,21 @@ function StoreCreditTab({ customerId, totalCents }: { customerId: string; totalC
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-[var(--color-table-border)] bg-gray-50 p-4 text-center">
-        <p className="text-xs font-medium uppercase tracking-wider text-[var(--color-text-secondary)]">
+      <div
+        className="rounded-lg p-4 text-center"
+        style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}
+      >
+        <p className="text-xs font-medium uppercase tracking-wider" style={{ color: "var(--color-text-secondary)" }}>
           Store credit balance
         </p>
         {loading ? (
-          <div className="mx-auto mt-2 h-8 w-28 animate-pulse rounded bg-gray-200" />
+          <div className="mx-auto mt-2 h-8 w-28 animate-skeleton rounded" />
         ) : (
           <p className={`mt-1 text-3xl font-bold tabular-nums ${sufficient ? "text-success-600" : "text-danger-500"}`}>
             {formatMoney(balance ?? 0)}
           </p>
         )}
-        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+        <p className="mt-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
           Order total: <span className="font-semibold">{formatMoney(totalCents)}</span>
         </p>
       </div>

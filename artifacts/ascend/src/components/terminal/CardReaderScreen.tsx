@@ -166,13 +166,17 @@ export function CardReaderScreen({
         onClick={phase !== "approved" ? handleCancel : undefined}
       />
 
-      <div className="relative flex w-full max-w-sm flex-col items-center gap-6 rounded-2xl bg-white px-8 py-10 shadow-2xl">
+      <div
+        className="relative flex w-full max-w-sm flex-col items-center gap-6 rounded-2xl px-8 py-10 shadow-2xl"
+        style={{ backgroundColor: "var(--color-surface)" }}
+      >
         {phase !== "approved" && phase !== "error" && (
           <button
             type="button"
             onClick={handleCancel}
             aria-label="Cancel card payment"
-            className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 min-h-[44px] min-w-[44px]"
+            className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 min-h-[44px] min-w-[44px]"
+            style={{ color: "var(--color-text-muted)" }}
           >
             <CloseIcon />
           </button>
@@ -227,7 +231,7 @@ export function CardReaderScreen({
             {phase === "approved" && "Payment approved"}
             {phase === "error" && "Payment failed"}
           </p>
-          <p className="text-sm text-gray-400">
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
             {phase === "starting" && "Setting up card reader…"}
             {phase === "waiting" && "Present card to the card reader"}
             {phase === "processing" && "Please wait…"}
@@ -241,7 +245,8 @@ export function CardReaderScreen({
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+              className="flex-1 rounded-lg px-4 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+              style={{ borderColor: "var(--color-border)", border: "1px solid", color: "var(--color-text-secondary)" }}
             >
               Cancel
             </button>
@@ -249,7 +254,7 @@ export function CardReaderScreen({
         )}
 
         {(phase === "waiting" || phase === "processing") && (
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100" aria-hidden="true">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-surface-subtle)]" aria-hidden="true">
             <div
               className={`h-full rounded-full bg-blue-500 transition-all duration-300 ${
                 phase === "processing" ? "w-3/4 animate-pulse" : "w-1/4"

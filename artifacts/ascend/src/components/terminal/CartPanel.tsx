@@ -68,13 +68,17 @@ export function CartPanel({ cart, onCharge, onClear, role, ageVerified, onAgeVer
   return (
     <section
       aria-label="Shopping cart"
-      className="flex flex-col h-full bg-white border-l border-gray-200"
+      className="flex flex-col h-full"
+      style={{ backgroundColor: "var(--color-surface)", borderLeft: "1px solid var(--color-border)" }}
     >
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="flex-none flex items-center justify-between px-4 py-3 border-b border-gray-200">
+      <div
+        className="flex-none flex items-center justify-between px-4 py-3"
+        style={{ borderBottom: "1px solid var(--color-border)" }}
+      >
         <div className="flex items-center gap-2">
           <CartIcon />
-          <h2 className="text-base font-semibold text-gray-900">
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>
             Cart
             {itemCount > 0 && (
               <span
@@ -94,10 +98,11 @@ export function CartPanel({ cart, onCharge, onClear, role, ageVerified, onAgeVer
             aria-label="Clear cart"
             title="Clear cart"
             className={clsx(
-              "flex min-h-[44px] min-w-[44px] items-center justify-center rounded text-gray-400 transition-colors",
+              "flex min-h-[44px] min-w-[44px] items-center justify-center rounded transition-colors",
               "hover:bg-danger-50 hover:text-danger-600",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-600"
             )}
+            style={{ color: "var(--color-text-muted)" }}
           >
             <TrashIcon />
           </button>
@@ -107,13 +112,13 @@ export function CartPanel({ cart, onCharge, onClear, role, ageVerified, onAgeVer
       {/* ── Line items ──────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto">
         {isEmpty ? (
-          <div className="flex flex-col items-center justify-center h-full py-16 text-gray-300 select-none">
+          <div className="flex flex-col items-center justify-center h-full py-16 select-none" style={{ color: "var(--color-text-muted)" }}>
             <CartEmptyIcon />
-            <p className="mt-3 text-sm text-gray-400">Cart is empty</p>
-            <p className="text-xs text-gray-300 mt-1">Tap a product to add it</p>
+            <p className="mt-3 text-sm" style={{ color: "var(--color-text-muted)" }}>Cart is empty</p>
+            <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>Tap a product to add it</p>
           </div>
         ) : (
-          <ul aria-label="Cart items" className="divide-y divide-gray-100">
+          <ul aria-label="Cart items" className="divide-y divide-[var(--color-table-border)]">
             {lines.map((line) => (
               <CartLineItem
                 key={line.product.id}
@@ -129,7 +134,10 @@ export function CartPanel({ cart, onCharge, onClear, role, ageVerified, onAgeVer
 
       {/* ── Totals ──────────────────────────────────────────────────────── */}
       {!isEmpty && (
-        <div className="flex-none space-y-1.5 border-t border-gray-200 bg-gray-50 px-4 py-3">
+        <div
+          className="flex-none space-y-1.5 px-4 py-3"
+          style={{ borderTop: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}
+        >
           <TotalRow label="Subtotal" cents={subtotal} />
           {discount > 0 && (
             <TotalRow label="Discount" cents={-discount} className="text-success-600" />
@@ -137,20 +145,20 @@ export function CartPanel({ cart, onCharge, onClear, role, ageVerified, onAgeVer
           <TotalRow
             label="Tax"
             cents={tax}
-            className="text-gray-500"
+            muted
             loading={syncing}
           />
-          <div className="border-t border-gray-200 pt-2 mt-2">
+          <div className="pt-2 mt-2" style={{ borderTop: "1px solid var(--color-border)" }}>
             <TotalRow
               label="Total"
               cents={total}
-              className="text-gray-900 font-bold text-base"
+              bold
               loading={syncing}
             />
           </div>
 
           {syncing && (
-            <p className="text-xs text-gray-400 text-center animate-pulse mt-1" aria-live="polite">
+            <p className="text-xs text-center animate-pulse mt-1" aria-live="polite" style={{ color: "var(--color-text-muted)" }}>
               Calculating totals…
             </p>
           )}
@@ -172,7 +180,8 @@ export function CartPanel({ cart, onCharge, onClear, role, ageVerified, onAgeVer
                   type="checkbox"
                   checked={ageVerified ?? false}
                   onChange={e => onAgeVerifiedChange?.(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                  className="h-4 w-4 rounded text-brand-600 focus:ring-brand-500"
+                  style={{ borderColor: "var(--color-border)" }}
                 />
                 <span className="text-xs font-medium text-amber-800">Customer ID verified — age confirmed</span>
               </label>
@@ -240,11 +249,11 @@ function CartLineItem({ line, onQtyChange, onRemove, onNumpad }: CartLineItemPro
   }, [quantity, onQtyChange]);
 
   return (
-    <li className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-gray-50">
+    <li className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[var(--color-surface-subtle)]">
       {/* Name + unit price */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
-        <p className="text-xs text-gray-400">{formatMoney(product.priceCents)} each</p>
+        <p className="text-sm font-medium truncate" style={{ color: "var(--color-text-primary)" }}>{product.name}</p>
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{formatMoney(product.priceCents)} each</p>
       </div>
 
       {/* Qty controls */}
@@ -260,10 +269,11 @@ function CartLineItem({ line, onQtyChange, onRemove, onNumpad }: CartLineItemPro
           title={quantity === 1 ? `Remove ${product.name}` : `Decrease ${product.name} quantity`}
           className={clsx(
             "flex h-8 w-8 items-center justify-center rounded text-sm font-bold transition-colors",
-            "bg-gray-100 text-gray-600 hover:bg-danger-100 hover:text-danger-700",
+            "hover:bg-danger-100 hover:text-danger-700",
             "focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:outline-none",
             "min-h-[44px] min-w-[44px]"
           )}
+          style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}
         >
           {quantity === 1 ? <TrashIcon /> : <MinusIcon />}
         </button>
@@ -274,11 +284,12 @@ function CartLineItem({ line, onQtyChange, onRemove, onNumpad }: CartLineItemPro
           aria-label={`${product.name} quantity: ${quantity}. Tap to edit.`}
           title="Tap to edit quantity"
           className={clsx(
-            "w-11 min-h-[44px] rounded border border-transparent text-center text-sm font-semibold text-gray-900",
+            "w-11 min-h-[44px] rounded border border-transparent text-center text-sm font-semibold",
             "hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600",
             "transition-colors"
           )}
+          style={{ color: "var(--color-text-primary)" }}
         >
           {quantity}
         </button>
@@ -290,10 +301,11 @@ function CartLineItem({ line, onQtyChange, onRemove, onNumpad }: CartLineItemPro
           title={`Increase ${product.name} quantity`}
           className={clsx(
             "flex h-8 w-8 items-center justify-center rounded text-sm font-bold transition-colors",
-            "bg-gray-100 text-gray-600 hover:bg-brand-100 hover:text-brand-700",
+            "hover:bg-brand-100 hover:text-brand-700",
             "focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:outline-none",
             "min-h-[44px] min-w-[44px]"
           )}
+          style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}
         >
           <PlusIcon />
         </button>
@@ -301,7 +313,7 @@ function CartLineItem({ line, onQtyChange, onRemove, onNumpad }: CartLineItemPro
 
       {/* Line total */}
       <div className="w-16 text-right">
-        <span className="text-sm font-semibold text-gray-900">
+        <span className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
           {formatMoney(lineCents)}
         </span>
       </div>
@@ -316,19 +328,23 @@ function TotalRow({
   cents,
   className,
   loading,
+  muted,
+  bold,
 }: {
   label: string;
   cents: number;
   className?: string;
   loading?: boolean;
+  muted?: boolean;
+  bold?: boolean;
 }) {
   return (
-    <div className={clsx("flex justify-between text-sm", className)}>
-      <span className="text-gray-500">{label}</span>
+    <div className={clsx("flex justify-between text-sm", bold && "font-bold text-base", className)}>
+      <span style={{ color: "var(--color-text-muted)" }}>{label}</span>
       {loading ? (
-        <span className="w-16 h-4 bg-gray-200 animate-pulse rounded" aria-hidden="true" />
+        <span className="w-16 h-4 animate-skeleton rounded" aria-hidden="true" />
       ) : (
-        <span>{formatMoney(cents)}</span>
+        <span style={muted ? { color: "var(--color-text-muted)" } : bold ? { color: "var(--color-text-primary)" } : undefined}>{formatMoney(cents)}</span>
       )}
     </div>
   );

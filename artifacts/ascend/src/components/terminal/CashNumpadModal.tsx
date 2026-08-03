@@ -79,15 +79,16 @@ export function CashNumpadModal({ orderTotalCents, onConfirm, onClose }: CashNum
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full max-w-xs rounded-xl bg-white shadow-2xl">
+      <div className="w-full max-w-xs rounded-xl shadow-2xl" style={{ backgroundColor: "var(--color-surface)" }}>
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--color-table-border)] px-4 py-3">
-          <span className="text-sm font-semibold text-[var(--color-text-secondary)]">CASH PAYMENT</span>
+        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
+          <span className="text-sm font-semibold" style={{ color: "var(--color-text-secondary)" }}>CASH PAYMENT</span>
           <button
             type="button"
             onClick={onClose}
             aria-label="Cancel"
-            className="rounded p-1 text-[var(--color-text-secondary)] hover:bg-gray-100"
+            className="rounded p-1 hover:bg-[var(--color-surface-subtle)]"
+            style={{ color: "var(--color-text-secondary)" }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <path d="M18 6 6 18M6 6l12 12" />
@@ -97,15 +98,15 @@ export function CashNumpadModal({ orderTotalCents, onConfirm, onClose }: CashNum
 
         {/* Amount display */}
         <div className="px-4 pt-4 pb-2 text-center">
-          <p className="text-xs font-medium uppercase tracking-widest text-[var(--color-text-secondary)]">
+          <p className="text-xs font-medium uppercase tracking-widest" style={{ color: "var(--color-text-secondary)" }}>
             Tendered
           </p>
-          <p className="mt-1 text-4xl font-bold tabular-nums text-[var(--color-text-primary)]">
+          <p className="mt-1 text-4xl font-bold tabular-nums" style={{ color: "var(--color-text-primary)" }}>
             {formatMoney(cents)}
           </p>
           <div className="mt-2 flex items-center justify-between text-sm">
-            <span className="text-[var(--color-text-secondary)]">
-              Order total: <span className="font-medium text-[var(--color-text-primary)]">{formatMoney(orderTotalCents)}</span>
+            <span style={{ color: "var(--color-text-secondary)" }}>
+              Order total: <span className="font-medium" style={{ color: "var(--color-text-primary)" }}>{formatMoney(orderTotalCents)}</span>
             </span>
             {changeCents !== null && (
               <span className="font-semibold text-success-600">
@@ -122,7 +123,8 @@ export function CashNumpadModal({ orderTotalCents, onConfirm, onClose }: CashNum
               key={amt}
               type="button"
               onClick={() => setCents(amt)}
-              className="flex-1 rounded-md border border-[#D9D9D9] bg-gray-50 py-1.5 text-[12px] font-semibold text-[var(--color-text-primary)] hover:bg-gray-100 active:bg-gray-200"
+              className="flex-1 rounded-md py-1.5 text-[12px] font-semibold hover:bg-[var(--color-surface-subtle)]"
+              style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-primary)" }}
             >
               {formatMoney(amt)}
             </button>
@@ -146,9 +148,14 @@ export function CashNumpadModal({ orderTotalCents, onConfirm, onClose }: CashNum
               onClick={() => handleDigit(key)}
               className={`flex min-h-[52px] items-center justify-center rounded-lg text-lg font-semibold transition-colors active:scale-95 ${
                 key === "⌫"
-                  ? "border border-[#D9D9D9] bg-white text-danger-500 hover:bg-red-50"
-                  : "border border-[#D9D9D9] bg-white text-[var(--color-text-primary)] hover:bg-gray-50"
+                  ? "border border-[#D9D9D9] text-danger-500 hover:bg-red-50"
+                  : "hover:bg-[var(--color-surface-subtle)]"
               }`}
+              style={key !== "⌫" ? {
+                border: "1px solid var(--color-border)",
+                backgroundColor: "var(--color-surface)",
+                color: "var(--color-text-primary)"
+              } : { backgroundColor: "var(--color-surface)" }}
               aria-label={key === "⌫" ? "Backspace" : key}
             >
               {key}
@@ -157,7 +164,7 @@ export function CashNumpadModal({ orderTotalCents, onConfirm, onClose }: CashNum
         </div>
 
         {/* Confirm */}
-        <div className="border-t border-[var(--color-table-border)] px-4 py-3">
+        <div className="px-4 py-3" style={{ borderTop: "1px solid var(--color-border)" }}>
           <button
             ref={confirmRef}
             type="button"

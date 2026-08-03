@@ -72,14 +72,20 @@ export function LotPickerModal({ productId, productName, onConfirm, onCancel }: 
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
     >
-      <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl">
+      <div className="w-full max-w-sm rounded-xl shadow-2xl" style={{ backgroundColor: "var(--color-surface)" }}>
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--color-table-border)] px-4 py-3">
+        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">Select Lot — FEFO</p>
-            <p className="text-sm font-medium text-[var(--color-text-primary)]">{productName}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-secondary)" }}>Select Lot — FEFO</p>
+            <p className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>{productName}</p>
           </div>
-          <button type="button" onClick={onCancel} aria-label="Cancel" className="rounded p-1 text-[var(--color-text-secondary)] hover:bg-gray-100">
+          <button
+            type="button"
+            onClick={onCancel}
+            aria-label="Cancel"
+            className="rounded p-1 hover:bg-[var(--color-surface-subtle)]"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
@@ -89,9 +95,9 @@ export function LotPickerModal({ productId, productName, onConfirm, onCancel }: 
         {/* Lot list */}
         <div className="max-h-64 overflow-y-auto px-4 py-3">
           {loading ? (
-            <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-14 animate-pulse rounded bg-gray-100" />)}</div>
+            <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-14 animate-skeleton rounded" style={{ backgroundColor: "var(--color-surface-subtle)" }} />)}</div>
           ) : lots.length === 0 ? (
-            <p className="py-6 text-center text-sm text-[var(--color-text-secondary)]">No available lots for this product.</p>
+            <p className="py-6 text-center text-sm" style={{ color: "var(--color-text-secondary)" }}>No available lots for this product.</p>
           ) : (
             <ul className="space-y-1.5">
               {lots.map((lot) => {
@@ -107,15 +113,16 @@ export function LotPickerModal({ productId, productName, onConfirm, onCancel }: 
                         isSelected
                           ? "border-brand-600 bg-brand-50"
                           : status === "expired"
-                          ? "border-[#D9D9D9] bg-gray-50 opacity-50 cursor-not-allowed"
-                          : "border-[#D9D9D9] hover:border-brand-400 hover:bg-gray-50"
+                          ? "opacity-50 cursor-not-allowed"
+                          : "hover:border-brand-400 hover:bg-[var(--color-surface-subtle)]"
                       }`}
+                      style={!isSelected && status !== "expired" ? { borderColor: "var(--color-border)" } : undefined}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-[var(--color-text-primary)]">
+                        <span className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>
                           {lot.lot_code ?? "No lot code"}
                         </span>
-                        <span className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                        <span className="text-xs font-semibold" style={{ color: "var(--color-text-secondary)" }}>
                           {lot.qty_on_hand} units
                         </span>
                       </div>
@@ -137,11 +144,12 @@ export function LotPickerModal({ productId, productName, onConfirm, onCancel }: 
         </div>
 
         {/* Footer */}
-        <div className="border-t border-[var(--color-table-border)] px-4 py-3 flex gap-2">
+        <div className="flex gap-2 px-4 py-3" style={{ borderTop: "1px solid var(--color-border)" }}>
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 rounded-lg border border-[#D9D9D9] py-2.5 text-sm font-medium text-[var(--color-text-primary)] hover:bg-gray-50"
+            className="flex-1 rounded-lg py-2.5 text-sm font-medium hover:bg-[var(--color-surface-subtle)]"
+            style={{ border: "1px solid var(--color-border)", color: "var(--color-text-primary)" }}
           >
             Cancel
           </button>

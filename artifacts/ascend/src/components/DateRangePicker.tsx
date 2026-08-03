@@ -88,8 +88,9 @@ export function DateRangePicker({
             "h-7 rounded px-3 text-[12px] font-medium transition-colors",
             activePreset === p
               ? "bg-brand-600 text-white"
-              : "bg-white border border-[#D9D9D9] text-[var(--color-text-primary)] hover:border-brand-600 hover:text-brand-600",
+              : "border border-[#D9D9D9] text-[var(--color-text-primary)] hover:border-brand-600 hover:text-brand-600",
           )}
+          style={activePreset === p ? undefined : { backgroundColor: "var(--color-surface)" }}
         >
           {PRESET_LABELS[p]}
         </button>

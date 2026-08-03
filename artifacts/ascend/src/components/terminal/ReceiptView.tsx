@@ -94,7 +94,7 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
   const statusConfig = {
     completed: { label: "Paid", classes: "bg-success-100 text-success-700 border-success-200" },
     refunded: { label: "Refunded", classes: "bg-warning-100 text-warning-700 border-warning-200" },
-    voided: { label: "Voided", classes: "bg-gray-100 text-gray-600 border-gray-200" },
+    voided: { label: "Voided", classes: "bg-[var(--color-surface-subtle)] border-[var(--color-border)]" },
     open: { label: "Open", classes: "bg-brand-100 text-brand-700 border-brand-200" },
   };
 
@@ -134,7 +134,10 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" aria-hidden="true" />
 
       {/* Modal */}
-      <div className="receipt-printable relative flex max-h-[95vh] w-full max-w-md flex-col overflow-hidden rounded-t-lg bg-white shadow-2xl sm:rounded-lg">
+      <div
+        className="receipt-printable relative flex max-h-[95vh] w-full max-w-md flex-col overflow-hidden rounded-t-lg shadow-2xl sm:rounded-lg"
+        style={{ backgroundColor: "var(--color-surface)" }}
+      >
         {/* Header */}
         <div className="flex-none flex flex-col items-center gap-2 pt-8 pb-4 px-6 bg-success-50 border-b border-success-100">
           <div
@@ -143,7 +146,7 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
           >
             <CheckIcon />
           </div>
-          <h2 id="receipt-title" className="text-xl font-bold text-gray-900">
+          <h2 id="receipt-title" className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>
             {currentOrder.status === "completed" ? "Payment Complete" :
               currentOrder.status === "refunded" ? "Order Refunded" : "Order Voided"}
           </h2>
@@ -171,28 +174,28 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
         {/* Receipt body */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {/* Order info */}
-          <div className="flex justify-between text-sm text-gray-500 mb-4">
+          <div className="flex justify-between text-sm mb-4" style={{ color: "var(--color-text-muted)" }}>
             <span>Order #{currentOrder.orderNumber}</span>
             <span>{fmtTime(currentOrder.createdAt)}</span>
           </div>
 
           {/* Line items */}
-          <ul aria-label="Receipt items" className="divide-y divide-gray-100 mb-4">
+          <ul aria-label="Receipt items" className="divide-y divide-[var(--color-table-border)] mb-4">
             {currentOrder.lines.map((line) => (
               <li key={line.id} className="flex justify-between gap-3 py-2.5 text-sm">
                 <div className="min-w-0">
-                  <span className="font-medium text-gray-900">{line.name}</span>
+                  <span className="font-medium" style={{ color: "var(--color-text-primary)" }}>{line.name}</span>
                   {line.quantity > 1 && (
-                    <span className="ml-2 text-gray-400">× {line.quantity}</span>
+                    <span className="ml-2" style={{ color: "var(--color-text-muted)" }}>× {line.quantity}</span>
                   )}
                 </div>
-                <span className="text-gray-900">{formatMoney(line.lineCents)}</span>
+                <span style={{ color: "var(--color-text-primary)" }}>{formatMoney(line.lineCents)}</span>
               </li>
             ))}
           </ul>
 
           {/* Totals */}
-          <div className="border-t border-gray-200 pt-3 space-y-1.5">
+          <div className="pt-3 space-y-1.5" style={{ borderTop: "1px solid var(--color-border)" }}>
             <ReceiptRow label="Subtotal" value={formatMoney(currentOrder.subtotalCents)} />
             {currentOrder.discountCents > 0 && (
               <ReceiptRow
@@ -204,17 +207,20 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
             <ReceiptRow
               label="Tax"
               value={formatMoney(currentOrder.taxCents)}
-              className="text-gray-500"
+              muted
             />
-            <div className="flex justify-between font-bold text-base pt-1 border-t border-gray-200">
+            <div className="flex justify-between font-bold text-base pt-1" style={{ borderTop: "1px solid var(--color-border)" }}>
               <span>Total</span>
               <span>{formatMoney(currentOrder.totalCents)}</span>
             </div>
           </div>
 
           {/* Payment info */}
-          <div className="mt-4 rounded-xl bg-gray-50 border border-gray-100 p-4 space-y-2">
-            <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-2">
+          <div
+            className="mt-4 rounded-xl p-4 space-y-2"
+            style={{ backgroundColor: "var(--color-surface-subtle)", border: "1px solid var(--color-border)" }}
+          >
+            <p className="text-xs uppercase tracking-wide font-medium mb-2" style={{ color: "var(--color-text-muted)" }}>
               Payment
             </p>
             <ReceiptRow
@@ -238,7 +244,7 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
               />
             )}
             {payment.authCode && (
-              <ReceiptRow label="Auth code" value={payment.authCode} className="text-gray-400 text-xs" />
+              <ReceiptRow label="Auth code" value={payment.authCode} muted small />
             )}
           </div>
 
@@ -266,7 +272,7 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
         </div>
 
         {/* Actions */}
-        <div className="no-print flex-none px-6 pb-6 pt-3 border-t border-gray-100 space-y-2">
+        <div className="no-print flex-none px-6 pb-6 pt-3 space-y-2" style={{ borderTop: "1px solid var(--color-border)" }}>
           <Button
             ref={newSaleRef}
             variant="primary"
@@ -283,7 +289,8 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
             <button
               type="button"
               onClick={() => window.print()}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 hover:bg-[var(--color-surface-subtle)]"
+              style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <polyline points="6 9 6 2 18 2 18 9"/>
@@ -307,7 +314,8 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
                 onKeyDown={(e) => { if (e.key === "Enter") void handleSendEmail(); if (e.key === "Escape") { setShowEmailInput(false); setEmailAddr(""); } }}
                 placeholder="customer@email.com"
                 autoFocus
-                className="flex-1 min-w-0 rounded border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+                className="flex-1 min-w-0 rounded px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+                style={{ border: "1px solid var(--color-border)" }}
               />
               <Button variant="primary" size="sm" loading={sendingEmail} disabled={!emailAddr.trim() || sendingEmail} onClick={() => void handleSendEmail()}>Send</Button>
               <Button variant="ghost" size="sm" onClick={() => { setShowEmailInput(false); setEmailAddr(""); }}>✕</Button>
@@ -358,15 +366,22 @@ function ReceiptRow({
   label,
   value,
   className,
+  muted,
+  small,
 }: {
   label: string;
   value: string;
   className?: string;
+  muted?: boolean;
+  small?: boolean;
 }) {
   return (
-    <div className={clsx("flex justify-between text-sm", className)}>
-      <span className="text-gray-500">{label}</span>
-        <span className="text-right">{value}</span>
+    <div className={clsx("flex justify-between text-sm", small && "text-xs", className)}>
+      <span style={{ color: "var(--color-text-muted)" }}>{label}</span>
+      <span
+        className="text-right"
+        style={muted ? { color: "var(--color-text-muted)" } : undefined}
+      >{value}</span>
     </div>
   );
 }

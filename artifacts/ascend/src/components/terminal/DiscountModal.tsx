@@ -107,15 +107,16 @@ export function DiscountModal({
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
 
       {/* Modal */}
-      <div className="relative w-full max-w-sm rounded-t-lg bg-white shadow-2xl sm:rounded-lg">
+      <div className="relative w-full max-w-sm rounded-t-lg shadow-2xl sm:rounded-lg" style={{ backgroundColor: "var(--color-surface)" }}>
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 id="discount-title" className="text-base font-bold text-slate-900">Apply Discount</h2>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
+          <h2 id="discount-title" className="text-base font-bold" style={{ color: "var(--color-text-primary)" }}>Apply Discount</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex h-8 w-8 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:outline-none"
+            className="flex h-8 w-8 items-center justify-center rounded hover:bg-[var(--color-surface-subtle)] focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:outline-none"
+            style={{ color: "var(--color-text-muted)" }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round">
               <path d="M18 6 6 18" /><path d="m6 6 12 12" />
@@ -125,7 +126,7 @@ export function DiscountModal({
 
         <div className="px-5 py-4 space-y-4">
           {/* Mode toggle */}
-          <div className="flex rounded-lg border border-slate-200 p-1 gap-1" role="group" aria-label="Discount type">
+          <div className="flex rounded-lg p-1 gap-1" role="group" aria-label="Discount type" style={{ border: "1px solid var(--color-border)" }}>
             <button
               type="button"
               role="radio"
@@ -135,8 +136,9 @@ export function DiscountModal({
                 "flex-1 rounded-md py-2 text-sm font-semibold transition-colors min-h-[40px]",
                 mode === "percent"
                   ? "bg-brand-600 text-white shadow-sm"
-                  : "text-slate-600 hover:bg-slate-50"
+                  : "hover:bg-[var(--color-surface-subtle)]"
               )}
+              style={mode !== "percent" ? { color: "var(--color-text-secondary)" } : undefined}
             >
               % Percent
             </button>
@@ -149,8 +151,9 @@ export function DiscountModal({
                 "flex-1 rounded-md py-2 text-sm font-semibold transition-colors min-h-[40px]",
                 mode === "fixed"
                   ? "bg-brand-600 text-white shadow-sm"
-                  : "text-slate-600 hover:bg-slate-50"
+                  : "hover:bg-[var(--color-surface-subtle)]"
               )}
+              style={mode !== "fixed" ? { color: "var(--color-text-secondary)" } : undefined}
             >
               $ Fixed
             </button>
@@ -168,8 +171,9 @@ export function DiscountModal({
                     "rounded-lg border py-2 text-sm font-semibold transition-colors min-h-[40px]",
                     input === String(p)
                       ? "border-brand-400 bg-brand-50 text-brand-700"
-                      : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-brand-50 hover:border-brand-200 hover:text-brand-700"
+                      : "hover:bg-brand-50 hover:border-brand-200 hover:text-brand-700"
                   )}
+                  style={input !== String(p) ? { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" } : undefined}
                 >
                   {p}%
                 </button>
@@ -179,11 +183,11 @@ export function DiscountModal({
 
           {/* Amount input */}
           <div>
-            <label htmlFor="discount-amount" className="block text-xs font-medium uppercase tracking-wide text-slate-500 mb-1.5">
+            <label htmlFor="discount-amount" className="block text-xs font-medium uppercase tracking-wide mb-1.5" style={{ color: "var(--color-text-muted)" }}>
               {mode === "percent" ? "Percent off" : "Dollar amount off"}
             </label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-3.5 flex items-center font-medium text-slate-500 pointer-events-none">
+              <span className="absolute inset-y-0 left-3.5 flex items-center font-medium pointer-events-none" style={{ color: "var(--color-text-muted)" }}>
                 {mode === "percent" ? "%" : "$"}
               </span>
               <input
@@ -198,7 +202,8 @@ export function DiscountModal({
                 onChange={(e) => { setInput(e.target.value); setError(null); }}
                 onKeyDown={(e) => { if (e.key === "Enter") handleApply(); }}
                 placeholder={mode === "percent" ? "10" : "5.00"}
-                className="w-full rounded-lg border border-slate-300 py-3 pl-9 pr-4 text-xl font-semibold focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-brand-600 min-h-[52px]"
+                className="w-full rounded-lg py-3 pl-9 pr-4 text-xl font-semibold focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-brand-600 min-h-[52px]"
+                style={{ border: "1px solid var(--color-border)" }}
                 aria-label={mode === "percent" ? "Discount percent" : "Discount dollar amount"}
               />
             </div>
@@ -213,7 +218,7 @@ export function DiscountModal({
           {previewCents !== null && previewCents > 0 && newTotalCents !== null && newTotalCents > 0 && (
             <div className="rounded-xl bg-success-50 border border-success-200 p-3 space-y-1" aria-live="polite">
               <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Subtotal</span>
+                <span style={{ color: "var(--color-text-muted)" }}>Subtotal</span>
                 <span className="font-medium">{formatMoney(subtotalCents)}</span>
               </div>
               <div className="flex justify-between text-sm text-success-700">
@@ -229,12 +234,13 @@ export function DiscountModal({
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2 border-t border-slate-100 px-5 pb-5 pt-3">
+        <div className="flex gap-2 px-5 pb-5 pt-3" style={{ borderTop: "1px solid var(--color-border)" }}>
           {currentDiscountCents > 0 && (
             <button
               type="button"
               onClick={onRemove}
-              className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors min-h-[44px]"
+              className="rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors min-h-[44px] hover:bg-[var(--color-surface-subtle)]"
+              style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}
             >
               Remove
             </button>
@@ -242,7 +248,8 @@ export function DiscountModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors min-h-[44px]"
+            className="flex-1 rounded-lg py-2.5 text-sm font-semibold transition-colors min-h-[44px] hover:bg-[var(--color-surface-subtle)]"
+            style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}
           >
             Cancel
           </button>
@@ -250,7 +257,7 @@ export function DiscountModal({
             type="button"
             onClick={handleApply}
             disabled={!input || parseFloat(input) <= 0}
-            className="flex-1 rounded-lg bg-brand-600 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors min-h-[44px]"
+            className="flex-1 rounded-lg bg-brand-600 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:bg-[var(--color-surface-subtle)] disabled:cursor-not-allowed transition-colors min-h-[44px]"
           >
             Apply
           </button>

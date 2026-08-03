@@ -48,14 +48,24 @@ export function ShortcutsOverlay({ open, onClose }: ShortcutsOverlayProps) {
       <div className="space-y-5">
         {SHORTCUTS.map((section) => (
           <div key={section.category}>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+            <h3
+              className="mb-2 text-xs font-semibold uppercase tracking-[0.08em]"
+              style={{ color: "var(--color-text-muted)" }}
+            >
               {section.category}
             </h3>
             <div className="space-y-1.5">
               {section.items.map((item) => (
                 <div key={item.key} className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-slate-600">{item.description}</span>
-                  <kbd className="shrink-0 rounded border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-xs text-slate-700 shadow-sm">
+                  <span className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{item.description}</span>
+                  <kbd
+                    className="shrink-0 rounded px-2 py-0.5 font-mono text-xs shadow-sm"
+                    style={{
+                      border: "1px solid var(--color-border)",
+                      backgroundColor: "var(--color-surface-subtle)",
+                      color: "var(--color-text-secondary)",
+                    }}
+                  >
                     {item.key}
                   </kbd>
                 </div>

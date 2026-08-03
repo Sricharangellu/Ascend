@@ -2,13 +2,13 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
-  ({ className, type, ...props }, ref) => {
+  ({ className, type, style, ...props }, ref) => {
     return (
       <input
         type={type}
         className={cn(
           // Enterprise input — clean, precise, Stripe-inspired
-          'flex h-9 w-full rounded-lg border bg-white px-3 py-1',
+          'flex h-9 w-full rounded-lg border px-3 py-1',
           'text-[14px] text-[var(--color-text-primary)]',
           'placeholder:text-[var(--color-text-muted)]',
           'transition-all duration-150',
@@ -19,10 +19,9 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
           'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-[var(--color-surface-subtle)]',
           // File input
           'file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-[var(--color-text-primary)]',
-          // Dark mode
-          'dark:bg-[var(--color-surface)] dark:border-[var(--color-border)]',
           className,
         )}
+        style={{ backgroundColor: 'var(--color-surface)', ...style }}
         ref={ref}
         {...props}
       />

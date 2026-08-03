@@ -80,13 +80,23 @@ export function PermissionGuard({ permission, children, message }: PermissionGua
   if (!hasFeature(permission)) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center py-24 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
-          <svg className="h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <div
+          className="flex h-16 w-16 items-center justify-center rounded-2xl"
+          style={{ backgroundColor: "var(--color-surface-subtle)" }}
+        >
+          <svg
+            className="h-8 w-8"
+            style={{ color: "var(--color-text-muted)" }}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
             <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
           </svg>
         </div>
-        <h2 className="mt-4 text-base font-semibold text-slate-900">Access restricted</h2>
-        <p className="mt-1 max-w-sm text-sm text-slate-500">
+        <h2 className="mt-4 text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Access restricted</h2>
+        <p className="mt-1 max-w-sm text-sm" style={{ color: "var(--color-text-muted)" }}>
           {message ?? "You don't have permission to view this page. Contact your administrator to request access."}
         </p>
       </div>
