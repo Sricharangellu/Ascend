@@ -57,11 +57,11 @@ function FormSection({
   children: React.ReactNode;
 }) {
   return (
-    <fieldset className="rounded-lg border border-slate-200 bg-white p-4">
-      <legend className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+    <fieldset className="rounded-xl border p-4" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+      <legend className="px-1 text-[10px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--color-text-secondary)" }}>
         {title}
       </legend>
-      {description && <p className="mb-4 mt-1 text-xs text-slate-500">{description}</p>}
+      {description && <p className="mb-4 mt-1 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{description}</p>}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {children}
       </div>
@@ -158,10 +158,10 @@ export function ProductFormModal({
                       type="button"
                       onClick={() => set("productKind", option.value)}
                       className={[
-                        "min-h-9 rounded-md border px-3 text-sm font-medium transition-colors",
+                        "min-h-9 rounded-lg border px-3 text-[13px] font-medium transition-colors",
                         form.productKind === option.value
-                          ? "border-slate-950 bg-slate-950 text-white"
-                          : "border-slate-300 bg-white text-slate-700 hover:border-slate-500",
+                          ? "bg-brand-600 text-white border-brand-600"
+                          : "hover:bg-[var(--color-surface-subtle)]",
                       ].join(" ")}
                     >
                       {option.label}
@@ -299,31 +299,27 @@ export function ProductFormModal({
             </div>
 
             <div className="sm:col-span-2 flex flex-wrap gap-5">
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" checked={form.ageRestricted} onChange={(e) => set("ageRestricted", e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-brand-600" />
-                Age restricted
-              </label>
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" checked={form.trackInventory} onChange={(e) => set("trackInventory", e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-brand-600" />
-                Track inventory
-              </label>
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" checked={form.returnable} onChange={(e) => set("returnable", e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-brand-600" />
-                Returnable
-              </label>
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" checked={form.serviceProduct} onChange={(e) => set("serviceProduct", e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-brand-600" />
-                Service product
-              </label>
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" checked={form.ecommerce} onChange={(e) => set("ecommerce", e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-brand-600" />
-                Online
-              </label>
+              {[
+                { label: "Age restricted", key: "ageRestricted" as const, val: form.ageRestricted },
+                { label: "Track inventory", key: "trackInventory" as const, val: form.trackInventory },
+                { label: "Returnable", key: "returnable" as const, val: form.returnable },
+                { label: "Service product", key: "serviceProduct" as const, val: form.serviceProduct },
+                { label: "Online", key: "ecommerce" as const, val: form.ecommerce },
+              ].map(({ label, key, val }) => (
+                <label key={key} className="flex cursor-pointer items-center gap-2 text-[13px]"
+                  style={{ color: "var(--color-text-primary)" }}>
+                  <input type="checkbox" checked={val as boolean}
+                    onChange={(e) => set(key, e.target.checked)}
+                    className="h-4 w-4 rounded border text-brand-600 focus:ring-2 focus:ring-brand-500/20"
+                    style={{ borderColor: "var(--color-border)" }} />
+                  {label}
+                </label>
+              ))}
             </div>
           </FormSection>
         </form>
 
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+        <div className="flex justify-end gap-2 border-t px-5 py-3" style={{ borderColor: "var(--color-border)" }}>
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
           <Button type="submit" form="product-form" loading={saving}>
             {initial ? "Save changes" : "Create product"}

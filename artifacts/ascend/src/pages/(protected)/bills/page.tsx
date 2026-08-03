@@ -74,7 +74,8 @@ export default function BillsPage() {
               type="button"
               disabled={loadingMore}
               onClick={() => void load(nextCursor)}
-              className="rounded-lg border border-slate-200 bg-white px-5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="rounded-lg border px-5 py-2 text-[13px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)] disabled:opacity-50"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}
             >
               {loadingMore ? "Loading…" : "Load more bills"}
             </button>

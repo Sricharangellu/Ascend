@@ -8,7 +8,7 @@ import type { ProductCredit, ProductCreditsResponse } from "@/api-client/types";
 const STATUS_COLOR: Record<string, string> = {
   issued: "bg-blue-100 text-blue-700",
   applied: "bg-emerald-100 text-emerald-700",
-  expired: "bg-slate-100 text-slate-500",
+  expired: "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)]",
   voided: "bg-red-100 text-red-700",
 };
 
@@ -88,7 +88,7 @@ export function CreditsTab({ productId }: { productId: string }) {
                     <td className="max-w-[160px] truncate px-4 py-3 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{c.reason}</td>
                     <td className="px-4 py-3 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{c.customer_name ?? <span style={{ color: "var(--color-text-muted)" }}>—</span>}</td>
                     <td className="px-4 py-3">
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${STATUS_COLOR[c.status] ?? "bg-slate-100 text-slate-600"}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${STATUS_COLOR[c.status] ?? "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]"}`}>
                         {c.status}
                       </span>
                     </td>

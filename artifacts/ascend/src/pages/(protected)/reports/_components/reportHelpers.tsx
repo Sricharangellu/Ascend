@@ -13,7 +13,7 @@ export function exportCsv(filename: string, rows: string[][]): void {
 }
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={`animate-pulse rounded bg-slate-100 ${className ?? ""}`} />;
+  return <div className={`animate-skeleton rounded ${className ?? ""}`} />;
 }
 
 export function CsvButton({ onClick }: { onClick: () => void }) {
@@ -21,7 +21,8 @@ export function CsvButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+      className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}
     >
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
         strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -40,8 +41,8 @@ export function SectionHeader({
   return (
     <div className="flex items-start justify-between gap-4 mb-4">
       <div>
-        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
-        {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+        <h2 className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>{title}</h2>
+        {subtitle && <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-secondary)" }}>{subtitle}</p>}
       </div>
       {onExport && <CsvButton onClick={onExport} />}
     </div>

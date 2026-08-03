@@ -230,7 +230,7 @@ function CustomerInputFields() {
   return (
     <div className="space-y-3">
       {fields.length === 0 && !adding && (
-        <p className="text-sm text-slate-400">This product has no customer input fields</p>
+        <p className="text-[13px]" style={{ color: "var(--color-text-muted)" }}>This product has no customer input fields</p>
       )}
       {fields.map((f) => (
         <div key={f.id} className="flex items-center gap-3 rounded-lg border px-3 py-2.5"
@@ -494,7 +494,8 @@ export function GeneralTab({
             <label className="flex cursor-pointer items-center gap-2.5">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600"
+                className="h-4 w-4 rounded border text-brand-600 focus:ring-2 focus:ring-brand-500/20"
+                style={{ borderColor: "var(--color-border)" }}
                 checked={form.sell_pos}
                 onChange={(e) => set("sell_pos", e.target.checked)}
               />

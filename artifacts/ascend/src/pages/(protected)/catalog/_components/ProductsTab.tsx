@@ -32,7 +32,7 @@ function productStatusStyle(status: ProductStatus) {
   if (status === "draft") {
     return { row: "border-l-warning-500 bg-warning-50/30 hover:bg-warning-50/70", card: "border-l-warning-500 bg-warning-50/30", dot: "bg-warning-500" };
   }
-  return { row: "border-l-slate-300 bg-slate-50/70 text-slate-500 hover:bg-slate-100", card: "border-l-slate-300 bg-slate-50/80", dot: "bg-slate-400" };
+  return { row: "border-l-[var(--color-border)] bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-table-row-hover)]", card: "border-l-[var(--color-border)] bg-[var(--color-surface-subtle)]", dot: "bg-[var(--color-text-muted)]" };
 }
 
 type MetricTone = "neutral" | "success" | "warning" | "muted" | "restricted";
@@ -75,8 +75,9 @@ function ProductListCard({ product, productType, onEdit, onArchive }: {
         <div className="flex min-w-0 items-start gap-2">
           <span className={clsx("mt-1.5 h-2 w-2 shrink-0 rounded-full", style.dot)} aria-hidden="true" />
           <div className="min-w-0">
-            <h3 className={clsx("truncate text-sm font-semibold", product.status === "archived" ? "text-slate-600" : "text-slate-950")}>{product.name}</h3>
-            <p className="mt-1 font-mono text-xs text-slate-500">{product.sku}</p>
+            <h3 className="truncate text-[13px] font-semibold"
+              style={{ color: product.status === "archived" ? "var(--color-text-secondary)" : "var(--color-text-primary)" }}>{product.name}</h3>
+            <p className="mt-1 font-mono text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{product.sku}</p>
           </div>
         </div>
         <p className="shrink-0 text-[13px] font-bold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{formatMoney(product.price_cents)}</p>

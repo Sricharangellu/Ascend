@@ -27,13 +27,11 @@ function appendText(doc: Document, parent: HTMLElement, className: string, text:
 function printLabels(products: CatalogProduct[]) {
   const win = window.open("", "_blank");
   if (!win) return;
-
   const doc = win.document;
   doc.title = "Labels";
   doc.head.replaceChildren();
   doc.body.replaceChildren();
   appendLabelStyles(doc);
-
   const sheet = doc.createElement("div");
   sheet.className = "sheet";
   for (const product of products) {
@@ -46,45 +44,39 @@ function printLabels(products: CatalogProduct[]) {
     sheet.appendChild(label);
   }
   doc.body.appendChild(sheet);
-
-  win.setTimeout(() => {
-    win.print();
-    win.close();
-  }, 0);
+  win.setTimeout(() => { win.print(); win.close(); }, 0);
 }
 
-export function PrintLabelsModal({
-  selected,
-  onClose,
-}: {
-  selected: CatalogProduct[];
-  onClose: () => void;
-}) {
+export function PrintLabelsModal({ selected, onClose }: { selected: CatalogProduct[]; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="flex max-h-[80vh] w-full max-w-md flex-col rounded-md bg-white shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-950">Print Labels</h2>
-          <button type="button" onClick={onClose} aria-label="Close print labels" className="flex h-9 w-9 items-center justify-center rounded-md text-xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-600">&times;</button>
+      <div className="flex max-h-[80vh] w-full max-w-md flex-col rounded-2xl shadow-2xl"
+        style={{ backgroundColor: "var(--color-surface)" }}
+        onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--color-border)" }}>
+          <h2 className="text-[15px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Print Labels</h2>
+          <button type="button" onClick={onClose} aria-label="Close print labels"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-xl leading-none transition-colors hover:bg-[var(--color-surface-subtle)]"
+            style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {selected.length === 0 ? (
-            <p className="text-sm text-slate-500">Select products first using the checkboxes.</p>
+            <p className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>Select products first using the checkboxes.</p>
           ) : (
             <>
-              <p className="mb-3 text-sm text-slate-600">{selected.length} product{selected.length !== 1 ? "s" : ""} selected for printing:</p>
-              <ul className="divide-y divide-slate-100 rounded-md border border-slate-200">
+              <p className="mb-3 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
+                {selected.length} product{selected.length !== 1 ? "s" : ""} selected for printing:
+              </p>
+              <ul className="divide-y divide-[var(--color-table-border)] rounded-xl border"
+                style={{ borderColor: "var(--color-border)" }}>
                 {selected.map((p) => (
                   <li key={p.id} className="flex items-center justify-between gap-2 px-3 py-2">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-slate-950">{p.name}</p>
-                      <p className="font-mono text-xs text-slate-500">{p.sku}</p>
+                      <p className="truncate text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>{p.name}</p>
+                      <p className="font-mono text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{p.sku}</p>
                     </div>
-                    <span className="shrink-0 text-sm font-semibold text-slate-950">{formatMoney(p.price_cents)}</span>
+                    <span className="shrink-0 text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(p.price_cents)}</span>
                   </li>
                 ))}
               </ul>
@@ -92,14 +84,13 @@ export function PrintLabelsModal({
           )}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
-          <button type="button" onClick={onClose} className="min-h-[40px] rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
-          <button
-            type="button"
-            disabled={selected.length === 0}
+        <div className="flex justify-end gap-2 border-t px-5 py-3" style={{ borderColor: "var(--color-border)" }}>
+          <button type="button" onClick={onClose}
+            className="min-h-[40px] rounded-lg border px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Cancel</button>
+          <button type="button" disabled={selected.length === 0}
             onClick={() => { printLabels(selected); onClose(); }}
-            className="min-h-[40px] rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-          >
+            className="min-h-[40px] rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-50">
             Print
           </button>
         </div>

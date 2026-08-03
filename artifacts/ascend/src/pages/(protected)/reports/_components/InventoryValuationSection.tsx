@@ -37,15 +37,15 @@ export function InventoryValuationSection() {
         {data && (
           <div className="flex flex-wrap gap-6 mb-3">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Cost Value</p>
-              <p className="text-xl font-semibold tabular-nums text-slate-950">{formatMoney(data.totalCostCents)}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-muted)" }}>Cost Value</p>
+              <p className="text-xl font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{formatMoney(data.totalCostCents)}</p>
             </div>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Retail Value</p>
-              <p className="text-xl font-semibold tabular-nums text-slate-700">{formatMoney(data.totalRetailCents)}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-muted)" }}>Retail Value</p>
+              <p className="text-xl font-semibold tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{formatMoney(data.totalRetailCents)}</p>
             </div>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Potential Margin</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-muted)" }}>Potential Margin</p>
               <p className="text-xl font-semibold tabular-nums text-emerald-600">
                 {data.totalRetailCents > 0
                   ? `${Math.round(((data.totalRetailCents - data.totalCostCents) / data.totalRetailCents) * 100)}%`
@@ -60,12 +60,13 @@ export function InventoryValuationSection() {
           {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-9" />)}
         </div>
       ) : !data || data.rows.length === 0 ? (
-        <p className="px-5 pb-5 text-sm text-slate-500">No inventory data.</p>
+        <p className="px-5 pb-5 text-[13px]" style={{ color: "var(--color-text-muted)" }}>No inventory data.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 border-y border-slate-100">
-              <tr className="text-left text-[11px] font-semibold text-slate-500 uppercase tracking-[0.07em]">
+          <table className="min-w-full text-[13px]">
+            <thead style={{ backgroundColor: "var(--color-table-header)", borderTop: "1px solid var(--color-border)", borderBottom: "1px solid var(--color-border)" }}>
+              <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.07em]"
+                style={{ color: "var(--color-text-secondary)" }}>
                 <th className="px-4 py-2.5">Product</th>
                 <th className="px-4 py-2.5 text-right">On Hand</th>
                 <th className="px-4 py-2.5 text-right">Cost/unit</th>
@@ -74,23 +75,23 @@ export function InventoryValuationSection() {
                 <th className="px-4 py-2.5 text-right">Retail Value</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-[var(--color-table-border)]">
               {data.rows.map((row) => (
-                <tr key={row.productId} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="px-4 py-2.5 font-medium text-slate-900">{row.name}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">{row.stockQty.toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-slate-600">{formatMoney(row.costCents)}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-slate-600">{formatMoney(row.retailCents)}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums font-medium text-slate-900">{formatMoney(row.costValueCents)}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-slate-900">{formatMoney(row.retailValueCents)}</td>
+                <tr key={row.productId} className="transition-colors hover:bg-[var(--color-table-row-hover)]">
+                  <td className="px-4 py-2.5 font-medium" style={{ color: "var(--color-text-primary)" }}>{row.name}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{row.stockQty.toLocaleString()}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{formatMoney(row.costCents)}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{formatMoney(row.retailCents)}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums font-medium" style={{ color: "var(--color-text-primary)" }}>{formatMoney(row.costValueCents)}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(row.retailValueCents)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold">
-                <td colSpan={4} className="px-4 py-2.5 text-slate-700 text-sm">Totals</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-slate-950 text-sm">{formatMoney(data.totalCostCents)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-slate-950 text-sm">{formatMoney(data.totalRetailCents)}</td>
+              <tr className="font-semibold" style={{ borderTop: "2px solid var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
+                <td colSpan={4} className="px-4 py-2.5 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>Totals</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-[13px]" style={{ color: "var(--color-text-primary)" }}>{formatMoney(data.totalCostCents)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-[13px]" style={{ color: "var(--color-text-primary)" }}>{formatMoney(data.totalRetailCents)}</td>
               </tr>
             </tfoot>
           </table>

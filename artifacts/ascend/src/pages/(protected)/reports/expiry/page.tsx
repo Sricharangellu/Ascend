@@ -8,44 +8,21 @@ import { ReportsSubNav } from "@/components/reports/ReportsSubNav";
 import { fmtDate } from "@/lib/date";
 
 interface ExpiringLot {
-  id: string;
-  product_id: string;
-  name: string;
-  lot_code: string | null;
-  quantity: number;
-  unit_cost_cents: number | null;
-  expiry_date: number;
-  days_to_expiry: number;
+  id: string; product_id: string; name: string; lot_code: string | null;
+  quantity: number; unit_cost_cents: number | null; expiry_date: number; days_to_expiry: number;
 }
-
 interface ExpiredLot {
-  id: string;
-  product_id: string;
-  name: string;
-  lot_code: string | null;
-  quantity: number;
-  unit_cost_cents: number | null;
-  expiry_date: number;
-  days_overdue: number;
+  id: string; product_id: string; name: string; lot_code: string | null;
+  quantity: number; unit_cost_cents: number | null; expiry_date: number; days_overdue: number;
 }
-
 interface ExpirySummary {
   expired: { lots: number; units: number; valueCents: number };
   expiringSoon: { lots: number; units: number; valueCents: number; withinDays: number };
 }
 
 function ExpiryBadge({ days }: { days: number }) {
-  const cls =
-    days <= 7
-      ? "bg-red-100 text-red-800"
-      : days <= 14
-      ? "bg-orange-100 text-orange-800"
-      : "bg-yellow-100 text-yellow-800";
-  return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>
-      {days}d
-    </span>
-  );
+  const cls = days <= 7 ? "bg-red-100 text-red-800" : days <= 14 ? "bg-orange-100 text-orange-800" : "bg-yellow-100 text-yellow-800";
+  return <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${cls}`}>{days}d</span>;
 }
 
 export default function ExpiryReportPage() {
@@ -58,8 +35,7 @@ export default function ExpiryReportPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     (async () => {
       try {
         const [expiringData, expiredData, summaryData] = await Promise.all([
@@ -67,11 +43,7 @@ export default function ExpiryReportPage() {
           apiGet<{ items: ExpiredLot[] }>("/api/v1/inventory/expired"),
           apiGet<ExpirySummary>(`/api/v1/inventory/expiry-summary?days=${days}`),
         ]);
-        if (!cancelled) {
-          setExpiring(expiringData.items ?? []);
-          setExpired(expiredData.items ?? []);
-          setSummary(summaryData);
-        }
+        if (!cancelled) { setExpiring(expiringData.items ?? []); setExpired(expiredData.items ?? []); setSummary(summaryData); }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load expiry data");
       } finally {
@@ -86,27 +58,24 @@ export default function ExpiryReportPage() {
   return (
     <EnterpriseShell active="reports" title="Expiry Report" subtitle="Near-expiry and expired stock">
       <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6">
-        <div className="border-b border-slate-200 pb-4">
+        <div className="border-b pb-4" style={{ borderColor: "var(--color-border)" }}>
           <div className="mb-3">
-            <h1 className="text-lg font-semibold text-slate-950">Expiry Report</h1>
-            <p className="mt-1 text-sm text-slate-500">Identify stock approaching expiry to mark down or return.</p>
+            <h1 className="text-[20px] font-bold tracking-tight" style={{ color: "var(--color-text-primary)" }}>Expiry Report</h1>
+            <p className="mt-1 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>Identify stock approaching expiry to mark down or return.</p>
           </div>
           <ReportsSubNav />
         </div>
 
-        {/* Look-ahead toggle */}
         <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-slate-700">Expiring within:</span>
-          <div className="inline-flex rounded-md border border-slate-200 bg-white p-1 shadow-sm">
+          <span className="text-[13px] font-medium" style={{ color: "var(--color-text-secondary)" }}>Expiring within:</span>
+          <div className="inline-flex rounded-xl border p-1 shadow-[var(--shadow-sm)]"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
             {([7, 14, 30, 60] as const).map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setDays(d)}
-                className={`min-h-[36px] rounded px-4 text-sm font-medium transition-colors ${
-                  days === d ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100"
+              <button key={d} type="button" onClick={() => setDays(d)}
+                className={`min-h-[34px] rounded-lg px-4 text-[13px] font-medium transition-colors ${
+                  days === d ? "bg-brand-600 text-white" : "hover:bg-[var(--color-surface-subtle)]"
                 }`}
-              >
+                style={days !== d ? { color: "var(--color-text-secondary)" } : {}}>
                 {d}d
               </button>
             ))}
@@ -114,16 +83,16 @@ export default function ExpiryReportPage() {
         </div>
 
         {error && (
-          <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+          <div className="rounded-xl border px-4 py-3 text-[13px] text-[var(--color-danger-text)]"
+            style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)" }} role="alert">
             {error}
           </div>
         )}
 
         {loading ? (
-          <p className="text-sm text-slate-500" aria-busy="true">Loading…</p>
+          <p className="text-[13px]" style={{ color: "var(--color-text-secondary)" }} aria-busy="true">Loading…</p>
         ) : (
           <>
-            {/* Summary cards */}
             {summary && (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 {[
@@ -133,20 +102,21 @@ export default function ExpiryReportPage() {
                   { label: "Total at risk", value: formatMoney(totalAtRiskCents), sub: "expired + near-expiry", red: false },
                 ].map((card) => (
                   <Card key={card.label}>
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{card.label}</p>
-                    <p className={`mt-1 text-2xl font-bold ${card.red ? "text-red-700" : "text-slate-900"}`}>{card.value}</p>
-                    <p className="mt-0.5 text-xs text-slate-400">{card.sub}</p>
+                    <p className="text-[10px] font-medium uppercase tracking-[0.07em]" style={{ color: "var(--color-text-secondary)" }}>{card.label}</p>
+                    <p className={`mt-1 text-2xl font-bold ${card.red ? "text-red-700" : ""}`}
+                      style={!card.red ? { color: "var(--color-text-primary)" } : {}}>{card.value}</p>
+                    <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-muted)" }}>{card.sub}</p>
                   </Card>
                 ))}
               </div>
             )}
 
-            {/* Expired table */}
             <Card title="Already Expired" description="Stock past its expiry date still on hand — write off or return immediately." noPadding>
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    <tr>
+                <table className="min-w-full text-[13px]">
+                  <thead style={{ backgroundColor: "var(--color-table-header)", borderTop: "1px solid var(--color-border)", borderBottom: "1px solid var(--color-border)" }}>
+                    <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.07em]"
+                      style={{ color: "var(--color-text-secondary)" }}>
                       <th className="px-5 py-3">Product</th>
                       <th className="px-5 py-3">Lot code</th>
                       <th className="px-5 py-3 text-right">Qty</th>
@@ -155,21 +125,19 @@ export default function ExpiryReportPage() {
                       <th className="px-5 py-3 text-right">Value at cost</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
+                  <tbody className="divide-y divide-[var(--color-table-border)]">
                     {expired.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-8 text-center text-gray-400">No expired stock on hand.</td>
-                      </tr>
+                      <tr><td colSpan={6} className="py-8 text-center" style={{ color: "var(--color-text-muted)" }}>No expired stock on hand.</td></tr>
                     ) : expired.map((lot) => (
-                      <tr key={lot.id} className="hover:bg-red-50">
-                        <td className="whitespace-nowrap px-5 py-3 font-medium text-gray-900">{lot.name}</td>
-                        <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-gray-500">{lot.lot_code ?? "—"}</td>
-                        <td className="whitespace-nowrap px-5 py-3 text-right text-gray-700">{lot.quantity}</td>
-                        <td className="whitespace-nowrap px-5 py-3 text-gray-600">{fmtDate(lot.expiry_date)}</td>
+                      <tr key={lot.id} className="transition-colors hover:bg-red-50/50">
+                        <td className="whitespace-nowrap px-5 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{lot.name}</td>
+                        <td className="whitespace-nowrap px-5 py-3 font-mono text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{lot.lot_code ?? "—"}</td>
+                        <td className="whitespace-nowrap px-5 py-3 text-right" style={{ color: "var(--color-text-secondary)" }}>{lot.quantity}</td>
+                        <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--color-text-secondary)" }}>{fmtDate(lot.expiry_date)}</td>
                         <td className="whitespace-nowrap px-5 py-3 text-right">
-                          <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">{lot.days_overdue}d</span>
+                          <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-800">{lot.days_overdue}d</span>
                         </td>
-                        <td className="whitespace-nowrap px-5 py-3 text-right text-gray-700">
+                        <td className="whitespace-nowrap px-5 py-3 text-right" style={{ color: "var(--color-text-secondary)" }}>
                           {lot.unit_cost_cents != null ? formatMoney(lot.unit_cost_cents * lot.quantity) : "—"}
                         </td>
                       </tr>
@@ -179,12 +147,12 @@ export default function ExpiryReportPage() {
               </div>
             </Card>
 
-            {/* Near-expiry table */}
             <Card title={`Expiring Within ${days} Days`} description="Take action before these lots expire." noPadding>
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    <tr>
+                <table className="min-w-full text-[13px]">
+                  <thead style={{ backgroundColor: "var(--color-table-header)", borderTop: "1px solid var(--color-border)", borderBottom: "1px solid var(--color-border)" }}>
+                    <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.07em]"
+                      style={{ color: "var(--color-text-secondary)" }}>
                       <th className="px-5 py-3">Product</th>
                       <th className="px-5 py-3">Lot code</th>
                       <th className="px-5 py-3 text-right">Qty</th>
@@ -193,21 +161,17 @@ export default function ExpiryReportPage() {
                       <th className="px-5 py-3 text-right">Value at cost</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
+                  <tbody className="divide-y divide-[var(--color-table-border)]">
                     {expiring.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-8 text-center text-gray-400">No stock expiring within {days} days.</td>
-                      </tr>
+                      <tr><td colSpan={6} className="py-8 text-center" style={{ color: "var(--color-text-muted)" }}>No stock expiring within {days} days.</td></tr>
                     ) : expiring.map((lot) => (
-                      <tr key={lot.id} className="hover:bg-amber-50">
-                        <td className="whitespace-nowrap px-5 py-3 font-medium text-gray-900">{lot.name}</td>
-                        <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-gray-500">{lot.lot_code ?? "—"}</td>
-                        <td className="whitespace-nowrap px-5 py-3 text-right text-gray-700">{lot.quantity}</td>
-                        <td className="whitespace-nowrap px-5 py-3 text-gray-600">{fmtDate(lot.expiry_date)}</td>
-                        <td className="whitespace-nowrap px-5 py-3 text-right">
-                          <ExpiryBadge days={lot.days_to_expiry} />
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-3 text-right text-gray-700">
+                      <tr key={lot.id} className="transition-colors hover:bg-amber-50/50">
+                        <td className="whitespace-nowrap px-5 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{lot.name}</td>
+                        <td className="whitespace-nowrap px-5 py-3 font-mono text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{lot.lot_code ?? "—"}</td>
+                        <td className="whitespace-nowrap px-5 py-3 text-right" style={{ color: "var(--color-text-secondary)" }}>{lot.quantity}</td>
+                        <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--color-text-secondary)" }}>{fmtDate(lot.expiry_date)}</td>
+                        <td className="whitespace-nowrap px-5 py-3 text-right"><ExpiryBadge days={lot.days_to_expiry} /></td>
+                        <td className="whitespace-nowrap px-5 py-3 text-right" style={{ color: "var(--color-text-secondary)" }}>
                           {lot.unit_cost_cents != null ? formatMoney(lot.unit_cost_cents * lot.quantity) : "—"}
                         </td>
                       </tr>

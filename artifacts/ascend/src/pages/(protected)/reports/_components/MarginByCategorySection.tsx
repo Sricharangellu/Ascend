@@ -38,28 +38,30 @@ export function MarginByCategorySection({ range }: { range: string }) {
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10" />)}
         </div>
       ) : sorted.length === 0 ? (
-        <p className="text-sm text-slate-500">No data available.</p>
+        <p className="text-[13px]" style={{ color: "var(--color-text-muted)" }}>No data available.</p>
       ) : (
         <div className="space-y-4">
           {sorted.map((row) => (
             <div key={row.category}>
               <div className="flex items-baseline justify-between mb-1.5">
-                <span className="text-sm font-medium text-slate-800">{row.category}</span>
+                <span className="text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>{row.category}</span>
                 <div className="flex items-baseline gap-4">
-                  <span className="text-xs text-slate-400">{formatMoney(row.revenueCents)} rev</span>
-                  <span className={`font-semibold text-sm tabular-nums ${row.marginPct >= 50 ? "text-emerald-600" : row.marginPct >= 35 ? "text-slate-800" : "text-amber-600"}`}>
+                  <span className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{formatMoney(row.revenueCents)} rev</span>
+                  <span className={`font-semibold text-[13px] tabular-nums ${row.marginPct >= 50 ? "text-emerald-600" : row.marginPct >= 35 ? "" : "text-amber-600"}`}
+                    style={row.marginPct >= 35 && row.marginPct < 50 ? { color: "var(--color-text-primary)" } : {}}>
                     {row.marginPct}%
                   </span>
                 </div>
               </div>
-              <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
+              <div className="h-3 w-full overflow-hidden rounded-full"
+                style={{ backgroundColor: "var(--color-surface-subtle)" }}>
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${row.marginPct >= 50 ? "bg-emerald-500" : row.marginPct >= 35 ? "bg-blue-500" : "bg-amber-500"}`}
                   style={{ width: `${Math.min(row.marginPct, 100)}%` }}
                   aria-label={`${row.category}: ${row.marginPct}% margin`}
                 />
               </div>
-              <p className="mt-1 text-[11px] text-slate-400">
+              <p className="mt-1 text-[11px]" style={{ color: "var(--color-text-muted)" }}>
                 {row.units.toLocaleString()} units · cost {formatMoney(row.costCents)}
               </p>
             </div>

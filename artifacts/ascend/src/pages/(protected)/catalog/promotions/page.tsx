@@ -15,73 +15,38 @@ type PromoStatus = "active" | "scheduled" | "expired" | "draft";
 type PromoScope  = "all" | "category" | "product";
 
 interface Promotion {
-  id: string;
-  name: string;
-  code: string | null;
-  type: PromoType;
-  value: number;
-  scope: PromoScope;
-  scope_value: string | null;
-  status: PromoStatus;
-  starts_at: number;
-  ends_at: number | null;
-  usage_count: number;
-  usage_limit: number | null;
-  per_customer_limit: number | null;
-  channel: "all" | "pos" | "ecommerce";
-  stackable: boolean;
-  revenue_impact_cents: number;
-  created_at: number;
+  id: string; name: string; code: string | null; type: PromoType; value: number;
+  scope: PromoScope; scope_value: string | null; status: PromoStatus;
+  starts_at: number; ends_at: number | null; usage_count: number;
+  usage_limit: number | null; per_customer_limit: number | null;
+  channel: "all" | "pos" | "ecommerce"; stackable: boolean;
+  revenue_impact_cents: number; created_at: number;
 }
 
 interface CouponCode {
-  id: string;
-  code: string;
-  promotion_id: string;
-  promotion_name: string;
-  type: "single_use" | "multi_use";
-  used: boolean;
-  used_at: number | null;
-  customer_name: string | null;
-  created_at: number;
+  id: string; code: string; promotion_id: string; promotion_name: string;
+  type: "single_use" | "multi_use"; used: boolean; used_at: number | null;
+  customer_name: string | null; created_at: number;
 }
 
 interface FlashSale {
-  id: string;
-  name: string;
-  discount_pct: number;
-  scope: PromoScope;
-  scope_value: string | null;
-  starts_at: number;
-  ends_at: number;
-  status: "upcoming" | "live" | "ended";
-  units_sold: number;
-  revenue_cents: number;
+  id: string; name: string; discount_pct: number; scope: PromoScope;
+  scope_value: string | null; starts_at: number; ends_at: number;
+  status: "upcoming" | "live" | "ended"; units_sold: number; revenue_cents: number;
 }
 
 interface BundleRule {
-  id: string;
-  name: string;
-  min_items: number;
-  discount_pct: number;
-  products: Array<{ sku: string; name: string }>;
-  active: boolean;
-  usage_count: number;
+  id: string; name: string; min_items: number; discount_pct: number;
+  products: Array<{ sku: string; name: string }>; active: boolean; usage_count: number;
 }
 
 interface StackRule {
-  id: string;
-  promo_a_name: string;
-  promo_b_name: string;
-  can_stack: boolean;
-  priority: number;
-  note: string | null;
+  id: string; promo_a_name: string; promo_b_name: string;
+  can_stack: boolean; priority: number; note: string | null;
 }
 
 interface PromoAnalytics {
-  total_redemptions: number;
-  total_revenue_impact_cents: number;
-  avg_order_lift_pct: number;
+  total_redemptions: number; total_revenue_impact_cents: number; avg_order_lift_pct: number;
   top_promotions: Array<{ name: string; redemptions: number; revenue_cents: number }>;
   redemptions_by_day: Array<{ date: string; count: number }>;
   channel_split: { pos: number; ecommerce: number };
@@ -99,30 +64,23 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 const TYPE_LABELS: Record<PromoType, string> = {
-  percent_off: "% Off",
-  fixed_off:   "$ Off",
-  bogo:        "Buy 1 Get 1",
-  bundle:      "Bundle",
-  flash:       "Flash Sale",
+  percent_off: "% Off", fixed_off: "$ Off", bogo: "Buy 1 Get 1", bundle: "Bundle", flash: "Flash Sale",
 };
 
 const TYPE_CLS: Record<PromoType, string> = {
-  percent_off: "bg-indigo-100 text-indigo-700",
-  fixed_off:   "bg-blue-100 text-blue-700",
-  bogo:        "bg-purple-100 text-purple-700",
-  bundle:      "bg-teal-100 text-teal-700",
-  flash:       "bg-red-100 text-red-700",
+  percent_off: "bg-indigo-100 text-indigo-700", fixed_off: "bg-blue-100 text-blue-700",
+  bogo: "bg-purple-100 text-purple-700", bundle: "bg-teal-100 text-teal-700", flash: "bg-red-100 text-red-700",
 };
 
 const STATUS_CLS: Record<PromoStatus, string> = {
   active:    "bg-emerald-100 text-emerald-700",
   scheduled: "bg-blue-100 text-blue-700",
-  expired:   "bg-slate-100 text-slate-500",
+  expired:   "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)]",
   draft:     "bg-amber-100 text-amber-700",
 };
 
 const CHANNEL_CLS: Record<string, string> = {
-  all:       "bg-slate-100 text-slate-600",
+  all:       "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]",
   pos:       "bg-indigo-100 text-indigo-700",
   ecommerce: "bg-teal-100 text-teal-700",
 };
@@ -135,8 +93,8 @@ function Badge({ label, cls }: { label: string; cls: string }) {
 
 function formatValue(type: PromoType, value: number): string {
   if (type === "percent_off" || type === "flash") return `${value}% off`;
-  if (type === "fixed_off")  return `${formatMoney(value)} off`;
-  if (type === "bogo")       return "Buy 1 Get 1 Free";
+  if (type === "fixed_off") return `${formatMoney(value)} off`;
+  if (type === "bogo") return "Buy 1 Get 1 Free";
   return `${value}+ items`;
 }
 
@@ -153,30 +111,36 @@ function Countdown({ endsAt }: { endsAt: number }) {
   const h = Math.floor(remaining / 3600000);
   const m = Math.floor((remaining % 3600000) / 60000);
   const s = Math.floor((remaining % 60000) / 1000);
-  if (remaining === 0) return <span className="font-mono text-xs text-slate-400">Ended</span>;
+  if (remaining === 0) return <span className="font-mono text-[11px]" style={{ color: "var(--color-text-muted)" }}>Ended</span>;
   return (
-    <span className="font-mono text-xs font-bold text-red-600">
+    <span className="font-mono text-[11px] font-bold text-red-600">
       {String(h).padStart(2, "0")}:{String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}
     </span>
   );
 }
 
 function ErrorBanner({ msg }: { msg: string }) {
-  return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{msg}</p>;
+  return (
+    <p className="rounded-xl border px-5 py-4 text-[13px]"
+      style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>
+      {msg}
+    </p>
+  );
 }
 
 function Skeleton({ rows = 5 }: { rows?: number }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
-        <div className="h-3 w-48 animate-pulse rounded bg-slate-200" />
+    <div className="overflow-hidden rounded-xl border shadow-[var(--shadow-sm)]"
+      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+      <div className="border-b px-5 py-3" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
+        <div className="h-3 w-48 animate-skeleton rounded" />
       </div>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-[var(--color-table-border)]">
         {Array.from({ length: rows }, (_, i) => (
           <div key={i} className="flex items-center gap-4 px-5 py-3.5">
-            <div className="h-3 flex-1 animate-pulse rounded bg-slate-100" />
-            <div className="h-3 w-20 animate-pulse rounded bg-slate-100" />
-            <div className="h-3 w-16 animate-pulse rounded bg-slate-100" />
+            <div className="h-3 flex-1 animate-skeleton rounded" />
+            <div className="h-3 w-20 animate-skeleton rounded" />
+            <div className="h-3 w-16 animate-skeleton rounded" />
           </div>
         ))}
       </div>
@@ -253,32 +217,47 @@ function PromoFormModal({ initial, onSave, onClose }: {
     catch (ex) { setErr(ex instanceof ApiResponseError ? ex.message : "Save failed."); setSaving(false); }
   };
 
-  const inp = "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20";
+  const inp = "w-full rounded-lg border px-3 py-2 text-[13px] outline-none transition-all focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500";
+  const inpStyle = { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" };
+  const lbl = "mb-1 block text-[11px] font-medium";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="flex max-h-[90vh] w-full max-w-xl flex-col rounded-xl bg-white shadow-xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-900">{initial ? "Edit campaign" : "New campaign"}</h2>
-          <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-lg text-xl text-slate-400 hover:bg-slate-100">&times;</button>
+      <div className="flex max-h-[90vh] w-full max-w-xl flex-col rounded-2xl shadow-2xl"
+        style={{ backgroundColor: "var(--color-surface)" }}
+        onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--color-border)" }}>
+          <h2 className="text-[15px] font-semibold" style={{ color: "var(--color-text-primary)" }}>
+            {initial ? "Edit campaign" : "New campaign"}
+          </h2>
+          <button type="button" onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-xl transition-colors hover:bg-[var(--color-surface-subtle)]"
+            style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
-        <form id="promo-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {err && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>}
+        <form id="promo-form" onSubmit={handleSubmit} className="flex-1 space-y-4 overflow-y-auto px-5 py-4"
+          style={{ backgroundColor: "var(--color-surface-subtle)" }}>
+          {err && (
+            <p role="alert" className="rounded-xl border px-3 py-2 text-[13px]"
+              style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>
+              {err}
+            </p>
+          )}
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Campaign name <span className="text-red-500">*</span></label>
-            <input type="text" value={form.name} onChange={e => set("name", e.target.value)} placeholder="Summer Sale 20% Off" className={inp} required />
+            <label className={lbl} style={{ color: "var(--color-text-secondary)" }}>Campaign name <span className="text-red-500">*</span></label>
+            <input type="text" value={form.name} onChange={e => set("name", e.target.value)}
+              placeholder="Summer Sale 20% Off" className={inp} style={inpStyle} required />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Coupon code</label>
+              <label className={lbl} style={{ color: "var(--color-text-secondary)" }}>Coupon code</label>
               <input type="text" value={form.code} onChange={e => set("code", e.target.value.toUpperCase())}
-                placeholder="SUMMER20 (blank = auto-apply)" className={`${inp} font-mono`} />
+                placeholder="SUMMER20 (blank = auto-apply)" className={`${inp} font-mono`} style={inpStyle} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Status</label>
-              <select value={form.status} onChange={e => set("status", e.target.value as PromoStatus)} className={inp}>
+              <label className={lbl} style={{ color: "var(--color-text-secondary)" }}>Status</label>
+              <select value={form.status} onChange={e => set("status", e.target.value as PromoStatus)} className={inp} style={inpStyle}>
                 <option value="active">Active</option>
                 <option value="draft">Draft</option>
                 <option value="scheduled">Scheduled</option>
@@ -288,8 +267,8 @@ function PromoFormModal({ initial, onSave, onClose }: {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Discount type</label>
-              <select value={form.type} onChange={e => { set("type", e.target.value as PromoType); set("value", ""); }} className={inp}>
+              <label className={lbl} style={{ color: "var(--color-text-secondary)" }}>Discount type</label>
+              <select value={form.type} onChange={e => { set("type", e.target.value as PromoType); set("value", ""); }} className={inp} style={inpStyle}>
                 <option value="percent_off">Percentage off (%)</option>
                 <option value="fixed_off">Fixed amount off ($)</option>
                 <option value="bogo">Buy 1 Get 1 Free</option>
@@ -298,22 +277,23 @@ function PromoFormModal({ initial, onSave, onClose }: {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label className={lbl} style={{ color: "var(--color-text-secondary)" }}>
                 {form.type === "percent_off" || form.type === "flash" ? "Percent off" : form.type === "fixed_off" ? "Amount off ($)" : form.type === "bundle" ? "Min items in bundle" : "N/A"}
               </label>
               {form.type !== "bogo" ? (
                 <input type="number" step={form.type === "fixed_off" ? "0.01" : "1"} min="0"
-                  value={form.value} onChange={e => set("value", e.target.value)} placeholder="0" className={inp} />
+                  value={form.value} onChange={e => set("value", e.target.value)} placeholder="0" className={inp} style={inpStyle} />
               ) : (
-                <input readOnly value="Buy 1 Get 1 Free" className={`${inp} bg-slate-50 text-slate-500`} />
+                <input readOnly value="Buy 1 Get 1 Free" className={inp}
+                  style={{ ...inpStyle, backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }} />
               )}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Applies to</label>
-              <select value={form.scope} onChange={e => { set("scope", e.target.value as PromoScope); set("scope_value", ""); }} className={inp}>
+              <label className={lbl} style={{ color: "var(--color-text-secondary)" }}>Applies to</label>
+              <select value={form.scope} onChange={e => { set("scope", e.target.value as PromoScope); set("scope_value", ""); }} className={inp} style={inpStyle}>
                 <option value="all">All products</option>
                 <option value="category">Specific category</option>
                 <option value="product">Specific product SKU</option>
@@ -321,27 +301,27 @@ function PromoFormModal({ initial, onSave, onClose }: {
             </div>
             {form.scope !== "all" && (
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
+                <label className={lbl} style={{ color: "var(--color-text-secondary)" }}>
                   {form.scope === "category" ? "Category name" : "Product SKU"}
                 </label>
                 <input type="text" value={form.scope_value} onChange={e => set("scope_value", e.target.value)}
-                  placeholder={form.scope === "category" ? "Beverages" : "BEV-001"} className={inp} />
+                  placeholder={form.scope === "category" ? "Beverages" : "BEV-001"} className={inp} style={inpStyle} />
               </div>
             )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Channel</label>
-              <select value={form.channel} onChange={e => set("channel", e.target.value as PromoForm["channel"])} className={inp}>
+              <label className={lbl} style={{ color: "var(--color-text-secondary)" }}>Channel</label>
+              <select value={form.channel} onChange={e => set("channel", e.target.value as PromoForm["channel"])} className={inp} style={inpStyle}>
                 <option value="all">All channels</option>
                 <option value="pos">POS only</option>
                 <option value="ecommerce">Ecommerce only</option>
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Stackable with others?</label>
-              <select value={form.stackable ? "yes" : "no"} onChange={e => set("stackable", e.target.value === "yes")} className={inp}>
+              <label className={lbl} style={{ color: "var(--color-text-secondary)" }}>Stackable with others?</label>
+              <select value={form.stackable ? "yes" : "no"} onChange={e => set("stackable", e.target.value === "yes")} className={inp} style={inpStyle}>
                 <option value="yes">Yes — can stack</option>
                 <option value="no">No — exclusive</option>
               </select>
@@ -350,36 +330,51 @@ function PromoFormModal({ initial, onSave, onClose }: {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Starts</label>
-              <input type="date" value={form.starts_at} onChange={e => set("starts_at", e.target.value)} className={inp} />
+              <label className={lbl} style={{ color: "var(--color-text-secondary)" }}>Starts</label>
+              <input type="date" value={form.starts_at} onChange={e => set("starts_at", e.target.value)} className={inp} style={inpStyle} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Ends (optional)</label>
-              <input type="date" value={form.ends_at} onChange={e => set("ends_at", e.target.value)} className={inp} />
+              <label className={lbl} style={{ color: "var(--color-text-secondary)" }}>Ends (optional)</label>
+              <input type="date" value={form.ends_at} onChange={e => set("ends_at", e.target.value)} className={inp} style={inpStyle} />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Total usage limit</label>
+              <label className={lbl} style={{ color: "var(--color-text-secondary)" }}>Total usage limit</label>
               <input type="number" min="1" step="1" value={form.usage_limit}
-                onChange={e => set("usage_limit", e.target.value)} placeholder="Unlimited" className={inp} />
+                onChange={e => set("usage_limit", e.target.value)} placeholder="Unlimited" className={inp} style={inpStyle} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Per-customer limit</label>
+              <label className={lbl} style={{ color: "var(--color-text-secondary)" }}>Per-customer limit</label>
               <input type="number" min="1" step="1" value={form.per_customer_limit}
-                onChange={e => set("per_customer_limit", e.target.value)} placeholder="Unlimited" className={inp} />
+                onChange={e => set("per_customer_limit", e.target.value)} placeholder="Unlimited" className={inp} style={inpStyle} />
             </div>
           </div>
         </form>
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
-          <button type="button" onClick={onClose} className="min-h-[40px] rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+        <div className="flex justify-end gap-2 border-t px-5 py-3" style={{ borderColor: "var(--color-border)" }}>
+          <button type="button" onClick={onClose}
+            className="min-h-[40px] rounded-lg border px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Cancel</button>
           <button type="submit" form="promo-form" disabled={saving}
-            className="min-h-[40px] rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-[#4B4DC8] disabled:opacity-60">
+            className="min-h-[40px] rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-[#4B4DC8] disabled:opacity-60">
             {saving ? "Saving…" : initial ? "Save changes" : "Create campaign"}
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Summary card helper ────────────────────────────────────────────────────────
+
+function StatCard({ label, value, cls }: { label: string; value: string | number; cls?: string }) {
+  return (
+    <div className="rounded-xl border px-4 py-3 shadow-[var(--shadow-sm)]"
+      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ color: "var(--color-text-muted)" }}>{label}</p>
+      <p className={`mt-1 text-2xl font-bold tabular-nums ${cls ?? ""}`}
+        style={!cls ? { color: "var(--color-text-primary)" } : {}}>{value}</p>
     </div>
   );
 }
@@ -417,29 +412,24 @@ function CampaignsTab() {
   const scheduledCount = promos.filter(p => promoStatusFor(p) === "scheduled").length;
   const expiredCount   = promos.filter(p => promoStatusFor(p) === "expired").length;
 
+  const filterInputCls = "h-9 rounded-lg border px-3 text-[13px] outline-none transition-all focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500";
+  const filterInputStyle = { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" };
+
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          { label: "Total",     value: total,          cls: "text-slate-900" },
-          { label: "Active",    value: activeCount,    cls: "text-emerald-700" },
-          { label: "Scheduled", value: scheduledCount, cls: "text-blue-700" },
-          { label: "Expired",   value: expiredCount,   cls: "text-slate-400" },
-        ].map(m => (
-          <div key={m.label} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{m.label}</p>
-            <p className={`mt-1 text-2xl font-bold tabular-nums ${m.cls}`}>{m.value}</p>
-          </div>
-        ))}
+        <StatCard label="Total"     value={total}          />
+        <StatCard label="Active"    value={activeCount}    cls="text-emerald-700" />
+        <StatCard label="Scheduled" value={scheduledCount} cls="text-blue-700" />
+        <StatCard label="Expired"   value={expiredCount}   />
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 px-5 py-3.5">
+      <div className="overflow-hidden rounded-xl border shadow-[var(--shadow-sm)]"
+        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <div className="flex flex-wrap items-center gap-3 border-b px-5 py-3.5" style={{ borderColor: "var(--color-border)" }}>
           <input type="search" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search campaigns…"
-            className="h-9 w-56 rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20" />
-          <select value={status} onChange={e => setStatus(e.target.value)}
-            className="h-9 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 focus:border-brand-600 focus:outline-none">
+            placeholder="Search campaigns…" className={`w-56 ${filterInputCls}`} style={filterInputStyle} />
+          <select value={status} onChange={e => setStatus(e.target.value)} className={filterInputCls} style={filterInputStyle}>
             <option value="">All statuses</option>
             <option value="active">Active</option>
             <option value="scheduled">Scheduled</option>
@@ -448,26 +438,27 @@ function CampaignsTab() {
           </select>
           <Can permission="promotions.manage">
             <button type="button" onClick={() => setShowCreate(true)}
-              className="ml-auto rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+              className="ml-auto rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#4B4DC8]">
               + New Campaign
             </button>
           </Can>
         </div>
 
         {loading ? <Skeleton /> : error ? (
-          <p className="px-5 py-6 text-sm text-red-600">{error}</p>
+          <p className="px-5 py-6 text-[13px] text-red-600">{error}</p>
         ) : promos.length === 0 ? (
           <div className="py-12 text-center">
-            <p className="text-sm text-slate-500">No campaigns found.</p>
-            <button type="button" onClick={() => setShowCreate(true)} className="mt-1 text-sm font-medium text-brand-600 hover:underline">
+            <p className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>No campaigns found.</p>
+            <button type="button" onClick={() => setShowCreate(true)} className="mt-1 text-[13px] font-medium text-brand-600 hover:underline">
               Create your first campaign →
             </button>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-500">
-                <tr>
+            <table className="w-full text-[13px]">
+              <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+                <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.07em]"
+                  style={{ color: "var(--color-text-secondary)" }}>
                   <th className="px-5 py-3">Campaign</th>
                   <th className="px-5 py-3">Code</th>
                   <th className="px-5 py-3">Type</th>
@@ -481,49 +472,52 @@ function CampaignsTab() {
                   <th className="px-5 py-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[var(--color-table-border)]">
                 {promos.map(p => {
                   const computed = promoStatusFor(p);
                   const usagePct = p.usage_limit ? Math.min(100, (p.usage_count / p.usage_limit) * 100) : null;
                   return (
-                    <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                    <tr key={p.id} className="transition-colors hover:bg-[var(--color-table-row-hover)]">
                       <td className="px-5 py-3.5">
-                        <p className="font-semibold text-slate-900">{p.name}</p>
-                        <p className="text-xs text-slate-400">{TYPE_LABELS[p.type]}</p>
+                        <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{p.name}</p>
+                        <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{TYPE_LABELS[p.type]}</p>
                       </td>
                       <td className="px-5 py-3.5">
                         {p.code
-                          ? <code className="rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-bold text-brand-600">{p.code}</code>
-                          : <span className="text-xs text-slate-400">Auto-apply</span>}
+                          ? <code className="rounded bg-indigo-50 px-1.5 py-0.5 text-[11px] font-bold text-brand-600">{p.code}</code>
+                          : <span className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>Auto-apply</span>}
                       </td>
                       <td className="px-5 py-3.5">
                         <Badge label={TYPE_LABELS[p.type]} cls={TYPE_CLS[p.type]} />
                       </td>
-                      <td className="px-5 py-3.5 font-semibold text-slate-900">{formatValue(p.type, p.value)}</td>
-                      <td className="px-5 py-3.5 text-xs text-slate-500">
+                      <td className="px-5 py-3.5 font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatValue(p.type, p.value)}</td>
+                      <td className="px-5 py-3.5 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
                         {p.scope === "all" ? "All products" : `${p.scope === "category" ? "Cat:" : "SKU:"} ${p.scope_value}`}
                       </td>
                       <td className="px-5 py-3.5">
                         <Badge label={p.channel === "all" ? "All channels" : p.channel.toUpperCase()} cls={CHANNEL_CLS[p.channel]} />
                       </td>
-                      <td className="px-5 py-3.5 text-xs text-slate-500">
+                      <td className="px-5 py-3.5 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
                         {fmtDate(p.starts_at)}
-                        {p.ends_at && <><br /><span className="text-slate-400">→ {fmtDate(p.ends_at)}</span></>}
+                        {p.ends_at && <><br /><span style={{ color: "var(--color-text-muted)" }}>→ {fmtDate(p.ends_at)}</span></>}
                       </td>
                       <td className="px-5 py-3.5 text-right">
-                        <span className={`text-sm tabular-nums ${usagePct === 100 ? "font-bold text-orange-600" : "text-slate-700"}`}>
+                        <span className={`tabular-nums ${usagePct === 100 ? "font-bold text-orange-600" : ""}`}
+                          style={usagePct !== 100 ? { color: "var(--color-text-primary)" } : {}}>
                           {p.usage_count.toLocaleString()}
                         </span>
-                        {p.usage_limit && <span className="text-xs text-slate-400"> / {p.usage_limit.toLocaleString()}</span>}
+                        {p.usage_limit && <span className="text-[11px]" style={{ color: "var(--color-text-muted)" }}> / {p.usage_limit.toLocaleString()}</span>}
                         {usagePct !== null && (
-                          <div className="ml-auto mt-1 h-1 w-16 overflow-hidden rounded-full bg-slate-100">
+                          <div className="ml-auto mt-1 h-1 w-16 overflow-hidden rounded-full"
+                            style={{ backgroundColor: "var(--color-surface-subtle)" }}>
                             <div className={`h-full rounded-full ${usagePct >= 90 ? "bg-orange-500" : "bg-brand-600"}`}
                               style={{ width: `${usagePct}%` }} />
                           </div>
                         )}
                       </td>
                       <td className="px-5 py-3.5">
-                        <span className={`text-xs font-semibold ${p.stackable ? "text-emerald-600" : "text-slate-400"}`}>
+                        <span className={`text-[11px] font-semibold ${p.stackable ? "text-emerald-600" : ""}`}
+                          style={!p.stackable ? { color: "var(--color-text-muted)" } : {}}>
                           {p.stackable ? "Yes" : "No"}
                         </span>
                       </td>
@@ -534,11 +528,13 @@ function CampaignsTab() {
                         <Can permission="promotions.manage">
                           <div className="flex items-center gap-1.5">
                             <button type="button" onClick={() => setEditTarget(p)}
-                              className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100">
+                              className="rounded-lg border px-2.5 py-1 text-[11px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+                              style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
                               Edit
                             </button>
                             <button type="button" onClick={() => setDeleteTarget(p)}
-                              className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50">
+                              className="rounded-lg border px-2.5 py-1 text-[11px] font-medium text-red-600 transition-colors hover:bg-red-50"
+                              style={{ borderColor: "var(--color-border)" }}>
                               Delete
                             </button>
                           </div>
@@ -553,7 +549,8 @@ function CampaignsTab() {
         )}
 
         {!loading && promos.length > 0 && (
-          <div className="border-t border-slate-200 px-5 py-2.5 text-xs text-slate-400">
+          <div className="border-t px-5 py-2.5 text-[11px]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>
             {promos.length} of {total} campaigns
           </div>
         )}
@@ -574,12 +571,19 @@ function CampaignsTab() {
       )}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDeleteTarget(null)}>
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h2 className="text-base font-semibold text-slate-900">Delete &ldquo;{deleteTarget.name}&rdquo;?</h2>
-            <p className="mt-2 text-sm text-slate-600">This permanently removes the campaign and all its coupon codes. This cannot be undone.</p>
+          <div className="w-full max-w-sm rounded-2xl p-6 shadow-2xl"
+            style={{ backgroundColor: "var(--color-surface)" }}
+            onClick={e => e.stopPropagation()}>
+            <h2 className="text-[15px] font-semibold" style={{ color: "var(--color-text-primary)" }}>
+              Delete &ldquo;{deleteTarget.name}&rdquo;?
+            </h2>
+            <p className="mt-2 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
+              This permanently removes the campaign and all its coupon codes. This cannot be undone.
+            </p>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setDeleteTarget(null)}
-                className="min-h-[40px] rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+                className="min-h-[40px] rounded-lg border px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Cancel</button>
               <button type="button" disabled={deleting}
                 onClick={async () => {
                   setDeleting(true);
@@ -587,7 +591,7 @@ function CampaignsTab() {
                   catch { /* keep modal open */ }
                   finally { setDeleting(false); }
                 }}
-                className="min-h-[40px] rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60">
+                className="min-h-[40px] rounded-lg bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 disabled:opacity-60">
                 {deleting ? "Deleting…" : "Delete"}
               </button>
             </div>
@@ -641,52 +645,54 @@ function CouponsTab() {
   const usedCount   = codes.filter(c => c.used).length;
   const unusedCount = codes.filter(c => !c.used).length;
 
+  const filterInputStyle = { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" };
+
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: "Total Codes", value: codes.length, cls: "text-slate-900" },
-          { label: "Used",        value: usedCount,    cls: "text-slate-500" },
-          { label: "Available",   value: unusedCount,  cls: "text-emerald-700" },
-        ].map(m => (
-          <div key={m.label} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{m.label}</p>
-            <p className={`mt-1 text-2xl font-bold ${m.cls}`}>{m.value}</p>
-          </div>
-        ))}
+        <StatCard label="Total Codes" value={codes.length} />
+        <StatCard label="Used"        value={usedCount} />
+        <StatCard label="Available"   value={unusedCount} cls="text-emerald-700" />
       </div>
 
-      <div className="rounded-xl border border-blue-100 bg-blue-50 px-5 py-3 text-sm text-blue-700">
+      <div className="rounded-xl border border-blue-100 bg-blue-50 px-5 py-3 text-[13px] text-blue-700">
         Single-use codes are invalidated after one redemption. Multi-use codes can be redeemed up to the campaign&apos;s usage limit.
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 px-5 py-3.5">
+      <div className="overflow-hidden rounded-xl border shadow-[var(--shadow-sm)]"
+        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <div className="flex flex-wrap items-center gap-3 border-b px-5 py-3.5" style={{ borderColor: "var(--color-border)" }}>
           <input type="search" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search codes…"
-            className="h-9 w-48 rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20" />
+            className="h-9 w-48 rounded-lg border px-3 text-[13px] outline-none transition-all focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+            style={filterInputStyle} />
           {(["all", "used", "unused"] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)}
-              className={`rounded-full px-3 py-1 text-xs font-semibold capitalize transition-colors ${filter === f ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+              className={`rounded-full px-3 py-1 text-[11px] font-semibold capitalize transition-colors ${
+                filter === f ? "bg-brand-600 text-white" : "hover:bg-[var(--color-surface-subtle)]"
+              }`}
+              style={filter !== f ? { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" } : {}}>
               {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
           <Can permission="promotions.manage">
             <button type="button" onClick={() => void handleGenerate()} disabled={generating}
-              className="ml-auto rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+              className="ml-auto rounded-lg border px-4 py-2 text-[13px] font-semibold transition-colors hover:bg-[var(--color-surface-subtle)] disabled:opacity-50"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
               {generating ? "Generating…" : "Bulk Generate (10)"}
             </button>
             <button type="button"
-              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+              className="rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#4B4DC8]">
               + New Code
             </button>
           </Can>
         </div>
 
         {loading ? <Skeleton /> : error ? <ErrorBanner msg={error} /> : (
-          <table className="w-full text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-500">
-              <tr>
+          <table className="w-full text-[13px]">
+            <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+              <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.07em]"
+                style={{ color: "var(--color-text-secondary)" }}>
                 <th className="px-5 py-3">Code</th>
                 <th className="px-5 py-3">Campaign</th>
                 <th className="px-5 py-3">Type</th>
@@ -696,28 +702,32 @@ function CouponsTab() {
                 <th className="px-5 py-3">Created</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[var(--color-table-border)]">
               {filtered.map(c => (
-                <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                <tr key={c.id} className="transition-colors hover:bg-[var(--color-table-row-hover)]">
                   <td className="px-5 py-3.5">
-                    <code className="rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-bold text-brand-600">{c.code}</code>
+                    <code className="rounded bg-indigo-50 px-1.5 py-0.5 text-[11px] font-bold text-brand-600">{c.code}</code>
                   </td>
-                  <td className="px-5 py-3.5 text-slate-700">{c.promotion_name}</td>
+                  <td className="px-5 py-3.5" style={{ color: "var(--color-text-primary)" }}>{c.promotion_name}</td>
                   <td className="px-5 py-3.5">
                     <Badge label={c.type === "single_use" ? "Single-use" : "Multi-use"}
                       cls={c.type === "single_use" ? "bg-purple-100 text-purple-700" : "bg-teal-100 text-teal-700"} />
                   </td>
                   <td className="px-5 py-3.5">
                     <Badge label={c.used ? "Used" : "Available"}
-                      cls={c.used ? "bg-slate-100 text-slate-500" : "bg-emerald-100 text-emerald-700"} />
+                      cls={c.used ? "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)]" : "bg-emerald-100 text-emerald-700"} />
                   </td>
-                  <td className="px-5 py-3.5 text-slate-600">{c.customer_name ?? "—"}</td>
-                  <td className="px-5 py-3.5 text-xs text-slate-500">{c.used_at ? fmtDateTime(c.used_at) : "—"}</td>
-                  <td className="px-5 py-3.5 text-xs text-slate-500">{fmtDate(c.created_at)}</td>
+                  <td className="px-5 py-3.5" style={{ color: "var(--color-text-secondary)" }}>{c.customer_name ?? "—"}</td>
+                  <td className="px-5 py-3.5 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{c.used_at ? fmtDateTime(c.used_at) : "—"}</td>
+                  <td className="px-5 py-3.5 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{fmtDate(c.created_at)}</td>
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={7} className="py-10 text-center text-sm text-slate-400">No codes match your search.</td></tr>
+                <tr>
+                  <td colSpan={7} className="py-10 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>
+                    No codes match your search.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -749,7 +759,7 @@ function FlashSalesTab() {
   const SALE_STATUS_CLS: Record<FlashSale["status"], string> = {
     upcoming: "bg-blue-100 text-blue-700",
     live:     "bg-red-100 text-red-700",
-    ended:    "bg-slate-100 text-slate-500",
+    ended:    "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)]",
   };
 
   if (error) return <ErrorBanner msg={error} />;
@@ -757,37 +767,39 @@ function FlashSalesTab() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-red-100 bg-red-50 px-5 py-3 text-sm text-red-700">
+      <div className="rounded-xl border border-red-100 bg-red-50 px-5 py-3 text-[13px] text-red-700">
         Flash sales apply time-limited discounts across all channels simultaneously. Live sales show a real-time countdown.
       </div>
       <div className="space-y-3">
         {sales.map(s => (
-          <div key={s.id} className={`overflow-hidden rounded-xl border shadow-sm ${s.status === "live" ? "border-red-200 bg-red-50" : "border-slate-200 bg-white"}`}>
+          <div key={s.id} className={`overflow-hidden rounded-xl border shadow-[var(--shadow-sm)] ${s.status === "live" ? "border-red-200 bg-red-50" : ""}`}
+            style={s.status !== "live" ? { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" } : {}}>
             <div className="flex items-center justify-between gap-4 px-5 py-4">
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="font-semibold text-slate-900">{s.name}</p>
+                  <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{s.name}</p>
                   <Badge label={s.status === "live" ? "LIVE" : s.status.charAt(0).toUpperCase() + s.status.slice(1)} cls={SALE_STATUS_CLS[s.status]} />
                 </div>
-                <p className="mt-0.5 text-xs text-slate-500">
+                <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
                   {s.discount_pct}% off · {s.scope === "all" ? "All products" : `${s.scope === "category" ? "Category" : "SKU"}: ${s.scope_value}`}
                 </p>
-                <p className="mt-0.5 text-xs text-slate-400">
+                <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-muted)" }}>
                   {fmtDateTime(s.starts_at)} → {fmtDateTime(s.ends_at)}
                 </p>
               </div>
-              <div className="text-right shrink-0">
+              <div className="shrink-0 text-right">
                 {s.status === "live" && (
                   <div className="mb-1">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-red-500">Ends in</p>
+                    <p className="text-[9px] font-semibold uppercase tracking-wider text-red-500">Ends in</p>
                     <Countdown endsAt={s.ends_at} />
                   </div>
                 )}
-                <p className="text-sm font-semibold text-slate-900">{s.units_sold.toLocaleString()} sold</p>
-                <p className="text-xs text-slate-400">{formatMoney(s.revenue_cents)} revenue</p>
+                <p className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>{s.units_sold.toLocaleString()} sold</p>
+                <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{formatMoney(s.revenue_cents)} revenue</p>
               </div>
               <Can permission="promotions.manage">
-                <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                <button className="rounded-lg border px-3 py-1.5 text-[11px] font-semibold transition-colors hover:bg-[var(--color-surface-subtle)]"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
                   {s.status === "upcoming" ? "Edit" : "View"}
                 </button>
               </Can>
@@ -795,12 +807,12 @@ function FlashSalesTab() {
           </div>
         ))}
         {sales.length === 0 && (
-          <p className="py-10 text-center text-sm text-slate-400">No flash sales configured.</p>
+          <p className="py-10 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>No flash sales configured.</p>
         )}
       </div>
       <Can permission="promotions.manage">
         <div className="flex justify-end">
-          <button className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+          <button className="rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#4B4DC8]">
             + Create Flash Sale
           </button>
         </div>
@@ -827,47 +839,50 @@ function BundlesTab() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-teal-100 bg-teal-50 px-5 py-3 text-sm text-teal-700">
+      <div className="rounded-xl border border-teal-100 bg-teal-50 px-5 py-3 text-[13px] text-teal-700">
         Bundle rules trigger a discount when all required products are in the same cart. Min-item count can be configured per bundle.
       </div>
-      <div className="flex justify-between items-center">
-        <p className="text-sm text-slate-500">{bundles.length} bundle rules</p>
+      <div className="flex items-center justify-between">
+        <p className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>{bundles.length} bundle rules</p>
         <Can permission="promotions.manage">
-          <button className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+          <button className="rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#4B4DC8]">
             + New Bundle Rule
           </button>
         </Can>
       </div>
       <div className="space-y-3">
         {bundles.map(b => (
-          <div key={b.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div key={b.id} className="rounded-xl border p-5 shadow-[var(--shadow-sm)]"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="font-semibold text-slate-900">{b.name}</p>
+                  <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{b.name}</p>
                   <Badge label={b.active ? "Active" : "Inactive"}
-                    cls={b.active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"} />
+                    cls={b.active ? "bg-emerald-100 text-emerald-700" : "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)]"} />
                 </div>
-                <p className="mt-0.5 text-xs text-slate-500">
+                <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
                   Buy {b.min_items}+ items from this bundle → {b.discount_pct}% off · {b.usage_count.toLocaleString()} uses
                 </p>
               </div>
               <Can permission="promotions.manage">
-                <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">Edit</button>
+                <button className="rounded-lg border px-3 py-1.5 text-[11px] font-semibold transition-colors hover:bg-[var(--color-surface-subtle)]"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Edit</button>
               </Can>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {b.products.map(p => (
-                <div key={p.sku} className="flex items-center gap-1.5 rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5">
-                  <span className="font-mono text-[10px] text-slate-400">{p.sku}</span>
-                  <span className="text-xs text-slate-700">{p.name}</span>
+                <div key={p.sku} className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5"
+                  style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
+                  <span className="font-mono text-[10px]" style={{ color: "var(--color-text-muted)" }}>{p.sku}</span>
+                  <span className="text-[11px]" style={{ color: "var(--color-text-primary)" }}>{p.name}</span>
                 </div>
               ))}
             </div>
           </div>
         ))}
         {bundles.length === 0 && (
-          <p className="py-10 text-center text-sm text-slate-400">No bundle rules configured.</p>
+          <p className="py-10 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>No bundle rules configured.</p>
         )}
       </div>
     </div>
@@ -892,21 +907,23 @@ function StackabilityTab() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-amber-100 bg-amber-50 px-5 py-3 text-sm text-amber-700">
+      <div className="rounded-xl border border-amber-100 bg-amber-50 px-5 py-3 text-[13px] text-amber-700">
         Stackability rules define which promotions can be applied together in a single transaction. If no rule exists for a pair, the system uses the campaign&apos;s default stackable flag.
       </div>
-      <div className="flex justify-between items-center">
-        <p className="text-sm text-slate-500">{rules.length} stacking rules</p>
+      <div className="flex items-center justify-between">
+        <p className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>{rules.length} stacking rules</p>
         <Can permission="promotions.manage">
-          <button className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+          <button className="rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#4B4DC8]">
             + New Rule
           </button>
         </Can>
       </div>
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-500">
-            <tr>
+      <div className="overflow-hidden rounded-xl border shadow-[var(--shadow-sm)]"
+        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <table className="w-full text-[13px]">
+          <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+            <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.07em]"
+              style={{ color: "var(--color-text-secondary)" }}>
               <th className="px-5 py-3">Promotion A</th>
               <th className="px-5 py-3">Promotion B</th>
               <th className="px-5 py-3">Can Stack?</th>
@@ -915,22 +932,23 @@ function StackabilityTab() {
               <th className="px-5 py-3" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-[var(--color-table-border)]">
             {rules.map(r => (
-              <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                <td className="px-5 py-3.5 font-medium text-slate-900">{r.promo_a_name}</td>
-                <td className="px-5 py-3.5 font-medium text-slate-900">{r.promo_b_name}</td>
+              <tr key={r.id} className="transition-colors hover:bg-[var(--color-table-row-hover)]">
+                <td className="px-5 py-3.5 font-medium" style={{ color: "var(--color-text-primary)" }}>{r.promo_a_name}</td>
+                <td className="px-5 py-3.5 font-medium" style={{ color: "var(--color-text-primary)" }}>{r.promo_b_name}</td>
                 <td className="px-5 py-3.5">
                   <Badge
                     label={r.can_stack ? "✓ Can stack" : "✗ Exclusive"}
                     cls={r.can_stack ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}
                   />
                 </td>
-                <td className="px-5 py-3.5 text-slate-600">{r.priority}</td>
-                <td className="px-5 py-3.5 text-xs text-slate-500">{r.note ?? "—"}</td>
+                <td className="px-5 py-3.5" style={{ color: "var(--color-text-secondary)" }}>{r.priority}</td>
+                <td className="px-5 py-3.5 text-[11px]" style={{ color: "var(--color-text-muted)" }}>{r.note ?? "—"}</td>
                 <td className="px-5 py-3.5">
                   <Can permission="promotions.manage">
-                    <button className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                    <button className="rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-colors hover:bg-[var(--color-surface-subtle)]"
+                      style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
                       Edit
                     </button>
                   </Can>
@@ -938,7 +956,11 @@ function StackabilityTab() {
               </tr>
             ))}
             {rules.length === 0 && (
-              <tr><td colSpan={6} className="py-10 text-center text-sm text-slate-400">No stackability rules defined. Campaign defaults apply.</td></tr>
+              <tr>
+                <td colSpan={6} className="py-10 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>
+                  No stackability rules defined. Campaign defaults apply.
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
@@ -961,7 +983,7 @@ function AnalyticsTab() {
   }, []);
 
   if (error) return <ErrorBanner msg={error} />;
-  if (loading) return <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-100" />)}</div>;
+  if (loading) return <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="h-24 animate-skeleton rounded-xl" />)}</div>;
   if (!data) return null;
 
   const maxRedemptions = Math.max(...data.redemptions_by_day.map(d => d.count), 1);
@@ -969,68 +991,62 @@ function AnalyticsTab() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {[
-          { label: "Total Redemptions",  value: data.total_redemptions.toLocaleString(),               sub: "all time" },
-          { label: "Revenue Impact",     value: formatMoney(data.total_revenue_impact_cents),           sub: "discount given" },
-          { label: "Avg Order Lift",     value: `+${data.avg_order_lift_pct.toFixed(1)}%`,             sub: "vs no-promo orders" },
-          { label: "Channel Split",      value: `${data.channel_split.pos}% POS`,                      sub: `${data.channel_split.ecommerce}% ecommerce` },
-        ].map(m => (
-          <div key={m.label} className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{m.label}</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900">{m.value}</p>
-            {m.sub && <p className="mt-0.5 text-xs text-slate-400">{m.sub}</p>}
-          </div>
-        ))}
+        <StatCard label="Total Redemptions" value={data.total_redemptions.toLocaleString()} />
+        <StatCard label="Revenue Impact"    value={formatMoney(data.total_revenue_impact_cents)} />
+        <StatCard label="Avg Order Lift"    value={`+${data.avg_order_lift_pct.toFixed(1)}%`} cls="text-emerald-700" />
+        <StatCard label="Channel Split"     value={`${data.channel_split.pos}% POS`} />
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">Redemptions — Last 14 Days</h3>
+      <div className="rounded-xl border p-5 shadow-[var(--shadow-sm)]"
+        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <h3 className="mb-4 text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Redemptions — Last 14 Days</h3>
         <div className="flex h-32 items-end gap-1">
           {data.redemptions_by_day.map(d => (
-            <div key={d.date} className="group relative flex-1 flex flex-col items-center gap-1">
-              <div
-                className="w-full rounded-t bg-brand-600 transition-opacity group-hover:opacity-80"
-                style={{ height: `${Math.max(4, (d.count / maxRedemptions) * 100)}%` }}
-              />
-              <span className="text-[9px] text-slate-400 rotate-45 origin-left mt-1 hidden group-hover:block absolute -bottom-4">
+            <div key={d.date} className="group relative flex flex-1 flex-col items-center gap-1">
+              <div className="w-full rounded-t bg-brand-600 transition-opacity group-hover:opacity-80"
+                style={{ height: `${Math.max(4, (d.count / maxRedemptions) * 100)}%` }} />
+              <span className="absolute -bottom-4 mt-1 hidden origin-left rotate-45 text-[9px] group-hover:block"
+                style={{ color: "var(--color-text-muted)" }}>
                 {d.date.slice(5)}
               </span>
             </div>
           ))}
         </div>
-        <div className="mt-3 flex justify-between text-[10px] text-slate-400">
+        <div className="mt-3 flex justify-between text-[10px]" style={{ color: "var(--color-text-muted)" }}>
           <span>{data.redemptions_by_day[0]?.date ?? ""}</span>
           <span>{data.redemptions_by_day[data.redemptions_by_day.length - 1]?.date ?? ""}</span>
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-5 py-3.5">
-          <h3 className="text-sm font-semibold text-slate-900">Top Campaigns by Redemption</h3>
+      <div className="overflow-hidden rounded-xl border shadow-[var(--shadow-sm)]"
+        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <div className="border-b px-5 py-3.5" style={{ borderColor: "var(--color-border)" }}>
+          <h3 className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Top Campaigns by Redemption</h3>
         </div>
-        <table className="w-full text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-500">
-            <tr>
+        <table className="w-full text-[13px]">
+          <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+            <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.07em]"
+              style={{ color: "var(--color-text-secondary)" }}>
               <th className="px-5 py-3">Campaign</th>
               <th className="px-5 py-3 text-right">Redemptions</th>
               <th className="px-5 py-3 text-right">Revenue Impact</th>
               <th className="px-5 py-3">Share</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-[var(--color-table-border)]">
             {data.top_promotions.map((p, i) => {
               const pct = data.total_redemptions > 0 ? Math.round((p.redemptions / data.total_redemptions) * 100) : 0;
               return (
-                <tr key={i} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-5 py-3.5 font-medium text-slate-900">{p.name}</td>
-                  <td className="px-5 py-3.5 text-right font-semibold text-slate-900">{p.redemptions.toLocaleString()}</td>
+                <tr key={i} className="transition-colors hover:bg-[var(--color-table-row-hover)]">
+                  <td className="px-5 py-3.5 font-medium" style={{ color: "var(--color-text-primary)" }}>{p.name}</td>
+                  <td className="px-5 py-3.5 text-right font-semibold" style={{ color: "var(--color-text-primary)" }}>{p.redemptions.toLocaleString()}</td>
                   <td className="px-5 py-3.5 text-right text-red-600">{formatMoney(p.revenue_cents)}</td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
+                      <div className="h-1.5 w-24 overflow-hidden rounded-full" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
                         <div className="h-full rounded-full bg-brand-600" style={{ width: `${pct}%` }} />
                       </div>
-                      <span className="text-xs text-slate-500">{pct}%</span>
+                      <span className="text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{pct}%</span>
                     </div>
                   </td>
                 </tr>
@@ -1057,18 +1073,16 @@ export default function PromotionsPage() {
     >
       <div className="mx-auto w-full max-w-7xl space-y-0 px-4 py-5 sm:px-6">
         {/* Tabs */}
-        <div className="border-b border-slate-200">
+        <div className="border-b" style={{ borderColor: "var(--color-border)" }}>
           <nav className="-mb-px flex gap-1 overflow-x-auto">
             {TABS.map(t => (
-              <button
-                key={t.key}
-                onClick={() => setActiveTab(t.key)}
-                className={`shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+              <button key={t.key} onClick={() => setActiveTab(t.key)}
+                className={`shrink-0 border-b-2 px-4 py-3 text-[13px] font-medium transition-colors ${
                   activeTab === t.key
                     ? "border-brand-600 text-brand-600"
-                    : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                    : "border-transparent hover:border-[var(--color-border)]"
                 }`}
-              >
+                style={activeTab !== t.key ? { color: "var(--color-text-secondary)" } : {}}>
                 {t.label}
               </button>
             ))}

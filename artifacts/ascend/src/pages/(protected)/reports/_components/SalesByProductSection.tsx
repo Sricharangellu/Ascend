@@ -61,40 +61,45 @@ export function SalesByProductSection({ range }: { range: string }) {
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 border-y border-slate-100">
-              <tr className="text-left text-[11px] font-semibold text-slate-500 uppercase tracking-[0.07em]">
+          <table className="min-w-full text-[13px]">
+            <thead style={{ backgroundColor: "var(--color-table-header)", borderTop: "1px solid var(--color-border)", borderBottom: "1px solid var(--color-border)" }}>
+              <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.07em]"
+                style={{ color: "var(--color-text-secondary)" }}>
                 <th className="px-4 py-2.5 w-7">#</th>
-                <th className="px-4 py-2.5 cursor-pointer select-none hover:text-slate-800 transition-colors" onClick={() => toggleSort("name")}>
+                <th className="px-4 py-2.5 cursor-pointer select-none transition-colors hover:text-[var(--color-text-primary)]" onClick={() => toggleSort("name")}>
                   Product <Indicator k="name" />
                 </th>
                 <th className="px-4 py-2.5">Category</th>
-                <th className="px-4 py-2.5 text-right cursor-pointer select-none hover:text-slate-800 transition-colors" onClick={() => toggleSort("units")}>
+                <th className="px-4 py-2.5 text-right cursor-pointer select-none transition-colors hover:text-[var(--color-text-primary)]" onClick={() => toggleSort("units")}>
                   Units <Indicator k="units" />
                 </th>
-                <th className="px-4 py-2.5 text-right cursor-pointer select-none hover:text-slate-800 transition-colors" onClick={() => toggleSort("revenueCents")}>
+                <th className="px-4 py-2.5 text-right cursor-pointer select-none transition-colors hover:text-[var(--color-text-primary)]" onClick={() => toggleSort("revenueCents")}>
                   Revenue <Indicator k="revenueCents" />
                 </th>
-                <th className="px-4 py-2.5 text-right cursor-pointer select-none hover:text-slate-800 transition-colors" onClick={() => toggleSort("marginPct")}>
+                <th className="px-4 py-2.5 text-right cursor-pointer select-none transition-colors hover:text-[var(--color-text-primary)]" onClick={() => toggleSort("marginPct")}>
                   Margin <Indicator k="marginPct" />
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-[var(--color-table-border)]">
               {sorted.map((row, idx) => (
-                <tr key={row.productId} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="px-4 py-2.5 text-xs text-slate-400 tabular-nums">{idx + 1}</td>
+                <tr key={row.productId} className="transition-colors hover:bg-[var(--color-table-row-hover)]">
+                  <td className="px-4 py-2.5 text-[11px] tabular-nums" style={{ color: "var(--color-text-muted)" }}>{idx + 1}</td>
                   <td className="px-4 py-2.5">
-                    <p className="font-medium text-slate-900 leading-tight">{row.name}</p>
-                    <p className="text-[11px] text-slate-400 font-mono">{row.sku}</p>
+                    <p className="font-medium leading-tight" style={{ color: "var(--color-text-primary)" }}>{row.name}</p>
+                    <p className="text-[11px] font-mono" style={{ color: "var(--color-text-muted)" }}>{row.sku}</p>
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">{row.category}</span>
+                    <span className="inline-block rounded-full px-2 py-0.5 text-[11px] font-medium"
+                      style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
+                      {row.category}
+                    </span>
                   </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">{row.units.toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums font-medium text-slate-900">{formatMoney(row.revenueCents)}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{row.units.toLocaleString()}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums font-medium" style={{ color: "var(--color-text-primary)" }}>{formatMoney(row.revenueCents)}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">
-                    <span className={`font-semibold ${row.marginPct >= 50 ? "text-emerald-600" : row.marginPct >= 35 ? "text-slate-700" : "text-amber-600"}`}>
+                    <span className={`font-semibold ${row.marginPct >= 50 ? "text-emerald-600" : row.marginPct >= 35 ? "" : "text-amber-600"}`}
+                      style={row.marginPct >= 35 && row.marginPct < 50 ? { color: "var(--color-text-secondary)" } : {}}>
                       {row.marginPct}%
                     </span>
                   </td>

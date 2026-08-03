@@ -221,7 +221,7 @@ export default function AccountingPage() {
                 {sweepBusy ? "Running sweep…" : "Run Dunning Sweep"}
               </Button>
               {sweepResult !== null && (
-                <span className="text-xs text-slate-500">
+                <span className="text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
                   {sweepResult === 0
                     ? "All invoices already up-to-date."
                     : `${sweepResult} invoice${sweepResult !== 1 ? "s" : ""} flagged.`}

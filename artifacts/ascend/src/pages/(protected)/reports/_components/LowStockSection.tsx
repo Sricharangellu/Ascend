@@ -41,15 +41,16 @@ export function LowStockSection() {
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-9" />)}
         </div>
       ) : items.length === 0 ? (
-        <div className="px-5 pb-5 flex items-center gap-2 text-sm text-slate-500">
+        <div className="px-5 pb-5 flex items-center gap-2 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
           <span className="text-emerald-500 text-base">✓</span>
           All products are above their reorder points.
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 border-y border-slate-100">
-              <tr className="text-left text-[11px] font-semibold text-slate-500 uppercase tracking-[0.07em]">
+          <table className="min-w-full text-[13px]">
+            <thead style={{ backgroundColor: "var(--color-table-header)", borderTop: "1px solid var(--color-border)", borderBottom: "1px solid var(--color-border)" }}>
+              <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.07em]"
+                style={{ color: "var(--color-text-secondary)" }}>
                 <th className="px-4 py-2.5">Product</th>
                 <th className="px-4 py-2.5">Category</th>
                 <th className="px-4 py-2.5 text-right">On Hand</th>
@@ -58,24 +59,27 @@ export function LowStockSection() {
                 <th className="px-4 py-2.5 text-right">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-[var(--color-table-border)]">
               {items.map((row) => {
                 const shortage = row.reorder_pt - row.stock_qty;
                 const isOut    = row.stock_qty === 0;
                 return (
-                  <tr key={row.id} className="hover:bg-slate-50/70 transition-colors">
+                  <tr key={row.id} className="transition-colors hover:bg-[var(--color-table-row-hover)]">
                     <td className="px-4 py-2.5">
-                      <p className="font-medium text-slate-900">{row.name}</p>
-                      <p className="text-[11px] text-slate-400 font-mono">{row.sku}</p>
+                      <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{row.name}</p>
+                      <p className="text-[11px] font-mono" style={{ color: "var(--color-text-muted)" }}>{row.sku}</p>
                     </td>
                     <td className="px-4 py-2.5">
-                      <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">{row.category}</span>
+                      <span className="inline-block rounded-full px-2 py-0.5 text-[11px] font-medium"
+                        style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
+                        {row.category}
+                      </span>
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-amber-700">{row.stock_qty}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-slate-600">{row.reorder_pt}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{row.reorder_pt}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-red-600 font-medium">{shortage}</td>
                     <td className="px-4 py-2.5 text-right">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                         isOut ? "bg-red-50 text-red-700 ring-1 ring-inset ring-red-200"
                               : "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200"
                       }`}>

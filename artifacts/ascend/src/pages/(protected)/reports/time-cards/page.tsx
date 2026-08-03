@@ -9,25 +9,13 @@ import { apiGet } from "@/api-client/client";
 import { fmtTime, fmtDateShort } from "@/lib/date";
 
 interface TimeEntry {
-  employee_id: string;
-  employee_name: string;
-  clock_in: number;
-  clock_out: number | null;
-  break_minutes: number;
-  worked_minutes: number | null;
+  employee_id: string; employee_name: string; clock_in: number; clock_out: number | null;
+  break_minutes: number; worked_minutes: number | null;
 }
-
 interface EmployeeSummary {
-  employeeId: string;
-  employeeName: string;
-  totalHours: number;
-  entryCount: number;
+  employeeId: string; employeeName: string; totalHours: number; entryCount: number;
 }
-
-interface TimeCardsResponse {
-  entries: TimeEntry[];
-  summary: EmployeeSummary[];
-}
+interface TimeCardsResponse { entries: TimeEntry[]; summary: EmployeeSummary[]; }
 
 function formatDuration(minutes: number | null): string {
   if (minutes === null) return "In progress";
@@ -63,30 +51,22 @@ export default function TimeCardsPage() {
       <div className="mx-auto w-full max-w-6xl space-y-5 px-4 py-5 sm:px-6">
         <ReportsSubNav />
 
-        {/* Filter bar */}
         <div className="flex flex-wrap items-center gap-3">
-          <select
-            value={range}
-            onChange={(e) => setRange(e.target.value)}
-            className="h-8 rounded border border-slate-200 bg-white px-3 text-[13px] outline-none focus:border-brand-600"
-          >
+          <select value={range} onChange={(e) => setRange(e.target.value)}
+            className="h-8 rounded-lg border px-3 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}>
             <option value="7d">Last 7 days</option>
             <option value="30d">Last 30 days</option>
             <option value="90d">Last 90 days</option>
           </select>
-          <select
-            value={selectedEmployee ?? ""}
-            onChange={(e) => setSelectedEmployee(e.target.value || null)}
-            className="h-8 rounded border border-slate-200 bg-white px-3 text-[13px] outline-none focus:border-brand-600"
-          >
+          <select value={selectedEmployee ?? ""} onChange={(e) => setSelectedEmployee(e.target.value || null)}
+            className="h-8 rounded-lg border px-3 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}>
             <option value="">All employees</option>
-            {summary.map((s) => (
-              <option key={s.employeeId} value={s.employeeId}>{s.employeeName}</option>
-            ))}
+            {summary.map((s) => <option key={s.employeeId} value={s.employeeId}>{s.employeeName}</option>)}
           </select>
         </div>
 
-        {/* KPI tiles */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           <KpiCard title="Total Hours" value={`${totalHours.toFixed(1)}h`} loading={loading} tone="blue" />
           <KpiCard title="Employees" value={summary.length.toLocaleString()} loading={loading} tone="neutral" />
@@ -94,30 +74,29 @@ export default function TimeCardsPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
-          {/* Employee summary */}
           <div className="lg:col-span-2">
             <Card>
-              <h3 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">
-                By Employee
-              </h3>
+              <h3 className="mb-3 text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>By Employee</h3>
               {loading ? (
-                <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-12 animate-pulse rounded bg-gray-100" />)}</div>
+                <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-12 animate-skeleton rounded" />)}</div>
               ) : summary.length === 0 ? (
-                <p className="py-6 text-center text-sm text-[var(--color-text-secondary)]">No time entries in this period.</p>
+                <p className="py-6 text-center text-[13px]" style={{ color: "var(--color-text-secondary)" }}>No time entries in this period.</p>
               ) : (
                 <ul className="divide-y divide-[var(--color-table-border)]">
                   {summary.map((s) => (
                     <li key={s.employeeId}>
-                      <button
-                        type="button"
+                      <button type="button"
                         onClick={() => setSelectedEmployee(selectedEmployee === s.employeeId ? null : s.employeeId)}
-                        className={`w-full px-2 py-3 text-left rounded-lg transition-colors ${selectedEmployee === s.employeeId ? "bg-brand-50" : "hover:bg-gray-50"}`}
-                      >
+                        className={`w-full rounded-lg px-2 py-3 text-left transition-colors ${
+                          selectedEmployee === s.employeeId ? "bg-brand-50" : "hover:bg-[var(--color-table-row-hover)]"
+                        }`}>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-[var(--color-text-primary)]">{s.employeeName}</span>
-                          <span className="text-sm font-bold text-[var(--color-text-primary)]">{s.totalHours.toFixed(1)}h</span>
+                          <span className="text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>{s.employeeName}</span>
+                          <span className="text-[13px] font-bold" style={{ color: "var(--color-text-primary)" }}>{s.totalHours.toFixed(1)}h</span>
                         </div>
-                        <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">{s.entryCount} shift{s.entryCount !== 1 ? "s" : ""}</p>
+                        <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
+                          {s.entryCount} shift{s.entryCount !== 1 ? "s" : ""}
+                        </p>
                       </button>
                     </li>
                   ))}
@@ -126,20 +105,20 @@ export default function TimeCardsPage() {
             </Card>
           </div>
 
-          {/* Entry detail */}
           <div className="lg:col-span-3">
             <Card>
-              <h3 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">
+              <h3 className="mb-3 text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>
                 {selectedEmployee ? `Shifts — ${summary.find(s => s.employeeId === selectedEmployee)?.employeeName}` : "All Shifts"}
               </h3>
               {loading ? (
-                <div className="space-y-2">{[1,2,3,4,5].map(i => <div key={i} className="h-10 animate-pulse rounded bg-gray-100" />)}</div>
+                <div className="space-y-2">{[1,2,3,4,5].map(i => <div key={i} className="h-10 animate-skeleton rounded" />)}</div>
               ) : entries.length === 0 ? (
-                <p className="py-8 text-center text-sm text-[var(--color-text-secondary)]">No entries.</p>
+                <p className="py-8 text-center text-[13px]" style={{ color: "var(--color-text-secondary)" }}>No entries.</p>
               ) : (
-                <table className="w-full text-sm">
+                <table className="w-full text-[13px]">
                   <thead>
-                    <tr className="border-b border-[var(--color-table-border)] text-xs text-[var(--color-text-secondary)]">
+                    <tr className="text-[10px] font-semibold uppercase tracking-[0.07em]"
+                      style={{ borderBottom: "1px solid var(--color-table-border)", color: "var(--color-text-secondary)" }}>
                       <th className="pb-2 text-left">Employee</th>
                       <th className="pb-2 text-left">Date</th>
                       <th className="pb-2 text-left">In</th>
@@ -150,13 +129,17 @@ export default function TimeCardsPage() {
                   </thead>
                   <tbody className="divide-y divide-[var(--color-table-border)]">
                     {entries.map((e, i) => (
-                      <tr key={i} className="hover:bg-gray-50">
-                        <td className="py-2 font-medium text-[var(--color-text-primary)]">{e.employee_name}</td>
-                        <td className="py-2 text-[var(--color-text-secondary)]">{fmtDateShort(e.clock_in)}</td>
-                        <td className="py-2 text-[var(--color-text-secondary)]">{fmtTime(e.clock_in)}</td>
-                        <td className="py-2 text-[var(--color-text-secondary)]">{e.clock_out ? fmtTime(e.clock_out) : <span className="text-success-600 font-medium">Active</span>}</td>
-                        <td className="py-2 text-[var(--color-text-secondary)]">{e.break_minutes > 0 ? `${e.break_minutes}m` : "—"}</td>
-                        <td className="py-2 text-right font-medium tabular-nums text-[var(--color-text-primary)]">
+                      <tr key={i} className="transition-colors hover:bg-[var(--color-table-row-hover)]">
+                        <td className="py-2 font-medium" style={{ color: "var(--color-text-primary)" }}>{e.employee_name}</td>
+                        <td className="py-2" style={{ color: "var(--color-text-secondary)" }}>{fmtDateShort(e.clock_in)}</td>
+                        <td className="py-2" style={{ color: "var(--color-text-secondary)" }}>{fmtTime(e.clock_in)}</td>
+                        <td className="py-2" style={{ color: "var(--color-text-secondary)" }}>
+                          {e.clock_out ? fmtTime(e.clock_out) : <span className="font-medium text-success-600">Active</span>}
+                        </td>
+                        <td className="py-2" style={{ color: "var(--color-text-secondary)" }}>
+                          {e.break_minutes > 0 ? `${e.break_minutes}m` : "—"}
+                        </td>
+                        <td className="py-2 text-right tabular-nums font-medium" style={{ color: "var(--color-text-primary)" }}>
                           {formatDuration(e.worked_minutes)}
                         </td>
                       </tr>

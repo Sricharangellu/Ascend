@@ -71,7 +71,7 @@ const MOVEMENT_STYLE: Record<string, string> = {
 };
 
 function MovementBadge({ type }: { type: string }) {
-  const cls = MOVEMENT_STYLE[type] ?? "bg-slate-100 text-slate-600";
+  const cls = MOVEMENT_STYLE[type] ?? "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]";
   return (
     <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${cls}`}>
       {type}
@@ -637,17 +637,20 @@ function AvailabilityCard({ productId, refreshKey }: { productId: string; refres
 
   if (!avail) return null;
   const tiles = [
-    { label: "On Hand", value: avail.on_hand, cls: "text-slate-900" },
-    { label: "Reserved", value: avail.reserved, cls: avail.reserved > 0 ? "text-amber-600" : "text-slate-400", hint: "On approved orders awaiting fulfillment" },
-    { label: "Incoming", value: avail.incoming, cls: avail.incoming > 0 ? "text-[#5D5FEF]" : "text-slate-400", hint: "On open purchase orders" },
+    { label: "On Hand", value: avail.on_hand, cls: "" },
+    { label: "Reserved", value: avail.reserved, cls: avail.reserved > 0 ? "text-amber-600" : "", hint: "On approved orders awaiting fulfillment" },
+    { label: "Incoming", value: avail.incoming, cls: avail.incoming > 0 ? "text-brand-600" : "", hint: "On open purchase orders" },
     { label: "Available", value: avail.available, cls: avail.available > 0 ? "text-emerald-600" : "text-red-600", hint: "On hand minus reserved" },
   ];
   return (
-    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-100 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl sm:grid-cols-4"
+      style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-border)" }}>
       {tiles.map((t) => (
-        <div key={t.label} className="bg-white px-4 py-3" title={t.hint}>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{t.label}</p>
-          <p className={`mt-0.5 text-xl font-semibold tabular-nums ${t.cls}`}>{t.value}</p>
+        <div key={t.label} className="px-4 py-3" title={t.hint}
+          style={{ backgroundColor: "var(--color-surface)" }}>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.07em]" style={{ color: "var(--color-text-muted)" }}>{t.label}</p>
+          <p className={`mt-0.5 text-xl font-semibold tabular-nums ${t.cls}`}
+            style={!t.cls ? { color: "var(--color-text-primary)" } : {}}>{t.value}</p>
         </div>
       ))}
     </div>
