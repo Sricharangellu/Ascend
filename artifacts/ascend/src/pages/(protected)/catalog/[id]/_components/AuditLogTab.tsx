@@ -50,9 +50,9 @@ function formatValue(field: string | null, value: string | null): string {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function AuditLogTab({ productId }: { productId: string }) {
-  const [entries, setEntries] = useState<AuditEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
+  const [entries, setEntries]   = useState<AuditEntry[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -69,77 +69,92 @@ export function AuditLogTab({ productId }: { productId: string }) {
 
   if (loading) return (
     <div className="space-y-3">
-      {[1, 2, 3, 4].map((i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-slate-100" />)}
+      {[1, 2, 3, 4].map((i) => <div key={i} className="h-16 animate-skeleton rounded-xl" />)}
     </div>
   );
 
-  if (error) return <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>;
+  if (error) return (
+    <p role="alert" className="rounded-xl border px-4 py-3 text-[13px]"
+      style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>
+      {error}
+    </p>
+  );
 
   if (entries.length === 0) return (
-    <div className="rounded-lg border border-dashed border-slate-200 py-12 text-center">
-      <p className="text-sm text-slate-400">No audit entries for this product.</p>
+    <div className="rounded-xl border border-dashed py-12 text-center" style={{ borderColor: "var(--color-border)" }}>
+      <p className="text-[13px]" style={{ color: "var(--color-text-muted)" }}>No audit entries for this product.</p>
     </div>
   );
 
   return (
     <div className="space-y-2">
-      <p className="text-xs text-slate-400">{entries.length} change{entries.length !== 1 ? "s" : ""} recorded</p>
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left">
-            <tr>
-              <th className="px-4 py-2.5 text-xs font-semibold text-slate-500">When</th>
-              <th className="px-4 py-2.5 text-xs font-semibold text-slate-500">Who</th>
-              <th className="px-4 py-2.5 text-xs font-semibold text-slate-500">Action</th>
-              <th className="px-4 py-2.5 text-xs font-semibold text-slate-500">Field</th>
-              <th className="px-4 py-2.5 text-xs font-semibold text-slate-500">Change</th>
-              <th className="px-4 py-2.5 text-xs font-semibold text-slate-500">Device</th>
+      <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>
+        {entries.length} change{entries.length !== 1 ? "s" : ""} recorded
+      </p>
+      <div className="overflow-hidden rounded-xl border shadow-[var(--shadow-sm)]"
+        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <table className="w-full text-[13px]">
+          <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+            <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.06em]"
+              style={{ color: "var(--color-text-secondary)" }}>
+              <th className="px-4 py-2.5">When</th>
+              <th className="px-4 py-2.5">Who</th>
+              <th className="px-4 py-2.5">Action</th>
+              <th className="px-4 py-2.5">Field</th>
+              <th className="px-4 py-2.5">Change</th>
+              <th className="px-4 py-2.5">Device</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-[var(--color-table-border)]">
             {entries.map((e) => (
               <>
                 <tr
                   key={e.id}
-                  className="cursor-pointer hover:bg-slate-50 transition-colors"
+                  className="cursor-pointer transition-colors hover:bg-[var(--color-table-row-hover)]"
                   onClick={() => setExpanded((v) => v === e.id ? null : e.id)}
                 >
-                  <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{fmtDateTime(e.created_at)}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
+                    {fmtDateTime(e.created_at)}
+                  </td>
                   <td className="px-4 py-3">
-                    <div className="font-medium text-slate-900">{e.actor}</div>
-                    <div className="text-[11px] text-slate-400 capitalize">{e.actor_role}</div>
+                    <div className="font-medium" style={{ color: "var(--color-text-primary)" }}>{e.actor}</div>
+                    <div className="text-[10px] capitalize" style={{ color: "var(--color-text-muted)" }}>{e.actor_role}</div>
                   </td>
                   <td className="px-4 py-3">
                     <Badge variant={ACTION_BADGE[e.action] ?? "gray"}>{e.action}</Badge>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">
-                    {e.field ? (FIELD_LABELS[e.field] ?? e.field) : <span className="text-slate-400">—</span>}
+                  <td className="px-4 py-3 text-[12px]" style={{ color: "var(--color-text-secondary)" }}>
+                    {e.field ? (FIELD_LABELS[e.field] ?? e.field) : <span style={{ color: "var(--color-text-muted)" }}>—</span>}
                   </td>
                   <td className="px-4 py-3">
                     {e.old_value !== null || e.new_value !== null ? (
-                      <div className="flex items-center gap-1.5 text-xs">
+                      <div className="flex items-center gap-1.5 text-[11px]">
                         {e.old_value !== null && (
-                          <span className="rounded bg-red-50 px-1.5 py-0.5 text-red-600 line-through">{formatValue(e.field, e.old_value)}</span>
+                          <span className="rounded bg-red-50 px-1.5 py-0.5 text-red-600 line-through">
+                            {formatValue(e.field, e.old_value)}
+                          </span>
                         )}
                         {e.old_value !== null && e.new_value !== null && (
-                          <span className="text-slate-300">→</span>
+                          <span style={{ color: "var(--color-text-muted)" }}>→</span>
                         )}
                         {e.new_value !== null && (
-                          <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700">{formatValue(e.field, e.new_value)}</span>
+                          <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700">
+                            {formatValue(e.field, e.new_value)}
+                          </span>
                         )}
                       </div>
-                    ) : <span className="text-slate-400 text-xs">—</span>}
+                    ) : <span className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>—</span>}
                   </td>
-                  <td className="px-4 py-3 text-slate-400 text-xs">{e.device}</td>
+                  <td className="px-4 py-3 text-[11px]" style={{ color: "var(--color-text-muted)" }}>{e.device}</td>
                 </tr>
                 {expanded === e.id && (
-                  <tr key={`${e.id}-exp`} className="bg-slate-50">
+                  <tr key={`${e.id}-exp`} style={{ backgroundColor: "var(--color-surface-subtle)" }}>
                     <td colSpan={6} className="px-4 py-3">
-                      <div className="flex flex-wrap gap-x-8 gap-y-1 text-xs text-slate-500">
-                        <span>IP: <strong className="text-slate-700">{e.ip}</strong></span>
-                        <span>Device: <strong className="text-slate-700">{e.device}</strong></span>
-                        {e.reason && <span>Reason: <strong className="text-slate-700">"{e.reason}"</strong></span>}
-                        <span>Entry ID: <strong className="font-mono text-slate-500">{e.id}</strong></span>
+                      <div className="flex flex-wrap gap-x-8 gap-y-1 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
+                        <span>IP: <strong style={{ color: "var(--color-text-primary)" }}>{e.ip}</strong></span>
+                        <span>Device: <strong style={{ color: "var(--color-text-primary)" }}>{e.device}</strong></span>
+                        {e.reason && <span>Reason: <strong style={{ color: "var(--color-text-primary)" }}>"{e.reason}"</strong></span>}
+                        <span>Entry ID: <strong className="font-mono" style={{ color: "var(--color-text-muted)" }}>{e.id}</strong></span>
                       </div>
                     </td>
                   </tr>

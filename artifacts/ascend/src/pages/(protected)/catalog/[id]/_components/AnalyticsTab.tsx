@@ -61,19 +61,23 @@ function Sparkline({ data, height = 80 }: { data: TrendPoint[]; height?: number 
           <stop offset="100%" stopColor="#5D5FEF" stopOpacity="0" />
         </linearGradient>
       </defs>
-      <polygon
-        points={`${pad},${height} ${pts.join(" ")} ${width - pad},${height}`}
-        fill="url(#spark-fill)"
-      />
-      <polyline
-        points={pts.join(" ")}
-        fill="none"
-        stroke="#5D5FEF"
-        strokeWidth="2"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
+      <polygon points={`${pad},${height} ${pts.join(" ")} ${width - pad},${height}`} fill="url(#spark-fill)" />
+      <polyline points={pts.join(" ")} fill="none" stroke="#5D5FEF" strokeWidth="2"
+        strokeLinejoin="round" strokeLinecap="round" />
     </svg>
+  );
+}
+
+// ── KPI tile ──────────────────────────────────────────────────────────────────
+
+function KpiTile({ label, value, extra }: { label: string; value: string; extra?: string }) {
+  return (
+    <div className="rounded-xl border shadow-[var(--shadow-sm)] px-4 py-3"
+      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+      <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{label}</p>
+      <p className={`mt-1 text-[18px] font-bold ${extra ?? ""}`}
+        style={!extra ? { color: "var(--color-text-primary)" } : {}}>{value}</p>
+    </div>
   );
 }
 
@@ -102,89 +106,74 @@ export function AnalyticsTab({ productId }: { productId: string }) {
 
       {/* ── Period selector ────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-700">Product Analytics</h3>
-        <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+        <h3 className="text-[13px] font-semibold" style={{ color: "var(--color-text-secondary)" }}>Product Analytics</h3>
+        <div className="flex gap-1 rounded-lg border p-1 shadow-[var(--shadow-sm)]"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
           {(["7d", "30d", "90d", "12m"] as Period[]).map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setPeriod(p)}
-              className={`rounded px-3 py-1 text-xs font-medium transition-colors ${period === p ? "bg-brand-600 text-white" : "text-slate-500 hover:text-slate-700"}`}
-            >
+            <button key={p} type="button" onClick={() => setPeriod(p)}
+              className={`rounded-md px-3 py-1 text-[11px] font-medium transition-colors ${period === p ? "bg-brand-600 text-white" : ""}`}
+              style={period !== p ? { color: "var(--color-text-secondary)" } : {}}>
               {PERIOD_LABELS[p]}
             </button>
           ))}
         </div>
       </div>
 
-      {error && <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+      {error && (
+        <p role="alert" className="rounded-xl border px-4 py-3 text-[13px]"
+          style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>
+          {error}
+        </p>
+      )}
 
       {loading ? (
         <div className="space-y-4">
-          <div className="h-24 animate-pulse rounded-lg bg-slate-100" />
-          <div className="h-48 animate-pulse rounded-lg bg-slate-100" />
+          <div className="h-24 animate-skeleton rounded-xl" />
+          <div className="h-48 animate-skeleton rounded-xl" />
         </div>
       ) : data ? (
         <>
-          {/* ── KPI cards ─────────────────────────────────────────────────── */}
+          {/* ── KPI cards row 1 ─────────────────────────────────────────── */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-              <p className="text-xs text-slate-400">Revenue</p>
-              <p className="mt-1 text-xl font-bold text-slate-900">{formatMoney(data.summary.revenue_cents)}</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-              <p className="text-xs text-slate-400">Units Sold</p>
-              <p className="mt-1 text-xl font-bold text-slate-900">{data.summary.units_sold.toLocaleString()}</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-              <p className="text-xs text-slate-400">Orders</p>
-              <p className="mt-1 text-xl font-bold text-slate-900">{data.summary.orders.toLocaleString()}</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-              <p className="text-xs text-slate-400">Avg Order Qty</p>
-              <p className="mt-1 text-xl font-bold text-slate-900">{data.summary.avg_order_qty}</p>
-            </div>
+            <KpiTile label="Revenue"      value={formatMoney(data.summary.revenue_cents)} />
+            <KpiTile label="Units Sold"   value={data.summary.units_sold.toLocaleString()} />
+            <KpiTile label="Orders"       value={data.summary.orders.toLocaleString()} />
+            <KpiTile label="Avg Order Qty" value={String(data.summary.avg_order_qty)} />
           </div>
 
+          {/* ── KPI cards row 2 ─────────────────────────────────────────── */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-              <p className="text-xs text-slate-400">Gross Margin</p>
-              <p className={`mt-1 text-xl font-bold ${data.summary.gross_margin_pct >= 30 ? "text-emerald-600" : data.summary.gross_margin_pct > 0 ? "text-amber-600" : "text-red-600"}`}>
-                {data.summary.gross_margin_pct.toFixed(1)}%
-              </p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-              <p className="text-xs text-slate-400">Return Rate</p>
-              <p className={`mt-1 text-xl font-bold ${data.summary.return_rate_pct < 3 ? "text-emerald-600" : data.summary.return_rate_pct < 8 ? "text-amber-600" : "text-red-600"}`}>
-                {data.summary.return_rate_pct}%
-              </p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-              <p className="text-xs text-slate-400">Inventory Turnover</p>
-              <p className="mt-1 text-xl font-bold text-slate-900">{data.summary.inventory_turnover}×</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-              <p className="text-xs text-slate-400">ABC Class</p>
+            <KpiTile label="Gross Margin" value={`${data.summary.gross_margin_pct.toFixed(1)}%`}
+              extra={data.summary.gross_margin_pct >= 30 ? "text-emerald-600" : data.summary.gross_margin_pct > 0 ? "text-amber-600" : "text-red-600"} />
+            <KpiTile label="Return Rate" value={`${data.summary.return_rate_pct}%`}
+              extra={data.summary.return_rate_pct < 3 ? "text-emerald-600" : data.summary.return_rate_pct < 8 ? "text-amber-600" : "text-red-600"} />
+            <KpiTile label="Inventory Turnover" value={`${data.summary.inventory_turnover}×`} />
+            <div className="rounded-xl border shadow-[var(--shadow-sm)] px-4 py-3"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+              <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>ABC Class</p>
               <div className="mt-1">
-                <span className={`rounded-full px-3 py-1 text-sm font-bold ${ABC_COLOR[data.summary.abc_class] ?? "bg-slate-100 text-slate-600"}`}>
+                <span className={`rounded-full px-3 py-1 text-[13px] font-bold ${ABC_COLOR[data.summary.abc_class] ?? ""}`}
+                  style={!ABC_COLOR[data.summary.abc_class] ? { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" } : {}}>
                   Class {data.summary.abc_class}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* ── Revenue trend chart ───────────────────────────────────────── */}
-          <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-100 px-5 py-3.5">
-              <h3 className="text-sm font-semibold text-[#111]">Revenue Trend — {PERIOD_LABELS[period]}</h3>
+          {/* ── Revenue trend chart ──────────────────────────────────────── */}
+          <div className="rounded-xl border shadow-[var(--shadow-sm)]"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+            <div className="border-b px-5 py-3.5" style={{ borderColor: "var(--color-border)" }}>
+              <h3 className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>
+                Revenue Trend — {PERIOD_LABELS[period]}
+              </h3>
             </div>
             <div className="px-5 py-4">
               <div className="relative h-40">
                 <Sparkline data={data.trend} height={160} />
               </div>
-              {/* X-axis labels: first and last date */}
               {data.trend.length > 1 && (
-                <div className="mt-1 flex justify-between text-[10px] text-slate-400">
+                <div className="mt-1 flex justify-between text-[10px]" style={{ color: "var(--color-text-muted)" }}>
                   <span>{new Date(data.trend[0].date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                   <span>{new Date(data.trend[data.trend.length - 1].date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                 </div>
@@ -192,28 +181,30 @@ export function AnalyticsTab({ productId }: { productId: string }) {
             </div>
           </div>
 
-          {/* ── Daily breakdown table (last 7 days) ─────────────────────── */}
-          <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-100 px-5 py-3.5">
-              <h3 className="text-sm font-semibold text-[#111]">Recent Daily Breakdown</h3>
+          {/* ── Daily breakdown table ─────────────────────────────────────── */}
+          <div className="rounded-xl border shadow-[var(--shadow-sm)]"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+            <div className="border-b px-5 py-3.5" style={{ borderColor: "var(--color-border)" }}>
+              <h3 className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Recent Daily Breakdown</h3>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-left">
-                  <tr>
-                    <th className="px-4 py-2.5 text-xs font-semibold text-slate-500">Date</th>
-                    <th className="px-4 py-2.5 text-xs font-semibold text-slate-500">Units</th>
-                    <th className="px-4 py-2.5 text-xs font-semibold text-slate-500">Revenue</th>
+              <table className="w-full text-[13px]">
+                <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+                  <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.06em]"
+                    style={{ color: "var(--color-text-secondary)" }}>
+                    <th className="px-4 py-2.5">Date</th>
+                    <th className="px-4 py-2.5">Units</th>
+                    <th className="px-4 py-2.5">Revenue</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-[var(--color-table-border)]">
                   {[...data.trend].reverse().slice(0, 7).map((pt) => (
-                    <tr key={pt.date} className="hover:bg-slate-50">
-                      <td className="px-4 py-2.5 text-slate-600">
+                    <tr key={pt.date} className="transition-colors hover:bg-[var(--color-table-row-hover)]">
+                      <td className="px-4 py-2.5" style={{ color: "var(--color-text-secondary)" }}>
                         {new Date(pt.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                       </td>
-                      <td className="px-4 py-2.5 font-medium text-slate-900">{pt.units}</td>
-                      <td className="px-4 py-2.5 font-semibold text-slate-900">{formatMoney(pt.revenue_cents)}</td>
+                      <td className="px-4 py-2.5 font-medium" style={{ color: "var(--color-text-primary)" }}>{pt.units}</td>
+                      <td className="px-4 py-2.5 font-semibold" style={{ color: "var(--color-text-primary)" }}>{formatMoney(pt.revenue_cents)}</td>
                     </tr>
                   ))}
                 </tbody>

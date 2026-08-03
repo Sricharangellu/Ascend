@@ -33,10 +33,10 @@ interface Movement {
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
-const FLD = "w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600";
+const FLD = "w-full rounded-lg border px-3 py-2 text-[13px] outline-none transition-all focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500";
 
 function Lbl({ children }: { children: React.ReactNode }) {
-  return <label className="mb-1 block text-xs font-medium text-slate-500">{children}</label>;
+  return <label className="mb-1 block text-[12px] font-medium" style={{ color: "var(--color-text-secondary)" }}>{children}</label>;
 }
 
 function Card({
@@ -45,11 +45,12 @@ function Card({
   title: string; sub?: string; action?: React.ReactNode; children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-start justify-between border-b border-slate-100 px-5 py-3.5">
+    <div className="rounded-xl border shadow-[var(--shadow-sm)]"
+      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+      <div className="flex items-start justify-between border-b px-5 py-3.5" style={{ borderColor: "var(--color-border)" }}>
         <div>
-          <h3 className="text-sm font-semibold text-[#111]">{title}</h3>
-          {sub && <p className="mt-0.5 text-xs text-slate-400">{sub}</p>}
+          <h3 className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>{title}</h3>
+          {sub && <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-muted)" }}>{sub}</p>}
         </div>
         {action}
       </div>
@@ -61,12 +62,12 @@ function Card({
 // ── Movement type badge ───────────────────────────────────────────────────────
 
 const MOVEMENT_STYLE: Record<string, string> = {
-  sale:       "bg-blue-50 text-blue-700",
-  receive:    "bg-emerald-50 text-emerald-700",
-  return:     "bg-purple-50 text-purple-700",
-  adjustment: "bg-amber-50 text-amber-700",
-  transfer:   "bg-slate-100 text-slate-600",
-  damage:     "bg-red-50 text-red-700",
+  sale:       "bg-blue-50/80 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  receive:    "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+  return:     "bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
+  adjustment: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  transfer:   "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]",
+  damage:     "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300",
 };
 
 function MovementBadge({ type }: { type: string }) {
@@ -107,19 +108,20 @@ function StockByLocation({ productId, refreshKey }: { productId: string; refresh
   );
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
+    <div className="rounded-xl border shadow-[var(--shadow-sm)]"
+      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+      <div className="flex items-center justify-between border-b px-5 py-3.5" style={{ borderColor: "var(--color-border)" }}>
         <div>
-          <h3 className="text-sm font-semibold text-[#111]">Stock by Location</h3>
-          <p className="mt-0.5 text-xs text-slate-400">On-hand, committed (reserved), and available-to-sell per location</p>
+          <h3 className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Stock by Location</h3>
+          <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-muted)" }}>On-hand, committed (reserved), and available-to-sell per location</p>
         </div>
         {!loading && (
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-[11px] text-slate-400">Total on hand</p>
-              <p className="text-lg font-bold text-slate-900">{totals.on_hand}</p>
+              <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>Total on hand</p>
+              <p className="text-[18px] font-bold" style={{ color: "var(--color-text-primary)" }}>{totals.on_hand}</p>
             </div>
-            <div className={`rounded-full px-3 py-1 text-xs font-semibold ${totals.available > 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+            <div className={`rounded-full px-3 py-1 text-[11px] font-semibold ${totals.available > 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
               {totals.available} available
             </div>
           </div>
@@ -127,13 +129,13 @@ function StockByLocation({ productId, refreshKey }: { productId: string; refresh
       </div>
       <div className="overflow-x-auto">
         {loading ? (
-          <div className="space-y-2 p-5">{[1, 2].map((i) => <div key={i} className="h-8 animate-pulse rounded-lg bg-slate-100" />)}</div>
+          <div className="space-y-2 p-5">{[1, 2].map((i) => <div key={i} className="h-8 animate-skeleton rounded-lg" />)}</div>
         ) : locations.length === 0 ? (
-          <p className="p-5 text-sm text-slate-400">No location data.</p>
+          <p className="p-5 text-[13px]" style={{ color: "var(--color-text-muted)" }}>No location data.</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          <table className="w-full text-[13px]">
+            <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+              <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--color-text-secondary)" }}>
                 <th className="px-5 py-2.5">Location</th>
                 <th className="px-4 py-2.5 text-right">On Hand</th>
                 <th className="px-4 py-2.5 text-right">Committed</th>
@@ -141,32 +143,34 @@ function StockByLocation({ productId, refreshKey }: { productId: string; refresh
                 <th className="px-4 py-2.5 text-right hidden sm:table-cell">Avg Cost</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody style={{ borderColor: "var(--color-table-border)" }} className="divide-y divide-[var(--color-table-border)]">
               {locations.map((l) => (
-                <tr key={l.location_id} className="hover:bg-slate-50/70">
+                <tr key={l.location_id} className="transition-colors hover:bg-[var(--color-table-row-hover)]">
                   <td className="px-5 py-3">
-                    <p className="font-medium text-[#111]">{l.location_name}</p>
-                    <p className="text-[11px] font-mono text-slate-400">{l.location_code}</p>
+                    <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{l.location_name}</p>
+                    <p className="text-[11px] font-mono" style={{ color: "var(--color-text-muted)" }}>{l.location_code}</p>
                   </td>
-                  <td className="px-4 py-3 text-right font-semibold text-[#111] tabular-nums">{l.quantity_on_hand}</td>
+                  <td className="px-4 py-3 text-right font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{l.quantity_on_hand}</td>
                   <td className="px-4 py-3 text-right tabular-nums">
-                    <span className={l.quantity_committed > 0 ? "font-medium text-amber-600" : "text-slate-400"}>{l.quantity_committed}</span>
+                    <span className={l.quantity_committed > 0 ? "font-medium text-amber-600" : ""}
+                      style={!l.quantity_committed ? { color: "var(--color-text-muted)" } : {}}>{l.quantity_committed}</span>
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
                     <span className={l.quantity_available > 0 ? "font-semibold text-emerald-600" : "font-semibold text-red-500"}>{l.quantity_available}</span>
                   </td>
-                  <td className="hidden px-4 py-3 text-right text-slate-500 tabular-nums sm:table-cell">
+                  <td className="hidden px-4 py-3 text-right tabular-nums sm:table-cell" style={{ color: "var(--color-text-secondary)" }}>
                     {l.average_cost_cents != null ? formatMoney(l.average_cost_cents) : "—"}
                   </td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold text-[#111]">
-                <td className="px-5 py-3 text-xs uppercase tracking-wide text-slate-500">Total</td>
+              <tr className="border-t-2 font-semibold" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-primary)" }}>
+                <td className="px-5 py-3 text-[10px] uppercase tracking-[0.06em]" style={{ color: "var(--color-text-secondary)" }}>Total</td>
                 <td className="px-4 py-3 text-right tabular-nums">{totals.on_hand}</td>
                 <td className="px-4 py-3 text-right tabular-nums">
-                  <span className={totals.committed > 0 ? "text-amber-600" : "text-slate-400"}>{totals.committed}</span>
+                  <span className={totals.committed > 0 ? "text-amber-600" : ""}
+                    style={!totals.committed ? { color: "var(--color-text-muted)" } : {}}>{totals.committed}</span>
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums">
                   <span className={totals.available > 0 ? "text-emerald-600" : "text-red-500"}>{totals.available}</span>
@@ -239,40 +243,38 @@ function QuickAdjust({
   return (
     <Card title="Quick Stock Adjust" sub="Manually add, remove, or set stock quantity">
       <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
-        {error && <p className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>}
+        {error && (
+          <p className="rounded-xl border px-4 py-2.5 text-[13px]"
+            style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>
+            {error}
+          </p>
+        )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {/* Location */}
           <div>
             <Lbl>Location</Lbl>
-            <select value={locationId} onChange={(e) => setLocationId(e.target.value)} className={FLD}>
+            <select value={locationId} onChange={(e) => setLocationId(e.target.value)} className={FLD}
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}>
               {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
           </div>
-
-          {/* Reason */}
           <div>
             <Lbl>Reason</Lbl>
-            <select value={reason} onChange={(e) => setReason(e.target.value)} className={FLD}>
+            <select value={reason} onChange={(e) => setReason(e.target.value)} className={FLD}
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}>
               {ADJUST_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
         </div>
 
-        {/* Mode + Qty */}
         <div className="flex items-end gap-3">
           <div className="flex-1">
             <Lbl>Adjustment type</Lbl>
-            <div className="flex gap-1 rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+            <div className="flex gap-1 rounded-lg border p-0.5" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
               {(["add", "remove", "set"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setMode(m)}
-                  className={`flex-1 rounded-md py-2 text-xs font-semibold capitalize transition-colors ${
-                    mode === m ? "bg-brand-600 text-white shadow-sm" : "text-slate-500 hover:text-[#111]"
-                  }`}
-                >
+                <button key={m} type="button" onClick={() => setMode(m)}
+                  className={`flex-1 rounded-md py-2 text-[11px] font-semibold capitalize transition-colors ${mode === m ? "bg-brand-600 text-white shadow-sm" : ""}`}
+                  style={mode !== m ? { color: "var(--color-text-secondary)" } : {}}>
                   {m === "add" ? "+ Add" : m === "remove" ? "− Remove" : "= Set to"}
                 </button>
               ))}
@@ -280,37 +282,24 @@ function QuickAdjust({
           </div>
           <div className="w-32">
             <Lbl>Quantity</Lbl>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
+            <input type="number" min="0" step="1" value={qty} onChange={(e) => setQty(e.target.value)}
               placeholder="0"
-              className={FLD + " text-center text-lg font-bold"}
-            />
+              className={FLD + " text-center text-[18px] font-bold"}
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} />
           </div>
         </div>
 
-        {/* Note */}
         <div>
           <Lbl>Note (optional)</Lbl>
-          <input
-            type="text"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="e.g. Stocktake Jan 2025"
-            className={FLD}
-          />
+          <input type="text" value={note} onChange={(e) => setNote(e.target.value)}
+            placeholder="e.g. Stocktake Jan 2025" className={FLD}
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} />
         </div>
 
         <div className="flex items-center justify-end gap-3">
-          {saved && <span className="text-sm font-medium text-emerald-600">✓ Adjustment recorded</span>}
-          <button
-            type="submit"
-            disabled={saving || !qty}
-            className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors"
-          >
+          {saved && <span className="text-[13px] font-medium text-emerald-600">✓ Adjustment recorded</span>}
+          <button type="submit" disabled={saving || !qty}
+            className="rounded-xl bg-brand-600 px-5 py-2.5 text-[13px] font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors">
             {saving ? "Adjusting…" : "Apply Adjustment"}
           </button>
         </div>
@@ -336,14 +325,14 @@ function MovementHistory({ productId, refreshKey }: { productId: string; refresh
   return (
     <Card title="Movement History" sub="All stock changes for this product — newest first">
       {loading ? (
-        <div className="space-y-2">{[1,2,3,4,5].map((i) => <div key={i} className="h-8 animate-pulse rounded-lg bg-slate-100" />)}</div>
+        <div className="space-y-2">{[1,2,3,4,5].map((i) => <div key={i} className="h-8 animate-skeleton rounded-lg" />)}</div>
       ) : movements.length === 0 ? (
-        <p className="py-4 text-center text-sm text-slate-400">No movements recorded yet. Adjustments will appear here.</p>
+        <p className="py-4 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>No movements recorded yet. Adjustments will appear here.</p>
       ) : (
         <div className="overflow-x-auto -mx-5">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          <table className="w-full text-[13px]">
+            <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+              <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--color-text-secondary)" }}>
                 <th className="px-5 py-2.5">Type</th>
                 <th className="px-4 py-2.5">Location</th>
                 <th className="px-4 py-2.5 text-center">Change</th>
@@ -352,23 +341,23 @@ function MovementHistory({ productId, refreshKey }: { productId: string; refresh
                 <th className="px-4 py-2.5 text-right">When</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-[var(--color-table-border)]">
               {movements.map((m) => (
-                <tr key={m.id} className="hover:bg-slate-50/70">
+                <tr key={m.id} className="transition-colors hover:bg-[var(--color-table-row-hover)]">
                   <td className="px-5 py-3"><MovementBadge type={m.type} /></td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{m.location}</td>
+                  <td className="px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{m.location}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`font-bold tabular-nums ${m.delta > 0 ? "text-emerald-600" : "text-red-500"}`}>
                       {m.delta > 0 ? `+${m.delta}` : m.delta}
                     </span>
                   </td>
                   <td className="px-4 py-3 max-w-[200px]">
-                    <p className="truncate text-xs text-slate-500">{m.note ?? "—"}</p>
+                    <p className="truncate text-[11px]" style={{ color: "var(--color-text-muted)" }}>{m.note ?? "—"}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="text-xs text-slate-500">{m.actor}</p>
+                    <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{m.actor}</p>
                   </td>
-                  <td className="px-4 py-3 text-right text-xs text-slate-400 whitespace-nowrap">
+                  <td className="px-4 py-3 text-right text-[11px] whitespace-nowrap" style={{ color: "var(--color-text-muted)" }}>
                     {timeAgo(m.created_at)}
                   </td>
                 </tr>
@@ -412,7 +401,8 @@ function PhysicalAttributes({ product, onSaved }: { product: CatalogProduct; onS
 
   return (
     <Card title="Physical Attributes" sub="Weight and dimensions used for shipping calculations">
-      {error && <p className="mb-3 rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>}
+      {error && <p className="mb-3 rounded-xl border px-4 py-2.5 text-[13px]"
+        style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>{error}</p>}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {([
           ["Weight (lb)", weight, setWeight],
@@ -433,13 +423,9 @@ function PhysicalAttributes({ product, onSaved }: { product: CatalogProduct; onS
         ))}
       </div>
       <div className="mt-4 flex items-center justify-end gap-3">
-        {saved && <span className="text-sm font-medium text-emerald-600">Saved</span>}
-        <button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={saving}
-          className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors"
-        >
+        {saved && <span className="text-[13px] font-medium text-emerald-600">Saved</span>}
+        <button type="button" onClick={() => void handleSave()} disabled={saving}
+          className="rounded-xl bg-brand-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors">
           {saving ? "Saving…" : "Save dimensions"}
         </button>
       </div>
@@ -488,35 +474,37 @@ function SupplierSection({ product, onSaved }: { product: CatalogProduct; onSave
         </button>
       }
     >
-      {error && <p className="mb-3 rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>}
+      {error && <p className="mb-3 rounded-xl border px-4 py-2.5 text-[13px]"
+        style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>{error}</p>}
       <div className="space-y-3">
         {rows.map((row, idx) => (
           <div key={row.id} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
               {idx === 0 && <Lbl>Supplier name</Lbl>}
-              <input className={FLD} value={row.name}
-                onChange={(e) => setRows((rs) => rs.map((r) => r.id === row.id ? { ...r, name: e.target.value } : r))}
+              <input className={FLD} style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+                value={row.name} onChange={(e) => setRows((rs) => rs.map((r) => r.id === row.id ? { ...r, name: e.target.value } : r))}
                 placeholder="Supplier name…" />
             </div>
             <div>
               {idx === 0 && <Lbl>Supplier code / UPC</Lbl>}
-              <input className={FLD} value={row.code}
-                onChange={(e) => setRows((rs) => rs.map((r) => r.id === row.id ? { ...r, code: e.target.value } : r))}
+              <input className={FLD} style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+                value={row.code} onChange={(e) => setRows((rs) => rs.map((r) => r.id === row.id ? { ...r, code: e.target.value } : r))}
                 placeholder="e.g. 012345678901" />
             </div>
             <div>
               {idx === 0 && <Lbl>Supplier price ($)</Lbl>}
-              <input type="number" step="0.01" min="0" className={FLD} value={row.price}
-                onChange={(e) => setRows((rs) => rs.map((r) => r.id === row.id ? { ...r, price: e.target.value } : r))}
+              <input type="number" step="0.01" min="0" className={FLD}
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+                value={row.price} onChange={(e) => setRows((rs) => rs.map((r) => r.id === row.id ? { ...r, price: e.target.value } : r))}
                 placeholder="0.00" />
             </div>
           </div>
         ))}
       </div>
       <div className="mt-4 flex items-center justify-end gap-3">
-        {saved && <span className="text-sm font-medium text-emerald-600">Saved</span>}
+        {saved && <span className="text-[13px] font-medium text-emerald-600">Saved</span>}
         <button type="button" onClick={() => void handleSave()} disabled={saving}
-          className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors">
+          className="rounded-xl bg-brand-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors">
           {saving ? "Saving…" : "Save supplier"}
         </button>
       </div>
@@ -559,56 +547,60 @@ function ReplenishmentSection({ product, onSaved }: { product: CatalogProduct; o
 
   return (
     <Card title="Replenishment Settings" sub="Configure inventory tracking and reorder thresholds">
-      {error && <p className="mb-3 rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>}
+      {error && <p className="mb-3 rounded-xl border px-4 py-2.5 text-[13px]"
+        style={{ backgroundColor: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>{error}</p>}
 
       <label className="mb-4 flex cursor-pointer items-center gap-2.5">
-        <input
-          type="checkbox"
-          className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600"
-          checked={track}
-          onChange={(e) => setTrack(e.target.checked)}
-        />
-        <span className="text-sm font-medium text-[#111]">Track inventory for this product</span>
+        <input type="checkbox" className="h-4 w-4 rounded text-brand-600 focus:ring-brand-600"
+          style={{ borderColor: "var(--color-border)" }}
+          checked={track} onChange={(e) => setTrack(e.target.checked)} />
+        <span className="text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>Track inventory for this product</span>
       </label>
 
       {track && (
         <div className="space-y-4">
           <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Replenishment method</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-secondary)" }}>Replenishment method</p>
 
             <label className="flex cursor-pointer items-start gap-3">
-              <input type="radio" className="mt-0.5 h-4 w-4 border-slate-300 text-brand-600"
+              <input type="radio" className="mt-0.5 h-4 w-4 text-brand-600"
+                style={{ borderColor: "var(--color-border)" }}
                 checked={method === "min_max"} onChange={() => setMethod("min_max")} />
               <div className="flex-1">
-                <p className="text-sm font-medium text-[#111]">Min / Max quantity</p>
-                <p className="text-xs text-slate-400">Min triggers replenishment; Max is the refill target</p>
+                <p className="text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>Min / Max quantity</p>
+                <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>Min triggers replenishment; Max is the refill target</p>
                 {method === "min_max" && (
                   <div className="mt-2 grid grid-cols-2 gap-3">
                     <div><Lbl>Min quantity</Lbl>
-                      <input type="number" min="0" className={FLD} value={form.min_qty}
-                        onChange={(e) => setForm((f) => ({ ...f, min_qty: e.target.value }))} placeholder="0" /></div>
+                      <input type="number" min="0" className={FLD}
+                        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+                        value={form.min_qty} onChange={(e) => setForm((f) => ({ ...f, min_qty: e.target.value }))} placeholder="0" /></div>
                     <div><Lbl>Max quantity</Lbl>
-                      <input type="number" min="0" className={FLD} value={form.max_qty}
-                        onChange={(e) => setForm((f) => ({ ...f, max_qty: e.target.value }))} placeholder="0" /></div>
+                      <input type="number" min="0" className={FLD}
+                        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+                        value={form.max_qty} onChange={(e) => setForm((f) => ({ ...f, max_qty: e.target.value }))} placeholder="0" /></div>
                   </div>
                 )}
               </div>
             </label>
 
             <label className="flex cursor-pointer items-start gap-3">
-              <input type="radio" className="mt-0.5 h-4 w-4 border-slate-300 text-brand-600"
+              <input type="radio" className="mt-0.5 h-4 w-4 text-brand-600"
+                style={{ borderColor: "var(--color-border)" }}
                 checked={method === "reorder_point"} onChange={() => setMethod("reorder_point")} />
               <div className="flex-1">
-                <p className="text-sm font-medium text-[#111]">Reorder point + quantity</p>
-                <p className="text-xs text-slate-400">Triggers when stock drops to the reorder point</p>
+                <p className="text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>Reorder point + quantity</p>
+                <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>Triggers when stock drops to the reorder point</p>
                 {method === "reorder_point" && (
                   <div className="mt-2 grid grid-cols-2 gap-3">
                     <div><Lbl>Reorder point</Lbl>
-                      <input type="number" min="0" className={FLD} value={form.reorder_point}
-                        onChange={(e) => setForm((f) => ({ ...f, reorder_point: e.target.value }))} placeholder="0" /></div>
+                      <input type="number" min="0" className={FLD}
+                        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+                        value={form.reorder_point} onChange={(e) => setForm((f) => ({ ...f, reorder_point: e.target.value }))} placeholder="0" /></div>
                     <div><Lbl>Reorder quantity</Lbl>
-                      <input type="number" min="0" className={FLD} value={form.reorder_qty}
-                        onChange={(e) => setForm((f) => ({ ...f, reorder_qty: e.target.value }))} placeholder="0" /></div>
+                      <input type="number" min="0" className={FLD}
+                        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}
+                        value={form.reorder_qty} onChange={(e) => setForm((f) => ({ ...f, reorder_qty: e.target.value }))} placeholder="0" /></div>
                   </div>
                 )}
               </div>
@@ -616,9 +608,9 @@ function ReplenishmentSection({ product, onSaved }: { product: CatalogProduct; o
           </div>
 
           <div className="flex items-center justify-end gap-3">
-            {saved && <span className="text-sm font-medium text-emerald-600">Saved</span>}
+            {saved && <span className="text-[13px] font-medium text-emerald-600">Saved</span>}
             <button type="button" onClick={() => void handleSave()} disabled={saving}
-              className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors">
+              className="rounded-xl bg-brand-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors">
               {saving ? "Saving…" : "Save settings"}
             </button>
           </div>
