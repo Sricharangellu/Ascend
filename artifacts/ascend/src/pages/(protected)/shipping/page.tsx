@@ -121,9 +121,9 @@ export default function ShippingPage() {
             { label: "Delivered", value: stats.delivered, color: "text-green-700" },
             { label: "Cancelled", value: stats.cancelled, color: "text-red-600" },
           ].map(s => (
-            <div key={s.label} className="rounded-xl border border-gray-200 bg-white px-4 py-3">
+            <div key={s.label} className="rounded-xl px-4 py-3" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
               <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-              <p className="text-xs text-gray-500">{s.label}</p>
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{s.label}</p>
             </div>
           ))}
         </div>
@@ -132,32 +132,34 @@ export default function ShippingPage() {
 
         <Card className="overflow-hidden p-0">
           {/* Toolbar */}
-          <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-3 px-4 py-3" style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)" }}>
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search ship #, carrier, tracking…"
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none w-56"
+              className="rounded-lg px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none w-56"
+              style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }}
             />
-            <div className="flex rounded-lg border border-slate-200 overflow-hidden text-xs">
+            <div className="flex rounded-lg overflow-hidden text-xs" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }}>
               {STATUS_FILTERS.map(f => (
                 <button
                   key={f}
                   type="button"
                   onClick={() => setStatusFilter(f)}
-                  className={`px-3 py-1.5 transition-colors ${statusFilter === f ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}
+                  className={`px-3 py-1.5 transition-colors ${statusFilter === f ? "bg-blue-600 text-white" : "hover:bg-[var(--color-surface-subtle)]"}`}
+                  style={statusFilter === f ? undefined : { backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}
                 >
                   {STATUS_LABEL[f]}
                 </button>
               ))}
             </div>
-            <span className="ml-auto text-xs text-slate-500">{filtered.length} of {items.length}</span>
+            <span className="ml-auto text-xs" style={{ color: "var(--color-text-muted)" }}>{filtered.length} of {items.length}</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                <tr className="text-left text-xs font-semibold uppercase tracking-[0.08em]" style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
                   <th className="px-5 py-3">Ship #</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Method</th>
@@ -166,20 +168,20 @@ export default function ShippingPage() {
                   <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[var(--color-table-border)]">
                 {filtered.length === 0 && (
-                  <tr><td colSpan={6} className="px-5 py-8 text-center text-slate-400">No shipments match the current filter.</td></tr>
+                  <tr><td colSpan={6} className="px-5 py-8 text-center" style={{ color: "var(--color-text-muted)" }}>No shipments match the current filter.</td></tr>
                 )}
                 {filtered.map(s => (
                   <Fragment key={s.id}>
-                    <tr className="hover:bg-slate-50 transition-colors">
-                      <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-950">{s.ship_number}</td>
+                    <tr className="hover:bg-[var(--color-surface-subtle)] transition-colors">
+                      <td className="whitespace-nowrap px-5 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{s.ship_number}</td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <Badge variant={STATUS_BADGE[s.status] ?? "gray"}>{s.status.replace(/_/g, " ")}</Badge>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 capitalize text-slate-700">{s.method}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">{s.carrier ?? "—"}</td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-600">{s.tracking_number ?? "—"}</td>
+                      <td className="whitespace-nowrap px-4 py-3 capitalize" style={{ color: "var(--color-text-secondary)" }}>{s.method}</td>
+                      <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{s.carrier ?? "—"}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs" style={{ color: "var(--color-text-secondary)" }}>{s.tracking_number ?? "—"}</td>
                       <td className="whitespace-nowrap px-5 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
                           {s.status === "pending_shipment" && shipFormId !== s.id && (
@@ -207,26 +209,28 @@ export default function ShippingPage() {
                     </tr>
                     {shipFormId === s.id && (
                       <tr key={`${s.id}-form`}>
-                        <td colSpan={6} className="bg-slate-50 px-5 py-4">
+                        <td colSpan={6} className="px-5 py-4" style={{ backgroundColor: "var(--color-table-header)" }}>
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
                             <div className="flex-1">
-                              <label className="block text-xs font-medium text-slate-700 mb-1">Carrier <span className="text-red-500">*</span></label>
+                              <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Carrier <span className="text-red-500">*</span></label>
                               <input
                                 autoFocus
                                 value={carrier}
                                 onChange={e => setCarrier(e.target.value)}
                                 placeholder="UPS / FedEx / USPS / DHL"
-                                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                                className="w-full rounded-md px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                                style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }}
                               />
                             </div>
                             <div className="flex-1">
-                              <label className="block text-xs font-medium text-slate-700 mb-1">Tracking number <span className="text-slate-400">(optional)</span></label>
+                              <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Tracking number <span style={{ color: "var(--color-text-muted)" }}>(optional)</span></label>
                               <input
                                 value={trackingNumber}
                                 onChange={e => setTrackingNumber(e.target.value)}
                                 onKeyDown={e => { if (e.key === "Enter") void confirmShip(s.id); }}
                                 placeholder="1Z999AA10123456784"
-                                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                                className="w-full rounded-md px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                                style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }}
                               />
                             </div>
                             <div className="flex gap-2 shrink-0">

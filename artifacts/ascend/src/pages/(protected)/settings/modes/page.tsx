@@ -133,7 +133,7 @@ const SOURCE_LABEL: Record<string, { text: string; cls: string }> = {
   core:                { text: "Core — always active", cls: "text-emerald-600" },
   business_pack:       { text: "From business pack",   cls: "text-brand-600" },
   manual_override:     { text: "Manual override",      cls: "text-amber-600" },
-  not_in_business_pack:{ text: "Not in current pack",  cls: "text-slate-400" },
+  not_in_business_pack:{ text: "Not in current pack",  cls: "" },
 };
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -285,7 +285,7 @@ export default function BusinessProfilePage() {
                         ? "border-brand-600 bg-brand-600/5"
                         : switchTarget === bt.key
                           ? "border-amber-400 bg-amber-50"
-                          : "hover:border-slate-300"
+                          : "hover:border-[var(--color-border)]"
                     }`}
                     style={!current && switchTarget !== bt.key ? { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" } : undefined}
                   >
@@ -370,7 +370,7 @@ export default function BusinessProfilePage() {
                           <div className="min-w-0">
                             <p className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>{mod.name}</p>
                             <p className="truncate text-xs" style={{ color: "var(--color-text-muted)" }}>{mod.description}</p>
-                            <p className={`mt-0.5 text-[11px] font-medium ${badge.cls}`}>{badge.text}</p>
+                            <p className={`mt-0.5 text-[11px] font-medium ${badge.cls}`} style={!badge.cls ? { color: "var(--color-text-muted)" } : undefined}>{badge.text}</p>
                           </div>
                           <Toggle
                             enabled={mod.enabled}

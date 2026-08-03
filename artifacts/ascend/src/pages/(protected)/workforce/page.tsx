@@ -93,30 +93,30 @@ export default function WorkforcePage() {
             { label: "Hours Scheduled",  value: `${totalHours.toFixed(0)}h`, color: "border-emerald-400" },
             { label: "Pending Requests", value: pendingCount,                color: "border-amber-400" },
           ].map((c) => (
-            <div key={c.label} className={clsx("bg-white rounded-xl border-l-4 p-4 shadow-sm", c.color)}>
-              <p className="text-xs text-slate-500 uppercase tracking-wide">{c.label}</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">{c.value}</p>
+            <div key={c.label} className={clsx("rounded-xl border-l-4 p-4 shadow-sm", c.color)} style={{ backgroundColor: "var(--color-surface)" }}>
+              <p className="text-xs uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>{c.label}</p>
+              <p className="text-2xl font-bold mt-1" style={{ color: "var(--color-text-primary)" }}>{c.value}</p>
             </div>
           ))}
         </div>
 
         {/* Schedule grid card */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="rounded-xl shadow-sm overflow-hidden" style={{ backgroundColor: "var(--color-surface)", borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }}>
           {/* Toolbar */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+          <div className="flex items-center justify-between px-5 py-3" style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)" }}>
             <div className="flex items-center gap-2">
-              <button onClick={prevWeek} className="p-1.5 rounded hover:bg-slate-100 text-slate-500 transition-colors" aria-label="Previous week">
+              <button onClick={prevWeek} className="p-1.5 rounded hover:bg-[var(--color-surface-subtle)] transition-colors" style={{ color: "var(--color-text-muted)" }} aria-label="Previous week">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
               </button>
-              <span className="text-sm font-semibold text-slate-800 min-w-[180px] text-center">{fmtWeekRange(weekStart)}</span>
-              <button onClick={nextWeek} className="p-1.5 rounded hover:bg-slate-100 text-slate-500 transition-colors" aria-label="Next week">
+              <span className="text-sm font-semibold min-w-[180px] text-center" style={{ color: "var(--color-text-secondary)" }}>{fmtWeekRange(weekStart)}</span>
+              <button onClick={nextWeek} className="p-1.5 rounded hover:bg-[var(--color-surface-subtle)] transition-colors" style={{ color: "var(--color-text-muted)" }} aria-label="Next week">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
               </button>
-              <button onClick={goToday} className="ml-1 text-xs px-2.5 py-1 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors">Today</button>
+              <button onClick={goToday} className="ml-1 text-xs px-2.5 py-1 rounded hover:bg-[var(--color-surface-subtle)] transition-colors" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Today</button>
             </div>
             <div className="hidden sm:flex items-center gap-3 text-xs">
               {(Object.keys(ROLE_COLORS) as ShiftRole[]).map((r) => (
@@ -131,7 +131,7 @@ export default function WorkforcePage() {
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center h-60 text-slate-400 text-sm">Loading schedule…</div>
+            <div className="flex items-center justify-center h-60 text-sm" style={{ color: "var(--color-text-muted)" }}>Loading schedule…</div>
           ) : (
             <ScheduleGrid employees={employees} shifts={shifts} dates={dates} onCellClick={openNew} onShiftClick={openEdit} />
           )}

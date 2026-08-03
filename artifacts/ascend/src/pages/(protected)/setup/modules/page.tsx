@@ -69,7 +69,7 @@ function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean
       onClick={() => !disabled && onChange(!on)}
       className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 ${
         disabled ? "cursor-not-allowed opacity-50" : ""
-      } ${on ? "bg-brand-600" : "bg-gray-200"}`}
+      } ${on ? "bg-brand-600" : "bg-[var(--color-surface-subtle)]"}`}
     >
       <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${on ? "translate-x-4" : "translate-x-0"}`} />
     </button>

@@ -25,12 +25,13 @@ interface DraftLine {
 
 function StatusBadge({ status }: { status: BillDetail["status"] }) {
   const styles: Record<string, string> = {
-    draft: "bg-slate-100 text-slate-600",
+    draft: "",
     approved: "bg-emerald-50 text-emerald-700",
     held: "bg-amber-50 text-amber-700",
     posted: "bg-brand-50 text-brand-700",
   };
-  return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${styles[status] ?? ""}`}>{status}</span>;
+  const draftStyle = status === "draft" ? { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" } : undefined;
+  return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${styles[status] ?? ""}`} style={draftStyle}>{status}</span>;
 }
 
 export function BillsSection({

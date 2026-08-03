@@ -20,8 +20,9 @@ function TerminalAction({
       className={`inline-flex min-h-[44px] min-w-[72px] shrink-0 flex-col items-center justify-center gap-1 rounded-md border px-3 text-xs font-semibold transition-colors ${
         active
           ? "border-warning-300 bg-warning-50 text-warning-700"
-          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-      } disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-300`}
+          : "hover:bg-[var(--color-surface-subtle)]"
+      } disabled:cursor-not-allowed disabled:opacity-40`}
+      style={active ? undefined : { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}
     >
       {icon}
       <span>{label}</span>
@@ -104,7 +105,7 @@ export function TerminalActionBar({
   onCharge: () => void;
 }) {
   return (
-    <div className="flex flex-none gap-2 overflow-x-auto border-t border-slate-200 bg-white px-3 py-2 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] sm:px-4">
+    <div className="flex flex-none gap-2 overflow-x-auto px-3 py-2 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] sm:px-4" style={{ borderTopWidth: 1, borderTopStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
       <TerminalAction label="Hold"     disabled={!hasCart}  onClick={onHoldSale}    icon={<HoldIcon />} />
       <TerminalAction label="Discount" disabled={!hasCart}  active={discountActive} onClick={onDiscount}     icon={<PercentIcon />} />
       <TerminalAction label={returnMode ? "Sale mode" : "Return"} active={returnMode} onClick={onReturnMode} icon={<ReturnIcon />} />
@@ -114,7 +115,7 @@ export function TerminalActionBar({
         type="button"
         disabled={!canCharge}
         onClick={onCharge}
-        className="ml-auto inline-flex min-h-[44px] min-w-[150px] shrink-0 items-center justify-center rounded-md bg-brand-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+        className="ml-auto inline-flex min-h-[44px] min-w-[150px] shrink-0 items-center justify-center rounded-md bg-brand-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {canCharge ? `Complete ${formatMoney(totalCents)}` : "Complete sale"}
       </button>

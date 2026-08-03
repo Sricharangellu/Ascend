@@ -100,7 +100,7 @@ export default function OnboardingPage() {
 
       {/* ── Step: Welcome ──────────────────────────────────────────── */}
       {step === "welcome" && (
-        <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl text-center">
+        <div className="w-full max-w-md rounded-2xl p-8 shadow-2xl text-center" style={{ backgroundColor: "var(--color-surface)" }}>
           <div className="mb-5 text-5xl">👋</div>
           <h1 className="mb-2 text-2xl font-bold text-[var(--color-text-primary)]">Welcome to Ascend</h1>
           <p className="mb-6 text-sm text-[var(--color-text-secondary)]">
@@ -130,7 +130,7 @@ export default function OnboardingPage() {
 
       {/* ── Step: Choose business type ─────────────────────────────── */}
       {step === "type" && (
-        <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="w-full max-w-2xl rounded-2xl p-6 shadow-2xl" style={{ backgroundColor: "var(--color-surface)" }}>
           <h2 className="mb-1 text-xl font-bold text-[var(--color-text-primary)]">What type of business are you?</h2>
           <p className="mb-5 text-sm text-[var(--color-text-secondary)]">
             Select your industry — we'll activate exactly the right modules for you.
@@ -175,7 +175,7 @@ export default function OnboardingPage() {
 
       {/* ── Step: Confirm + launch ─────────────────────────────────── */}
       {step === "confirm" && selectedBt && (
-        <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl text-center">
+        <div className="w-full max-w-md rounded-2xl p-8 shadow-2xl text-center" style={{ backgroundColor: "var(--color-surface)" }}>
           <div className="mb-3 text-5xl">{selectedBt.icon}</div>
           <h2 className="mb-1 text-xl font-bold text-[var(--color-text-primary)]">{selectedBt.name}</h2>
           <p className="mb-6 text-sm text-[var(--color-text-secondary)]">{selectedBt.desc}</p>

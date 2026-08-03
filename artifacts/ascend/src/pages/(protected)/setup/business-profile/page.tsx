@@ -273,14 +273,14 @@ export default function BusinessProfilePage() {
                                 isCore
                                   ? ""
                                   : isEnabled
-                                  ? "border-brand-200 bg-white shadow-sm"
+                                  ? "border-brand-200 shadow-sm"
                                   : "opacity-60"
                               }`}
                               style={
                                 isCore
                                   ? { borderColor: "var(--color-table-border)", backgroundColor: "var(--color-surface-subtle)" }
                                   : isEnabled
-                                  ? undefined
+                                  ? { backgroundColor: "var(--color-surface)" }
                                   : { borderColor: "var(--color-table-border)", backgroundColor: "var(--color-surface-subtle)" }
                               }
                             >
@@ -306,10 +306,10 @@ export default function BusinessProfilePage() {
                                 aria-label={`${isEnabled ? "Disable" : "Enable"} ${mod.name}`}
                                 className={`relative flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ${
                                   isCore
-                                    ? "cursor-not-allowed bg-gray-200"
+                                    ? "cursor-not-allowed bg-[var(--color-surface-subtle)]"
                                     : isEnabled
                                     ? "bg-brand-600"
-                                    : "bg-gray-200"
+                                    : "bg-[var(--color-surface-subtle)]"
                                 }`}
                               >
                                 <span

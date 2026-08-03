@@ -308,7 +308,7 @@ function TimeClockTab({ emp, onUpdated }: { emp: Employee; onUpdated: (e: Employ
           <div>
             <p className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Status today</p>
             <div className="mt-1 flex items-center gap-2">
-              <span className={`inline-flex h-2.5 w-2.5 rounded-full ${emp.clocked_in ? "bg-emerald-500" : "bg-slate-300"}`} />
+              <span className={`inline-flex h-2.5 w-2.5 rounded-full ${emp.clocked_in ? "bg-emerald-500" : "bg-[var(--color-border)]"}`} />
               <span className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
                 {emp.clocked_in
                   ? `Clocked in at ${fmtTime(emp.clocked_in_at!)}`
@@ -386,17 +386,17 @@ function TimeClockTab({ emp, onUpdated }: { emp: Employee; onUpdated: (e: Employ
 // ── Permission status helpers ─────────────────────────────────────────────────
 
 const PR_STATUS_STYLES: Record<PRStatus, { bg: string; text: string; label: string }> = {
-  draft:          { bg: "bg-slate-100",  text: "text-slate-500",  label: "Draft" },
+  draft:          { bg: "bg-[var(--color-surface-subtle)]",  text: "text-[var(--color-text-muted)]",  label: "Draft" },
   submitted:      { bg: "bg-amber-100",  text: "text-amber-700",  label: "Submitted" },
   pending_review: { bg: "bg-amber-100",  text: "text-amber-700",  label: "Pending Review" },
   approved:       { bg: "bg-emerald-100",text: "text-emerald-700",label: "Approved" },
   rejected:       { bg: "bg-red-100",    text: "text-red-600",    label: "Rejected" },
-  expired:        { bg: "bg-slate-100",  text: "text-slate-500",  label: "Expired" },
+  expired:        { bg: "bg-[var(--color-surface-subtle)]",  text: "text-[var(--color-text-muted)]",  label: "Expired" },
   revoked:        { bg: "bg-red-50",     text: "text-red-500",    label: "Revoked" },
 };
 
 const URGENCY_STYLES: Record<Urgency, { bg: string; text: string; label: string }> = {
-  low:    { bg: "bg-slate-100",  text: "text-slate-500",  label: "Low" },
+  low:    { bg: "bg-[var(--color-surface-subtle)]",  text: "text-[var(--color-text-muted)]",  label: "Low" },
   normal: { bg: "bg-blue-100",   text: "text-blue-700",   label: "Normal" },
   high:   { bg: "bg-orange-100", text: "text-orange-700", label: "High" },
   urgent: { bg: "bg-red-100",    text: "text-red-700",    label: "Urgent" },
@@ -473,7 +473,7 @@ function PermissionsTab({ emp, onRequestClick }: { emp: Employee; onRequestClick
             { color: "bg-emerald-500", label: "Role permission" },
             { color: "bg-blue-500",    label: "Temporary override" },
             { color: "bg-amber-400",   label: "Pending request" },
-            { color: "bg-slate-300",   label: "Not allowed" },
+            { color: "bg-[var(--color-border)]", label: "Not allowed" },
           ].map((l) => (
             <div key={l.label} className="flex items-center gap-1.5">
               <span className={`h-2.5 w-2.5 rounded-full ${l.color}`} />
@@ -554,25 +554,25 @@ function PermissionsTab({ emp, onRequestClick }: { emp: Employee; onRequestClick
                   const isPending    = !fromRole && !fromOverride && pendingSet.has(feat.id);
                   const allowed      = fromRole || fromOverride;
 
-                  let dotColor = "bg-slate-300";
+                  let dotColor = "bg-[var(--color-border)]";
                   let iconEl: React.ReactNode = (
-                    <svg className="h-3 w-3 text-slate-400" viewBox="0 0 12 12" fill="none">
+                    <svg className="h-3 w-3" style={{ color: "var(--color-text-muted)" }} viewBox="0 0 12 12" fill="none">
                       <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                     </svg>
                   );
-                  let bgColor = "bg-slate-100";
-                  let labelColor = "text-slate-400";
+                  let bgColor = "bg-[var(--color-surface-subtle)]";
+                  let labelColor = "text-[var(--color-text-muted)]";
                   let badge: React.ReactNode = null;
 
                   if (fromRole) {
-                    dotColor = "bg-emerald-500"; bgColor = "bg-emerald-100"; labelColor = "text-slate-900";
+                    dotColor = "bg-emerald-500"; bgColor = "bg-emerald-100"; labelColor = "text-[var(--color-text-primary)]";
                     iconEl = <svg className="h-3 w-3 text-emerald-600" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
                   } else if (fromOverride) {
-                    dotColor = "bg-blue-500"; bgColor = "bg-blue-100"; labelColor = "text-slate-900";
+                    dotColor = "bg-blue-500"; bgColor = "bg-blue-100"; labelColor = "text-[var(--color-text-primary)]";
                     iconEl = <svg className="h-3 w-3 text-blue-600" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
                     badge = <span className="ml-2 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">Override</span>;
                   } else if (isPending) {
-                    dotColor = "bg-amber-400"; bgColor = "bg-amber-100"; labelColor = "text-slate-700";
+                    dotColor = "bg-amber-400"; bgColor = "bg-amber-100"; labelColor = "text-[var(--color-text-secondary)]";
                     iconEl = <svg className="h-3 w-3 text-amber-600" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5"/><path d="M6 3.5V6l1.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
                     badge = <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">Pending</span>;
                   }

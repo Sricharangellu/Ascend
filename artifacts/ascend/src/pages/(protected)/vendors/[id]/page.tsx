@@ -74,7 +74,7 @@ const PO_STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   received:  { bg: "bg-emerald-100", text: "text-emerald-700" },
   billed:    { bg: "bg-violet-100",  text: "text-violet-700" },
   cancelled: { bg: "bg-red-100",     text: "text-red-600" },
-  draft:     { bg: "bg-slate-100",   text: "text-slate-500" },
+  draft:     { bg: "bg-[var(--color-surface-subtle)]", text: "text-[var(--color-text-muted)]" },
 };
 
 const INVOICE_STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
@@ -180,10 +180,10 @@ function ProfileTab({ vendor }: { vendor: Vendor }) {
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Financial summary</h3>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
-            { label: "Total spend",    value: formatMoney(vendor.totalSpentCents), color: "text-slate-900" },
-            { label: "Total POs",      value: vendor.poCount,                       color: "text-slate-900" },
-            { label: "Avg PO value",   value: formatMoney(vendor.avg_po_value_cents), color: "text-slate-900" },
-            { label: "Open credits",   value: formatMoney(vendor.openCreditsCents),  color: vendor.openCreditsCents > 0 ? "text-emerald-700" : "text-slate-400" },
+            { label: "Total spend",    value: formatMoney(vendor.totalSpentCents), color: "text-[var(--color-text-primary)]" },
+            { label: "Total POs",      value: vendor.poCount,                       color: "text-[var(--color-text-primary)]" },
+            { label: "Avg PO value",   value: formatMoney(vendor.avg_po_value_cents), color: "text-[var(--color-text-primary)]" },
+            { label: "Open credits",   value: formatMoney(vendor.openCreditsCents),  color: vendor.openCreditsCents > 0 ? "text-emerald-700" : "text-[var(--color-text-muted)]" },
           ].map(({ label, value, color }) => (
             <div key={label} className="rounded-lg px-3 py-2.5" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
               <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{label}</p>
@@ -613,10 +613,10 @@ export default function VendorDetailPage() {
         {/* KPI strip */}
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { label: "Total spend",   value: formatMoney(vendor.totalSpentCents), color: "text-slate-900" },
-            { label: "POs",           value: vendor.poCount,                       color: "text-slate-900" },
-            { label: "Open credits",  value: formatMoney(vendor.openCreditsCents), color: vendor.openCreditsCents > 0 ? "text-emerald-700" : "text-slate-400" },
-            { label: "Lead time",     value: vendor.lead_time_days != null ? `${vendor.lead_time_days} days` : "—", color: "text-slate-900" },
+            { label: "Total spend",   value: formatMoney(vendor.totalSpentCents), color: "text-[var(--color-text-primary)]" },
+            { label: "POs",           value: vendor.poCount,                       color: "text-[var(--color-text-primary)]" },
+            { label: "Open credits",  value: formatMoney(vendor.openCreditsCents), color: vendor.openCreditsCents > 0 ? "text-emerald-700" : "text-[var(--color-text-muted)]" },
+            { label: "Lead time",     value: vendor.lead_time_days != null ? `${vendor.lead_time_days} days` : "—", color: "text-[var(--color-text-primary)]" },
           ].map(({ label, value, color }) => (
             <div key={label} className="rounded-xl border px-4 py-3 shadow-sm" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
               <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{label}</p>

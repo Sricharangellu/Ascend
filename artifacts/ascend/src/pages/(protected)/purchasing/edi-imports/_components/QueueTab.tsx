@@ -198,7 +198,7 @@ export function QueueTab({ refreshKey }: { refreshKey: number }) {
                 <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{detail.filename}</h2>
                 <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{detail.format_label} · {detail.supplier_name}</p>
               </div>
-              <button type="button" onClick={() => setDetail(null)} className="text-xl hover:text-slate-600" style={{ color: "var(--color-text-muted)" }}>&times;</button>
+              <button type="button" onClick={() => setDetail(null)} className="text-xl" style={{ color: "var(--color-text-muted)" }}>&times;</button>
             </div>
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
               {/* Stats */}

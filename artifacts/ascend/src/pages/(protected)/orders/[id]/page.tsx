@@ -475,7 +475,7 @@ export default function OrderDetailPage() {
             <div className="absolute left-7 top-0 h-full w-px" style={{ backgroundColor: "var(--color-border)" }} />
             <ul className="space-y-4">
               {[...timeline].reverse().map((ev, i) => {
-                const colorClass = TIMELINE_COLORS[ev.type] ?? "bg-slate-100 text-slate-500";
+                const colorClass = TIMELINE_COLORS[ev.type] ?? "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)]";
                 const iconPath = TIMELINE_ICONS[ev.type] ?? TIMELINE_ICONS.created;
                 return (
                   <li key={ev.id} className="relative flex items-start gap-4">

@@ -54,43 +54,43 @@ export function ShiftModal({ employees, shift, prefillDate, prefillEmployee, onC
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-slate-900">{shift ? "Edit Shift" : "Add Shift"}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+      <div className="rounded-xl shadow-2xl w-full max-w-md" style={{ backgroundColor: "var(--color-surface)" }}>
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)" }}>
+          <h2 className="text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>{shift ? "Edit Shift" : "Add Shift"}</h2>
+          <button onClick={onClose} className="text-2xl leading-none hover:opacity-70" style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
         <form id="shift-form" onSubmit={submit} className="p-6 space-y-4">
           {error && <div role="alert" className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Employee <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Employee <span className="text-red-500">*</span></label>
             <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }} required>
               {employees.map((emp) => (
                 <option key={emp.id} value={emp.id}>{emp.name} — {ROLE_LABELS[emp.role as ShiftRole]}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Date <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Date <span className="text-red-500">*</span></label>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }} required />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Start Time</label>
+              <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Start Time</label>
               <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">End Time</label>
+              <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>End Time</label>
               <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }} />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Notes</label>
             <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional note…"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }} />
           </div>
         </form>
         <div className="px-6 pb-5 flex items-center justify-between">

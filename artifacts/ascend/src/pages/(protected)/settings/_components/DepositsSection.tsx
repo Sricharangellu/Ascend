@@ -44,7 +44,7 @@ export function DepositsSection({ canManage }: { canManage: boolean }) {
   const statusColor = (s: string) => {
     if (s === "completed" || s === "deposited") return "text-emerald-700";
     if (s === "pending") return "text-amber-700";
-    return "text-slate-500";
+    return "";
   };
 
   return (

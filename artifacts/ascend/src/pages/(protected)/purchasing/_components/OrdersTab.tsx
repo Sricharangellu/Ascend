@@ -119,7 +119,7 @@ export function OrdersTab() {
                   <td className="whitespace-nowrap px-4 py-3 font-mono text-xs" style={{ color: "var(--color-text-secondary)" }}>{order.id}</td>
                   <td className="whitespace-nowrap px-4 py-3" style={{ color: "var(--color-text-primary)" }}>{supplierName(order.supplier_id)}</td>
                   <td className="whitespace-nowrap px-4 py-3">
-                    <span className={`inline-flex rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${STATUS_STYLE[order.status] ?? "bg-slate-100 text-slate-700 ring-slate-200"}`}>
+                    <span className={`inline-flex rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${STATUS_STYLE[order.status] ?? "ring-[var(--color-border)]"}`} style={STATUS_STYLE[order.status] ? undefined : { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
                       {order.status}
                     </span>
                   </td>

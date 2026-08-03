@@ -56,7 +56,7 @@ export function LedgerTab({
     [rows, selectedSku, filteredRows],
   );
 
-  const inputCls = "min-h-[44px] w-full rounded-md border px-3 text-sm outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950";
+  const inputCls = "min-h-[44px] w-full rounded-md border px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--color-border)]";
   const inputStyle = {
     borderColor: "var(--color-border)",
     backgroundColor: "var(--color-surface)",
@@ -163,7 +163,7 @@ export function LedgerTab({
                         <button
                           type="button"
                           onClick={() => setSelectedSku(row.sku)}
-                          className="font-mono text-xs font-semibold underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-950"
+                          className="font-mono text-xs font-semibold underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--color-border)]"
                           style={{ color: "var(--color-text-primary)" }}
                         >
                           {row.sku}
@@ -182,7 +182,7 @@ export function LedgerTab({
                           <button
                             type="button"
                             onClick={() => setAdjustProduct({ id: row.id, name: row.name, sku: row.sku, onHand: row.onHand })}
-                            className="inline-flex min-h-[32px] items-center rounded border px-2 text-xs font-medium hover:bg-[var(--color-surface-subtle)] focus:outline-none focus:ring-2 focus:ring-slate-950"
+                            className="inline-flex min-h-[32px] items-center rounded border px-2 text-xs font-medium hover:bg-[var(--color-surface-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--color-border)]"
                             style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}
                           >
                             Adjust
@@ -190,7 +190,7 @@ export function LedgerTab({
                           <button
                             type="button"
                             onClick={() => setMovementsProduct({ id: row.id, name: row.name, sku: row.sku })}
-                            className="inline-flex min-h-[32px] items-center gap-1 rounded border px-2 text-xs font-medium hover:bg-[var(--color-surface-subtle)] focus:outline-none focus:ring-2 focus:ring-slate-950"
+                            className="inline-flex min-h-[32px] items-center gap-1 rounded border px-2 text-xs font-medium hover:bg-[var(--color-surface-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--color-border)]"
                             style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}
                             aria-label={`View movement history for ${row.name}`}
                           >

@@ -26,17 +26,19 @@ export function ScheduleGrid({
     <div className="overflow-x-auto">
       <table className="w-full border-collapse min-w-[900px]">
         <thead>
-          <tr className="bg-slate-50">
-            <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600 border-b border-slate-200 w-40 sticky left-0 bg-slate-50 z-10">
+          <tr style={{ backgroundColor: "var(--color-table-header)" }}>
+            <th className="text-left px-4 py-3 text-sm font-semibold z-10 sticky left-0" style={{ color: "var(--color-text-secondary)", borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)", width: "10rem" }}>
               Employee
             </th>
             {dates.map((d, i) => (
               <th key={i} className={clsx(
-                "text-center py-3 px-2 text-sm font-semibold border-b border-slate-200 min-w-[110px]",
-                isToday(d) ? "bg-blue-50 text-blue-700" : "text-slate-600"
-              )}>
+                "text-center py-3 px-2 text-sm font-semibold min-w-[110px]",
+                isToday(d) ? "bg-blue-50 text-blue-700" : ""
+              )}
+              style={isToday(d) ? { borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)" } : { borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
                 <div>{DAYS[i]}</div>
-                <div className={clsx("text-xs font-normal mt-0.5", isToday(d) ? "text-blue-500" : "text-slate-400")}>
+                <div className={clsx("text-xs font-normal mt-0.5", isToday(d) ? "text-blue-500" : "")}
+                  style={isToday(d) ? undefined : { color: "var(--color-text-muted)" }}>
                   {fmtDateShort(d.getTime())}
                 </div>
               </th>
@@ -45,8 +47,8 @@ export function ScheduleGrid({
         </thead>
         <tbody>
           {employees.map((emp) => (
-            <tr key={emp.id} className="border-b border-slate-100 hover:bg-slate-50/50 group">
-              <td className="px-4 py-3 sticky left-0 bg-white group-hover:bg-slate-50/50 z-10 border-r border-slate-100">
+            <tr key={emp.id} className="group hover:bg-[var(--color-surface-subtle)]/50" style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)" }}>
+              <td className="px-4 py-3 sticky left-0 z-10 group-hover:bg-[var(--color-surface-subtle)]/50" style={{ backgroundColor: "var(--color-surface)", borderRightWidth: 1, borderRightStyle: "solid", borderColor: "var(--color-border)" }}>
                 <div className="flex items-center gap-2.5">
                   <div
                     className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
@@ -55,8 +57,8 @@ export function ScheduleGrid({
                     {emp.name.charAt(0)}
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-slate-800 truncate max-w-[100px]">{emp.name}</p>
-                    <p className="text-xs text-slate-400">{ROLE_LABELS[emp.role as ShiftRole]}</p>
+                    <p className="text-sm font-medium truncate max-w-[100px]" style={{ color: "var(--color-text-secondary)" }}>{emp.name}</p>
+                    <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{ROLE_LABELS[emp.role as ShiftRole]}</p>
                   </div>
                 </div>
               </td>
@@ -73,7 +75,7 @@ export function ScheduleGrid({
                   >
                     {dayShifts.length === 0 ? (
                       <div className="h-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span className="text-slate-300 text-xl leading-none">+</span>
+                        <span className="text-xl leading-none" style={{ color: "var(--color-text-muted)" }}>+</span>
                       </div>
                     ) : (
                       <div className="space-y-1">
@@ -95,7 +97,8 @@ export function ScheduleGrid({
                         })}
                         <button
                           onClick={(e) => { e.stopPropagation(); onCellClick(isoDate(d), emp.id); }}
-                          className="w-full text-center text-slate-300 hover:text-slate-500 text-lg leading-tight opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="w-full text-center text-lg leading-tight opacity-0 group-hover:opacity-100 transition-opacity"
+                          style={{ color: "var(--color-text-muted)" }}
                         >
                           +
                         </button>

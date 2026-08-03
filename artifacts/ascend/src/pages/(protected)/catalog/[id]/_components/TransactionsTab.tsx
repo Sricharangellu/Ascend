@@ -35,9 +35,11 @@ export function TransactionsTab({ productId }: { productId: string }) {
         {TX_TABS.map((t) => (
           <button key={t.key} type="button" onClick={() => setTab(t.key)}
             className={["rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors",
-              tab === t.key ? "bg-white text-brand-600 shadow-sm dark:bg-slate-700" : "hover:bg-[var(--color-surface)]"
+              tab === t.key ? "shadow-sm" : "hover:bg-[var(--color-surface)]"
             ].join(" ")}
-            style={tab !== t.key ? { color: "var(--color-text-secondary)" } : {}}>
+            style={tab === t.key
+              ? { backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }
+              : { color: "var(--color-text-secondary)" }}>
             {t.label}
           </button>
         ))}

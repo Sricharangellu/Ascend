@@ -96,10 +96,11 @@ export default function TaxCompliancePage() {
   return (
     <EnterpriseShell active="tax-compliance" title="Tax & Compliance" subtitle="Tax rates, MSA reporting, and industry compliance rules">
       <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6">
-        <div className="flex border-b border-slate-200 mb-5">
+        <div className="flex mb-5" style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)" }}>
           {TABS.map((t) => (
             <button key={t.key} onClick={() => setTab(t.key)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === t.key ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === t.key ? "border-brand-600 text-brand-700" : "border-transparent"}`}
+              style={tab === t.key ? undefined : { color: "var(--color-text-muted)" }}>
               {t.label}
             </button>
           ))}
@@ -109,8 +110,8 @@ export default function TaxCompliancePage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-base font-semibold text-slate-900">Tax Rates</h2>
-                <p className="text-sm text-slate-500">Configure sales tax, excise, and special rates by product class and state.</p>
+                <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Tax Rates</h2>
+                <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Configure sales tax, excise, and special rates by product class and state.</p>
               </div>
               {canManage && <Button variant="primary" size="sm" onClick={() => setShowAddRate(true)}>+ Add Rate</Button>}
             </div>
@@ -118,16 +119,16 @@ export default function TaxCompliancePage() {
             {showAddRate && (
               <Card>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div><label className="block text-xs font-medium text-slate-600 mb-1">Name</label>
-                    <input value={rateForm.name} onChange={e => setRateForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. CA Sales Tax" className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" /></div>
-                  <div><label className="block text-xs font-medium text-slate-600 mb-1">Rate %</label>
-                    <input type="number" step="0.01" value={rateForm.rate} onChange={e => setRateForm(f => ({ ...f, rate: e.target.value }))} placeholder="7.25" className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" /></div>
-                  <div><label className="block text-xs font-medium text-slate-600 mb-1">Class</label>
-                    <select value={rateForm.taxClass} onChange={e => setRateForm(f => ({ ...f, taxClass: e.target.value }))} className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
+                  <div><label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Name</label>
+                    <input value={rateForm.name} onChange={e => setRateForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. CA Sales Tax" className="w-full rounded px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }} /></div>
+                  <div><label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Rate %</label>
+                    <input type="number" step="0.01" value={rateForm.rate} onChange={e => setRateForm(f => ({ ...f, rate: e.target.value }))} placeholder="7.25" className="w-full rounded px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }} /></div>
+                  <div><label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Class</label>
+                    <select value={rateForm.taxClass} onChange={e => setRateForm(f => ({ ...f, taxClass: e.target.value }))} className="w-full rounded px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }}>
                       <option value="standard">Standard</option><option value="exempt">Exempt</option><option value="tobacco">Tobacco</option><option value="vapor">Vapor</option>
                     </select></div>
-                  <div><label className="block text-xs font-medium text-slate-600 mb-1">State</label>
-                    <input value={rateForm.state} onChange={e => setRateForm(f => ({ ...f, state: e.target.value }))} placeholder="CA" maxLength={2} className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" /></div>
+                  <div><label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>State</label>
+                    <input value={rateForm.state} onChange={e => setRateForm(f => ({ ...f, state: e.target.value }))} placeholder="CA" maxLength={2} className="w-full rounded px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }} /></div>
                 </div>
                 <div className="flex gap-2 mt-3">
                   <Button variant="primary" size="sm" loading={savingRate} onClick={() => void addRate()}>Save</Button>
@@ -137,24 +138,24 @@ export default function TaxCompliancePage() {
             )}
 
             <Card noPadding>
-              {loadingRates ? <div className="space-y-2 p-4">{[...Array(3)].map((_, i) => <div key={i} className="h-10 animate-pulse rounded bg-slate-100" />)}</div>
+              {loadingRates ? <div className="space-y-2 p-4">{[...Array(3)].map((_, i) => <div key={i} className="h-10 animate-skeleton rounded" />)}</div>
                 : rates.length === 0 ? (
                   <div className="px-5 py-10 text-center">
-                    <p className="text-sm text-slate-500">No tax rates configured.</p>
+                    <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No tax rates configured.</p>
                     {canManage && <button onClick={() => setShowAddRate(true)} className="mt-2 text-sm font-medium text-brand-600 hover:text-brand-700">Add your first rate</button>}
                   </div>
                 ) : (
                   <table className="w-full text-sm">
-                    <thead><tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    <thead><tr className="text-left text-xs font-semibold uppercase tracking-[0.08em]" style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
                       <th className="px-4 py-3">Name</th><th className="px-4 py-3 text-right">Rate</th><th className="px-4 py-3">Class</th><th className="px-4 py-3">State</th><th className="px-4 py-3">Status</th>
                     </tr></thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-[var(--color-table-border)]">
                       {rates.map(r => (
-                        <tr key={r.id} className="hover:bg-slate-50">
-                          <td className="px-4 py-3 font-medium text-slate-900">{r.name}</td>
+                        <tr key={r.id} className="hover:bg-[var(--color-surface-subtle)]">
+                          <td className="px-4 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{r.name}</td>
                           <td className="px-4 py-3 text-right font-mono font-semibold">{(Number(r.rate) * 100).toFixed(2)}%</td>
                           <td className="px-4 py-3"><Badge variant={TAX_CLASS_BADGE[r.tax_class] ?? "gray"}>{r.tax_class}</Badge></td>
-                          <td className="px-4 py-3 text-slate-500">{r.state ?? "—"}</td>
+                          <td className="px-4 py-3" style={{ color: "var(--color-text-muted)" }}>{r.state ?? "—"}</td>
                           <td className="px-4 py-3"><Badge variant={r.is_active ? "green" : "gray"}>{r.is_active ? "Active" : "Inactive"}</Badge></td>
                         </tr>
                       ))}
@@ -166,9 +167,9 @@ export default function TaxCompliancePage() {
             <Card title="State Tax Reference">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {STATE_TAX_INFO.map(s => (
-                  <div key={s.state} className="rounded-md border border-slate-200 p-3">
-                    <p className="font-semibold text-sm text-slate-900 mb-1">{s.state}</p>
-                    <ul className="space-y-0.5">{s.types.map(t => <li key={t} className="text-xs text-slate-500">• {t}</li>)}</ul>
+                  <div key={s.state} className="rounded-md p-3" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }}>
+                    <p className="font-semibold text-sm mb-1" style={{ color: "var(--color-text-primary)" }}>{s.state}</p>
+                    <ul className="space-y-0.5">{s.types.map(t => <li key={t} className="text-xs" style={{ color: "var(--color-text-muted)" }}>• {t}</li>)}</ul>
                   </div>
                 ))}
               </div>
@@ -180,10 +181,10 @@ export default function TaxCompliancePage() {
           <div className="space-y-4">
             <Card>
               <div className="flex items-end gap-3 flex-wrap">
-                <div><label className="block text-xs font-medium text-slate-600 mb-1">Report Period</label>
-                  <input type="month" value={msaPeriod} onChange={e => setMsaPeriod(e.target.value)} className="h-9 px-3 bg-white border border-slate-300 rounded-md text-sm focus:outline-none focus:border-brand-500" /></div>
-                <div><label className="block text-xs font-medium text-slate-600 mb-1">MSA Category</label>
-                  <select value={msaFilter} onChange={e => setMsaFilter(e.target.value)} className="h-9 px-3 bg-white border border-slate-300 rounded-md text-sm focus:outline-none focus:border-brand-500">
+                <div><label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>Report Period</label>
+                  <input type="month" value={msaPeriod} onChange={e => setMsaPeriod(e.target.value)} className="h-9 px-3 rounded-md text-sm focus:outline-none focus:border-brand-500" style={{ backgroundColor: "var(--color-surface)", borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }} /></div>
+                <div><label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>MSA Category</label>
+                  <select value={msaFilter} onChange={e => setMsaFilter(e.target.value)} className="h-9 px-3 rounded-md text-sm focus:outline-none focus:border-brand-500" style={{ backgroundColor: "var(--color-surface)", borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }}>
                     <option value="all">All Categories</option>
                     {MSA_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select></div>
@@ -196,25 +197,25 @@ export default function TaxCompliancePage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[{ label: "Total Quantity", value: `${msaTotalQty.toLocaleString()} units` }, { label: "Total Sales Amount", value: `$${msaTotalAmt.toLocaleString("en-US", { minimumFractionDigits: 2 })}` }, { label: "Customers Reported", value: String(new Set(filteredMsa.map(r => r.customer)).size) }]
-                .map(k => (<Card key={k.label}><p className="text-xs text-slate-500">{k.label}</p><p className="text-2xl font-bold text-slate-900 mt-1 tabular-nums">{k.value}</p></Card>))}
+                .map(k => (<Card key={k.label}><p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{k.label}</p><p className="text-2xl font-bold mt-1 tabular-nums" style={{ color: "var(--color-text-primary)" }}>{k.value}</p></Card>))}
             </div>
 
             <Card noPadding>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead><tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  <thead><tr className="text-xs font-semibold uppercase tracking-[0.08em]" style={{ backgroundColor: "var(--color-table-header)", borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>
                     <th className="px-4 py-3 text-left">Customer</th><th className="px-4 py-3 text-left">MSA Category</th><th className="px-4 py-3 text-left">Product</th><th className="px-4 py-3 text-left font-mono">UPC</th><th className="px-4 py-3 text-right">Qty</th><th className="px-4 py-3 text-right">Unit Price</th><th className="px-4 py-3 text-right">Total</th>
                   </tr></thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-[var(--color-table-border)]">
                     {filteredMsa.map((row, i) => (
-                      <tr key={i} className="hover:bg-slate-50">
-                        <td className="px-4 py-3 font-medium text-slate-900">{row.customer}</td>
-                        <td className="px-4 py-3"><span className="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-700">{row.msaCategory}</span></td>
-                        <td className="px-4 py-3 text-slate-700">{row.product}</td>
-                        <td className="px-4 py-3 font-mono text-xs text-slate-500">{row.upc}</td>
+                      <tr key={i} className="hover:bg-[var(--color-surface-subtle)]">
+                        <td className="px-4 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{row.customer}</td>
+                        <td className="px-4 py-3"><span className="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>{row.msaCategory}</span></td>
+                        <td className="px-4 py-3" style={{ color: "var(--color-text-secondary)" }}>{row.product}</td>
+                        <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--color-text-muted)" }}>{row.upc}</td>
                         <td className="px-4 py-3 text-right tabular-nums font-medium">{row.qty}</td>
                         <td className="px-4 py-3 text-right tabular-nums">${row.unitPrice.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right tabular-nums font-semibold text-slate-900">${row.total.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: "var(--color-text-primary)" }}>${row.total.toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -238,16 +239,16 @@ export default function TaxCompliancePage() {
         {tab === "exemptions" && (
           <Card>
             <div className="py-8 text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-slate-400">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: "var(--color-text-muted)" }}>
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 </svg>
               </div>
-              <h3 className="text-base font-semibold text-slate-700">Customer Tax Exemptions</h3>
-              <p className="mt-1 text-sm text-slate-500 max-w-sm mx-auto">Manage resale certificates, tax-exempt status, and exemption documentation per customer. Coming in a future release.</p>
+              <h3 className="text-base font-semibold" style={{ color: "var(--color-text-secondary)" }}>Customer Tax Exemptions</h3>
+              <p className="mt-1 text-sm max-w-sm mx-auto" style={{ color: "var(--color-text-muted)" }}>Manage resale certificates, tax-exempt status, and exemption documentation per customer. Coming in a future release.</p>
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-lg mx-auto text-left">
                 {["Resale certificates", "State tax exemptions", "Hemp/CBD license tracking"].map(item => (
-                  <div key={item} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">○ {item}</div>
+                  <div key={item} className="rounded-md px-3 py-2 text-xs" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>○ {item}</div>
                 ))}
               </div>
             </div>

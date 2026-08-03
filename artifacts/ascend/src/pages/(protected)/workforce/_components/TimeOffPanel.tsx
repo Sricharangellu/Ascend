@@ -5,12 +5,12 @@ import { TO_STATUS_COLORS } from "./workforceTypes";
 
 function Row({ r, onUpdateStatus }: { r: TimeOffRequest; onUpdateStatus: (id: string, status: TimeOffStatus) => void }) {
   return (
-    <div className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
+    <div className="flex items-center justify-between py-3 last:border-0" style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)" }}>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-800">{r.employee_name}</p>
-        <p className="text-xs text-slate-500">
+        <p className="text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>{r.employee_name}</p>
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           {r.date_from === r.date_to ? r.date_from : `${r.date_from} → ${r.date_to}`}
-          {r.reason && <span className="ml-2 text-slate-400">· {r.reason}</span>}
+          {r.reason && <span className="ml-2" style={{ color: "var(--color-text-muted)" }}>· {r.reason}</span>}
         </p>
       </div>
       <div className="flex items-center gap-2 ml-4">
@@ -24,7 +24,7 @@ function Row({ r, onUpdateStatus }: { r: TimeOffRequest; onUpdateStatus: (id: st
               Approve
             </button>
             <button onClick={() => onUpdateStatus(r.id, "denied")}
-              className="text-xs px-2 py-1 rounded bg-slate-200 text-slate-700 hover:bg-slate-300">
+              className="text-xs px-2 py-1 rounded hover:bg-[var(--color-surface-subtle)]" style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
               Deny
             </button>
           </>
@@ -42,15 +42,15 @@ export function TimeOffPanel({ requests, onUpdateStatus }: {
   const resolved = requests.filter((r) => r.status !== "pending");
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-      <h3 className="text-sm font-semibold text-slate-800 mb-4">
+    <div className="rounded-xl shadow-sm p-5" style={{ backgroundColor: "var(--color-surface)", borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }}>
+      <h3 className="text-sm font-semibold mb-4" style={{ color: "var(--color-text-secondary)" }}>
         Time-Off Requests
         {pending.length > 0 && (
           <span className="ml-2 bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full">{pending.length} pending</span>
         )}
       </h3>
       {requests.length === 0 ? (
-        <p className="text-sm text-slate-400">No time-off requests.</p>
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No time-off requests.</p>
       ) : (
         <div>
           {pending.map((r) => <Row key={r.id} r={r} onUpdateStatus={onUpdateStatus} />)}

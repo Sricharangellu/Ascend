@@ -31,7 +31,7 @@ const STEP_TYPE_BADGE: Record<StepType, "blue" | "yellow" | "green" | "purple"> 
   external_api: "purple",
 };
 
-const inputCls = "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+const inputCls = "w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 // ── StepFormModal ──────────────────────────────────────────────────────────────
 
@@ -75,29 +75,29 @@ function StepFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-950">{initial ? "Edit step" : "Add step"}</h2>
-          <button type="button" onClick={onClose} className="text-xl leading-none text-slate-400 hover:text-slate-600">&times;</button>
+      <div className="w-full max-w-lg rounded-xl shadow-xl" style={{ backgroundColor: "var(--color-surface)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)" }}>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>{initial ? "Edit step" : "Add step"}</h2>
+          <button type="button" onClick={onClose} className="text-xl leading-none hover:opacity-70" style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
         <form id="step-form" onSubmit={handleSubmit} className="space-y-4 px-5 py-4">
           {err && <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>}
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Step name <span className="text-red-500">*</span></label>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Prompt cashier for ID" className={inputCls} required />
+            <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>Step name <span className="text-red-500">*</span></label>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Prompt cashier for ID" className={inputCls} style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }} required />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Type</label>
-              <select value={stepType} onChange={(e) => setStepType(e.target.value as StepType)} className={inputCls}>
+              <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>Type</label>
+              <select value={stepType} onChange={(e) => setStepType(e.target.value as StepType)} className={inputCls} style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }}>
                 {(Object.keys(STEP_TYPE_LABELS) as StepType[]).map((t) => (
                   <option key={t} value={t}>{STEP_TYPE_LABELS[t]}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Trigger</label>
-              <select value={triggerCondition} onChange={(e) => setTriggerCondition(e.target.value as TriggerCondition)} className={inputCls}>
+              <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>Trigger</label>
+              <select value={triggerCondition} onChange={(e) => setTriggerCondition(e.target.value as TriggerCondition)} className={inputCls} style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }}>
                 {(Object.keys(TRIGGER_LABELS) as TriggerCondition[]).map((t) => (
                   <option key={t} value={t}>{TRIGGER_LABELS[t]}</option>
                 ))}
@@ -105,15 +105,15 @@ function StepFormModal({
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Config <span className="font-normal text-slate-400">(JSON)</span>
+            <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
+              Config <span className="font-normal" style={{ color: "var(--color-text-muted)" }}>(JSON)</span>
             </label>
             <textarea value={configJson} onChange={(e) => setConfigJson(e.target.value)} rows={4} spellCheck={false}
-              className={`${inputCls} resize-none font-mono text-xs`} />
+              className={`${inputCls} resize-none font-mono text-xs`} style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }} />
           </div>
         </form>
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+        <div className="flex justify-end gap-2 px-5 py-3" style={{ borderTopWidth: 1, borderTopStyle: "solid", borderColor: "var(--color-border)" }}>
+          <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium hover:bg-[var(--color-surface-subtle)]" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Cancel</button>
           <button type="submit" form="step-form" disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60">
             {saving ? "Saving…" : initial ? "Save changes" : "Add step"}
           </button>
@@ -158,7 +158,7 @@ function StepsPanel({ workflow, onReload }: { workflow: WorkflowDefinition; onRe
   const sorted = [...workflow.steps].sort((a, b) => a.position - b.position);
 
   return (
-    <div className="border-t border-slate-200 bg-slate-50/60">
+    <div style={{ borderTopWidth: 1, borderTopStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
       {actionError && (
         <div className="border-b border-red-100 bg-red-50 px-4 py-2">
           <p className="text-sm text-red-700">{actionError}</p>
@@ -167,30 +167,30 @@ function StepsPanel({ workflow, onReload }: { workflow: WorkflowDefinition; onRe
 
       {sorted.length === 0 ? (
         <div className="px-6 py-6 text-center">
-          <p className="text-sm text-slate-500">No steps yet.</p>
-          <p className="mt-0.5 text-xs text-slate-400">Steps define what happens when this workflow triggers at checkout.</p>
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No steps yet.</p>
+          <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>Steps define what happens when this workflow triggers at checkout.</p>
         </div>
       ) : (
-        <ol className="divide-y divide-slate-200">
+        <ol className="divide-y divide-[var(--color-border)]">
           {sorted.map((step, i) => (
             <li key={step.id} className="flex items-start gap-3 px-6 py-3">
-              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold" style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
                 {i + 1}
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium text-slate-900">{step.name}</span>
+                  <span className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>{step.name}</span>
                   <Badge variant={STEP_TYPE_BADGE[step.stepType]}>{STEP_TYPE_LABELS[step.stepType]}</Badge>
-                  <span className="text-xs text-slate-400">{TRIGGER_LABELS[step.triggerCondition]}</span>
+                  <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{TRIGGER_LABELS[step.triggerCondition]}</span>
                   {!step.enabled && <Badge variant="gray">Disabled</Badge>}
                 </div>
                 {Object.keys(step.config).length > 0 && (
-                  <p className="mt-0.5 truncate font-mono text-xs text-slate-400">{JSON.stringify(step.config)}</p>
+                  <p className="mt-0.5 truncate font-mono text-xs" style={{ color: "var(--color-text-muted)" }}>{JSON.stringify(step.config)}</p>
                 )}
               </div>
               <div className="flex shrink-0 gap-1.5">
                 <button type="button" onClick={() => { setEditStep(step); setActionError(null); }}
-                  className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-white">
+                  className="rounded px-2 py-1 text-xs hover:bg-[var(--color-surface)]" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
                   Edit
                 </button>
                 <button type="button" onClick={() => { setDeleteStep(step); setActionError(null); }}
@@ -203,7 +203,7 @@ function StepsPanel({ workflow, onReload }: { workflow: WorkflowDefinition; onRe
         </ol>
       )}
 
-      <div className="border-t border-slate-200 px-6 py-3">
+      <div className="px-6 py-3" style={{ borderTopWidth: 1, borderTopStyle: "solid", borderColor: "var(--color-border)" }}>
         <button type="button" onClick={() => setShowAddStep(true)} className="text-sm font-medium text-blue-600 hover:underline">
           + Add step
         </button>
@@ -217,12 +217,12 @@ function StepsPanel({ workflow, onReload }: { workflow: WorkflowDefinition; onRe
       )}
       {deleteStep && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDeleteStep(null)}>
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-base font-semibold text-slate-950">Remove &ldquo;{deleteStep.name}&rdquo;?</h2>
-            <p className="mt-2 text-sm text-slate-600">This step will be permanently removed from the workflow.</p>
+          <div className="w-full max-w-sm rounded-xl p-6 shadow-xl" style={{ backgroundColor: "var(--color-surface)" }} onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Remove &ldquo;{deleteStep.name}&rdquo;?</h2>
+            <p className="mt-2 text-sm" style={{ color: "var(--color-text-secondary)" }}>This step will be permanently removed from the workflow.</p>
             {actionError && <p className="mt-3 text-sm text-red-700">{actionError}</p>}
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setDeleteStep(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+              <button type="button" onClick={() => setDeleteStep(null)} className="rounded-lg px-4 py-2 text-sm font-medium hover:bg-[var(--color-surface-subtle)]" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Cancel</button>
               <button type="button" onClick={handleDeleteStep} disabled={deleting} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60">
                 {deleting ? "Removing…" : "Remove step"}
               </button>
@@ -270,12 +270,13 @@ export function WorkflowRow({ workflow, onReload }: { workflow: WorkflowDefiniti
 
   return (
     <>
-      <div className="divide-y divide-slate-100">
-        <div className="flex items-center gap-4 px-4 py-4 transition-colors hover:bg-slate-50">
+      <div className="divide-y divide-[var(--color-table-border)]">
+        <div className="flex items-center gap-4 px-4 py-4 transition-colors hover:bg-[var(--color-surface-subtle)]">
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="shrink-0 text-slate-400 transition-transform hover:text-slate-600"
+            className="shrink-0 transition-transform hover:opacity-70"
+            style={{ color: "var(--color-text-muted)" }}
             aria-label={expanded ? "Collapse" : "Expand"}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
@@ -286,12 +287,12 @@ export function WorkflowRow({ workflow, onReload }: { workflow: WorkflowDefiniti
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-semibold text-slate-950">{workflow.name}</span>
+              <span className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{workflow.name}</span>
               <Badge variant={workflow.enabled ? "green" : "gray"}>{workflow.enabled ? "Active" : "Inactive"}</Badge>
-              <span className="text-xs text-slate-400">{workflow.steps.length} {workflow.steps.length === 1 ? "step" : "steps"}</span>
+              <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{workflow.steps.length} {workflow.steps.length === 1 ? "step" : "steps"}</span>
             </div>
-            {workflow.description && <p className="mt-0.5 truncate text-sm text-slate-500">{workflow.description}</p>}
-            <p className="mt-0.5 text-xs text-slate-400">Updated {fmtDate(workflow.updatedAt)}</p>
+            {workflow.description && <p className="mt-0.5 truncate text-sm" style={{ color: "var(--color-text-muted)" }}>{workflow.description}</p>}
+            <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>Updated {fmtDate(workflow.updatedAt)}</p>
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
@@ -301,7 +302,7 @@ export function WorkflowRow({ workflow, onReload }: { workflow: WorkflowDefiniti
               disabled={toggling}
               aria-label={workflow.enabled ? "Disable workflow" : "Enable workflow"}
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:opacity-50 ${
-                workflow.enabled ? "bg-blue-600" : "bg-slate-200"
+                workflow.enabled ? "bg-blue-600" : "bg-[var(--color-surface-subtle)]"
               }`}
             >
               <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform ${
@@ -309,7 +310,7 @@ export function WorkflowRow({ workflow, onReload }: { workflow: WorkflowDefiniti
               }`} />
             </button>
             <button type="button" onClick={() => setShowEdit(true)}
-              className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100">
+              className="rounded px-2 py-1 text-xs hover:bg-[var(--color-surface-subtle)]" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
               Edit
             </button>
             <button type="button" onClick={() => setShowDelete(true)}
@@ -328,14 +329,14 @@ export function WorkflowRow({ workflow, onReload }: { workflow: WorkflowDefiniti
 
       {showDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowDelete(false)}>
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-base font-semibold text-slate-950">Delete &ldquo;{workflow.name}&rdquo;?</h2>
-            <p className="mt-2 text-sm text-slate-600">
+          <div className="w-full max-w-sm rounded-xl p-6 shadow-xl" style={{ backgroundColor: "var(--color-surface)" }} onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Delete &ldquo;{workflow.name}&rdquo;?</h2>
+            <p className="mt-2 text-sm" style={{ color: "var(--color-text-secondary)" }}>
               This will permanently remove the workflow and all its steps. Active checkouts using this workflow will not be affected.
             </p>
             {actionError && <p className="mt-3 text-sm text-red-700">{actionError}</p>}
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setShowDelete(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+              <button type="button" onClick={() => setShowDelete(false)} className="rounded-lg px-4 py-2 text-sm font-medium hover:bg-[var(--color-surface-subtle)]" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Cancel</button>
               <button type="button" onClick={handleDelete} disabled={deleting} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60">
                 {deleting ? "Deleting…" : "Delete workflow"}
               </button>

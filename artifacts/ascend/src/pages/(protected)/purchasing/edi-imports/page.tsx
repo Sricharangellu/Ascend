@@ -41,7 +41,7 @@ export default function EdiImportsPage() {
                   "whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
                   tab === t.key
                     ? "border-blue-600 text-blue-600"
-                    : "border-transparent hover:border-slate-300",
+                    : "border-transparent hover:border-[var(--color-border)]",
                 ].join(" ")}
                 style={tab === t.key ? undefined : { color: "var(--color-text-muted)" }}
                 aria-selected={tab === t.key}

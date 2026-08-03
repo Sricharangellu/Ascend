@@ -148,7 +148,7 @@ function ActionModal({ error, onClose, onDone }: ActionModalProps) {
                     "rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
                     action === a
                       ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                      : "hover:border-slate-300",
+                      : "hover:border-[var(--color-border)]",
                   ].join(" ")}
                   style={action !== a ? { borderColor: "var(--color-border)", color: "var(--color-text-secondary)" } : undefined}
                 >

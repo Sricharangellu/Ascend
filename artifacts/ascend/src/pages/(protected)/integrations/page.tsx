@@ -278,14 +278,14 @@ function Metric({
   tone: "neutral" | "success" | "warning" | "brand" | "danger";
 }) {
   const toneClass = {
-    neutral: "border-slate-200 bg-white",
+    neutral: "border-[var(--color-border)]",
     success: "border-success-200 bg-success-50",
     warning: "border-warning-200 bg-warning-50",
     brand: "border-brand-200 bg-brand-50",
     danger: "border-danger-200 bg-danger-50",
   }[tone];
   return (
-    <div className={`rounded-md border p-4 shadow-sm ${toneClass}`}>
+    <div className={`rounded-md border p-4 shadow-sm ${toneClass}`} style={tone === "neutral" ? { backgroundColor: "var(--color-surface)" } : undefined}>
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--color-text-muted)" }}>{label}</p>
       <p className="mt-1 text-xl font-semibold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{value}</p>
       <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>{helper}</p>

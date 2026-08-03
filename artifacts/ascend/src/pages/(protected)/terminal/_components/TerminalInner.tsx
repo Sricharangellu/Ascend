@@ -258,7 +258,7 @@ export function TerminalInner() {
             <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
               <ProductGrid onAddProduct={handleAddProduct} />
             </div>
-            <div className="h-[42vh] shrink-0 overflow-hidden border-t border-slate-200 lg:h-auto lg:w-[45%] lg:border-l lg:border-t-0">
+            <div className="h-[42vh] shrink-0 overflow-hidden border-t border-[var(--color-border)] lg:h-auto lg:w-[45%] lg:border-l lg:border-t-0">
               <CartPanel
                 cart={cart}
                 onCharge={handleCharge}

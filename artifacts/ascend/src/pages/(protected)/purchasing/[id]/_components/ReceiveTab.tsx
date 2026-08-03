@@ -119,7 +119,7 @@ export function ReceiveTab({
                 <polyline points="14 2 14 8 20 8" />
               </svg>
               <div>
-                <p className="text-xs font-medium text-slate-800">{doc.name}</p>
+                <p className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>{doc.name}</p>
                 <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{docTypeLabel(doc.type)} · {fmtBytes(doc.size_bytes)}</p>
               </div>
             </div>

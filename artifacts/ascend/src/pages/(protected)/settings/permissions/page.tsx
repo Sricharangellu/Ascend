@@ -31,7 +31,7 @@ function Toggle({
         "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2",
         disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer",
-        enabled ? "bg-brand-600" : "bg-slate-200",
+        enabled ? "bg-brand-600" : "bg-[var(--color-surface-subtle)]",
       ].join(" ")}
     >
       <span
@@ -74,7 +74,7 @@ function RoleMenu({
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
-        className="flex h-5 w-5 items-center justify-center rounded text-slate-300 hover:text-slate-500 focus:outline-none"
+        className="flex h-5 w-5 items-center justify-center rounded focus:outline-none" style={{ color: "var(--color-text-muted)" }}
         aria-label="Role actions"
       >
         <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
@@ -82,15 +82,15 @@ function RoleMenu({
         </svg>
       </button>
       {open && (
-        <div className="absolute right-0 z-50 mt-1 w-36 rounded-lg border border-slate-200 bg-white py-1 shadow-xl">
+        <div className="absolute right-0 z-50 mt-1 w-36 rounded-lg py-1 shadow-xl" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
           <button type="button" onClick={() => { onDuplicate(roleId); setOpen(false); }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50">
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs hover:bg-[var(--color-surface-subtle)]" style={{ color: "var(--color-text-secondary)" }}>
             Duplicate
           </button>
           {isCustom && (
             <>
               <button type="button" onClick={() => { onEdit(roleId); setOpen(false); }}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50">
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-xs hover:bg-[var(--color-surface-subtle)]" style={{ color: "var(--color-text-secondary)" }}>
                 Rename
               </button>
               <button type="button" onClick={() => { onDelete(roleId); setOpen(false); }}
@@ -138,17 +138,17 @@ const RISK_STYLES = {
 const URGENCY_LABELS: Record<string, string> = { low: "Low", normal: "Normal", high: "High", urgent: "Urgent" };
 
 const URGENCY_COLORS: Record<string, string> = {
-  low: "bg-slate-100 text-slate-500", normal: "bg-blue-100 text-blue-700",
+  low: "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)]", normal: "bg-blue-100 text-blue-700",
   high: "bg-orange-100 text-orange-700", urgent: "bg-red-100 text-red-700",
 };
 
 const STATUS_STYLES: Record<PRStatus, { bg: string; text: string; label: string }> = {
-  draft:          { bg: "bg-slate-100",  text: "text-slate-500",  label: "Draft" },
+  draft:          { bg: "bg-[var(--color-surface-subtle)]",  text: "text-[var(--color-text-muted)]",  label: "Draft" },
   submitted:      { bg: "bg-amber-100",  text: "text-amber-700",  label: "Submitted" },
   pending_review: { bg: "bg-amber-100",  text: "text-amber-700",  label: "Pending" },
   approved:       { bg: "bg-emerald-100",text: "text-emerald-700",label: "Approved" },
   rejected:       { bg: "bg-red-100",    text: "text-red-600",    label: "Rejected" },
-  expired:        { bg: "bg-slate-100",  text: "text-slate-500",  label: "Expired" },
+  expired:        { bg: "bg-[var(--color-surface-subtle)]",  text: "text-[var(--color-text-muted)]",  label: "Expired" },
   revoked:        { bg: "bg-red-50",     text: "text-red-500",    label: "Revoked" },
 };
 
@@ -190,10 +190,10 @@ function ApproveModal({ req, onClose, onDone }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-xl bg-white shadow-2xl">
-        <div className="border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-900">Approve request</h2>
-          <p className="text-xs text-slate-500">{featLabel(req.permission_code)} for {req.requested_for_name}</p>
+      <div className="w-full max-w-md rounded-xl shadow-2xl" style={{ backgroundColor: "var(--color-surface)" }}>
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Approve request</h2>
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{featLabel(req.permission_code)} for {req.requested_for_name}</p>
         </div>
         <div className="space-y-4 p-5">
           <div className="flex items-center gap-2">
@@ -202,36 +202,39 @@ function ApproveModal({ req, onClose, onDone }: {
               type="checkbox"
               checked={useExpiry}
               onChange={(e) => setUseExpiry(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600"
+              className="h-4 w-4 rounded text-brand-600 focus:ring-brand-600"
+              style={{ borderColor: "var(--color-border)" }}
             />
-            <label htmlFor="use-expiry" className="text-sm text-slate-700">Approve with expiry date</label>
+            <label htmlFor="use-expiry" className="text-sm" style={{ color: "var(--color-text-secondary)" }}>Approve with expiry date</label>
           </div>
           {useExpiry && (
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-600">Access expires on</label>
+              <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Access expires on</label>
               <input
                 type="date"
                 value={expiryDate}
                 onChange={(e) => setExpiryDate(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                className="w-full rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+                style={{ border: "1px solid var(--color-border)" }}
               />
             </div>
           )}
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-600">Approval notes (optional)</label>
+            <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Approval notes (optional)</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
               placeholder="Add context for the employee or audit log…"
-              className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              className="w-full resize-none rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              style={{ border: "1px solid var(--color-border)" }}
             />
           </div>
           {error && <p className="text-sm text-red-700">{error}</p>}
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
+        <div className="flex justify-end gap-2 px-5 py-4" style={{ borderTop: "1px solid var(--color-border)" }}>
           <button type="button" onClick={onClose}
-            className="rounded-md border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
+            className="rounded-md px-4 py-2 text-sm hover:bg-[var(--color-surface-subtle)]" style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>Cancel</button>
           <button type="button" onClick={handleApprove} disabled={saving}
             className="rounded-md bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60">
             {saving ? "Approving…" : "Approve"}
@@ -265,27 +268,28 @@ function RejectModal({ req, onClose, onDone }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-xl bg-white shadow-2xl">
-        <div className="border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-900">Reject request</h2>
-          <p className="text-xs text-slate-500">{featLabel(req.permission_code)} for {req.requested_for_name}</p>
+      <div className="w-full max-w-md rounded-xl shadow-2xl" style={{ backgroundColor: "var(--color-surface)" }}>
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
+          <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Reject request</h2>
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{featLabel(req.permission_code)} for {req.requested_for_name}</p>
         </div>
         <div className="space-y-4 p-5">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-600">Reason for rejection</label>
+            <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Reason for rejection</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               placeholder="Explain why this request was denied…"
-              className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              className="w-full resize-none rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
+              style={{ border: "1px solid var(--color-border)" }}
             />
           </div>
           {error && <p className="text-sm text-red-700">{error}</p>}
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
+        <div className="flex justify-end gap-2 px-5 py-4" style={{ borderTop: "1px solid var(--color-border)" }}>
           <button type="button" onClick={onClose}
-            className="rounded-md border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
+            className="rounded-md px-4 py-2 text-sm hover:bg-[var(--color-surface-subtle)]" style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>Cancel</button>
           <button type="button" onClick={handleReject} disabled={saving}
             className="rounded-md bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60">
             {saving ? "Rejecting…" : "Reject"}
@@ -335,21 +339,22 @@ function PermissionRequestsAdmin() {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Toolbar */}
-      <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
+      <div className="flex shrink-0 items-center justify-between px-6 py-3" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold text-slate-900">Permission Requests</h2>
+          <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Permission Requests</h2>
           {pendingCount > 0 && (
             <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[11px] font-bold text-white">
               {pendingCount}
             </span>
           )}
         </div>
-        <div className="flex gap-1 rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+        <div className="flex gap-1 rounded-lg p-0.5" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
           {(["pending", "all"] as const).map((f) => (
             <button key={f} type="button" onClick={() => setFilter(f)}
               className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                filter === f ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-              }`}>
+                filter === f ? "shadow-sm" : "hover:bg-[var(--color-surface-subtle)]"
+              }`}
+              style={filter === f ? { backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" } : { color: "var(--color-text-muted)" }}>
               {f === "pending" ? `Pending (${pendingCount})` : "All requests"}
             </button>
           ))}
@@ -359,7 +364,7 @@ function PermissionRequestsAdmin() {
       <div className="flex-1 overflow-y-auto px-6 py-4">
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-brand-600" />
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-t-brand-600" style={{ borderColor: "var(--color-border)", borderTopColor: "var(--color-sidebar-bg)" }} />
           </div>
         ) : shown.length === 0 ? (
           <div className="flex flex-col items-center py-16 text-center">
@@ -368,8 +373,8 @@ function PermissionRequestsAdmin() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <p className="mt-3 text-sm font-medium text-slate-700">All caught up</p>
-            <p className="mt-1 text-xs text-slate-400">No pending permission requests.</p>
+            <p className="mt-3 text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>All caught up</p>
+            <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>No pending permission requests.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -378,21 +383,22 @@ function PermissionRequestsAdmin() {
               const statusStyle = STATUS_STYLES[req.status];
               const isPending = req.status === "submitted" || req.status === "pending_review";
               return (
-                <div key={req.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div key={req.id} className="overflow-hidden rounded-xl shadow-sm" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
                   <div className="flex items-start gap-4 p-4">
                     {/* Left: employee + permission info */}
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <Link
                           href={`/team/${req.requested_for_user_id}`}
-                          className="text-sm font-semibold text-slate-900 hover:text-brand-600"
+                          className="text-sm font-semibold hover:text-brand-600"
+                          style={{ color: "var(--color-text-primary)" }}
                         >
                           {req.requested_for_name}
                         </Link>
-                        <svg className="h-3.5 w-3.5 text-slate-300" fill="none" viewBox="0 0 16 16">
+                        <svg className="h-3.5 w-3.5" style={{ color: "var(--color-text-muted)" }} fill="none" viewBox="0 0 16 16">
                           <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
-                        <span className="text-sm font-medium text-slate-700">{featLabel(req.permission_code)}</span>
+                        <span className="text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>{featLabel(req.permission_code)}</span>
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusStyle.bg} ${statusStyle.text}`}>
                           {statusStyle.label}
                         </span>
@@ -408,18 +414,18 @@ function PermissionRequestsAdmin() {
                           {req.access_type === "permanent" ? "Permanent" : "Temporary"}
                         </span>
                       </div>
-                      <p className="mt-1.5 text-sm text-slate-600">{req.reason}</p>
+                      <p className="mt-1.5 text-sm" style={{ color: "var(--color-text-secondary)" }}>{req.reason}</p>
                       {req.business_justification && (
-                        <p className="mt-0.5 text-xs text-slate-400">
-                          <span className="font-medium text-slate-500">Justification:</span> {req.business_justification}
+                        <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>
+                          <span className="font-medium" style={{ color: "var(--color-text-muted)" }}>Justification:</span> {req.business_justification}
                         </p>
                       )}
                       {req.review_notes && (
-                        <p className="mt-1 text-xs text-slate-400 italic">
-                          <span className="font-medium not-italic text-slate-500">Review note:</span> {req.review_notes}
+                        <p className="mt-1 text-xs italic" style={{ color: "var(--color-text-muted)" }}>
+                          <span className="font-medium not-italic" style={{ color: "var(--color-text-muted)" }}>Review note:</span> {req.review_notes}
                         </p>
                       )}
-                      <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
+                      <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[11px]" style={{ color: "var(--color-text-muted)" }}>
                         <span>Requested by {req.requested_by_name}</span>
                         <span>{new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(req.created_at))}</span>
                         {req.end_at && <span>Until {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(req.end_at))}</span>}
@@ -446,7 +452,7 @@ function PermissionRequestsAdmin() {
                           type="button"
                           onClick={() => void handleRevoke(req.id)}
                           disabled={revoking === req.id}
-                          className="rounded-md border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+                          className="rounded-md px-3 py-1.5 text-xs hover:bg-[var(--color-surface-subtle)] disabled:opacity-60" style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}
                         >
                           {revoking === req.id ? "…" : "Revoke"}
                         </button>
@@ -597,7 +603,7 @@ export default function PermissionsPage() {
     return (
       <EnterpriseShell active="permissions" title="Role Permissions" subtitle="Configure access by role" contentClassName="overflow-hidden">
         <div className="flex flex-1 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-brand-600" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-t-brand-600" style={{ borderColor: "var(--color-border)", borderTopColor: "var(--color-sidebar-bg)" }} />
         </div>
       </EnterpriseShell>
     );
@@ -613,7 +619,7 @@ export default function PermissionsPage() {
       <div className="flex h-full min-h-0 flex-col">
 
         {/* ── Page-level tab bar ────────────────────────────────────────────── */}
-        <div className="flex shrink-0 border-b border-slate-200 bg-white px-6">
+        <div className="flex shrink-0 px-6" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
           {([
             { id: "roles" as PageTab,    label: "Roles" },
             { id: "requests" as PageTab, label: "Permission Requests" },
@@ -626,8 +632,9 @@ export default function PermissionsPage() {
                 "flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors",
                 pageTab === t.id
                   ? "border-b-2 border-brand-600 text-brand-600"
-                  : "text-slate-500 hover:text-slate-700",
+                  : "hover:text-brand-600",
               ].join(" ")}
+              style={pageTab === t.id ? undefined : { color: "var(--color-text-muted)" }}
             >
               {t.label}
               {t.id === "requests" && pendingCount > 0 && (
@@ -645,9 +652,9 @@ export default function PermissionsPage() {
         <div className="flex flex-1 min-h-0">
 
         {/* ── Left: role list ───────────────────────────────────────────────── */}
-        <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Roles</p>
+        <aside className="flex w-60 shrink-0 flex-col" style={{ borderRight: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid var(--color-border)" }}>
+            <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Roles</p>
             <button
               type="button"
               onClick={() => setShowNewRole(true)}
@@ -660,7 +667,7 @@ export default function PermissionsPage() {
           </div>
           <div className="flex-1 overflow-y-auto py-1.5">
             <div className="px-3 pb-1 pt-2">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-300">Built-in</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>Built-in</p>
             </div>
             {BUILT_IN_ORDER.map((roleId) => {
               const def = BUILT_IN[roleId];
@@ -671,17 +678,18 @@ export default function PermissionsPage() {
                   <button
                     type="button"
                     onClick={() => setActiveRoleId(roleId)}
-                    className={`flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left transition-colors ${isActive ? "bg-brand-600/8 text-[#111]" : "text-slate-600 hover:bg-slate-50"}`}
+                    className={`flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left transition-colors ${isActive ? "bg-brand-600/8" : "hover:bg-[var(--color-surface-subtle)]"}`}
+                    style={isActive ? { color: "var(--color-text-primary)" } : { color: "var(--color-text-secondary)" }}
                   >
                     <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${def.color}`} />
                     <div className="min-w-0 flex-1">
                       <p className={`truncate text-sm font-semibold ${isActive ? "text-brand-600" : ""}`}>{def.name}</p>
-                      <p className="truncate text-[11px] text-slate-400">
+                      <p className="truncate text-[11px]" style={{ color: "var(--color-text-muted)" }}>
                         {def.immutable ? "Full access" : `${featureCount} permissions`}
                       </p>
                     </div>
                     {def.immutable && (
-                      <svg className="h-3 w-3 shrink-0 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-label="Locked">
+                      <svg className="h-3 w-3 shrink-0" style={{ color: "var(--color-text-muted)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-label="Locked">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                       </svg>
                     )}
@@ -698,7 +706,7 @@ export default function PermissionsPage() {
             {customRoles.length > 0 && (
               <>
                 <div className="px-3 pb-1 pt-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-300">Custom</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>Custom</p>
                 </div>
                 {customRoles.map((cr) => {
                   const featureCount = permissions[cr.id]?.size ?? 0;
@@ -708,15 +716,16 @@ export default function PermissionsPage() {
                       <button
                         type="button"
                         onClick={() => setActiveRoleId(cr.id)}
-                        className={`flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left transition-colors ${isActive ? "bg-brand-600/8 text-[#111]" : "text-slate-600 hover:bg-slate-50"}`}
+                        className={`flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left transition-colors ${isActive ? "bg-brand-600/8" : "hover:bg-[var(--color-surface-subtle)]"}`}
+                        style={isActive ? { color: "var(--color-text-primary)" } : { color: "var(--color-text-secondary)" }}
                       >
                         <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${cr.color}`} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
                             <p className={`truncate text-sm font-semibold ${isActive ? "text-brand-600" : ""}`}>{cr.name}</p>
-                            <span className="shrink-0 rounded bg-slate-100 px-1 py-0.5 text-[9px] font-semibold uppercase text-slate-400">Custom</span>
+                            <span className="shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold uppercase" style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }}>Custom</span>
                           </div>
-                          <p className="truncate text-[11px] text-slate-400">{featureCount} permissions</p>
+                          <p className="truncate text-[11px]" style={{ color: "var(--color-text-muted)" }}>{featureCount} permissions</p>
                         </div>
                       </button>
                       <div className="mr-2 opacity-0 transition-opacity group-hover:opacity-100">
@@ -739,17 +748,17 @@ export default function PermissionsPage() {
         {/* ── Right: feature toggles ────────────────────────────────────────── */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {activeRole && (
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
+            <div className="flex shrink-0 items-center justify-between px-6 py-3" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
               <div className="flex items-center gap-3">
                 <span className={`h-3 w-3 rounded-full ${activeRole.color}`} />
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold text-[#111]">{activeRole.name}</p>
                     {activeRole.custom && (
-                      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-400">Custom</span>
+                      <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase" style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-muted)" }}>Custom</span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-400">{activeRole.description}</p>
+                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{activeRole.description}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -784,11 +793,11 @@ export default function PermissionsPage() {
               {FEATURE_GROUPS.map((group) => {
                 const enabledInGroup = group.features.filter((f) => isImmutable || currentFeatures.has(f.id)).length;
                 return (
-                  <div key={group.label} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-2.5">
-                      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{group.label}</h2>
+                  <div key={group.label} className="overflow-hidden rounded-xl shadow-sm" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+                    <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-table-header)" }}>
+                      <h2 className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>{group.label}</h2>
                       <div className="flex items-center gap-3">
-                        <span className="text-[11px] text-slate-400">{enabledInGroup} / {group.features.length}</span>
+                        <span className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{enabledInGroup} / {group.features.length}</span>
                         {!isImmutable && (
                           <button
                             type="button"
@@ -803,14 +812,14 @@ export default function PermissionsPage() {
                         )}
                       </div>
                     </div>
-                    <div className="divide-y divide-slate-50">
+                    <div className="divide-y divide-[var(--color-table-border)]">
                       {group.features.map((feature) => {
                         const enabled = isImmutable || currentFeatures.has(feature.id);
                         return (
                           <div key={feature.id} className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-[#FAFAFA]">
                             <div className="mr-4">
-                              <p className={`text-sm font-medium ${enabled ? "text-[#111]" : "text-slate-400"}`}>{feature.label}</p>
-                              <p className="text-xs text-slate-400">{feature.description}</p>
+                              <p className="text-sm font-medium" style={{ color: enabled ? "var(--color-text-primary)" : "var(--color-text-muted)" }}>{feature.label}</p>
+                              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{feature.description}</p>
                             </div>
                             <Toggle enabled={enabled} onChange={(v) => toggleFeature(feature.id, v)} disabled={isImmutable} />
                           </div>
@@ -847,14 +856,14 @@ export default function PermissionsPage() {
 
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
-            <p className="font-semibold text-[#111]">Delete this role?</p>
-            <p className="mt-1 text-sm text-slate-500">
+          <div className="w-full max-w-sm rounded-2xl p-6 shadow-2xl" style={{ backgroundColor: "var(--color-surface)" }}>
+            <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>Delete this role?</p>
+            <p className="mt-1 text-sm" style={{ color: "var(--color-text-muted)" }}>
               Employees assigned this role will retain their current access until reassigned. This cannot be undone.
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button type="button" onClick={() => setDeleteConfirm(null)}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                className="rounded-lg px-4 py-2 text-sm font-medium hover:bg-[var(--color-surface-subtle)]" style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
                 Cancel
               </button>
               <button type="button" onClick={() => void handleDelete(deleteConfirm)}

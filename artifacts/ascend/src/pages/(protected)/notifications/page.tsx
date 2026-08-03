@@ -96,7 +96,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
     <button
       type="button"
       onClick={() => onChange(!on)}
-      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-brand-600/30 ${on ? "bg-brand-600" : "bg-slate-200"}`}
+      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-brand-600/30 ${on ? "bg-brand-600" : "bg-[var(--color-border)]"}`}
     >
       <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${on ? "translate-x-4" : "translate-x-0"}`} />
     </button>
@@ -201,7 +201,7 @@ function InboxTab() {
         <div className="space-y-2">
           {filtered.map(n => (
             <div key={n.id}
-              className={`relative rounded-xl border px-5 py-4 transition-colors ${n.read ? "border-slate-200" : "border-brand-600/30 bg-indigo-50"}`}
+              className={`relative rounded-xl border px-5 py-4 transition-colors ${n.read ? "border-[var(--color-border)]" : "border-brand-600/30 bg-indigo-50"}`}
               style={n.read ? { backgroundColor: "var(--color-surface)" } : {}}>
               {!n.read && <span className="absolute left-2.5 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-brand-600" />}
               <div className="flex items-start justify-between gap-4">
@@ -642,7 +642,7 @@ export default function NotificationsPage() {
                 className={`shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
                   activeTab === t.key
                     ? "border-brand-600 text-brand-600"
-                    : "border-transparent hover:border-slate-300"
+                    : "border-transparent hover:border-[var(--color-border)]"
                 }`}
                 style={activeTab === t.key ? {} : { color: "var(--color-text-muted)" }}>
                 {t.label}

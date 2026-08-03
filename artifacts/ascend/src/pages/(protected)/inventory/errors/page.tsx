@@ -55,7 +55,7 @@ export default function InventoryErrorsPage() {
                 "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
                 tab === t.key
                   ? "shadow-sm"
-                  : "hover:text-slate-800",
+                  : "",
               ].join(" ")}
               style={tab === t.key
                 ? { backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }

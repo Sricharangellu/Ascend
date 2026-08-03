@@ -124,7 +124,7 @@ export function CatalogTab() {
   const allChecked = filteredProducts.length > 0 && selectedIds.size === filteredProducts.length;
   const someChecked = selectedIds.size > 0 && !allChecked;
 
-  const inputCls = "min-h-[44px] w-full rounded-md border px-3 text-sm outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950";
+  const inputCls = "min-h-[44px] w-full rounded-md border px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--color-border)]";
   const inputStyle = {
     borderColor: "var(--color-border)",
     backgroundColor: "var(--color-surface)",
@@ -242,7 +242,8 @@ export function CatalogTab() {
                     ref={(el) => { if (el) el.indeterminate = someChecked; }}
                     onChange={toggleSelectAll}
                     aria-label="Select all products"
-                    className="h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-slate-950"
+                    className="h-4 w-4 rounded"
+                    style={{ borderColor: "var(--color-border)" }}
                   />
                 </th>
                 <th className="px-4 py-3">SKU</th>
@@ -266,13 +267,14 @@ export function CatalogTab() {
                       checked={selectedIds.has(product.id)}
                       onChange={() => toggleSelectOne(product.id)}
                       aria-label={`Select ${product.name}`}
-                      className="h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-slate-950"
+                      className="h-4 w-4 rounded"
+                      style={{ borderColor: "var(--color-border)" }}
                     />
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <Link
                       href={`/catalog/${product.id}`}
-                      className="font-mono text-xs font-semibold underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-950"
+                      className="font-mono text-xs font-semibold underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--color-border)]"
                       style={{ color: "var(--color-text-primary)" }}
                     >
                       {product.sku}

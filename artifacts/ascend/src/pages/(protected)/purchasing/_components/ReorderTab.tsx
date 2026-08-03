@@ -178,7 +178,7 @@ export function ReorderTab({
                           <tr key={po.po_id}>
                             <td className="py-1 pr-6 font-mono" style={{ color: "var(--color-text-secondary)" }}>#{po.po_number}</td>
                             <td className="py-1 pr-6" style={{ color: "var(--color-text-secondary)" }}>{fmtDateShort(po.created_at)}</td>
-                            <td className="py-1 pr-6 text-right font-semibold tabular-nums text-slate-800">{formatMoney(po.total_cost_cents)}</td>
+                            <td className="py-1 pr-6 text-right font-semibold tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{formatMoney(po.total_cost_cents)}</td>
                             <td className="py-1 pr-6 text-right" style={{ color: "var(--color-text-muted)" }}>{po.item_count}</td>
                             <td className="py-1"><span className="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">{po.status}</span></td>
                           </tr>

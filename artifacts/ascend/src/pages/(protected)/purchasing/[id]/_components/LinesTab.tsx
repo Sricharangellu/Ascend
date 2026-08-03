@@ -185,13 +185,13 @@ export function LinesTab({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {priceHistory.map((ph) => (
               <div key={ph.product_id} className="rounded-lg border p-3" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
-                <p className="text-xs font-semibold text-slate-800">{ph.product_name}</p>
+                <p className="text-xs font-semibold" style={{ color: "var(--color-text-secondary)" }}>{ph.product_name}</p>
                 <p className="mb-2 font-mono text-xs" style={{ color: "var(--color-text-muted)" }}>{ph.sku}</p>
 
                 <dl className="space-y-1 text-xs">
                   <div className="flex items-center justify-between">
                     <dt style={{ color: "var(--color-text-muted)" }}>Invoiced (this PO)</dt>
-                    <dd className="font-bold tabular-nums text-slate-900">{formatMoney(ph.invoiced_cents)}</dd>
+                    <dd className="font-bold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{formatMoney(ph.invoiced_cents)}</dd>
                   </div>
                   <div className="flex items-center justify-between">
                     <dt style={{ color: "var(--color-text-muted)" }}>Last · this supplier</dt>

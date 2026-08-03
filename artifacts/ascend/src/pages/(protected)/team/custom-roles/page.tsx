@@ -105,7 +105,7 @@ function PermissionPicker({
                     type="checkbox"
                     checked={selected.includes(p.key)}
                     onChange={() => toggle(p.key)}
-                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500" style={{ borderColor: "var(--color-border)" }}
                   />
                   <span className="flex-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>{p.label}</span>
                   <code className="text-xs" style={{ color: "var(--color-text-muted)" }}>{p.key}</code>

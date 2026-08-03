@@ -22,7 +22,7 @@ const DEFAULT_TIERS = [
 
 const TIER_COLOR: Record<number, string> = {
   1: "text-amber-700",
-  2: "text-slate-500",
+  2: "",
   3: "text-yellow-600",
   4: "text-violet-700",
 };

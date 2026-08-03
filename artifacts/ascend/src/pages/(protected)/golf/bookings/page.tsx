@@ -226,9 +226,9 @@ export default function GolfBookingsPage() {
         {/* Summary cards */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { label: "Bookings", value: String(visible.length), color: "text-slate-900" },
+            { label: "Bookings", value: String(visible.length), color: "text-[var(--color-text-primary)]" },
             { label: "Revenue", value: formatMoney(totalRevenue), color: "text-green-700" },
-            { label: "Outstanding", value: formatMoney(outstanding), color: outstanding > 0 ? "text-amber-700" : "text-slate-400" },
+            { label: "Outstanding", value: formatMoney(outstanding), color: outstanding > 0 ? "text-amber-700" : "text-[var(--color-text-muted)]" },
             { label: "Confirmed", value: String(visible.filter(b => b.status === "confirmed").length), color: "text-blue-700" },
           ].map(c => (
             <div key={c.label} className="rounded-xl px-4 py-3" style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)" }}>

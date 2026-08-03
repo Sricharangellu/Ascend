@@ -105,7 +105,7 @@ export default function PurchaseOrderDetailPage() {
         <button
           type="button"
           onClick={() => router.push("/purchasing")}
-          className="inline-flex self-start items-center gap-1.5 text-sm hover:text-slate-950"
+          className="inline-flex self-start items-center gap-1.5 text-sm"
           style={{ color: "var(--color-text-muted)" }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -178,7 +178,7 @@ export default function PurchaseOrderDetailPage() {
                         "min-h-[44px] border-b-2 px-4 text-sm font-medium transition-colors",
                         activeTab === t.key
                           ? "border-blue-600 text-blue-600"
-                          : "border-transparent hover:border-slate-300",
+                          : "border-transparent hover:border-[var(--color-border)]",
                       )}
                       style={activeTab === t.key ? undefined : { color: "var(--color-text-muted)" }}
                       aria-current={activeTab === t.key ? "page" : undefined}

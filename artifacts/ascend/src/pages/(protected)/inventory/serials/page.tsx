@@ -18,7 +18,7 @@ const STATUS_LABELS: Record<SerialStatus, string> = {
 
 const STATUS_COLORS: Record<SerialStatus, string> = {
   in_stock: "bg-emerald-100 text-emerald-800",
-  sold: "bg-slate-100 text-slate-600",
+  sold: "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]",
   returned: "bg-amber-100 text-amber-800",
   service: "bg-blue-100 text-blue-800",
 };
@@ -334,7 +334,7 @@ export default function SerialsPage() {
   const statCards = [
     { label: "Total Units", value: total, color: "border-l-4 border-l-[var(--color-border)]" },
     { label: "In Stock", value: counts["in_stock"] ?? 0, color: "border-l-4 border-l-emerald-400" },
-    { label: "Sold", value: counts["sold"] ?? 0, color: "border-l-4 border-l-slate-400" },
+    { label: "Sold", value: counts["sold"] ?? 0, color: "border-l-4 border-l-[var(--color-border)]" },
     { label: "In Service", value: counts["service"] ?? 0, color: "border-l-4 border-l-blue-400" },
   ];
 

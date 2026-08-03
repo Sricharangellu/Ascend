@@ -61,11 +61,11 @@ function Badge({ label, cls }: { label: string; cls: string }) {
 
 function Skeleton({ rows = 5 }: { rows?: number }) {
   return (
-    <div className="divide-y divide-slate-100">
+    <div className="divide-y divide-[var(--color-table-border)]">
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex items-center gap-4 px-5 py-4">
-          <div className="h-3 flex-1 animate-pulse rounded bg-slate-100" />
-          <div className="h-3 w-20 animate-pulse rounded bg-slate-100" />
+          <div className="h-3 flex-1 animate-skeleton rounded" />
+          <div className="h-3 w-20 animate-skeleton rounded" />
         </div>
       ))}
     </div>
@@ -101,20 +101,20 @@ function WorkflowsTab() {
         <div className="flex flex-wrap gap-3">
           {[
             { label: "Active",   count: activeCount,   cls: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
-            { label: "Inactive", count: inactiveCount, cls: "bg-slate-50 text-slate-600 ring-1 ring-slate-200" },
-          ].map(({ label, count, cls }) => (
-            <span key={label} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${cls}`}>
+            { label: "Inactive", count: inactiveCount, cls: "bg-[var(--color-surface-subtle)] ring-1 ring-[var(--color-border)]", style: { color: "var(--color-text-secondary)" } as React.CSSProperties },
+          ].map(({ label, count, cls, style }) => (
+            <span key={label} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${cls}`} style={style}>
               <span className="text-base font-semibold">{count}</span> {label}
             </span>
           ))}
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5">
+      <div className="overflow-hidden rounded-xl shadow-sm" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)" }}>
           <div>
-            <h2 className="text-sm font-semibold text-slate-900">Workflow definitions</h2>
-            {!loading && <p className="text-xs text-slate-500">{workflows.length} {workflows.length === 1 ? "workflow" : "workflows"}</p>}
+            <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Workflow definitions</h2>
+            {!loading && <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{workflows.length} {workflows.length === 1 ? "workflow" : "workflows"}</p>}
           </div>
           <button type="button" onClick={() => setShowCreate(true)}
             className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
@@ -126,22 +126,22 @@ function WorkflowsTab() {
           <p className="px-5 py-6 text-sm text-red-600">{error}</p>
         ) : workflows.length === 0 ? (
           <div className="py-14 text-center">
-            <p className="text-sm font-medium text-slate-700">No workflows yet</p>
-            <p className="mt-1 text-sm text-slate-500">Create a workflow to automate checkout steps — or install one from Templates.</p>
+            <p className="text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>No workflows yet</p>
+            <p className="mt-1 text-sm" style={{ color: "var(--color-text-muted)" }}>Create a workflow to automate checkout steps — or install one from Templates.</p>
             <button type="button" onClick={() => setShowCreate(true)}
               className="mt-4 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-[#4B4DC8]">
               Create first workflow
             </button>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-[var(--color-table-border)]">
             {workflows.map(wf => <WorkflowRow key={wf.id} workflow={wf} onReload={load} />)}
           </div>
         )}
       </div>
 
       {!loading && workflows.length > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm text-slate-600">
+        <div className="rounded-xl px-5 py-3 text-sm" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
           <span className="font-semibold">How workflows fire: </span>
           Each workflow runs at the point-of-sale when its trigger condition is met (e.g. an age-restricted product is added to a cart).
           Steps execute in order — a Gate step can block the transaction until the condition is cleared.
@@ -191,9 +191,9 @@ function ApprovalChainsTab() {
         Approval chains define multi-step sign-off flows for sensitive operations. Each step routes to a role and blocks the action until approved.
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5">
-          <h3 className="text-sm font-semibold text-slate-900">{chains.length} approval chains</h3>
+      <div className="overflow-hidden rounded-xl shadow-sm" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)" }}>
+          <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{chains.length} approval chains</h3>
           <button type="button"
             className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
             + New Chain
@@ -203,22 +203,22 @@ function ApprovalChainsTab() {
         {loading ? <Skeleton /> : error ? (
           <p className="px-5 py-6 text-sm text-red-600">{error}</p>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-[var(--color-table-border)]">
             {chains.map(c => (
               <div key={c.id} className="px-5 py-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-slate-900">{c.name}</p>
+                      <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{c.name}</p>
                       <Badge label={c.enabled ? "Active" : "Disabled"}
-                        cls={c.enabled ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"} />
+                        cls={c.enabled ? "bg-emerald-100 text-emerald-700" : "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)]"} />
                       <Badge label={TRIGGER_LABELS[c.trigger] ?? c.trigger} cls="bg-indigo-100 text-indigo-700" />
                       {c.threshold !== null && (
                         <Badge label={`Threshold: ${c.threshold}${c.trigger === "price_override" || c.trigger === "discount_create" ? "%" : c.trigger === "refund" ? "¢" : ""}`}
                           cls="bg-orange-100 text-orange-700" />
                       )}
                     </div>
-                    <p className="mt-0.5 text-xs text-slate-400">{c.runs.toLocaleString()} lifetime runs</p>
+                    <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{c.runs.toLocaleString()} lifetime runs</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <button
@@ -226,30 +226,30 @@ function ApprovalChainsTab() {
                         await apiPatch(`/api/v1/workflows/approval-chains/${c.id}`, { enabled: !c.enabled });
                         await load();
                       }}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${c.enabled ? "bg-brand-600" : "bg-slate-200"}`}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${c.enabled ? "bg-brand-600" : "bg-[var(--color-surface-subtle)]"}`}
                     >
                       <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${c.enabled ? "translate-x-4" : "translate-x-0"}`} />
                     </button>
-                    <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">Edit</button>
+                    <button className="rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-[var(--color-surface-subtle)]" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Edit</button>
                   </div>
                 </div>
 
                 <div className="mt-3 flex items-center gap-2 flex-wrap">
                   {c.steps.map((s, i) => (
                     <div key={i} className="flex items-center gap-1.5">
-                      {i > 0 && <span className="text-xs text-slate-300">→</span>}
-                      <div className="flex items-center gap-1.5 rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5">
-                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${ROLE_CLS[s.role] ?? "bg-slate-100 text-slate-600"}`}>{s.role}</span>
-                        <span className="text-xs text-slate-700">{s.label}</span>
+                      {i > 0 && <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>→</span>}
+                      <div className="flex items-center gap-1.5 rounded-lg px-3 py-1.5" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
+                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${ROLE_CLS[s.role] ?? "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]"}`}>{s.role}</span>
+                        <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{s.label}</span>
                       </div>
                     </div>
                   ))}
-                  {c.steps.length === 0 && <span className="text-xs text-slate-400">No approvers configured</span>}
+                  {c.steps.length === 0 && <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>No approvers configured</span>}
                 </div>
               </div>
             ))}
             {chains.length === 0 && (
-              <p className="py-10 text-center text-sm text-slate-400">No approval chains configured.</p>
+              <p className="py-10 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No approval chains configured.</p>
             )}
           </div>
         )}
@@ -275,7 +275,7 @@ function RunHistoryTab() {
   const STATUS_CLS: Record<RunRecord["status"], string> = {
     passed:  "bg-emerald-100 text-emerald-700",
     failed:  "bg-red-100 text-red-700",
-    skipped: "bg-slate-100 text-slate-500",
+    skipped: "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)]",
   };
 
   if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
@@ -290,23 +290,23 @@ function RunHistoryTab() {
         {[
           { label: "Passed",  value: passedCount,  cls: "text-emerald-700" },
           { label: "Failed",  value: failedCount,  cls: "text-red-600" },
-          { label: "Skipped", value: skippedCount, cls: "text-slate-500" },
+          { label: "Skipped", value: skippedCount, style: { color: "var(--color-text-muted)" } as React.CSSProperties },
         ].map(m => (
-          <div key={m.label} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{m.label}</p>
-            <p className={`mt-1 text-2xl font-bold ${m.cls}`}>{m.value}</p>
-            <p className="mt-0.5 text-xs text-slate-400">of {runs.length} shown ({total.toLocaleString()} total)</p>
+          <div key={m.label} className="rounded-xl px-4 py-3 shadow-sm" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+            <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>{m.label}</p>
+            <p className={`mt-1 text-2xl font-bold ${"cls" in m ? m.cls : ""}`} style={"style" in m ? m.style : undefined}>{m.value}</p>
+            <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>of {runs.length} shown ({total.toLocaleString()} total)</p>
           </div>
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-5 py-3.5">
-          <h3 className="text-sm font-semibold text-slate-900">Recent workflow runs</h3>
+      <div className="overflow-hidden rounded-xl shadow-sm" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <div className="px-5 py-3.5" style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)" }}>
+          <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Recent workflow runs</h3>
         </div>
         {loading ? <Skeleton /> : (
           <table className="w-full text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-500">
+            <thead className="text-left text-xs font-semibold" style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
               <tr>
                 <th className="px-5 py-3">Workflow</th>
                 <th className="px-5 py-3">Trigger</th>
@@ -317,18 +317,18 @@ function RunHistoryTab() {
                 <th className="px-5 py-3">Ran at</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[var(--color-table-border)]">
               {runs.map(r => (
-                <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-5 py-3.5 font-medium text-slate-900">{r.workflow_name}</td>
-                  <td className="px-5 py-3.5 text-xs text-slate-500">{TRIGGER_LABELS[r.trigger] ?? r.trigger}</td>
+                <tr key={r.id} className="hover:bg-[var(--color-surface-subtle)] transition-colors">
+                  <td className="px-5 py-3.5 font-medium" style={{ color: "var(--color-text-primary)" }}>{r.workflow_name}</td>
+                  <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{TRIGGER_LABELS[r.trigger] ?? r.trigger}</td>
                   <td className="px-5 py-3.5">
                     <Badge label={r.status.charAt(0).toUpperCase() + r.status.slice(1)} cls={STATUS_CLS[r.status]} />
                   </td>
-                  <td className="px-5 py-3.5 text-slate-600">{r.cashier}</td>
-                  <td className="px-5 py-3.5 text-xs text-slate-500">{r.outlet}</td>
-                  <td className="px-5 py-3.5 text-right font-mono text-xs text-slate-500">{r.duration_ms}ms</td>
-                  <td className="px-5 py-3.5 text-xs text-slate-500">{new Date(r.ran_at).toLocaleString()}</td>
+                  <td className="px-5 py-3.5" style={{ color: "var(--color-text-secondary)" }}>{r.cashier}</td>
+                  <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{r.outlet}</td>
+                  <td className="px-5 py-3.5 text-right font-mono text-xs" style={{ color: "var(--color-text-muted)" }}>{r.duration_ms}ms</td>
+                  <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{new Date(r.ran_at).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
@@ -388,24 +388,24 @@ function TemplatesTab({ onInstall }: { onInstall: () => void }) {
       {loading ? <Skeleton rows={8} /> : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {templates.map(t => (
-            <div key={t.id} className={`rounded-xl border bg-white p-5 shadow-sm ${t.installed ? "border-brand-600/30" : "border-slate-200"}`}>
+            <div key={t.id} className={`rounded-xl p-5 shadow-sm`} style={{ borderWidth: 1, borderStyle: "solid", borderColor: t.installed ? "rgba(var(--color-brand-rgb,90,94,200),0.3)" : "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="font-semibold text-slate-900">{t.name}</p>
+                  <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{t.name}</p>
                   <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                    <Badge label={CATEGORY_LABEL[t.category] ?? t.category} cls={CATEGORY_CLS[t.category] ?? "bg-slate-100 text-slate-600"} />
-                    <span className="text-[10px] text-slate-400">{t.steps} step{t.steps !== 1 ? "s" : ""}</span>
-                    <span className="text-[10px] text-slate-400">{t.installs.toLocaleString()} installs</span>
+                    <Badge label={CATEGORY_LABEL[t.category] ?? t.category} cls={CATEGORY_CLS[t.category] ?? "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]"} />
+                    <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>{t.steps} step{t.steps !== 1 ? "s" : ""}</span>
+                    <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>{t.installs.toLocaleString()} installs</span>
                   </div>
                 </div>
                 {t.installed && (
                   <span className="shrink-0 rounded-full bg-brand-600/10 px-2.5 py-0.5 text-[10px] font-bold text-brand-600">Installed</span>
                 )}
               </div>
-              <p className="mt-3 text-xs text-slate-500 leading-relaxed">{t.description}</p>
+              <p className="mt-3 text-xs leading-relaxed" style={{ color: "var(--color-text-muted)" }}>{t.description}</p>
               <div className="mt-4">
                 {t.installed ? (
-                  <button disabled className="w-full rounded-lg border border-slate-200 py-2 text-xs font-semibold text-slate-400 cursor-not-allowed">
+                  <button disabled className="w-full rounded-lg py-2 text-xs font-semibold cursor-not-allowed" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>
                     Already installed
                   </button>
                 ) : (
@@ -441,7 +441,7 @@ export default function WorkflowsPage() {
     >
       <div className="mx-auto w-full max-w-6xl space-y-0 px-4 py-5 sm:px-6">
         {/* Tabs */}
-        <div className="border-b border-slate-200">
+        <div style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)" }}>
           <nav className="-mb-px flex gap-1 overflow-x-auto">
             {TABS.map(t => (
               <button
@@ -450,8 +450,9 @@ export default function WorkflowsPage() {
                 className={`shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
                   activeTab === t.key
                     ? "border-brand-600 text-brand-600"
-                    : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                    : "border-transparent hover:border-[var(--color-border)]"
                 }`}
+                style={activeTab === t.key ? undefined : { color: "var(--color-text-muted)" }}
               >
                 {t.label}
               </button>

@@ -98,7 +98,7 @@ const RECEIVE_STATUS: Record<ReceivingItem["status"], { label: string; cls: stri
 };
 
 const PICK_STATUS: Record<PickList["status"], { label: string; cls: string }> = {
-  open:        { label: "Open",        cls: "bg-slate-100 text-slate-600" },
+  open:        { label: "Open",        cls: "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]" },
   in_progress: { label: "In Progress", cls: "bg-amber-100 text-amber-700" },
   packed:      { label: "Packed",      cls: "bg-blue-100 text-blue-700" },
   complete:    { label: "Complete",    cls: "bg-emerald-100 text-emerald-700" },
@@ -107,11 +107,11 @@ const PICK_STATUS: Record<PickList["status"], { label: string; cls: string }> = 
 const PRIORITY_CLS: Record<string, string> = {
   urgent: "bg-red-100 text-red-700",
   high:   "bg-orange-100 text-orange-700",
-  normal: "bg-slate-100 text-slate-600",
+  normal: "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]",
 };
 
 const COUNT_STATUS: Record<CycleCount["status"], { label: string; cls: string }> = {
-  scheduled:   { label: "Scheduled",   cls: "bg-slate-100 text-slate-600" },
+  scheduled:   { label: "Scheduled",   cls: "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]" },
   in_progress: { label: "In Progress", cls: "bg-amber-100 text-amber-700" },
   complete:    { label: "Complete",    cls: "bg-blue-100 text-blue-700" },
   approved:    { label: "Approved",    cls: "bg-emerald-100 text-emerald-700" },
@@ -121,10 +121,10 @@ const COUNT_STATUS: Record<CycleCount["status"], { label: string; cls: string }>
 
 function KpiCard({ label, value, sub, accent }: { label: string; value: string | number; sub?: string; accent?: boolean }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
-      <p className={`mt-1 text-2xl font-bold ${accent ? "text-brand-600" : "text-slate-900"}`}>{value}</p>
-      {sub && <p className="mt-0.5 text-xs text-slate-400">{sub}</p>}
+    <div className="rounded-xl px-5 py-4 shadow-sm" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+      <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>{label}</p>
+      <p className={`mt-1 text-2xl font-bold ${accent ? "text-brand-600" : ""}`} style={accent ? undefined : { color: "var(--color-text-primary)" }}>{value}</p>
+      {sub && <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{sub}</p>}
     </div>
   );
 }
@@ -132,7 +132,7 @@ function KpiCard({ label, value, sub, accent }: { label: string; value: string |
 function ProgressBar({ value, max, color = "bg-brand-600" }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+    <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
       <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
     </div>
   );
@@ -152,7 +152,7 @@ function DashboardTab() {
   }, []);
 
   if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
-  if (loading) return <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100" />)}</div>;
+  if (loading) return <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 animate-skeleton rounded-xl" />)}</div>;
   if (!data) return null;
 
   const occupancyPct = data.totalLocations > 0 ? Math.round((data.occupiedLocations / data.totalLocations) * 100) : 0;
@@ -172,17 +172,17 @@ function DashboardTab() {
         <KpiCard label="Scheduled Counts" value={data.scheduledCounts} />
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-5 py-3.5">
-          <h3 className="text-sm font-semibold text-slate-900">Recent Activity</h3>
+      <div className="rounded-xl shadow-sm" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
+        <div className="px-5 py-3.5" style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)" }}>
+          <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Recent Activity</h3>
         </div>
-        <ul className="divide-y divide-slate-100">
+        <ul className="divide-y divide-[var(--color-table-border)]">
           {data.recentActivity.map((ev) => (
             <li key={ev.id} className="flex items-center gap-3 px-5 py-3 text-sm">
               <span className="text-lg">{ACTIVITY_ICONS[ev.type] ?? "•"}</span>
-              <span className="flex-1 text-slate-700">{ev.label}</span>
-              <span className="text-xs text-slate-400">{ev.actor}</span>
-              <span className="text-xs text-slate-400">{fmtDateTime(ev.ts)}</span>
+              <span className="flex-1" style={{ color: "var(--color-text-secondary)" }}>{ev.label}</span>
+              <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{ev.actor}</span>
+              <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDateTime(ev.ts)}</span>
             </li>
           ))}
         </ul>
@@ -212,7 +212,7 @@ function LocationsTab() {
     aisle:     "bg-cyan-100 text-cyan-700",
     rack:      "bg-teal-100 text-teal-700",
     shelf:     "bg-green-100 text-green-700",
-    bin:       "bg-slate-100 text-slate-700",
+    bin:       "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]",
   };
 
   const filtered = useMemo(() => {
@@ -221,7 +221,7 @@ function LocationsTab() {
   }, [locations, search]);
 
   if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
-  if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
+  if (loading) return <div className="h-64 animate-skeleton rounded-xl" />;
 
   return (
     <div className="space-y-4">
@@ -229,7 +229,8 @@ function LocationsTab() {
         <input
           value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search locations..."
-          className="h-9 w-64 rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+          className="h-9 w-64 rounded-lg px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+          style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)" }}
         />
         <Can permission="inventory.adjust">
           <button className="ml-auto rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
@@ -238,9 +239,9 @@ function LocationsTab() {
         </Can>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl shadow-sm" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         <table className="w-full text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-500">
+          <thead className="text-left text-xs font-semibold" style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
             <tr>
               <th className="px-5 py-3">Code</th>
               <th className="px-5 py-3">Name</th>
@@ -250,38 +251,38 @@ function LocationsTab() {
               <th className="px-5 py-3">Temperature</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-[var(--color-table-border)]">
             {filtered.map((loc) => {
               const pct = loc.capacity > 0 ? Math.round((loc.occupied / loc.capacity) * 100) : 0;
               const barColor = pct > 90 ? "bg-red-500" : pct > 70 ? "bg-amber-400" : "bg-emerald-500";
               return (
                 <tr
                   key={loc.id}
-                  className={`cursor-pointer hover:bg-slate-50 transition-colors ${selectedId === loc.id ? "bg-indigo-50" : ""}`}
+                  className={`cursor-pointer hover:bg-[var(--color-surface-subtle)] transition-colors ${selectedId === loc.id ? "bg-indigo-50" : ""}`}
                   onClick={() => setSelectedId(selectedId === loc.id ? null : loc.id)}
                 >
-                  <td className="px-5 py-3.5 font-mono text-xs font-semibold text-slate-700">{loc.code}</td>
-                  <td className="px-5 py-3.5 font-medium text-slate-900">{loc.name}</td>
+                  <td className="px-5 py-3.5 font-mono text-xs font-semibold" style={{ color: "var(--color-text-secondary)" }}>{loc.code}</td>
+                  <td className="px-5 py-3.5 font-medium" style={{ color: "var(--color-text-primary)" }}>{loc.name}</td>
                   <td className="px-5 py-3.5">
                     <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${TYPE_COLOR[loc.type]}`}>
                       {loc.type}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 text-right text-slate-600">{loc.skuCount}</td>
+                  <td className="px-5 py-3.5 text-right" style={{ color: "var(--color-text-secondary)" }}>{loc.skuCount}</td>
                   <td className="px-5 py-3.5 min-w-[140px]">
                     <div className="flex items-center gap-2">
                       <ProgressBar value={loc.occupied} max={loc.capacity} color={barColor} />
-                      <span className="text-xs text-slate-500 w-10 text-right">{pct}%</span>
+                      <span className="text-xs w-10 text-right" style={{ color: "var(--color-text-muted)" }}>{pct}%</span>
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 text-xs text-slate-500">{loc.temperature ?? "Ambient"}</td>
+                  <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{loc.temperature ?? "Ambient"}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
         {filtered.length === 0 && (
-          <p className="py-10 text-center text-sm text-slate-400">No locations match your search.</p>
+          <p className="py-10 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No locations match your search.</p>
         )}
       </div>
     </div>
@@ -303,12 +304,12 @@ function ReceivingTab() {
   }, []);
 
   if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
-  if (loading) return <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-16 animate-pulse rounded-xl bg-slate-100" />)}</div>;
+  if (loading) return <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-16 animate-skeleton rounded-xl" />)}</div>;
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">{items.length} inbound shipments</p>
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>{items.length} inbound shipments</p>
         <Can permission="inventory.receive">
           <button className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
             + Schedule Receiving
@@ -322,29 +323,29 @@ function ReceivingTab() {
         const totalOrdered  = item.lines.reduce((s, l) => s + l.ordered, 0);
         const totalReceived = item.lines.reduce((s, l) => s + l.received, 0);
         return (
-          <div key={item.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div key={item.id} className="overflow-hidden rounded-xl shadow-sm" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
             <button
-              className="flex w-full items-center gap-4 px-5 py-4 text-left hover:bg-slate-50 transition-colors"
+              className="flex w-full items-center gap-4 px-5 py-4 text-left hover:bg-[var(--color-surface-subtle)] transition-colors"
               onClick={() => setExpanded(isOpen ? null : item.id)}
             >
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-slate-900">{item.poNumber}</span>
+                  <span className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{item.poNumber}</span>
                   <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${st.cls}`}>{st.label}</span>
                 </div>
-                <p className="mt-0.5 text-xs text-slate-500">{item.vendorName} · Expected {fmtDate(item.expectedDate)}</p>
+                <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{item.vendorName} · Expected {fmtDate(item.expectedDate)}</p>
               </div>
               <div className="text-right">
-                <p className="text-sm font-semibold text-slate-900">{totalReceived}/{totalOrdered} units</p>
+                <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{totalReceived}/{totalOrdered} units</p>
                 <ProgressBar value={totalReceived} max={totalOrdered} />
               </div>
-              <span className="text-slate-400 ml-2">{isOpen ? "▲" : "▼"}</span>
+              <span className="ml-2" style={{ color: "var(--color-text-muted)" }}>{isOpen ? "▲" : "▼"}</span>
             </button>
 
             {isOpen && (
-              <div className="border-t border-slate-100">
+              <div style={{ borderTopWidth: 1, borderTopStyle: "solid", borderColor: "var(--color-border)" }}>
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-50 text-left text-xs font-semibold text-slate-500">
+                  <thead className="text-left text-xs font-semibold" style={{ backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
                     <tr>
                       <th className="px-5 py-2.5">SKU</th>
                       <th className="px-5 py-2.5">Product</th>
@@ -353,11 +354,11 @@ function ReceivingTab() {
                       <th className="px-5 py-2.5">Progress</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-[var(--color-table-border)]">
                     {item.lines.map((ln) => (
                       <tr key={ln.sku}>
-                        <td className="px-5 py-2.5 font-mono text-xs text-slate-500">{ln.sku}</td>
-                        <td className="px-5 py-2.5 text-slate-900">{ln.name}</td>
+                        <td className="px-5 py-2.5 font-mono text-xs" style={{ color: "var(--color-text-muted)" }}>{ln.sku}</td>
+                        <td className="px-5 py-2.5" style={{ color: "var(--color-text-primary)" }}>{ln.name}</td>
                         <td className="px-5 py-2.5 text-right">{ln.ordered}</td>
                         <td className="px-5 py-2.5 text-right font-semibold">{ln.received}</td>
                         <td className="px-5 py-2.5 w-32"><ProgressBar value={ln.received} max={ln.ordered} /></td>
@@ -365,9 +366,9 @@ function ReceivingTab() {
                     ))}
                   </tbody>
                 </table>
-                <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
+                <div className="flex justify-end gap-2 px-5 py-3" style={{ borderTopWidth: 1, borderTopStyle: "solid", borderColor: "var(--color-border)" }}>
                   <Can permission="inventory.receive">
-                    <button className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    <button className="rounded-lg px-4 py-2 text-sm font-semibold hover:bg-[var(--color-surface-subtle)]" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
                       Print ASN
                     </button>
                     <button className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
@@ -398,12 +399,12 @@ function PutawayTab() {
   }, []);
 
   if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
-  if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
+  if (loading) return <div className="h-64 animate-skeleton rounded-xl" />;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">{tasks.length} items awaiting putaway</p>
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>{tasks.length} items awaiting putaway</p>
         <Can permission="inventory.adjust">
           <button className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
             Print Putaway Sheet
@@ -411,9 +412,9 @@ function PutawayTab() {
         </Can>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl shadow-sm" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         <table className="w-full text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-500">
+          <thead className="text-left text-xs font-semibold" style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
             <tr>
               <th className="px-5 py-3">Priority</th>
               <th className="px-5 py-3">SKU</th>
@@ -426,25 +427,25 @@ function PutawayTab() {
               <th className="px-5 py-3"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-[var(--color-table-border)]">
             {tasks.map((t) => (
-              <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+              <tr key={t.id} className="hover:bg-[var(--color-surface-subtle)] transition-colors">
                 <td className="px-5 py-3.5">
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold capitalize ${PRIORITY_CLS[t.priority]}`}>
                     {t.priority}
                   </span>
                 </td>
-                <td className="px-5 py-3.5 font-mono text-xs text-slate-500">{t.sku}</td>
-                <td className="px-5 py-3.5 font-medium text-slate-900">{t.productName}</td>
+                <td className="px-5 py-3.5 font-mono text-xs" style={{ color: "var(--color-text-muted)" }}>{t.sku}</td>
+                <td className="px-5 py-3.5 font-medium" style={{ color: "var(--color-text-primary)" }}>{t.productName}</td>
                 <td className="px-5 py-3.5 text-right font-semibold">{t.qty}</td>
-                <td className="px-5 py-3.5 font-mono text-xs text-slate-500">{t.fromLocation}</td>
+                <td className="px-5 py-3.5 font-mono text-xs" style={{ color: "var(--color-text-muted)" }}>{t.fromLocation}</td>
                 <td className="px-5 py-3.5">
                   <span className="rounded bg-indigo-50 px-2 py-0.5 font-mono text-xs font-semibold text-brand-600">
                     {t.suggestedBin}
                   </span>
                 </td>
-                <td className="px-5 py-3.5 text-xs text-slate-500">{t.poNumber}</td>
-                <td className="px-5 py-3.5 text-xs text-slate-400">{fmtDateTime(t.receivedAt)}</td>
+                <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{t.poNumber}</td>
+                <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDateTime(t.receivedAt)}</td>
                 <td className="px-5 py-3.5">
                   <Can permission="inventory.adjust">
                     <button className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#4B4DC8]">
@@ -457,7 +458,7 @@ function PutawayTab() {
           </tbody>
         </table>
         {tasks.length === 0 && (
-          <p className="py-10 text-center text-sm text-slate-400">No items pending putaway.</p>
+          <p className="py-10 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No items pending putaway.</p>
         )}
       </div>
     </div>
@@ -483,7 +484,7 @@ function PicksTab() {
   [picks, filter]);
 
   if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
-  if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
+  if (loading) return <div className="h-64 animate-skeleton rounded-xl" />;
 
   return (
     <div className="space-y-4">
@@ -493,8 +494,9 @@ function PicksTab() {
             key={s}
             onClick={() => setFilter(s)}
             className={`rounded-full px-3 py-1 text-xs font-semibold capitalize transition-colors ${
-              filter === s ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              filter === s ? "bg-brand-600 text-white" : "hover:bg-[var(--color-surface-subtle)]"
             }`}
+            style={filter === s ? undefined : { backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}
           >
             {s === "all" ? "All" : s.replace("_", " ")}
           </button>
@@ -506,9 +508,9 @@ function PicksTab() {
         </Can>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl shadow-sm" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         <table className="w-full text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-500">
+          <thead className="text-left text-xs font-semibold" style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
             <tr>
               <th className="px-5 py-3">Pick #</th>
               <th className="px-5 py-3">Order</th>
@@ -521,38 +523,38 @@ function PicksTab() {
               <th className="px-5 py-3"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-[var(--color-table-border)]">
             {filtered.map((p) => {
               const st = PICK_STATUS[p.status];
               const overdue = p.status !== "complete" && Date.now() > p.dueAt;
               return (
-                <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                <tr key={p.id} className="hover:bg-[var(--color-surface-subtle)] transition-colors">
                   <td className="px-5 py-3.5 font-semibold text-brand-600">{p.pickNumber}</td>
-                  <td className="px-5 py-3.5 text-xs text-slate-500">{p.orderNumber}</td>
-                  <td className="px-5 py-3.5 text-slate-900">{p.customerName}</td>
+                  <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{p.orderNumber}</td>
+                  <td className="px-5 py-3.5" style={{ color: "var(--color-text-primary)" }}>{p.customerName}</td>
                   <td className="px-5 py-3.5">
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold capitalize ${PRIORITY_CLS[p.priority]}`}>
                       {p.priority}
                     </span>
                   </td>
                   <td className="px-5 py-3.5">
-                    <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-mono text-slate-600">{p.strategy}</span>
+                    <span className="rounded px-2 py-0.5 text-xs font-mono" style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>{p.strategy}</span>
                   </td>
                   <td className="px-5 py-3.5 min-w-[120px]">
                     <div className="flex items-center gap-2">
                       <ProgressBar value={p.pickedLines} max={p.lines} />
-                      <span className="text-xs text-slate-500 w-12 text-right">{p.pickedLines}/{p.lines}</span>
+                      <span className="text-xs w-12 text-right" style={{ color: "var(--color-text-muted)" }}>{p.pickedLines}/{p.lines}</span>
                     </div>
                   </td>
                   <td className="px-5 py-3.5">
                     <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${st.cls}`}>{st.label}</span>
                   </td>
-                  <td className={`px-5 py-3.5 text-xs ${overdue ? "font-bold text-red-600" : "text-slate-400"}`}>
+                  <td className={`px-5 py-3.5 text-xs ${overdue ? "font-bold text-red-600" : ""}`} style={overdue ? undefined : { color: "var(--color-text-muted)" }}>
                     {fmtDate(p.dueAt)}{overdue ? " ⚠" : ""}
                   </td>
                   <td className="px-5 py-3.5">
                     <Can permission="orders.fulfill">
-                      <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                      <button className="rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-[var(--color-surface-subtle)]" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
                         {p.status === "open" ? "Start" : "View"}
                       </button>
                     </Can>
@@ -563,7 +565,7 @@ function PicksTab() {
           </tbody>
         </table>
         {filtered.length === 0 && (
-          <p className="py-10 text-center text-sm text-slate-400">No pick lists match this filter.</p>
+          <p className="py-10 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No pick lists match this filter.</p>
         )}
       </div>
     </div>
@@ -586,11 +588,11 @@ function CycleCountsTab() {
   const ABC_CLS: Record<CycleCount["abcClass"], string> = {
     A: "bg-red-100 text-red-700",
     B: "bg-amber-100 text-amber-700",
-    C: "bg-slate-100 text-slate-600",
+    C: "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]",
   };
 
   if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
-  if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
+  if (loading) return <div className="h-64 animate-skeleton rounded-xl" />;
 
   return (
     <div className="space-y-4">
@@ -606,9 +608,9 @@ function CycleCountsTab() {
         </Can>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl shadow-sm" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         <table className="w-full text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-500">
+          <thead className="text-left text-xs font-semibold" style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)", backgroundColor: "var(--color-table-header)", color: "var(--color-text-muted)" }}>
             <tr>
               <th className="px-5 py-3">Count #</th>
               <th className="px-5 py-3">Zone</th>
@@ -620,23 +622,23 @@ function CycleCountsTab() {
               <th className="px-5 py-3"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-[var(--color-table-border)]">
             {counts.map((c) => {
               const st = COUNT_STATUS[c.status];
               return (
-                <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                <tr key={c.id} className="hover:bg-[var(--color-surface-subtle)] transition-colors">
                   <td className="px-5 py-3.5 font-semibold text-brand-600">{c.countNumber}</td>
-                  <td className="px-5 py-3.5 font-medium text-slate-900">{c.zone}</td>
+                  <td className="px-5 py-3.5 font-medium" style={{ color: "var(--color-text-primary)" }}>{c.zone}</td>
                   <td className="px-5 py-3.5">
                     <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${ABC_CLS[c.abcClass]}`}>
                       Class {c.abcClass}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 text-xs text-slate-500">{fmtDate(c.scheduledDate)}</td>
+                  <td className="px-5 py-3.5 text-xs" style={{ color: "var(--color-text-muted)" }}>{fmtDate(c.scheduledDate)}</td>
                   <td className="px-5 py-3.5 min-w-[140px]">
                     <div className="flex items-center gap-2">
                       <ProgressBar value={c.completedLocations} max={c.locationCount} />
-                      <span className="text-xs text-slate-500 w-16 text-right">
+                      <span className="text-xs w-16 text-right" style={{ color: "var(--color-text-muted)" }}>
                         {c.completedLocations}/{c.locationCount}
                       </span>
                     </div>
@@ -646,14 +648,14 @@ function CycleCountsTab() {
                       <span className={`font-semibold ${c.variance === 0 ? "text-emerald-600" : c.variance < 0 ? "text-red-600" : "text-amber-600"}`}>
                         {c.variance > 0 ? "+" : ""}{formatMoney(c.variance)}
                       </span>
-                    ) : <span className="text-slate-400">—</span>}
+                    ) : <span style={{ color: "var(--color-text-muted)" }}>—</span>}
                   </td>
                   <td className="px-5 py-3.5">
                     <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${st.cls}`}>{st.label}</span>
                   </td>
                   <td className="px-5 py-3.5">
                     <Can permission="inventory.count">
-                      <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                      <button className="rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-[var(--color-surface-subtle)]" style={{ borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
                         {c.status === "scheduled" ? "Start" : c.status === "complete" ? "Approve" : "View"}
                       </button>
                     </Can>
@@ -664,7 +666,7 @@ function CycleCountsTab() {
           </tbody>
         </table>
         {counts.length === 0 && (
-          <p className="py-10 text-center text-sm text-slate-400">No cycle counts scheduled.</p>
+          <p className="py-10 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>No cycle counts scheduled.</p>
         )}
       </div>
     </div>
@@ -682,8 +684,8 @@ export default function WarehousePage() {
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Warehouse Management</h1>
-            <p className="mt-1 text-sm text-slate-500">Location hierarchy, receiving, putaway, picking, and cycle counts</p>
+            <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>Warehouse Management</h1>
+            <p className="mt-1 text-sm" style={{ color: "var(--color-text-muted)" }}>Location hierarchy, receiving, putaway, picking, and cycle counts</p>
           </div>
           <Can permission="inventory.receive">
             <button className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#4B4DC8]">
@@ -693,7 +695,7 @@ export default function WarehousePage() {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-slate-200">
+        <div style={{ borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-border)" }}>
           <nav className="flex gap-1" aria-label="WMS tabs">
             {TABS.map((t) => (
               <button
@@ -702,8 +704,9 @@ export default function WarehousePage() {
                 className={`px-4 py-2.5 text-sm font-semibold transition-colors ${
                   activeTab === t.key
                     ? "border-b-2 border-brand-600 text-brand-600"
-                    : "text-slate-500 hover:text-slate-900"
+                    : ""
                 }`}
+                style={activeTab === t.key ? undefined : { color: "var(--color-text-muted)" }}
               >
                 {t.label}
               </button>

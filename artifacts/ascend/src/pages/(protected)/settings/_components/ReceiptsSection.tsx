@@ -30,8 +30,8 @@ function ReceiptPreview({ template, outletName }: { template: Omit<ReceiptTempla
   return (
     <div
       aria-label="Receipt preview"
-      className="w-full max-w-[220px] mx-auto rounded shadow-lg text-[11px] font-mono text-slate-800 px-4 py-5 space-y-2 select-none"
-      style={{ backgroundColor: "var(--color-surface)", border: "1px solid var(--color-border)" }}
+      className="w-full max-w-[220px] mx-auto rounded shadow-lg text-[11px] font-mono px-4 py-5 space-y-2 select-none"
+      style={{ backgroundColor: "var(--color-surface)", border: "1px solid var(--color-border)", color: "var(--color-text-primary)" }}
     >
       {template.showLogo && (
         <div className="flex justify-center mb-1">
@@ -45,14 +45,14 @@ function ReceiptPreview({ template, outletName }: { template: Omit<ReceiptTempla
         <div className="text-center text-[10px] leading-tight whitespace-pre-line" style={{ color: "var(--color-text-muted)" }}>{template.contactInfo}</div>
       )}
       {template.headerText && (
-        <div className="text-center text-[10px] italic leading-tight border-t border-dashed border-slate-300 pt-2" style={{ color: "var(--color-text-muted)" }}>{template.headerText}</div>
+        <div className="text-center text-[10px] italic leading-tight border-t border-dashed pt-2" style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>{template.headerText}</div>
       )}
-      <div className="border-t border-dashed border-slate-300 pt-2 space-y-1">
+      <div className="border-t border-dashed pt-2 space-y-1" style={{ borderColor: "var(--color-border)" }}>
         <div className="flex justify-between"><span>Latte × 2</span><span>$9.98</span></div>
         <div className="flex justify-between"><span>Cold Brew × 1</span><span>$5.49</span></div>
         <div className="flex justify-between"><span>Croissant × 1</span><span>$3.25</span></div>
       </div>
-      <div className="border-t border-dashed border-slate-300 pt-2 space-y-1">
+      <div className="border-t border-dashed pt-2 space-y-1" style={{ borderColor: "var(--color-border)" }}>
         <div className="flex justify-between"><span>Subtotal</span><span>$18.72</span></div>
         {template.showTaxBreakdown && (
           <div className="flex justify-between" style={{ color: "var(--color-text-muted)" }}><span>Tax (8.75%)</span><span>$1.64</span></div>
@@ -61,20 +61,20 @@ function ReceiptPreview({ template, outletName }: { template: Omit<ReceiptTempla
         <div className="flex justify-between" style={{ color: "var(--color-text-muted)" }}><span>VISA ···· 4242</span><span>$20.36</span></div>
       </div>
       {template.showBarcode && (
-        <div className="border-t border-dashed border-slate-300 pt-2 flex flex-col items-center gap-0.5">
+        <div className="border-t border-dashed pt-2 flex flex-col items-center gap-0.5" style={{ borderColor: "var(--color-border)" }}>
           <div className="flex gap-px">
             {Array.from({ length: 28 }).map((_, i) => (
-              <div key={i} className="bg-slate-800" style={{ width: i % 3 === 0 ? 2 : 1, height: 18 }} />
+              <div key={i} style={{ width: i % 3 === 0 ? 2 : 1, height: 18, backgroundColor: "var(--color-text-primary)" }} />
             ))}
           </div>
           <span className="text-[9px] tracking-widest" style={{ color: "var(--color-text-muted)" }}>2026061800001</span>
         </div>
       )}
       {template.footerText && (
-        <div className="border-t border-dashed border-slate-300 pt-2 text-center text-[10px] leading-tight italic" style={{ color: "var(--color-text-muted)" }}>{template.footerText}</div>
+        <div className="border-t border-dashed pt-2 text-center text-[10px] leading-tight italic" style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>{template.footerText}</div>
       )}
       {template.returnPolicy && (
-        <div className="text-center text-[9px] leading-tight border-t border-dashed border-slate-300 pt-2" style={{ color: "var(--color-text-muted)" }}>{template.returnPolicy}</div>
+        <div className="text-center text-[9px] leading-tight border-t border-dashed pt-2" style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>{template.returnPolicy}</div>
       )}
       <div className="text-center text-[9px] pt-1" style={{ color: "var(--color-text-muted)" }}>Thank you for your business!</div>
     </div>

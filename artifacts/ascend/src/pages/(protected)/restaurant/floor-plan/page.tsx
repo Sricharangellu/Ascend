@@ -36,14 +36,14 @@ const STATUS_COLOR: Record<string, string> = {
   available: "bg-success-50 border-success-300 text-success-700",
   occupied:  "bg-red-50 border-red-300 text-red-700",
   reserved:  "bg-amber-50 border-amber-300 text-amber-700",
-  cleaning:  "bg-slate-50 border-slate-300 text-slate-600",
+  cleaning:  "bg-[var(--color-surface-subtle)] border-[var(--color-border)] text-[var(--color-text-secondary)]",
 };
 
 const STATUS_DOT: Record<string, string> = {
   available: "bg-success-500",
   occupied:  "bg-red-500",
   reserved:  "bg-amber-500",
-  cleaning:  "bg-slate-400",
+  cleaning:  "bg-[var(--color-border)]",
 };
 
 function elapsed(ms: number): string {

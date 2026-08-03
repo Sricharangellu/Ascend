@@ -19,10 +19,10 @@ export function TabButton({
       className={[
         "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
         active
-          ? "border-slate-950 text-slate-950"
+          ? "border-[var(--color-text-primary)]"
           : "border-transparent hover:border-[var(--color-border)]",
       ].join(" ")}
-      style={active ? undefined : { color: "var(--color-text-muted)" }}
+      style={active ? { color: "var(--color-text-primary)" } : { color: "var(--color-text-muted)" }}
     >
       {children}
     </button>
