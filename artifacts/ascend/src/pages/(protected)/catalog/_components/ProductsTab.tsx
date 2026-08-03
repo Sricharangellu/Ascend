@@ -39,10 +39,10 @@ type MetricTone = "neutral" | "success" | "warning" | "muted" | "restricted";
 
 function metricToneClass(tone: MetricTone) {
   const tones: Record<MetricTone, string> = {
-    neutral: "border-slate-200 bg-white",
-    success: "border-success-200 bg-success-50",
-    warning: "border-warning-200 bg-warning-50",
-    muted: "border-slate-200 bg-slate-50",
+    neutral:    "border-[var(--color-border)] bg-[var(--color-surface)]",
+    success:    "border-success-200 bg-success-50",
+    warning:    "border-warning-200 bg-warning-50",
+    muted:      "border-[var(--color-border)] bg-[var(--color-surface-subtle)]",
     restricted: "border-orange-200 bg-orange-50",
   };
   return tones[tone];
@@ -55,11 +55,11 @@ function CatalogMetric({ label, value, helper, tone = "neutral", active = false 
   tone?: MetricTone; active?: boolean;
 }) {
   return (
-    <div className={clsx("h-full min-w-0 rounded-md border px-4 py-3 transition-colors", metricToneClass(tone), active && "ring-2 ring-brand-200")}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
-      <div className="mt-1 flex items-baseline gap-2">
-        <span className="text-xl font-semibold tabular-nums text-slate-950">{value}</span>
-        <span className="truncate text-xs text-slate-500">{helper}</span>
+    <div className={clsx("h-full min-w-0 rounded-lg border px-4 py-3 transition-colors", metricToneClass(tone), active && "ring-2 ring-brand-300")}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--color-text-secondary)" }}>{label}</p>
+      <div className="mt-1 flex items-baseline gap-1.5">
+        <span className="text-[18px] font-bold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{value}</span>
+        <span className="truncate text-[11px]" style={{ color: "var(--color-text-muted)" }}>{helper}</span>
       </div>
     </div>
   );
@@ -79,21 +79,27 @@ function ProductListCard({ product, productType, onEdit, onArchive }: {
             <p className="mt-1 font-mono text-xs text-slate-500">{product.sku}</p>
           </div>
         </div>
-        <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-950">{formatMoney(product.price_cents)}</p>
+        <p className="shrink-0 text-[13px] font-bold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{formatMoney(product.price_cents)}</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant={statusBadge(product.status)}>{product.status.charAt(0).toUpperCase() + product.status.slice(1)}</Badge>
-        <span className="rounded-md bg-white px-2 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200">{productType}</span>
-        <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{product.category}</span>
-        {product.brand && <span className="text-xs text-slate-500">{product.brand}</span>}
+        <span className="rounded-md border px-2 py-0.5 text-[11px] font-medium"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}>{productType}</span>
+        <span className="rounded-md px-2 py-0.5 text-[11px] font-medium"
+          style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>{product.category}</span>
+        {product.brand && <span className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{product.brand}</span>}
         {product.age_restricted === 1 && (
-          <span className="rounded-md bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700 ring-1 ring-orange-200">18+</span>
+          <span className="rounded-md bg-orange-50 px-2 py-0.5 text-[11px] font-medium text-orange-700 border border-orange-200">18+</span>
         )}
       </div>
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={onEdit} className="min-h-[36px] rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-700 hover:bg-slate-100">Edit</button>
+        <button type="button" onClick={onEdit}
+          className="h-8 rounded-lg border px-3 text-[11px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+          style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Edit</button>
         {product.status !== "archived" && (
-          <button type="button" onClick={onArchive} className="min-h-[36px] rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-500 hover:bg-slate-100">Archive</button>
+          <button type="button" onClick={onArchive}
+            className="h-8 rounded-lg border px-3 text-[11px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>Archive</button>
         )}
       </div>
     </article>
@@ -322,24 +328,27 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
     <>
       <Card className="overflow-hidden p-0">
         {/* ── Spec: header row — Import + Add product ─────────────────────────── */}
-        <div className="flex flex-col gap-3 border-b border-[#E8E8E8] px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-center sm:justify-between"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
           <div className="min-w-0">
-            <span className="block truncate text-sm font-semibold text-[#111]">Products</span>
-            <span className="text-xs text-slate-500">Manage retail catalog items, master products, and variants.</span>
+            <span className="block truncate text-[14px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Products</span>
+            <span className="text-[12px]" style={{ color: "var(--color-text-secondary)" }}>Manage retail catalog items, master products, and variants.</span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={() => setShowImport(true)}
-              className="flex min-h-9 items-center gap-1.5 rounded border border-[#D9D9D9] bg-white px-3 py-1.5 text-sm text-[#555] transition-colors hover:bg-gray-50">
+              className="flex h-8 items-center gap-1.5 rounded-lg border px-3 text-[12px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
               ↑ Import
             </button>
             <button type="button" onClick={openCreate}
-              className="min-h-9 rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#4849d0]">
+              className="h-8 rounded-lg bg-brand-600 px-3 text-[13px] font-medium text-white transition-colors hover:bg-brand-700">
               + Add product
             </button>
           </div>
         </div>
 
-        <div className="grid gap-3 border-b border-[#E8E8E8] bg-slate-50 px-5 py-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        <div className="grid gap-3 border-b px-5 py-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
           <button type="button" aria-pressed={!filterStatus && filterProductType === "all" && !filterAgeRestricted} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => { setFilterStatus(""); setFilterProductType("all"); setFilterAgeRestricted(false); }}>
             <CatalogMetric label="Total" value={total} helper={`${products.length} loaded`} active={!filterStatus && filterProductType === "all" && !filterAgeRestricted} />
           </button>
@@ -364,29 +373,35 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
         </div>
 
         {/* ── Spec: standard filter bar ────────────────────────────────────── */}
-        <div className="border-b border-[#E8E8E8] bg-white px-5 py-3">
+        <div className="border-b px-5 py-3" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
           <div className="flex flex-wrap items-end gap-3">
             {/* Name / SKU */}
             <div className="flex flex-col gap-1">
-              <label htmlFor="catalog-search" className="text-xs font-medium text-[#555]">Name or SKU</label>
-              <input id="catalog-search" type="search" value={search} onChange={e => setSearch(e.target.value)}
+              <label htmlFor="catalog-search" className="text-[11px] font-semibold uppercase tracking-[0.04em]"
+                style={{ color: "var(--color-text-secondary)" }}>Name or SKU</label>
+              <input id="catalog-search" type="search" value={search} onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search…"
-                className="h-9 w-full rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600 sm:w-44" />
+                className="h-8 w-full rounded-lg border px-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 sm:w-44"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} />
             </div>
             {/* Category */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[#555]">Category</label>
-              <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
-                className="h-9 min-w-36 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.04em]"
+                style={{ color: "var(--color-text-secondary)" }}>Category</label>
+              <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}
+                className="h-8 min-w-36 rounded-lg border px-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}>
                 <option value="">All categories</option>
-                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
               </select>
             </div>
             {/* Product type */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[#555]">Product type</label>
-              <select value={filterProductType} onChange={e => setFilterProductType(e.target.value as typeof filterProductType)}
-                className="h-9 min-w-36 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.04em]"
+                style={{ color: "var(--color-text-secondary)" }}>Product type</label>
+              <select value={filterProductType} onChange={(e) => setFilterProductType(e.target.value as typeof filterProductType)}
+                className="h-8 min-w-36 rounded-lg border px-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}>
                 <option value="all">All types</option>
                 <option value="standalone">Standalone</option>
                 <option value="master">Master</option>
@@ -395,15 +410,19 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
             </div>
             {/* Brand */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[#555]">Brand</label>
-              <input type="text" value={filterBrand} onChange={e => setFilterBrand(e.target.value)} placeholder="Brand…"
-                className="h-9 w-full rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none sm:w-32" />
+              <label className="text-[11px] font-semibold uppercase tracking-[0.04em]"
+                style={{ color: "var(--color-text-secondary)" }}>Brand</label>
+              <input type="text" value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)} placeholder="Brand…"
+                className="h-8 w-full rounded-lg border px-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 sm:w-32"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} />
             </div>
-            {/* Channel (ecommerce status) */}
+            {/* Channel */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[#555]">Channel</label>
-              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-                className="h-9 min-w-32 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.04em]"
+                style={{ color: "var(--color-text-secondary)" }}>Channel</label>
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
+                className="h-8 min-w-32 rounded-lg border px-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}>
                 <option value="">All</option>
                 <option value="active">Active</option>
                 <option value="draft">Draft</option>
@@ -414,18 +433,22 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
             {showMoreFilters && (
               <>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-[#555]">Tax class</label>
-                  <select value={filterTaxClass} onChange={e => setFilterTaxClass(e.target.value)}
-                    className="h-9 min-w-32 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
+                  <label className="text-[11px] font-semibold uppercase tracking-[0.04em]"
+                    style={{ color: "var(--color-text-secondary)" }}>Tax class</label>
+                  <select value={filterTaxClass} onChange={(e) => setFilterTaxClass(e.target.value)}
+                    className="h-8 min-w-32 rounded-lg border px-2 text-[13px] outline-none"
+                    style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}>
                     <option value="">All</option>
                     <option value="standard">Standard</option>
                     <option value="exempt">Exempt</option>
                   </select>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-[#555]">Age restricted</label>
-                  <select value={filterAgeRestricted ? "1" : "0"} onChange={e => setFilterAgeRestricted(e.target.value === "1")}
-                    className="h-9 min-w-32 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
+                  <label className="text-[11px] font-semibold uppercase tracking-[0.04em]"
+                    style={{ color: "var(--color-text-secondary)" }}>Age restricted</label>
+                  <select value={filterAgeRestricted ? "1" : "0"} onChange={(e) => setFilterAgeRestricted(e.target.value === "1")}
+                    className="h-8 min-w-32 rounded-lg border px-2 text-[13px] outline-none"
+                    style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }}>
                     <option value="0">All</option>
                     <option value="1">18+ only</option>
                   </select>
@@ -434,25 +457,30 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
             )}
             {/* Actions */}
             <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
-              <button type="button" onClick={clearFilters} disabled={!hasFilters} className="text-sm text-brand-600 hover:underline disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline">Clear filters</button>
-              <button type="button" onClick={() => setShowMoreFilters(v => !v)} className="text-sm text-brand-600 hover:underline">
+              <button type="button" onClick={clearFilters} disabled={!hasFilters}
+                className="text-[12px] font-medium text-brand-600 hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline">
+                Clear filters
+              </button>
+              <button type="button" onClick={() => setShowMoreFilters((v) => !v)}
+                className="text-[12px] font-medium text-brand-600 hover:underline">
                 {showMoreFilters ? "Fewer filters" : "More filters"}
               </button>
               <button type="button" onClick={() => void load()}
-                className="h-9 rounded bg-brand-600 px-4 text-sm font-medium text-white transition-colors hover:bg-[#4849d0]">
+                className="h-8 rounded-lg bg-brand-600 px-4 text-[13px] font-medium text-white transition-colors hover:bg-brand-700">
                 Search
               </button>
             </div>
           </div>
           {/* Results count */}
-          <div className="mt-2 flex items-center justify-between text-xs text-[#666]">
-            <span>Showing <strong>{visibleProducts.length}</strong> of {total} products
+          <div className="mt-2 flex items-center justify-between text-[12px]" style={{ color: "var(--color-text-secondary)" }}>
+            <span>Showing <strong style={{ color: "var(--color-text-primary)" }}>{visibleProducts.length}</strong> of {total} products
               {someSelected && <span className="ml-2 text-brand-600">· {selectedIds.size} selected</span>}
             </span>
             <div className="flex items-center gap-3">
               {someSelected && (
-                <button type="button" onClick={() => setShowPrintLabels(true)}
-                  className="text-brand-600 hover:underline">Labels ({selectedIds.size})</button>
+                <button type="button" onClick={() => setShowPrintLabels(true)} className="text-brand-600 hover:underline">
+                  Labels ({selectedIds.size})
+                </button>
               )}
               <button type="button" onClick={handleExportCSV} className="text-brand-600 hover:underline">Export CSV</button>
             </div>
@@ -466,8 +494,9 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
         )}
 
         {actionError && (
-          <div className="border-b border-red-100 bg-red-50 px-4 py-2">
-            <p role="alert" className="text-sm text-red-700">{actionError}</p>
+          <div className="border-b px-4 py-2 text-[13px]"
+            style={{ borderColor: "var(--color-danger-border)", backgroundColor: "var(--color-danger-bg)", color: "var(--color-danger-text)" }}>
+            <p role="alert">{actionError}</p>
           </div>
         )}
 
@@ -496,25 +525,29 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
           <>
             <div className="hidden overflow-x-auto md:block">
               {/* ── Spec: checkbox | thumbnail+Name | Brand | Supplier | Available | Retail price | Channels | Created | ✎ */}
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[#F0F0F0] bg-[#FAFAFA] text-left text-xs font-semibold uppercase tracking-wider text-[#888]">
-                    <th className="px-4 py-3">
-                      <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} aria-label="Select all products" className="h-4 w-4 rounded border-slate-300" />
+              <table className="w-full text-[13px]">
+                <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)" }}>
+                  <tr>
+                    <th className="px-4 py-2.5">
+                      <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} aria-label="Select all products" className="h-4 w-4 rounded" />
                     </th>
                     <SortTh col="name"        label="Name"          cur={sortCol} dir={sortDir} onSort={handleSort} />
-                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em]"
+                      style={{ color: "var(--color-text-secondary)" }}>Type</th>
                     <SortTh col="brand"       label="Brand"         cur={sortCol} dir={sortDir} onSort={handleSort} />
-                    <th className="px-4 py-3">Supplier</th>
-                    <th className="px-4 py-3">Available</th>
+                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em]"
+                      style={{ color: "var(--color-text-secondary)" }}>Supplier</th>
+                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em]"
+                      style={{ color: "var(--color-text-secondary)" }}>Available</th>
                     <SortTh col="price_cents" label="Retail price"  cur={sortCol} dir={sortDir} onSort={handleSort} right />
-                    <th className="px-4 py-3">Channels</th>
+                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em]"
+                      style={{ color: "var(--color-text-secondary)" }}>Channels</th>
                     <SortTh col="created_at"  label="Created"       cur={sortCol} dir={sortDir} onSort={handleSort} />
-                    <th className="w-10 px-4 py-3" />
+                    <th className="w-10 px-4 py-2.5" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#F5F5F5]">
-                  {visibleProducts.map(p => {
+                <tbody>
+                  {visibleProducts.map((p) => {
                     const isSelected = selectedIds.has(p.id);
                     const isAvailable = p.status === "active";
                     const productType = getProductType(p);
@@ -523,14 +556,16 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                       : "—";
                     return (
                       <tr key={p.id}
-                        className={clsx("hover:bg-[#FAFAFA] transition-colors", isSelected && "bg-blue-50")}
+                        className={clsx("border-b last:border-0 transition-colors duration-75", isSelected && "bg-[var(--color-primary-subtle)]")}
+                        style={{ borderColor: "var(--color-table-border)", cursor: "pointer" }}
+                        onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "var(--color-table-row-hover)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isSelected ? "var(--color-primary-subtle)" : ""; }}
                         onClick={() => router.push(`/catalog/${p.id}`)}
-                        style={{ cursor: "pointer" }}
                       >
                         {/* Checkbox */}
-                        <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                           <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(p.id)}
-                            aria-label={`Select ${p.name}`} className="h-4 w-4 rounded border-slate-300" />
+                            aria-label={`Select ${p.name}`} className="h-4 w-4 rounded" />
                         </td>
 
                         {/* thumbnail + Name + SKU */}
@@ -538,82 +573,89 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                           <div className="flex items-center gap-2.5">
                             {p.image_url ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={p.image_url} alt="" className="h-9 w-9 shrink-0 rounded-md object-cover" aria-hidden="true" />
+                              <img src={p.image_url} alt="" className="h-8 w-8 shrink-0 rounded-md object-cover" aria-hidden="true" />
                             ) : (
-                              <span className={clsx("flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white",
-                                p.status === "active" ? "bg-brand-600" : p.status === "draft" ? "bg-amber-400" : "bg-slate-300")}
+                              <span className={clsx("flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[11px] font-bold text-white",
+                                p.status === "active" ? "bg-brand-600" : p.status === "draft" ? "bg-warning-400" : "bg-[var(--color-text-muted)]")}
                                 aria-hidden="true">
                                 {p.name.charAt(0).toUpperCase()}
                               </span>
                             )}
                             <div className="min-w-0">
-                              <p className={clsx("font-medium text-[#111] leading-snug", p.status === "archived" && "text-[#888] line-through")}>{p.name}</p>
-                              <p className="text-[11px] text-[#888] font-mono">{p.sku}</p>
+                              <p className={clsx("font-semibold leading-snug",
+                                p.status === "archived" ? "line-through opacity-50" : "")}
+                                style={{ color: "var(--color-text-primary)" }}>{p.name}</p>
+                              <p className="font-mono text-[11px]" style={{ color: "var(--color-text-muted)" }}>{p.sku}</p>
                             </div>
                           </div>
                         </td>
 
                         <td className="px-4 py-3">
                           <span className={clsx(
-                            "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                            productType === "Variant" ? "bg-blue-50 text-blue-700"
-                              : productType === "Master" ? "bg-violet-50 text-violet-700"
-                              : "bg-slate-100 text-slate-600"
-                          )}>
+                            "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                            productType === "Variant" ? "bg-info-50 text-info-700 border border-info-200"
+                              : productType === "Master" ? "bg-brand-50 text-brand-700 border border-brand-200"
+                              : "border text-[var(--color-text-muted)]"
+                          )}
+                          style={productType === "Standalone" ? { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" } : {}}>
                             {productType}
                           </span>
                         </td>
 
                         {/* Brand */}
-                        <td className="px-4 py-3 text-[#555]">{p.brand ?? <span className="text-[#ccc]">—</span>}</td>
+                        <td className="px-4 py-3 text-[12px]" style={{ color: "var(--color-text-secondary)" }}>
+                          {p.brand ?? <span style={{ color: "var(--color-text-muted)" }}>—</span>}
+                        </td>
 
                         {/* Supplier */}
-                        <td className="px-4 py-3 text-[#555]">
-                          {p.preferred_vendor_name ?? <span className="text-[#ccc]">—</span>}
+                        <td className="px-4 py-3 text-[12px]" style={{ color: "var(--color-text-secondary)" }}>
+                          {p.preferred_vendor_name ?? <span style={{ color: "var(--color-text-muted)" }}>—</span>}
                         </td>
 
                         {/* Available indicator */}
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1.5">
-                            <span className={clsx("h-2 w-2 rounded-full shrink-0",
-                              isAvailable ? "bg-emerald-500" : p.status === "draft" ? "bg-amber-400" : "bg-slate-300"
+                            <span className={clsx("h-1.5 w-1.5 shrink-0 rounded-full",
+                              isAvailable ? "bg-success-500" : p.status === "draft" ? "bg-warning-400" : "bg-[var(--color-text-muted)]"
                             )} aria-hidden="true" />
-                            <span className={clsx("text-xs font-medium capitalize",
-                              isAvailable ? "text-emerald-700" : p.status === "draft" ? "text-amber-700" : "text-[#888]"
-                            )}>
+                            <span className={clsx("text-[12px] font-medium capitalize",
+                              isAvailable ? "text-success-700" : p.status === "draft" ? "text-warning-700" : ""
+                            )}
+                            style={p.status === "archived" ? { color: "var(--color-text-muted)" } : {}}>
                               {p.status}
                             </span>
                             {p.age_restricted === 1 && (
-                              <span className="rounded bg-orange-100 px-1 py-0.5 text-[10px] font-semibold text-orange-700">18+</span>
+                              <span className="rounded bg-orange-50 px-1 py-0.5 text-[10px] font-semibold text-orange-700 border border-orange-200">18+</span>
                             )}
                           </div>
                         </td>
 
                         {/* Retail price */}
-                        <td className="px-4 py-3 text-right font-semibold tabular-nums text-[#111]">
+                        <td className="px-4 py-3 text-right font-bold tabular-nums" style={{ color: "var(--color-text-primary)" }}>
                           {formatMoney(p.price_cents)}
                         </td>
 
                         {/* Channels */}
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-1">
-                            <span className="rounded-full bg-[#F0F0F0] px-2 py-0.5 text-[11px] font-medium text-[#555]">In-store</span>
+                            <span className="rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>In-store</span>
                             {p.ecommerce === 1 && (
-                              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">Online</span>
+                              <span className="rounded-full bg-info-50 px-2 py-0.5 text-[10px] font-medium text-info-700 border border-info-200">Online</span>
                             )}
                           </div>
                         </td>
 
                         {/* Created */}
-                        <td className="px-4 py-3 text-xs text-[#888] tabular-nums">{createdDate}</td>
+                        <td className="px-4 py-3 text-[11px] tabular-nums" style={{ color: "var(--color-text-muted)" }}>{createdDate}</td>
 
                         {/* Edit icon */}
-                        <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                          <button type="button"
-                            onClick={() => router.push(`/catalog/${p.id}`)}
+                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                          <button type="button" onClick={() => router.push(`/catalog/${p.id}`)}
                             aria-label={`Edit ${p.name}`}
-                            className="text-[#aaa] hover:text-brand-600 transition-colors">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            className="transition-colors hover:text-brand-600"
+                            style={{ color: "var(--color-text-muted)" }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                             </svg>
@@ -625,7 +667,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                 </tbody>
               </table>
             </div>
-            <div className="divide-y divide-slate-100 md:hidden">
+            <div className="md:hidden" style={{ borderTop: "1px solid var(--color-border)" }}>
               {visibleProducts.map(p => (
                 <ProductListCard key={p.id} product={p}
                   productType={getProductType(p)}
@@ -645,16 +687,25 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
       {showCreate    && <ProductFormModal categories={categories} onSave={handleCreate} onClose={closeCreate} />}
 
       {archiveTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setArchiveTarget(null)}>
-          <div className="w-full max-w-sm rounded-md bg-white p-6 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h2 className="text-base font-semibold text-slate-950">Archive &ldquo;{archiveTarget.name}&rdquo;?</h2>
-            <p className="mt-2 text-sm text-slate-600">The product will be set to archived and hidden from active views. You can restore it by editing the status.</p>
-            {actionError && <p className="mt-3 text-sm text-red-700">{actionError}</p>}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={() => setArchiveTarget(null)}>
+          <div className="w-full max-w-sm rounded-2xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}
+            style={{ backgroundColor: "var(--color-surface)" }}>
+            <h2 className="text-[15px] font-semibold" style={{ color: "var(--color-text-primary)" }}>
+              Archive &ldquo;{archiveTarget.name}&rdquo;?
+            </h2>
+            <p className="mt-2 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
+              The product will be set to archived and hidden from active views. You can restore it by editing the status.
+            </p>
+            {actionError && <p className="mt-3 text-[12px]" style={{ color: "var(--color-danger-text)" }}>{actionError}</p>}
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setArchiveTarget(null)} className="min-h-[40px] rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+              <button type="button" onClick={() => setArchiveTarget(null)}
+                className="h-8 rounded-lg border px-4 text-[13px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Cancel</button>
               <button type="button" onClick={handleArchive} disabled={archiving}
-                className="min-h-[40px] rounded-md bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60">
-                {archiving ? "Archiving..." : "Archive"}
+                className="h-8 rounded-lg px-4 text-[13px] font-medium text-white transition-colors disabled:opacity-60"
+                style={{ backgroundColor: "var(--color-text-secondary)" }}>
+                {archiving ? "Archiving…" : "Archive"}
               </button>
             </div>
           </div>
