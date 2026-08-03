@@ -131,11 +131,11 @@ function StoreCreditPanel({ customerId }: { customerId: string }) {
   };
 
   return (
-    <div className="rounded-md bg-white p-4">
+    <div className="rounded-lg p-4" style={{ backgroundColor: "var(--color-surface)" }}>
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-900">Store Credit</h3>
+        <h3 className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Store Credit</h3>
         {loading ? (
-          <div className="h-5 w-20 animate-pulse rounded bg-gray-200" />
+          <div className="h-5 w-20 animate-skeleton rounded" />
         ) : (
           <span className="text-lg font-bold text-emerald-600">{formatMoney(balance ?? 0)}</span>
         )}
@@ -143,7 +143,8 @@ function StoreCreditPanel({ customerId }: { customerId: string }) {
       <div className="mt-3 flex gap-1.5">
         {(["add", "deduct"] as const).map((m) => (
           <button key={m} type="button" onClick={() => setMode(m)}
-            className={`flex-1 rounded-md py-1.5 text-xs font-semibold capitalize transition-colors ${mode === m ? "bg-brand-600 text-white" : "border border-slate-200 text-slate-600 hover:bg-gray-50"}`}>
+            className={`flex-1 rounded-md py-1.5 text-[11px] font-semibold capitalize transition-colors ${mode === m ? "bg-brand-600 text-white" : "border hover:bg-[var(--color-surface-subtle)]"}`}
+            style={mode !== m ? { borderColor: "var(--color-border)", color: "var(--color-text-secondary)" } : {}}>
             {m === "add" ? "Add credit" : "Deduct"}
           </button>
         ))}
@@ -151,10 +152,12 @@ function StoreCreditPanel({ customerId }: { customerId: string }) {
       <div className="mt-2 space-y-2">
         <input type="number" min="0.01" step="0.01" placeholder="Amount ($)"
           value={amount} onChange={(e) => { setAmount(e.target.value); setError(null); }}
-          className="w-full rounded border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-brand-600" />
+          className="w-full rounded-md border px-3 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} />
         <input type="text" placeholder="Reason (required)"
           value={reason} onChange={(e) => { setReason(e.target.value); setError(null); }}
-          className="w-full rounded border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-brand-600" />
+          className="w-full rounded-md border px-3 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} />
         {error && <p role="alert" className="text-xs text-red-500">{error}</p>}
         <button type="button" disabled={adjusting || !amount || !reason} onClick={() => void handleAdjust()}
           className="w-full rounded-md bg-brand-600 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0] disabled:opacity-40">
@@ -179,7 +182,7 @@ function AccountTab({ customer }: { customer: CustomerView }) {
           <p className="mt-1 text-2xl font-bold text-white">{formatMoney(customer.avgOrderCents)}</p>
         </div>
       </div>
-      <div className="rounded-md bg-white p-1">
+      <div className="rounded-lg p-1" style={{ backgroundColor: "var(--color-surface)" }}>
         <StoreCreditPanel customerId={customer.id} />
       </div>
     </div>

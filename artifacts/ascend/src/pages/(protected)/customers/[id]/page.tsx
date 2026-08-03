@@ -79,22 +79,23 @@ function MergeModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-md bg-white shadow-xl"
+        className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl shadow-2xl"
+        style={{ backgroundColor: "var(--color-surface)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-950">Merge duplicate customer</h2>
-          <button type="button" onClick={onClose} aria-label="Close merge modal" className="flex h-9 w-9 items-center justify-center rounded-md text-xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-600">&times;</button>
+        <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--color-border)" }}>
+          <h2 className="text-[15px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Merge duplicate customer</h2>
+          <button type="button" onClick={onClose} aria-label="Close merge modal" className="flex h-9 w-9 items-center justify-center rounded-lg text-xl leading-none transition-colors hover:bg-[var(--color-surface-subtle)]" style={{ color: "var(--color-text-muted)" }}>&times;</button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {step === "search" && (
             <div className="space-y-4">
-              <p className="text-sm text-slate-600">
-                Search for the duplicate record to merge into <span className="font-semibold text-slate-950">{primary.name}</span>. The primary record&apos;s name and email will be kept; loyalty points will be summed.
+              <p className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
+                Search for the duplicate record to merge into <span className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{primary.name}</span>. The primary record&apos;s name and email will be kept; loyalty points will be summed.
               </p>
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Search by name or email</label>
+                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ color: "var(--color-text-secondary)" }}>Search by name or email</label>
                 <input
                   type="search"
                   value={query}
@@ -104,22 +105,23 @@ function MergeModal({
                   autoFocus
                 />
               </div>
-              {searching && <p className="text-sm text-slate-400" aria-busy="true">Searching…</p>}
+              {searching && <p className="text-[13px]" style={{ color: "var(--color-text-muted)" }} aria-busy="true">Searching…</p>}
               {!searching && debouncedQ && results.length === 0 && (
-                <p className="text-sm text-slate-500">No customers found matching &ldquo;{debouncedQ}&rdquo;.</p>
+                <p className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>No customers found matching &ldquo;{debouncedQ}&rdquo;.</p>
               )}
               {results.length > 0 && (
-                <ul className="divide-y divide-slate-100 rounded-md border border-slate-200">
+                <ul className="divide-y rounded-lg border overflow-hidden" style={{ borderColor: "var(--color-border)", divideColor: "var(--color-table-border)" }}>
                   {results.map((r) => (
-                    <li key={r.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                    <li key={r.id} className="flex items-center justify-between gap-3 px-4 py-3" style={{ borderColor: "var(--color-table-border)" }}>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-950">{r.name}</p>
-                        <p className="text-xs text-slate-500">{r.email} &middot; {r.phone}</p>
+                        <p className="text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>{r.name}</p>
+                        <p className="text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{r.email} &middot; {r.phone}</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => { setDuplicate(r); setStep("confirm"); }}
-                        className="shrink-0 rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        className="shrink-0 rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+                        style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
                       >
                         Merge into this record
                       </button>
@@ -132,22 +134,22 @@ function MergeModal({
 
           {step === "confirm" && duplicate && (
             <div className="space-y-4">
-              <p className="text-sm text-slate-600">
-                You are about to merge <span className="font-semibold text-slate-950">{duplicate.name}</span> into <span className="font-semibold text-slate-950">{primary.name}</span>. This cannot be undone.
+              <p className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
+                You are about to merge <span className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{duplicate.name}</span> into <span className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{primary.name}</span>. This cannot be undone.
               </p>
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-md border border-success-200 bg-success-50 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-success-700">Kept (Primary)</p>
-                  <p className="mt-1 text-sm font-medium text-slate-950">{primary.name}</p>
-                  <p className="text-xs text-slate-600">{primary.email ?? "—"}</p>
-                  <p className="mt-1 text-xs text-slate-500">Points: {primary.points} + duplicate&apos;s points</p>
-                  <p className="text-xs text-slate-500">All orders from duplicate will be reassigned here</p>
+                <div className="rounded-xl border border-success-200 bg-success-50 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.07em] text-success-700">Kept (Primary)</p>
+                  <p className="mt-1 text-[13px] font-medium text-success-900">{primary.name}</p>
+                  <p className="text-[11px] text-success-700">{primary.email ?? "—"}</p>
+                  <p className="mt-1 text-[11px] text-success-600">Points: {primary.points} + duplicate&apos;s points</p>
+                  <p className="text-[11px] text-success-600">All orders from duplicate will be reassigned here</p>
                 </div>
-                <div className="rounded-md border border-danger-200 bg-danger-50 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-danger-700">Deleted (Duplicate)</p>
-                  <p className="mt-1 text-sm font-medium text-slate-950">{duplicate.name}</p>
-                  <p className="text-xs text-slate-600">{duplicate.email}</p>
-                  <p className="mt-1 text-xs text-slate-500">{duplicate.phone}</p>
+                <div className="rounded-xl border border-danger-200 bg-danger-50 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.07em] text-danger-700">Deleted (Duplicate)</p>
+                  <p className="mt-1 text-[13px] font-medium text-danger-900">{duplicate.name}</p>
+                  <p className="text-[11px] text-danger-600">{duplicate.email}</p>
+                  <p className="mt-1 text-[11px] text-danger-500">{duplicate.phone}</p>
                 </div>
               </div>
               {mergeError && (
@@ -157,21 +159,21 @@ function MergeModal({
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-2 border-t border-slate-200 px-5 py-3">
+        <div className="flex items-center justify-between gap-2 border-t px-5 py-3" style={{ borderColor: "var(--color-border)" }}>
           {step === "confirm" ? (
             <>
-              <button type="button" onClick={() => setStep("search")} className="min-h-[40px] rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Back</button>
+              <button type="button" onClick={() => setStep("search")} className="min-h-[40px] rounded-lg border px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]" style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}>Back</button>
               <button
                 type="button"
                 onClick={() => void handleConfirmMerge()}
                 disabled={merging}
-                className="min-h-[40px] rounded-md bg-danger-600 px-4 py-2 text-sm font-medium text-white hover:bg-danger-700 disabled:opacity-60"
+                className="min-h-[40px] rounded-lg bg-danger-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-danger-700 disabled:opacity-60"
               >
                 {merging ? "Merging…" : "Confirm Merge"}
               </button>
             </>
           ) : (
-            <button type="button" onClick={onClose} className="min-h-[40px] rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+            <button type="button" onClick={onClose} className="min-h-[40px] rounded-lg border px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]" style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}>Cancel</button>
           )}
         </div>
       </div>
@@ -190,23 +192,23 @@ function Skeleton() {
       contentClassName="overflow-y-auto"
     >
       <div className="mx-auto w-full max-w-5xl px-4 py-6">
-        <div className="mb-5 h-4 w-24 animate-pulse rounded bg-slate-200" />
-        <div className="mb-3 h-8 w-64 animate-pulse rounded bg-slate-200" />
+        <div className="mb-5 h-4 w-24 animate-skeleton rounded" />
+        <div className="mb-3 h-8 w-64 animate-skeleton rounded" />
         <div className="mb-6 flex gap-2">
-          <div className="h-6 w-16 animate-pulse rounded bg-slate-200" />
-          <div className="h-6 w-16 animate-pulse rounded bg-slate-200" />
+          <div className="h-6 w-16 animate-skeleton rounded" />
+          <div className="h-6 w-16 animate-skeleton rounded" />
         </div>
-        <div className="mb-6 flex gap-1 border-b border-slate-200">
+        <div className="mb-6 flex gap-1 border-b" style={{ borderColor: "var(--color-border)" }}>
           {["General", "Transactions", "Financials", "Store Credit"].map((t) => (
-            <div key={t} className="mr-1 h-10 w-24 animate-pulse rounded-t bg-slate-200" />
+            <div key={t} className="mr-1 h-10 w-24 animate-skeleton rounded-t" />
           ))}
         </div>
         <Card>
           <div className="grid gap-4 sm:grid-cols-2">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i}>
-                <div className="mb-1 h-3 w-20 animate-pulse rounded bg-slate-200" />
-                <div className="h-10 animate-pulse rounded-md bg-slate-200" />
+                <div className="mb-1 h-3 w-20 animate-skeleton rounded" />
+                <div className="h-10 animate-skeleton rounded-lg" />
               </div>
             ))}
           </div>
@@ -290,7 +292,7 @@ export default function CustomerDetailPage() {
         contentClassName="overflow-y-auto"
       >
         <div className="p-6">
-          <Link href="/customers" className="mb-4 inline-flex items-center gap-1 text-sm text-slate-950 hover:underline">
+          <Link href="/customers" className="mb-4 inline-flex items-center gap-1 text-[13px] text-brand-600 hover:underline">
             <BackIcon /> Back to Customers
           </Link>
           <div className="rounded-md border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
@@ -320,16 +322,17 @@ export default function CustomerDetailPage() {
     >
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-6">
         <div>
-          <Link href="/customers" className="inline-flex items-center gap-1 text-sm text-slate-950 hover:underline">
+          <Link href="/customers" className="inline-flex items-center gap-1 text-[13px] text-brand-600 hover:underline">
             <BackIcon /> Back to Customers
           </Link>
         </div>
 
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-950">{customer.name}</h1>
+            <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>{customer.name}</h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="inline-flex rounded border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-950">
+              <span className="inline-flex rounded-lg border px-2.5 py-0.5 text-[11px] font-semibold"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-primary)" }}>
                 {tierLabel(customer.tier)}
               </span>
               <span className={`inline-flex rounded px-2.5 py-0.5 text-xs font-semibold capitalize ${statusColor(customer.status)}`}>
@@ -362,18 +365,19 @@ export default function CustomerDetailPage() {
           )}
         </div>
 
-        <div className="flex gap-1 border-b border-slate-200">
+        <div className="flex gap-1 border-b" style={{ borderColor: "var(--color-border)" }}>
           {tabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
               onClick={() => setActiveTab(tab.key)}
               className={[
-                "border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
+                "border-b-2 px-4 py-2.5 text-[13px] font-medium transition-colors",
                 activeTab === tab.key
-                  ? "border-slate-950 text-slate-950"
-                  : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700",
+                  ? "border-brand-600 text-brand-600"
+                  : "border-transparent hover:border-[var(--color-border)]",
               ].join(" ")}
+              style={activeTab !== tab.key ? { color: "var(--color-text-secondary)" } : {}}
             >
               {tab.label}
             </button>

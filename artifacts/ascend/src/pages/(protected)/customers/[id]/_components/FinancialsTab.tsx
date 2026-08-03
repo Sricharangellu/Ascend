@@ -13,16 +13,17 @@ function FinancialMetric({
   tone?: "neutral" | "success" | "warning" | "danger";
 }) {
   const toneClass = {
-    neutral: "bg-white border-slate-200",
+    neutral: "",
     success: "bg-success-50 border-success-200",
     warning: "bg-warning-50 border-warning-200",
     danger: "bg-danger-50 border-danger-200",
   }[tone];
 
   return (
-    <div className={`rounded-lg border p-4 shadow-sm ${toneClass}`}>
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-bold tabular-nums text-slate-950">{value}</p>
+    <div className={`rounded-lg border p-4 shadow-[var(--shadow-sm)] ${toneClass}`}
+      style={tone === "neutral" ? { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" } : {}}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ color: "var(--color-text-secondary)" }}>{label}</p>
+      <p className="mt-1 text-xl font-bold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{value}</p>
     </div>
   );
 }
@@ -66,20 +67,21 @@ export function FinancialsTab({
       <Card title="Account credit">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-10">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Credit limit</p>
-            <p className="mt-1 text-lg font-bold text-slate-950">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ color: "var(--color-text-secondary)" }}>Credit limit</p>
+            <p className="mt-1 text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>
               {creditLimit !== undefined ? formatMoney(creditLimit) : "No limit"}
             </p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Open balance</p>
-            <p className={`mt-1 text-lg font-bold ${openInvoices > 0 ? "text-warning-700" : "text-slate-950"}`}>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ color: "var(--color-text-secondary)" }}>Open balance</p>
+            <p className={`mt-1 text-lg font-bold ${openInvoices > 0 ? "text-warning-700" : ""}`}
+              style={!openInvoices ? { color: "var(--color-text-primary)" } : {}}>
               {formatMoney(openInvoices)}
             </p>
           </div>
           {creditLimit !== undefined && (
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Available</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ color: "var(--color-text-secondary)" }}>Available</p>
               <p className={`mt-1 text-lg font-bold ${creditLimit - openInvoices < 0 ? "text-danger-700" : "text-success-700"}`}>
                 {formatMoney(Math.max(0, creditLimit - openInvoices))}
               </p>

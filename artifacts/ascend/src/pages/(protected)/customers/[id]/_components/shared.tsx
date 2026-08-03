@@ -1,4 +1,5 @@
 // Shared types, constants, and helpers for the customer detail page.
+import type React from "react";
 
 export interface Customer {
   id: string;
@@ -58,8 +59,9 @@ export interface CustomerSearchResult { id: string; name: string; email: string;
 export type MergeStep = "search" | "confirm";
 
 export const INPUT_CLASS =
-  "w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-950 focus:ring-2 focus:ring-slate-950 outline-none min-h-[44px]";
-export const LABEL_CLASS = "block text-xs font-semibold uppercase text-slate-500 mb-1";
+  "w-full rounded-md border px-3 py-2 text-[13px] outline-none transition-all focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 min-h-[44px]";
+export const INPUT_STYLE = { borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" } as React.CSSProperties;
+export const LABEL_CLASS = "block text-[10px] font-semibold uppercase tracking-[0.07em] mb-1";
 
 export function tierLabel(tier?: number): string {
   if (!tier) return "Standard";
@@ -68,22 +70,23 @@ export function tierLabel(tier?: number): string {
 
 export function statusColor(status: string) {
   if (status === "active") return "bg-success-100 text-success-700";
-  return "bg-slate-100 text-slate-600";
+  return "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]";
 }
 
 export function orderStatusColor(status: string) {
   if (status === "completed") return "bg-success-100 text-success-700";
   if (status === "refunded") return "bg-warning-100 text-warning-700";
   if (status === "voided") return "bg-danger-100 text-danger-700";
-  return "bg-slate-100 text-slate-600";
+  return "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]";
 }
 
 export function ReadField({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div>
-      <p className={LABEL_CLASS}>{label}</p>
-      <div className="min-h-[40px] rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-950">
-        {value || <span className="text-slate-400">—</span>}
+      <p className={LABEL_CLASS} style={{ color: "var(--color-text-secondary)" }}>{label}</p>
+      <div className="min-h-[40px] rounded-md border px-3 py-2 text-[13px]"
+        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-primary)" }}>
+        {value || <span style={{ color: "var(--color-text-muted)" }}>—</span>}
       </div>
     </div>
   );

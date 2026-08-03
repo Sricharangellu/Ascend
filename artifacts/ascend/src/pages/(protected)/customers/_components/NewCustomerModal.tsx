@@ -44,9 +44,9 @@ function FormField({ label, required, hint, error, children }: {
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium text-slate-700">
-        {label}{required && <span className="ml-0.5 text-red-500">*</span>}
-        {hint && <span className="ml-1 text-xs font-normal text-slate-400">{hint}</span>}
+      <label className="text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>
+        {label}{required && <span className="ml-0.5 text-danger-600">*</span>}
+        {hint && <span className="ml-1 text-[11px] font-normal" style={{ color: "var(--color-text-muted)" }}>{hint}</span>}
       </label>
       {children}
       {error && <p className="text-xs text-red-600">{error}</p>}
@@ -54,7 +54,7 @@ function FormField({ label, required, hint, error, children }: {
   );
 }
 
-const inputCls = "form-input w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-700";
+const inputCls = "form-input w-full rounded-lg border px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500";
 
 // ── NewCustomerModal ──────────────────────────────────────────────────────────
 
@@ -131,17 +131,20 @@ export function NewCustomerModal({ open, onClose }: { open: boolean; onClose: ()
     >
       <form id="new-customer-form" onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-5">
         {/* Customer type toggle */}
-        <div className="flex gap-2 rounded-lg border border-slate-200 bg-slate-50 p-1">
+        <div className="flex gap-2 rounded-xl border p-1" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
           {(["retail", "business"] as CustomerType[]).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setField("customerType", t)}
-              className={`flex-1 rounded-md px-3 py-2 text-sm font-medium capitalize transition-colors ${
+              className={`flex-1 rounded-lg px-3 py-2 text-[13px] font-medium capitalize transition-all ${
                 form.customerType === t
-                  ? "bg-white text-slate-950 shadow-sm ring-1 ring-slate-200"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "shadow-sm"
+                  : "hover:bg-[var(--color-surface-subtle)]"
               }`}
+              style={form.customerType === t
+                ? { backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }
+                : { color: "var(--color-text-secondary)" }}
             >
               {t === "retail" ? "Retail Customer" : "Business Account"}
             </button>
@@ -150,7 +153,7 @@ export function NewCustomerModal({ open, onClose }: { open: boolean; onClose: ()
 
         {form.customerType === "retail" ? (
           <div className="grid gap-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Customer details</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ color: "var(--color-text-muted)" }}>Customer details</p>
             <FormField label="Full name" required error={fieldErrs.name}>
               <input type="text" value={form.name} onChange={(e) => setField("name", e.target.value)}
                 required placeholder="Ada Lovelace" className={inputCls} />
@@ -177,7 +180,7 @@ export function NewCustomerModal({ open, onClose }: { open: boolean; onClose: ()
           </div>
         ) : (
           <div className="grid gap-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Company information</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ color: "var(--color-text-muted)" }}>Company information</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField label="Company name" required error={fieldErrs.company}>
                 <input type="text" value={form.company} onChange={(e) => setField("company", e.target.value)}
@@ -209,7 +212,7 @@ export function NewCustomerModal({ open, onClose }: { open: boolean; onClose: ()
                 </select>
               </FormField>
             </div>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Primary contact</p>
+            <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ color: "var(--color-text-muted)" }}>Primary contact</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField label="Contact person" required error={fieldErrs.contactPerson ?? fieldErrs.name}>
                 <input type="text" value={form.contactPerson} onChange={(e) => setField("contactPerson", e.target.value)}
@@ -224,7 +227,7 @@ export function NewCustomerModal({ open, onClose }: { open: boolean; onClose: ()
               <input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)}
                 placeholder="billing@acmecorp.com" className={inputCls} />
             </FormField>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Addresses</p>
+            <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ color: "var(--color-text-muted)" }}>Addresses</p>
             <FormField label="Billing address" required error={fieldErrs.billingAddress}>
               <textarea value={form.billingAddress} onChange={(e) => setField("billingAddress", e.target.value)}
                 required rows={2} placeholder="123 Main St, Suite 100, Los Angeles, CA 90001"
@@ -234,7 +237,7 @@ export function NewCustomerModal({ open, onClose }: { open: boolean; onClose: ()
               <textarea value={form.shippingAddress} onChange={(e) => setField("shippingAddress", e.target.value)}
                 rows={2} placeholder="Same as billing" className={`${inputCls} resize-none`} />
             </FormField>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Account settings</p>
+            <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ color: "var(--color-text-muted)" }}>Account settings</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField label="Credit limit ($)" hint="Optional — leave blank for prepay only" error={fieldErrs.creditLimitCents}>
                 <input type="number" value={form.creditLimitDollars} onChange={(e) => setField("creditLimitDollars", e.target.value)}

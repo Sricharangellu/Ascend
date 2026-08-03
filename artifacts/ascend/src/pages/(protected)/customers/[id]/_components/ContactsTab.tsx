@@ -119,36 +119,37 @@ export function ContactsTab({
           onClick={() => setEditTarget(null)}
         >
           <div
-            className="w-full max-w-md space-y-4 rounded-xl bg-white p-6 shadow-2xl"
+            className="w-full max-w-md space-y-4 rounded-2xl p-6 shadow-2xl"
+            style={{ backgroundColor: "var(--color-surface)" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-base font-semibold text-slate-900">Edit Contact</h2>
+            <h2 className="text-[15px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Edit Contact</h2>
             <div className="space-y-3">
               <input
                 value={editTarget.contact_name}
                 onChange={(e) => setEditTarget((t) => t && ({ ...t, contact_name: e.target.value }))}
                 placeholder="Name"
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                className="w-full rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
               <input
                 value={editTarget.title ?? ""}
                 onChange={(e) => setEditTarget((t) => t && ({ ...t, title: e.target.value }))}
                 placeholder="Title"
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                className="w-full rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
               <input
                 type="email"
                 value={editTarget.email ?? ""}
                 onChange={(e) => setEditTarget((t) => t && ({ ...t, email: e.target.value }))}
                 placeholder="Email"
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                className="w-full rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
               <input
                 type="tel"
                 value={editTarget.phone ?? ""}
                 onChange={(e) => setEditTarget((t) => t && ({ ...t, phone: e.target.value }))}
                 placeholder="Phone"
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                className="w-full rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
               <label className="flex cursor-pointer items-center gap-1.5 text-sm">
                 <input
@@ -169,10 +170,10 @@ export function ContactsTab({
       )}
 
       <Card className="overflow-hidden p-0">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--color-border)" }}>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-slate-950">Contacts</span>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+            <span className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Contacts</span>
+            <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
               {items.length}
             </span>
           </div>
@@ -184,33 +185,33 @@ export function ContactsTab({
         </div>
 
         {showForm && canEdit && (
-          <div className="space-y-3 border-b border-slate-200 bg-slate-50 px-4 py-4">
+          <div className="space-y-3 border-b px-4 py-4" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
             <div className="flex flex-wrap gap-3">
               <input
                 value={form.contact_name}
                 onChange={(e) => setForm((f) => ({ ...f, contact_name: e.target.value }))}
                 placeholder="Name (required)"
-                className="min-w-36 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                className="min-w-36 flex-1 rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
               <input
                 value={form.title}
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                 placeholder="Title"
-                className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                className="w-36 rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
               <input
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                 placeholder="Email"
-                className="w-48 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                className="w-48 rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
               <input
                 type="tel"
                 value={form.phone}
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                 placeholder="Phone"
-                className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                className="w-36 rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
             </div>
             <div className="flex items-center gap-4">
@@ -250,7 +251,7 @@ export function ContactsTab({
 
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+            <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Title</th>
               <th className="px-4 py-3">Email</th>
@@ -259,22 +260,22 @@ export function ContactsTab({
               {canEdit && <th className="px-4 py-3" />}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-[var(--color-table-border)]">
             {loading && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">Loading…</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>Loading…</td></tr>
             )}
             {!loading && items.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">No contacts yet.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>No contacts yet.</td></tr>
             )}
             {items.map((contact) => (
-              <tr key={contact.id} className="hover:bg-slate-50">
-                <td className="px-4 py-3 font-medium text-slate-900">{contact.contact_name}</td>
-                <td className="px-4 py-3 text-slate-500">{contact.title ?? "—"}</td>
-                <td className="px-4 py-3 text-slate-500">{contact.email ?? "—"}</td>
-                <td className="px-4 py-3 text-slate-500">{contact.phone ?? "—"}</td>
+              <tr key={contact.id} className="transition-colors hover:bg-[var(--color-table-row-hover)]">
+                <td className="px-4 py-3 text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>{contact.contact_name}</td>
+                <td className="px-4 py-3 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>{contact.title ?? "—"}</td>
+                <td className="px-4 py-3 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>{contact.email ?? "—"}</td>
+                <td className="px-4 py-3 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>{contact.phone ?? "—"}</td>
                 <td className="px-4 py-3">
                   {contact.is_primary ? (
-                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
                       Primary
                     </span>
                   ) : (
@@ -286,13 +287,13 @@ export function ContactsTab({
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => setEditTarget({ ...contact })}
-                        className="text-xs text-slate-500 underline hover:text-slate-800"
+                        className="text-[11px] text-brand-600 underline hover:text-brand-700"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => setDeleteTarget(contact)}
-                        className="text-xs text-red-500 underline hover:text-red-700"
+                        className="text-[11px] text-danger-600 underline hover:text-danger-700"
                       >
                         Remove
                       </button>

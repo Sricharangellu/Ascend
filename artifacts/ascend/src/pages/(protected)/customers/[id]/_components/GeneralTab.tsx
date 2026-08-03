@@ -92,8 +92,8 @@ export function GeneralTab({
   if (editMode) {
     return (
       <div className="flex flex-col gap-5">
-        <div className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-100 px-4 py-3">
-          <p className="text-sm font-medium text-slate-800">Editing customer profile</p>
+        <div className="flex items-center justify-between gap-3 rounded-xl border px-4 py-3" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
+          <p className="text-[13px] font-medium" style={{ color: "var(--color-text-primary)" }}>Editing customer profile</p>
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={onCancel} disabled={saving}>
               Cancel
@@ -174,7 +174,7 @@ export function GeneralTab({
             <div>
               <label className={LABEL_CLASS}>Credit Limit ($, optional)</label>
               <input type="number" min="0" step="0.01" value={form.creditLimitDollars} onChange={(e) => update("creditLimitDollars", e.target.value)} placeholder="No limit" className={INPUT_CLASS} />
-              <p className="mt-1 text-xs text-slate-400">Leave empty for no credit limit (pay-as-you-go).</p>
+              <p className="mt-1 text-[11px]" style={{ color: "var(--color-text-muted)" }}>Leave empty for no credit limit (pay-as-you-go).</p>
             </div>
           </div>
         </Card>

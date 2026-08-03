@@ -165,16 +165,17 @@ export function AddressesTab({
           onClick={() => setEditTarget(null)}
         >
           <div
-            className="w-full max-w-lg space-y-4 rounded-xl bg-white p-6 shadow-2xl"
+            className="w-full max-w-lg space-y-4 rounded-2xl p-6 shadow-2xl"
+            style={{ backgroundColor: "var(--color-surface)" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-base font-semibold text-slate-900">Edit Address</h2>
+            <h2 className="text-[15px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Edit Address</h2>
             <div className="space-y-3">
               <div className="flex gap-3">
                 <select
                   value={editForm.address_type}
                   onChange={(e) => setEditForm((f) => ({ ...f, address_type: e.target.value }))}
-                  className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                  className="w-36 rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
                 >
                   <option value="billing">Billing</option>
                   <option value="shipping">Shipping</option>
@@ -193,32 +194,32 @@ export function AddressesTab({
                 value={editForm.address_line1}
                 onChange={(e) => setEditForm((f) => ({ ...f, address_line1: e.target.value }))}
                 placeholder="Address line 1"
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                className="w-full rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
               <input
                 value={editForm.address_line2}
                 onChange={(e) => setEditForm((f) => ({ ...f, address_line2: e.target.value }))}
                 placeholder="Address line 2"
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                className="w-full rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
               <div className="flex gap-3">
                 <input
                   value={editForm.city}
                   onChange={(e) => setEditForm((f) => ({ ...f, city: e.target.value }))}
                   placeholder="City"
-                  className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                  className="flex-1 rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
                 />
                 <input
                   value={editForm.state}
                   onChange={(e) => setEditForm((f) => ({ ...f, state: e.target.value }))}
                   placeholder="State"
-                  className="w-20 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                  className="w-20 rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
                 />
                 <input
                   value={editForm.zip}
                   onChange={(e) => setEditForm((f) => ({ ...f, zip: e.target.value }))}
                   placeholder="ZIP"
-                  className="w-24 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                  className="w-24 rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
                 />
               </div>
             </div>
@@ -231,10 +232,10 @@ export function AddressesTab({
       )}
 
       <Card className="overflow-hidden p-0">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--color-border)" }}>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-slate-950">Addresses</span>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+            <span className="text-[13px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Addresses</span>
+            <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
               {items.length}
             </span>
           </div>
@@ -246,12 +247,12 @@ export function AddressesTab({
         </div>
 
         {showForm && canEdit && (
-          <div className="space-y-3 border-b border-slate-200 bg-slate-50 px-4 py-4">
+          <div className="space-y-3 border-b px-4 py-4" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
             <div className="flex flex-wrap gap-3">
               <select
                 value={form.address_type}
                 onChange={(e) => setForm((f) => ({ ...f, address_type: e.target.value }))}
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                className="rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               >
                 <option value="billing">Billing</option>
                 <option value="shipping">Shipping</option>
@@ -260,25 +261,25 @@ export function AddressesTab({
                 value={form.address_line1}
                 onChange={(e) => setForm((f) => ({ ...f, address_line1: e.target.value }))}
                 placeholder="Address line 1 (required)"
-                className="min-w-48 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                className="min-w-48 flex-1 rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
               <input
                 value={form.city}
                 onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
                 placeholder="City (required)"
-                className="w-32 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                className="w-32 rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
               <input
                 value={form.state}
                 onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))}
                 placeholder="State"
-                className="w-20 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                className="w-20 rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
               <input
                 value={form.zip}
                 onChange={(e) => setForm((f) => ({ ...f, zip: e.target.value }))}
                 placeholder="ZIP"
-                className="w-24 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                className="w-24 rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
             </div>
             <div className="flex items-center gap-4">
@@ -311,7 +312,7 @@ export function AddressesTab({
 
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+            <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
               <th className="px-4 py-3">Type</th>
               <th className="px-4 py-3">Address</th>
               <th className="px-4 py-3">City / State / ZIP</th>
@@ -319,28 +320,28 @@ export function AddressesTab({
               {canEdit && <th className="px-4 py-3" />}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-[var(--color-table-border)]">
             {loading && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">Loading…</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>Loading…</td></tr>
             )}
             {!loading && items.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">No addresses yet.</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-[13px]" style={{ color: "var(--color-text-muted)" }}>No addresses yet.</td></tr>
             )}
             {items.map((addr) => (
-              <tr key={addr.id} className="hover:bg-slate-50">
-                <td className="px-4 py-3 capitalize text-slate-700">{addr.address_type}</td>
-                <td className="px-4 py-3">
-                  <p>{addr.address_line1}</p>
+              <tr key={addr.id} className="transition-colors hover:bg-[var(--color-table-row-hover)]">
+                <td className="px-4 py-3 capitalize text-[13px]" style={{ color: "var(--color-text-primary)" }}>{addr.address_type}</td>
+                <td className="px-4 py-3 text-[13px]">
+                  <p style={{ color: "var(--color-text-primary)" }}>{addr.address_line1}</p>
                   {addr.address_line2 && (
-                    <p className="text-xs text-slate-500">{addr.address_line2}</p>
+                    <p className="text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{addr.address_line2}</p>
                   )}
                 </td>
-                <td className="px-4 py-3 text-slate-500">
+                <td className="px-4 py-3 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
                   {[addr.city, addr.state, addr.zip].filter(Boolean).join(", ")}
                 </td>
                 <td className="px-4 py-3">
                   {addr.is_default ? (
-                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+                    <span className="rounded-full bg-success-100 px-2 py-0.5 text-[10px] font-semibold text-success-700">
                       Default
                     </span>
                   ) : (
@@ -352,13 +353,13 @@ export function AddressesTab({
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => startEdit(addr)}
-                        className="text-xs text-slate-500 underline hover:text-slate-800"
+                        className="text-[11px] text-brand-600 underline hover:text-brand-700"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => setDeleteTarget(addr)}
-                        className="text-xs text-red-500 underline hover:text-red-700"
+                        className="text-[11px] text-danger-600 underline hover:text-danger-700"
                       >
                         Remove
                       </button>

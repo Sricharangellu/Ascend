@@ -5,7 +5,7 @@ import type { CustomerLoyalty } from "./shared";
 
 const TIER_BADGE_COLOR: Record<number, string> = {
   1: "bg-amber-100 text-amber-800",
-  2: "bg-slate-100 text-slate-700",
+  2: "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]",
   3: "bg-yellow-100 text-yellow-800",
   4: "bg-violet-100 text-violet-700",
 };
@@ -21,8 +21,8 @@ export function LoyaltyCard({
     return (
       <Card title="Loyalty">
         <div className="space-y-2">
-          <div className="h-4 w-48 animate-pulse rounded bg-slate-100" />
-          <div className="h-4 w-32 animate-pulse rounded bg-slate-100" />
+          <div className="h-4 w-48 animate-skeleton rounded" />
+          <div className="h-4 w-32 animate-skeleton rounded" />
         </div>
       </Card>
     );
@@ -31,7 +31,7 @@ export function LoyaltyCard({
   if (!loyalty || loyalty.currentTierName === null) {
     return (
       <Card title="Loyalty">
-        <p className="text-sm text-slate-500">
+        <p className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
           No tier configured — set up loyalty tiers in Settings
         </p>
       </Card>
@@ -39,7 +39,7 @@ export function LoyaltyCard({
   }
 
   const tierBadgeClass =
-    TIER_BADGE_COLOR[loyalty.currentTierLevel] ?? "bg-slate-100 text-slate-700";
+    TIER_BADGE_COLOR[loyalty.currentTierLevel] ?? "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]";
 
   const progressPct =
     loyalty.pointsToNextTier !== null && loyalty.currentPoints !== undefined
@@ -62,11 +62,11 @@ export function LoyaltyCard({
           >
             {loyalty.currentTierName}
           </span>
-          <p className="text-2xl font-bold tabular-nums text-slate-950">
+          <p className="text-2xl font-bold tabular-nums" style={{ color: "var(--color-text-primary)" }}>
             {loyalty.currentPoints.toLocaleString()}{" "}
-            <span className="text-sm font-normal text-slate-500">pts</span>
+            <span className="text-[13px] font-normal" style={{ color: "var(--color-text-secondary)" }}>pts</span>
           </p>
-          <p className="text-sm text-slate-500">{loyalty.pointMultiplier}× earn</p>
+          <p className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>{loyalty.pointMultiplier}× earn</p>
           {loyalty.discountPct > 0 && (
             <Badge variant="green">{loyalty.discountPct}% discount on purchases</Badge>
           )}
@@ -75,15 +75,15 @@ export function LoyaltyCard({
         <div className="flex-1">
           {loyalty.nextTierName !== null && loyalty.pointsToNextTier !== null ? (
             <div className="flex flex-col gap-2">
-              <p className="text-sm text-slate-600">
-                <span className="font-semibold text-slate-950">
+              <p className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
+                <span className="font-semibold" style={{ color: "var(--color-text-primary)" }}>
                   {loyalty.pointsToNextTier.toLocaleString()} pts
                 </span>{" "}
                 to {loyalty.nextTierName}
               </p>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+              <div className="h-2 w-full overflow-hidden rounded-full" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
                 <div
-                  className="h-2 rounded-full bg-blue-600 transition-all"
+                  className="h-2 rounded-full bg-brand-600 transition-all"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
