@@ -459,7 +459,7 @@ export const purchasingModule: PosModule = {
 };
 
 export { PurchasingService } from "./service.js";
-export type { Supplier, PurchaseOrder, PurchaseOrderWithLines } from "./service.js";
+export type { Supplier, PurchaseOrder, PurchaseOrderWithLines, POLineInput, Actor } from "./service.js";
 export { EdiImportsService } from "./edi-imports.js";
 export type { EdiImport, EdiStatus, EdiFormatDef } from "./edi-imports.js";
 export { getVendorHistory } from "./vendor-history.js";

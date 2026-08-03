@@ -563,6 +563,31 @@ async function makeOrderedPO(app: App, supplierId: string, productId: string, qt
   })).json;
 }
 
+/**
+ * Directly inserts an order + single line at an arbitrary status — bypassing
+ * the real order-creation flow (which always stamps 'completed'). Needed to
+ * prove the Phase 7 item 1 bug fix: priceHistory()'s velocity calc had no
+ * order-status filter at all, so a refunded/open order's units counted
+ * toward "sold" just as much as a completed one.
+ */
+async function insertOrder(app: App, opts: { productId: string; quantity: number; status: string }): Promise<void> {
+  const orderId = `ord_test_${Math.random().toString(36).slice(2)}`;
+  const lineId = `oln_test_${Math.random().toString(36).slice(2)}`;
+  const unitCents = 500;
+  const lineCents = opts.quantity * unitCents;
+  const now = Date.now();
+  await app.db.withTenant(TEST_TENANT).query(
+    `INSERT INTO orders (id, tenant_id, order_number, state_code, status, subtotal_cents, tax_cents, total_cents, created_at, updated_at)
+     VALUES (@id, @t, @num, 'CA', @status, @total, 0, @total, @now, @now)`,
+    { id: orderId, t: TEST_TENANT, num: orderId, status: opts.status, total: lineCents, now },
+  );
+  await app.db.withTenant(TEST_TENANT).query(
+    `INSERT INTO order_lines (id, tenant_id, order_id, product_id, name, quantity, unit_cents, tax_cents, line_cents, taxable)
+     VALUES (@id, @t, @orderId, @productId, 'Test Line', @qty, @unitCents, 0, @lineCents, 0)`,
+    { id: lineId, t: TEST_TENANT, orderId, productId: opts.productId, qty: opts.quantity, unitCents, lineCents },
+  );
+}
+
 test("price intelligence surfaces invoiced, last-from-supplier and best-across-suppliers", async () => {
   const app = await freshApp();
   const supA = await makeSupplier(app, "Supplier A");
@@ -633,6 +658,23 @@ test("suggested qty reflects reorder point when stock and velocity are zero", as
   const r = await call(app, "GET", `/api/purchasing/orders/${cur.id}/price-history`);
   const item = r.json.items.find((i: any) => i.product_id === p);
   assert.equal(item.suggested_qty, 40); // reorder_point 40, stock 0, no velocity
+});
+
+test("price-history velocity_per_day only counts completed orders (Phase 7 item 1 bug fix)", async () => {
+  const app = await freshApp();
+  const supB = await makeSupplier(app, "Supplier B");
+  const p = await makeProduct(app, "PI-5", 1000);
+
+  // A completed sale of 9 units should count; a refunded sale of 20 units
+  // must not — the pre-fix subquery had no order-status filter at all, so
+  // it would have summed 29, not 9.
+  await insertOrder(app, { productId: p, quantity: 9, status: "completed" });
+  await insertOrder(app, { productId: p, quantity: 20, status: "refunded" });
+
+  const cur = await makeOrderedPO(app, supB, p, 5, 100);
+  const r = await call(app, "GET", `/api/purchasing/orders/${cur.id}/price-history`);
+  const item = r.json.items.find((i: any) => i.product_id === p);
+  assert.equal(item.velocity_per_day, Math.round((9 / 90) * 100) / 100, "must count only the 9 completed units, not the 20 refunded units");
 });
 
 // ── Vendor bills · 3-way match (#42) ──────────────────────────────────────────

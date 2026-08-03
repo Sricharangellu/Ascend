@@ -29,28 +29,28 @@ export type NavKey =
   | "restaurant-dashboard" | "restaurant-floor-plan" | "restaurant-tabs"
   | "permissions" | "modes" | "kiosk-settings" | "b2b-settings"
   | "warehouse" | "pricing" | "edi-imports" | "promotions" | "documents"
-  | "inventory-errors" | "bills" | "delivery";
+  | "inventory-errors" | "bills" | "delivery" | "ai-assistant";
 
 // ── Section / nav tree ────────────────────────────────────────────────────────
 
 type RailSection =
   | "home" | "sell" | "online" | "reporting" | "catalog"
-  | "inventory" | "customers" | "finance" | "setup";
+  | "inventory" | "shipping" | "customers" | "finance" | "setup";
 
 const SECTION_MAP: Record<NavKey, RailSection> = {
   dashboard: "home",
   register: "sell", sales: "sell", orders: "sell", quotes: "sell",
   returns: "sell", payments: "sell", "service-orders": "sell",
   ecommerce: "online",
-  reports: "reporting", insights: "reporting", "tax-compliance": "reporting",
+  reports: "reporting", insights: "reporting", "ai-assistant": "reporting", "tax-compliance": "reporting",
   catalog: "catalog", discounts: "catalog", "gift-cards": "catalog",
   loyalty: "catalog", promotions: "catalog", pricing: "catalog",
   inventory: "inventory", operations: "inventory", purchasing: "inventory",
   "edi-imports": "inventory",
-  vendors: "inventory", shipping: "inventory", "inventory-locations": "inventory",
+  vendors: "inventory", shipping: "shipping", "inventory-locations": "inventory",
   "inventory-expiry": "inventory", "inventory-serials": "inventory",
   "inventory-reorder": "inventory", "inventory-counts": "inventory", "inventory-pipeline": "inventory", "inventory-errors": "inventory", workforce: "inventory",
-  warehouse: "inventory", delivery: "inventory",
+  warehouse: "inventory", delivery: "shipping",
   customers: "customers", appointments: "customers", healthcare: "customers",
   finance: "finance", accounting: "finance", invoicing: "finance", bills: "finance",
   settings: "setup", team: "setup", workflows: "setup", integrations: "setup",
@@ -138,6 +138,7 @@ const NAV_TREE: NavSection[] = [
     children: [
       { label: "Reports",        href: "/reports",        featureGate: "reports" },
       { label: "Insights",       href: "/insights",       featureGate: "insights" },
+      { label: "AI Assistant",   href: "/ai-assistant",   featureGate: "ai-assistant" },
       { label: "Tax Compliance", href: "/tax-compliance", featureGate: "tax-compliance" },
     ],
   },
@@ -165,7 +166,6 @@ const NAV_TREE: NavSection[] = [
       { label: "Purchase",      href: "/purchase",                featureGate: "purchasing" },
       { label: "Expiry",        href: "/inventory/expiry-pool",   featureGate: "inventory" },
       { label: "Warehouse",     href: "/warehouse",               featureGate: "inventory", partial: true },
-      { label: "Delivery",      href: "/delivery",                featureGate: "shipping" },
       { label: "Purchasing",    href: "/purchasing",              featureGate: "purchasing" },
       { label: "EDI Imports",   href: "/purchasing/edi-imports",  featureGate: "purchasing" },
       { label: "Error Center",  href: "/inventory/errors",        featureGate: "inventory" },
@@ -175,6 +175,16 @@ const NAV_TREE: NavSection[] = [
       { label: "Locations",     href: "/inventory/locations",     featureGate: "inventory" },
       { label: "Vendors",       href: "/vendors",                 featureGate: "vendors" },
       { label: "Operations",    href: "/operations",              featureGate: "operations" },
+      { label: "Workforce",     href: "/workforce",               featureGate: "workforce" },
+    ],
+  },
+  {
+    section: "shipping",
+    label: "Shipping",
+    icon: <ShippingIcon />,
+    children: [
+      { label: "Delivery", href: "/delivery", featureGate: "shipping" },
+      { label: "Shipments", href: "/shipping", featureGate: "shipping" },
     ],
   },
   {
@@ -213,6 +223,7 @@ const NAV_TREE: NavSection[] = [
       { label: "Imports/Exports", href: "/imports-exports",      featureGate: "imports-exports" },
       { label: "Document Center", href: "/documents",            featureGate: "documents", partial: true },
       { label: "Audit Log",       href: "/audit-log",            featureGate: "audit-log" },
+      { label: "Notifications",   href: "/notifications",        featureGate: "notifications" },
     ],
   },
 ];
@@ -716,6 +727,17 @@ function InventoryIcon() {
       <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
       <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
       <line x1="12" y1="22.08" x2="12" y2="12" />
+    </svg>
+  );
+}
+
+function ShippingIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="1" y="3" width="15" height="13" />
+      <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+      <circle cx="5.5" cy="18.5" r="2.5" />
+      <circle cx="18.5" cy="18.5" r="2.5" />
     </svg>
   );
 }

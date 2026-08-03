@@ -127,12 +127,31 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS parent_order_id TEXT;
 CREATE INDEX IF NOT EXISTS orders_parent_id_idx ON orders (parent_order_id) WHERE parent_order_id IS NOT NULL;
 `;
 
+// POS-v1 (ADR-006 extension): a line sold in a purchasing/selling unit ("case",
+// "box") records that unit + the human-entered count, purely for cart/receipt
+// display. `quantity` above is untouched — it always means base (each) units,
+// exactly as every other module already assumes; these two columns are never
+// read by tax/inventory/accounting math, only by display.
+const ALTER_ORDER_LINES_UNIT_KIND = `
+ALTER TABLE order_lines ADD COLUMN IF NOT EXISTS unit_kind TEXT;
+ALTER TABLE order_lines ADD COLUMN IF NOT EXISTS unit_qty INTEGER;
+`;
+
+// Sales History real-data fix: created_by records who rang up the sale
+// (actorId already flowed into create()/void() for the audit log — this
+// persists it onto the row itself so it can be resolved to a real name,
+// same LEFT JOIN users pattern reports.salesByRep() already uses).
+// NULL = legacy orders created before this column existed.
+const ALTER_ORDERS_CREATED_BY = `
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS created_by TEXT;
+`;
+
 export const ordersModule: PosModule = {
   name: "orders",
-  migrations: [dropLegacyNoTenant("order_lines"), dropLegacyNoTenant("orders"), CREATE_ORDERS_TABLE, CREATE_ORDER_LINES_TABLE, ALTER_ORDERS_STORE_ID, ALTER_ORDERS_CURRENCY, ADD_ENTERPRISE_ORDER_INDEXES, ADD_ORDER_QUANTITY_CHECKS, ADD_ORDER_LINE_FK, ADD_ORDERS_UPDATED_AT_TRIGGERS, ALTER_ORDERS_PARENT_ID],
+  migrations: [dropLegacyNoTenant("order_lines"), dropLegacyNoTenant("orders"), CREATE_ORDERS_TABLE, CREATE_ORDER_LINES_TABLE, ALTER_ORDERS_STORE_ID, ALTER_ORDERS_CURRENCY, ADD_ENTERPRISE_ORDER_INDEXES, ADD_ORDER_QUANTITY_CHECKS, ADD_ORDER_LINE_FK, ADD_ORDERS_UPDATED_AT_TRIGGERS, ALTER_ORDERS_PARENT_ID, ALTER_ORDER_LINES_UNIT_KIND, ALTER_ORDERS_CREATED_BY],
   register(ctx: ModuleContext): void {
     const service = new OrdersService(ctx.db, ctx.events);
-    registerRoutes(ctx.router, service);
+    registerRoutes(ctx.router, service, ctx.db);
 
     // A captured payment completes the order it was made against.
     // Durable (ACPA M1.3): markCompleted only transitions 'open' → 'completed',

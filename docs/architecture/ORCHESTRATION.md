@@ -37,10 +37,13 @@ develop    ──PR──▶  staging   → deploy to TESTING (own DB, Supabase 
 staging    ──PR──▶  master    → deploy to PROD (Sri's explicit go-ahead only)
 ```
 
-- Hosting: frontend on Vercel (git-connected auto-deploy per environment);
-  production backend on Render (persistent process, real background
+- Hosting: frontend on Vercel; production backend on Render (persistent process, real background
   workers, no cold starts) as of this session — `develop`/`staging` backend
-  hosting is a live open item, not yet reconciled to match.
+  hosting is a live open item, not yet reconciled to match. **Unconfirmed as of 2026-07-23** (see
+  `PIPELINE.md`'s "Re-verification" note) — `scripts/deploy.sh` itself documents these Vercel
+  projects as NOT git-connected (manual CLI deploy only, which is what `ci.yml` actually runs), and
+  no Render deploy path exists in code for either frontend or backend. Confirm the real hosting
+  origin before relying on this line.
 - Database: Supabase Postgres. Production and testing tiers use separate
   projects; each tier's `DATABASE_URL`/`PG_CA_CERT_B64` are environment
   secrets, never hardcoded.
@@ -69,6 +72,22 @@ staging    ──PR──▶  master    → deploy to PROD (Sri's explicit go-ah
 | QA agent | every mutation route needs a test; suite must stay green on real PG |
 | Observability agent | pino structured logs + redaction, `/metrics`, trace ids; alerting is an open critical (C-4, see `GAPS.md`) |
 
+## Environment routing (which AI tool, not just which functional role)
+
+The table above routes by *function* — any capable session can play any of those roles. This
+table routes by *environment*, since the four AI tools actually in use on this repo
+(2026-07-30) differ in what they can safely be trusted to do unattended:
+
+| Environment | Best-fit work | Constraint |
+|---|---|---|
+| Claude Code sessions (any seat/session — "Claude – Sri", "Claude – Pavan", etc.) | Full SDLC, including autonomous/background loop work off the board (`WORK/LOOP_PROTOCOL.md`) | Same session discipline as any other session: worktree-isolated, GitHub Issue claimed before code, `LOCK.md` entry while editing, gates before PR |
+| Cursor | Interactive, human-watched implementation, debugging, refactors inside the editor | Treat as human-paired only — no autonomous/unattended loop unless proven otherwise; still claims the Issue + `LOCK.md` entry like any other session |
+| Replit | Sandbox/prototyping | **Not a deploy target** — see `REPLIT.md` at repo root. Must not touch `master`/staging secrets or the prod/staging Supabase project until an ADR explicitly promotes it |
+
+Bootstrap pointers so every environment reads the same source of truth instead of a
+tool-specific copy: `CLAUDE.md` (repo root), `.cursor/rules/ascend.mdc`, `REPLIT.md` (repo
+root) — all three are short pointers to `AGENTS.md`, never duplicates of it.
+
 ## Decision protocol (proposal → review → approval)
 
 Major change = new dependency, schema change, cross-module contract,
@@ -92,8 +111,10 @@ LOCK claim or the committed work owns the area; later arrivals adapt.
 - Never `git add -A` — stage only files you authored.
 - Build anything you'll commit in an isolated `git worktree` off the target
   base branch; cherry-pick/PR from there.
-- Claim work in `WORK/LOCK.md` before starting (session + exact files +
-  explicit NOT-list); release with gates evidence when done.
+- Claim durable task ownership on the GitHub Issue (`tools/AGENT_PROMPT.md`), then take a
+  short-lived `WORK/LOCK.md` entry the moment you start editing (session + exact files +
+  explicit NOT-list); release with gates evidence as soon as those edits land — don't let it
+  sit ACTIVE past the session that opened it.
 - Treat files another session is touching as owned — coordinate, don't
   collide. If a file you need enters another session's claim mid-flight,
   back off and pick a different task.

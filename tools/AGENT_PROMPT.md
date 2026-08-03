@@ -5,12 +5,26 @@ sessions work this repo at once; duplicate files and duplicate *work* (two sessi
 the same thing) have wasted real effort. The board below prevents it. Follow exactly.
 
 ## The board = GitHub Issues (free, git-native)
-The queue and coordination live in **GitHub Issues** on `Sricharangellu/Ascend`, not in a
-file. Lanes are labels: `lane:ready` → `lane:in-progress` → `lane:in-review` → (closed = done),
-plus `lane:blocked`. Kinds: `kind:retail-core`, `kind:security`, `kind:infra`, `sri-only`.
+The queue and coordination live in **GitHub Issues** on `Sricharangellu/Ascend`. Lanes are
+labels: `lane:ready` → `lane:in-progress` → `lane:in-review` → (closed = done), plus
+`lane:blocked`. Kinds: `kind:retail-core`, `kind:security`, `kind:infra`, `sri-only`.
 "Update the board" and "check the git commits" are the same system: issues ↔ branches ↔ PRs ↔
 commits. (A visual Projects v2 kanban can layer on top once the owner grants the `project`
 scope — the process below works with plain Issues today.)
+
+**Two-tier claim model (2026-07-30, reconciled — read this before step 2):**
+GitHub Issues and `WORK/LOCK.md` are not competing systems; they answer different questions
+at different timescales.
+- **GitHub Issue assignee = durable task ownership.** Who owns this feature/task, from claim
+  to merged PR — can span hours or days, survives a session ending.
+- **`WORK/LOCK.md` = short-lived session edit lock.** Which exact files a session is *actively
+  writing to right now* — claimed when you start editing, released the moment your changes
+  land (commit/PR) or the session ends. This is what prevents two sessions from editing the
+  same file in the same few minutes; it is not a task tracker and should never sit ACTIVE for
+  more than one working session.
+Claim the Issue first (step 2), then take the short-lived `LOCK.md` entry when you actually
+start touching files (step 4) — release it as soon as those edits land, even if the Issue
+itself stays open longer (e.g. waiting on review).
 
 ## 1. Orient (check the board + git before doing anything)
 ```bash
@@ -21,7 +35,7 @@ gh pr list  --repo Sricharangellu/Ascend                              # what's m
 ```
 Read `AGENTS.md` (operating prompt) and `WORK/FORWARD_PLAN.md` for the deeper rules/spec.
 
-## 2. Pick + CLAIM a card (atomic — this replaces WORK/LOCK.md)
+## 2. Pick + CLAIM a card (atomic — durable ownership; see the two-tier model above)
 Choose the top `lane:ready` issue with **no assignee**, then claim it in one step:
 ```bash
 gh issue edit <n> --repo Sricharangellu/Ascend \
@@ -42,6 +56,10 @@ in `src/modules/reports/`.)
 ## 4. Work in isolation
 - `tools/new-worktree.sh issue-<n>` → work in `../finder-wt-issue-<n>` on branch `wt/issue-<n>`.
   Never make a second `git clone`.
+- Add your short-lived claim to `WORK/LOCK.md` (session, exact files/areas, NOT-list) the
+  moment you start editing — this is the file-level lock, separate from the Issue assignee
+  above. Mark it RELEASED (with gates evidence) as soon as your edits land, not when the Issue
+  eventually closes.
 
 ## 5. Gates — all pass before you move to review
 - Backend: `npm run typecheck && npm test && npm run smoke`

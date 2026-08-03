@@ -25,16 +25,17 @@ created anywhere else in the repo.
    Never describe a module as done without saying which label applies.
 6. **Product documentation is separate.** `docs/`, `contracts/`, `orchestration/` hold
    product/architecture specs and stay where they are. `WORK/` holds *process* state.
-7. **One active queue item.** Before touching code, claim work in `LOCK.md`. Do not work
-   the same queue item as another active agent. If the lock overlaps your intended task,
-   stop and reconcile instead of creating competing fixes.
+7. **One active queue item.** Claim durable ownership on the GitHub Issue first
+   (`tools/AGENT_PROMPT.md` step 2), then take the short-lived `WORK/LOCK.md` entry the moment
+   you start editing (step 4). Do not work the same queue item as another active agent. If the
+   lock overlaps your intended task, stop and reconcile instead of creating competing fixes.
 
 ## File index
 
 | File | Kind | Write policy |
 |---|---|---|
 | `README.md` | Folder rules | Override only when the rules themselves change |
-| `LOCK.md` | Multi-agent coordination lock: active queue item, owner, files/areas, status | Update at session start and end; never ignore an active overlapping lock |
+| `LOCK.md` | **Short-lived session edit lock** — exact files/areas a session is actively writing to right now, released the moment those edits land. Durable task ownership lives in GitHub Issues (see `tools/AGENT_PROMPT.md`'s two-tier claim model, reconciled 2026-07-30); `LOCK.md` is the finer-grained, shorter-lived layer under it. | Update at session start and end; never ignore an active overlapping lock; do not let an entry sit ACTIVE past one working session |
 | `FORWARD_PLAN.md` | Authoritative phase-based plan + release gates + audit prompt | Override only when the plan genuinely changes |
 | `LOOP_PROTOCOL.md` | Autonomous-loop program (re-read each wake) | Override only when the loop mechanics change |
 | `LOOP_STATE.md` | **THE single live work-updates file**: heartbeat, iteration log, backlog, NEEDS-SRI list, delivery/release status | Override in place every iteration; all status/pipeline/session updates go HERE — never a new file |

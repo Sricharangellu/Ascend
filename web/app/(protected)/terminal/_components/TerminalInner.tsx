@@ -27,7 +27,7 @@ import { TerminalActionBar } from "./TerminalActionBar";
 
 export function TerminalInner() {
   const { user } = useAuth();
-  const { registerId, outletId } = useFinderContext();
+  const { registerId } = useFinderContext();
   const { isOffline } = useOffline();
   const cart = useCart();
   const { addToast } = useToast();
@@ -90,19 +90,14 @@ export function TerminalInner() {
     }
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
     cart.dispatch({ type: "SET_SYNCING", value: true });
-    syncTimerRef.current = setTimeout(() => { void syncOrder(); }, 400);
+    // No existing order yet: debounce longer since a burst of line-item scans
+    // typically follows. Once an order exists, a shorter debounce keeps
+    // discount/quantity edits feeling responsive.
+    const delay = orderIdRef.current ? 200 : 400;
+    syncTimerRef.current = setTimeout(() => { void syncOrder(); }, delay);
     return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cart.state.lines]);
-
-  useEffect(() => {
-    if (cart.state.lines.length === 0 || !orderIdRef.current) return;
-    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
-    cart.dispatch({ type: "SET_SYNCING", value: true });
-    syncTimerRef.current = setTimeout(() => { void syncOrder(); }, 200);
-    return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [discountCents]);
+  }, [cart.state.lines, discountCents]);
 
   const syncOrder = useCallback(async () => {
     const lines = cart.state.lines;
@@ -113,8 +108,13 @@ export function TerminalInner() {
         productId: l.product.id,
         quantity: l.quantity,
         ...(l.product.ageRestricted ? { ageVerified } : {}),
+        ...(l.product.unitKind ? { unitKind: l.product.unitKind } : {}),
       })),
       ...(discountCents > 0 ? { discountCents } : {}),
+      // Sales History real-data fix: orders.store_id is otherwise always NULL
+      // for POS-created orders, since the inventory/deduct call below carries
+      // the outlet separately and this create/update payload never did.
+      ...(activeOutletId ? { storeId: activeOutletId } : {}),
     };
 
     if (isOffline) {
@@ -139,7 +139,7 @@ export function TerminalInner() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cart.state.lines, isOffline, ageVerified, discountCents]);
+  }, [cart.state.lines, isOffline, ageVerified, discountCents, activeOutletId]);
 
   const handleAddProduct = useCallback(
     (product: Product) => {
@@ -159,10 +159,12 @@ export function TerminalInner() {
   const handleBarcodeScan = useCallback(async (code: string) => {
     if (screen !== "terminal") return;
     try {
-      const raw = await apiGet<Product>(`/api/v1/catalog/barcode/${encodeURIComponent(code)}`);
+      // POS-v1: fully resolved (product + packaging + price + stock) — the
+      // terminal does no conversion/pricing math, it only renders this.
+      const raw = await apiGet<Product>(`/api/v1/catalog/barcode/${encodeURIComponent(code)}/pos`);
       const product = normalizeTerminalProduct(raw); // real backend returns snake_case
       cart.addProduct(product);
-      setScannedName(product.name);
+      setScannedName(product.unitKind ? `${product.name} (${product.unitDisplayName})` : product.name);
     } catch {
       addToast({ title: `Barcode not found: ${code}`, variant: "error" });
     }
@@ -175,11 +177,6 @@ export function TerminalInner() {
     setScreen("tender");
   }, [cart.state.order]);
 
-  const handleAction = useCallback((action: string) => {
-    if (action === "Discount") { setShowDiscountModal(true); return; }
-    addToast({ title: action, description: "Feature coming soon.", variant: "info" });
-  }, [addToast]);
-
   const handleReturnMode = useCallback(() => {
     setReturnMode((current) => {
       const next = !current;
@@ -191,7 +188,13 @@ export function TerminalInner() {
   const handleTenderSuccess = useCallback(
     (payment: Payment) => {
       setCompletedPayment(payment);
-      setCompletedOrder(cart.state.order);
+      // A successful tender completes the order, but cart.state.order still
+      // carries the "open" status it was created with. Stamp it "completed" so
+      // the receipt renders correctly — otherwise ReceiptView's status fallback
+      // mistitles the success screen "Order Voided" and hides refund/void.
+      setCompletedOrder(
+        cart.state.order ? { ...cart.state.order, status: "completed" } : null,
+      );
       setScreen("receipt");
       const lines = cart.state.lines;
       if (lines.length > 0 && activeOutletId) {
@@ -227,6 +230,8 @@ export function TerminalInner() {
     setDiscountCents(0);
   }, [cart]);
 
+  const activeOutletName = outlets.find((o) => o.id === activeOutletId)?.name ?? activeOutletId;
+
   const hasAgeRestricted = cart.state.lines.some((line) => line.product.ageRestricted);
   const canCharge =
     cart.state.lines.length > 0 &&
@@ -239,7 +244,7 @@ export function TerminalInner() {
     <EnterpriseShell
       active="register"
       title="Sell"
-      subtitle={`${outletId} · ${registerId}`}
+      subtitle={`${activeOutletName} · ${registerId}`}
       banner={<OfflineQueueBanner />}
       contentClassName="flex flex-1 flex-col overflow-hidden lg:flex-row"
     >
@@ -276,11 +281,8 @@ export function TerminalInner() {
             returnMode={returnMode}
             hasCart={cart.state.lines.length > 0}
             discountActive={discountCents > 0}
-            onHoldSale={() => handleAction("Hold sale")}
-            onDiscount={() => handleAction("Discount")}
+            onDiscount={() => setShowDiscountModal(true)}
             onReturnMode={handleReturnMode}
-            onCashDrawer={() => handleAction("Cash drawer")}
-            onPrintReceipt={() => handleAction("Print receipt")}
             onCharge={handleCharge}
           />
         </div>

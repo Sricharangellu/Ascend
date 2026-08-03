@@ -43,6 +43,12 @@ const reorderSchema = z.object({
   reorderPt: z.number().int().nonnegative(),
 });
 
+// Phase 6 item 2 (WORK/FORWARD_PLAN.md): safety stock is a dedicated buffer,
+// independent of reorder point — mirrors reorderSchema's shape exactly.
+const safetyStockSchema = z.object({
+  safetyStock: z.number().int().nonnegative(),
+});
+
 function parseInt0(value: unknown): number | undefined {
   if (typeof value !== "string" || value.trim() === "") return undefined;
   const n = Number(value);
@@ -61,11 +67,12 @@ function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
 
-function present(row: { product_id: string; stock_qty: number; reorder_pt: number; updated_at: number }) {
+function present(row: { product_id: string; stock_qty: number; reorder_pt: number; safety_stock?: number; updated_at: number }) {
   return {
     productId: row.product_id,
     stockQty: row.stock_qty,
     reorderPt: row.reorder_pt,
+    safetyStock: row.safety_stock ?? 0,
     updatedAt: row.updated_at,
   };
 }
@@ -425,6 +432,17 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
     handler(async (req, res) => {
       const body = parseBody(reorderSchema, req.body);
       const row = await service.setReorderPoint(String(req.params.productId), body.reorderPt, tenantId(res));
+      res.json(present(row));
+    }),
+  );
+
+  // Phase 6 item 2: safety stock, independent of reorder point.
+  router.put(
+    "/:productId/safety-stock",
+    mgr,
+    handler(async (req, res) => {
+      const body = parseBody(safetyStockSchema, req.body);
+      const row = await service.setSafetyStock(String(req.params.productId), body.safetyStock, tenantId(res));
       res.json(present(row));
     }),
   );
