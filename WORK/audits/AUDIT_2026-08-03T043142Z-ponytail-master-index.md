@@ -102,7 +102,7 @@ Legend: **Doc** = A (clusters) or B (retail-ops). **Kind** = impl / redirect / r
 | `/gift-cards` | impl | REFACTOR | Medium | B |
 | `/loyalty` | impl | REFACTOR | Medium | B |
 
-### Inventory, purchasing, fulfillment (22)
+### Inventory, purchasing, fulfillment (21)
 
 | Route | Kind | Decision | Priority | Doc |
 |---|---|---|---|---|
