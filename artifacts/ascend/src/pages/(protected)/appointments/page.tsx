@@ -24,12 +24,12 @@ interface Appointment {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  scheduled:   "bg-blue-100 text-blue-800 border-blue-300",
-  confirmed:   "bg-indigo-100 text-indigo-800 border-indigo-300",
-  in_progress: "bg-amber-100 text-amber-800 border-amber-300",
-  completed:   "bg-green-100 text-green-800 border-green-300",
-  cancelled:   "bg-red-100 text-red-800 border-red-300",
-  no_show:     "bg-gray-100 text-gray-500 border-gray-300",
+  scheduled:   "bg-info-50 text-info-700 border-info-200",
+  confirmed:   "bg-brand-50 text-brand-700 border-brand-200",
+  in_progress: "bg-warning-50 text-warning-700 border-warning-200",
+  completed:   "bg-success-50 text-success-700 border-success-200",
+  cancelled:   "bg-danger-50 text-danger-700 border-danger-200",
+  no_show:     "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)] border-[var(--color-border)]",
 };
 
 
@@ -111,16 +111,19 @@ export default function AppointmentsPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button type="button" onClick={prevDay}
-              className="rounded-lg border border-[var(--color-table-border)] p-2 hover:bg-gray-50">
+              className="rounded-lg border p-2 transition-colors hover:bg-[var(--color-surface-subtle)]"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
               ‹
             </button>
-            <h2 className="text-base font-semibold text-[var(--color-text-primary)]">{displayDate}</h2>
+            <h2 className="text-[15px] font-semibold" style={{ color: "var(--color-text-primary)" }}>{displayDate}</h2>
             <button type="button" onClick={nextDay}
-              className="rounded-lg border border-[var(--color-table-border)] p-2 hover:bg-gray-50">
+              className="rounded-lg border p-2 transition-colors hover:bg-[var(--color-surface-subtle)]"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
               ›
             </button>
             <button type="button" onClick={() => setDate(todayDateStr())}
-              className="ml-1 rounded-lg border border-[var(--color-table-border)] px-3 py-1.5 text-xs hover:bg-gray-50">
+              className="ml-1 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
               Today
             </button>
           </div>
@@ -131,7 +134,7 @@ export default function AppointmentsPage() {
         <Card noPadding>
           {loading ? (
             <div className="space-y-2 p-4">
-              {[1, 2, 3].map(i => <div key={i} className="h-14 animate-pulse rounded-lg bg-gray-100" />)}
+              {[1, 2, 3].map((i) => <div key={i} className="h-14 animate-skeleton rounded-lg" />)}
             </div>
           ) : (
             <div className="divide-y divide-[var(--color-table-border)]">
@@ -175,24 +178,28 @@ export default function AppointmentsPage() {
             <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Service *</label>
             <input type="text" value={form.service} onChange={e => setForm(f => ({ ...f, service: e.target.value }))}
               placeholder="e.g. Haircut, Oil change, Consultation"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+              className="w-full rounded-lg border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Start time *</label>
-              <input type="time" value={form.startsAt} onChange={e => setForm(f => ({ ...f, startsAt: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+              <label className="mb-1 block text-[12px] font-medium" style={{ color: "var(--color-text-secondary)" }}>Start time *</label>
+              <input type="time" value={form.startsAt} onChange={(e) => setForm((f) => ({ ...f, startsAt: e.target.value }))}
+                className="w-full rounded-lg border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">End time *</label>
-              <input type="time" value={form.endsAt} onChange={e => setForm(f => ({ ...f, endsAt: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+              <label className="mb-1 block text-[12px] font-medium" style={{ color: "var(--color-text-secondary)" }}>End time *</label>
+              <input type="time" value={form.endsAt} onChange={(e) => setForm((f) => ({ ...f, endsAt: e.target.value }))}
+                className="w-full rounded-lg border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Notes</label>
-            <textarea rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-              className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
+            <label className="mb-1 block text-[12px] font-medium" style={{ color: "var(--color-text-secondary)" }}>Notes</label>
+            <textarea rows={2} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              className="w-full resize-none rounded-lg border px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} />
           </div>
           <div className="flex gap-2">
             <Button variant="secondary" fullWidth onClick={() => setModal(false)}>Cancel</Button>

@@ -83,74 +83,82 @@ export function CategoriesTab() {
 
   return (
     <>
-      <Card className="overflow-hidden p-0">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+      <div
+        className="overflow-hidden rounded-xl border shadow-[var(--shadow-sm)]"
+        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b px-4 py-3"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
           <div>
-            <h2 className="text-base font-semibold text-slate-950">Product categories</h2>
-            <p className="text-sm text-slate-500">{categories.length} {categories.length === 1 ? "category" : "categories"}</p>
+            <h2 className="text-[14px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Product categories</h2>
+            <p className="text-[12px]" style={{ color: "var(--color-text-secondary)" }}>
+              {categories.length} {categories.length === 1 ? "category" : "categories"}
+            </p>
           </div>
         </div>
 
         {actionError && (
-          <div className="border-b border-red-100 bg-red-50 px-4 py-2">
-            <p className="text-sm text-red-700">{actionError}</p>
+          <div className="border-b px-4 py-2 text-[13px]"
+            style={{ borderColor: "var(--color-danger-border)", backgroundColor: "var(--color-danger-bg)", color: "var(--color-danger-text)" }}>
+            {actionError}
           </div>
         )}
 
         {categories.length === 0 ? (
-          <div className="px-4 py-10 text-center text-sm text-slate-500">No categories yet. Add one below.</div>
+          <div className="px-4 py-10 text-center text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
+            No categories yet. Add one below.
+          </div>
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <ul style={{ borderColor: "var(--color-border)" }}>
             {roots.map((root) => {
               const subs = children.filter((c) => c.parent_id === root.id);
               return (
-                <li key={root.id}>
+                <li key={root.id} className="border-b last:border-0" style={{ borderColor: "var(--color-border)" }}>
                   {/* Root category row */}
-                  <div className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50">
+                  <div className="flex items-center gap-3 px-4 py-3 transition-colors duration-75"
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-table-row-hover)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "")}>
                     {editTarget?.id === root.id ? (
                       <div className="flex flex-1 items-center gap-2">
-                        <input
-                          type="text"
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          autoFocus
-                          className="min-h-[40px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
-                        />
+                        <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus
+                          className="h-8 flex-1 rounded-lg border px-3 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} />
                         <button type="button" onClick={handleEditSave} disabled={editSaving}
-                          className="min-h-[40px] rounded-md bg-brand-600 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-60">
-                          {editSaving ? "..." : "Save"}
+                          className="h-8 rounded-lg bg-brand-600 px-3 text-[12px] font-medium text-white hover:bg-brand-700 disabled:opacity-60">
+                          {editSaving ? "…" : "Save"}
                         </button>
                         <button type="button" onClick={() => setEditTarget(null)}
-                          className="min-h-[40px] rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100">Cancel</button>
+                          className="h-8 rounded-lg border px-3 text-[12px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+                          style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Cancel</button>
                       </div>
                     ) : (
                       <>
-                        {/* Clickable name → category detail */}
-                        <button
-                          type="button"
-                          onClick={() => router.push(`/catalog/categories/${root.id}`)}
-                          className="flex flex-1 items-center gap-3 text-left"
-                        >
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-600/10 text-sm font-bold text-brand-600">
+                        <button type="button" onClick={() => router.push(`/catalog/categories/${root.id}`)}
+                          className="flex flex-1 items-center gap-3 text-left">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-600/10 text-[13px] font-bold text-brand-600">
                             {root.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-slate-900 hover:text-brand-600 transition-colors">{root.name}</p>
+                            <p className="truncate text-[13px] font-semibold transition-colors hover:text-brand-600"
+                              style={{ color: "var(--color-text-primary)" }}>{root.name}</p>
                             {subs.length > 0 && (
-                              <p className="text-[11px] text-slate-400">{subs.length} sub-{subs.length === 1 ? "category" : "categories"}</p>
+                              <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>
+                                {subs.length} sub-{subs.length === 1 ? "category" : "categories"}
+                              </p>
                             )}
                           </div>
-                          {/* Product count badge */}
-                          <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                          <span className="shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+                            style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)", border: "1px solid var(--color-border)" }}>
                             {root.product_count ?? 0} products
                           </span>
                         </button>
-
                         <div className="flex shrink-0 gap-2">
                           <button type="button" onClick={() => startEdit(root)}
-                            className="min-h-[32px] rounded-md border border-slate-200 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100">Edit</button>
+                            className="h-7 rounded-md border px-2.5 text-[11px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+                            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Edit</button>
                           <button type="button" onClick={() => { setDeleteTarget(root); setActionError(null); }}
-                            className="min-h-[32px] rounded-md border border-red-200 px-3 py-1 text-xs text-red-600 hover:bg-red-50">Delete</button>
+                            className="h-7 rounded-md border border-danger-200 px-2.5 text-[11px] font-medium text-danger-600 transition-colors hover:bg-danger-50">Delete</button>
                         </div>
                       </>
                     )}
@@ -158,44 +166,45 @@ export function CategoriesTab() {
 
                   {/* Sub-category rows */}
                   {subs.map((sub) => (
-                    <div key={sub.id} className="flex items-center gap-3 border-t border-slate-50 bg-slate-50/60 py-2 pl-14 pr-4 hover:bg-slate-100/60">
+                    <div key={sub.id} className="flex items-center gap-3 border-t py-2 pl-14 pr-4 transition-colors duration-75"
+                      style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-table-row-hover)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--color-surface-subtle)")}>
                       {editTarget?.id === sub.id ? (
                         <div className="flex flex-1 items-center gap-2">
-                          <input
-                            type="text"
-                            value={editName}
-                            onChange={(e) => setEditName(e.target.value)}
-                            autoFocus
-                            className="min-h-[36px] flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
-                          />
+                          <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus
+                            className="h-7 flex-1 rounded-lg border px-3 text-[12px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} />
                           <button type="button" onClick={handleEditSave} disabled={editSaving}
-                            className="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-60">
-                            {editSaving ? "..." : "Save"}
+                            className="h-7 rounded-md bg-brand-600 px-2.5 text-[11px] font-medium text-white hover:bg-brand-700 disabled:opacity-60">
+                            {editSaving ? "…" : "Save"}
                           </button>
                           <button type="button" onClick={() => setEditTarget(null)}
-                            className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100">Cancel</button>
+                            className="h-7 rounded-md border px-2.5 text-[11px] font-medium"
+                            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Cancel</button>
                         </div>
                       ) : (
                         <>
-                          <button
-                            type="button"
-                            onClick={() => router.push(`/catalog/categories/${sub.id}`)}
-                            className="flex flex-1 items-center gap-2 text-left"
-                          >
-                            <svg className="h-3.5 w-3.5 shrink-0 text-slate-300" viewBox="0 0 16 16" fill="none">
+                          <button type="button" onClick={() => router.push(`/catalog/categories/${sub.id}`)}
+                            className="flex flex-1 items-center gap-2 text-left">
+                            <svg className="h-3 w-3 shrink-0" viewBox="0 0 16 16" fill="none"
+                              style={{ color: "var(--color-text-muted)" }}>
                               <path d="M2 4h4v8H2V4z" fill="currentColor" opacity=".3"/>
                               <path d="M7 8h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                             </svg>
-                            <span className="flex-1 text-sm text-slate-700 hover:text-brand-600 transition-colors">{sub.name}</span>
-                            <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-500 border border-slate-200">
+                            <span className="flex-1 text-[12px] transition-colors hover:text-brand-600"
+                              style={{ color: "var(--color-text-secondary)" }}>{sub.name}</span>
+                            <span className="shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+                              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-muted)" }}>
                               {sub.product_count ?? 0} products
                             </span>
                           </button>
-                          <div className="flex shrink-0 gap-2">
+                          <div className="flex shrink-0 gap-1.5">
                             <button type="button" onClick={() => startEdit(sub)}
-                              className="rounded-md border border-slate-200 px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-100">Edit</button>
+                              className="h-6 rounded border px-2 text-[10px] font-medium"
+                              style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Edit</button>
                             <button type="button" onClick={() => { setDeleteTarget(sub); setActionError(null); }}
-                              className="rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-600 hover:bg-red-50">Delete</button>
+                              className="h-6 rounded border border-danger-200 px-2 text-[10px] font-medium text-danger-600 hover:bg-danger-50">Delete</button>
                           </div>
                         </>
                       )}
@@ -208,46 +217,50 @@ export function CategoriesTab() {
         )}
 
         {/* Add category form */}
-        <form onSubmit={handleCreate} className="flex items-center gap-2 border-t border-slate-200 px-4 py-3">
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="New category name..."
-            className="min-h-[40px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
-          />
-          <select
-            value={newParent}
-            onChange={(e) => setNewParent(e.target.value)}
-            className="min-h-[40px] rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-600"
-          >
+        <form onSubmit={handleCreate} className="flex items-center gap-2 border-t px-4 py-3"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-subtle)" }}>
+          <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New category name…"
+            className="h-8 flex-1 rounded-lg border px-3 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-primary)" }} />
+          <select value={newParent} onChange={(e) => setNewParent(e.target.value)}
+            className="h-8 rounded-lg border px-3 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}>
             <option value="">No parent</option>
             {roots.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
-          <button
-            type="submit"
-            disabled={creating || !newName.trim()}
-            className="min-h-[40px] rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
-          >
-            {creating ? "Adding..." : "Add"}
+          <button type="submit" disabled={creating || !newName.trim()}
+            className="h-8 rounded-lg bg-brand-600 px-4 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-60">
+            {creating ? "Adding…" : "Add category"}
           </button>
         </form>
-        {createError && <p className="px-4 pb-2 text-xs text-red-700">{createError}</p>}
-      </Card>
+        {createError && (
+          <p className="border-t px-4 pb-3 pt-2 text-[12px]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-danger-text)" }}>{createError}</p>
+        )}
+      </div>
 
       {/* Delete confirm modal */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDeleteTarget(null)}>
-          <div className="w-full max-w-sm rounded-md bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-base font-semibold text-slate-950">Delete &ldquo;{deleteTarget.name}&rdquo;?</h2>
-            <p className="mt-2 text-sm text-slate-600">Products will not be deleted but will no longer be linked to this category.</p>
-            {actionError && <p className="mt-3 text-sm text-red-700">{actionError}</p>}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+          onClick={() => setDeleteTarget(null)}>
+          <div className="w-full max-w-sm rounded-2xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}
+            style={{ backgroundColor: "var(--color-surface)" }}>
+            <h2 className="text-[15px] font-semibold" style={{ color: "var(--color-text-primary)" }}>
+              Delete &ldquo;{deleteTarget.name}&rdquo;?
+            </h2>
+            <p className="mt-2 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
+              Products will not be deleted but will no longer be linked to this category.
+            </p>
+            {actionError && (
+              <p className="mt-3 text-[12px]" style={{ color: "var(--color-danger-text)" }}>{actionError}</p>
+            )}
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setDeleteTarget(null)}
-                className="min-h-[40px] rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+                className="h-8 rounded-lg border px-4 text-[13px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>Cancel</button>
               <button type="button" onClick={handleDelete} disabled={deleting}
-                className="min-h-[40px] rounded-md bg-danger-600 px-4 py-2 text-sm font-medium text-white hover:bg-danger-700 disabled:opacity-60">
-                {deleting ? "Deleting..." : "Delete"}
+                className="h-8 rounded-lg bg-danger-600 px-4 text-[13px] font-medium text-white hover:bg-danger-700 disabled:opacity-60">
+                {deleting ? "Deleting…" : "Delete"}
               </button>
             </div>
           </div>
