@@ -1,7 +1,7 @@
 import type { DB } from "../../shared/db.js";
+import { resolveDemandRates } from "../../shared/demand-rate.js";
 import { badRequest, notFound } from "../../shared/http.js";
 import { roundToOrderQuantity } from "../../shared/reorder-quantity.js";
-import { computeSalesVelocity } from "../../shared/sales-velocity.js";
 import type { PurchasingService } from "../purchasing/index.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -162,6 +162,12 @@ export class PipelineViewsService {
    * back to the product's general lead_time_days, then a 7-day default) —
    * "if I ordered today, when would this arrive," null when there's no
    * preferred supplier to promise against.
+   *
+   * Phase 7 item 4: `avg_daily_sales` / days-until-stockout come from
+   * `resolveDemandRates()` — prefer a covering persisted forecast
+   * (`demand_forecasts`), else fall back to the Phase 7 item 1 trailing
+   * velocity. No new forecast model is introduced here; other reorder
+   * surfaces still use velocity directly until migrated the same way.
    */
   async reorderAlerts(tenantId: string) {
     const rows = await this.db.query<{
@@ -191,12 +197,9 @@ export class PipelineViewsService {
     if (rows.length === 0) return { items: [] };
 
     const productIds = rows.map((r) => r.product_id);
-    // Phase 7 item 1 (WORK/FORWARD_PLAN.md): velocity now comes from the
-    // shared sales-velocity service (src/shared/sales-velocity.ts) instead of
-    // a locally-duplicated query — same consolidation as catalog/
-    // detail-views.ts's reorderSuggestions().
-    const [velocity, incomingRows] = await Promise.all([
-      computeSalesVelocity(this.db, { tenantId, productIds, lookbackDays: 30 }),
+    // Phase 7 item 4: demand rate via resolveDemandRates (forecast → velocity).
+    const [demandRates, incomingRows] = await Promise.all([
+      resolveDemandRates(this.db, { tenantId, productIds, lookbackDays: 30 }),
       // received_qty-based remaining, not billed_qty — see the 2026-07-18 fix
       // in catalog/detail-views.ts's reorderSuggestions() for why.
       this.db.query<{ product_id: string; qty: number }>(
@@ -214,7 +217,8 @@ export class PipelineViewsService {
         const stock = Number(r.stock_qty);
         const reorderPt = Number(r.reorder_pt);
         const safetyStock = Number(r.safety_stock ?? 0);
-        const avgDaily = velocity.get(r.product_id)?.velocityPerDay ?? 0;
+        const demand = demandRates.get(r.product_id);
+        const avgDaily = demand?.ratePerDay ?? 0;
         const daysUntilStockout = avgDaily > 0 ? Math.floor(stock / avgDaily) : -1;
         const baseTargetQty = reorderPt > 0 ? reorderPt : Math.max(1, Math.ceil(avgDaily * 14));
         // Phase 6 item 2: safety_stock is additive to the base target before
@@ -239,6 +243,8 @@ export class PipelineViewsService {
           safety_stock: safetyStock,
           avg_daily_sales: Math.round(avgDaily * 100) / 100,
           days_until_stockout: daysUntilStockout,
+          // Additive observability for the Phase 7 item 4 cutover — FE may ignore.
+          demand_source: (demand?.source ?? "velocity") as "forecast" | "velocity",
           preferred_supplier: r.preferred_vendor_name ?? "",
           preferred_supplier_moq: r.preferred_moq ?? null,
           preferred_supplier_case_pack: r.preferred_case_pack ?? null,
