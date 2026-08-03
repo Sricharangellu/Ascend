@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
@@ -167,6 +168,18 @@ export default function DeliveryPage() {
       contentClassName="overflow-y-auto"
     >
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-erp-text-secondary">
+            Order fulfillment pipeline. Shipment registry lives under All shipments.
+          </p>
+          <Link
+            href="/shipping"
+            className="inline-flex min-h-touch items-center rounded-lg border border-erp-table-border bg-white px-3 py-1.5 text-sm font-medium text-erp-text-primary transition-colors hover:bg-erp-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+          >
+            All shipments
+          </Link>
+        </div>
+
         {error && (
           <Card role="alert" className="border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
             {error}
