@@ -42,6 +42,7 @@ first; there's nothing here for it to pick up.
 
 | # | UTC | Commit | Summary |
 |---|---|---|---|
+| — | 2026-08-03T054700Z | (ui-audit) | Continue product-experience Wave A/B: #165 closed superseded (develop already restored); #163 Quick Sell deep-link; #166 outlet filter scope; #169 dead-chrome + Quick Sell href. Waiting CI then merge. |
 | — | 2026-08-03T042850Z | (wave1) | Ponytail Wave 1: reporting/sell/finance/setup redirects; Inventory nav trim + Purchasing hub ?tab=; Delivery→Sell; checklist/dashboard link fixes. |
 | — | 2026-08-02T232920Z | (wave0) | Ponytail Wave 0 honesty: hide Error Center + Kiosk (partial); /sales→/orders; Pipeline mock tabs gated; brand F→A + finder-pos URLs; kiosk no fake save. |
 | 1 | 2026-07-15T17:30Z | 3665437 | movements route drift (mock-only → real, prod panels were blank) + keyset pagination on inventory movements + audit_log cursor mode; 27/27, smoke 20/20 |
