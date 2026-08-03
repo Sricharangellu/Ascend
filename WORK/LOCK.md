@@ -1,3 +1,14 @@
+## Active Claim (Claude Code — HOTFIX Cursor Cloud environment.json pnpm→npm)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code (isolated worktree `ascend-wt-cursor-env-npm-install`, branch `chore/cursor-cloud-env-npm-install`) |
+| Queue item | HOTFIX: `.cursor/environment.json` ran `corepack enable && pnpm install --frozen-lockfile` (Replit-merge pnpm contamination) — Cursor Cloud install fails with `ERR_PNPM_NO_LOCKFILE`. Repo is npm-based (`package-lock.json`, `web/package-lock.json`, CI `npm ci`). Fixed to `npm ci --no-audit --no-fund && npm --prefix web ci --no-audit --no-fund`. Scoped to this one file only — does NOT touch root `package.json`/lockfiles/`tsconfig.json`, which are being restored separately on `hotfix/restore-npm-root-after-replit-merge` (left untouched per Sri's instruction not to interfere with that in-flight work). |
+| Files/areas expected | `.cursor/environment.json`, `WORK/**` |
+| Started | 2026-08-03T104813Z |
+| Status | RELEASED — see AUDIT_2026-08-03T104813Z-cursor-env-npm-install.md. Committed on `chore/cursor-cloud-env-npm-install`, NOT pushed (handoff to Sri). |
+| Blockers | Full install still fails at root `preinstall` until the separate `hotfix/restore-npm-root-after-replit-merge` work lands — this fix alone is necessary but not sufficient. |
+
 ## Active Claim (Cursor Cloud — HOTFIX restore Ascend tsconfig)
 
 | Field | Value |
