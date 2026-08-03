@@ -63,7 +63,47 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler): () => void
   };
 }
 
+// ─── Network-error interception ───────────────────────────────────────────────
+type NetworkStatusHandler = (offline: boolean) => void;
+let networkStatusHandler: NetworkStatusHandler | null = null;
+
+/**
+ * Register a handler invoked when a request fails at the network level
+ * (server unreachable) with `true`, and with `false` once a request
+ * succeeds again. Returns an unsubscribe function.
+ */
+export function setNetworkStatusHandler(
+  handler: NetworkStatusHandler,
+): () => void {
+  networkStatusHandler = handler;
+  return () => {
+    if (networkStatusHandler === handler) networkStatusHandler = null;
+  };
+}
+
+/**
+ * Lightweight connectivity probe against the API server's health endpoint.
+ * Resolves true if the server responded (any HTTP status), false otherwise.
+ */
+export async function pingServer(): Promise<boolean> {
+  try {
+    await fetch(`${getApiBase()}/healthz`, { method: 'GET' });
+    networkStatusHandler?.(false);
+    return true;
+  } catch {
+    networkStatusHandler?.(true);
+    return false;
+  }
+}
+
 // ─── Error class ──────────────────────────────────────────────────────────────
+export class NetworkError extends Error {
+  constructor(message = 'Unable to reach the server') {
+    super(message);
+    this.name = 'NetworkError';
+  }
+}
+
 export class ApiRequestError extends Error {
   constructor(
     public readonly code: string,
@@ -93,7 +133,18 @@ export async function apiFetch<T>(
   }
 
   const url = `${getApiBase()}${path}`;
-  const res = await fetch(url, { ...fetchOptions, headers });
+  let res: Response;
+  try {
+    res = await fetch(url, { ...fetchOptions, headers });
+  } catch {
+    // fetch rejects only on network-level failures (server unreachable,
+    // DNS, offline). Surface a global offline state so the app can react.
+    networkStatusHandler?.(true);
+    throw new NetworkError();
+  }
+
+  // Any HTTP response means the server is reachable again.
+  networkStatusHandler?.(false);
 
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;

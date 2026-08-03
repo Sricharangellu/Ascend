@@ -14,6 +14,8 @@ import {
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { NetworkProvider } from '@/contexts/NetworkContext';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
@@ -41,10 +43,13 @@ function RootLayoutNav() {
   usePushNotifications();
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="login" />
-      <Stack.Screen name="(tabs)" />
-    </Stack>
+    <>
+      <OfflineBanner />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="login" />
+        <Stack.Screen name="(tabs)" />
+      </Stack>
+    </>
   );
 }
 
@@ -70,9 +75,11 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
-              <AuthProvider>
-                <RootLayoutNav />
-              </AuthProvider>
+              <NetworkProvider>
+                <AuthProvider>
+                  <RootLayoutNav />
+                </AuthProvider>
+              </NetworkProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>

@@ -16,6 +16,7 @@ import {
   clearSession,
   getStoredUser,
   saveSession,
+  setNetworkStatusHandler,
   setUnauthorizedHandler,
 } from '../lib/api';
 
@@ -126,10 +127,25 @@ describe('apiFetch – error handling', () => {
     expect((error as ApiRequestError).status).toBe(502);
   });
 
-  it('re-throws on network failure (fetch rejects)', async () => {
+  it('throws NetworkError and notifies the network handler on network failure', async () => {
+    const onNetworkStatus = jest.fn();
+    const unsubscribe = setNetworkStatusHandler(onNetworkStatus);
+
     fetchSpy.mockRejectedValueOnce(new TypeError('Network request failed'));
 
-    await expect(apiFetch('/api/test')).rejects.toThrow('Network request failed');
+    await expect(apiFetch('/api/test')).rejects.toMatchObject({
+      name: 'NetworkError',
+    });
+    expect(onNetworkStatus).toHaveBeenCalledWith(true);
+
+    // A successful response clears the offline state.
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+    await apiFetch('/api/test');
+    expect(onNetworkStatus).toHaveBeenLastCalledWith(false);
+
+    unsubscribe();
   });
 });
 
