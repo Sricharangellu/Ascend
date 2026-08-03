@@ -1,25 +1,25 @@
-
 import { useState, useCallback, useEffect } from "react";
 import { useQuery, invalidateQuery } from "@/lib/useQuery";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
-import { Card } from "@/components/Card";
 import { apiGet, apiPost } from "@/api-client/client";
 import { useFinderContext, type FinderDateRange } from "@/lib/useFinderContext";
 import { useRealtimeStream } from "@/hooks/useRealtimeStream";
-import { VerticalWidgets } from "@/components/dashboard/VerticalWidgets";
 import { RetailSetupChecklist } from "@/components/setup/RetailSetupChecklist";
-import { DashboardTopLists } from "./_components/DashboardTopLists";
-import { DashboardOperational } from "./_components/DashboardOperational";
-import { BackupHealthCard } from "./_components/BackupHealthCard";
-import { DashboardKpiSection } from "./_components/DashboardKpiSection";
-import { DashboardCharts } from "./_components/DashboardCharts";
-import { DashboardQuickActions } from "./_components/DashboardQuickActions";
-import { DashboardRecommendations, type RecommendationReport, type DashboardRecommendation } from "./_components/DashboardRecommendations";
-import ProgressPanel from "./_components/ProgressPanel";
 
-// Map each actionable recommendation signal to the progress verification source
-// Ascend can prove it from — so a recommendation-born task can later be
-// system-verified against real data. Signals without a data check stay manual.
+import { DashboardHero } from "./_components/DashboardHero";
+import { DashboardOverview } from "./_components/DashboardOverview";
+import { DashboardOpsHub } from "./_components/DashboardOpsHub";
+import { DashboardAiCommandCenter } from "./_components/DashboardAiCommandCenter";
+import { DashboardPipeline } from "./_components/DashboardPipeline";
+import { DashboardTimeline } from "./_components/DashboardTimeline";
+import { DashboardCharts } from "./_components/DashboardCharts";
+import { DashboardTopPerformers } from "./_components/DashboardTopPerformers";
+import { DashboardQuickActions } from "./_components/DashboardQuickActions";
+import ProgressPanel from "./_components/ProgressPanel";
+import { BackupHealthCard } from "./_components/BackupHealthCard";
+
+import type { RecommendationReport, DashboardRecommendation } from "./_components/DashboardAiCommandCenter";
+
 const SIGNAL_TO_VERIFICATION: Record<string, string> = {
   no_products: "retail.first_product",
   products_without_cost: "retail.cost_prices_complete",
@@ -29,11 +29,9 @@ const SIGNAL_TO_VERIFICATION: Record<string, string> = {
   uncategorized_expenses: "retail.expenses_categorized",
 };
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+export type Range = "today" | "7d" | "30d";
 
-type Range = "today" | "7d" | "30d";
-
-interface SummaryResponse {
+export interface SummaryResponse {
   orders: { open: number; completed: number; refunded: number; voided: number; total: number };
   revenue: { grossCents: number; taxCents: number; netCents: number };
   payments: { capturedCount: number; capturedCents: number; byMethod: Record<string, number> };
@@ -45,43 +43,29 @@ interface SummaryResponse {
   sparklines?: { revenue: number[]; saleCount: number[] };
 }
 
-interface OutletItem { id: string; name: string; }
-
-interface TopProductItem {
-  id?: string; productId?: string; sku?: string; name: string; category?: string;
-  revenue?: number; revenueCents?: number; qty?: number; units?: number;
+export interface Valuation {
+  totalCostCents: number;
+  totalRetailCents: number;
+  total: number;
 }
-interface TopProductsResponse { items: TopProductItem[]; }
 
-interface TopCustomerItem {
-  customer_id?: string; key?: string; name: string;
-  totalCents?: number; revenueCents?: number; orderCount?: number; units?: number;
+export interface CashMovementResponse {
+  items: { movement_type: string; amount: number; created_at: number }[];
+  totalInCents: number;
+  totalOutCents: number;
+  netCents: number;
 }
-interface TopCustomersResponse { items: TopCustomerItem[]; }
 
-interface TrendDay { date: string; label: string; revenueCents: number; orderCount: number; }
-interface TrendResponse { items: TrendDay[]; }
-
-interface HourlyBucket { hour: number; label: string; orderCount: number; revenueCents: number; value: number; }
-interface HourlyResponse { items: HourlyBucket[]; }
-
-interface CategoryItem { key: string; name: string; units: number; revenueCents: number; }
-interface CategoryResponse { items: CategoryItem[]; }
-
-interface LowStockItem {
-  id: string; sku: string; name: string; category: string;
-  onHand: number; reorderPoint: number; lowStock: boolean;
+export interface POListResponse {
+  items: { status: string }[];
 }
-interface DashNotification {
+
+export interface InventoryLevelsResponse {
+  items: any[];
+}
+
+export interface DashNotification {
   id: string; type: string; severity: string; title: string; body: string; read: boolean; created_at: number;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function rangeLabel(range: Range): string {
-  if (range === "today") return "Today";
-  if (range === "7d") return "Last 7 days";
-  return "Last 30 days";
 }
 
 function dateRangeForPreset(preset: FinderDateRange["preset"]): FinderDateRange {
@@ -101,43 +85,54 @@ function dateRangeForPreset(preset: FinderDateRange["preset"]): FinderDateRange 
   return { startDate: iso(start), endDate: iso(end), preset };
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
 export default function DashboardPage() {
-  const { storeId, outletId, dateRange, granularity, setDateRange, setGranularity } = useFinderContext();
+  const { storeId, outletId, dateRange } = useFinderContext();
   const range: Range = dateRange.preset === "today" ? "today" : dateRange.preset === "current_month" ? "30d" : "7d";
   const scope = new URLSearchParams({ store_id: storeId, outlet_id: outletId }).toString();
 
-  const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
-  const [recentNotifs, setRecentNotifs] = useState<DashNotification[]>([]);
-  const [outlets, setOutlets] = useState<OutletItem[]>([]);
-  const [selectedOutletId, setSelectedOutletId] = useState<string>(outletId);
   const [progressRefresh, setProgressRefresh] = useState(0);
 
-  useEffect(() => {
-    apiGet<{ items: LowStockItem[] }>("/api/v1/inventory/levels?pageSize=200")
-      .then((d) => setLowStock((d.items ?? []).filter((i) => i.lowStock).slice(0, 5)))
-      .catch(() => {});
-    apiGet<{ items: DashNotification[] }>("/api/v1/notifications?limit=5")
-      .then((d) => setRecentNotifs(d.items ?? []))
-      .catch(() => {});
-    apiGet<{ items: OutletItem[] }>("/api/v1/outlets")
-      .then((d) => setOutlets(d.items ?? []))
-      .catch(() => {});
-  }, []);
-
-  const trendRange = range === "today" ? "7d" : range;
-
+  // Queries
   const fetchSummary = useCallback(() => apiGet<SummaryResponse>(`/api/v1/reports/summary?range=${range}&${scope}`), [range, scope]);
-  const fetchTopProducts = useCallback(() => apiGet<TopProductsResponse>(`/api/v1/reports/top-products?range=${range}&limit=5&${scope}`), [range, scope]);
-  const fetchTopCustomers = useCallback(() => apiGet<TopCustomersResponse>(`/api/v1/reports/sales-by-customer?range=${range}&${scope}`), [range, scope]);
-  const fetchTrend = useCallback(() => apiGet<TrendResponse>(`/api/v1/reports/revenue-trend?range=${trendRange}&${scope}`), [scope, trendRange]);
-  const fetchHourly = useCallback(() => apiGet<HourlyResponse>(`/api/v1/reports/hourly?range=${range}&${scope}`), [range, scope]);
-  const fetchCategory = useCallback(() => apiGet<CategoryResponse>(`/api/v1/reports/sales-by-category?range=${range}&${scope}`), [range, scope]);
+  const fetchValuation = useCallback(() => apiGet<Valuation>(`/api/v1/reports/inventory-valuation`), []);
+  const fetchCash = useCallback(() => {
+    const days = range === "today" ? 1 : range === "7d" ? 7 : 30;
+    const from = Date.now() - days * 24 * 60 * 60 * 1000;
+    return apiGet<CashMovementResponse>(`/api/v1/reports/cash-movement?limit=500&from=${from}`);
+  }, [range]);
+  const fetchPOs = useCallback(() => apiGet<POListResponse>(`/api/v1/purchasing/orders?limit=200`), []);
+  const fetchLowStock = useCallback(() => apiGet<InventoryLevelsResponse>(`/api/v1/inventory/levels?lowStock=true&pageSize=10`), []);
+  const fetchReorder = useCallback(() => apiGet<{ items: any[] }>(`/api/v1/inventory/reorder-suggestions`), []);
+  const fetchExpiry = useCallback(() => apiGet<{ items: any[] }>(`/api/v1/inventory/expiry`), []);
+  const fetchLocations = useCallback(() => apiGet<{ items: any[] }>(`/api/v1/inventory/locations`), []);
+  const fetchNotifs = useCallback(() => apiGet<{ items: DashNotification[] }>("/api/v1/notifications?limit=10"), []);
   const fetchRecommendations = useCallback(() => apiGet<RecommendationReport>("/api/v1/reports/recommendations?recentDays=30"), []);
+  const fetchTopProducts = useCallback(() => apiGet<{ items: any[] }>(`/api/v1/reports/top-products?range=${range}&limit=5&${scope}`), [range, scope]);
+  const fetchTopCustomers = useCallback(() => apiGet<{ items: any[] }>(`/api/v1/reports/sales-by-customer?range=${range}&${scope}`), [range, scope]);
 
-  // Turn a recommendation into a progress task, carrying the linked source
-  // context (the reason, the destination, and the data source it verifies from).
+  const { data: summary, loading: loadingSummary } = useQuery(`dashboard:summary:${range}:${scope}`, fetchSummary, { staleMs: 60_000 });
+  const { data: valuation, loading: loadingVal } = useQuery(`dashboard:valuation`, fetchValuation, { staleMs: 60_000 });
+  const { data: cash, loading: loadingCash } = useQuery(`dashboard:cash:${range}`, fetchCash, { staleMs: 60_000 });
+  const { data: pos, loading: loadingPOs } = useQuery(`dashboard:pos`, fetchPOs, { staleMs: 60_000 });
+  const { data: lowStockData } = useQuery(`dashboard:lowStock`, fetchLowStock, { staleMs: 60_000 });
+  const { data: reorderData } = useQuery(`dashboard:reorder`, fetchReorder, { staleMs: 60_000 });
+  const { data: expiryData } = useQuery(`dashboard:expiry`, fetchExpiry, { staleMs: 60_000 });
+  const { data: locationsData } = useQuery(`dashboard:locations`, fetchLocations, { staleMs: 60_000 });
+  const { data: notifsData } = useQuery(`dashboard:notifs`, fetchNotifs, { staleMs: 60_000 });
+  const { data: recData, loading: loadingRecs } = useQuery("dashboard:recommendations:30d", fetchRecommendations, { staleMs: 60_000 });
+  const { data: topProductsData } = useQuery(`dashboard:top-products:${range}:${scope}`, fetchTopProducts, { staleMs: 60_000 });
+  const { data: topCustomersData } = useQuery(`dashboard:top-customers:${range}:${scope}`, fetchTopCustomers, { staleMs: 60_000 });
+
+  useRealtimeStream(
+    useCallback((event) => {
+      if (event.type === "order_created" || event.type === "payment_captured") {
+        invalidateQuery(`dashboard:summary:${range}:${scope}`);
+        invalidateQuery("dashboard:recommendations:30d");
+        invalidateQuery(`dashboard:cash:${range}`);
+      }
+    }, [range, scope]),
+  );
+
   const onTrackRecommendation = useCallback(async (rec: DashboardRecommendation) => {
     await apiPost("/api/v1/progress/tasks", {
       title: rec.title,
@@ -148,195 +143,88 @@ export default function DashboardPage() {
     setProgressRefresh((n) => n + 1);
   }, []);
 
-  useRealtimeStream(
-    useCallback((event) => {
-      if (event.type === "order_created" || event.type === "payment_captured") {
-        invalidateQuery(`dashboard:summary:${range}:${scope}`);
-        invalidateQuery(`dashboard:top-products:${range}:${scope}`);
-        invalidateQuery("dashboard:recommendations:30d");
-      }
-    }, [range, scope]),
-  );
+  // Compute metrics (normalize: API values may be null/non-numeric)
+  const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : Number(v) || 0);
+  const cashFlowCents = num(cash?.netCents);
+  const openPOs = (pos?.items ?? []).filter(po => po.status === "ordered" || po.status === "partially_received").length;
+  const activeUsers = 1; // Backend doesn't have an endpoint for active users currently, so default to 1 (the current user).
 
-  const { data: summary, loading: loadingSummary, error: errorSummary } =
-    useQuery(`dashboard:summary:${range}:${scope}`, fetchSummary, { staleMs: 60_000 });
-  const { data: topProductsData, loading: loadingProducts } =
-    useQuery(`dashboard:top-products:${range}:${scope}`, fetchTopProducts, { staleMs: 60_000 });
-  const { data: topCustomersData, loading: loadingCustomers } =
-    useQuery(`dashboard:top-customers:${range}:${scope}`, fetchTopCustomers, { staleMs: 60_000 });
-  const { data: trendData, loading: loadingTrend } =
-    useQuery(`dashboard:trend:${trendRange}:${scope}`, fetchTrend, { staleMs: 60_000 });
-  const { data: hourlyData, loading: loadingHourly } =
-    useQuery(`dashboard:hourly:${range}:${scope}`, fetchHourly, { staleMs: 60_000 });
-  const { data: categoryData, loading: loadingCategory } =
-    useQuery(`dashboard:category:${range}:${scope}`, fetchCategory, { staleMs: 60_000 });
-  const { data: recommendationsData, loading: loadingRecommendations, error: errorRecommendations } =
-    useQuery("dashboard:recommendations:30d", fetchRecommendations, { staleMs: 60_000 });
-
-  const topProducts = (topProductsData?.items ?? []).map((item) => ({
-    ...item,
-    id: item.id ?? item.productId ?? "",
-    qty: item.qty ?? item.units ?? 0,
-    revenue: item.revenue ?? item.revenueCents ?? 0,
-  }));
-  const topCustomers = (topCustomersData?.items ?? []).map((item) => ({
-    ...item,
-    customer_id: item.customer_id ?? item.key ?? "",
-    orderCount: item.orderCount ?? item.units ?? 0,
-    totalCents: item.totalCents ?? item.revenueCents ?? 0,
-  }));
-  const loading = loadingSummary || loadingProducts || loadingCustomers;
-
-  const trendPoints = (trendData?.items ?? []).map((d) => ({ label: d.label, value: d.revenueCents }));
-  const hourlyPoints = (hourlyData?.items ?? []).map((d) => ({ label: d.label, value: d.revenueCents }));
-  const categoryItems = (categoryData?.items ?? []).slice(0, 6);
-
-  const gross = summary?.revenue.grossCents ?? 0;
-  const kpi = summary?.kpi;
-  const spark = summary?.sparklines;
-  const saleCount = kpi?.saleCount ?? summary?.orders.completed ?? 0;
-  const grossProfit = kpi?.grossProfitCents ?? gross;
-  const customerCount = kpi?.customerCount ?? 0;
-  const avgSaleValue = kpi?.avgSaleValueCents ?? (saleCount > 0 ? Math.trunc(gross / saleCount) : 0);
-  const avgItems = kpi?.avgItemsPerSale ?? 0;
-  const discountedAmt = kpi?.discountedAmountCents ?? 0;
-  const discountedPct = kpi?.discountedPct ?? 0;
-  const sparkRev = (spark?.revenue ?? []).map((v) => ({ value: v }));
-  const sparkSales = (spark?.saleCount ?? []).map((v) => ({ value: v }));
+  const inventoryStats = {
+    warehouses: (locationsData?.items ?? []).length,
+    skus: num(valuation?.total),
+    lowStock: (lowStockData?.items ?? []).length,
+    expiringSoon: (expiryData?.items ?? []).length,
+  };
 
   return (
     <EnterpriseShell
       active="dashboard"
       title="Dashboard"
-      subtitle={`Overview · Demo Store · ${rangeLabel(range)}`}
-      contentClassName="overflow-y-auto"
+      subtitle="Enterprise Command Center"
+      contentClassName="overflow-y-auto bg-[var(--color-page-bg)]"
     >
-      <div className="mx-auto w-full max-w-7xl space-y-5 px-5 py-5 sm:px-6">
-
-        {/* ── Retail setup checklist (auto-hides when complete or dismissed) ── */}
+      <div className="mx-auto w-full max-w-[1600px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        
+        {/* Retail Setup Checklist Banner (auto-hides when complete) */}
         <RetailSetupChecklist />
 
-        {/* ── Page header + filter bar ──────────────────────────────────────── */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--color-border)] pb-4">
-          <div>
-            <h1 className="text-[20px] font-bold tracking-tight text-[var(--color-text-primary)]">
-              Business Overview
-            </h1>
-            <p className="mt-0.5 text-[13px] text-[var(--color-text-secondary)]">
-              Revenue, orders, inventory movement, and tender mix.
-            </p>
-          </div>
+        {/* Hero Section */}
+        <DashboardHero />
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Outlet filter */}
-            {outlets.length > 0 && (
-              <select
-                aria-label="Filter by outlet"
-                value={selectedOutletId}
-                onChange={(e) => setSelectedOutletId(e.target.value)}
-                className="h-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-[13px] text-[var(--color-text-primary)] shadow-[var(--shadow-xs)] outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
-              >
-                <option value="">All Outlets</option>
-                {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-              </select>
-            )}
-
-            {/* Granularity toggle */}
-            <div
-              role="group"
-              aria-label="Report granularity"
-              className="inline-flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-0.5 shadow-[var(--shadow-xs)]"
-            >
-              {(["day", "week", "month"] as const).map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setGranularity(value)}
-                  aria-pressed={granularity === value}
-                  className={[
-                    "h-7 rounded-md px-3 text-[12px] font-medium capitalize transition-all duration-150",
-                    granularity === value
-                      ? "bg-brand-600 text-white shadow-[var(--shadow-xs)]"
-                      : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]",
-                  ].join(" ")}
-                >
-                  {value}
-                </button>
-              ))}
-            </div>
-
-            {/* Date range */}
-            <select
-              aria-label="Date range"
-              value={dateRange.preset === "custom" ? "current_week" : dateRange.preset}
-              onChange={(e) => setDateRange(dateRangeForPreset(e.target.value as FinderDateRange["preset"]))}
-              className="h-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-[13px] text-[var(--color-text-primary)] shadow-[var(--shadow-xs)] outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
-            >
-              <option value="today">Today</option>
-              <option value="current_week">This Week</option>
-              <option value="current_month">This Month</option>
-            </select>
-          </div>
-        </div>
-
-        {errorSummary && !loading && (
-          <div
-            role="alert"
-            className="rounded-xl border border-[var(--color-danger-border)] bg-[var(--color-danger-bg)] px-4 py-3 text-[13px] text-[var(--color-danger-text)]"
-          >
-            {errorSummary}
-          </div>
-        )}
-
-        <DashboardKpiSection
-          loading={loadingSummary}
-          gross={gross}
-          saleCount={saleCount}
-          grossProfit={grossProfit}
-          customerCount={customerCount}
-          avgSaleValue={avgSaleValue}
-          avgItems={avgItems}
-          discountedAmt={discountedAmt}
-          discountedPct={discountedPct}
-          sparkRev={sparkRev}
-          sparkSales={sparkSales}
-        />
-
-        <DashboardRecommendations
-          report={recommendationsData}
-          loading={loadingRecommendations}
-          error={errorRecommendations}
-          onTrackTask={onTrackRecommendation}
-        />
-
-        <ProgressPanel refreshSignal={progressRefresh} />
-
-        <DashboardCharts
-          trendPoints={trendPoints}
-          hourlyPoints={hourlyPoints}
-          paymentsByMethod={summary?.payments.byMethod}
-          loadingTrend={loadingTrend}
-          loadingHourly={loadingHourly}
-          loadingPayments={loading}
-          trendRange={trendRange}
-        />
-
-        <DashboardTopLists
-          topProducts={topProducts}
-          topCustomers={topCustomers}
-          categoryItems={categoryItems}
-          loading={loading}
-          loadingCategory={loadingCategory}
-        />
-
+        {/* Quick Actions Strip */}
         <DashboardQuickActions />
 
-        <VerticalWidgets />
+        {/* Live Business Overview (KPIs) */}
+        <DashboardOverview
+          summary={summary}
+          loadingSummary={loadingSummary}
+          inventoryValueCents={num(valuation?.totalCostCents)}
+          loadingValuation={loadingVal}
+          cashFlowCents={cashFlowCents}
+          loadingCash={loadingCash}
+          openPOs={openPOs}
+          loadingPOs={loadingPOs}
+          activeUsers={activeUsers}
+          recommendationCount={recData?.summary?.total ?? 0}
+        />
 
-        <DashboardOperational lowStock={lowStock} recentNotifs={recentNotifs} />
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <div className="xl:col-span-2 space-y-6">
+            {/* Enterprise Workflow Pipeline */}
+            <DashboardPipeline />
 
-        {/* Owner-only backup health — renders nothing for manager/cashier roles */}
-        <BackupHealthCard />
+            {/* Business Operations Hub */}
+            <DashboardOpsHub inventoryStats={inventoryStats} />
+
+            {/* Performance Analytics (Charts) */}
+            <DashboardCharts range={range} scope={scope} />
+
+            {/* Top Performers */}
+            <DashboardTopPerformers 
+              topProducts={topProductsData?.items ?? []} 
+              topCustomers={topCustomersData?.items ?? []} 
+            />
+          </div>
+
+          <div className="space-y-6">
+            {/* AI Command Center Briefing */}
+            <DashboardAiCommandCenter
+              report={recData}
+              loading={loadingRecs}
+              onTrackTask={onTrackRecommendation}
+              reorderCount={(reorderData?.items ?? []).length}
+            />
+
+            {/* Activity Timeline */}
+            <DashboardTimeline notifs={notifsData?.items ?? []} />
+
+            {/* Progress Panel */}
+            <ProgressPanel refreshSignal={progressRefresh} />
+
+            {/* Backup Health */}
+            <BackupHealthCard />
+          </div>
+        </div>
 
       </div>
     </EnterpriseShell>

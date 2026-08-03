@@ -1,114 +1,87 @@
-
-import { Card } from "@/components/Card";
+import { useQuery } from "@/lib/useQuery";
+import { apiGet } from "@/api-client/client";
 import { LineChart } from "@/components/charts/LineChart";
 import { BarChart } from "@/components/charts/BarChart";
 import { formatMoney } from "@/lib/money";
 
 function SkeletonBox({ className = "" }: { className?: string }) {
-  return <div aria-hidden="true" className={`animate-skeleton rounded ${className}`} />;
+  return <div aria-hidden="true" className={`animate-skeleton rounded border border-[var(--color-border)] ${className}`} />;
 }
 
-interface ChartPoint { label: string; value: number; }
+interface TrendDay { date: string; label: string; revenueCents: number; orderCount: number; }
+interface TrendResponse { items: TrendDay[]; }
 
-interface Props {
-  trendPoints: ChartPoint[];
-  hourlyPoints: ChartPoint[];
-  paymentsByMethod: Record<string, number> | undefined;
-  loadingTrend: boolean;
-  loadingHourly: boolean;
-  loadingPayments: boolean;
-  trendRange: string;
-}
+interface HourlyBucket { hour: number; label: string; orderCount: number; revenueCents: number; value: number; }
+interface HourlyResponse { items: HourlyBucket[]; }
 
-export function DashboardCharts({
-  trendPoints,
-  hourlyPoints,
-  paymentsByMethod,
-  loadingTrend,
-  loadingHourly,
-  loadingPayments,
-  trendRange,
-}: Props) {
-  const paymentEntries = Object.entries(paymentsByMethod ?? {});
-  const paymentTotal = paymentEntries.reduce((s, [, v]) => s + v, 0);
+export function DashboardCharts({ range, scope }: { range: string; scope: string }) {
+  const trendRange = range === "today" ? "7d" : range;
+
+  const { data: trendData, loading: loadingTrend } = useQuery(
+    `dashboard:trend:${trendRange}:${scope}`,
+    () => apiGet<TrendResponse>(`/api/v1/reports/revenue-trend?range=${trendRange}&${scope}`)
+  );
+  
+  const { data: hourlyData, loading: loadingHourly } = useQuery(
+    `dashboard:hourly:${range}:${scope}`,
+    () => apiGet<HourlyResponse>(`/api/v1/reports/hourly?range=${range}&${scope}`)
+  );
+
+  const trendPoints = (trendData?.items ?? []).map((d) => ({ label: d.label, value: d.revenueCents }));
+  const hourlyPoints = (hourlyData?.items ?? []).map((d) => ({ label: d.label, value: d.revenueCents }));
 
   return (
-    <>
-      {/* Revenue Trend */}
-      <section aria-label="Revenue trend">
-        <Card
-          title={`Revenue Trend — Last ${trendRange === "7d" ? "7 Days" : "30 Days"}`}
-          noPadding
-        >
-          <div className="px-5 pb-5 pt-3">
-            <LineChart
-              data={trendPoints}
-              height={200}
-              color="#389E0D"
-              loading={loadingTrend}
-              formatValue={(v) => formatMoney(v)}
-            />
+    <section>
+      <h2 className="mb-4 text-lg font-bold tracking-tight text-[var(--color-text-primary)]">Performance Analytics</h2>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Trend */}
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-sm">
+          <div className="mb-4">
+            <h3 className="text-[13px] font-semibold text-[var(--color-text-primary)]">Revenue Trend</h3>
+            <p className="mt-0.5 text-[12px] text-[var(--color-text-secondary)]">Trailing {trendRange === "7d" ? "7" : "30"} days</p>
           </div>
-        </Card>
-      </section>
-
-      {/* Sales by Hour + Payment Mix */}
-      <section aria-label="Sales patterns" className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card title="Sales by Hour" noPadding>
-          <div className="px-5 pb-5 pt-3">
-            <BarChart
-              data={hourlyPoints}
-              height={160}
-              color="#5D5FEF"
-              loading={loadingHourly}
-              showEveryNthLabel={4}
-              formatValue={(v) => formatMoney(v)}
-            />
-          </div>
-        </Card>
-
-        <Card title="Revenue by Payment Method" noPadding>
-          {loadingPayments ? (
-            <div className="space-y-3.5 px-5 py-5">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="space-y-1.5">
-                  <SkeletonBox className="h-3.5 w-1/3" />
-                  <SkeletonBox className="h-2 w-full" />
-                </div>
-              ))}
-            </div>
-          ) : paymentEntries.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-center px-5">
-              <p className="text-[13px] text-[var(--color-text-secondary)]">No payments in this period.</p>
+          {loadingTrend ? (
+            <SkeletonBox className="h-[250px] w-full" />
+          ) : trendPoints.length === 0 ? (
+            <div className="flex h-[250px] items-center justify-center rounded border border-dashed border-[var(--color-border)] text-[13px] text-[var(--color-text-muted)]">
+              No trend data available.
             </div>
           ) : (
-            <div className="space-y-4 px-5 py-5">
-              {paymentEntries.map(([method, cents]) => {
-                const pct = paymentTotal > 0 ? Math.round((cents / paymentTotal) * 100) : 0;
-                return (
-                  <div key={method}>
-                    <div className="mb-1.5 flex items-center justify-between">
-                      <span className="text-[13px] font-medium capitalize text-[var(--color-text-primary)]">
-                        {method}
-                      </span>
-                      <span className="text-[13px] tabular-nums text-[var(--color-text-secondary)]">
-                        {formatMoney(cents)}{" "}
-                        <span className="text-[11px] text-[var(--color-text-muted)]">({pct}%)</span>
-                      </span>
-                    </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-border-subtle)]">
-                      <div
-                        className="h-full rounded-full bg-brand-500 transition-all duration-500"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="h-[250px] w-full">
+              <LineChart
+                data={trendPoints}
+                height={250}
+                color="var(--color-primary)"
+                formatValue={(val) => formatMoney(val)}
+              />
             </div>
           )}
-        </Card>
-      </section>
-    </>
+        </div>
+
+        {/* Hourly */}
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-sm">
+          <div className="mb-4">
+            <h3 className="text-[13px] font-semibold text-[var(--color-text-primary)]">Hourly Performance</h3>
+            <p className="mt-0.5 text-[12px] text-[var(--color-text-secondary)]">Revenue by hour of day</p>
+          </div>
+          {loadingHourly ? (
+            <SkeletonBox className="h-[250px] w-full" />
+          ) : hourlyPoints.length === 0 ? (
+            <div className="flex h-[250px] items-center justify-center rounded border border-dashed border-[var(--color-border)] text-[13px] text-[var(--color-text-muted)]">
+              No hourly data available.
+            </div>
+          ) : (
+            <div className="h-[250px] w-full">
+              <BarChart
+                data={hourlyPoints}
+                height={250}
+                color="var(--color-primary)"
+                formatValue={(val) => formatMoney(val)}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
