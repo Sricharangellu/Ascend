@@ -1,3 +1,15 @@
+
+## Active Claim (Cursor Cloud — HOTFIX restore npm root after 5th Replit re-merge)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud `bc-ef8f489e` — Pending agent commits |
+| Queue item | HOTFIX: `origin/develop` tip `a4dbf2c` again has `{"name":"workspace"}` + pnpm locks + deleted `package-lock.json` + project-references `tsconfig.json` + pnpm `.cursor/environment.json`. Surgical restore from last-good `dcdf04b` (#179); supersedes stale #180/#173 for current tip. |
+| Files/areas expected | `package.json`, `package-lock.json`, `tsconfig.json`, `.npmrc`, `pnpm-*`, `.env*.example`, `web/.env*.example`, `artifacts/ascend/.env.example`, `.cursor/environment.json`, `scripts/post-merge.sh`, `WORK/**` |
+| Started | 2026-08-03T190400Z |
+| Status | RELEASED — `cursor/hotfix-restore-npm-root-0e3c`; see AUDIT_2026-08-03T190400Z-replit-pnpm-root-hijack-5th.md |
+| Blockers | none |
+
 ## Active Claim (Cursor Cloud — HOTFIX restore Ascend tsconfig)
 
 | Field | Value |
