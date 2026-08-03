@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { apiFetch, completeOrder, refundOrder, voidOrder } from '@/lib/api';
 import type { Order, OrderLine, OrdersListResponse } from '@/lib/api';
@@ -629,10 +629,22 @@ export default function OrdersScreen() {
   );
   const flatListRef = useRef<FlatList<Order>>(null);
 
+  const [isFocused, setIsFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setIsFocused(true);
+      return () => setIsFocused(false);
+    }, []),
+  );
+
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['orders'],
     queryFn: () => apiFetch<OrdersListResponse>('/api/v1/orders?limit=50&offset=0'),
-    staleTime: 20_000,
+    // Poll while the tab is focused so changes made on other devices
+    // (POS terminal, another manager's phone) show up without a manual refresh.
+    refetchInterval: isFocused ? 10_000 : false,
+    refetchOnWindowFocus: true,
+    staleTime: 5_000,
     retry: 1,
   });
 
