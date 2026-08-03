@@ -1,0 +1,524 @@
+name: CI
+
+# ─── Trigger rules (3-tier promotion pipeline) ────────────────────────────────
+# develop → full CI + deploy to DEV      (Vercel preview, own dedicated Supabase)
+# staging → full CI + deploy to TESTING  (Vercel preview alias, TESTING Supabase)
+# master  → full CI + deploy to PROD      (Vercel --prod, PROD Supabase, ascendhq-app.vercel.app)
+# PRs     → full CI, no deploy
+# feature → no CI (local dev + pre-push hook); PR into develop to run CI
+# Promotion is forward-only: feature/* → develop → staging → master.
+on:
+  push:
+    branches: [develop, staging, master]
+  pull_request:
+    branches: [develop, staging, master]
+
+# Least-privilege default for GITHUB_TOKEN: no job here needs to write to the
+# repo or comment on PRs (Vercel deploys use VERCEL_TOKEN, not GITHUB_TOKEN).
+# actions/checkout only needs read. deployments:write is kept because
+# deploy-dev/staging/production declare `environment:` blocks, which GitHub
+# uses to record deployment status/history against that token permission.
+# Matches uptime.yml / backup.yml, which already scope permissions down.
+permissions:
+  contents: read
+  deployments: write
+
+# ─── Shared test jobs (run on every trigger) ──────────────────────────────────
+jobs:
+  guard:
+    name: Production guard — lint anti-patterns
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No unguarded mutation routes (router.patch/delete without requireRole)
+        run: |
+          ! grep -rn --include="*routes.ts" -A1 "router\.\(patch\|delete\|put\)" src/ \
+            | grep -B1 "handler(" \
+            | grep -v "requireRole\|//\s*no auth" \
+            | grep "router\.\(patch\|delete\|put\)" \
+            | grep -v "test\|spec" \
+            || echo "All mutation routes have role guards ✓"
+      - name: No console.log/error in production source (modules + gateway)
+        run: |
+          # shellcheck disable=SC2126 # grep|wc -l keeps this symmetric with the identical pattern below (AGENTS.md count)
+          count=$(grep -rn --include="*.ts" "console\.\(log\|error\|warn\)" src/modules/ src/gateway/ \
+            | grep -v "\.test\.ts" | wc -l | tr -d ' ')
+          echo "Remaining console.* calls in modules/gateway: $count"
+          if [ "$count" -gt "0" ]; then
+            grep -rn --include="*.ts" "console\.\(log\|error\|warn\)" src/modules/ src/gateway/ | grep -v "\.test\.ts"
+            exit 1
+          fi
+      - name: No raw SQL string interpolation (SQL injection risk)
+        run: |
+          ! grep -rn --include="*.ts" "\.query\(\`.*\${" src/modules/ src/gateway/ \
+            | grep -v "\.test\.ts\|set_config\|schema" \
+            || (echo "❌ Raw string interpolation in SQL — use @param syntax" && exit 1)
+          echo "No raw SQL interpolation found ✓"
+
+      - name: No duplicate / copy-junk files committed
+        run: |
+          # macOS/editor/chat-export "<name> 2.<ext>" copies and merge
+          # "*.collision-backup.md" files must never be tracked — they blocked
+          # rebases and diverged the tree in the past. .gitignore prevents them;
+          # this fails the build if one is force-added anyway.
+          dupes=$(git ls-files | grep -E ' [0-9]+\.[A-Za-z0-9]+$|\.collision-backup\.md$' || true)
+          if [ -n "$dupes" ]; then
+            echo "❌ Duplicate/copy-junk files are tracked — remove them:"; echo "$dupes"; exit 1
+          fi
+          echo "No duplicate/copy-junk files tracked ✓"
+
+      - name: Repo hygiene (duplicates / backups / merge-conflict junk)
+        # Comprehensive superset of the inline check above: scans the whole tree
+        # for "<name> 2.<ext>" copies, *.bak/*.orig backups, and merge-conflict
+        # markers. Fails CI so junk can never land. Runs on the runner's Node
+        # (no deps); the script is a plain ESM module.
+        run: node tools/hygiene-check.mjs
+
+      - name: Prevention agent — no dirty drift or stray modules
+        run: npm run prevent:drift
+
+      - name: API gap scan — every frontend call has a backend route
+        # Guards against pages shipping on MSW mocks while the real API 404s
+        # (the AUDIT_2026-07-18T005030Z incident class). Deliberate Preview
+        # surfaces live in tools/api-gap-allowlist.json, each tied to a board
+        # entry. No deps; plain ESM on the runner's Node.
+        run: npm run gap:scan
+
+      - name: One canonical agent-instruction file
+        run: |
+          # "1 file for all agents": exactly one root AGENTS.md; CLAUDE.md may
+          # only exist as a short pointer to it. Guards against doc sprawl.
+          # shellcheck disable=SC2126 # grep|wc -l keeps this symmetric with the identical pattern above (console.* count)
+          count=$(git ls-files | grep -E '(^|/)AGENTS\.md$' | wc -l | tr -d ' ')
+          if [ "$count" != "1" ]; then
+            echo "❌ Expected exactly one AGENTS.md, found $count:"; git ls-files | grep -E 'AGENTS\.md$'; exit 1
+          fi
+          echo "One canonical AGENTS.md ✓"
+
+      # Nothing previously validated workflow YAML itself — a typo in an `if:`
+      # expression or a job name drift in `needs:` fails silently (skipped, not
+      # red) until someone notices a deploy never ran. actionlint catches that
+      # class of mistake (and shell bugs inside `run:` blocks, via its bundled
+      # shellcheck integration) before merge.
+      - name: Lint workflow YAML (actionlint)
+        run: |
+          # Pinned to an immutable release tag, not `main` — piping a curl'd
+          # script from a mutable ref straight into bash is a supply-chain
+          # risk (a compromised or force-pushed main would run arbitrary code
+          # in CI on every PR). Bump ACTIONLINT_VERSION deliberately to update.
+          ACTIONLINT_VERSION=1.7.12
+          bash <(curl -fsSL "https://raw.githubusercontent.com/rhysd/actionlint/v${ACTIONLINT_VERSION}/scripts/download-actionlint.bash") "$ACTIONLINT_VERSION"
+          ./actionlint -color
+
+      # Shellcheck the standalone ops scripts (deploy/backup/restore/migration
+      # runner) — these run unattended in CI and, for restore.sh, by hand
+      # during an incident, so a quoting bug is exactly the kind of thing that
+      # should fail fast in review instead of at 2am during a restore.
+      # --severity=error only (not warning/style): two pre-existing warnings
+      # (scripts/deploy.sh:84 redundant env prefix, db/backup/restore.sh:168
+      # unused $pg_flags) are harmless and left as follow-up cleanup rather
+      # than gating CI on style-level findings.
+      - name: Shellcheck — deploy/backup/restore/migration scripts
+        run: |
+          shellcheck --severity=error \
+            scripts/deploy.sh \
+            db/backup/backup.sh \
+            db/backup/restore.sh \
+            db/migrations/run.sh
+
+  backend:
+    name: Backend — typecheck + test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: finder_test
+        ports: ["5432:5432"]
+        # --shm-size: Docker's default /dev/shm is 64MB; the backend suite is now
+        # 700+ tests and Postgres exhausts it mid-run ("could not resize shared
+        # memory segment ... No space left on device"), cascading into mass
+        # failures. 1g gives ample headroom (first hit: PR #81, 2026-07-19).
+        options: >-
+          --shm-size=1g
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/finder_test
+      JWT_SECRET: ci-test-secret-not-for-production
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      # Strongest real-DB gate: boots the assembled app on the service Postgres
+      # and drives the full POS lifecycle over HTTP, asserting zero failed
+      # workflow instances. Uses its own throwaway schema, so it cannot clash
+      # with the unit-test database state.
+      - name: Smoke — full POS lifecycle on real Postgres
+        run: npm run smoke
+
+  frontend:
+    name: Frontend — typecheck + lint + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
+
+  # ─── Docker build sanity check ─────────────────────────────────────────────
+  # Nothing previously exercised the Dockerfile at all — the node:20-alpine vs
+  # .nvmrc's node:24 drift found this session sat undetected indefinitely.
+  # Vercel (not Docker) is the actual deploy path, so this is deliberately a
+  # build-only sanity check (no push, no run/boot) — cheap, and it would have
+  # caught that exact drift automatically. NOT yet in any deploy `needs` or
+  # branch-protection required checks: this is its first-ever run in CI, and
+  # nothing should hard-gate on an unproven check (same reasoning applied to
+  # e2e earlier in this pipeline's history — prove it green first).
+  docker-build:
+    name: Docker build (sanity check, non-blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --target runtime -t ascend-backend:ci .
+
+  # ─── E2E tests (master + staging pushes only, after backend + frontend pass) ─
+  e2e:
+    name: E2E tests (Playwright — golden paths)
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: finder_e2e
+        ports: ["5432:5432"]
+        # --shm-size=1g: same shared-memory headroom as the backend job above.
+        options: >-
+          --shm-size=1g
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    # NODE_ENV is deliberately NOT "production" here: production mode forces
+    # SSL to Postgres (the CI service container has no SSL) and marks auth
+    # cookies Secure (rejected by the browser over plain-HTTP localhost), so a
+    # production-mode backend can never pass login on a CI runner. Production
+    # behavior is verified by the staging/production smoke tests over HTTPS.
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/finder_e2e
+      JWT_SECRET: e2e-test-secret-not-for-production
+      NODE_ENV: test
+      FINDER_BACKGROUND_JOBS: "false"
+      PORT: 3001
+      # Root cause of the login flake (confirmed via a Playwright trace DOM
+      # snapshot showing "Too many requests — slow down." on the login page):
+      # /api/identity is rate-limited per-IP (10 burst, 0.33/s refill — a
+      # brute-force guard, correct for prod). The whole suite runs from ONE CI
+      # runner IP and needs dozens of login/probe requests (global setup, every
+      # worker-restart self-heal login, login.spec.ts's 3 tests, every retry),
+      # which exhausts the bucket fast; once tripped, every spec needing auth
+      # fails simultaneously (matches the observed cross-spec cascade) until it
+      # slowly refills. See docs/architecture/PIPELINE.md. Defaults (10, 0.33)
+      # are unchanged everywhere this isn't explicitly set — prod security is
+      # untouched.
+      IDENTITY_RATE_LIMIT_CAPACITY: "1000"
+      IDENTITY_RATE_LIMIT_REFILL: "100"
+      # Same single-IP cascade risk for register + SSO handshake paths
+      # (defaults are even tighter than login). Keep prod defaults unchanged.
+      IDENTITY_REGISTER_RATE_CAPACITY: "1000"
+      IDENTITY_REGISTER_RATE_REFILL: "100"
+      SSO_RATE_LIMIT_CAPACITY: "1000"
+      SSO_RATE_LIMIT_REFILL: "100"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # ── Build and start the backend ─────────────────────────────────────────
+      - name: Install backend deps
+        run: npm ci --include=dev
+      - name: Build backend
+        run: npx tsc -p tsconfig.json
+      # Diagnostic instrumentation (2026-07-18, tracking the e2e login flake
+      # documented in docs/architecture/PIPELINE.md): stdout/stderr was
+      # previously discarded — this step's own log capture ends the instant
+      # the backgrounded process starts, so nothing about later requests was
+      # ever visible. Redirect to a file and set LOG_LEVEL=debug so a future
+      # failure has real evidence instead of another blind guess.
+      - name: Start backend (background)
+        run: LOG_LEVEL=debug node dist/src/server.js > /tmp/backend.log 2>&1 &
+      - name: Wait for backend
+        run: |
+          for _ in $(seq 1 20); do
+            curl -sf http://localhost:3001/healthz && exit 0
+            sleep 2
+          done
+          echo "❌ backend never became healthy on :3001"
+          cat /tmp/backend.log || true
+          exit 1
+      # Correlates backend availability with the Playwright timeline: if the
+      # backend stalls, crashes, or restarts mid-run, this is the only place
+      # that would show it (no per-request access logging exists yet).
+      - name: Start backend health poller (background)
+        run: |
+          ( while true; do
+              printf '%s %s\n' "$(date -u +%H:%M:%S)" "$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://localhost:3001/healthz || echo timeout)" >> /tmp/backend-health.log
+              sleep 2
+            done ) &
+      - name: Seed E2E demo data
+        run: npx tsx scripts/seed-e2e.ts
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/finder_e2e
+          # Opt-in required by the script's production guard — this is the
+          # ephemeral CI Postgres service, never a real database.
+          ALLOW_E2E_SEED: "1"
+      # ── Build and start the frontend ────────────────────────────────────────
+      - name: Install frontend deps
+        run: npm ci --include=dev
+        working-directory: web
+      # NEXT_PUBLIC_MOCK=false is what makes this a REAL e2e run: the default
+      # is mock mode, and the previously used NEXT_PUBLIC_E2E_MODE flag is read
+      # by nothing. API base stays empty → same-origin calls proxied to the
+      # backend via next.config rewrites (BACKEND_URL, baked at build time),
+      # which avoids production CORS restrictions on the backend.
+      - name: Build frontend
+        run: npm run build
+        working-directory: web
+        env:
+          NEXT_PUBLIC_MOCK: "false"
+          BACKEND_URL: http://localhost:3001
+      # output is "standalone": `next start` refuses that config — run the
+      # generated server.js with static assets and public/ copied in.
+      - name: Start frontend (background)
+        run: |
+          cp -r .next/static .next/standalone/.next/static
+          cp -r public .next/standalone/public
+          (PORT=3000 HOSTNAME=127.0.0.1 node .next/standalone/server.js > /tmp/frontend.log 2>&1 &)
+        working-directory: web
+      - name: Wait for frontend
+        run: |
+          for _ in $(seq 1 20); do
+            curl -sf http://localhost:3000/login >/dev/null && exit 0
+            sleep 3
+          done
+          echo "❌ frontend never became healthy on :3000"
+          cat /tmp/frontend.log || true
+          exit 1
+      # ── Run Playwright ───────────────────────────────────────────────────────
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+        working-directory: web
+      - name: Run E2E tests
+        run: npx playwright test --reporter=github
+        working-directory: web
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          E2E_EMAIL: owner@ascend.dev
+          E2E_PASSWORD: AscendDemo!2026
+      # `--reporter=github` (above) only emits GH Actions annotations — it does
+      # NOT write an HTML report, so web/playwright-report/ has been empty on
+      # every past run and this upload was silently capturing nothing (found
+      # while investigating the login flake: no artifact was ever downloadable
+      # from a failed run). screenshot/video/trace are still written to
+      # web/test-results/ regardless of reporter — upload that instead, since
+      # it's the only place the actual browser evidence exists.
+      - name: Upload Playwright test-results (screenshots/video/trace) on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: web/test-results/
+          retention-days: 7
+          if-no-files-found: warn
+      # Diagnostic — print + upload the backend log and health-poll timeline
+      # regardless of outcome, so a green run establishes the healthy baseline
+      # and a red run has real evidence instead of another blind guess.
+      - name: Show backend log + health timeline
+        if: always()
+        run: |
+          echo "── backend.log (last 200 lines) ──"
+          tail -n 200 /tmp/backend.log || echo "(no backend.log)"
+          echo "── backend-health.log (last 60 samples) ──"
+          tail -n 60 /tmp/backend-health.log || echo "(no backend-health.log)"
+      - name: Upload backend log + health timeline
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-diagnostics
+          path: |
+            /tmp/backend.log
+            /tmp/backend-health.log
+          retention-days: 7
+
+  # ─── DEV deploy (push to develop only) ─────────────────────────────────────
+  # Deploys BOTH projects as Vercel previews, sharing the SAME testing Supabase
+  # project as staging (Sri directive, 2026-07-20: exactly 2 databases — one
+  # shared by develop+staging, one isolated for prod — not three). No
+  # DATABASE_URL override here on purpose: the backend falls back to whatever
+  # is stored in the Vercel project's own Preview environment vars, which is
+  # the same value staging's deploy uses below. Repo variables carry the
+  # non-secret dev origins.
+  deploy-dev:
+    name: Deploy → Dev (Vercel preview)
+    # e2e runs in parallel as a reported signal but does NOT gate deploys — the
+    # golden-path suite has a known auth-rotation timing flake (see PIPELINE.md).
+    # Re-add `e2e` here once that flake is fixed to make it a hard deploy gate.
+    needs: [guard, backend, frontend, e2e]
+    runs-on: ubuntu-latest
+    # Skips (does not fail) until the dev tier is configured — set the repo
+    # variable DEV_BACKEND_URL to activate.
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push' && vars.DEV_BACKEND_URL != ''
+    environment:
+      name: Preview
+      url: https://${{ vars.DEV_FRONTEND_ALIAS }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Deploy dev (backend + frontend) → Vercel preview
+        run: ./scripts/deploy.sh both
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DEPLOY_ENV: dev
+          NEXT_PUBLIC_MOCK: "false"
+          BACKEND_URL: ${{ vars.DEV_BACKEND_URL }}
+          BACKEND_ALIAS: ${{ vars.DEV_BACKEND_ALIAS }}
+          FRONTEND_ALIAS: ${{ vars.DEV_FRONTEND_ALIAS }}
+      - name: Dev smoke test
+        run: |
+          sleep 10
+          curl -fsS --retry 3 --retry-delay 5 "${{ vars.DEV_BACKEND_URL }}/healthz" \
+            || (echo "❌ dev backend /healthz failed — check DEV_BACKEND_URL var + Vercel Preview env" && exit 1)
+          curl -fsS --retry 3 --retry-delay 5 "${{ vars.DEV_BACKEND_URL }}/readyz" \
+            || (echo "❌ dev backend /readyz failed (DB not reachable — check the shared testing Supabase project)" && exit 1)
+
+  # ─── TESTING deploy (push to staging only) ─────────────────────────────────
+  # Deploys BOTH projects as Vercel previews aliased to stable staging domains,
+  # pointing at the TESTING backend/DB (Supabase B). Then smoke-tests the alias.
+  deploy-staging:
+    name: Deploy → Testing (Vercel preview alias)
+    # e2e runs in parallel as a reported signal but does NOT gate deploys — the
+    # golden-path suite has a known auth-rotation timing flake (see PIPELINE.md).
+    # Re-add `e2e` here once that flake is fixed to make it a hard deploy gate.
+    needs: [guard, backend, frontend, e2e]
+    runs-on: ubuntu-latest
+    # Skips (does not fail) until the testing tier is configured — set the repo
+    # variables STAGING_BACKEND_URL/_ALIAS/_FRONTEND_ALIAS + Vercel Preview env.
+    if: github.ref == 'refs/heads/staging' && github.event_name == 'push' && vars.STAGING_BACKEND_URL != ''
+    environment:
+      name: staging
+      url: https://${{ vars.STAGING_FRONTEND_ALIAS }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Deploy testing (backend + frontend) → Vercel preview alias
+        run: ./scripts/deploy.sh both
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DEPLOY_ENV: testing
+          NEXT_PUBLIC_MOCK: "false"
+          BACKEND_URL: ${{ vars.STAGING_BACKEND_URL }}
+          BACKEND_ALIAS: ${{ vars.STAGING_BACKEND_ALIAS }}
+          FRONTEND_ALIAS: ${{ vars.STAGING_FRONTEND_ALIAS }}
+      - name: Testing smoke test
+        run: |
+          sleep 10
+          curl -fsS --retry 3 --retry-delay 5 "${{ vars.STAGING_BACKEND_URL }}/healthz" \
+            || (echo "❌ testing backend /healthz failed — check STAGING_BACKEND_URL var + Vercel Preview env" && exit 1)
+          curl -fsS --retry 3 --retry-delay 5 "${{ vars.STAGING_BACKEND_URL }}/readyz" \
+            || (echo "❌ testing backend /readyz failed (DB not reachable — check Supabase B)" && exit 1)
+
+  # ─── PROD deploy (push to master only) ─────────────────────────────────────
+  # Deploys BOTH projects to Vercel Production (--prod) against the PROD Supabase.
+  # Single deploy authority (deploy-prod.yml was removed to avoid double-deploys).
+  deploy-production:
+    name: Deploy → Production (Vercel --prod)
+    # e2e runs in parallel as a reported signal but does NOT gate deploys — the
+    # golden-path suite has a known auth-rotation timing flake (see PIPELINE.md).
+    # Re-add `e2e` here once that flake is fixed to make it a hard deploy gate.
+    needs: [guard, backend, frontend, e2e]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    environment:
+      name: Production
+      url: https://ascendhq-app.vercel.app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Deploy production (backend + frontend) → Vercel --prod
+        run: ./scripts/deploy.sh both
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN_PROD }}
+          DEPLOY_ENV: prod
+          NEXT_PUBLIC_MOCK: "false"
+
+  # ─── Production smoke test ─────────────────────────────────────────────────
+  smoke-test:
+    name: Post-deploy smoke test (production)
+    needs: [deploy-production]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    steps:
+      - name: Wait for Vercel propagation
+        run: sleep 15
+      - name: Health check — backend liveness
+        run: |
+          curl -f --retry 3 --retry-delay 5 \
+            https://ascendhq-api.vercel.app/healthz \
+            || (echo "❌ /healthz failed" && exit 1)
+      - name: Health check — backend readiness
+        run: |
+          curl -f --retry 3 --retry-delay 5 \
+            https://ascendhq-api.vercel.app/readyz \
+            || (echo "❌ /readyz failed" && exit 1)
+      - name: Health check — feature flags auth boundary
+        run: |
+          http_status="$(curl -sS --retry 2 --retry-delay 5 \
+            -o /tmp/flags-response.json \
+            -w '%{http_code}' \
+            https://ascendhq-api.vercel.app/api/v1/flags)"
+          if [ "$http_status" != "401" ]; then
+            echo "❌ /api/v1/flags without auth returned $http_status, expected 401"
+            cat /tmp/flags-response.json
+            exit 1
+          fi
+      - name: Health check — frontend
+        run: |
+          curl -f --retry 3 --retry-delay 5 \
+            https://ascendhq-app.vercel.app/ \
+            || (echo "❌ frontend failed" && exit 1)
