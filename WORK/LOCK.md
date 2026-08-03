@@ -6,7 +6,7 @@
 | Queue item | Continue Ponytail page-by-page on develop: fix Wave 0 sales conflict markers; Payments → Orders; catalog/[id] tab collapse (~6 sections); delete orphan ReorderSuggestionsTab. |
 | Files/areas expected | `web/app/(protected)/{sales,payments,catalog/[id],orders}/**`; `web/next.config.mjs`; `web/components/EnterpriseShell.tsx`; WORK audit + LOCK. |
 | Started | 2026-08-03 |
-| Status | ACTIVE |
+| Status | RELEASED — Wave 2b–3 shipped; AUDIT_2026-08-03T044200Z-ponytail-wave2b3-payments-catalog.md |
 | Blockers | none |
 
 
