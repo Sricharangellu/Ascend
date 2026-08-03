@@ -45,6 +45,27 @@ export function registerRoutes(router: Router, service: AiAssistantService): voi
     }),
   );
 
+  // POST /briefing — the dashboard's "AI Command Center" narration. Same
+  // async-by-default pipeline as /ask (202 + poll /conversations/:id), just
+  // with the sentinel question instead of user-typed text; the job handler
+  // recognizes it and fetches the recommendations report to narrate.
+  router.post(
+    "/briefing",
+    handler(async (req: Request, res: Response) => {
+      const auth = res.locals["auth"] as AuthPayload;
+      const db = res.locals["db"];
+      const conv = await service.createBriefing(tenantId(res), auth.userId ?? "unknown");
+      const producer = new QueueProducer(db);
+      await producer.enqueue({
+        type: QueueNames.AI_ASSISTANT_ANSWER,
+        tenantId: tenantId(res),
+        payload: { conversationId: conv.id },
+        maxAttempts: 2,
+      });
+      res.status(202).json({ conversationId: conv.id, status: conv.status });
+    }),
+  );
+
   router.get(
     "/conversations",
     handler(async (_req: Request, res: Response) => {

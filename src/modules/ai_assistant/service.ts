@@ -4,11 +4,20 @@ import type { EventBus } from "../../shared/events.js";
 import { HttpError } from "../../shared/http.js";
 import { writeAudit } from "../../shared/audit.js";
 import { moduleLogger } from "../../shared/logger.js";
-import { explainSignal, isAnthropicConfigured } from "../../shared/ai/anthropic-client.js";
+import { explainSignal, explainRecommendations, isAnthropicConfigured } from "../../shared/ai/anthropic-client.js";
 
 const log = moduleLogger("ai-assistant");
 
-export type Intent = "reorder" | "low_stock" | "expiry" | "best_sellers" | "slow_movers" | "unknown";
+export type Intent = "reorder" | "low_stock" | "expiry" | "best_sellers" | "slow_movers" | "briefing" | "unknown";
+
+/**
+ * A conversation created with this exact question text is the dashboard's
+ * daily-briefing request, not a user-typed question — matchIntent() maps it
+ * deterministically to "briefing" (never produced by keyword matching, only
+ * ever set by createBriefing() below). Exported so the orchestration job can
+ * recognize it without importing this module's private gathering logic.
+ */
+export const BRIEFING_SENTINEL = "__DAILY_BRIEFING__";
 
 export interface Conversation {
   id: string;
@@ -63,6 +72,7 @@ function has(msg: string, ...words: string[]): boolean {
 }
 
 export function matchIntent(question: string): Intent {
+  if (question === BRIEFING_SENTINEL) return "briefing";
   const q = question.toLowerCase();
   if (has(q, "reorder", "re-order", "order more", "should i order", "running low", "running out")) return "reorder";
   if (has(q, "low stock", "low on stock", "out of stock", "stock level")) return "low_stock";
@@ -124,6 +134,16 @@ export class AiAssistantService {
     return toConversation(row);
   }
 
+  /**
+   * The dashboard's "AI Command Center" briefing is a conversation like any
+   * other — same table, same status/polling lifecycle, same narration
+   * pipeline — just with the sentinel question instead of user-typed text.
+   * No new table, no new queue: reuses everything the Q&A flow already has.
+   */
+  async createBriefing(tenantId: string, userId: string): Promise<Conversation> {
+    return this.createConversation(tenantId, userId, BRIEFING_SENTINEL);
+  }
+
   async getConversation(tenantId: string, id: string): Promise<Conversation | null> {
     const rows = await this.db.query<ConversationRow>(
       `SELECT * FROM ai_conversations WHERE tenant_id = @tenantId AND id = @id`,
@@ -144,7 +164,20 @@ export class AiAssistantService {
   //    async job handler (src/orchestration/index.ts), never synchronously
   //    from the HTTP request per DESIGN_PRINCIPLES.md's async-by-default rule.
 
-  async processQuestion(tenantId: string, conversationId: string): Promise<void> {
+  async processQuestion(
+    tenantId: string,
+    conversationId: string,
+    /**
+     * Briefing-only: the recommendations report, pre-fetched by the
+     * orchestration job. ai_assistant's own service must not import
+     * reports/service.ts directly (modules never import each other's code) —
+     * the orchestration layer is exempt from that rule (same precedent as
+     * demand-snapshot.job.ts importing DemandPlanningService directly), so
+     * the job fetches it there and hands it to this method. Ignored for
+     * every non-briefing intent.
+     */
+    prefetchedRecommendations?: { data: Record<string, unknown>; found: boolean },
+  ): Promise<void> {
     const convRows = await this.db.query<ConversationRow>(
       `SELECT * FROM ai_conversations WHERE tenant_id = @tenantId AND id = @id`,
       { tenantId, id: conversationId },
@@ -154,15 +187,34 @@ export class AiAssistantService {
 
     try {
       const intent = matchIntent(conv.question);
-      const signal = await this.gatherSignal(tenantId, intent, conv.question);
+      const signal: Signal =
+        intent === "briefing" && prefetchedRecommendations
+          ? {
+              found: prefetchedRecommendations.found,
+              data: prefetchedRecommendations.data,
+              recommendation: "",
+              reason: "",
+              confidence: prefetchedRecommendations.found ? 90 : 0,
+              approvalLevel: "none",
+              sourceRef: null,
+              actionType: "none",
+              actionPayload: null,
+            }
+          : await this.gatherSignal(tenantId, intent, conv.question);
 
       // The deterministic recommendation is created regardless of whether the
       // LLM narration succeeds — a manager can act on it from the
       // Recommendations list even if chat narration is degraded or
       // unconfigured. Narration and recommendation creation are deliberately
       // independent, not one faked as a substitute for the other.
+      //
+      // Briefing is the one exception: it summarizes many existing report
+      // items at once, not a single actionable one, so there is no sensible
+      // ai_recommendations row to create (no single sourceRef, no single
+      // action) — each underlying item already has its own action/href in
+      // the dashboard's own recommendations list. Only narration applies.
       let recommendationId: string | null = null;
-      if (signal.found) {
+      if (signal.found && intent !== "briefing") {
         recommendationId = `airec_${uuidv7()}`;
         await this.db.query(
           `INSERT INTO ai_recommendations
@@ -200,11 +252,17 @@ export class AiAssistantService {
         return;
       }
 
-      const answer = await explainSignal({
-        userQuestion: conv.question,
-        signalJson: JSON.stringify(signal.data),
-        signalFound: signal.found,
-      });
+      const answer =
+        intent === "briefing"
+          ? await explainRecommendations({
+              recommendationsJson: JSON.stringify(signal.data),
+              hasRecommendations: signal.found,
+            })
+          : await explainSignal({
+              userQuestion: conv.question,
+              signalJson: JSON.stringify(signal.data),
+              signalFound: signal.found,
+            });
 
       await this.db.query(
         `UPDATE ai_conversations SET answer = @answer, status = 'complete', completed_at = @now WHERE tenant_id = @tenantId AND id = @id`,
