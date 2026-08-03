@@ -42,6 +42,9 @@ first; there's nothing here for it to pick up.
 
 | # | UTC | Commit | Summary |
 |---|---|---|---|
+| — | 2026-08-03T053000Z | (PR #164) | Ponytail Waves 0–3 rebased onto develop + **develop CI repaired**: the Replit-workspace merge (`74f7d91`) had replaced the backend root `package.json` with a pnpm workspace shell (every `npm run typecheck/test/smoke/prevent:drift/gap:scan` gone, lock out of sync → Backend + Production guard + Docker red on develop itself). Restored the `ascend` manifest/tsconfig, kept the workspace solution config as `tsconfig.workspace.json`, and untracked the tracked 1082-file `.migration-backup/` duplicate checkout. All required checks green. |
+| — | 2026-08-03T044331Z | (wave3) | Ponytail Wave 3: delete `/reporting/*` + thin alias page twins (redirects are SoT); Outlets owned by `/setup/outlets`; Pricing quarantined to Customer Overrides; Delivery stage tokens. |
+| — | 2026-08-03T043540Z | (wave2) | Ponytail Wave 2: Finance/Accounting hub simplify (duplicate pay grids dropped); Delivery `?tab=shipments`; Operations dissolved to Outlets. |
 | — | 2026-08-03T042850Z | (wave1) | Ponytail Wave 1: reporting/sell/finance/setup redirects; Inventory nav trim + Purchasing hub ?tab=; Delivery→Sell; checklist/dashboard link fixes. |
 | — | 2026-08-02T232920Z | (wave0) | Ponytail Wave 0 honesty: hide Error Center + Kiosk (partial); /sales→/orders; Pipeline mock tabs gated; brand F→A + finder-pos URLs; kiosk no fake save. |
 | 1 | 2026-07-15T17:30Z | 3665437 | movements route drift (mock-only → real, prod panels were blank) + keyset pagination on inventory movements + audit_log cursor mode; 27/27, smoke 20/20 |
