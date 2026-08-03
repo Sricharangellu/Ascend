@@ -134,19 +134,21 @@ export function RetailSetupChecklist() {
   return (
     <section
       aria-label="Retail setup checklist"
-      className="mb-5 rounded-xl border border-brand-600/25 bg-white p-5 shadow-sm"
+      className="mb-5 rounded-xl border border-brand-600/25 p-5 shadow-[var(--shadow-sm)]"
+      style={{ backgroundColor: "var(--color-surface)" }}
     >
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-sm font-semibold text-[#111]">Finish setting up your store</h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
             {doneCount} of {tasks.length} tasks complete — everything the register needs before your first sale.
           </p>
         </div>
         <button
           type="button"
           onClick={dismiss}
-          className="text-xs text-slate-400 hover:text-slate-600"
+          className="text-[11px] transition-colors hover:text-brand-600"
+          style={{ color: "var(--color-text-muted)" }}
           aria-label="Dismiss setup checklist"
         >
           Dismiss
@@ -154,7 +156,8 @@ export function RetailSetupChecklist() {
       </div>
 
       {/* Progress */}
-      <div className="mt-3 h-1.5 rounded-full bg-slate-100" role="progressbar"
+      <div className="mt-3 h-1.5 rounded-full" role="progressbar"
+        style={{ backgroundColor: "var(--color-surface-subtle)" }}
         aria-valuemin={0} aria-valuemax={tasks.length} aria-valuenow={doneCount}
         aria-label="Setup progress">
         <div
@@ -170,23 +173,24 @@ export function RetailSetupChecklist() {
               href={task.href}
               className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
                 task.done
-                  ? "border-emerald-100 bg-emerald-50/50"
-                  : "border-slate-200 bg-white hover:border-brand-600/40"
+                  ? "border-success-200 bg-success-50/50"
+                  : "hover:border-brand-600/40"
               }`}
             >
               <span
                 aria-hidden="true"
                 className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                  task.done ? "bg-emerald-500 text-white" : "border-2 border-slate-300 text-transparent"
+                  task.done ? "bg-success-500 text-white" : "border-2 text-transparent"
                 }`}
               >
                 ✓
               </span>
               <span>
-                <span className={`block text-sm font-medium ${task.done ? "text-emerald-700 line-through decoration-emerald-300" : "text-[#111]"}`}>
+                <span className={`block text-[13px] font-medium ${task.done ? "text-success-700 line-through decoration-success-300" : ""}`}
+                  style={task.done ? {} : { color: "var(--color-text-primary)" }}>
                   {task.label}
                 </span>
-                <span className="block text-xs text-slate-500">{task.description}</span>
+                <span className="block text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{task.description}</span>
               </span>
             </Link>
           </li>

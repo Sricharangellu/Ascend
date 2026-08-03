@@ -33,11 +33,11 @@ export function BarChart({
   showEveryNthLabel = 4,
 }: BarChartProps) {
   if (loading) {
-    return <div className="animate-pulse rounded bg-slate-100" style={{ height }} />;
+    return <div className="animate-skeleton rounded" style={{ height }} />;
   }
   if (!data.length) {
     return (
-      <div className="flex items-center justify-center text-sm text-slate-400" style={{ height }}>
+      <div className="flex items-center justify-center text-[13px]" style={{ height, color: "var(--color-text-muted)" }}>
         No data
       </div>
     );

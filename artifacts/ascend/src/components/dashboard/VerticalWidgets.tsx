@@ -22,7 +22,7 @@ function Widget({
   title: string; href: string; linkLabel?: string; children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--color-table-border)] bg-white p-4 shadow-sm">
+    <div className="rounded-xl border p-4 shadow-[var(--shadow-sm)]" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">{title}</h3>
         <Link href={href} className="text-xs text-brand-600 hover:underline">{linkLabel}</Link>
@@ -34,7 +34,7 @@ function Widget({
 
 function WidgetRow({ label, value, sub, color = "" }: { label: string; value: string; sub?: string; color?: string }) {
   return (
-    <div className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-gray-50">
+    <div className="flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors hover:bg-[var(--color-surface-subtle)]">
       <p className="text-sm text-[var(--color-text-primary)] truncate">{label}</p>
       <div className="text-right shrink-0 ml-2">
         <p className={`text-sm font-semibold ${color || "text-[var(--color-text-primary)]"}`}>{value}</p>
@@ -47,7 +47,7 @@ function WidgetRow({ label, value, sub, color = "" }: { label: string; value: st
 function Skeleton() {
   return (
     <div className="space-y-2">
-      {[1,2,3].map(i => <div key={i} className="h-8 animate-pulse rounded-lg bg-gray-100" />)}
+      {[1,2,3].map(i => <div key={i} className="h-8 animate-skeleton rounded-lg" />)}
     </div>
   );
 }
@@ -152,8 +152,8 @@ function RoomsWidget() {
             <div className="flex items-center justify-between text-xs text-[var(--color-text-secondary)] mb-1">
               <span>Occupancy</span><span className="font-semibold text-[var(--color-text-primary)]">{pctOcc}%</span>
             </div>
-            <div className="h-2 w-full rounded-full bg-gray-100">
-              <div className={`h-2 rounded-full transition-all ${pctOcc > 80 ? "bg-green-500" : pctOcc > 50 ? "bg-amber-400" : "bg-red-400"}`}
+            <div className="h-2 w-full rounded-full" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
+              <div className={`h-2 rounded-full transition-all ${pctOcc > 80 ? "bg-success-500" : pctOcc > 50 ? "bg-warning-500" : "bg-danger-500"}`}
                 style={{ width: `${pctOcc}%` }} />
             </div>
           </div>
@@ -261,13 +261,13 @@ function EntertainmentWidget() {
           {events.slice(0, 4).map(e => {
             const pct = Math.round((e.sold / e.capacity) * 100);
             return (
-              <div key={e.id} className="rounded-lg px-2 py-1.5 hover:bg-gray-50">
+              <div key={e.id} className="rounded-lg px-2 py-1.5 transition-colors hover:bg-[var(--color-surface-subtle)]">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">{e.name}</p>
-                  <p className="text-xs text-[var(--color-text-secondary)] shrink-0 ml-2">{pct}% sold</p>
+                  <p className="text-[13px] font-medium truncate" style={{ color: "var(--color-text-primary)" }}>{e.name}</p>
+                  <p className="text-[11px] shrink-0 ml-2" style={{ color: "var(--color-text-secondary)" }}>{pct}% sold</p>
                 </div>
-                <div className="mt-1 h-1 w-full rounded-full bg-gray-100">
-                  <div className={`h-1 rounded-full ${pct >= 90 ? "bg-red-500" : "bg-brand-500"}`}
+                <div className="mt-1 h-1 w-full rounded-full" style={{ backgroundColor: "var(--color-surface-subtle)" }}>
+                  <div className={`h-1 rounded-full ${pct >= 90 ? "bg-danger-500" : "bg-brand-500"}`}
                     style={{ width: `${pct}%` }} />
                 </div>
               </div>

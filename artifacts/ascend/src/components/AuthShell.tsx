@@ -40,7 +40,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-950 lg:flex-row">
+    <div className="flex min-h-screen flex-col lg:flex-row" style={{ backgroundColor: "var(--color-page-bg)" }}>
       {/* Left — brand / marketing panel (60%) */}
       <div className="relative hidden overflow-hidden bg-gradient-to-br from-brand-700 via-brand-800 to-indigo-950 lg:flex lg:w-[60%] lg:flex-col lg:justify-between lg:p-12 xl:p-16">
         <DashboardPreview />
@@ -104,14 +104,15 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
             >
               F
             </div>
-            <span className="text-base font-semibold text-slate-900 dark:text-white">Ascend</span>
+            <span className="text-[15px] font-semibold" style={{ color: "var(--color-text-primary)" }}>Ascend</span>
           </div>
 
           <button
             type="button"
             onClick={toggleTheme}
             aria-pressed={theme === "dark"}
-            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border px-3 text-[13px] font-medium shadow-[var(--shadow-sm)] transition-colors hover:bg-[var(--color-surface-subtle)] focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}
           >
             {theme === "dark" ? <SunIcon /> : <MoonIcon />}
             <span className="hidden sm:inline">{theme === "dark" ? "Light mode" : "Dark mode"}</span>
@@ -138,22 +139,21 @@ function AuthFooter() {
   ];
 
   return (
-    <footer className="border-t border-slate-200 px-4 py-4 dark:border-slate-800 sm:px-8">
-      <div className="flex flex-col gap-3 text-xs text-slate-500 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+    <footer className="border-t px-4 py-4 sm:px-8" style={{ borderColor: "var(--color-border)" }}>
+      <div className="flex flex-col gap-3 text-[12px] sm:flex-row sm:items-center sm:justify-between"
+        style={{ color: "var(--color-text-secondary)" }}>
         <nav aria-label="Legal and support" className="flex flex-wrap gap-x-4 gap-y-2">
           {links.map((link) => (
-            <Link key={link.label} href={link.href} className="hover:text-slate-700 hover:underline dark:hover:text-slate-200">
+            <Link key={link.label} href={link.href} className="hover:text-brand-600 hover:underline transition-colors">
               {link.label}
             </Link>
           ))}
         </nav>
-
         <label className="flex items-center gap-2">
           <span className="sr-only">Language</span>
-          <select
-            defaultValue="en"
-            className="min-h-[36px] rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-          >
+          <select defaultValue="en"
+            className="h-8 rounded-lg border px-2 text-[12px] outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-text-secondary)" }}>
             <option value="en">English (US)</option>
             <option value="es">Español</option>
             <option value="fr">Français</option>
@@ -162,8 +162,7 @@ function AuthFooter() {
           </select>
         </label>
       </div>
-
-      <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">
+      <p className="mt-3 text-[11px]" style={{ color: "var(--color-text-muted)" }}>
         This site is protected by reCAPTCHA and is subject to the Ascend Privacy Policy and Terms of Service.
         &copy; {new Date().getFullYear()} Ascend.
       </p>
