@@ -21,7 +21,7 @@ no unexplained frontend gaps, a single consistent error envelope, a single API c
 tenant-scoping previously swept clean, and 96 backend + 26 frontend test files.
 
 The damage is concentrated in one place, and it is not the application code: **a
-foreign workspace has been merged into this repository three times**, and the third
+foreign workspace has been merged into this repository five times**, and one
 occurrence is live on `develop` right now. It has broken CI, deleted the environment
 templates, and left a **second, diverging copy of the entire application** in
 `artifacts/` — 1,004 files, 46% of the tree.
@@ -51,7 +51,26 @@ is not 70% healthy regardless of what the code looks like underneath.
 
 ### CRITICAL
 
-#### C-1 — CI is red on `develop`: the npm root was replaced by a foreign workspace stub (3rd occurrence) — **FIXED**
+#### C-1 — CI is red on `develop`: the npm root was replaced by a foreign workspace stub — **FIXED (superseded on merge)**
+
+> **Correction, 2026-08-04T14:30Z.** This section originally called it the *third*
+> occurrence. It was the **fifth**. That count was everything the tree at `a4dbf2c`
+> could support — `AUDIT_2026-08-03T190400Z` and `…T190734Z`, which document
+> occurrences four and five, were **not committed at that commit** (verified:
+> `git cat-file -e a4dbf2c:WORK/audits/…` fails for both). They arrived with PR #182.
+> Worth recording rather than quietly editing, because the mechanism is itself a
+> finding: *the audit trail was incomplete because parallel sessions' work had not
+> landed yet*, so an audit taken at a point-in-time commit under-counted a recurring
+> incident. Any future count should be taken against `origin/develop`, not the
+> working tree.
+>
+> **This fix was also superseded.** PR #182 (`2db1ee7`, "restore Ascend npm root
+> (5th workspace re-merge)") landed the same restore on `develop` independently
+> while this branch was open. On merge, `develop`'s root won and my restore
+> collapsed to nothing — the root manifests here are now byte-identical to
+> `develop`'s. **C-2's guard is not superseded**: #182 explicitly states its own
+> durable fix is "enforce_admins on develop protection — Sri-only", i.e. it shipped
+> no structural prevention. That remains this branch's contribution.
 
 **Description.** At `a4dbf2c` the repository root was not Ascend's. `package.json` was
 `{"name":"workspace"}` carrying one dependency (`@replit/connectors-sdk`) and a single
@@ -110,7 +129,7 @@ repository (verified by grep across all `.ts`/`.tsx`/`.js`).
 
 ---
 
-#### C-2 — Nothing prevented C-1, three times running — **FIXED**
+#### C-2 — Nothing prevented C-1, five times running — **FIXED**
 
 **Description.** Occurrences one and two were each hand-diagnosed after the fact. The
 second audit recommended exactly this guard and explicitly did not build it: *"a
@@ -439,7 +458,7 @@ The jobs that are red on `develop` pass here, which is the point of the change:
 1. **H-1 — which tree is canonical, and may the duplicate be removed after harvesting
    `push_tokens`?** This is the largest single cleanup available and it is blocked on a
    decision only you can make.
-2. **Branch protection on `develop` requiring green CI.** The third occurrence of C-1
+2. **Branch protection on `develop` requiring green CI.** Every occurrence of C-1
    would have been blocked automatically; it was red on arrival. The prior audit
    recommended this after occurrence two.
 3. **The other workspace's `origin`.** A guard makes the breakage loud. It does not stop

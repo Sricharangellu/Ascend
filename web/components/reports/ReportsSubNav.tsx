@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 // One entry per report — every report page is reachable from this sub-nav
 // (no URL-only dead ends). Hrefs are the canonical /reports tree; the legacy
-// /reporting/* aliases still serve the same pages and highlight correctly.
+// Legacy /reporting/* URLs 308 to /reports/* (next.config); normalize for highlight.
 const REPORT_LINKS = [
   { label: "Overview", href: "/reports" },
   { label: "Sales", href: "/reports/sales" },

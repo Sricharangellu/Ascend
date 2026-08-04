@@ -112,8 +112,9 @@ for (const f of files) {
 
 // 8. Root-manifest integrity — the npm surface CI actually invokes.
 //
-//    Three times (2026-08-02 PR #145, 2026-08-03 AUDIT_...T110000Z, and again on
-//    `develop` at a4dbf2c) a merge from a separately-scaffolded workspace replaced
+//    FIVE times over ~2 days (PR #145, #171 tsconfig, #174 full root, the
+//    2026-08-03T110000Z incident, and the a4dbf2c/#182 pair) a merge from a
+//    separately-scaffolded workspace replaced
 //    this repo's root with a foreign one: `package.json` became a `name: workspace`
 //    pnpm stub whose `preinstall` hook deletes `package-lock.json` and hard-fails
 //    every npm invocation, `package-lock.json` was deleted, and `tsconfig.json`

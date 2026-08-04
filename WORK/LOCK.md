@@ -3,11 +3,44 @@
 | Field | Value |
 |---|---|
 | Agent/session | Claude Code web session — `claude/ai-slop-consistency-audit-lc2552` |
-| Queue item | Repo-wide AI-slop elimination & consistency audit. P0: restore the npm root broken by the **third** Replit-workspace merge (CI red on `develop` — `npm ci` × 7 cannot run); add the structural guardrail the 2026-08-03T110000Z incident audit recommended but did not build. Then evidence-based duplication/dead-code/consistency findings on the canonical tree. |
+| Queue item | Repo-wide AI-slop elimination & consistency audit. P0: restore the npm root broken by the Replit-workspace merge (called the 3rd here; it was the **5th** — see the audit's correction note, and PR #182 landed the same restore independently) (CI red on `develop` — `npm ci` × 7 cannot run); add the structural guardrail the 2026-08-03T110000Z incident audit recommended but did not build. Then evidence-based duplication/dead-code/consistency findings on the canonical tree. |
 | Files/areas expected | `package.json`, `package-lock.json`, `tsconfig.json`, `.env*.example`, `web/.env*.example`, `tools/hygiene-check.mjs`, `.github/workflows/ci.yml`, `WORK/**`. NO `artifacts/**` (another environment's tree — documented, not touched). |
 | Started | 2026-08-04T040621Z |
 | Status | RELEASED — pushed to `claude/ai-slop-consistency-audit-lc2552`; see AUDIT_2026-08-04T040621Z-ai-slop-consistency-audit.md |
 | Blockers | none. Backend `npm test` completed: **851/851 pass, 0 fail** (~19 min — budget for that here; embedded-postgres cannot init as root, used system PG 16 via DATABASE_URL). `npm run smoke` not run locally; CI runs it in the same job. |
+
+## Active Claim (Cursor Cloud — Dashboard display and data)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud agent (`cursor/dashboard-display-data-45ad`) |
+| Queue item | Port Phase 13/14 enterprise command-center dashboard into canonical `web/`; honest KPIs; real routes; range-scoped cash flow; live-order sparklines; dark-mode tokens. Rebased onto post-#183 develop; integrated AiCommandCenterBanner (#177) + outlet scope (#166). |
+| Files/areas expected | `web/app/(protected)/dashboard/**`, `web/app/globals.css`, `src/modules/reports/{service,reports.test}.ts`, `WORK/**` |
+| Started | 2026-08-03T05:09:16Z |
+| Status | RELEASED — merged to develop via PR #167 |
+| Blockers | none |
+
+## Active Claim (Cursor Cloud — PR-A3 exhaustive-deps)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud `bc-ef8f489e` |
+| Queue item | PR-A3: fix 3 `react-hooks/exhaustive-deps` warnings (AllDocumentsTab refreshKey; ByTypeTab activeType; OfflineQueueBanner refreshCounts). Fix dep arrays — do not disable the rule. |
+| Files/areas expected | `web/app/(protected)/documents/_components/AllDocumentsTab.tsx`, `web/app/(protected)/documents/_components/ByTypeTab.tsx`, `web/components/terminal/OfflineQueueBanner.tsx`, `WORK/LOCK.md` |
+| Started | 2026-08-03T191000Z |
+| Status | RELEASED — `fix/web-exhaustive-deps`; lint/typecheck/build clean |
+| Blockers | none |
+
+## Active Claim (Cursor Cloud — HOTFIX restore npm root after 5th Replit re-merge)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud `bc-ef8f489e` — Pending agent commits |
+| Queue item | HOTFIX: `origin/develop` tip `a4dbf2c` again has `{"name":"workspace"}` + pnpm locks + deleted `package-lock.json` + project-references `tsconfig.json` + pnpm `.cursor/environment.json`. Surgical restore from last-good `dcdf04b` (#179); supersedes stale #180/#173 for current tip. |
+| Files/areas expected | `package.json`, `package-lock.json`, `tsconfig.json`, `.npmrc`, `pnpm-*`, `.env*.example`, `web/.env*.example`, `artifacts/ascend/.env.example`, `.cursor/environment.json`, `scripts/post-merge.sh`, `WORK/**` |
+| Started | 2026-08-03T190400Z |
+| Status | RELEASED — `cursor/hotfix-restore-npm-root-0e3c`; see AUDIT_2026-08-03T190400Z-replit-pnpm-root-hijack-5th.md |
+| Blockers | none |
 
 ## Active Claim (Cursor Cloud — HOTFIX restore Ascend tsconfig)
 
@@ -19,6 +52,18 @@
 | Started | 2026-08-03T061100Z |
 | Status | RELEASED — `cursor/hotfix-restore-ascend-tsconfig-604f`; see AUDIT_2026-08-03T061100Z-hotfix-restore-ascend-tsconfig.md |
 | Blockers | none |
+
+## Active Claim (Cursor cloud — Ponytail Wave 3 alias cleanup on develop)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor cloud agent (`cursor/ponytail-wave3-develop-72bc`) |
+| Queue item | Wave 3 delta develop still lacked: delete `/reporting/*` + thin alias page twins; invert Outlets ownership to `/setup/outlets`; Pricing quarantine to Customer Overrides; Delivery stage tokens. Waves 0–2 were already landed by `cursor/ponytail-implement-4fe7` (PR #160) — not replayed. |
+| Files/areas expected | `web/app/(protected)/{reporting,sell,sales,shipping,finance,setup,inventory,ecommerce,catalog,operations,pricing,delivery}/**`; `web/next.config.mjs`; `web/public/sw.js`; `web/mocks/mockHandlers.ts`; WORK audit + LOCK. |
+| Started | 2026-08-03 |
+| Status | RELEASED — Wave 3 shipped; AUDIT_2026-08-03T060225Z-ponytail-wave3-develop.md |
+| Blockers | none |
+
 
 ## Active Claim (Cursor cloud — Ponytail implement Waves 2b–3)
 
