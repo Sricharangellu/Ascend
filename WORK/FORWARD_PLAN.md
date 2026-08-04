@@ -1611,6 +1611,163 @@ Use evidence from files and commands. Run at least:
 Do not overwrite existing work-state docs. Write the audit as a new dated file at WORK/AUDIT_YYYY-MM-DD.md and follow the rules in WORK/README.md. Be brutally honest but practical. Separate "built", "verified", "mocked", "partial", and "planned". End with a prioritized phase plan and release gate checklist.
 ```
 
+### Phase 9: AI-slop remediation program (approved scope, 2026-08-04)
+
+Source: `WORK/audits/AUDIT_2026-08-04T040621Z-ai-slop-consistency-audit.md`.
+
+**The governing rule for this phase: findings are not fixed in one pass.** An
+agent turned loose to "fix everything the audit found" trades a known set of
+defects for an unknown set of regressions, and this repo has already paid that
+price — three of the four table-collision bugs fixed in July were introduced by
+work that looked locally correct. Each bucket below is a separate PR series with
+its own gates. Do not open a PR that spans two buckets.
+
+Buckets P0 and the CI-blocker half of P1 are already **DONE** (PR #185). What
+remains is sequenced, not scheduled — pick the next unchecked item in order.
+
+#### Phase 9.1 — Classification
+
+| Priority | Definition | Findings |
+|---|---|---|
+| **P0** | Security, data corruption, broken transactions, pipeline down | C-1 root-manifest hijack ✅ DONE · C-2 missing guardrail ✅ DONE |
+| **P1** | Duplicate business logic, inconsistent APIs, architecture violations | P1-1 tax has three authorities · P1-2 `artifacts/` duplicate app tree (NEEDS-SRI) · H-2 duplicate `apiFetch` ✅ DONE |
+| **P2** | Dead code, inconsistent naming, mechanical refactoring | P2-1 48× `test-request.ts` · P2-2 `expenses` module layout differs from all 52 others · M-1/M-2/M-3/M-4 ✅ DONE |
+| **P3** | Style, comments, formatting | P3-1 31 `eslint-disable` + 3 `: any` in `src/` · L-2 Node-24 test assertion |
+
+Nothing in the audit was classified P0 on the *application* — the P0s were both
+pipeline/infrastructure. That is worth stating plainly: the retail core did not
+produce a security or data-corruption finding this pass.
+
+#### Phase 9.2 — Canonical ownership
+
+Done: `docs/architecture/ARCHITECTURE.md` now carries a **Domain → owning
+implementation** table naming the single file that decides each business rule,
+alongside the existing team→module table. Two domains are recorded as having no
+single owner (tax, pricing) rather than being assigned a plausible one.
+
+Every duplicate below migrates *toward* an owner in that table. If a duplicate
+has no owner, naming the owner is the first task, not the refactor.
+
+#### Phase 9.3 — Duplication elimination, in dependency order
+
+Bottom-up so each layer is stable before the one above it moves. One domain per
+PR; full backend suite green before the next.
+
+1. **Shared utilities** — P2-1 (`test-request.ts` ×48).
+2. **Validation** — audit zod schemas for the P1-1 class (optional fields that
+   silently default to a money value). `tax_rate_pct` is the known instance.
+3. **DTOs** — P2-2; align `expenses.dto.ts`/`expenses.repository.ts` with the
+   `service.ts`/`routes.ts`/`index.ts` shape the other 52 modules use, or
+   document why expenses is the exception and make it the new standard.
+4. **Repositories / services / business logic** — P1-1 tax consolidation.
+5. **API controllers** — deferred; `gap:scan` reports no route-level drift today.
+6. **UI components** — deferred; only 4 files bypass the shared API client and
+   each has a stated reason.
+
+#### Phase 9.4 — Hallucination sweep (not yet run)
+
+The audit checked module registration (clean), table collisions (clean), and
+route alignment (clean). It did **not** run a systematic unreferenced-symbol
+sweep — no tooling exists for it here. Blocked on Phase 9.6's dead-code
+detector; running it by hand across 977 `.ts` + 836 `.tsx` files is exactly the
+kind of task that should be automated once rather than eyeballed once.
+
+#### Phase 9.5 — Standards
+
+Already enforced and holding: integer cents, tenant-scoped tables, idempotent
+hash-tracked migrations, one error envelope, keyset pagination, append-only
+financial records, `strict: true` on both trees.
+
+Gaps to close: module file layout (P2-2), and a written rule that an optional
+request field may never default to a money or tax value (P1-1's root cause).
+
+#### Phase 9.6 — Automated guardrails: have vs. missing
+
+Measured 2026-08-04, not assumed.
+
+| Check | Status |
+|---|---|
+| TS strict, no ignored errors | ✅ `strict: true` both trees; **0** `@ts-ignore`, **0** `@ts-expect-error` in `src/` |
+| Backend typecheck / test / smoke | ✅ CI |
+| Frontend typecheck / lint / build | ✅ CI (lint currently allows warnings) |
+| Root-manifest integrity | ✅ CI, first step (added PR #185) |
+| Route/contract drift | ✅ `gap:scan` (+ orphan detection, PR #185) |
+| Table collisions | ✅ `table:scan` |
+| Repo hygiene, secrets, tracked env | ✅ `hygiene` |
+| Unguarded mutations, SQL interpolation, `console.*` | ✅ CI greps |
+| e2e golden paths | ✅ CI (non-gating: known auth flake) |
+| **Duplicate-code detection** | ❌ **none** — would have found P2-1 and H-2 automatically |
+| **Dead-code detection** | ❌ none — blocks Phase 9.4 |
+| **Dependency-cycle detection** | ❌ none |
+| **Dependency vulnerability scanning** | ❌ none, and no `.github/dependabot.yml` |
+| **Test coverage thresholds** | ❌ none (`node --test`, no coverage gate) |
+| **OpenAPI contract validation** | ❌ none — `contracts/openapi.yaml` is generated *from*, never checked *against* |
+| Bundle size / perf regression | ❌ none |
+
+Highest value first: **duplicate-code detection** (it would have caught two of
+this audit's findings with no human), then **dependency vulnerability
+scanning** (conspicuous by absence — `pnpm-workspace.yaml` already carries a
+`minimumReleaseAge` supply-chain defence, so the intent exists without the
+check), then **dead-code detection** to unblock 9.4.
+
+Add each as **non-blocking first**, exactly as `docker-build` and `e2e` were
+introduced. A brand-new detector on a 2,195-file repo will report hundreds of
+findings; gating merges on it before the backlog is burned down blocks all work
+and the check gets deleted. Prove it green, then gate it.
+
+#### Phase 9.7 — Incremental refactor loop
+
+Per module: audit → refactor → full backend suite → staging → verify → merge →
+next. Never two modules in one PR.
+
+#### Phase 9.8 — Agent workflow
+
+`AGENTS.md` already mandates the discovery half (read order, "before building
+any feature/module/endpoint, check it does not already exist", lock protocol).
+The gap is that it says nothing about *which owner* a change belongs to. Add
+one step: after the duplicate check, identify the owning implementation in
+`ARCHITECTURE.md`'s domain table and extend it, rather than adding a local
+helper. H-2 was a private `apiFetch` written beside a canonical one — the rule
+that would have prevented it is exactly that.
+
+#### Phase 9.9 — Backlog
+
+| ID | Title | Module | Pri | Effort | Depends on | Risk | Acceptance criteria |
+|---|---|---|---|---|---|---|---|
+| **P1-1** | Single tax authority | orders, customer_invoices, settings | P1 | 2–3 d | Sri: which of the three wins | **High — changes what customers are charged; needs a data check for invoices already written at 0%** | One tax calculator imported by every writer; `tax_rate_pct` can no longer default to 0 silently; tests cover POS and invoice paths agreeing on identical input; existing zero-tax invoices identified and reported |
+| **P1-2** | Resolve `artifacts/` duplicate app tree | repo-wide | P1 | 1–2 d | **NEEDS-SRI** decision | Medium — 857 files; reversible via git | ADR names the canonical tree; `push_tokens` harvested into `src/` with its tests; duplicate trees removed in a separate follow-up PR |
+| **P2-1** | Consolidate 48× `test-request.ts` | all backend modules | P2 | 0.5 d | none | Low — test-only | One `src/shared/test-request.ts` factory; each module re-exports with its own default role preserved exactly; 851/851 still green |
+| **P2-2** | Align `expenses` module layout | expenses | P2 | 0.5 d | none | Low | Either matches the 52-module convention, or the convention is updated and documented |
+| **G-1** | Duplicate-code detection in CI | tooling | P2 | 0.5 d | none | Low — non-blocking | Reports on PRs; baseline recorded; not merge-gating until backlog burned down |
+| **G-2** | Dependency vulnerability scanning | tooling | P2 | 0.5 d | none | Low | `dependabot.yml` + a CI advisory check; findings triaged, not auto-merged |
+| **G-3** | Dead-code detection | tooling | P2 | 1 d | none | Low | Non-blocking report; unblocks Phase 9.4 |
+| **G-4** | OpenAPI contract validation | tooling, contracts | P2 | 1 d | none | Medium — may reveal real drift | CI fails when a route's shape diverges from `contracts/openapi.yaml` |
+| **P3-1** | Burn down 31 `eslint-disable` + 3 `: any` | src, web | P3 | 1 d | G-1..G-3 landed | Low | Each remaining suppression carries a one-line justification; `next lint` gates on zero *new* warnings |
+| **S-1** | Branch protection on `develop` | — | **P0** | minutes | **Sri-only** | None | `develop` requires green CI; all three root hijacks were red on arrival |
+
+#### Phase 9.10 — Re-audit baseline
+
+Re-run the audit after 9.3 and after 9.6. Compare against 2026-08-04:
+
+| Metric | 2026-08-04 baseline |
+|---|---|
+| Duplicate business-rule domains | 2 (tax; `artifacts/` tree) |
+| Duplicated helper files | 48 (`test-request.ts`), 8 variants |
+| Duplicate app trees | 1 (1,004 files, 46% of repo) |
+| Dead config entries | 0 (4 removed) |
+| Backend tests | 851, 851 pass |
+| Backend modules / tables / routes | 53 / 166 / 473 |
+| Type suppressions in `src/` | 0 |
+| `eslint-disable` (src+web) | 31 |
+| CI guardrail coverage | 9 of 16 categories |
+| Overall health score | 58/100 |
+
+Phase 9 is complete when: no P0 or P1 open, the duplicate-app-tree decision is
+made and executed, duplicate/dead-code detection runs in CI, and a re-audit
+scores every category it can measure without inventing one — Performance stays
+unscored until real profiling evidence exists.
+
+
 ## Release gate checklist
 
 Ascend should not be considered production-ready until all of these are true:

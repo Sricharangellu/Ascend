@@ -460,6 +460,15 @@ lost-then-recovered work). These rules exist so it cannot recur:
 - **Before building any feature/module/endpoint, check it does not already exist** —
   `git grep -n "<name>" origin/master` and scan `src/modules/`. Duplicate *work* (two
   sessions building the same thing) is the costliest collision; extend, don't fork.
+- **Then find the OWNER before you write the code.** Look the business rule up in
+  `docs/architecture/ARCHITECTURE.md`'s "Domain → owning implementation" table and extend
+  that file. Writing a local helper beside a canonical one is the *other* duplication
+  failure — it passes every existing gate, because nothing is missing and nothing
+  collides, and it only surfaces later as behaviour drift. Real example: a private
+  `apiFetch` in `web/contexts/StoreAuthContext.tsx` sat next to the shared API client
+  long enough to diverge on error parsing (users saw `[object Object]`) and to read an
+  env var that exists nowhere in the repo. If a domain has no owner listed, naming one
+  is the first task, not the refactor.
 - **New agent/session onboarding:** paste `tools/AGENT_PROMPT.md` — the copy-paste
   coordination brief (read order, lock claim, worktree, duplicate-check, gates, PR flow).
 - Before ending a session: `git status` must show no untracked ` 2.` / backup junk.
