@@ -397,10 +397,35 @@ Phases 1–2 are done. The rest is ordered by dependency, not by appetite.
 | **1 — Critical blockers** | C-1 root restore; C-2 structural guard | **DONE** |
 | **2 — AI-slop quick wins** | H-2 duplicate `apiFetch` + regression test; M-1 gitignore door; M-2/3/4 allowlist + scanner | **DONE** |
 | **3 — Architecture cleanup** | H-1: ADR naming the canonical tree → harvest `push_tokens` and any other `artifacts`-only backend work → remove the duplicate trees | **NEEDS-SRI** (decision, then ~1–2 days) |
-| **4 — Duplication** | H-3: consolidate 48 `test-request.ts` copies behind one factory | Ready; own PR |
+| **4 — Duplication** | H-3: 48 `test-request.ts` copies now compose shared primitives (−2,925 lines) | **DONE** (852/852) |
 | **5 — Prevention** | Branch protection on `develop` requiring green CI; decide the other workspace's remote | **Sri-only** |
 | **6 — Testing** | L-2 Node-version assertion; extend coverage to the storefront surfaces H-2 exposed as untested | Backlog |
 | **7 — Documentation** | Fold this audit's conclusions into `GAPS.md`; ADR for phase 3 | With phase 3 |
+
+### What phase 4 corrected about H-3 itself
+
+The finding said "48 identical copies". Two parts of that were wrong, and both
+mattered to the fix:
+
+1. **They were not identical.** 34 were; the other 14 differed in ways their
+   tests depend on. Five modules (`discounts`, `insights`, `purchasing`, `sso`,
+   `workflows`) default to role `manager` where the rest default to `owner`;
+   `identity` signs no token at all; `progress` uses a different subject prefix
+   and takes a tenant. The obvious reading of the finding — one factory, one
+   signature — would have silently re-roled five modules' tests. That is a
+   change that **passes green while testing something other than what it says**,
+   which is the exact failure mode this audit exists to catch. The fix extracts
+   only the plumbing that was genuinely identical and leaves each module a shim
+   holding its own defaults.
+2. **The count was 50, not 48.** `team` and `notifications` don't import a
+   helper — their tests inline the same plumbing directly, so those two copies
+   were invisible to a file-name count and their sibling helpers were dead code
+   (now deleted). The duplicate-code guardrail still reports 7 duplicated blocks
+   inside module test files; that inlined plumbing is part of it, and is the
+   natural next slice.
+
+No test file was modified, which is what makes the 852/852 result evidence
+about the refactor rather than a rewritten baseline.
 
 **Performance** is deliberately absent: no evidence was gathered, so there is nothing
 honest to schedule. A real pass needs query plans against a seeded database and a bundle
