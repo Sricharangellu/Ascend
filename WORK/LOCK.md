@@ -1,3 +1,14 @@
+## Active Claim (Claude Code web — AI-slop / consistency audit)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ai-slop-consistency-audit-lc2552` |
+| Queue item | Repo-wide AI-slop elimination & consistency audit. P0: restore the npm root broken by the **third** Replit-workspace merge (CI red on `develop` — `npm ci` × 7 cannot run); add the structural guardrail the 2026-08-03T110000Z incident audit recommended but did not build. Then evidence-based duplication/dead-code/consistency findings on the canonical tree. |
+| Files/areas expected | `package.json`, `package-lock.json`, `tsconfig.json`, `.env*.example`, `web/.env*.example`, `tools/hygiene-check.mjs`, `.github/workflows/ci.yml`, `WORK/**`. NO `artifacts/**` (another environment's tree — documented, not touched). |
+| Started | 2026-08-04T040621Z |
+| Status | RELEASED — pushed to `claude/ai-slop-consistency-audit-lc2552`; see AUDIT_2026-08-04T040621Z-ai-slop-consistency-audit.md |
+| Blockers | Backend `npm test` + `npm run smoke` did NOT complete in this environment (96 test files in one `node --test` process, exceeded the time available; embedded-postgres also cannot init as root here — used system PG 16). No backend source was modified, and backend typecheck passes against the restored config, but CI must be green before merge. |
+
 ## Active Claim (Cursor Cloud — HOTFIX restore Ascend tsconfig)
 
 | Field | Value |
