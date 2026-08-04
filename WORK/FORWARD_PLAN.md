@@ -1814,12 +1814,15 @@ IDs are stable. Do not renumber; add.
 | **F-12** | — *(new)* | Optional request fields may silently default to money values | validation | **Medium** | No rule forbids it; `tax_rate_pct` is the known instance, others unaudited | Sweep zod schemas for `.optional()` on money/rate fields; write the rule into `AGENTS.md` | F-11 | 1 d | Medium | No money-affecting field defaults silently; rule documented | ⬜ **READY** after F-11 |
 | **F-13** | — *(new)* | Pricing has no owning module | pricing | **Medium** | Never built; `/api/v1/pricing` is a UI-only Preview prefix | Decide whether pricing becomes a real domain; if so create the module and add it to the ownership table | **NEEDS-SRI** | — | — | Ownership table has a real owner, or Preview status is explicitly reaffirmed | ⛔ **BLOCKED** |
 | **F-14** | — *(new)* | `expenses` layout differs from all 52 other modules | expenses | **Low** | Uses `expenses.dto.ts` / `expenses.repository.ts` instead of the `service.ts`/`routes.ts`/`index.ts` convention | Align it, or promote its layout to the standard and migrate the rest | F-3 | 0.5 d | Low | One documented module layout, applied consistently | ⬜ **READY** |
-| **F-15** | 9.6 | Duplicate-code detection in CI | tooling | **Medium** | No detector exists; this audit found duplicates by hand | Add a duplicate-code check, **non-blocking first** | — | 0.5 d | Low | Reports on PRs; baseline recorded; would flag F-4 and F-5 | ⬜ **READY — highest-value guardrail** |
+| **F-15** | 9.6 | Duplicate-code detection in CI | tooling | **Medium** | No detector exists; this audit found duplicates by hand | `tools/duplicate-code-scan.mjs`, dependency-free, report-only, wired into the guard job | — | 0.5 d | Low | Reports on PRs; baseline recorded (9.10); reproduced F-5 unaided **and surfaced F-21/F-22/F-23** | ✅ **DONE** |
 | **F-16** | 9.6 | Dependency vulnerability scanning | tooling | **Medium** | Absent, despite `pnpm-workspace.yaml` already carrying a `minimumReleaseAge` supply-chain defence — the intent exists without the check | `dependabot.yml` + a CI advisory check | — | 0.5 d | Low | Findings triaged, never auto-merged | ⬜ **READY** |
 | **F-17** | 9.4 | Dead-code detection + hallucination sweep | tooling → repo-wide | **Medium** | No tooling; sweeping 977 `.ts` + 836 `.tsx` by hand is not repeatable | Add a dead-code detector (non-blocking), then run the sweep it enables | — | 1 d | Low | Report exists; unreferenced exports/routes/columns enumerated; removals are a *separate* PR | ⬜ **READY** |
 | **F-18** | 9.6 | OpenAPI contract validation | tooling / contracts | **Medium** | `contracts/openapi.yaml` is generated *from* the code, never checked *against* it | CI check comparing route shapes to the contract | — | 1 d | Medium — may reveal real drift | CI fails on divergence | ⬜ **READY** |
 | **F-19** | — *(gap in the audit itself)* | **DB ↔ API ↔ frontend type consistency never audited** | cross-cutting | **High** | The audit verified route *existence* (`gap:scan`) and table collisions, but never the Schema→ORM→Service→API→FE-types→UI chain the master prompt asked for. Recorded as *not done*, not as *clean*. | Run that audit as its own pass; feed findings back here as F-20+ | F-3 (don't audit a tree that may be deleted) | 1–2 d | Medium | Every FE type traces to a real column; no field referenced that does not exist | ⬜ **READY** |
 | **F-20** | P3 | 31 `eslint-disable` + 3 `: any` in `src`/`web` | cross-cutting | **Low** | Accumulated without justification requirements | Burn down; require a one-line reason for survivors | F-15..F-17 | 1 d | Low | Every suppression justified; lint gates on zero *new* warnings | ⬜ **READY** last |
+| **F-21** | — *(found by F-15)* | `ProgressTask`/`ProgressEvidence` interfaces hand-duplicated backend↔frontend | progress, web/api-client | **Medium** | `web/api-client/types.ts` is **manually maintained** (its own header documents that the "auto-generated" claim was false) and 218 files import from it, so backend interfaces are re-typed by hand with no generation link | Generate from one source, or make the frontend type alias the backend's | F-19 | 0.5 d | Medium — 218 importers | One definition per interface; drift impossible by construction | ⬜ **READY** |
+| **F-22** | — *(found by F-15)* | Duplicated block: `OrdersTab.tsx` ↔ `ReturnsTab.tsx` | web / inventory | **Low** | Tab components copy-pasted | Extract the shared block | F-3 | 0.5 d | Low | One implementation, both tabs render unchanged | ⬜ **READY** |
+| **F-23** | — *(found by F-15)* | Duplicated block: `reports/sales-by-rep` ↔ `sales-by-vendor` pages | web / reports | **Low** | Report pages copy-pasted | Extract a shared report-page component | F-3 | 0.5 d | Low | One implementation, both reports render unchanged | ⬜ **READY** |
 | **S-1** | C-1/C-2 rec. | Branch protection on `develop` requiring green CI | — | **Critical** | Nothing enforces that a red branch cannot merge | Repo setting | **Sri-only** | mins | None | `develop` requires green CI. All three hijacks were red on arrival | ⛔ **SRI-ONLY** |
 | **S-2** | C-1 rec. | Repoint the other workspace's `origin` | — | **High** | Two projects share one remote | Fork, or disconnect | **Sri-only** | mins | None | A foreign root can no longer reach this repo | ⛔ **SRI-ONLY** |
 
@@ -1842,13 +1845,15 @@ Re-run the audit after 9.3 and after 9.6. Compare against 2026-08-04:
 |---|---|
 | Duplicate business-rule domains | 2 (tax; `artifacts/` tree) |
 | Duplicated helper files | 48 (`test-request.ts`), 8 variants |
+| Identical-file groups (`dupe:scan`) | 3 groups / 44 files |
+| Duplicated blocks ≥25 lines (`dupe:scan`) | 9 |
 | Duplicate app trees | 1 (1,004 files, 46% of repo) |
 | Dead config entries | 0 (4 removed) |
 | Backend tests | 851, 851 pass |
 | Backend modules / tables / routes | 53 / 166 / 473 |
 | Type suppressions in `src/` | 0 |
 | `eslint-disable` (src+web) | 31 |
-| CI guardrail coverage | 9 of 16 categories |
+| CI guardrail coverage | 10 of 16 categories (duplicate-code added 2026-08-04) |
 | Overall health score | 58/100 |
 
 Phase 9 is complete when: no P0 or P1 open, the duplicate-app-tree decision is

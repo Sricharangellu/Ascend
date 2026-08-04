@@ -88,6 +88,17 @@ jobs:
         # entry. No deps; plain ESM on the runner's Node.
         run: npm run gap:scan
 
+      # Backlog F-15. REPORT-ONLY on purpose — the script exits 0 regardless.
+      # The 2026-08-04 audit found two duplication defects by hand (48 copies of
+      # test-request.ts; a private apiFetch beside the canonical one) that no
+      # existing guard could catch, because they all look for something MISSING
+      # or COLLIDING and duplication is neither. Gating on it now would fail
+      # every PR until F-5 lands, and a check that blocks all work gets deleted
+      # — so it reports first, exactly like docker-build and e2e did. Add
+      # `--max <n>` here once the count is small and stable.
+      - name: Duplicate-code scan (report-only)
+        run: node tools/duplicate-code-scan.mjs
+
       - name: One canonical agent-instruction file
         run: |
           # "1 file for all agents": exactly one root AGENTS.md; CLAUDE.md may

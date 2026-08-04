@@ -16,6 +16,7 @@
     "prevent:drift": "node tools/prevention-agent.mjs",
     "gap:scan": "node tools/api-gap-scan.mjs",
     "table:scan": "node tools/table-collision-scan.mjs",
+    "dupe:scan": "node tools/duplicate-code-scan.mjs",
     "dashboard": "node tools/dashboard.mjs",
     "seed:e2e": "tsx scripts/seed-e2e.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
