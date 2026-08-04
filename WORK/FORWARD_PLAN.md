@@ -1755,7 +1755,7 @@ Measured 2026-08-04, not assumed.
 | Unguarded mutations, SQL interpolation, `console.*` | ✅ CI greps |
 | e2e golden paths | ✅ CI (non-gating: known auth flake) |
 | **Duplicate-code detection** | ❌ **none** — would have found F-5 and F-4 automatically |
-| **Dead-code detection** | ❌ none — blocks Phase 9.4 |
+| Dead-code detection | ✅ **added 2026-08-04** — report-only (F-17); unblocks 9.4 |
 | **Dependency-cycle detection** | ❌ none |
 | Dependency vulnerability scanning | ✅ **added 2026-08-04** — `dependabot.yml` + report-only `npm audit` in CI (F-16) |
 | **Test coverage thresholds** | ❌ none (`node --test`, no coverage gate) |
@@ -1816,7 +1816,8 @@ IDs are stable. Do not renumber; add.
 | **F-14** | — *(new)* | `expenses` layout differs from all 52 other modules | expenses | **Low** | Uses `expenses.dto.ts` / `expenses.repository.ts` instead of the `service.ts`/`routes.ts`/`index.ts` convention | Align it, or promote its layout to the standard and migrate the rest | F-3 | 0.5 d | Low | One documented module layout, applied consistently | ⬜ **READY** |
 | **F-15** | 9.6 | Duplicate-code detection in CI | tooling | **Medium** | No detector exists; this audit found duplicates by hand | `tools/duplicate-code-scan.mjs`, dependency-free, report-only, wired into the guard job | — | 0.5 d | Low | Reports on PRs; baseline recorded (9.10); reproduced F-5 unaided **and surfaced F-21/F-22/F-23** | ✅ **DONE** |
 | **F-16** | 9.6 | Dependency vulnerability scanning | tooling | **Medium** | Absent, despite `pnpm-workspace.yaml` already carrying a `minimumReleaseAge` supply-chain defence — the intent exists without the check | `.github/dependabot.yml` (grouped, low PR limit, majors ignored — this repo's failure mode is merge chaos, not stale deps) + a report-only `npm audit` CI step | — | 0.5 d | Low | Advisories visible on every PR; **first run found 14 in `web` + 2 at root** → F-24/F-25/F-26 | ✅ **DONE** |
-| **F-17** | 9.4 | Dead-code detection + hallucination sweep | tooling → repo-wide | **Medium** | No tooling; sweeping 977 `.ts` + 836 `.tsx` by hand is not repeatable | Add a dead-code detector (non-blocking), then run the sweep it enables | — | 1 d | Low | Report exists; unreferenced exports/routes/columns enumerated; removals are a *separate* PR | ⬜ **READY** |
+| **F-17** | 9.4 | Dead-code detection | tooling | **Medium** | No tooling; sweeping 977 `.ts` + 836 `.tsx` by hand is not repeatable | `tools/dead-code-scan.mjs`, dependency-free, report-only, split value vs type | — | 1 d | Low | Report exists and is wired into CI. **Baseline: 371 unreferenced exports — 95 value, 276 type-only** | ✅ **DONE** |
+| **F-27** | 9.4 | Run the hallucination sweep F-17 enables | repo-wide | **Medium** | Deferred until detection was repeatable | Triage the 95 value hits: most are **over-exported, not dead** (verified: `CREATE_USERS_TABLE` is used at line 493 of its own file; `withStripeBreaker` only inside `stripe.ts`). Drop the `export` keyword where the symbol is file-local; delete only what is genuinely unreachable | F-17, F-3 | 1–2 d | **Medium — this is the one item that deletes code**; removals must be their own PR, never bundled | Each of the 95 classified as over-exported / dead / false-positive; deletions in a separate reviewed PR; 852 tests green | ⬜ **READY** |
 | **F-18** | 9.6 | OpenAPI contract validation | tooling / contracts | **Medium** | `contracts/openapi.yaml` is generated *from* the code, never checked *against* it | CI check comparing route shapes to the contract | — | 1 d | Medium — may reveal real drift | CI fails on divergence | ⬜ **READY** |
 | **F-19** | — *(gap in the audit itself)* | **DB ↔ API ↔ frontend type consistency never audited** | cross-cutting | **High** | The audit verified route *existence* (`gap:scan`) and table collisions, but never the Schema→ORM→Service→API→FE-types→UI chain the master prompt asked for. Recorded as *not done*, not as *clean*. | Run that audit as its own pass; feed findings back here as F-20+ | F-3 (don't audit a tree that may be deleted) | 1–2 d | Medium | Every FE type traces to a real column; no field referenced that does not exist | ⬜ **READY** |
 | **F-20** | P3 | 31 `eslint-disable` + 3 `: any` in `src`/`web` | cross-cutting | **Low** | Accumulated without justification requirements | Burn down; require a one-line reason for survivors | F-15..F-17 | 1 d | Low | Every suppression justified; lint gates on zero *new* warnings | ⬜ **READY** last |
@@ -1856,7 +1857,8 @@ Re-run the audit after 9.3 and after 9.6. Compare against 2026-08-04:
 | Backend modules / tables / routes | 53 / 166 / 473 |
 | Type suppressions in `src/` | 0 |
 | `eslint-disable` (src+web) | 31 |
-| CI guardrail coverage | 11 of 16 categories (duplicate-code + dependency advisories added 2026-08-04) |
+| CI guardrail coverage | 12 of 16 categories (duplicate-code, dependency advisories, dead-code added 2026-08-04) |
+| Unreferenced exports (`dead:scan`) | 371 — 95 value, 276 type-only |
 | Dependency advisories — `web` | 14 (1 critical, 9 high, 4 moderate) |
 | Dependency advisories — root | 2 low |
 | Overall health score | 58/100 |

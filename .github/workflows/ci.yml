@@ -109,6 +109,13 @@ jobs:
       # `--omit=dev` is NOT used: the critical finding is vitest, a devDependency.
       # Dev-only advisories still run on this runner and on contributors'
       # machines, so hiding them would defeat the point.
+      # Backlog F-17, and what unblocks Phase 9.4's hallucination sweep.
+      # REPORT-ONLY: 371 hits today, so any gate fails on arrival. The method
+      # can only under-report (see the script header), which is the correct
+      # bias for anything that leads to deleting code.
+      - name: Dead-code scan (report-only)
+        run: node tools/dead-code-scan.mjs
+
       - name: Dependency advisories (report-only)
         run: |
           echo "── root ──"
