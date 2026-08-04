@@ -461,6 +461,12 @@ The jobs that are red on `develop` pass here, which is the point of the change:
   "~9GB of orphaned embedded-Postgres dirs from timeout-killed runs" — different
   mechanism, same lesson: **a mass backend-test failure in this environment is a
   disk symptom until proven otherwise.** Check `df -h /` before believing it.
+  Confirmed, not just asserted: after reclaiming the space, a clean re-run was
+  **852 pass / 0 fail** (`duration_ms 990064`), so every anomaly above — the 770
+  failures, the lone unexplained one — was the disk and none was a code defect.
+  Note the honest cost of the diagnosis: the fast, obvious read of "770 tests
+  just broke" was wrong, and acting on it would have meant hunting a regression
+  that never existed.
 
 - **`npm run smoke` was still not run locally** — CI runs it immediately after `npm test`
   in the same job, so it is covered there rather than here.
