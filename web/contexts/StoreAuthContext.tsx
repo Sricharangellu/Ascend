@@ -2,6 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 
+import { apiFetch } from "@/api-client";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface StoreCustomer {
@@ -53,14 +55,38 @@ export function useStoreAuth() {
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
-async function apiFetch<T>(path: string, opts?: RequestInit, token?: string | null): Promise<T> {
-  const base = process.env.NEXT_PUBLIC_API_BASE ?? "";
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(`${base}${path}`, { ...opts, headers: { ...headers, ...(opts?.headers as Record<string, string> ?? {}) } });
-  const data = await res.json();
-  if (!res.ok) throw new Error((data as { error?: string }).error ?? "Request failed");
-  return data as T;
+/**
+ * Storefront requests go through the ONE shared API client, like every other
+ * caller in the app — this file used to carry a private 8-line `apiFetch` fork
+ * instead, which silently diverged from it in three ways:
+ *
+ *  - it read `NEXT_PUBLIC_API_BASE`, a variable that exists nowhere else in the
+ *    repo (env templates, next.config.mjs's `env` allowlist, middleware.ts's CSP
+ *    `connect-src`, playwright and the docs all use `NEXT_PUBLIC_API_BASE_URL`),
+ *    so Next inlined it as `undefined` and every storefront call went
+ *    same-origin regardless of how the backend origin was configured;
+ *  - it treated the error envelope's `error` as a string, but the gateway sends
+ *    `{ error: { code, message, requestId } }` (src/gateway/errorEnvelope.ts) —
+ *    an object, so the `?? "Request failed"` fallback never fired and users saw
+ *    `[object Object]` on any failed sign-in;
+ *  - it had none of the shared client's 429 `Retry-After` retry, network-error
+ *    wrapping, or 204 handling.
+ *
+ * `anonymous: true` is deliberate: the customer token below is a DIFFERENT
+ * credential from the staff session token, so the client must not attach
+ * `getAccessToken()` or run the staff 401-refresh/redirect-to-/login path.
+ */
+function storeFetch<T>(
+  method: "GET" | "POST",
+  path: string,
+  opts: { body?: unknown; token?: string | null } = {},
+): Promise<T> {
+  const { body, token } = opts;
+  return apiFetch<T>(method, path, {
+    anonymous: true,
+    ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+    ...(body !== undefined ? { body } : {}),
+  });
 }
 
 export function StoreAuthProvider({ children }: { children: React.ReactNode }) {
@@ -75,7 +101,7 @@ export function StoreAuthProvider({ children }: { children: React.ReactNode }) {
     const saved = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
     if (!saved) { setLoading(false); return; }
     setToken(saved);
-    apiFetch<StoreCustomer>("/api/v1/ecommerce/auth/me", {}, saved)
+    storeFetch<StoreCustomer>("GET", "/api/v1/ecommerce/auth/me", { token: saved })
       .then((c) => setCustomer(c))
       .catch(() => { localStorage.removeItem(TOKEN_KEY); setToken(null); })
       .finally(() => setLoading(false));
@@ -85,9 +111,10 @@ export function StoreAuthProvider({ children }: { children: React.ReactNode }) {
     if (storeAuthPreview()) {
       throw new Error("Store accounts are a preview — customer sign-in isn't available yet.");
     }
-    const res = await apiFetch<{ token: string; customer: StoreCustomer }>(
+    const res = await storeFetch<{ token: string; customer: StoreCustomer }>(
+      "POST",
       "/api/v1/ecommerce/auth/login",
-      { method: "POST", body: JSON.stringify({ email, password }) },
+      { body: { email, password } },
     );
     localStorage.setItem(TOKEN_KEY, res.token);
     setToken(res.token);
@@ -98,9 +125,10 @@ export function StoreAuthProvider({ children }: { children: React.ReactNode }) {
     if (storeAuthPreview()) {
       throw new Error("Store accounts are a preview — registration isn't available yet.");
     }
-    const res = await apiFetch<{ token: string; customer: StoreCustomer }>(
+    const res = await storeFetch<{ token: string; customer: StoreCustomer }>(
+      "POST",
       "/api/v1/ecommerce/auth/register",
-      { method: "POST", body: JSON.stringify({ name, email, password }) },
+      { body: { name, email, password } },
     );
     localStorage.setItem(TOKEN_KEY, res.token);
     setToken(res.token);
@@ -109,7 +137,7 @@ export function StoreAuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     if (token) {
-      await apiFetch("/api/v1/ecommerce/auth/logout", { method: "POST" }, token).catch(() => {});
+      await storeFetch("POST", "/api/v1/ecommerce/auth/logout", { token }).catch(() => {});
     }
     localStorage.removeItem(TOKEN_KEY);
     setToken(null);
