@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
+import Link from "next/link";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { formatMoney } from "@/lib/money";
 import { CustomerDetailPanel } from "./CustomerDetailPanel";
@@ -151,27 +152,21 @@ export function CustomerTable({ customers, loading, error }: Props) {
           </div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <thead className="border-b border-erp-table-border bg-erp-table-header text-xs font-semibold uppercase tracking-wide text-erp-text-secondary">
               <tr>
-                <th className="w-10 px-4 py-3">
-                  <input type="checkbox" className="rounded border-slate-300" aria-label="Select all" />
-                </th>
                 <th className="px-4 py-3 text-left">Customer</th>
                 <th className="px-4 py-3 text-left">Loyalty</th>
                 <th className="px-4 py-3 text-left">Account</th>
                 <th className="w-10 px-4 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-erp-table-border">
               {visible.map((c) => (
                 <Fragment key={c.id}>
                   <tr
-                    className="cursor-pointer hover:bg-[#FAFAFA]"
+                    className="cursor-pointer hover:bg-erp-table-header"
                     onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
                   >
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <input type="checkbox" className="rounded border-slate-300" aria-label={`Select ${c.name}`} />
-                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div
@@ -200,17 +195,21 @@ export function CustomerTable({ customers, loading, error }: Props) {
                       <span className="ml-1 text-xs text-[#666]">lifetime</span>
                     </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      <button type="button" aria-label={`Edit ${c.name}`} className="text-slate-400 hover:text-brand-600">
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <Link
+                        href={`/customers/${encodeURIComponent(c.id)}`}
+                        aria-label={`Open ${c.name}`}
+                        className="inline-flex min-h-touch min-w-touch items-center justify-center text-erp-text-secondary hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                         </svg>
-                      </button>
+                      </Link>
                     </td>
                   </tr>
 
                   {expandedId === c.id && (
                     <tr>
-                      <td colSpan={5} className="p-0">
+                      <td colSpan={4} className="p-0">
                         <CustomerDetailPanel customer={c} />
                       </td>
                     </tr>

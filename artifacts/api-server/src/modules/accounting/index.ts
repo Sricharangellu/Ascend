@@ -111,7 +111,7 @@ export const accountingModule: PosModule = {
     onBoth("purchase_order.received", async (event) => {
       const p = event.payload as { tenantId: string; poId: string; lines?: Array<{ quantity: number; unitCostCents: number }> };
       const goods = (p.lines ?? []).reduce((s, l) => s + l.quantity * l.unitCostCents, 0);
-      if (goods <= 0) return;
+      if (!Number.isFinite(goods) || goods <= 0) return; // NaN guard: malformed lines must not reach the ledger
       // Each receive event is its own posting (partial receipts post separately),
       // so the idempotency key is per event — poId + occurrence time survives
       // redelivery of the same event without collapsing distinct receipts.
@@ -152,10 +152,18 @@ export const accountingModule: PosModule = {
     });
 
     // POS payment captured → cash up, revenue recognized (net of change given).
+    // Redelivered/replayed events can arrive after the order reached a terminal
+    // state (refunded/voided) and may carry partial payloads (e.g. only orderId).
+    // Amounts must be validated as finite numbers before posting — otherwise
+    // `net` becomes NaN and postTransaction rejects with a NaN-balance error,
+    // corrupting the ledger path on every redelivery. Skipping is safe: if the
+    // original capture posted, hasPosting() already makes replays no-ops, and a
+    // payload without id/tenant/amount carries nothing postable.
     onBoth("payment.captured", async (event) => {
-      const p = event.payload as { tenantId: string; id: string; orderId: string; amountCents: number; changeCents?: number };
-      const net = p.amountCents - (p.changeCents ?? 0);
-      if (net <= 0) return;
+      const p = event.payload as { tenantId?: string; id?: string; orderId?: string; amountCents?: number; changeCents?: number };
+      if (!p.tenantId || !p.id) return; // partial replayed payload — nothing safe to post
+      const net = Number(p.amountCents) - Number(p.changeCents ?? 0);
+      if (!Number.isFinite(net) || net <= 0) return;
       await post("pos_payment", p.id, p.tenantId, [
         { accountCode: "1000", debitCents: net },
         { accountCode: "4000", creditCents: net },

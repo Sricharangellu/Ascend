@@ -81,10 +81,11 @@ export async function evaluateRetailSetupTasks(): Promise<SetupTaskState[]> {
   }
 
   return [
+    // /setup/* aliases still resolve into Settings/Operations for deep links.
     { key: "outlet",   label: "Create an outlet",        description: "Your store location — timezone, name, address.",            href: "/setup/outlets",       done: hasOutlet },
     { key: "register", label: "Add a register",           description: "A till the POS terminal can open and close.",               href: "/setup/outlets",       done: hasRegister },
-    { key: "tax",      label: "Set a tax rate",           description: "Sales tax applied at checkout.",                            href: "/setup/taxes",         done: hasTax },
-    { key: "payments", label: "Configure payment modes",  description: "Cash, card, and any other tenders you accept.",             href: "/setup/payment-modes", done: hasModes },
+    { key: "tax",      label: "Set a tax rate",           description: "Sales tax applied at checkout.",                            href: "/settings",            done: hasTax },
+    { key: "payments", label: "Configure payment modes",  description: "Cash, card, and any other tenders you accept.",             href: "/settings",            done: hasModes },
     { key: "receipt",  label: "Set up your receipt",      description: "Header, contact info, and return policy on receipts.",      href: "/settings",            done: hasReceipt },
     { key: "product",  label: "Add your first product",   description: "Create a product so the register has something to sell.",   href: "/catalog",             done: hasProduct },
     { key: "receive",  label: "Receive your first stock", description: "Bring inventory on hand through a receiving.",              href: "/inventory/receive-stock", done: hasStock },

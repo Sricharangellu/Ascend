@@ -16,6 +16,7 @@ import { useRouter, useSearchParams } from "@/lib/router";
 import { AuthShell } from "@/components/AuthShell";
 import { Button } from "@/components/Button";
 import { useAuth } from "@/lib/useAuth";
+import { isDemoMode, isMockActive } from "@/mocks/MockWorkerInit";
 
 const SSO_PROVIDERS = [
   { key: "google", label: "Google" },
@@ -41,7 +42,7 @@ export default function LoginPage() {
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const isDemo = searchParams.get("demo") === "1";
+  const isDemo = searchParams.get("demo") === "1" || isDemoMode();
   const { status, login, completeMfaLogin, loginError, isLoading } = useAuth();
 
   const [email, setEmail] = useState(
@@ -120,7 +121,15 @@ function LoginContent() {
           <div className="mb-5 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800 dark:border-indigo-700/40 dark:bg-indigo-700/10 dark:text-indigo-300">
             <p className="font-semibold">Demo mode active</p>
             <p className="mt-0.5 text-indigo-600 dark:text-indigo-400">
-              Credentials are pre-filled. Click <strong>Sign in</strong> to explore the full app with realistic data — no backend required.
+              {isMockActive() ? (
+                <>
+                  Credentials are pre-filled. Click <strong>Sign in</strong> to explore the full app with realistic data — no backend required.
+                </>
+              ) : (
+                <>
+                  Demo credentials are pre-filled. Click <strong>Sign in</strong> to access the live demo environment.
+                </>
+              )}
             </p>
           </div>
         )}
@@ -226,11 +235,7 @@ function LoginContent() {
                 Caps Lock is on.
               </p>
             )}
-            {import.meta.env.DEV && (() => {
-              const isMock =
-                import.meta.env.VITE_MOCK === "true" ||
-                (import.meta.env.VITE_MOCK !== "false" && import.meta.env.DEV);
-              return isMock ? (
+            {import.meta.env.DEV && (isMockActive() ? (
                 <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                   Dev mode: any password works (use &quot;wrong&quot; to test an error).
                 </p>
@@ -238,8 +243,7 @@ function LoginContent() {
                 <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                   Demo credentials: <span className="font-medium" style={{ color: "var(--color-text-secondary)" }}>owner@ascend.dev</span> / <span className="font-medium" style={{ color: "var(--color-text-secondary)" }}>AscendDemo!2026</span>
                 </p>
-              );
-            })()}
+              ))}
           </div>
 
           {/* Remember me */}

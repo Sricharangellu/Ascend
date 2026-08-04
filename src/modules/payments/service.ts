@@ -17,7 +17,7 @@ const log = moduleLogger("payments");
 // checkout logic.
 const gateway: PaymentGatewayAdapter = stripeGatewayAdapter;
 
-export type PaymentMethod = "cash" | "card" | "split" | "store_credit";
+export type PaymentMethod = "cash" | "card" | "split" | "store_credit" | "gift_card";
 export type PaymentStatus = "captured" | "declined" | "queued_offline";
 
 export interface PaymentRecord {
@@ -51,6 +51,8 @@ export interface CapturePaymentInput {
   stripePaymentIntentId?: string;
   /** Required for store_credit payments — the customer whose balance to deduct. */
   customerId?: string;
+  /** Required for gift_card payments — human-readable card code (e.g. GC-XXXX-XXXX-XXXX). */
+  giftCardCode?: string;
 }
 
 interface OrderRow {
@@ -116,8 +118,17 @@ function captureFingerprint(input: CapturePaymentInput): string {
     cashCents: input.cashCents ?? 0,
     cardCents: input.cardCents ?? 0,
     tenderedCents: input.tenderedCents ?? 0,
+    customerId: input.customerId ?? null,
+    giftCardCode: input.giftCardCode?.trim().toUpperCase() ?? null,
   });
   return createHash("sha256").update(canonical).digest("hex");
+}
+
+interface GiftCardRow {
+  id: string;
+  code: string;
+  balance_cents: number;
+  status: string;
 }
 
 /** Shape persisted in idempotency_keys.response. */
@@ -266,6 +277,17 @@ export class PaymentsService {
         break;
       }
 
+      case "gift_card": {
+        // Full-order tender only (v1) — same constraint as store_credit.
+        // Balance drawdown runs inside the payment transaction below so a
+        // failed payment insert cannot orphan a redemption.
+        if (!input.giftCardCode?.trim()) {
+          throw badRequest("giftCardCode is required for gift_card payments");
+        }
+        cashCents = owed;
+        break;
+      }
+
       default: {
         const exhaustive: never = input.method;
         throw badRequest(`unsupported payment method ${String(exhaustive)}`);
@@ -291,7 +313,51 @@ export class PaymentsService {
     // its outbox row commits atomically with the payment insert, so a crash
     // after commit can no longer lose the downstream revenue posting, order
     // completion, or loyalty award — the reconciler redelivers them.
+    type GiftRedeemEvent = {
+      id: string;
+      code: string;
+      amountCents: number;
+      balanceCents: number;
+    };
+    // Object holder avoids TS control-flow narrowing of a closed-over `let` to `never`
+    // after assignment inside the async tx callback.
+    const giftRedeemHolder: { event: GiftRedeemEvent | null } = { event: null };
+
     const stagedEvent = await this.db.withTenant(tenantId).tx(async (tdb) => {
+      if (input.method === "gift_card") {
+        const code = input.giftCardCode!.trim().toUpperCase();
+        const card = await tdb.one<GiftCardRow>(
+          "SELECT id, code, balance_cents, status FROM gift_cards WHERE code = @code AND tenant_id = @tenantId FOR UPDATE",
+          { code, tenantId },
+        );
+        if (!card) throw notFound(`gift card '${code}' not found`);
+        if (card.status === "void") {
+          throw new HttpError(409, "card_void", "gift card is void");
+        }
+        if (card.status === "redeemed" || card.balance_cents <= 0) {
+          throw new HttpError(400, "insufficient_balance", `gift card '${code}' has no remaining balance`);
+        }
+        if (card.balance_cents < owed) {
+          throw new HttpError(
+            400,
+            "insufficient_balance",
+            `Gift card balance ${card.balance_cents} is less than order total ${owed}.`,
+          );
+        }
+        const balance = card.balance_cents - owed;
+        const nextStatus = balance === 0 ? "redeemed" : "active";
+        await tdb.query(
+          "UPDATE gift_cards SET balance_cents = @balance, status = @status, updated_at = @now WHERE id = @id AND tenant_id = @tenantId",
+          { balance, status: nextStatus, now: Date.now(), id: card.id, tenantId },
+        );
+        giftRedeemHolder.event = {
+          id: card.id,
+          code: card.code,
+          amountCents: owed,
+          balanceCents: balance,
+        };
+      }
+
       await tdb.query(
         `INSERT INTO payments
            (id, tenant_id, order_id, method, amount_cents, cash_cents, card_cents,
@@ -336,7 +402,25 @@ export class PaymentsService {
     });
 
     // Transaction committed — run the synchronous consumers (revenue posting,
-    // order completion, loyalty).
+    // order completion, loyalty). Gift-card redeem is published after commit
+    // (same pattern as GiftCardsService.redeem) so the outbox writer is not
+    // starved while the payment tx still holds the pool connection.
+    if (giftRedeemHolder.event) {
+      const redeemed = giftRedeemHolder.event;
+      await this.events.publish(
+        "gift_card.redeemed",
+        {
+          id: redeemed.id,
+          tenantId,
+          code: redeemed.code,
+          amountCents: redeemed.amountCents,
+          balanceCents: redeemed.balanceCents,
+          orderId: record.order_id,
+          paymentId: record.id,
+        },
+        redeemed.id,
+      );
+    }
     await this.events.dispatchStaged(stagedEvent);
 
     await writeAudit(this.db, {

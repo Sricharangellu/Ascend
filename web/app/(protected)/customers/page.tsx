@@ -79,16 +79,12 @@ export default function CustomersPage() {
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-6">
         {/* Header actions */}
         <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            className="rounded-md border border-brand-600 px-4 py-2 text-sm font-semibold text-brand-600 transition-colors hover:bg-brand-600/5"
-          >
-            Import customers
-          </button>
+          {/* Import customers removed — button had no handler and no import API.
+              Re-add when /api/v1/customers/import (or CSV import flow) exists. */}
           <button
             type="button"
             onClick={() => setShowNewCustomer(true)}
-            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0]"
+            className="min-h-touch rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             Add customer
           </button>

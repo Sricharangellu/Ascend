@@ -24,6 +24,41 @@ const ENV_MOCKS =
   (import.meta.env.VITE_MOCK !== "false" &&
     import.meta.env.DEV);
 
+// Set to true only after the MSW worker has actually registered and is
+// intercepting requests. MockWorkerInit blocks rendering of its children
+// until worker startup settles, so by the time any page renders this flag
+// accurately reflects whether requests are mocked. If startup fails or the
+// 4s fallback fires first, it stays false (children render, real backend).
+let workerActive = false;
+
+/**
+ * True when MSW is actively intercepting API requests for this page load —
+ * i.e. the worker successfully started, whether via build-time env mocks
+ * (VITE_MOCK / dev default) or runtime demo mode (?demo=1 / persisted
+ * localStorage flag). Use this (not just VITE_MOCK) anywhere UI copy or
+ * behavior depends on mock vs real backend. Conservative: returns false
+ * whenever the worker could not start (blocked localStorage, registration
+ * failure, fallback timeout), in which case requests hit the real server.
+ */
+export function isMockActive(): boolean {
+  return workerActive;
+}
+
+/**
+ * True when demo mode is active for this page load: ?demo=1 in the URL or the
+ * persisted localStorage flag (MockWorkerInit strips the query param and
+ * persists the flag, so the URL alone is not a reliable signal).
+ */
+export function isDemoMode(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (new URLSearchParams(window.location.search).get("demo") === "1") return true;
+    return window.localStorage.getItem("ascend_demo") === "1";
+  } catch {
+    return false;
+  }
+}
+
 export default function MockWorkerInit({ children }: { children: ReactNode }) {
   // Production non-demo starts as ready; env mocks and demo mode block until worker registers.
   const [ready, setReady] = useState(!ENV_MOCKS);
@@ -35,6 +70,7 @@ export default function MockWorkerInit({ children }: { children: ReactNode }) {
       const fallback = window.setTimeout(() => { if (active) setReady(true); }, 4_000);
       import("./browser")
         .then(({ startWorker }) => startWorker())
+        .then(() => { workerActive = true; })
         .catch(() => {})
         .finally(() => { window.clearTimeout(fallback); if (active) setReady(true); });
       return () => { active = false; window.clearTimeout(fallback); };
@@ -65,6 +101,7 @@ export default function MockWorkerInit({ children }: { children: ReactNode }) {
     const fallback = window.setTimeout(() => { if (active) setReady(true); }, 4_000);
     import("./browser")
       .then(({ startWorker }) => startWorker())
+      .then(() => { workerActive = true; })
       .catch(() => {})
       .finally(() => { window.clearTimeout(fallback); if (active) setReady(true); });
     return () => { active = false; window.clearTimeout(fallback); };

@@ -207,6 +207,28 @@ test("createForecast + getForecastAccuracy compares against demand_snapshots", a
   assert.equal(rows[0]!.accuracyPct, 80);
 });
 
+test("createForecast rejects a periodStart not aligned to a UTC day boundary", async () => {
+  const app = await freshApp();
+  const p = await makeProduct(app, "DP-UNALIGNED-1");
+  const service = new DemandPlanningService(app.db);
+  const dayStart = Math.floor(Date.now() / DAY_MS) * DAY_MS - DAY_MS;
+
+  await assert.rejects(
+    () =>
+      service.createForecast({
+        tenantId: TEST_TENANT,
+        productId: p,
+        periodType: "week",
+        // Noon, not midnight — getForecastAccuracy compares at day
+        // granularity regardless of periodType, so this must be rejected
+        // rather than silently dropping a day of actuals from the sum.
+        periodStart: dayStart + 12 * 60 * 60 * 1000,
+        forecastUnits: 5,
+      }),
+    /day boundary/,
+  );
+});
+
 test("getForecastAccuracy skips open (not-yet-ended) periods by default", async () => {
   const app = await freshApp();
   const p = await makeProduct(app, "DP-OPEN-1");

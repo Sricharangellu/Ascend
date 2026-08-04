@@ -9,5 +9,5 @@ import { redirect } from "@/lib/router";
 // flow. product_batches' table and any existing rows are left untouched —
 // only this disconnected page is retired, not the data.
 export default function LegacyExpiryRedirect() {
-  redirect("/inventory/expiry-pool");
+  return redirect("/inventory/expiry-pool");
 }

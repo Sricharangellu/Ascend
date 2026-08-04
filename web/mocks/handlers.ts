@@ -798,7 +798,7 @@ export const handlers = [
           title: "Restock low inventory",
           detail: "Some products are at or below their reorder point.",
           action: "Review reorder list",
-          href: "/inventory/reorder",
+          href: "/purchasing?tab=reorder",
           count: 4,
           rank: 2,
         },

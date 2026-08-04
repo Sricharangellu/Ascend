@@ -4,11 +4,14 @@
  */
 import { useLocation, useParams } from "wouter";
 
+/** Next.js router options (e.g. { scroll: false }). Accepted for compatibility; ignored by wouter. */
+type NavigateOptions = { scroll?: boolean };
+
 export function useRouter() {
   const [, navigate] = useLocation();
   return {
-    push: (href: string) => navigate(href),
-    replace: (href: string) => navigate(href, { replace: true }),
+    push: (href: string, _options?: NavigateOptions) => navigate(href),
+    replace: (href: string, _options?: NavigateOptions) => navigate(href, { replace: true }),
     back: () => history.back(),
     forward: () => history.forward(),
     prefetch: () => {},
@@ -27,6 +30,15 @@ export function usePathname() {
  */
 export function useSearchParams(): URLSearchParams {
   return new URLSearchParams(window.location.search);
+}
+
+/**
+ * Compatibility shim for next/navigation's redirect().
+ * Performs a client-side replace so legacy routes forward to their new homes.
+ */
+export function redirect(href: string): null {
+  window.location.replace(href);
+  return null;
 }
 
 export { useParams };

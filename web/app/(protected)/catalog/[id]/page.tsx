@@ -9,65 +9,65 @@ import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type { CatalogProduct } from "@/api-client/types";
 
-// ── New combined tabs ─────────────────────────────────────────────────────────
-import { OverviewTab }      from "./_components/OverviewTab";
-import { TransactionsTab }  from "./_components/TransactionsTab";
-import { PurchasingTab }    from "./_components/PurchasingTab";
-
-// ── Existing tabs ─────────────────────────────────────────────────────────────
-import { GeneralTab }    from "./_components/GeneralTab";
-import { InventoryTab }  from "./_components/InventoryTab";
-import { MarketingTab }  from "./_components/MarketingTab";
-import { ExpiryTab }     from "./_components/ExpiryTab";
-import { VariantsTab }   from "./_components/VariantsTab";
-import { EcommerceTab }  from "./_components/EcommerceTab";
-import { PricingTab }    from "./_components/PricingTab";
-import { AnalyticsTab }  from "./_components/AnalyticsTab";
-import { AuditLogTab }   from "./_components/AuditLogTab";
-import { ImagesTab }     from "./_components/ImagesTab";
-import { LabelsTab }     from "./_components/LabelsTab";
-import { CategoriesTab } from "./_components/CategoriesTab";
+import { OverviewTab } from "./_components/OverviewTab";
+import { DetailsWorkspace } from "./_components/DetailsWorkspace";
+import { StockWorkspace } from "./_components/StockWorkspace";
+import { PurchasingTab } from "./_components/PurchasingTab";
+import { ActivityWorkspace } from "./_components/ActivityWorkspace";
+import { PricingTab } from "./_components/PricingTab";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Tab =
-  | "overview" | "general" | "variants" | "pricing" | "categories"
-  | "inventory" | "purchasing" | "transactions" | "expiry"
-  | "media" | "ecommerce" | "compliance" | "labels"
-  | "analytics" | "audit-log";
+  | "overview"
+  | "details"
+  | "pricing"
+  | "stock"
+  | "purchasing"
+  | "activity";
 
 const STATUS_BADGE = { active: "green", draft: "yellow", archived: "gray" } as const;
 
-// 14 tabs (down from 21). Grouped logically:
-// Core → Inventory → Activity → Content/Compliance → Insights
-const TABS: { key: Tab; label: string; group: string }[] = [
-  { key: "general",       label: "Product Details",  group: "core" },
-  { key: "variants",      label: "Master & Variants", group: "core" },
-  { key: "overview",      label: "Overview",         group: "core" },
-  { key: "pricing",       label: "Pricing",          group: "core" },
-  { key: "categories",    label: "Categories",       group: "core" },
-  { key: "inventory",     label: "Inventory",        group: "inventory" },
-  { key: "purchasing",    label: "Purchasing",       group: "inventory" },
-  { key: "expiry",        label: "Expiry",           group: "inventory" },
-  { key: "transactions",  label: "Transactions",     group: "activity" },
-  { key: "media",         label: "Media",            group: "content" },
-  { key: "ecommerce",     label: "Online",           group: "content" },
-  { key: "compliance",    label: "Compliance",       group: "content" },
-  { key: "labels",        label: "Labels",           group: "content" },
-  { key: "analytics",     label: "Analytics",        group: "insights" },
-  { key: "audit-log",     label: "Audit Log",        group: "insights" },
+// Ponytail Wave 3 — six top-level sections (was 15). Nested workspaces hold
+// the former leaf tabs so cashiers/merchandisers see one job at a time.
+const TABS: { key: Tab; label: string }[] = [
+  { key: "overview", label: "Overview" },
+  { key: "details", label: "Details" },
+  { key: "pricing", label: "Pricing" },
+  { key: "stock", label: "Stock" },
+  { key: "purchasing", label: "Purchasing" },
+  { key: "activity", label: "Activity" },
 ];
 
-// Visual separators: show a small divider before the first tab of each new group
-const GROUP_BREAKS = new Set(["inventory", "activity", "content", "insights"]);
-
-// Group labels shown above the divider so the existing grouping is legible,
-// not just a silent line — the grouping itself already existed (TABS above),
-// it just wasn't surfaced anywhere in the rendered tab bar.
-const GROUP_LABELS: Record<string, string> = {
-  core: "Core", inventory: "Inventory", activity: "Activity",
-  content: "Content", insights: "Insights",
-};
+/** Map legacy Overview deep-links / old tab ids onto the collapsed set. */
+function resolveTab(raw: string): Tab {
+  switch (raw) {
+    case "overview":
+    case "details":
+    case "pricing":
+    case "stock":
+    case "purchasing":
+    case "activity":
+      return raw;
+    case "general":
+    case "variants":
+    case "categories":
+    case "media":
+    case "labels":
+    case "compliance":
+    case "ecommerce":
+      return "details";
+    case "inventory":
+    case "expiry":
+      return "stock";
+    case "transactions":
+    case "analytics":
+    case "audit-log":
+      return "activity";
+    default:
+      return "overview";
+  }
+}
 
 // ── Stock badge helper ────────────────────────────────────────────────────────
 
@@ -116,7 +116,7 @@ export default function ProductDetailPage() {
   const [product, setProduct]       = useState<CatalogProduct | null>(null);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState<string | null>(null);
-  const [activeTab, setActiveTab]   = useState<Tab>("general");
+  const [activeTab, setActiveTab]   = useState<Tab>("overview");
   const [duplicating, setDuplicating] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [barcodeResult, setBarcodeResult] = useState<"ok" | "not_found" | null>(null);
@@ -296,7 +296,7 @@ export default function ProductDetailPage() {
                   <div className="fixed inset-0 z-30" onClick={() => setShowActions(false)} />
                   <div className="absolute right-0 top-full z-40 mt-1 w-52 rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
                     <button type="button"
-                      onClick={() => { setShowActions(false); router.push(`/register?product=${product.id}`); }}
+                      onClick={() => { setShowActions(false); router.push(`/terminal?product=${product.id}`); }}
                       className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
@@ -304,7 +304,7 @@ export default function ProductDetailPage() {
                       Quick Sell
                     </button>
                     <button type="button"
-                      onClick={() => { setShowActions(false); setActiveTab("transactions"); }}
+                      onClick={() => { setShowActions(false); setActiveTab("activity"); }}
                       className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/>
@@ -362,60 +362,52 @@ export default function ProductDetailPage() {
         )}
 
         {/* ── Tab nav ───────────────────────────────────────────────────────── */}
-        <div className="mb-5 -mx-1 overflow-x-auto">
-          <div className="flex gap-0 border-b border-slate-200 min-w-max px-1">
-            {TABS.map(({ key, label, group }, idx) => {
-              const prevGroup = idx > 0 ? TABS[idx - 1].group : group;
-              const showDivider = GROUP_BREAKS.has(group) && prevGroup !== group;
-              const badge = key === "expiry" && expiryAlertCount > 0 ? expiryAlertCount : null;
+        <div className="mb-5 -mx-1 overflow-x-auto" role="tablist" aria-label="Product sections">
+          <div className="flex min-w-max gap-0 border-b border-erp-table-border px-1">
+            {TABS.map(({ key, label }) => {
+              const badge = key === "stock" && expiryAlertCount > 0 ? expiryAlertCount : null;
               return (
-                <div key={key} className="flex items-center">
-                  {showDivider && (
-                    <div className="mx-1 flex items-center gap-2 self-stretch" aria-hidden="true">
-                      <div className="h-5 w-px bg-slate-200" />
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                        {GROUP_LABELS[group]}
-                      </span>
-                    </div>
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === key}
+                  onClick={() => setActiveTab(key)}
+                  className={`relative flex min-h-touch items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 ${
+                    activeTab === key
+                      ? "border-b-2 border-brand-600 text-brand-600"
+                      : "border-b-2 border-transparent text-erp-text-secondary hover:text-erp-text-primary"
+                  }`}
+                >
+                  {label}
+                  {badge !== null && (
+                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-danger-600 px-1 text-[10px] font-bold text-white">
+                      {badge}
+                    </span>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab(key)}
-                    className={`relative flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
-                      activeTab === key
-                        ? "border-b-2 border-brand-600 text-brand-600"
-                        : "border-b-2 border-transparent text-slate-500 hover:text-[#111]"
-                    }`}
-                  >
-                    {label}
-                    {badge !== null && (
-                      <span className="flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                        {badge}
-                      </span>
-                    )}
-                  </button>
-                </div>
+                </button>
               );
             })}
           </div>
         </div>
 
         {/* ── Tab content ──────────────────────────────────────────────────── */}
-        {activeTab === "overview"     && <OverviewTab product={product} onNavigate={(t) => setActiveTab(t as Tab)} />}
-        {activeTab === "general"      && <GeneralTab product={product} onSaved={setProduct} />}
-        {activeTab === "variants"     && <VariantsTab product={product} />}
-        {activeTab === "pricing"      && <PricingTab product={product} />}
-        {activeTab === "categories"   && <CategoriesTab productId={product.id} />}
-        {activeTab === "inventory"    && <InventoryTab product={product} onSaved={setProduct} />}
-        {activeTab === "purchasing"   && <PurchasingTab productId={product.id} />}
-        {activeTab === "transactions" && <TransactionsTab productId={product.id} />}
-        {activeTab === "expiry"       && <ExpiryTab productId={product.id} />}
-        {activeTab === "media"        && <ImagesTab productId={product.id} />}
-        {activeTab === "ecommerce"    && <EcommerceTab product={product} />}
-        {activeTab === "compliance"   && <MarketingTab product={product} onSaved={setProduct} />}
-        {activeTab === "labels"       && <LabelsTab product={product} />}
-        {activeTab === "analytics"    && <AnalyticsTab productId={product.id} />}
-        {activeTab === "audit-log"    && <AuditLogTab productId={product.id} />}
+        {activeTab === "overview" && (
+          <OverviewTab product={product} onNavigate={(t) => setActiveTab(resolveTab(t))} />
+        )}
+        {activeTab === "details" && (
+          <DetailsWorkspace product={product} onSaved={setProduct} />
+        )}
+        {activeTab === "pricing" && <PricingTab product={product} />}
+        {activeTab === "stock" && (
+          <StockWorkspace
+            product={product}
+            onSaved={setProduct}
+            expiryAlertCount={expiryAlertCount}
+          />
+        )}
+        {activeTab === "purchasing" && <PurchasingTab productId={product.id} />}
+        {activeTab === "activity" && <ActivityWorkspace productId={product.id} />}
 
       </div>
     </EnterpriseShell>

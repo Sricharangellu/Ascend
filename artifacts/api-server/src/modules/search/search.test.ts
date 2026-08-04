@@ -148,3 +148,29 @@ test("no results returns empty arrays, not 404", async () => {
   assert.equal(r.json.results.products.length, 0);
   assert.equal(r.json.results.customers.length, 0);
 });
+
+test("purchase order search matches PO number and labels with it", async () => {
+  const app = await freshApp();
+  const prod = await mkProduct(app, "PO-SRCH-1", "PO Search Product");
+  const sup = await mkSupplier(app, "PO Search Supplier");
+  const po = await call(app, "POST", "/api/purchasing/orders", {
+    supplierId: sup.id,
+    lines: [{ productId: prod.id, quantity: 1, unitCostCents: 100 }],
+  });
+  assert.equal(po.status, 201, `po create failed: ${JSON.stringify(po.json)}`);
+  const poNumber = po.json.po_number as number;
+  assert.ok(poNumber != null);
+
+  // Bare number
+  const byNum = await call(app, "GET", `/api/search/?q=${poNumber}`, undefined);
+  assert.ok(byNum.json.results.purchaseOrders.some((h: { id: string }) => h.id === po.json.id));
+
+  // "PO-<n>" form
+  const byPrefixed = await call(app, "GET", `/api/search/?q=PO-${poNumber}`, undefined);
+  const hit = byPrefixed.json.results.purchaseOrders.find((h: { id: string }) => h.id === po.json.id) as { label: string };
+  assert.ok(hit, "expected PO hit for PO-prefixed query");
+  assert.equal(hit.label, `PO-${poNumber}`);
+
+  // UUID must not be the label anymore
+  assert.notEqual(hit.label, po.json.id);
+});

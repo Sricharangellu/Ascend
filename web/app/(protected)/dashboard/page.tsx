@@ -20,6 +20,7 @@ import { DashboardCharts } from "./_components/DashboardCharts";
 import { DashboardTopPerformers } from "./_components/DashboardTopPerformers";
 import { DashboardQuickActions } from "./_components/DashboardQuickActions";
 import { DashboardExecutive } from "./_components/DashboardExecutive";
+import { AiCommandCenterBanner } from "./_components/AiCommandCenterBanner";
 import ProgressPanel from "./_components/ProgressPanel";
 
 import type { RecommendationReport, DashboardRecommendation } from "./_components/DashboardPrioritiesPanel";
@@ -111,9 +112,22 @@ const INDUSTRY_OPTIONS = [
 export default function DashboardPage() {
   const { storeId, outletId, dateRange } = useFinderContext();
   const range: Range = dateRange.preset === "today" ? "today" : dateRange.preset === "current_month" ? "30d" : "7d";
-  const scope = new URLSearchParams({ store_id: storeId, outlet_id: outletId }).toString();
 
   const [progressRefresh, setProgressRefresh] = useState(0);
+  // Local outlet filter drives report fetches (develop #166). Empty = All Outlets.
+  const [selectedOutletId, setSelectedOutletId] = useState<string>(outletId);
+  const [outlets, setOutlets] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    apiGet<{ items: { id: string; name: string }[] }>("/api/v1/outlets")
+      .then((d) => setOutlets(d.items ?? []))
+      .catch(() => setOutlets([]));
+  }, []);
+
+  const scope = new URLSearchParams({
+    store_id: storeId,
+    ...(selectedOutletId ? { outlet_id: selectedOutletId } : {}),
+  }).toString();
 
   const fetchSummary = useCallback(
     () => apiGet<SummaryResponse>(`/api/v1/reports/summary?range=${range}&${scope}`),
@@ -312,22 +326,23 @@ export default function DashboardPage() {
   const S_QA = <DashboardQuickActions key="qa" />;
   const S_OPS = <DashboardOpsHub key="ops" inventoryStats={inventoryStats} industry={industry} view={view} />;
   const S_PROG = <ProgressPanel key="prog" refreshSignal={progressRefresh} />;
+  const S_BRIEF = <AiCommandCenterBanner key="briefing" />;
 
   const layouts: Record<DashboardView, { top: ReactNode[]; main: ReactNode[]; side: ReactNode[] }> = {
     Executive: {
       top: [S_HERO],
       main: [S_KPI, S_EXEC, S_PIPELINE, S_CHARTS, S_TOP, S_OPS],
-      side: [S_RECS, S_TIMELINE, S_PROG],
+      side: [S_BRIEF, S_RECS, S_TIMELINE, S_PROG],
     },
     Operations: {
       top: [S_QA],
       main: [S_KPI, S_OPS, S_PIPELINE, S_CHARTS, S_TOP],
-      side: [S_RECS, S_TIMELINE, S_PROG],
+      side: [S_BRIEF, S_RECS, S_TIMELINE, S_PROG],
     },
     Finance: {
       top: [],
       main: [S_EXEC, S_KPI, S_CHARTS, S_TOP, S_OPS],
-      side: [S_RECS, S_TIMELINE, S_PROG],
+      side: [S_BRIEF, S_RECS, S_TIMELINE, S_PROG],
     },
     Store: {
       top: [S_QA],
@@ -365,7 +380,17 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {outlets.length > 0 && (
+              <Select
+                aria-label="Filter by outlet"
+                value={selectedOutletId}
+                onChange={(e) => setSelectedOutletId(e.target.value)}
+                options={[{ value: "", label: "All Outlets" }, ...outlets.map((o) => ({ value: o.id, label: o.name }))]}
+                size="md"
+                className="min-w-[160px]"
+              />
+            )}
             <span className="text-[12px] font-medium text-[var(--color-text-secondary)]" id="industry-focus-label">
               Industry focus:
             </span>

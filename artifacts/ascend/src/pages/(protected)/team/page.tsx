@@ -267,7 +267,7 @@ export default function TeamPage() {
                           )}
                           <Link
                             href={`/team/${emp.id}`}
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e: React.MouseEvent) => e.stopPropagation()}
                             className="rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors hover:bg-[var(--color-surface-subtle)]"
                             style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
                           >
