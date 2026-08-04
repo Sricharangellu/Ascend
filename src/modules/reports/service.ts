@@ -367,23 +367,43 @@ export class ReportsService {
     const avgItemsPerSale = saleCount > 0 ? Math.round((totalItems / saleCount) * 10) / 10 : 0;
     const discountedPct = saleCount > 0 ? Math.round((discountedOrders / saleCount) * 1000) / 10 : 0;
 
-    // DB-9: CQRS sparklines — read from daily_sales_summary (pre-aggregated).
-    // Uses pre-computed ISO date string for comparison (avoids to_char/to_timestamp
-    // which behaves differently on embedded-postgres vs production Postgres 16).
-    const sparkStartDate = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
-    const sparkRows = await this.db.query<{ day: string; rev: number; cnt: number }>(
+    // Sparklines: last 8 UTC days from live completed orders.
+    // `daily_sales_summary` exists for a future CQRS read model (DB-9) but is
+    // never written today — reading it left every dashboard sparkline empty
+    // even when real sales existed. Same grain as aggregateDailySales(); day
+    // buckets use integer ms/86400000 (portable across embedded + PG16).
+    // Dense-fill missing days with zeros so the FE sparkline (≥2 points) can
+    // render after a single sale in the window.
+    const SPARK_DAYS = 8;
+    const dayMs = 86_400_000;
+    const now = Date.now();
+    const todayBucket = Math.floor(now / dayMs);
+    const firstBucket = todayBucket - (SPARK_DAYS - 1);
+    const sparkStartMs = firstBucket * dayMs;
+    const sparkRows = await this.db.query<{ day_bucket: number; rev: number; cnt: number }>(
       `SELECT
-         summary_date        AS day,
-         gross_sales_cents   AS rev,
-         transaction_count   AS cnt
-       FROM daily_sales_summary
+         (created_at / 86400000)::bigint AS day_bucket,
+         COALESCE(SUM(total_cents), 0)   AS rev,
+         COUNT(*)::int                   AS cnt
+       FROM orders
        WHERE tenant_id = @tenantId
-         AND summary_date >= @sparkStartDate
-       ORDER BY summary_date ASC LIMIT 8`,
-      { tenantId, sparkStartDate },
+         AND status = 'completed'
+         AND created_at >= @sparkStartMs
+       GROUP BY 1
+       ORDER BY 1 ASC`,
+      { tenantId, sparkStartMs },
     );
-    const sparkRevenue = sparkRows.map((r) => Number(r.rev));
-    const sparkSaleCount = sparkRows.map((r) => Number(r.cnt));
+    const byBucket = new Map<number, { rev: number; cnt: number }>();
+    for (const r of sparkRows) {
+      byBucket.set(Number(r.day_bucket), { rev: Number(r.rev), cnt: Number(r.cnt) });
+    }
+    const sparkRevenue: number[] = [];
+    const sparkSaleCount: number[] = [];
+    for (let b = firstBucket; b <= todayBucket; b++) {
+      const cell = byBucket.get(b);
+      sparkRevenue.push(cell?.rev ?? 0);
+      sparkSaleCount.push(cell?.cnt ?? 0);
+    }
 
     return {
       orders,

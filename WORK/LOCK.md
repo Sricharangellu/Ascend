@@ -1,5 +1,16 @@
 
 
+## Active Claim (Cursor Cloud — Dashboard display and data)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud agent (`cursor/dashboard-display-data-45ad`) |
+| Queue item | Port Phase 13/14 enterprise command-center dashboard into canonical `web/`; honest KPIs; real routes; range-scoped cash flow; live-order sparklines; dark-mode tokens. Rebased onto post-#183 develop; integrated AiCommandCenterBanner (#177) + outlet scope (#166). |
+| Files/areas expected | `web/app/(protected)/dashboard/**`, `web/app/globals.css`, `src/modules/reports/{service,reports.test}.ts`, `WORK/**` |
+| Started | 2026-08-03T05:09:16Z |
+| Status | RELEASED — merged to develop via PR #167 |
+| Blockers | none |
+
 ## Active Claim (Cursor Cloud — PR-A3 exhaustive-deps)
 
 | Field | Value |
