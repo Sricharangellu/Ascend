@@ -173,7 +173,7 @@ exists:
    two reads.
 
 `reports` only sums stored `tax_cents`, so it is a consumer, not a fourth
-authority. Resolution is tracked as **P1-1** in `WORK/FORWARD_PLAN.md`
+authority. Resolution is tracked as **F-11** in `WORK/FORWARD_PLAN.md`
 Phase 9 — it is deliberately not a drive-by fix, because picking the winner
 changes what customers are charged.
 

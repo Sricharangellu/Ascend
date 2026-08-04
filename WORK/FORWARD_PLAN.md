@@ -1625,14 +1625,32 @@ its own gates. Do not open a PR that spans two buckets.
 Buckets P0 and the CI-blocker half of P1 are already **DONE** (PR #185). What
 remains is sequenced, not scheduled — pick the next unchecked item in order.
 
+#### Phase 9.0 — Frozen baseline
+
+Every Phase 9 change is measured against, and rolls back to:
+
+| | |
+|---|---|
+| **Commit** | `8b6218d010a238dea6276c5fe30de6d7848cdcef` (PR #185 head) |
+| **Local tag** | `baseline/ai-slop-audit-2026-08-04` — created, **not on origin**: this environment's git proxy accepts branch pushes but rejects tag pushes (4 retries, `remote end hung up`). Recreate with `git tag -a baseline/ai-slop-audit-2026-08-04 8b6218d && git push origin --tags`. The SHA above is the authoritative reference either way. |
+| **Report** | `WORK/audits/AUDIT_2026-08-04T040621Z-ai-slop-consistency-audit.md` |
+| **Metrics** | Phase 9.10 below |
+
+**Deliberately not `develop@a4dbf2c`, where the audit was taken.** That commit
+does not build and its CI is red across five consecutive runs, so it cannot be
+a rollback point. `8b6218d` is the first commit on that line where the freeze
+conditions actually hold: backend `npm test` 851/851, backend typecheck exit 0,
+web tsc/lint/build clean, hygiene + gap:scan + table:scan + prevent:drift pass,
+and CI run 700 green on every job including the real-Postgres smoke.
+
 #### Phase 9.1 — Classification
 
 | Priority | Definition | Findings |
 |---|---|---|
 | **P0** | Security, data corruption, broken transactions, pipeline down | C-1 root-manifest hijack ✅ DONE · C-2 missing guardrail ✅ DONE |
-| **P1** | Duplicate business logic, inconsistent APIs, architecture violations | P1-1 tax has three authorities · P1-2 `artifacts/` duplicate app tree (NEEDS-SRI) · H-2 duplicate `apiFetch` ✅ DONE |
-| **P2** | Dead code, inconsistent naming, mechanical refactoring | P2-1 48× `test-request.ts` · P2-2 `expenses` module layout differs from all 52 others · M-1/M-2/M-3/M-4 ✅ DONE |
-| **P3** | Style, comments, formatting | P3-1 31 `eslint-disable` + 3 `: any` in `src/` · L-2 Node-24 test assertion |
+| **P1** | Duplicate business logic, inconsistent APIs, architecture violations | F-11 tax has three authorities · F-3 `artifacts/` duplicate app tree (NEEDS-SRI) · F-4 duplicate `apiFetch` ✅ DONE |
+| **P2** | Dead code, inconsistent naming, mechanical refactoring | F-5 48× `test-request.ts` · F-14 `expenses` module layout differs from all 52 others · F-6/F-7/F-8 ✅ DONE |
+| **P3** | Style, comments, formatting | F-20 31 `eslint-disable` + 3 `: any` in `src/` · F-9 Node-24 test assertion |
 
 Nothing in the audit was classified P0 on the *application* — the P0s were both
 pipeline/infrastructure. That is worth stating plainly: the retail core did not
@@ -1648,18 +1666,58 @@ single owner (tax, pricing) rather than being assigned a plausible one.
 Every duplicate below migrates *toward* an owner in that table. If a duplicate
 has no owner, naming the owner is the first task, not the refactor.
 
+**Work is grouped by domain, not by file.** A PR touches one domain; a domain is
+finished before the next starts. Domains with no open findings are listed anyway
+so the sweep is provably complete rather than silently partial.
+
+| Domain | Owning module(s) | Open items | Cleanup plan |
+|---|---|---|---|
+| **Tax** | ⚠️ none — 3 authorities | **F-11** | Pick the authority, migrate the other two, backfill-check invoices written at 0%. Highest risk in the program; do it first because #3 (types) and #6 (tests) both touch invoice shapes. |
+| **Pricing** | ⚠️ none — module absent | **F-13** | Name an owner before any pricing work. Currently UI-only Preview. |
+| Repo structure | — | **F-3**, **F-10** | The `artifacts/` decision. Gates almost everything else — do not refactor a module that may be deleted. |
+| Test harness | all backend modules | **F-5** | Single `test-request.ts` factory. |
+| Expenses | `expenses` | **F-14** | Align layout with the other 52 modules, or promote its layout to the standard. |
+| Tooling / CI | `tools/`, `.github/` | **F-15**…**F-18** | Guardrails, non-blocking first. |
+| Types (DB↔API↔UI) | cross-cutting | **F-19** | **Never audited** — see 9.4. |
+| Inventory · Purchasing · Receiving · Orders · Catalog · Accounting · Identity | per ownership table | none | Verified clean this pass: no module orphans, no table collisions, no route drift, tenant-scoping swept clean 2026-07-16. Re-check at 9.10, don't pre-emptively refactor. |
+
+#### Phase 9.2b — Definition of "done" for a module
+
+Agreed *before* a module's cleanup PR opens. A module is clean when all of:
+
+- [ ] No duplicate business logic — every rule it implements traces to an owner in the `ARCHITECTURE.md` domain table, and it imports rather than reimplements.
+- [ ] No dead code — no unreferenced exports, routes, or columns (needs **F-17**; until that lands, say "not checked" rather than ticking this).
+- [ ] Consistent naming and file layout — `index.ts` / `routes.ts` / `service.ts`, matching the other modules.
+- [ ] Standard API responses — the shared `{ error: { code, message, requestId } }` envelope; keyset pagination via `shared/pagination.ts`; no bespoke error shapes.
+- [ ] Domain rules hold — tenant-scoped queries, RBAC on mutations, integer cents, immutable inventory movements, append-only financial records.
+- [ ] Tests pass, and cover the business rules the module owns — not just its routes.
+- [ ] No lint or type errors; no new suppressions (`@ts-ignore`, `eslint-disable`) without a one-line justification.
+- [ ] Docs updated — `ARCHITECTURE.md` ownership table if ownership moved; an ADR if a seam changed.
+
+"Not checked" is an acceptable answer for any line. A tick that was never
+verified is worse than an honest gap — that is the failure mode this whole
+program exists to correct.
+
+#### Phase 9.2c — PR discipline
+
+- One logical concern per PR. Never two domains, never two buckets.
+- Behaviour-preserving unless the PR says otherwise in its title.
+- Tests updated in the same PR as the change they cover.
+- Full backend suite green before the next PR in the series opens (~19 min; run it detached).
+- A refactor PR that also fixes a bug is two PRs.
+
 #### Phase 9.3 — Duplication elimination, in dependency order
 
 Bottom-up so each layer is stable before the one above it moves. One domain per
 PR; full backend suite green before the next.
 
-1. **Shared utilities** — P2-1 (`test-request.ts` ×48).
-2. **Validation** — audit zod schemas for the P1-1 class (optional fields that
+1. **Shared utilities** — F-5 (`test-request.ts` ×48).
+2. **Validation** — audit zod schemas for the F-11 class (optional fields that
    silently default to a money value). `tax_rate_pct` is the known instance.
-3. **DTOs** — P2-2; align `expenses.dto.ts`/`expenses.repository.ts` with the
+3. **DTOs** — F-14; align `expenses.dto.ts`/`expenses.repository.ts` with the
    `service.ts`/`routes.ts`/`index.ts` shape the other 52 modules use, or
    document why expenses is the exception and make it the new standard.
-4. **Repositories / services / business logic** — P1-1 tax consolidation.
+4. **Repositories / services / business logic** — F-11 tax consolidation.
 5. **API controllers** — deferred; `gap:scan` reports no route-level drift today.
 6. **UI components** — deferred; only 4 files bypass the shared API client and
    each has a stated reason.
@@ -1678,8 +1736,8 @@ Already enforced and holding: integer cents, tenant-scoped tables, idempotent
 hash-tracked migrations, one error envelope, keyset pagination, append-only
 financial records, `strict: true` on both trees.
 
-Gaps to close: module file layout (P2-2), and a written rule that an optional
-request field may never default to a money or tax value (P1-1's root cause).
+Gaps to close: module file layout (F-14), and a written rule that an optional
+request field may never default to a money or tax value (F-11's root cause, tracked as F-12).
 
 #### Phase 9.6 — Automated guardrails: have vs. missing
 
@@ -1696,7 +1754,7 @@ Measured 2026-08-04, not assumed.
 | Repo hygiene, secrets, tracked env | ✅ `hygiene` |
 | Unguarded mutations, SQL interpolation, `console.*` | ✅ CI greps |
 | e2e golden paths | ✅ CI (non-gating: known auth flake) |
-| **Duplicate-code detection** | ❌ **none** — would have found P2-1 and H-2 automatically |
+| **Duplicate-code detection** | ❌ **none** — would have found F-5 and F-4 automatically |
 | **Dead-code detection** | ❌ none — blocks Phase 9.4 |
 | **Dependency-cycle detection** | ❌ none |
 | **Dependency vulnerability scanning** | ❌ none, and no `.github/dependabot.yml` |
@@ -1730,20 +1788,51 @@ one step: after the duplicate check, identify the owning implementation in
 helper. H-2 was a private `apiFetch` written beside a canonical one — the rule
 that would have prevented it is exactly that.
 
-#### Phase 9.9 — Backlog
+#### Phase 9.9 — Master remediation backlog
 
-| ID | Title | Module | Pri | Effort | Depends on | Risk | Acceptance criteria |
-|---|---|---|---|---|---|---|---|
-| **P1-1** | Single tax authority | orders, customer_invoices, settings | P1 | 2–3 d | Sri: which of the three wins | **High — changes what customers are charged; needs a data check for invoices already written at 0%** | One tax calculator imported by every writer; `tax_rate_pct` can no longer default to 0 silently; tests cover POS and invoice paths agreeing on identical input; existing zero-tax invoices identified and reported |
-| **P1-2** | Resolve `artifacts/` duplicate app tree | repo-wide | P1 | 1–2 d | **NEEDS-SRI** decision | Medium — 857 files; reversible via git | ADR names the canonical tree; `push_tokens` harvested into `src/` with its tests; duplicate trees removed in a separate follow-up PR |
-| **P2-1** | Consolidate 48× `test-request.ts` | all backend modules | P2 | 0.5 d | none | Low — test-only | One `src/shared/test-request.ts` factory; each module re-exports with its own default role preserved exactly; 851/851 still green |
-| **P2-2** | Align `expenses` module layout | expenses | P2 | 0.5 d | none | Low | Either matches the 52-module convention, or the convention is updated and documented |
-| **G-1** | Duplicate-code detection in CI | tooling | P2 | 0.5 d | none | Low — non-blocking | Reports on PRs; baseline recorded; not merge-gating until backlog burned down |
-| **G-2** | Dependency vulnerability scanning | tooling | P2 | 0.5 d | none | Low | `dependabot.yml` + a CI advisory check; findings triaged, not auto-merged |
-| **G-3** | Dead-code detection | tooling | P2 | 1 d | none | Low | Non-blocking report; unblocks Phase 9.4 |
-| **G-4** | OpenAPI contract validation | tooling, contracts | P2 | 1 d | none | Medium — may reveal real drift | CI fails when a route's shape diverges from `contracts/openapi.yaml` |
-| **P3-1** | Burn down 31 `eslint-disable` + 3 `: any` | src, web | P3 | 1 d | G-1..G-3 landed | Low | Each remaining suppression carries a one-line justification; `next lint` gates on zero *new* warnings |
-| **S-1** | Branch protection on `develop` | — | **P0** | minutes | **Sri-only** | None | `develop` requires green CI; all three root hijacks were red on arrival |
+**Every audit finding appears here.** Nothing from
+`AUDIT_2026-08-04T040621Z` remains as an untracked note — the *Audit ref*
+column is the traceability link, and the four findings that had drifted out of
+an earlier draft of this table (L-1, L-2, the hallucination sweep, and the
+never-run type-consistency check) are now F-11, F-9, F-17 and F-19.
+
+IDs are stable. Do not renumber; add.
+
+| ID | Audit ref | Title | Domain / module | Severity | Root cause | Proposed fix | Depends on | Effort | Risk | Acceptance criteria | Status |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| **F-1** | C-1 | npm root replaced by foreign workspace stub | repo root | **Critical** | A separately-scaffolded pnpm workspace shares this `origin` and merges into it; nothing structural stopped it | Restore root manifests from last-known-good `ca7ec4b` | — | 0.5 d | Low | `npm ci` resolves; all root scripts CI calls exist; CI green | ✅ **DONE** PR #185 |
+| **F-2** | C-2 | No guard against the hijack class | tooling / CI | **Critical** | Failure only surfaces *after* checkout+install, so it reads as an infra flake; prior audit recommended a guard and did not build it | `hygiene-check.mjs` check 8, run as CI's first step via bare `node` | F-1 | 0.5 d | Low | Green on restored tree; 6 violations + exit 1 against the real broken commit | ✅ **DONE** PR #185 |
+| **F-3** | H-1 | `artifacts/` is a 1,004-file duplicate app tree | repo structure | **High** | Another environment's full copy merged in and then diverged in both directions | ADR names canonical tree → harvest `push_tokens` → remove duplicates in a separate PR | **NEEDS-SRI** | 1–2 d | Medium — 857 files, reversible via git | ADR merged; `push_tokens` in `src/` with tests; duplicates removed in a follow-up PR | ⛔ **BLOCKED** |
+| **F-4** | H-2 | Duplicate `apiFetch` in `StoreAuthContext` | web / storefront auth | **High** | Local helper written beside a canonical one; passes every gate because nothing is missing or colliding | Route through shared `@/api-client` with `anonymous: true` | — | 0.5 d | Low | Envelope message surfaces (not `[object Object]`); customer token never mixed with staff token; regression test fails against old code | ✅ **DONE** PR #185 |
+| **F-5** | H-3 | `test-request.ts` copied into 48 modules, 8 variants | test harness | **Medium** | Per-module helper creation instead of one shared import; drifted silently | One `src/shared/test-request.ts` factory; each module re-exports pinning its own default role | — | 0.5 d | Low — test-only | 851/851 still green; per-module default roles preserved *exactly* (`workflows` stays `manager`) | ⬜ **READY** |
+| **F-6** | M-1 | `.gitignore` `.env*` made template deletion irreversible | repo root | **Medium** | Bare ignore rule added while templates were already tracked, so it looked harmless | Add `!.env*.example` to both `.gitignore`s | — | mins | Low | `git add .env.example` works | ✅ **DONE** PR #185 |
+| **F-7** | M-2 | 4 dead entries in `api-gap-allowlist.json` | tooling | **Medium** | Allowlist grew without a mechanism to notice entries going stale | Remove; verified against real routes first | — | mins | Low | 21 → 17 entries, scan green | ✅ **DONE** PR #185 |
+| **F-8** | M-3, M-4 | `gap:scan` counted doc-comment paths; no orphan detection | tooling | **Medium** | Regex over raw source; only checked one direction of staleness | Strip block comments; add `orphaned` warning | — | 0.5 d | Low | Doc examples no longer need allowlisting; orphan check found `/api/v1/things` on first run | ✅ **DONE** PR #185 |
+| **F-9** | L-2 | 3 web tests require Node 24; local default is 22 | web / tests | **Low** | jsdom `Blob`/`FileReader` behaviour differs by Node major; nothing asserts the version | Assert the Node major in the web test setup so the failure names its own cause | — | 0.5 h | Low | Running on Node 22 produces a clear message, not 3 opaque `FileReader` failures | ⬜ **READY** |
+| **F-10** | L-1 | `scripts/` has two owners | repo structure | **Low** | Workspace merge added `@workspace/scripts` (`package.json` + `src/hello.ts`) beside Ascend's operational scripts | Resolve with F-3 — same root cause | F-3 | mins | Low | One definition of what `scripts/` is | ⛔ **BLOCKED** |
+| **F-11** | — *(new, found while building the ownership table)* | **Tax has three independent authorities** | tax | **High** | No owner: `orders/tax.ts` claims it but is imported only within `orders/`; `customer_invoices` does inline math on an `.optional()` `tax_rate_pct` defaulting to `0`; `settings.tax_rates` is a third source | Pick the authority; migrate the other two to import it; make a missing tax rate an error, not a silent `0` | **Sri: which wins** | 2–3 d | **High — changes what customers are charged** | One calculator imported by every writer; POS and invoice agree on identical input, test-proven; no silent `0` default; invoices already written at 0% identified and reported | ⛔ **BLOCKED** |
+| **F-12** | — *(new)* | Optional request fields may silently default to money values | validation | **Medium** | No rule forbids it; `tax_rate_pct` is the known instance, others unaudited | Sweep zod schemas for `.optional()` on money/rate fields; write the rule into `AGENTS.md` | F-11 | 1 d | Medium | No money-affecting field defaults silently; rule documented | ⬜ **READY** after F-11 |
+| **F-13** | — *(new)* | Pricing has no owning module | pricing | **Medium** | Never built; `/api/v1/pricing` is a UI-only Preview prefix | Decide whether pricing becomes a real domain; if so create the module and add it to the ownership table | **NEEDS-SRI** | — | — | Ownership table has a real owner, or Preview status is explicitly reaffirmed | ⛔ **BLOCKED** |
+| **F-14** | — *(new)* | `expenses` layout differs from all 52 other modules | expenses | **Low** | Uses `expenses.dto.ts` / `expenses.repository.ts` instead of the `service.ts`/`routes.ts`/`index.ts` convention | Align it, or promote its layout to the standard and migrate the rest | F-3 | 0.5 d | Low | One documented module layout, applied consistently | ⬜ **READY** |
+| **F-15** | 9.6 | Duplicate-code detection in CI | tooling | **Medium** | No detector exists; this audit found duplicates by hand | Add a duplicate-code check, **non-blocking first** | — | 0.5 d | Low | Reports on PRs; baseline recorded; would flag F-4 and F-5 | ⬜ **READY — highest-value guardrail** |
+| **F-16** | 9.6 | Dependency vulnerability scanning | tooling | **Medium** | Absent, despite `pnpm-workspace.yaml` already carrying a `minimumReleaseAge` supply-chain defence — the intent exists without the check | `dependabot.yml` + a CI advisory check | — | 0.5 d | Low | Findings triaged, never auto-merged | ⬜ **READY** |
+| **F-17** | 9.4 | Dead-code detection + hallucination sweep | tooling → repo-wide | **Medium** | No tooling; sweeping 977 `.ts` + 836 `.tsx` by hand is not repeatable | Add a dead-code detector (non-blocking), then run the sweep it enables | — | 1 d | Low | Report exists; unreferenced exports/routes/columns enumerated; removals are a *separate* PR | ⬜ **READY** |
+| **F-18** | 9.6 | OpenAPI contract validation | tooling / contracts | **Medium** | `contracts/openapi.yaml` is generated *from* the code, never checked *against* it | CI check comparing route shapes to the contract | — | 1 d | Medium — may reveal real drift | CI fails on divergence | ⬜ **READY** |
+| **F-19** | — *(gap in the audit itself)* | **DB ↔ API ↔ frontend type consistency never audited** | cross-cutting | **High** | The audit verified route *existence* (`gap:scan`) and table collisions, but never the Schema→ORM→Service→API→FE-types→UI chain the master prompt asked for. Recorded as *not done*, not as *clean*. | Run that audit as its own pass; feed findings back here as F-20+ | F-3 (don't audit a tree that may be deleted) | 1–2 d | Medium | Every FE type traces to a real column; no field referenced that does not exist | ⬜ **READY** |
+| **F-20** | P3 | 31 `eslint-disable` + 3 `: any` in `src`/`web` | cross-cutting | **Low** | Accumulated without justification requirements | Burn down; require a one-line reason for survivors | F-15..F-17 | 1 d | Low | Every suppression justified; lint gates on zero *new* warnings | ⬜ **READY** last |
+| **S-1** | C-1/C-2 rec. | Branch protection on `develop` requiring green CI | — | **Critical** | Nothing enforces that a red branch cannot merge | Repo setting | **Sri-only** | mins | None | `develop` requires green CI. All three hijacks were red on arrival | ⛔ **SRI-ONLY** |
+| **S-2** | C-1 rec. | Repoint the other workspace's `origin` | — | **High** | Two projects share one remote | Fork, or disconnect | **Sri-only** | mins | None | A foreign root can no longer reach this repo | ⛔ **SRI-ONLY** |
+
+**Execution order** (architecture settles before cleanup, per the sequence
+agreed 2026-08-04): **S-1** → **F-11** (tax owner) → **F-3** decision →
+**F-15/F-16/F-17** guardrails → **F-5**, **F-14**, **F-9** cleanups →
+**F-19** type-consistency audit → **F-12**, **F-18** → **F-20**.
+
+S-1 first because it is minutes of Sri's time and prevents a fourth
+occurrence of the thing that started all of this. F-11 before any type or
+test work because it changes invoice shapes. F-3 before module-level
+refactors because there is no point cleaning a tree that may be deleted.
+
 
 #### Phase 9.10 — Re-audit baseline
 
