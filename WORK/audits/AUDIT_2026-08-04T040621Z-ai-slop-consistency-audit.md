@@ -76,6 +76,25 @@ its first act. The documented gates (`npm run typecheck`, `npm test`, `npm run s
 `tsc -p tsconfig.json` emitting `dist/src/server.js`; against a `files: []` stub that
 build emits nothing and "succeeds".
 
+**This is confirmed from CI's own logs, not predicted.** `develop` has failed **five
+consecutive runs**, every run since the hijack merged at `186de92` (2026-08-03T10:37Z):
+
+| Run | Commit | Result |
+|---:|---|---|
+| 695 | `a4dbf2c` | failure |
+| 692 | `7b61407` | failure |
+| 691 | `dcdf04b` | failure |
+| 690 | `2ad1724` | failure |
+| 687 | `8e0b3fa` | failure |
+
+Run 695 (the current `develop` HEAD), 3 of 9 jobs failed, with exactly the causes above:
+
+- **Production guard** — `npm error Missing script: "prevent:drift"`
+- **Docker build** — `RUN npm ci --omit=dev` → `did not complete successfully: exit code: 1`
+- **Backend — typecheck + test** — failed
+
+The first of those is word-for-word the condition C-2's guard now asserts.
+
 **Fix applied.** Restored `package.json`, `package-lock.json`, `tsconfig.json` and the
 four env templates from `ca7ec4b` (last known good, an ancestor of HEAD).
 **Verified:** `npm ci` → 154 packages, clean; `npm run typecheck` → exit 0;
@@ -384,8 +403,19 @@ analysis — worth doing, not worth guessing at.
 | `web` `next lint` | **PASS** — 0 errors (pre-existing warnings only) |
 | `web` vitest | 174 passed / 3 failed — the 3 are L-2, **proven pre-existing** by re-running on a stashed tree |
 | New `storeAuthErrorEnvelope.test.tsx` | **3/3 pass**; **1 fails against the old code** with the predicted `[object Object]` |
-| `npm test` (backend, 96 files) | **NOT COMPLETED** — see below |
-| `npm run smoke` | **NOT RUN** — see below |
+| `npm test` (backend, 96 files) | **NOT COMPLETED locally** — see below; running in CI on PR #185 |
+| `npm run smoke` | **NOT RUN locally** — running in CI on PR #185 |
+
+### CI evidence on PR #185 (run 700, `7ffadac`)
+
+The jobs that are red on `develop` pass here, which is the point of the change:
+
+| Job | on `develop` (run 695) | on this branch (run 700) |
+|---|---|---|
+| Production guard | **FAIL** — `Missing script: "prevent:drift"` | **PASS** — incl. the new *Root manifest integrity* step, green in 1s as CI's first step |
+| Docker build | **FAIL** — `npm ci --omit=dev` exit 1 | **PASS** |
+| Backend `npm ci` → `typecheck` | **FAIL** | **PASS** (suite still running at time of writing) |
+| Frontend `npm ci` → `typecheck` → `lint` | **FAIL** | **PASS** |
 
 ### Honest gaps in this verification
 
