@@ -26,9 +26,6 @@
     "/api/v1/inventory/errors/summary",
     "/api/v1/inventory/pipeline/issues",
     "/api/v1/inventory/pipeline/issues/:p",
-    "/api/v1/inventory/pipeline/receiving",
-    "/api/v1/inventory/pipeline/receiving/:p/update",
-    "/api/v1/inventory/pipeline/summary",
     "/api/v1/inventory/returns",
     "/api/v1/inventory/supplier-returns",
     "/api/v1/progress",
@@ -36,7 +33,6 @@
     "/api/v1/settings/b2b",
     "/api/v1/settings/custom-roles",
     "/api/v1/settings/custom-roles/:p",
-    "/api/v1/settings/permissions",
-    "/api/v1/things"
+    "/api/v1/settings/permissions"
   ]
 }
