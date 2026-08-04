@@ -73,9 +73,11 @@ export function ByTypeTab() {
       const data = await apiGet<{ types: TypeStat[] }>("/api/v1/documents/types");
       const nonEmpty = data.types.filter((t) => t.count > 0);
       setTypes(nonEmpty);
-      if (nonEmpty.length > 0 && activeType === null) {
-        setActiveType(nonEmpty[0].key);
-      }
+      // Functional update: auto-select first type only when none is active yet.
+      // Avoids closing over `activeType` (which would refetch types on every click).
+      setActiveType((prev) =>
+        prev === null && nonEmpty.length > 0 ? nonEmpty[0].key : prev
+      );
     } catch (e) {
       setError(e instanceof ApiResponseError ? e.message : "Failed to load.");
     } finally {
