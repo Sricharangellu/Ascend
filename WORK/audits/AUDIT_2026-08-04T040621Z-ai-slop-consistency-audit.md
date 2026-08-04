@@ -403,7 +403,7 @@ analysis — worth doing, not worth guessing at.
 | `web` `next lint` | **PASS** — 0 errors (pre-existing warnings only) |
 | `web` vitest | 174 passed / 3 failed — the 3 are L-2, **proven pre-existing** by re-running on a stashed tree |
 | New `storeAuthErrorEnvelope.test.tsx` | **3/3 pass**; **1 fails against the old code** with the predicted `[object Object]` |
-| `npm test` (backend, 96 files) | **NOT COMPLETED locally** — see below; running in CI on PR #185 |
+| `npm test` (backend, 96 files) | **PASS — 851/851, 0 failures** (`# pass 851 / # fail 0`), 19m implementation time against a local Postgres 16 |
 | `npm run smoke` | **NOT RUN locally** — running in CI on PR #185 |
 
 ### CI evidence on PR #185 (run 700, `7ffadac`)
@@ -419,16 +419,15 @@ The jobs that are red on `develop` pass here, which is the point of the change:
 
 ### Honest gaps in this verification
 
-- **The backend suite did not finish in this environment.** `scripts/test.ts` runs all 96
-  test files in a single `node --test` process; it exceeded the time available twice.
-  Mitigating facts, not excuses: **no backend source file was modified this session** —
-  the backend-facing changes are `package.json`/`tsconfig.json` restored verbatim from
-  `ca7ec4b`, plus two `tools/` scripts and a CI YAML. Backend typecheck passes against the
-  restored config. The suite must still be green in CI before this merges; that is now
-  possible again, which it was not at `a4dbf2c`.
-  *(Embedded Postgres cannot init as root here, so a system Postgres 16 was used instead —
-  worth knowing for the next session in this environment.)*
-- **`npm run smoke` was not run** for the same reason.
+- ~~The backend suite did not finish in this environment.~~ **Resolved — it did finish:
+  851 tests, 851 pass, 0 fail.** It takes ~19 minutes wall-clock (`duration_ms 1138014`),
+  which is why two earlier attempts hit a timeout and looked like a hard limit rather than
+  a slow run. Worth recording for the next session here: `scripts/test.ts` runs all 96 test
+  files in a single `node --test` process, so budget 20 minutes and run it detached.
+  *(Embedded Postgres cannot `initdb` as root in this environment — a system Postgres 16
+  was used via `DATABASE_URL` instead.)*
+- **`npm run smoke` was still not run locally** — CI runs it immediately after `npm test`
+  in the same job, so it is covered there rather than here.
 - **No Docker build** was attempted; the `docker-build` CI job covers it.
 - **Nothing in `artifacts/` was executed or verified.** H-1 is a structural finding from
   file comparison, not a claim about whether that tree runs.

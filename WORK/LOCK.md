@@ -7,7 +7,7 @@
 | Files/areas expected | `package.json`, `package-lock.json`, `tsconfig.json`, `.env*.example`, `web/.env*.example`, `tools/hygiene-check.mjs`, `.github/workflows/ci.yml`, `WORK/**`. NO `artifacts/**` (another environment's tree — documented, not touched). |
 | Started | 2026-08-04T040621Z |
 | Status | RELEASED — pushed to `claude/ai-slop-consistency-audit-lc2552`; see AUDIT_2026-08-04T040621Z-ai-slop-consistency-audit.md |
-| Blockers | Backend `npm test` + `npm run smoke` did NOT complete in this environment (96 test files in one `node --test` process, exceeded the time available; embedded-postgres also cannot init as root here — used system PG 16). No backend source was modified, and backend typecheck passes against the restored config, but CI must be green before merge. |
+| Blockers | none. Backend `npm test` completed: **851/851 pass, 0 fail** (~19 min — budget for that here; embedded-postgres cannot init as root, used system PG 16 via DATABASE_URL). `npm run smoke` not run locally; CI runs it in the same job. |
 
 ## Active Claim (Cursor Cloud — HOTFIX restore Ascend tsconfig)
 
