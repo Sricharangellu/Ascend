@@ -34,13 +34,13 @@ That is the finding. Most of the rest is small.
 |---|---:|---|
 | **AI slop** | **34** | 1,004-file duplicate app tree; 48 copies of one test helper in 8 variants; a dead root dependency; 4 dead allowlist entries |
 | **Architecture** | **72** | Canonical tree is clean and consistent (no module orphans, no table collisions); the score is held down entirely by the duplicate tree, not by `src/` itself |
-| **Security** | **80** | Prior sweeps verified authz + tenant-scoping; CI guards unguarded mutations and SQL interpolation. Unscored risk: nothing structural stopped a foreign tree from landing |
+| **Security** | ~~80~~ **68** | Prior sweeps verified authz + tenant-scoping; CI guards unguarded mutations and SQL interpolation. **Revised down 2026-08-04T15:00Z**: the original 80 was assigned without ever running a dependency audit — a gap in this audit, not a clean result. Running one (F-16) found **14 advisories in `web`: 1 critical, 9 high, 4 moderate**, plus 2 low at the root, with nothing watching for them. See F-24/F-25/F-26 |
 | **Performance** | — | **Not assessed.** No profiling or query-plan evidence was gathered; a score here would be invented |
 | **Maintainability** | **62** | Strong conventions and unusually good comments, undermined by the duplicate tree and the copy-pasted test harness |
 | **Testing** | **78** | 96 backend + 26 frontend test files, real-DB smoke, e2e. Gaps: 3 web tests need Node 24; `StoreAuthContext` had zero coverage and carried a real bug |
 | **Documentation** | **70** | Genuinely excellent (AGENTS.md, ADRs, audit trail). Penalised because the documented gates (`npm test`, `npm run verify`) did not exist at HEAD |
 | **Production readiness** | **45** | CI cannot pass on `develop` as of `a4dbf2c`. Everything else is secondary to that |
-| **Overall** | **58** | A good codebase with a broken front door |
+| **Overall** | ~~58~~ **56** | A good codebase with a broken front door (revised for the dependency finding above) |
 
 Overall is deliberately below the component average: a repository whose CI cannot run
 is not 70% healthy regardless of what the code looks like underneath.

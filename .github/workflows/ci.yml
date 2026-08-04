@@ -99,6 +99,23 @@ jobs:
       - name: Duplicate-code scan (report-only)
         run: node tools/duplicate-code-scan.mjs
 
+      # Backlog F-16. REPORT-ONLY, and it has to be: as of 2026-08-04 `web`
+      # carries 14 advisories (1 critical, 9 high) and the root 2 low, so any
+      # `--audit-level` gate fails every PR on arrival. Most need major bumps
+      # (`next` 14->16, `vitest` 2->4) that are migrations, not fixes — tracked
+      # as F-24/F-25. `|| true` keeps this a visible report until those land;
+      # remove it (and pick an --audit-level) once the count is near zero.
+      #
+      # `--omit=dev` is NOT used: the critical finding is vitest, a devDependency.
+      # Dev-only advisories still run on this runner and on contributors'
+      # machines, so hiding them would defeat the point.
+      - name: Dependency advisories (report-only)
+        run: |
+          echo "── root ──"
+          npm audit --audit-level=low || true
+          echo "── web ──"
+          npm audit --audit-level=low --prefix web || true
+
       - name: One canonical agent-instruction file
         run: |
           # "1 file for all agents": exactly one root AGENTS.md; CLAUDE.md may
