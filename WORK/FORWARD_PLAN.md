@@ -1826,7 +1826,7 @@ IDs are stable. Do not renumber; add.
 | **F-23** | — *(found by F-15)* | Duplicated block: `reports/sales-by-rep` ↔ `sales-by-vendor` pages | web / reports | **Low** | Report pages copy-pasted | Extract a shared report-page component | F-3 | 0.5 d | Low | One implementation, both reports render unchanged | ⬜ **READY** |
 | **F-24** | — *(found by F-16)* | `next` 14.2.29 → 16.x (9 high advisories incl. `postcss` chain) | web | **High** | Framework majors deferred; `next`, `postcss`, `eslint-config-next` and `glob` all resolve through this one bump | Plan a Next 14→16 migration; **not** `npm audit fix --force` | — | 2–3 d | **High — framework major, touches every page** | `npm audit` clean of the `next` chain; build, lint, e2e green | ⬜ **READY** |
 | **F-25** | — *(found by F-16)* | `vitest` 2.x → 4.x (the 1 **critical**, + `vite`/`esbuild`/`@vitest/mocker`) | web / tests | **High** *(dev-only exposure)* | Test-runner major deferred | Upgrade vitest and its vite chain | — | 1 d | Medium — test-only blast radius, but 177 tests must stay green | `npm audit` clean of the vitest chain; 177 pass / 3 known Node-24 fails unchanged | ⬜ **READY** |
-| **F-26** | — *(found by F-16)* | 4 advisories with **non-breaking** fixes | web, root | **Medium** | Nothing was watching, so trivially-fixable transitive advisories accumulated | `npm audit fix` for `brace-expansion`, `form-data`, `js-yaml`, `@redocly/openapi-core`; root's 2 low (`body-parser`, `esbuild`) | — | 0.5 d | Low — no major bumps | Those 6 gone from `npm audit`; build + full suites still green | ⬜ **READY — quickest win in the backlog** |
+| **F-26** | — *(found by F-16)* | 4 advisories with **non-breaking** fixes | web, root | **Medium** | Nothing was watching, so trivially-fixable transitive advisories accumulated | `npm audit fix` (never `--force`); lockfiles only, `package.json` untouched | — | 0.5 d | Low — no major bumps | **root 2 → 0, web 14 → 10; 6 cleared.** `brace-expansion`, `form-data`, `js-yaml`, `@redocly/openapi-core`, `body-parser`, `esbuild` all gone. Verified: web tsc 0, lint clean, 177 pass/3 known, **prod build succeeds**; backend tsc 0 | ✅ **DONE** |
 | **S-1** | C-1/C-2 rec. | Branch protection on `develop` requiring green CI | — | **Critical** | Nothing enforces that a red branch cannot merge | Repo setting | **Sri-only** | mins | None | `develop` requires green CI. Every hijack was red on arrival | ⛔ **SRI-ONLY** |
 | **S-2** | C-1 rec. | Repoint the other workspace's `origin` | — | **High** | Two projects share one remote | Fork, or disconnect | **Sri-only** | mins | None | A foreign root can no longer reach this repo | ⛔ **SRI-ONLY** |
 
@@ -1859,8 +1859,8 @@ Re-run the audit after 9.3 and after 9.6. Compare against 2026-08-04:
 | `eslint-disable` (src+web) | 31 |
 | CI guardrail coverage | 12 of 16 categories (duplicate-code, dependency advisories, dead-code added 2026-08-04) |
 | Unreferenced exports (`dead:scan`) | 371 — 95 value, 276 type-only |
-| Dependency advisories — `web` | 14 (1 critical, 9 high, 4 moderate) |
-| Dependency advisories — root | 2 low |
+| Dependency advisories — `web` | ~~14~~ **10** (1 critical, 6 high, 3 moderate) — remainder needs F-24/F-25 majors |
+| Dependency advisories — root | ~~2 low~~ **0** |
 | Overall health score | 58/100 |
 
 Phase 9 is complete when: no P0 or P1 open, the duplicate-app-tree decision is
