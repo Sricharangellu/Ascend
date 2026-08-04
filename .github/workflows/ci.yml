@@ -30,6 +30,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # FIRST step in the whole pipeline, deliberately: it fails in seconds on a
+      # swapped root manifest, before any job spends minutes reaching a confusing
+      # `npm ci` error. Run as a bare `node`, never `npm run hygiene` — the whole
+      # point is to survive a root package.json that has no scripts and a
+      # preinstall hook that rejects npm. See check 8 in the script, and
+      # WORK/audits/AUDIT_2026-08-03T110000Z-replit-pnpm-root-hijack-incident.md.
+      - name: Root manifest integrity (package.json / lockfiles / tsconfig)
+        run: node tools/hygiene-check.mjs
       - name: No unguarded mutation routes (router.patch/delete without requireRole)
         run: |
           ! grep -rn --include="*routes.ts" -A1 "router\.\(patch\|delete\|put\)" src/ \
@@ -67,13 +75,9 @@ jobs:
           fi
           echo "No duplicate/copy-junk files tracked ✓"
 
-      - name: Repo hygiene (duplicates / backups / merge-conflict junk)
-        # Comprehensive superset of the inline check above: scans the whole tree
-        # for "<name> 2.<ext>" copies, *.bak/*.orig backups, and merge-conflict
-        # markers. Fails CI so junk can never land. Runs on the runner's Node
-        # (no deps); the script is a plain ESM module.
-        run: node tools/hygiene-check.mjs
-
+      # (The former "Repo hygiene" step ran this same `node tools/hygiene-check.mjs`
+      # a second time in this job — it is now the first step above, which covers
+      # the identical ground plus root-manifest integrity. One invocation, not two.)
       - name: Prevention agent — no dirty drift or stray modules
         run: npm run prevent:drift
 
