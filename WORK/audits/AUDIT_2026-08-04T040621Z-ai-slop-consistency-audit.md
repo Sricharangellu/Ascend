@@ -445,6 +445,23 @@ The jobs that are red on `develop` pass here, which is the point of the change:
   files in a single `node --test` process, so budget 20 minutes and run it detached.
   *(Embedded Postgres cannot `initdb` as root in this environment — a system Postgres 16
   was used via `DATABASE_URL` instead.)*
+- **Local Postgres eats the disk, and the symptom looks like a code failure.**
+  Costly enough this session to write down. `scripts/test.ts` runs 852 tests
+  against whatever `DATABASE_URL` points at; against a *persistent* local
+  Postgres, each full run leaves several GB behind. Five runs took `ascend_test`
+  to **27 GB** and filled the volume, after which:
+    - a run failed **770/852 in 44 seconds** (Postgres refusing connections),
+      which reads exactly like a catastrophic regression and is not one;
+    - Postgres needed a **70s+ full-directory fsync** on every restart;
+    - one run reported a single unexplained failure with the disk nearly full;
+    - the harness could no longer write command output at all (ENOSPC).
+  CI never sees this — its Postgres service is ephemeral per job. Fix is
+  `dropdb --force ascend_test` between runs (reclaimed 29 GB here), or just let
+  CI run the suite. This is the same *class* as `LOOP_STATE` iteration 17's
+  "~9GB of orphaned embedded-Postgres dirs from timeout-killed runs" — different
+  mechanism, same lesson: **a mass backend-test failure in this environment is a
+  disk symptom until proven otherwise.** Check `df -h /` before believing it.
+
 - **`npm run smoke` was still not run locally** — CI runs it immediately after `npm test`
   in the same job, so it is covered there rather than here.
 - **No Docker build** was attempted; the `docker-build` CI job covers it.
