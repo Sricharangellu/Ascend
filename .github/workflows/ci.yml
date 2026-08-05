@@ -168,7 +168,7 @@ jobs:
         run: npm run smoke
 
   frontend:
-    name: Frontend — typecheck + lint + build
+    name: Frontend — typecheck + lint + test + build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -183,6 +183,11 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
+      # web/tests (179 vitest tests) previously ran nowhere in CI — only the
+      # backend suite was gated. That is how 3 failing api-client tests sat
+      # green-by-omission, and it would equally have hidden routeIntegrity,
+      # the guard against linking to deleted pages. Gate them here.
+      - run: npm test
       - run: npm run build
 
   # ─── Docker build sanity check ─────────────────────────────────────────────

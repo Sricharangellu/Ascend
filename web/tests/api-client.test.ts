@@ -22,13 +22,16 @@ beforeEach(() => {
   clearSession();
 });
 
+/**
+ * Read a Blob as text.
+ *
+ * Uses the standard `Blob.text()` rather than a FileReader: under jsdom, the
+ * blob that comes back from `Response.blob()` is a *native* Node Blob, and
+ * jsdom's FileReader only accepts jsdom Blobs — it rejects anything else with
+ * "parameter 1 is not of type 'Blob'". `Blob.text()` works on both.
+ */
 function readBlob(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error);
-    reader.onload = () => resolve(String(reader.result));
-    reader.readAsText(blob);
-  });
+  return blob.text();
 }
 
 describe("apiFetch — login flow", () => {
