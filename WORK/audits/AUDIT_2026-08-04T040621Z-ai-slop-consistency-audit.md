@@ -399,7 +399,7 @@ Phases 1–2 are done. The rest is ordered by dependency, not by appetite.
 | **3 — Architecture cleanup** | H-1: ADR naming the canonical tree → harvest `push_tokens` and any other `artifacts`-only backend work → remove the duplicate trees | **NEEDS-SRI** (decision, then ~1–2 days) |
 | **4 — Duplication** | H-3: 48 `test-request.ts` copies now compose shared primitives (−2,925 lines) | **DONE** (852/852) |
 | **5 — Prevention** | Branch protection on `develop` requiring green CI; decide the other workspace's remote | **Sri-only** |
-| **6 — Testing** | L-2 Node-version assertion; extend coverage to the storefront surfaces H-2 exposed as untested | Backlog |
+| **6 — Testing** | L-2 Node-version assertion; 6 tests over the storefront surfaces H-2 left untested | **DONE** (183 web tests) |
 | **7 — Documentation** | Fold this audit's conclusions into `GAPS.md`; ADR for phase 3 | With phase 3 |
 
 ### What phase 4 corrected about H-3 itself
