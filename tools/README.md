@@ -108,31 +108,28 @@ Next.js App Router files (`page`/`layout`/`route`/…), `middleware.ts` and
 ## `new-worktree.sh` — one isolated checkout per session
 
 ```bash
-tools/new-worktree.sh expenses-mvp
+tools/new-worktree.sh expenses-mvp              # -> ../ascend-wt-expenses-mvp, branch wt/expenses-mvp
+tools/new-worktree.sh fix/expenses-cents        # a slug with a type prefix becomes the branch as-is
+tools/new-worktree.sh hotfix/readyz-500 master  # the one sanctioned master base; warns
 ```
 
-Creates `../finder-wt-expenses-mvp` on a fresh branch off `origin/master`. Use this
-(or run sessions one at a time) so parallel work does not share the primary tree —
-the single biggest source of the collisions. **Never make a second clone**; a
+Creates `../ascend-wt-<slug>` on a fresh branch off `origin/develop`. The base is
+`develop` by design — promotion is forward-only (`feature/* → develop → staging →
+master`) and `master` is a release target, not a starting point. Pass a second
+argument only for a real hotfix.
+
+Use this (or run sessions one at a time) so parallel work does not share the primary
+tree — the single biggest source of the collisions. **Never make a second clone**; a
 worktree shares one object store, a clone diverges.
 
-## Sri-only: turn on PR protection (ends direct-to-master racing)
+## PR protection on `master` — already on
 
-The deepest fix is that no session pushes to `master` directly — every change goes
-through a short-lived branch + PR, so conflicts surface *before* landing. Enable it
-once (GitHub Settings → Branches → `master`), or via API:
+No session pushes to `master` directly. Branch protection requires the CI checks
+(`Production guard`, `Backend — typecheck + test`, `Frontend — typecheck + lint +
+build`) and is **admin-enforced** — there is no bypass, including for repo admins —
+and no workflow auto-merges anything, so a human clicks merge every time. The
+authoritative description of what is enforced, and the config registry behind it,
+live in `docs/architecture/PIPELINE.md`; don't restate them here.
 
-```bash
-gh api -X PUT repos/Sricharangellu/Ascend/branches/master/protection \
-  -F required_pull_request_reviews.required_approving_review_count=0 \
-  -F 'required_status_checks.contexts[]=Backend' \
-  -F 'required_status_checks.contexts[]=Frontend' \
-  -F 'required_status_checks.contexts[]=Production guard' \
-  -F 'required_status_checks.contexts[]=E2E' \
-  -F required_status_checks.strict=true \
-  -F enforce_admins=false -F restrictions=
-```
-
-Also enable Settings → General → "Allow squash merging" only + "Automatically
-delete head branches". After that, every session follows: branch → PR →
-`gh pr merge --auto --squash --delete-branch` (see `AGENTS.md` "Git: where and how").
+Every session therefore follows: branch off `develop` → PR into `develop` → green CI
+→ Sri merges. See `AGENTS.md` "Git: where and how" and `tools/AGENT_PROMPT.md`.

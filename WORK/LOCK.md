@@ -1,3 +1,15 @@
+## Active Claim (Claude Code web — prompt guide)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-prompt-guide-6ol0p9` |
+| Queue item | Ascend prompt guide. Rewrite `tools/AGENT_PROMPT.md` (the sanctioned onboarding prompt) into the current, correct prompt guide + per-job prompt recipes, and fix the three places it depends on that are stale: `tools/new-worktree.sh` cuts branches off `origin/master` (violates the binding "never branch from master" directive), `tools/README.md` documents that same base plus an already-completed "Sri-only: turn on PR protection" step, and `AGENTS.md`'s Operational Reference still says "Current mode (Phase 1): direct-to-master". No new instruction file — every change updates a mapped file in place. |
+| Files/areas expected | `tools/AGENT_PROMPT.md`, `tools/new-worktree.sh`, `tools/README.md`, `AGENTS.md` ("Git: where and how" + the Sri-only list only), `WORK/README.md` (AGENT_PROMPT row only), `docs/architecture/ORCHESTRATION.md` (concurrency-protocol claim line only), `WORK/LOCK.md`. NOT `src/**`, NOT `web/**`, NOT `WORK/FORWARD_PLAN.md`, NOT `WORK/LOOP_STATE.md`, NOT `docs/architecture/PIPELINE.md`. |
+| Started | 2026-08-05T045427Z |
+| Status | RELEASED — pushed to `claude/ascend-prompt-guide-6ol0p9`. Gates: `node tools/hygiene-check.mjs` PASS (2176 files — no junk, tracked env, conflict markers, secrets, or **broken doc links**, which is the load-bearing check for a docs change), `bash -n tools/new-worktree.sh` PASS + branch/dir derivation exercised over 6 inputs incl. the empty-slug guard. Every path and identifier the guide cites verified present (11 design primitives, `requireCapability`/`requireRole`, the ARCHITECTURE.md owner table, all 12 doc targets, the 3 CI check names). |
+| Blockers | none |
+| Not run | `npm test` / `npm run smoke` / `tsc --noEmit` — this container has an empty `node_modules` (deps were never installed), so `tsc` fails on a missing `@types/node` rather than on anything in the diff. Justified: the change touches only `.md` and one `.sh`, zero TypeScript. CI runs the full gate on the PR. |
+
 ## Active Claim (Claude Code web — AI-slop / consistency audit)
 
 | Field | Value |
