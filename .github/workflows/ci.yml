@@ -57,10 +57,46 @@ jobs:
             exit 1
           fi
       - name: No raw SQL string interpolation (SQL injection risk)
+        # This step was a no-op from the day it was written until 2026-08-05: the
+        # BRE `\.query\(\`.*\${` leaves `\(` unclosed, so grep exited 2 with
+        # "Unmatched ( or \(" — and the leading `!` inverted that error into a
+        # pass. It could never fail. Rewritten as an explicit if/exit so a grep
+        # error can no longer be laundered into success.
+        #
+        # Turning it on surfaced 6 pre-existing sites, all reviewed and all safe:
+        # they interpolate *identifiers only* — `orderCol`/`modeCol`/`where` are
+        # ternaries over closed unions yielding hardcoded column names, and
+        # `sets` is built from object keys that are literal in the source. Every
+        # caller-supplied value in them is bound through @param. They are
+        # allowlisted by interpolated expression rather than by line number so
+        # the guard does not false-fire when surrounding code shifts.
+        #
+        # Shrink-only: never add an entry here without proving the interpolated
+        # text cannot carry request data.
+        #
+        # Two shellcheck-driven spellings, both deliberate — actionlint runs
+        # shellcheck over this block and fails the job on SC2016 ("expressions
+        # don't expand in single quotes"), which fires on anything inside single
+        # quotes that *looks* like it was meant to expand. Both offenders here
+        # are literal regex, so the warning is wrong, but the job still goes red:
+        #   - no backtick in the pattern: matching the template literal's opening
+        #     backtick reads as command substitution. Dropped in favour of `.*`,
+        #     which is also strictly broader — it catches concatenated
+        #     interpolation like `.query("… " + `${u}`)`, not just template
+        #     literals (verified against a probe of that exact shape).
+        #   - `{` written as the class `[{]` so the sequence `${` never appears.
+        # Preferred over a blanket `shellcheck disable=SC2016`, which would also
+        # mask a genuine quoting bug introduced into this step later.
         run: |
-          ! grep -rn --include="*.ts" "\.query\(\`.*\${" src/modules/ src/gateway/ \
-            | grep -v "\.test\.ts\|set_config\|schema" \
-            || (echo "❌ Raw string interpolation in SQL — use @param syntax" && exit 1)
+          violations=$(grep -rnE --include="*.ts" '\.query\(.*\$[{]' src/modules/ src/gateway/ \
+            | grep -v '\.test\.ts' \
+            | grep -vE '\$[{](orderCol|modeCol|where)[}]' \
+            | grep -vE '\$[{]sets\.join\(' || true)
+          if [ -n "$violations" ]; then
+            echo "$violations"
+            echo "❌ Raw string interpolation in SQL — use @param syntax"
+            exit 1
+          fi
           echo "No raw SQL interpolation found ✓"
 
       - name: No duplicate / copy-junk files committed
