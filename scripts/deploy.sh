@@ -103,6 +103,13 @@ deploy_backend() {
   url=$( cd "$S" && VERCEL_ORG_ID="$TEAM" VERCEL_PROJECT_ID="$BACKEND_PID" \
       npx --yes vercel deploy $PROD_FLAG --archive=tgz --yes --token "$VERCEL_TOKEN" "${DB_ENV_ARGS[@]}" \
       | grep -oE 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1 )
+  # An empty url means `vercel deploy` failed (e.g. "Project not found") — its
+  # non-zero status cannot propagate here, because `set -e` is suspended inside
+  # the `deploy_backend || backend_status=$?` call below. Fail explicitly.
+  if [[ -z "$url" ]]; then
+    echo "✗ backend deploy failed ($DEPLOY_ENV): vercel produced no deployment URL" >&2
+    return 1
+  fi
   echo "→ Backend deployed: $url"
   # Non-prod: pin the unique preview URL to a stable alias so the frontend can be
   # built against a durable backend origin (prod uses --prod's own alias).
@@ -138,6 +145,15 @@ deploy_frontend() {
   url=$( cd "$S" && VERCEL_ORG_ID="$TEAM" VERCEL_PROJECT_ID="$FRONTEND_PID" \
       npx --yes vercel deploy $PROD_FLAG --archive=tgz --yes --token "$VERCEL_TOKEN" \
       | grep -oE 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1 )
+  # Same failure mode as deploy_backend: without this guard a failed deploy
+  # ("Project not found") fell through to the alias step, which errored with
+  # `argument "" is not a valid ID or URL`, and the function still returned 0
+  # because its last command was the unconditional "✓ frontend deployed" echo.
+  # That reported a green deploy while shipping nothing — including for prod.
+  if [[ -z "$url" ]]; then
+    echo "✗ frontend deploy failed ($DEPLOY_ENV): vercel produced no deployment URL" >&2
+    return 1
+  fi
   echo "→ Frontend deployed: $url"
   if [[ "$DEPLOY_ENV" != "prod" && -n "${FRONTEND_ALIAS:-}" ]]; then
     echo "→ Frontend: aliasing $url → $FRONTEND_ALIAS"

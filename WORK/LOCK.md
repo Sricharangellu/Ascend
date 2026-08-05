@@ -221,6 +221,27 @@ Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0
 | Status | RELEASED — merged to develop via PR #141 (`0f30096`); see AUDIT_2026-08-02T200816Z-aging-party-names-deeplinks.md |
 | Blockers | none |
 
+## Active Claim (Claude session H — post-merge staging hardening + release go/no-go)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code (web), Opus — Sri-directed: post-merge hardening of the `develop → staging` promotion (PR #187) and a go/no-go on `staging → master` |
+| Queue item | Verify the merged `staging` tree `f0c1845`: tier-sync proof, full `npm run verify` + `ops:check`, CI guard anti-pattern checks, backup/restore drill (standing critical C-1), rollback procedure, and a structured release verdict. Fix what is found. |
+| Files/areas expected | `scripts/deploy.sh` (empty-URL guards only); NEW `src/shared/deploy-guard.test.ts`; NEW `WORK/audits/AUDIT_2026-08-05T054800Z-post-merge-staging-hardening.md`; `WORK/LOOP_STATE.md`; this LOCK. **No module/product code touched.** No pushes to `master`/`staging`/`develop` — PR only. |
+| Started | 2026-08-05 |
+| Status | RELEASED — verdict NO-GO (see audit). Fixed: `scripts/deploy.sh` reported `✓ frontend deployed` + exit 0 when the Vercel deploy failed with "Project not found" — same code path as `DEPLOY_ENV=prod`, so a production release could have reported green while shipping nothing. Regression test verified to fail without the fix. C-1 restore drill executed for the first time (backup 0.168s, restore ~1s, 193/193 tables and all sampled row counts identical, app boots against the restored DB). Gates on `f0c1845`: 852/852 tests, smoke, web typecheck/lint/build, CI E2E all green. |
+| Blockers | Load/stress testing (mandate §3) NOT done — no reachable TESTING tier (`deploy-staging` ran and failed; Vercel projects deleted), no Vercel/Supabase credentials, restricted egress. Reported as FAIL, not softened. |
+
+## Reconciliation note (session H, 2026-08-05)
+
+Board was clear before this claim: the session G coordinator entry below was
+already closed (`RELEASED — SUPERSEDED`, 2026-07-30 staleness review), and no
+other claim was `ACTIVE`. No overlapping claim was taken over.
+
+The file-header `Status:` line above still reads "ACTIVE — session G … Phase 0"
+and now contradicts session G's own closed Status row; left as-is rather than
+edited, since this session's remit was hardening, not board maintenance.
+
 ## Active Claim (Claude session G — Phase 0 coordinator: finish end-to-end + deployment readiness)
 
 | Field | Value |
