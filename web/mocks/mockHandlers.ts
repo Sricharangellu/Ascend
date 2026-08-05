@@ -221,7 +221,7 @@ const _BP_CATALOG: _BPMod[] = [
   { key: "online_store",      name: "Online Store",        description: "Product visibility, SEO fields, meta title/description",    group: "ecommerce" },
   { key: "order_fulfillment", name: "Order Fulfillment",   description: "Pick-pack-ship for online orders, tracking integration",    group: "ecommerce" },
   { key: "marketplace",       name: "Marketplace Sync",    description: "Sync inventory/orders with external marketplaces",          group: "ecommerce" },
-  { key: "shipping_mgmt",     name: "Shipping Management", description: "Carrier integrations, label printing, tracking numbers",    group: "ecommerce", route: "/delivery?tab=shipments" },
+  { key: "shipping_mgmt",     name: "Shipping Management", description: "Carrier integrations, label printing, tracking numbers",    group: "ecommerce", route: "/delivery" },
   { key: "vehicle_history", name: "Vehicle History",    description: "VIN/license lookup, service history per vehicle, notes",    group: "automotive", route: "/automotive/vehicles" },
   { key: "parts_inventory", name: "Parts Inventory",    description: "Auto parts with OEM/aftermarket codes, supplier ordering",  group: "automotive" },
   { key: "work_orders",     name: "Work Orders",        description: "Job cards, technician assignment, time tracking, parts",    group: "automotive", route: "/automotive/work-orders" },
@@ -705,6 +705,24 @@ export const mockHandlers = [
       { key: "cus_demo_2", name: "Grace Hopper", units: 12, revenueCents: 286000 },
     ] });
   }),
+  // Cash movement had NO handler at all. MSW is configured onUnhandledRequest:
+  // "warn", so the request fell through to a backend that isn't deployed in mock
+  // mode; useQuery's error branch clears loading, leaving the dashboard Cash Flow
+  // KPI showing a confident $0.00. Shape mirrors ReportsService.cashMovement.
+  http.get(`${V1}/reports/cash-movement`, async () => {
+    await lat();
+    const now = Date.now();
+    const items = [
+      { movement_type: "sale",       amount: 12_450, reason: null,              created_by: "usr_demo_cashier", created_at: now - 3_600_000 },
+      { movement_type: "float_in",   amount: 10_000, reason: "Opening float",   created_by: "usr_demo_owner",   created_at: now - 28_800_000 },
+      { movement_type: "sale",       amount:  8_320, reason: null,              created_by: "usr_demo_cashier", created_at: now - 7_200_000 },
+      { movement_type: "cash_out",   amount:  4_500, reason: "Supplier payout", created_by: "usr_demo_owner",   created_at: now - 10_800_000 },
+      { movement_type: "cash_out",   amount:  2_000, reason: "Petty cash",      created_by: "usr_demo_owner",   created_at: now - 14_400_000 },
+    ];
+    const totalInCents = items.filter((r) => r.movement_type !== "cash_out").reduce((s, r) => s + r.amount, 0);
+    const totalOutCents = items.filter((r) => r.movement_type === "cash_out").reduce((s, r) => s + r.amount, 0);
+    return HttpResponse.json({ items, totalInCents, totalOutCents, netCents: totalInCents - totalOutCents });
+  }),
   http.get(`${V1}/reports/inventory-valuation`, async () => {
     await lat();
     const rows = [
@@ -716,7 +734,9 @@ export const mockHandlers = [
     ];
     const totalCostCents = rows.reduce((s, r) => s + r.costValueCents, 0);
     const totalRetailCents = rows.reduce((s, r) => s + r.retailValueCents, 0);
-    return HttpResponse.json({ rows, totalCostCents, totalRetailCents });
+    // `total` (SKU count) is part of the backend's Valuation shape; omitting it
+    // made the dashboard Ops Hub render "SKUs: 0" next to a real inventory value.
+    return HttpResponse.json({ rows, totalCostCents, totalRetailCents, total: rows.length });
   }),
 
 
@@ -3159,15 +3179,25 @@ mockHandlers.push(
   }),
 
   // ── P&L report ────────────────────────────────────────────────────────────
+  // Shape mirrors PnlReport in src/modules/reports/service.ts. It used to return
+  // a nested {revenue:{...},cogs:{...},...} object no backend ever produced, so
+  // every consumer read undefined and rendered a confident $0.00 P&L.
   http.get(`${V1}/reports/p-l`, async () => {
     await lat();
+    const grossSalesCents = 284_600;
+    const taxCents = 22_768;
+    const revenueCents = grossSalesCents - taxCents; // 261,832 — revenue is net of tax
+    const cogsCents = 142_300;
+    const grossProfitCents = revenueCents - cogsCents; // 119,532
+    const operatingExpensesCents = 38_400;
     return HttpResponse.json({
-      revenue: { grossCents: 284600, taxCents: 22768, netCents: 261832 },
-      cogs: { costCents: 142300 },
-      grossProfit: { cents: 119532, pct: 45.6 },
-      opex: { cents: 38400 },
-      netProfit: { cents: 81132, pct: 31.0 },
-      period: "Last 30 days",
+      revenueCents,
+      grossSalesCents,
+      taxCents,
+      cogsCents,
+      grossProfitCents,
+      operatingExpensesCents,
+      netIncomeCents: grossProfitCents - operatingExpensesCents, // 81,132
     });
   }),
 
@@ -3182,12 +3212,13 @@ mockHandlers.push(
   }),
 
   // ── Sales-by-vendor report ─────────────────────────────────────────────────
+  // Shape mirrors SalesByVendorRow (totalCents/qty, not revenueCents/unitsSold).
   http.get(`${V1}/reports/sales-by-vendor`, async () => {
     await lat();
     return HttpResponse.json({ items: [
-      { vendorId: "sup_acme", vendorName: "Acme Coffee Co", orderCount: 54, revenueCents: 168400, unitsSold: 312 },
-      { vendorId: "sup_tea", vendorName: "Tea Traders", orderCount: 29, revenueCents: 84200, unitsSold: 198 },
-      { vendorId: "sup_other", vendorName: "General Goods", orderCount: 15, revenueCents: 32000, unitsSold: 87 },
+      { vendorId: "sup_acme", vendorName: "Acme Coffee Co", orderCount: 54, totalCents: 168400, qty: 312 },
+      { vendorId: "sup_tea", vendorName: "Tea Traders", orderCount: 29, totalCents: 84200, qty: 198 },
+      { vendorId: "sup_other", vendorName: "General Goods", orderCount: 15, totalCents: 32000, qty: 87 },
     ]});
   }),
 
