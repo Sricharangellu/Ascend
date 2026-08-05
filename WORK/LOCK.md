@@ -1,4 +1,13 @@
+## Active Claim (Claude Code web — AI-slop / consistency audit)
 
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ai-slop-consistency-audit-lc2552` |
+| Queue item | Repo-wide AI-slop elimination & consistency audit. P0: restore the npm root broken by the Replit-workspace merge (called the 3rd here; it was the **5th** — see the audit's correction note, and PR #182 landed the same restore independently) (CI red on `develop` — `npm ci` × 7 cannot run); add the structural guardrail the 2026-08-03T110000Z incident audit recommended but did not build. Then evidence-based duplication/dead-code/consistency findings on the canonical tree. |
+| Files/areas expected | `package.json`, `package-lock.json`, `tsconfig.json`, `.env*.example`, `web/.env*.example`, `tools/hygiene-check.mjs`, `.github/workflows/ci.yml`, `WORK/**`. NO `artifacts/**` (another environment's tree — documented, not touched). |
+| Started | 2026-08-04T040621Z |
+| Status | RELEASED — pushed to `claude/ai-slop-consistency-audit-lc2552`; see AUDIT_2026-08-04T040621Z-ai-slop-consistency-audit.md |
+| Blockers | none. Backend `npm test` completed: **851/851 pass, 0 fail** (~19 min — budget for that here; embedded-postgres cannot init as root, used system PG 16 via DATABASE_URL). `npm run smoke` not run locally; CI runs it in the same job. |
 
 ## Active Claim (Cursor Cloud — Dashboard display and data)
 
