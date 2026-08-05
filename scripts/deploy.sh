@@ -51,8 +51,21 @@ case "$DEPLOY_ENV" in
   *) echo "DEPLOY_ENV must be prod|testing|dev"; exit 1 ;;
 esac
 TEAM="team_WNp8vBq1RmWTEH8WSnenP7jM"             # gellusricharan-4715s-projects
-BACKEND_PID="prj_krZ34CIFjzQrMvZ08PWqqbxzBf7d"    # ascend-backend (rebrand Phase 3; formerly finder-pos-backend — project ID is immutable, never changed)
-FRONTEND_PID="prj_TiPX9UYctGKJbQr4Lb1WFwSsKiN1"   # ascend-frontend (formerly finder-pos-frontend — project ID unchanged)
+# Vercel project IDs. Overridable via env so a deleted/renamed/replaced project
+# can be repointed from repo variables WITHOUT editing this script — set
+# VERCEL_BACKEND_PROJECT_ID / VERCEL_FRONTEND_PROJECT_ID under
+# Settings → Secrets and variables → Actions → Variables (ci.yml passes them).
+#
+# The defaults below are the historical IDs. As of 2026-08-05 the frontend
+# default no longer exists — the staging deploy failed with
+# `Error: Project not found ({"VERCEL_PROJECT_ID":"prj_TiPX9UY…"})` — while a
+# live project `ascend_hq_web` (prj_MvvmpNkRQbKUAEOmh9ZvmRJa7ETN, root dir
+# `web`) is actively building previews and is what PIPELINE.md names as the
+# production frontend. Which project each tier should target is a Sri decision
+# (one project + aliases vs. separate per-tier projects), so the defaults are
+# left unchanged here and the override is what moves them.
+BACKEND_PID="${VERCEL_BACKEND_PROJECT_ID:-prj_krZ34CIFjzQrMvZ08PWqqbxzBf7d}"    # ascend-backend (rebrand Phase 3; formerly finder-pos-backend — project ID is immutable, never changed)
+FRONTEND_PID="${VERCEL_FRONTEND_PROJECT_ID:-prj_TiPX9UYctGKJbQr4Lb1WFwSsKiN1}"  # ascend-frontend (formerly finder-pos-frontend — project ID unchanged)
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 : "${VERCEL_TOKEN:?Set VERCEL_TOKEN (a Vercel token with access to the team scope)}"
 

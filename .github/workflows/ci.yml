@@ -23,6 +23,16 @@ permissions:
   contents: read
   deployments: write
 
+# Vercel project IDs for scripts/deploy.sh, sourced from repo variables so a
+# deleted or replaced project can be repointed WITHOUT a code change (Settings →
+# Secrets and variables → Actions → Variables). Empty = deploy.sh keeps its own
+# historical defaults, so this is a no-op until the variables are set.
+# See docs/architecture/DEPLOYMENTS.md — the frontend default currently points
+# at a project that returns "Project not found".
+env:
+  VERCEL_BACKEND_PROJECT_ID: ${{ vars.VERCEL_BACKEND_PROJECT_ID }}
+  VERCEL_FRONTEND_PROJECT_ID: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
+
 # ─── Shared test jobs (run on every trigger) ──────────────────────────────────
 jobs:
   guard:
