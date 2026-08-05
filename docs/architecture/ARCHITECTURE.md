@@ -133,6 +133,50 @@ creating a duplicate concept is a constitution violation (see
 Cross-team seams are event contracts (bus) and documented read-joins
 (ADR-002) — never imports of another module's service.
 
+### Domain → owning implementation (added 2026-08-04)
+
+The table above assigns modules to *teams*. This one assigns each business
+rule to the *one file that decides it*, which is what a duplicate has to be
+migrated toward. Verified against the code, not aspirational — a domain with
+no single owner says so rather than being assigned a plausible one.
+
+| Domain | Canonical owner | Notes |
+|---|---|---|
+| Inventory levels & movements | `src/modules/inventory/service.ts` — `InventoryService` | Movements immutable; `adjustStockTx` is the only writer, `FOR UPDATE` guarded |
+| Purchasing (POs, suppliers, bills) | `src/modules/purchasing/service.ts` — `PurchasingService` | |
+| Receiving | `src/modules/purchasing/receiving-sessions.ts` — `ReceivingSessionService` | Inside purchasing by design; not a separate module |
+| Catalog & price history | `src/modules/catalog/service.ts` — `CatalogService` | Owns `product_price_history` (append-only) |
+| Orders / POS | `src/modules/orders/service.ts` — `OrdersService` | |
+| Accounting (COA, ledger) | `src/modules/accounting/service.ts` — `AccountingService` | `journal_entries` append-only |
+| Identity & authentication | `src/identity/service.ts` — `IdentityService`, with `src/gateway/auth.ts` | |
+| Money arithmetic | `src/shared/money.ts` | Integer cents everywhere |
+| Document numbering | `src/shared/docnumber.ts` | Race-free `document_counters` |
+| Keyset pagination | `src/shared/pagination.ts` | |
+| Sales velocity / demand rate | `src/shared/sales-velocity.ts`, `src/shared/demand-rate.ts` | Consolidated 2026-07-28 from 5 divergent call sites — the precedent this table exists to prevent repeating |
+| **Tax** | **CONTESTED — no single owner** | See below. |
+| **Pricing (price selection)** | **NO OWNER — does not exist** | There is no `src/modules/pricing`. `/api/v1/pricing` is an allowlisted UI-only Preview prefix. Catalog owns price *storage*; nothing owns price *derivation* (rules, tiers, promos). Do not cite a "PricingEngine" — it is not there. |
+
+**Tax has three independent authorities today.** This is a live correctness
+defect, not a naming quibble, and it is the worked example of why this table
+exists:
+
+1. `src/modules/orders/tax.ts` — declares itself "Tax Engine (orders module
+   owns it)"; hard-codes four state rates (CA 8.25 / NY 8.875 / TX 6.25 /
+   FL 6.00) per `CONTRACTS.md`. **Imported only within `orders/`.**
+2. `src/modules/customer_invoices/service.ts` — computes tax inline from a
+   caller-supplied `tax_rate_pct`, which `routes.ts`'s zod schema marks
+   `.optional()` and the service defaults to `0`. An invoice POSTed without a
+   rate charges **zero tax**, silently, while the same goods through POS are
+   taxed at the state rate.
+3. `src/modules/settings/service.ts` — a tenant-configurable `tax_rates`
+   table (`listTaxRates`), a third source of truth that neither of the other
+   two reads.
+
+`reports` only sums stored `tax_cents`, so it is a consumer, not a fourth
+authority. Resolution is tracked as **F-11** in `WORK/FORWARD_PLAN.md`
+Phase 9 — it is deliberately not a drive-by fix, because picking the winner
+changes what customers are charged.
+
 ## Platform roadmap (Levels 1–10, real status)
 
 Status is code-verified, not aspirational.

@@ -13,9 +13,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { apiGet, apiPost } from "@/api-client/client";
-import type { Order, Payment, CapturePaymentRequest, PaymentMethod } from "@/api-client/types";
+import type { Order, Payment, CapturePaymentRequest, PaymentMethod, GiftCard } from "@/api-client/types";
 import { formatMoney, parseToCents, calcChange } from "@/lib/money";
 import { Button } from "@/components/Button";
+import { Input } from "@/components/Input";
 import { CardReaderScreen } from "./CardReaderScreen";
 import { CashNumpadModal } from "./CashNumpadModal";
 import { enqueueCheckout, requestSync } from "@/lib/offlineOutbox";
@@ -30,7 +31,7 @@ interface TenderScreenProps {
   splitEnabled?: boolean;
 }
 
-type TenderTab = "cash" | "card" | "split" | "store_credit";
+type TenderTab = "cash" | "card" | "split" | "store_credit" | "gift_card";
 
 export function TenderScreen({
   order,
@@ -41,6 +42,9 @@ export function TenderScreen({
   const [tab, setTab] = useState<TenderTab>("cash");
   const [cashInput, setCashInput] = useState("");
   const [splitCash, setSplitCash] = useState("");
+  const [giftCardCode, setGiftCardCode] = useState("");
+  const [giftCard, setGiftCard] = useState<GiftCard | null>(null);
+  const [giftLookupLoading, setGiftLookupLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCardReader, setShowCardReader] = useState(false);
@@ -84,6 +88,7 @@ export function TenderScreen({
       cashAmount: number,
       cardAmount: number,
       stripePaymentIntentId?: string,
+      giftCode?: string,
     ) => {
       setSubmitting(true);
       setError(null);
@@ -96,10 +101,11 @@ export function TenderScreen({
           stripePaymentIntentId,
           // Required for store_credit — backend verifies balance and deducts atomically.
           customerId: method === "store_credit" ? (order.customerId ?? undefined) : undefined,
+          giftCardCode: method === "gift_card" ? giftCode : undefined,
         };
 
         // If offline, write to the IndexedDB outbox and request background sync.
-        // Cash-only payments can be queued; card payments require connectivity.
+        // Cash-only payments can be queued; card/gift-card require connectivity.
         if (!navigator.onLine && method === "cash") {
           const label = `Order ${order.id} — ${formatMoney(cashAmount)} cash`;
           await enqueueCheckout("/api/v1/payments", req, getAccessToken(), label);
@@ -133,8 +139,28 @@ export function TenderScreen({
         setSubmitting(false);
       }
     },
-    [order.id, order.totalCents, onSuccess],
+    [order.id, order.totalCents, order.customerId, onSuccess],
   );
+
+  const lookupGiftCard = useCallback(async () => {
+    const code = giftCardCode.trim().toUpperCase();
+    if (!code) {
+      setError("Enter a gift card code");
+      return;
+    }
+    setGiftLookupLoading(true);
+    setError(null);
+    setGiftCard(null);
+    try {
+      const card = await apiGet<GiftCard>(`/api/v1/giftcards/${encodeURIComponent(code)}`);
+      setGiftCard(card);
+      setGiftCardCode(card.code);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gift card not found");
+    } finally {
+      setGiftLookupLoading(false);
+    }
+  }, [giftCardCode]);
 
   const handleCashSubmit = () => {
     if (isNaN(cashCents) || cashCents < totalCents) {
@@ -260,6 +286,7 @@ export function TenderScreen({
           {splitEnabled && (
             <TabButton active={tab === "split"} id="tender-tab-split" panelId="tender-panel-split" onClick={() => setTab("split")} label="Split" icon={<SplitIcon />} />
           )}
+          <TabButton active={tab === "gift_card"} id="tender-tab-gc" panelId="tender-panel-gc" onClick={() => setTab("gift_card")} label="Gift card" icon={<GiftCardIcon />} />
           {order.customerId && (
             <TabButton active={tab === "store_credit"} id="tender-tab-sc" panelId="tender-panel-sc" onClick={() => setTab("store_credit")} label="Credit" icon={<CashIcon />} />
           )}
@@ -305,6 +332,55 @@ export function TenderScreen({
                 splitCash={splitCash}
                 onSplitCashChange={(v) => { setSplitCash(v); setError(null); }}
               />
+            </div>
+          )}
+
+          {tab === "gift_card" && (
+            <div id="tender-panel-gc" role="tabpanel" aria-labelledby="tender-tab-gc" className="space-y-4">
+              <Input
+                label="Gift card code"
+                value={giftCardCode}
+                onChange={(e) => {
+                  setGiftCardCode(e.target.value.toUpperCase());
+                  setGiftCard(null);
+                  setError(null);
+                }}
+                placeholder="GC-XXXX-XXXX-XXXX"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                fullWidth
+                loading={giftLookupLoading}
+                disabled={giftLookupLoading || !giftCardCode.trim()}
+                onClick={() => { void lookupGiftCard(); }}
+              >
+                Check balance
+              </Button>
+              {giftCard && (
+                <div className="rounded-lg border border-erp-table-border bg-erp-table-header p-4 text-center">
+                  <p className="text-xs font-medium uppercase tracking-wider text-erp-text-secondary">
+                    Gift card balance
+                  </p>
+                  <p className={`mt-1 text-3xl font-bold tabular-nums ${giftCard.balance_cents >= totalCents ? "text-success-700" : "text-danger-700"}`}>
+                    {formatMoney(giftCard.balance_cents)}
+                  </p>
+                  <p className="mt-1 text-sm text-erp-text-secondary">
+                    Order total: <span className="font-semibold">{formatMoney(totalCents)}</span>
+                  </p>
+                  {giftCard.status !== "active" && (
+                    <p className="mt-2 text-sm text-danger-700">Card status: {giftCard.status}</p>
+                  )}
+                  {giftCard.balance_cents < totalCents && (
+                    <p className="mt-2 rounded-md border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-700">
+                      Insufficient balance. {formatMoney(totalCents - giftCard.balance_cents)} short.
+                      Partial gift-card tender is not available yet — use cash/card for the full amount, or attach store credit.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -376,6 +452,26 @@ export function TenderScreen({
               onClick={handleSplitSubmit}
             >
               Charge Split
+            </Button>
+          )}
+
+          {tab === "gift_card" && (
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={submitting}
+              disabled={
+                submitting ||
+                !giftCard ||
+                giftCard.status !== "active" ||
+                giftCard.balance_cents < totalCents
+              }
+              onClick={() => {
+                void capture("gift_card", 0, 0, undefined, giftCard?.code ?? giftCardCode.trim().toUpperCase());
+              }}
+            >
+              Pay {formatMoney(totalCents)} with Gift Card
             </Button>
           )}
 
@@ -684,6 +780,16 @@ function SplitIcon() {
       <path d="M6 3v6a6 6 0 0 0 6 6h6" />
       <path d="M18 11l4 4-4 4" />
       <path d="M6 21v-6a6 6 0 0 1 2.1-4.57" />
+    </svg>
+  );
+}
+
+function GiftCardIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M2 10h20" />
+      <path d="M12 5v14" />
     </svg>
   );
 }

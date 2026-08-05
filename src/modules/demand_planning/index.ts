@@ -9,6 +9,8 @@ import { registerRoutes } from "./routes.js";
  *   2. `demand_snapshots` — persisted daily actual units sold
  *   3. `demand_forecasts` — persisted predictions + accuracy read path
  *      (measurement layer before any forecasting model)
+ * Item 4 consumes covering `demand_forecasts` rows via
+ * `src/shared/demand-rate.ts` (reorder surfaces; velocity fallback).
  *
  * See `service.ts` for why snapshots are deliberately separate from
  * `src/shared/sales-velocity.ts` (Phase 7 item 1).

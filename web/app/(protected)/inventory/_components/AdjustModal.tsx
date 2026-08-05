@@ -19,16 +19,23 @@ export function AdjustModal({ product, onClose, onSaved }: AdjustModalProps) {
   const [note, setNote] = useState("");
   const [locationId, setLocationId] = useState("loc_main");
   const [locationOptions, setLocationOptions] = useState<{ id: string; name: string }[]>([]);
+  const [locationsError, setLocationsError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    setLocationsError(null);
     apiGet<{ items: { id: string; name: string }[] }>("/api/v1/inventory/locations")
       .then((d) => {
         const items = d.items ?? [];
         setLocationOptions(items);
         if (items.length > 0 && items[0]) setLocationId(items[0].id);
       })
-      .catch(() => {});
+      .catch((err) => {
+        setLocationOptions([]);
+        setLocationsError(
+          err instanceof ApiResponseError ? err.message : "Failed to load locations.",
+        );
+      });
   }, []);
 
   if (!product) return null;
@@ -144,12 +151,19 @@ export function AdjustModal({ product, onClose, onSaved }: AdjustModalProps) {
             <select
               value={locationId}
               onChange={(e) => setLocationId(e.target.value)}
-              className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-950"
+              disabled={!!locationsError || locationOptions.length === 0}
+              className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-950 disabled:opacity-50"
             >
+              {locationOptions.length === 0 && (
+                <option value="">{locationsError ? "Locations unavailable" : "Loading…"}</option>
+              )}
               {locationOptions.map((l) => (
                 <option key={l.id} value={l.id}>{l.name}</option>
               ))}
             </select>
+            {locationsError && (
+              <p role="alert" className="mt-1 text-xs text-danger-700">{locationsError}</p>
+            )}
           </label>
 
           <label className="block">
@@ -166,7 +180,16 @@ export function AdjustModal({ product, onClose, onSaved }: AdjustModalProps) {
 
           <div className="flex gap-2 pt-2">
             <Button variant="secondary" size="sm" fullWidth onClick={onClose} type="button">Cancel</Button>
-            <Button variant="primary" size="sm" fullWidth loading={saving} type="submit">Save adjustment</Button>
+            <Button
+              variant="primary"
+              size="sm"
+              fullWidth
+              loading={saving}
+              type="submit"
+              disabled={!!locationsError || locationOptions.length === 0}
+            >
+              Save adjustment
+            </Button>
           </div>
         </form>
       </div>

@@ -47,6 +47,64 @@ This stricter guard blocks the local patterns that create unrelated dirty code:
 
 Run this before opening a PR or handing off a session. CI also runs it in the guard job.
 
+## `duplicate-code-scan.mjs` — copy-paste detector (report-only)
+
+```bash
+npm run dupe:scan              # summary + top 10 groups
+npm run dupe:scan -- --verbose # every file in every group
+npm run dupe:scan -- --max 12  # exit 1 if groups exceed 12
+```
+
+Finds two things the other scanners structurally cannot: files that are
+identical after comments and whitespace are stripped, and blocks of ≥25
+identical lines shared across files. Everything else in this directory looks
+for something **missing** (`api-gap-scan`) or **colliding** (`table-collision-scan`,
+`hygiene-check`) — duplication is neither, which is how 48 copies of
+`test-request.ts` and a second `apiFetch` beside the canonical one both survived
+a full green pipeline until a human read the code.
+
+**Exits 0 by default, on purpose.** A new detector over a 2,195-file repo
+reports a backlog, and gating merges on it before that backlog is burned down
+blocks all work — at which point the check gets deleted rather than fixed. Same
+staged rollout `docker-build` and `e2e` got. Add `--max <n>` to the CI step once
+the number is small and stable.
+
+Scope is `src/` + `web/`, matching `api-gap-scan`. `artifacts/` is excluded: it
+is a known ~1,000-file duplicate of the whole app (audit finding H-1 / backlog
+F-3), and including it would bury every actionable finding under one already-
+tracked one. Re-scope when F-3 is resolved.
+
+## `dead-code-scan.mjs` — unreferenced exports (report-only)
+
+```bash
+npm run dead:scan               # summary, split by value vs type
+npm run dead:scan -- --verbose  # every file
+npm run dead:scan -- --max 40   # exit 1 above N *value* exports
+```
+
+Reports exports whose name appears nowhere outside the file declaring them.
+Results split into **value** exports (functions/classes/consts — the actionable
+list) and **type-only** exports (over-exposed surface, low priority), because a
+single undifferentiated number buries the ~95 that matter under ~276 that
+mostly do not.
+
+**The method can only under-report.** It is a word-boundary text match, not an
+import graph, so anything mentioned anywhere — a real import, a re-export, a
+dynamic `import()`, a string in a test — counts as live. That bias is chosen
+deliberately: this feeds *deletion* decisions, and proposing the removal of
+live code is the one outcome that must never happen. A clean run therefore does
+not mean "no dead code", only "none this method can prove".
+
+**Most hits are over-exported, not dead.** Verified examples: `CREATE_USERS_TABLE`
+in `src/identity/migrations.ts` is used at line 493 of its own file;
+`withStripeBreaker` is used only inside `stripe.ts`. Both are correctly
+"referenced nowhere else" — and neither should be deleted. Treat every hit as a
+candidate to investigate, and check dynamic imports, string-keyed registries and
+framework conventions before touching anything.
+
+Next.js App Router files (`page`/`layout`/`route`/…), `middleware.ts` and
+`src/server.ts` are excluded — the framework calls them, so nothing imports them.
+
 ## `new-worktree.sh` — one isolated checkout per session
 
 ```bash

@@ -134,7 +134,7 @@ function AuthFooter() {
     { label: "Privacy Policy", href: "#" },
     { label: "Terms of Service", href: "#" },
     { label: "Security Center", href: "#" },
-    { label: "Help Center", href: "#" },
+    { label: "Help Center", href: "/help" },
     { label: "System Status", href: "#" },
   ];
 

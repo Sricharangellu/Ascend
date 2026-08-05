@@ -3,6 +3,9 @@ import { PurchasingService } from "./service.js";
 import { registerRoutes } from "./routes.js";
 import { EdiImportsService } from "./edi-imports.js";
 import { registerEdiRoutes } from "./edi-routes.js";
+import { ReceivingSessionService } from "./receiving-sessions.js";
+import { ReceivingDashboardService } from "./receiving-dashboard.js";
+import { registerReceivingSessionRoutes } from "./receiving-session-routes.js";
 
 const CREATE_SUPPLIERS = `
 CREATE TABLE IF NOT EXISTS suppliers (
@@ -445,16 +448,92 @@ CREATE INDEX IF NOT EXISTS edi_imports_tenant_idx ON edi_imports (tenant_id, upl
 CREATE INDEX IF NOT EXISTS edi_imports_tenant_status_idx ON edi_imports (tenant_id, status);
 `;
 
+// Enterprise receiving sessions: dock → scan → validate → commit.
+// Commit still goes through PurchasingService.receive() so inventory/accounting
+// event paths stay unchanged. Held/rejected qty live on the session until disposition.
+const CREATE_RECEIVING_SESSIONS = `
+CREATE TABLE IF NOT EXISTS receiving_sessions (
+  id             TEXT PRIMARY KEY,
+  tenant_id      TEXT NOT NULL,
+  po_id          TEXT NOT NULL,
+  session_number TEXT NOT NULL,
+  status         TEXT NOT NULL DEFAULT 'open',
+  mode           TEXT NOT NULL DEFAULT 'standard',
+  receiver_id    TEXT,
+  receiver_name  TEXT,
+  dock_code      TEXT,
+  notes          TEXT,
+  started_at     BIGINT NOT NULL,
+  completed_at   BIGINT,
+  created_at     BIGINT NOT NULL,
+  updated_at     BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS receiving_sessions_tenant_status_idx
+  ON receiving_sessions (tenant_id, status, started_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS receiving_sessions_open_po_uidx
+  ON receiving_sessions (tenant_id, po_id)
+  WHERE status IN ('open','docked','receiving','quality_hold');
+
+CREATE TABLE IF NOT EXISTS receiving_session_lines (
+  id                   TEXT PRIMARY KEY,
+  tenant_id            TEXT NOT NULL,
+  session_id           TEXT NOT NULL REFERENCES receiving_sessions(id) ON DELETE CASCADE,
+  po_line_id           TEXT NOT NULL,
+  product_id           TEXT NOT NULL,
+  expected_qty         INTEGER NOT NULL DEFAULT 0,
+  scanned_qty          INTEGER NOT NULL DEFAULT 0,
+  accepted_qty         INTEGER NOT NULL DEFAULT 0,
+  held_qty             INTEGER NOT NULL DEFAULT 0,
+  rejected_qty         INTEGER NOT NULL DEFAULT 0,
+  unit_cost_cents      BIGINT,
+  cost_override_reason TEXT,
+  lot_code             TEXT,
+  expiry_date          BIGINT,
+  manufacture_date     BIGINT,
+  location_id          TEXT,
+  barcode_scanned      TEXT,
+  status               TEXT NOT NULL DEFAULT 'pending',
+  created_at           BIGINT NOT NULL,
+  updated_at           BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS receiving_session_lines_session_idx
+  ON receiving_session_lines (tenant_id, session_id);
+
+CREATE TABLE IF NOT EXISTS receiving_scan_events (
+  id              TEXT PRIMARY KEY,
+  tenant_id       TEXT NOT NULL,
+  session_id      TEXT NOT NULL,
+  session_line_id TEXT,
+  barcode         TEXT NOT NULL,
+  qty             INTEGER NOT NULL DEFAULT 1,
+  result          TEXT NOT NULL,
+  detail          TEXT,
+  created_at      BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS receiving_scan_events_session_idx
+  ON receiving_scan_events (tenant_id, session_id, created_at DESC);
+`;
+
+// 3-way match: never silently approve variances — require an override reason.
+const ALTER_PO_BILLS_OVERRIDE = `
+ALTER TABLE po_bills ADD COLUMN IF NOT EXISTS variance_override_reason TEXT;
+ALTER TABLE po_bills ADD COLUMN IF NOT EXISTS variance_override_at BIGINT;
+ALTER TABLE po_bills ADD COLUMN IF NOT EXISTS variance_override_by TEXT;
+`;
+
 /** Purchasing — suppliers, purchase orders, receiving. Receiving emits
  *  `purchase_order.received`; inventory listens and increments stock. */
 export const purchasingModule: PosModule = {
   name: "purchasing",
-  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_SUPPLIERS_VENDOR_360, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES, ADD_PO_LINE_FK, ADD_PURCHASING_UPDATED_AT_TRIGGERS, CREATE_PO_DOCUMENTS, CREATE_PO_APPROVALS, SEED_PO_COUNTER, CREATE_REQUISITIONS, CREATE_EDI_IMPORTS, CREATE_PO_BILLS],
+  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_SUPPLIERS_VENDOR_360, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES, ADD_PO_LINE_FK, ADD_PURCHASING_UPDATED_AT_TRIGGERS, CREATE_PO_DOCUMENTS, CREATE_PO_APPROVALS, SEED_PO_COUNTER, CREATE_REQUISITIONS, CREATE_EDI_IMPORTS, CREATE_PO_BILLS, CREATE_RECEIVING_SESSIONS, ALTER_PO_BILLS_OVERRIDE],
   async register({ db, events, router }) {
     const service = new PurchasingService(db, events);
     const ediService = new EdiImportsService(db);
+    const sessions = new ReceivingSessionService(db, service);
+    const dashboard = new ReceivingDashboardService(db);
     registerRoutes(router, service);
     registerEdiRoutes(router, ediService, db);
+    registerReceivingSessionRoutes(router, sessions, dashboard);
   },
 };
 
@@ -464,3 +543,5 @@ export { EdiImportsService } from "./edi-imports.js";
 export type { EdiImport, EdiStatus, EdiFormatDef } from "./edi-imports.js";
 export { getVendorHistory } from "./vendor-history.js";
 export type { VendorPOSummary } from "./vendor-history.js";
+export { ReceivingSessionService } from "./receiving-sessions.js";
+export { ReceivingDashboardService } from "./receiving-dashboard.js";

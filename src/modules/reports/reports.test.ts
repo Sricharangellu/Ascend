@@ -55,6 +55,50 @@ test("sales summary aggregates orders, revenue, and captured payments for the te
   assert.equal(r.json.payments.byMethod.cash, 2165);
 });
 
+test("summary sparklines come from live orders (not the never-written daily_sales_summary)", async () => {
+  const app = await freshApp();
+
+  // Empty tenant: dense 8-day zero series so the FE sparkline (≥2 points) can render.
+  let r = await call(app, "GET", "/api/reports/summary");
+  assert.equal(r.status, 200);
+  assert.equal(r.json.sparklines.revenue.length, 8);
+  assert.equal(r.json.sparklines.saleCount.length, 8);
+  assert.ok(r.json.sparklines.revenue.every((v: number) => v === 0));
+  assert.ok(r.json.sparklines.saleCount.every((v: number) => v === 0));
+
+  const p = await call(app, "POST", "/api/catalog/", {
+    sku: "SPARK-001", name: "Spark Widget", price_cents: 1000, category: "general",
+  });
+  assert.equal(p.status, 201);
+  await call(app, "POST", `/api/inventory/${p.json.id}/receive`, { quantity: 5 });
+  const o = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: p.json.id, quantity: 1 }],
+  });
+  assert.equal(o.status, 201);
+  await call(app, "POST", "/api/payments/", {
+    orderId: o.json.id, method: "cash", tenderedCents: o.json.total_cents,
+  });
+
+  r = await call(app, "GET", "/api/reports/summary");
+  assert.equal(r.status, 200);
+  assert.equal(r.json.sparklines.revenue.length, 8, "dense 8-day revenue series");
+  assert.equal(r.json.sparklines.saleCount.length, 8, "dense 8-day sale-count series");
+  // Today's bucket carries the completed sale; prior days stay 0.
+  assert.equal(r.json.sparklines.revenue[7], o.json.total_cents, "today's revenue matches the sale");
+  assert.equal(r.json.sparklines.saleCount[7], 1, "today's sale count is 1");
+  assert.equal(
+    r.json.sparklines.revenue.reduce((a: number, b: number) => a + b, 0),
+    o.json.total_cents,
+    "window sum equals the single completed order",
+  );
+  // Prove we are NOT reading the empty CQRS table: nothing wrote to it.
+  const anyRows = await app.db.query<{ n: number }>(
+    "SELECT COUNT(*)::int AS n FROM daily_sales_summary",
+  );
+  assert.equal(Number(anyRows[0]?.n ?? 0), 0, "daily_sales_summary still empty — sparkline used live orders");
+});
+
 test("summary kpi: gross profit is real COGS-based, or null when sold units have no known cost", async () => {
   const app = await freshApp();
 
@@ -410,6 +454,42 @@ test("cashier cannot trigger the AR-aging dunning sweep (403); manager can", asy
   const app = await freshApp();
   assert.equal((await callAsRep(app, "cashier", "POST", "/api/reports/ar-aging/sweep")).status, 403);
   assert.equal((await callAsRep(app, "manager", "POST", "/api/reports/ar-aging/sweep")).status, 200);
+});
+
+test("AR aging joins customer names; AP aging joins supplier names", async () => {
+  const app = await freshApp();
+
+  const customer = await call(app, "POST", "/api/customers/", { name: "Acme Retail LLC" });
+  assert.equal(customer.status, 201);
+  const inv = await call(app, "POST", "/api/billing/invoices", {
+    customerId: customer.json.id,
+    totalCents: 12_500,
+  });
+  assert.equal(inv.status, 201);
+
+  const ar = await call(app, "GET", "/api/reports/ar-aging");
+  assert.equal(ar.status, 200);
+  assert.ok(Array.isArray(ar.json.parties));
+  const arParty = ar.json.parties.find((p: { partyId: string }) => p.partyId === customer.json.id);
+  assert.ok(arParty, "customer appears in AR aging");
+  assert.equal(arParty.partyName, "Acme Retail LLC");
+  assert.equal(arParty.buckets.total, 12_500);
+
+  const supplier = await call(app, "POST", "/api/purchasing/suppliers", { name: "Northwind Supply" });
+  assert.equal(supplier.status, 201);
+  const bill = await call(app, "POST", "/api/billing/bills", {
+    supplierId: supplier.json.id,
+    totalCents: 8_000,
+  });
+  assert.equal(bill.status, 201);
+
+  const ap = await call(app, "GET", "/api/reports/ap-aging");
+  assert.equal(ap.status, 200);
+  assert.ok(Array.isArray(ap.json.parties));
+  const apParty = ap.json.parties.find((p: { partyId: string }) => p.partyId === supplier.json.id);
+  assert.ok(apParty, "supplier appears in AP aging");
+  assert.equal(apParty.partyName, "Northwind Supply");
+  assert.equal(apParty.buckets.total, 8_000);
 });
 
 test("top-products: a non-numeric limit falls back to the default instead of producing NaN, and a huge limit is capped", async () => {

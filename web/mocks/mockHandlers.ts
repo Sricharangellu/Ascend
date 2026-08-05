@@ -191,7 +191,7 @@ const _BP_CATALOG: _BPMod[] = [
   { key: "compliance",       name: "Compliance",               description: "Age verification, MSA/PACT reporting, state flavor bans",      group: "retail" },
   { key: "ecommerce",        name: "Ecommerce",                description: "Online store sync, product visibility, online orders",          group: "retail",  route: "/ecommerce" },
   { key: "customer_display", name: "Customer Display",          description: "Second-screen cart mirror for customer-facing display",        group: "retail",  route: "/display" },
-  { key: "sales_orders",  name: "Sales Orders",        description: "B2B orders, credit terms, fulfilment workflows",              group: "b2b",  route: "/sales" },
+  { key: "sales_orders",  name: "Sales Orders",        description: "B2B orders, credit terms, fulfilment workflows",              group: "b2b",  route: "/orders" },
   { key: "purchasing",    name: "Purchasing",           description: "Purchase orders, receiving, vendor management, returns",     group: "b2b",  route: "/purchasing" },
   { key: "billing",       name: "Billing — AP/AR",      description: "Supplier bills, customer invoices, aging reports",           group: "b2b",  route: "/finance" },
   { key: "accounting",    name: "Accounting",           description: "Chart of accounts, journal entries, batch deposits, P&L",   group: "b2b",  route: "/accounting" },
@@ -221,7 +221,7 @@ const _BP_CATALOG: _BPMod[] = [
   { key: "online_store",      name: "Online Store",        description: "Product visibility, SEO fields, meta title/description",    group: "ecommerce" },
   { key: "order_fulfillment", name: "Order Fulfillment",   description: "Pick-pack-ship for online orders, tracking integration",    group: "ecommerce" },
   { key: "marketplace",       name: "Marketplace Sync",    description: "Sync inventory/orders with external marketplaces",          group: "ecommerce" },
-  { key: "shipping_mgmt",     name: "Shipping Management", description: "Carrier integrations, label printing, tracking numbers",    group: "ecommerce", route: "/shipping" },
+  { key: "shipping_mgmt",     name: "Shipping Management", description: "Carrier integrations, label printing, tracking numbers",    group: "ecommerce", route: "/delivery?tab=shipments" },
   { key: "vehicle_history", name: "Vehicle History",    description: "VIN/license lookup, service history per vehicle, notes",    group: "automotive", route: "/automotive/vehicles" },
   { key: "parts_inventory", name: "Parts Inventory",    description: "Auto parts with OEM/aftermarket codes, supplier ordering",  group: "automotive" },
   { key: "work_orders",     name: "Work Orders",        description: "Job cards, technician assignment, time tracking, parts",    group: "automotive", route: "/automotive/work-orders" },
@@ -659,8 +659,8 @@ export const mockHandlers = [
     return HttpResponse.json({
       totals: { current: 120000, d1_30: 45000, d31_60: 18000, d61_90: 9000, d90_plus: 5000, total: 197000 },
       parties: [
-        { partyId: "cus_demo_1", buckets: { current: 80000, d1_30: 20000, d31_60: 0, d61_90: 0, d90_plus: 5000, total: 105000 } },
-        { partyId: "cus_demo_2", buckets: { current: 40000, d1_30: 25000, d31_60: 18000, d61_90: 9000, d90_plus: 0, total: 92000 } },
+        { partyId: "cus_demo_1", partyName: "Demo Customer One", buckets: { current: 80000, d1_30: 20000, d31_60: 0, d61_90: 0, d90_plus: 5000, total: 105000 } },
+        { partyId: "cus_demo_2", partyName: "Demo Customer Two", buckets: { current: 40000, d1_30: 25000, d31_60: 18000, d61_90: 9000, d90_plus: 0, total: 92000 } },
       ],
     });
   }),
@@ -687,7 +687,7 @@ export const mockHandlers = [
     await lat();
     return HttpResponse.json({
       totals: { current: 60000, d1_30: 22000, d31_60: 0, d61_90: 0, d90_plus: 0, total: 82000 },
-      parties: [{ partyId: "sup_demo_1", buckets: { current: 60000, d1_30: 22000, d31_60: 0, d61_90: 0, d90_plus: 0, total: 82000 } }],
+      parties: [{ partyId: "sup_demo_1", partyName: "Demo Supplier", buckets: { current: 60000, d1_30: 22000, d31_60: 0, d61_90: 0, d90_plus: 0, total: 82000 } }],
     });
   }),
   http.get(`${V1}/reports/sales-by-category`, async () => {

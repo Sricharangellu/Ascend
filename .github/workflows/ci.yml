@@ -30,6 +30,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # FIRST step in the whole pipeline, deliberately: it fails in seconds on a
+      # swapped root manifest, before any job spends minutes reaching a confusing
+      # `npm ci` error. Run as a bare `node`, never `npm run hygiene` — the whole
+      # point is to survive a root package.json that has no scripts and a
+      # preinstall hook that rejects npm. See check 8 in the script, and
+      # WORK/audits/AUDIT_2026-08-03T110000Z-replit-pnpm-root-hijack-incident.md.
+      - name: Root manifest integrity (package.json / lockfiles / tsconfig)
+        run: node tools/hygiene-check.mjs
       - name: No unguarded mutation routes (router.patch/delete without requireRole)
         run: |
           ! grep -rn --include="*routes.ts" -A1 "router\.\(patch\|delete\|put\)" src/ \
@@ -67,13 +75,9 @@ jobs:
           fi
           echo "No duplicate/copy-junk files tracked ✓"
 
-      - name: Repo hygiene (duplicates / backups / merge-conflict junk)
-        # Comprehensive superset of the inline check above: scans the whole tree
-        # for "<name> 2.<ext>" copies, *.bak/*.orig backups, and merge-conflict
-        # markers. Fails CI so junk can never land. Runs on the runner's Node
-        # (no deps); the script is a plain ESM module.
-        run: node tools/hygiene-check.mjs
-
+      # (The former "Repo hygiene" step ran this same `node tools/hygiene-check.mjs`
+      # a second time in this job — it is now the first step above, which covers
+      # the identical ground plus root-manifest integrity. One invocation, not two.)
       - name: Prevention agent — no dirty drift or stray modules
         run: npm run prevent:drift
 
@@ -83,6 +87,41 @@ jobs:
         # surfaces live in tools/api-gap-allowlist.json, each tied to a board
         # entry. No deps; plain ESM on the runner's Node.
         run: npm run gap:scan
+
+      # Backlog F-15. REPORT-ONLY on purpose — the script exits 0 regardless.
+      # The 2026-08-04 audit found two duplication defects by hand (48 copies of
+      # test-request.ts; a private apiFetch beside the canonical one) that no
+      # existing guard could catch, because they all look for something MISSING
+      # or COLLIDING and duplication is neither. Gating on it now would fail
+      # every PR until F-5 lands, and a check that blocks all work gets deleted
+      # — so it reports first, exactly like docker-build and e2e did. Add
+      # `--max <n>` here once the count is small and stable.
+      - name: Duplicate-code scan (report-only)
+        run: node tools/duplicate-code-scan.mjs
+
+      # Backlog F-16. REPORT-ONLY, and it has to be: as of 2026-08-04 `web`
+      # carries 14 advisories (1 critical, 9 high) and the root 2 low, so any
+      # `--audit-level` gate fails every PR on arrival. Most need major bumps
+      # (`next` 14->16, `vitest` 2->4) that are migrations, not fixes — tracked
+      # as F-24/F-25. `|| true` keeps this a visible report until those land;
+      # remove it (and pick an --audit-level) once the count is near zero.
+      #
+      # `--omit=dev` is NOT used: the critical finding is vitest, a devDependency.
+      # Dev-only advisories still run on this runner and on contributors'
+      # machines, so hiding them would defeat the point.
+      # Backlog F-17, and what unblocks Phase 9.4's hallucination sweep.
+      # REPORT-ONLY: 371 hits today, so any gate fails on arrival. The method
+      # can only under-report (see the script header), which is the correct
+      # bias for anything that leads to deleting code.
+      - name: Dead-code scan (report-only)
+        run: node tools/dead-code-scan.mjs
+
+      - name: Dependency advisories (report-only)
+        run: |
+          echo "── root ──"
+          npm audit --audit-level=low || true
+          echo "── web ──"
+          npm audit --audit-level=low --prefix web || true
 
       - name: One canonical agent-instruction file
         run: |
