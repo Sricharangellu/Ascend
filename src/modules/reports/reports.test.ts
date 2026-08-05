@@ -584,3 +584,136 @@ test("sales-by-customer: limit caps the number of distinct customers returned (r
   assert.equal(limited.status, 200);
   assert.equal(limited.json.items.length, 1, "only 1 customer returned when limit=1");
 });
+
+// ── P&L correctness ─────────────────────────────────────────────────────────
+
+test("p-l excludes sales tax from revenue — tax collected is a liability, not income", async () => {
+  const app = await freshApp();
+
+  const p = await call(app, "POST", "/api/catalog/", {
+    sku: "PNL-001", name: "PnL Widget", price_cents: 1000, category: "general",
+  });
+  assert.equal(p.status, 201);
+  await call(app, "POST", `/api/inventory/${p.json.id}/receive`, { quantity: 10 });
+
+  // 2 units @ $10 = $20 subtotal, CA tax 8.25% = $1.65, total $21.65.
+  const o = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: p.json.id, quantity: 2 }],
+  });
+  assert.equal(o.status, 201);
+  assert.equal(o.json.total_cents, 2165);
+
+  const pay = await call(app, "POST", "/api/payments/", {
+    orderId: o.json.id, method: "cash", tenderedCents: 2165,
+  });
+  assert.equal(pay.status, 201);
+
+  const r = await call(app, "GET", "/api/reports/p-l?range=all");
+  assert.equal(r.status, 200);
+
+  // Revenue is net of tax: 2165 gross − 165 tax = 2000.
+  assert.equal(r.json.grossSalesCents, 2165, "gross sales include tax");
+  assert.equal(r.json.taxCents, 165, "tax is reported separately");
+  assert.equal(r.json.revenueCents, 2000, "revenue excludes the tax collected");
+
+  // Gross profit derives from the tax-exclusive revenue.
+  assert.equal(
+    r.json.grossProfitCents,
+    r.json.revenueCents - r.json.cogsCents,
+    "gross profit = net revenue − COGS",
+  );
+});
+
+test("p-l operating expenses come from recorded expenses, not from bills", async () => {
+  const app = await freshApp();
+
+  const p = await call(app, "POST", "/api/catalog/", {
+    sku: "PNL-002", name: "Opex Widget", price_cents: 5000, category: "general",
+  });
+  assert.equal(p.status, 201);
+  await call(app, "POST", `/api/inventory/${p.json.id}/receive`, { quantity: 5 });
+
+  const o = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: p.json.id, quantity: 1 }],
+  });
+  assert.equal(o.status, 201);
+  await call(app, "POST", "/api/payments/", {
+    orderId: o.json.id, method: "cash", tenderedCents: o.json.total_cents,
+  });
+
+  const before = await call(app, "GET", "/api/reports/p-l?range=all");
+  assert.equal(before.status, 200);
+  assert.equal(before.json.operatingExpensesCents, 0, "no recorded expenses yet");
+
+  // Record real operating spend (rent) — this is what opex must reflect.
+  const e = await call(app, "POST", "/api/expenses/", {
+    amountCents: 75_000, category: "rent", note: "Storefront rent",
+  });
+  assert.equal(e.status, 201, `expense create failed: ${JSON.stringify(e.json)}`);
+
+  const after = await call(app, "GET", "/api/reports/p-l?range=all");
+  assert.equal(after.status, 200);
+  assert.equal(after.json.operatingExpensesCents, 75_000, "opex reflects the recorded expense");
+  assert.equal(
+    after.json.netIncomeCents,
+    after.json.grossProfitCents - 75_000,
+    "net income = gross profit − operating expenses",
+  );
+});
+
+// ── Authorization on executive/financial reports ────────────────────────────
+
+test("cashiers cannot read executive financial reports; managers can", async () => {
+  const app = await freshApp();
+
+  async function as(role: "cashier" | "manager", path: string) {
+    const { default: request } = await import("./test-request.js");
+    return request(app.express, "GET", path, undefined, role);
+  }
+
+  // Business financials, counterparty balances, and cost/margin data are
+  // manager+ only. The frontend already assumed this bar (reports/p-l gates on
+  // owner||manager); the server did not enforce it, so any cashier token could
+  // read the whole company's P&L, receivables, and payables.
+  const gated = [
+    "/api/reports/p-l?range=all",
+    "/api/reports/ar-aging",
+    "/api/reports/ap-aging",
+    "/api/reports/sales-by-customer?range=all",
+    "/api/reports/sales-by-vendor?range=all",
+    "/api/reports/inventory-valuation",
+    "/api/reports/revenue-trend?range=7d",
+    "/api/reports/margin-by-category?range=all",
+  ];
+
+  for (const path of gated) {
+    const denied = await as("cashier", path);
+    assert.equal(denied.status, 403, `cashier must be denied ${path}`);
+
+    const allowed = await as("manager", path);
+    assert.equal(allowed.status, 200, `manager must be allowed ${path}`);
+  }
+});
+
+test("cashiers keep access to the operational reports they need at the till", async () => {
+  const app = await freshApp();
+
+  async function asCashier(path: string) {
+    const { default: request } = await import("./test-request.js");
+    return request(app.express, "GET", path, undefined, "cashier");
+  }
+
+  // Guarding the executive surface must not lock cashiers out of shift work.
+  for (const path of [
+    "/api/reports/summary",
+    "/api/reports/top-products?range=all",
+    "/api/reports/hourly?range=all",
+    "/api/reports/end-of-day",
+    "/api/reports/register-closures",
+  ]) {
+    const r = await asCashier(path);
+    assert.equal(r.status, 200, `cashier must retain access to ${path}`);
+  }
+});

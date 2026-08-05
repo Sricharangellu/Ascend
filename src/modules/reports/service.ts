@@ -125,13 +125,16 @@ export interface SalesByVendorRow {
   vendorName: string;
   totalCents: number;
   qty: number;
+  orderCount: number;
 }
 
 export interface PnlReport {
-  revenueCents: number;          // gross from completed orders
+  revenueCents: number;          // NET of sales tax — tax collected is a liability, not revenue
+  grossSalesCents: number;       // gross from completed orders, tax included (reconciliation aid)
+  taxCents: number;              // sales tax collected in the window (excluded from revenue)
   cogsCents: number;             // sum(cost_cents * qty) from order_lines via product_costs
   grossProfitCents: number;      // revenue − COGS
-  operatingExpensesCents: number; // sum of expense account line items (from accounts)
+  operatingExpensesCents: number; // sum(expenses.amount_cents) — recorded business spend
   netIncomeCents: number;        // grossProfit − operatingExpenses
 }
 
@@ -655,11 +658,14 @@ export class ReportsService {
   /** Revenue + qty grouped by vendor/supplier (via products.preferred_vendor_id, completed orders). */
   async salesByVendor(tenantId: string, sinceMs?: number): Promise<SalesByVendorRow[]> {
     const since = sinceMs ?? 0;
-    const rows = await this.db.query<{ vendor_id: string; vendor_name: string; total: number; qty: number }>(
+    const rows = await this.db.query<{
+      vendor_id: string; vendor_name: string; total: number; qty: number; order_count: number;
+    }>(
       `SELECT p.preferred_vendor_id AS vendor_id,
               COALESCE(MAX(s.name), p.preferred_vendor_id) AS vendor_name,
               COALESCE(SUM(ol.line_cents), 0) AS total,
-              SUM(ol.quantity)::int AS qty
+              SUM(ol.quantity)::int AS qty,
+              COUNT(DISTINCT o.id)::int AS order_count
          FROM order_lines ol
          JOIN orders o ON o.id = ol.order_id AND o.tenant_id = ol.tenant_id
          LEFT JOIN products p ON p.id = ol.product_id AND p.tenant_id = ol.tenant_id
@@ -675,6 +681,7 @@ export class ReportsService {
       vendorName: r.vendor_name ?? r.vendor_id,
       totalCents: Number(r.total),
       qty: Number(r.qty),
+      orderCount: Number(r.order_count),
     }));
   }
 
@@ -683,15 +690,21 @@ export class ReportsService {
     const since = sinceMs ?? 0;
     const until = untilMs ?? Date.now();
 
-    // Revenue: gross from completed orders in the window.
-    const revRow = await this.db.one<{ revenue: number }>(
-      `SELECT COALESCE(SUM(total_cents), 0) AS revenue
+    // Revenue: completed orders in the window, NET of sales tax. `total_cents` is
+    // subtotal − discount + tax; tax collected is a liability owed to the tax
+    // authority, never revenue. This matches salesSummary(), which reports
+    // `netCents: grossCents - taxCents` from the same orders table.
+    const revRow = await this.db.one<{ gross: number; tax: number }>(
+      `SELECT COALESCE(SUM(total_cents), 0) AS gross,
+              COALESCE(SUM(tax_cents), 0)   AS tax
          FROM orders
         WHERE tenant_id = @tenantId AND status = 'completed'
           AND created_at >= @since AND created_at <= @until`,
       { tenantId, since, until },
     );
-    const revenueCents = Number(revRow?.revenue ?? 0);
+    const grossSalesCents = Number(revRow?.gross ?? 0);
+    const taxCents = Number(revRow?.tax ?? 0);
+    const revenueCents = grossSalesCents - taxCents;
 
     // COGS: sum(cost_cents * qty) joining order_lines to product_costs.
     const cogsRow = await this.db.one<{ cogs: number }>(
@@ -705,27 +718,36 @@ export class ReportsService {
     );
     const cogsCents = Number(cogsRow?.cogs ?? 0);
 
-    // Operating expenses: accounts of type 'expense' (chart of accounts).
-    // We use the sum of all expense account balances — approximated as bills
-    // issued in the window. If no bills table is available, defaults to 0.
-    let operatingExpensesCents = 0;
-    try {
-      const expRow = await this.db.one<{ expenses: number }>(
-        `SELECT COALESCE(SUM(total_cents), 0) AS expenses
-           FROM bills
-          WHERE tenant_id = @tenantId AND status <> 'void'
-            AND issued_at >= @since AND issued_at <= @until`,
-        { tenantId, since, until },
-      );
-      operatingExpensesCents = Number(expRow?.expenses ?? 0);
-    } catch {
-      // bills table may not exist in all deployments; default to 0.
-    }
+    // Operating expenses: recorded business spend from the `expenses` table.
+    //
+    // This deliberately does NOT sum `bills`. Bills are auto-drafted from fully
+    // received purchase orders (see billing/service.ts billFromPO), i.e. they are
+    // inventory purchases — already expensed through COGS above when the goods
+    // sell. Counting them here too double-counts inventory cost and, worse,
+    // omits real opex (rent, payroll) entirely, since those live in `expenses`.
+    // retailProof() already computes net profit off `expenses`; this aligns the
+    // P&L with it, so the two no longer contradict each other on the same screen.
+    const expRow = await this.db.one<{ expenses: number }>(
+      `SELECT COALESCE(SUM(amount_cents), 0) AS expenses
+         FROM expenses
+        WHERE tenant_id = @tenantId
+          AND spent_at >= @since AND spent_at <= @until`,
+      { tenantId, since, until },
+    );
+    const operatingExpensesCents = Number(expRow?.expenses ?? 0);
 
     const grossProfitCents = revenueCents - cogsCents;
     const netIncomeCents = grossProfitCents - operatingExpensesCents;
 
-    return { revenueCents, cogsCents, grossProfitCents, operatingExpensesCents, netIncomeCents };
+    return {
+      revenueCents,
+      grossSalesCents,
+      taxCents,
+      cogsCents,
+      grossProfitCents,
+      operatingExpensesCents,
+      netIncomeCents,
+    };
   }
 
   /** Inventory valuation at cost and retail (on-hand qty × cost / price).
@@ -820,13 +842,19 @@ export class ReportsService {
     const rows = await this.db.query<{
       category: string; revenue: number; cost: number; units: number;
     }>(
+      // This report used to 500 for every caller: order_lines has no
+      // `unit_price_cents` column (it is `unit_cents`), and `products` has no
+      // `cost_cents` (that column is on product_suppliers). Cost now comes from
+      // product_costs — the same source pnl() and salesByProduct() use — so
+      // margins agree across reports instead of diverging.
       `SELECT COALESCE(p.category, 'Uncategorized') AS category,
-              SUM(ol.unit_price_cents * ol.quantity)::bigint AS revenue,
-              SUM(COALESCE(p.cost_cents, 0) * ol.quantity)::bigint AS cost,
+              SUM(ol.unit_cents * ol.quantity)::bigint AS revenue,
+              SUM(COALESCE(pc.cost_cents, 0) * ol.quantity)::bigint AS cost,
               SUM(ol.quantity)::int AS units
          FROM order_lines ol
          JOIN orders o ON o.id = ol.order_id
          LEFT JOIN products p ON p.id = ol.product_id
+         LEFT JOIN product_costs pc ON pc.product_id = ol.product_id AND pc.tenant_id = o.tenant_id
         WHERE o.tenant_id = @tenantId AND o.status = 'completed' AND o.created_at >= @since
         GROUP BY COALESCE(p.category, 'Uncategorized')
         ORDER BY revenue DESC`,

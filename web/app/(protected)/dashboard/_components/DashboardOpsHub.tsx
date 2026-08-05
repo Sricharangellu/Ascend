@@ -162,7 +162,7 @@ export function DashboardOpsHub({
       id: "sales",
       title: "Sales",
       icon: <IconTag />,
-      href: "/sales",
+      href: "/orders",
       metrics: [
         { label: "Open Orders", value: "View" },
         { label: "Quotations", value: "View" },

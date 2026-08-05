@@ -37,7 +37,7 @@ export function DashboardQuickActions() {
         <QuickActionNode href="/terminal" label="New Sale" />
         <QuickActionNode href="/customers" label="Add Customer" />
         <QuickActionNode href="/catalog?new=product" label="Add Product" />
-        <QuickActionNode href="/inventory/transfers" label="Transfer Inventory" />
+        <QuickActionNode href="/inventory?tab=transfers" label="Transfer Inventory" />
         <QuickActionNode href="/invoicing" label="Create Invoice" />
         <QuickActionNode href="/vendors" label="Create Vendor" />
       </div>
