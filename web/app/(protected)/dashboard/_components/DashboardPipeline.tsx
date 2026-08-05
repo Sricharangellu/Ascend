@@ -50,7 +50,7 @@ export function DashboardPipeline() {
             <PipelineArrow />
             <PipelineNode label="Inventory" href="/inventory" active />
             <PipelineArrow />
-            <PipelineNode label="Sales" href="/sales" active />
+            <PipelineNode label="Sales" href="/orders" active />
             <PipelineArrow />
             <PipelineNode label="Customer" href="/customers" />
             <PipelineArrow />
