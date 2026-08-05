@@ -8,7 +8,7 @@ import { apiGet, apiPost } from "@/api-client/client";
 import { useFinderContext } from "@/lib/useFinderContext";
 import { useRealtimeStream } from "@/hooks/useRealtimeStream";
 import { RetailSetupChecklist } from "@/components/setup/RetailSetupChecklist";
-import { getUser } from "@/lib/auth";
+import { getUser, getStoredUser } from "@/lib/auth";
 
 import { DashboardHero } from "./_components/DashboardHero";
 import { DashboardOverview } from "./_components/DashboardOverview";
@@ -259,12 +259,27 @@ export default function DashboardPage() {
     const stored = localStorage.getItem("ascend_dashboard_view");
     const valid = VALID_VIEWS.find((v) => v === stored);
     if (valid) return valid;
-    const user = getUser();
-    const role = user?.role || "owner";
+    // getUser() reads an in-memory profile that is empty on every page reload
+    // until the async silentRefresh() resolves, so this initializer used to see
+    // null and fall back to "owner" — putting every user, cashiers included,
+    // into the Executive view. getStoredUser() reads the profile setSession()
+    // persists to sessionStorage, so the role is known synchronously here.
+    // The remaining fallback is least-privileged, not most.
+    const role = (getUser() ?? getStoredUser())?.role ?? "cashier";
     if (role === "cashier") return "Store";
     if (role === "manager") return "Operations";
     return "Executive";
   });
+
+  // Executive and Finance are built on manager+ report endpoints (p-l, ar/ap-aging,
+  // sales-by-vendor, inventory-valuation). Offering a cashier those tabs would only
+  // render a wall of zeros behind 403s, so the toggle shows what the role can load.
+  // This is presentation, not enforcement — the guard is server-side in
+  // src/modules/reports/routes.ts.
+  const availableViews: DashboardView[] =
+    ((getUser() ?? getStoredUser())?.role ?? "cashier") === "cashier"
+      ? ["Store"]
+      : ["Executive", "Operations", "Finance", "Store"];
 
   const handleSetIndustry = (val: Industry) => {
     setIndustry(val);
@@ -363,7 +378,7 @@ export default function DashboardPage() {
       <div className="mx-auto w-full max-w-[1600px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
           <div className="inline-flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-1 shadow-sm" role="group" aria-label="Dashboard view">
-            {(["Executive", "Operations", "Finance", "Store"] as DashboardView[]).map((v) => (
+            {availableViews.map((v) => (
               <button
                 key={v}
                 type="button"

@@ -18,12 +18,16 @@ import { ReportsSubNav } from "@/components/reports/ReportsSubNav";
 
 type Range = "today" | "7d" | "30d";
 
+// Mirrors SalesByVendorRow in src/modules/reports/service.ts. These names are
+// the backend's: the page previously declared revenueCents/unitsSold, which the
+// API never returns — every money cell rendered $NaN and unitsSold.toLocaleString()
+// threw against a real backend.
 interface VendorItem {
   vendorId: string;
   vendorName: string;
   orderCount: number;
-  revenueCents: number;
-  unitsSold: number;
+  totalCents: number;
+  qty: number;
 }
 
 interface VendorResponse {
@@ -106,7 +110,7 @@ export default function SalesByVendorPage() {
         if (!cancelled) {
           // Sort by revenue descending
           const sorted = [...(data.items ?? [])].sort(
-            (a, b) => b.revenueCents - a.revenueCents
+            (a, b) => b.totalCents - a.totalCents
           );
           setItems(sorted);
         }
@@ -129,8 +133,8 @@ export default function SalesByVendorPage() {
 
   // Totals for footer
   const totalOrders = items.reduce((s, v) => s + v.orderCount, 0);
-  const totalRevenue = items.reduce((s, v) => s + v.revenueCents, 0);
-  const totalUnits = items.reduce((s, v) => s + v.unitsSold, 0);
+  const totalRevenue = items.reduce((s, v) => s + v.totalCents, 0);
+  const totalUnits = items.reduce((s, v) => s + v.qty, 0);
 
   return (
     <EnterpriseShell
@@ -192,10 +196,10 @@ export default function SalesByVendorPage() {
                               {item.orderCount}
                             </td>
                             <td className="py-2.5 pr-4 text-right font-semibold text-slate-950">
-                              {formatMoney(item.revenueCents)}
+                              {formatMoney(item.totalCents)}
                             </td>
                             <td className="py-2.5 text-right text-slate-600">
-                              {item.unitsSold.toLocaleString()}
+                              {item.qty.toLocaleString()}
                             </td>
                           </tr>
                         ))}
