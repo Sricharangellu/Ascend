@@ -1,6 +1,7 @@
 import http from "node:http";
 import jwt from "jsonwebtoken";
 import type { Express } from "express";
+import type { Role } from "../../identity/types.js";
 
 /**
  * Tiny test client: spins up the express app on an ephemeral port, issues one
@@ -8,13 +9,14 @@ import type { Express } from "express";
  *
  * Commerce routes live under /api/v1/<module> behind auth, so for brevity tests
  * call /api/<module>; this helper transparently upgrades the path to /api/v1
- * and attaches a signed demo-tenant (tnt_demo / owner) bearer token. The harness
- * (scripts/test.ts) sets JWT_SECRET so authMiddleware can verify it.
+ * and attaches a signed demo-tenant bearer token. Defaults to `owner`; pass a
+ * `role` to exercise role guards (e.g. that a cashier cannot read the P&L). The
+ * harness (scripts/test.ts) sets JWT_SECRET so authMiddleware can verify it.
  */
-function testAuthToken(): string {
+function testAuthToken(role: Role = "owner"): string {
   const secret = process.env.JWT_SECRET ?? "test-secret-finder-pos";
   return jwt.sign(
-    { sub: "usr_demo_owner", tenantId: "tnt_demo", role: "owner" },
+    { sub: `usr_demo_${role}`, tenantId: "tnt_demo", role },
     secret,
     { expiresIn: "1h" },
   );
@@ -36,6 +38,7 @@ export default function request(
   method: string,
   path: string,
   body?: unknown,
+  role: Role = "owner",
 ): Promise<{ status: number; json: any }> {
   return new Promise((resolve, reject) => {
     const server = http.createServer(app);
@@ -48,7 +51,7 @@ export default function request(
       }
       const payload = body === undefined ? undefined : JSON.stringify(body);
       const headers: Record<string, string> = {
-        authorization: `Bearer ${testAuthToken()}`,
+        authorization: `Bearer ${testAuthToken(role)}`,
       };
       if (payload) {
         headers["content-type"] = "application/json";
