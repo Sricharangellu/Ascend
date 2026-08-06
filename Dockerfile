@@ -47,4 +47,16 @@ COPY api ./api
 RUN chown -R node:node /app
 USER node
 EXPOSE 3001
+# Container-level liveness. Without this, any orchestrator that reads Docker
+# health (compose `condition: service_healthy`, ECS, Swarm, Render's own
+# container checks) sees a crash-looped or wedged process as "running" — the
+# app's /healthz endpoint existed but nothing outside GitHub Actions' 15-minute
+# heartbeat ever asked it anything.
+#
+# Uses node's global fetch rather than curl/wget: node:24-alpine ships neither,
+# and adding one would grow the runtime image for a probe the runtime already
+# has. --start-period covers boot-time migrations, which hold an advisory lock
+# and can legitimately take a while on a cold database.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3001)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "dist/src/server.js"]

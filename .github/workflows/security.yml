@@ -1,0 +1,144 @@
+# Security scanning — supply chain, secrets, and container surface.
+#
+# Why a separate workflow and not more steps in ci.yml's `guard` job: these
+# scans are slower, some are scheduled rather than per-push, and one of them
+# (secret scanning) is worth running on a schedule against history even when
+# nobody is pushing. Keeping them out of `guard` also keeps the deploy path's
+# critical checks fast — `guard` gates every deploy, this does not.
+#
+# Gating policy, matching this repo's existing convention (see ci.yml's
+# docker-build / e2e / duplicate-code-scan comments — new checks prove
+# themselves green before anything hard-gates on them):
+#
+#   secret-scan     — FAILS. A first full scan (2026-08-06) found 4 hits, all
+#                     false positives, all justified in .gitleaks.toml. There is
+#                     no backlog to burn down, so there is no reason to accept a
+#                     check that cannot say no. Verified against planted AWS /
+#                     Stripe / GitHub credentials before landing.
+#   dependency-scan — REPORT-ONLY. `web` carries 14 advisories (1 critical,
+#                     9 high) as of 2026-08-04 and the fixes are major-version
+#                     migrations (next 14->16, vitest 2->4), tracked as F-24/F-25.
+#                     Gating today would fail every PR on arrival, and a check
+#                     that blocks all work gets deleted rather than fixed.
+#   license-scan    — REPORT-ONLY until the inventory has been reviewed once.
+#   sbom            — Artifact only. This is evidence for SOC 2 / customer
+#                     security review, not a gate.
+#
+# Promotion path for each report-only scan is written at the step itself.
+name: Security
+
+on:
+  push:
+    branches: [develop, staging, master]
+  pull_request:
+    branches: [develop, staging, master]
+  schedule:
+    # Weekly, Monday 07:00 UTC — two hours before backup.yml so a bad Monday
+    # does not have both jobs competing for attention. Catches newly-published
+    # advisories against unchanged code, which push-triggered runs never would.
+    - cron: "0 7 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: a credential deleted in a later commit is still
+          # published — removing the line does not unpublish the secret. The
+          # scheduled run is the one that benefits most from this.
+          fetch-depth: 0
+      # Pinned to an immutable release tag and checksum-free-but-versioned,
+      # matching how ci.yml pins actionlint. Do NOT switch to a `latest` URL:
+      # piping an unpinned release into a privileged runner is the supply-chain
+      # risk this repo already decided against once.
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          GITLEAKS_VERSION=8.28.0
+          curl -fsSL -o /tmp/gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          /tmp/gitleaks version
+      - name: Scan working tree
+        run: /tmp/gitleaks dir . -c .gitleaks.toml --no-banner --redact --exit-code 1
+      - name: Scan git history
+        # Report-only for history specifically: a hit here means a credential
+        # was published at some point, which needs rotation and a decision, not
+        # a red build on an unrelated PR. The working-tree scan above is the
+        # gate. Promote this to --exit-code 1 once history has been reviewed once.
+        run: /tmp/gitleaks git . -c .gitleaks.toml --no-banner --redact --exit-code 0
+
+  dependency-scan:
+    name: Dependency vulnerabilities (report-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # `--omit=dev` is deliberately NOT used: the one critical advisory is
+      # vitest, a devDependency. Dev-only advisories still execute on this
+      # runner and on contributors' machines.
+      #
+      # Promotion: replace `|| true` with `--audit-level=high` once F-24/F-25
+      # (the next and vitest major migrations) have landed and the count is
+      # near zero. Do it for root and web independently — root is already at 2
+      # low and could gate today.
+      - name: npm audit — root
+        run: |
+          npm ci --no-audit --no-fund
+          npm audit --audit-level=low || true
+      - name: npm audit — web
+        run: |
+          npm ci --no-audit --no-fund --prefix web
+          npm audit --audit-level=low --prefix web || true
+
+  sbom:
+    name: SBOM (CycloneDX)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # `npm sbom` is built into npm 10+, so this needs no third-party tool and
+      # no registry fetch beyond the install that already happens. A CycloneDX
+      # SBOM is the artifact enterprise customers and SOC 2 auditors ask for by
+      # name; before this, the only answer to "what is in your build" was
+      # "read package-lock.json".
+      - name: Generate SBOMs
+        run: |
+          set -euo pipefail
+          mkdir -p sbom
+          npm ci --no-audit --no-fund
+          npm sbom --sbom-format=cyclonedx > sbom/backend-sbom.cdx.json
+          npm ci --no-audit --no-fund --prefix web
+          npm sbom --sbom-format=cyclonedx --prefix web > sbom/web-sbom.cdx.json
+          wc -c sbom/*.json
+      # Report-only: the point of the first run is to produce the inventory, not
+      # to adjudicate it. Promote to a failing gate once the licence policy has
+      # been agreed (which families are acceptable is a business decision, not
+      # an engineering default).
+      - name: Licence inventory (report-only)
+        run: node tools/license-scan.mjs sbom/backend-sbom.cdx.json sbom/web-sbom.cdx.json || true
+      - name: Upload SBOMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.run_id }}
+          path: sbom/
+          retention-days: 90
