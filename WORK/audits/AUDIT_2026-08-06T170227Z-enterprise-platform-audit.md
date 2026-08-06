@@ -14,7 +14,7 @@ already been burned twice by docs that outlived their facts.
 | `tools/hygiene-check.mjs` | **PASS** — 2,181 files |
 | `tools/api-gap-scan.mjs` | **PASS** — 473 backend / 378 frontend paths, 17 allowlisted |
 | `tools/table-collision-scan.mjs` | **PASS** — 166 table names, no collisions |
-| `npm test` (backend, real Postgres 16) | **PASS** — see §6.1 for the count |
+| `npm test` (backend, real Postgres 16) | **PASS**, 0 fail — see §12.15 for the counted run |
 | `web`: typecheck / lint / vitest | **PASS** — 0 errors, 0 warnings, **188/188** in 28 files |
 | `web`: `NEXT_PUBLIC_MOCK=false npm run build` | **PASS** — 124 routes, 87.4 kB shared JS |
 | `npm audit` root | **0 advisories** |
@@ -1027,10 +1027,10 @@ Honesty about scope matters more than a longer changelog:
 | `npm run authz:scan` (new) | **PASS** — 49 route files, 6 allowlisted, 0 unguarded |
 | `npm run gap:scan` | **PASS** |
 | `npm run table:scan` | **PASS** |
-| `npm test` (backend, real Postgres 16) | see §12.16 |
+| `npm test` (backend, real Postgres 16) | **893/893 PASS**, 0 fail. This is the post-change run and the only clean count: the pre-change run overlapped this session's own edits, so its number is not quotable as a baseline. 3 of the 893 are new here (2 metrics, 1 quotes authz), and no pre-existing test changed behaviour. |
 | `web` typecheck / lint / test | **PASS** — 188/188 |
 | `web build` (`NEXT_PUBLIC_MOCK=false`) | **PASS** |
-| `actionlint` on the new + modified workflows | see §12.16 |
+| `actionlint` 1.7.12 on the new + modified workflows | **PASS** — and it caught a real YAML syntax error in one of this change's own steps before commit |
 
 **Proof the new guard actually works** — the standard this audit argues every guard should
 meet (§8.2). Run against the tree *before* the allowlist was written, `route-authz-scan.mjs`
