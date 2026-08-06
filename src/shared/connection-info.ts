@@ -301,8 +301,32 @@ export function describeTarget(info: ConnectionInfo): string {
   return `${base} — ${bits.join(", ")}`;
 }
 
-function isLocalHost(host: string): boolean {
-  return ["localhost", "127.0.0.1", "::1", "0.0.0.0", "host.docker.internal", "postgres"].includes(
-    host.toLowerCase(),
-  );
+/**
+ * Hosts for which plaintext Postgres is a legitimate setup, so "TLS is off"
+ * should not be reported as a problem: loopback, Docker/compose service names,
+ * and private (RFC 1918 / RFC 4193) networks. Everything else — a managed
+ * provider or any public host — is expected to require TLS.
+ */
+export function isLocalHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, "");
+
+  if (["localhost", "0.0.0.0", "::1", "::", "host.docker.internal", "postgres", "db"].includes(h)) return true;
+  if (h.endsWith(".localhost") || h.endsWith(".local") || h.endsWith(".internal")) return true;
+
+  // IPv4 loopback and RFC 1918 private ranges: 10/8, 172.16/12, 192.168/16,
+  // plus link-local 169.254/16.
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    if (a === 127 || a === 10) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 169 && b === 254) return true;
+    return false;
+  }
+
+  // IPv6 unique-local (fc00::/7) and link-local (fe80::/10).
+  if (/^f[cd][0-9a-f]{2}:/.test(h) || /^fe[89ab][0-9a-f]:/.test(h)) return true;
+
+  return false;
 }

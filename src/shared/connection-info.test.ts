@@ -10,6 +10,7 @@ import {
   classifySupabaseHost,
   describeTarget,
   diagnoseConnection,
+  isLocalHost,
   parseConnectionInfo,
   redactConnectionString,
   tlsEnabled,
@@ -168,6 +169,41 @@ test("a remote database with TLS off is an error", () => {
 test("a local database with TLS off is fine — that is the dev default", () => {
   const { findings } = diagnoseConnection(LOCAL, env({ NODE_ENV: "development" }));
   assert.deepEqual(titles(findings, "error"), []);
+});
+
+test("isLocalHost covers loopback, compose service names and private networks", () => {
+  for (const h of [
+    "localhost", "db.localhost", "127.0.0.1", "127.0.0.53", "0.0.0.0", "::1",
+    "host.docker.internal", "postgres", "db", "pg.internal", "nas.local",
+    "10.0.0.7", "172.16.4.2", "172.31.255.1", "192.168.1.5", "169.254.10.1",
+    "fd00::1", "fe80::1",
+  ]) {
+    assert.equal(isLocalHost(h), true, `${h} should be treated as local`);
+  }
+  for (const h of [
+    "aws-0-ca-central-1.pooler.supabase.com", "db.abcdefghijklmnop.supabase.co",
+    "8.8.8.8", "172.32.0.1", "172.15.0.1", "192.169.1.5", "11.0.0.1",
+    "ep-cool-name.eu-central-1.aws.neon.tech", "2606:4700::1",
+  ]) {
+    assert.equal(isLocalHost(h), false, `${h} should NOT be treated as local`);
+  }
+});
+
+test("a private-network database with TLS off is not flagged", () => {
+  // Docker/LAN Postgres over plaintext is a legitimate setup — it must not
+  // block db:check the way a managed provider would.
+  for (const host of ["192.168.1.50", "10.1.2.3", "172.20.0.4", "db"]) {
+    const { findings } = diagnoseConnection(`postgresql://u:p@${host}:5432/app`, env({ NODE_ENV: "development" }));
+    assert.deepEqual(titles(findings, "error"), [], `${host} should not error`);
+  }
+});
+
+test("a public non-Supabase host with TLS off is still an error", () => {
+  const { findings } = diagnoseConnection(
+    "postgresql://u:p@ep-cool-name.eu-central-1.aws.neon.tech:5432/app",
+    env({ NODE_ENV: "development" }),
+  );
+  assert.deepEqual(titles(findings, "error"), ["TLS disabled for a remote database"]);
 });
 
 test("findings are ordered error before warn before info", () => {
