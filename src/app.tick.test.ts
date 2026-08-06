@@ -45,6 +45,41 @@ test("tick requires the CRON_SECRET bearer when configured", async () => {
   }
 });
 
+// `.env.example` has documented JOBS_TICK_SECRET (sent as X-Jobs-Tick-Secret)
+// as an alternative to Vercel's CRON_SECRET since the endpoint existed, but
+// nothing read it — an operator on a non-Vercel host who set only that var got
+// a 503 in production and no background jobs, silently.
+test("tick accepts JOBS_TICK_SECRET via X-Jobs-Tick-Secret", async () => {
+  const app = await freshApp();
+  process.env["JOBS_TICK_SECRET"] = "tick-header-secret";
+  try {
+    assert.equal((await get(app, "/jobs/tick")).status, 401);
+    assert.equal((await get(app, "/jobs/tick", { "x-jobs-tick-secret": "wrong" })).status, 401);
+    // The Vercel-style bearer must NOT be accepted when only JOBS_TICK_SECRET is set.
+    assert.equal((await get(app, "/jobs/tick", { authorization: "Bearer tick-header-secret" })).status, 401);
+    const ok = await get(app, "/jobs/tick", { "x-jobs-tick-secret": "tick-header-secret" });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.json.status, "ok");
+  } finally {
+    delete process.env["JOBS_TICK_SECRET"];
+  }
+});
+
+test("tick accepts either credential when both are configured", async () => {
+  const app = await freshApp();
+  process.env["CRON_SECRET"] = "bearer-secret";
+  process.env["JOBS_TICK_SECRET"] = "header-secret";
+  try {
+    assert.equal((await get(app, "/jobs/tick", { authorization: "Bearer bearer-secret" })).status, 200);
+    assert.equal((await get(app, "/jobs/tick", { "x-jobs-tick-secret": "header-secret" })).status, 200);
+    assert.equal((await get(app, "/jobs/tick", { authorization: "Bearer header-secret" })).status, 401);
+    assert.equal((await get(app, "/jobs/tick")).status, 401);
+  } finally {
+    delete process.env["CRON_SECRET"];
+    delete process.env["JOBS_TICK_SECRET"];
+  }
+});
+
 test("tick drains due jobs and reconciles pending outbox rows in one call", async () => {
   const app = await freshApp();
 
