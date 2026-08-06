@@ -47,10 +47,36 @@ describes correcting once already):
 ## Known open criticals (operational floor, outrank feature work)
 
 From `docs/architecture/CTO_CHARTER.md` / `PLATFORM_ROADMAP.md`, still true as of this pass:
-- **C-1** — backup restore drill never run against real infra.
+- **C-1** — backup restore drill never run against real infra. **Refined
+  2026-08-06:** the *mechanism* was drilled end-to-end 2026-08-05 and works
+  (backup 0.168s → 501KB, restore ~1s, 193 tables verified identical, app
+  booted against the restored DB). What has never happened is a **production**
+  backup — `PROD_DATABASE_URL` is unset, so `backup.yml` has reported success
+  16 times while skipping every real step. Honest RPO is total loss, not ≤24h.
 - **C-2** — background workers still `setInterval`-based in the general orchestration layer outside the M1.2 job-tick path; runtime move to a long-lived process (Level 5/E3 step 6) not done.
 - **C-3** — DB TLS: production connects with `PG_SSL_NO_VERIFY`-style trust in some paths; the *code* supports proper `PG_CA_CERT`/`PG_CA_CERT_B64` verification (used correctly for the new Supabase project this session) but isn't universally enforced yet.
 - **C-4** — no alerting between deploys beyond the `uptime.yml` heartbeat.
+
+## Infrastructure gaps (added 2026-08-06, code-verified)
+
+From the 12-phase infrastructure audit —
+`WORK/audits/AUDIT_2026-08-06T170650Z-erp-infrastructure-audit.md`. Only items
+still open are listed; what that pass fixed is in the audit's §12.6 and in
+ADR-008/009/010, not repeated here.
+
+| Item | Status | What's actually missing |
+|---|---|---|
+| Authorization: 14 ungated mutating routes | Open | `tools/route-guard-scan.mjs` finds 76 mutating routes with no authorization middleware; 62 are correct (POS/floor/self-service/public-auth), 14 are real debt — every one classified `GAP:` in `tools/route-guard-allowlist.json`. Worst: `catalog POST /` (a cashier can create products), `billing POST /bills` + `/invoices` (a cashier can create AP/AR documents while the *pay* route is guarded), `quotes DELETE /:id` and `PATCH /:id/status` (that module imports no guard at all). Not a wiring gap — each needs a product decision about who may do it. |
+| Object storage | Open — **blocks 4 other items** | No S3/R2/GCS/Blob credential or SDK anywhere. This is why EDI import can never parse a file (the frontend has nowhere to upload bytes to), and it equally blocks invoice OCR, receipt OCR, product images and document search. Highest-leverage single prerequisite in the integration backlog. |
+| Observability: signals produced, nothing consumes them | Open | `/metrics` renders Prometheus text that nothing scrapes; W3C `traceparent` is generated and exported nowhere; structured JSON logs go to stdout with no aggregator; the Sentry integration is a hand-rolled envelope with no releases, source maps, breadcrumbs or user context, and no frontend coverage at all (`web/app/error.tsx` still says "when wired in production"). Worse than absent — it reads as covered. |
+| No IaC | Open — **root cause of the DEPLOYMENTS.md incident** | No Terraform, Pulumi or `render.yaml`. Every piece of infrastructure was created by hand in a dashboard, which is exactly why nobody can say where production runs. Deliberately NOT added in the 2026-08-06 pass: codifying a topology this repo cannot confirm is worse than codifying none. Blocked on `DEPLOYMENTS.md` P1. |
+| No rollback path | Open | `db/migrations/*.down.sql` exist for the 3 foundation files only — the 186 module-owned tables have none. Combined with C-1's production half, a data-affecting mistake is currently permanent. Needs either down-migrations or an explicit, documented forward-only + restore policy. |
+| Testing: no load, a11y, visual, contract or performance layer | Open | No k6/Artillery, no `@axe-core/playwright` (though `axe-core` is already a transitive dep), no visual regression, and nothing asserts the running server matches `contracts/openapi.yaml` despite the frontend consuming it via codegen. `AGENTS.md` mandates WCAG 2.1 AA as non-negotiable and nothing verifies it. |
+| No SAST / container image scanning | Open | CodeQL on a private repo needs GitHub Advanced Security — a licensing decision, therefore Sri's; Semgrep is the no-GHAS alternative. CI builds the container image and never scans it (Trivy). Both must be proven green on a branch before gating, per ADR-008. |
+| No secrets manager | Open | GitHub Actions secrets + host env vars; no central rotation, access audit or expiry. Sharpest edge: **per-tenant OIDC client secrets live in the `settings_kv` table** — deliberate (see `ARCHITECTURE.md`) but it puts customer IdP credentials in the application database. |
+| `errorEnvelopeMiddleware` is dead code | Open | `app.ts` mounts `errorMiddleware` first; it always responds and never calls `next(err)`, so the envelope middleware after it never runs. The documented `{error:{code,message,requestId}}` contract is never delivered — no error response carries a `requestId`, so a customer reporting an error has nothing to correlate against the logs. No test asserts it, which is why it survived. |
+| `compile()` binds NULL for unmatched `@named` params | Open (latent) | `src/shared/db.ts` silently binds `undefined` → NULL when a placeholder has no matching key. Already caused a total module outage once (`customer_invoices.create()`, iteration 19 — every invoice creation with lines 500'd). Invisible until a specific write path is exercised. |
+| Job tick runs **daily** | Open | `vercel.json` schedules `/jobs/tick` at `0 6 * * *`, so worst-case latency for outbox redelivery and every scheduled job is ~24h. Left unchanged deliberately: Vercel Hobby permits only daily crons. If the backend is on Render, the `crons` block should be **deleted**, not tuned — see ADR-010. |
 
 ## How to keep this file honest
 

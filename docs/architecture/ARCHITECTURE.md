@@ -232,3 +232,22 @@ Kafka, K8s, multi-DB, schema-per-domain rename, low-code engine v1.
 (known parallel flakiness — single-file runs are authoritative; confirmed
 repeatedly this session via isolated re-runs). `npm run verify` aggregates
 all gates.
+
+Structural guards (each a dependency-free `tools/*.mjs`, run in CI's `guard`
+job and in `npm run verify`) — every one exists because the failure it catches
+already happened at least once here:
+
+| Guard | Catches |
+|---|---|
+| `hygiene-check.mjs` | Copy-junk, collision backups, merge leftovers, duplicate `AGENTS.md`, **root-manifest hijack** (check 8 — the pnpm/workspace incident, 5 occurrences) |
+| `api-gap-scan.mjs` | Frontend calling a route that has no backend (pages shipping on MSW mocks while prod 404s) |
+| `table-collision-scan.mjs` | Two modules declaring the same table — silently makes the losing module 100% non-functional (3 real occurrences) |
+| `route-guard-scan.mjs` | Mutating routes registered with no authorization middleware. Added 2026-08-06, replacing a CI grep step that could not fail and had never evaluated the codebase (ADR-008) |
+| `duplicate-code-scan.mjs` / `dead-code-scan.mjs` | Report-only |
+
+Security scanning lives in `.github/workflows/security.yml` (secret scan —
+gating; dependency advisories, licence inventory — report-only; CycloneDX SBOM —
+artifact). The gating policy is ADR-008: **a check either fails on a real
+violation or is explicitly labelled report-only at the step where it runs.**
+There is no third state, and a check that cannot fail is a defect regardless of
+what it prints.

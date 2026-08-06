@@ -105,6 +105,60 @@ framework conventions before touching anything.
 Next.js App Router files (`page`/`layout`/`route`/…), `middleware.ts` and
 `src/server.ts` are excluded — the framework calls them, so nothing imports them.
 
+## `route-guard-scan.mjs` — mutating routes with no authorization (gating)
+
+```bash
+npm run route:scan
+```
+
+Fails when a `router.post/put/patch/delete` registers no authorization
+middleware between its path and its handler. Current tree: **314 mutating routes
+across 49 route files, 76 unguarded, all allowlisted** in
+`route-guard-allowlist.json`.
+
+**This replaced a CI grep step that could never fail.** The old step ended
+`! grep … || echo "All mutation routes have role guards ✓"` — the `!` inverts a
+successful match into non-zero and `|| echo` swallows that into exit 0.
+Reproduced 2026-08-06: it printed 39 matching lines *and* the ✓ *and* exited 0.
+It had never once evaluated this codebase. Its detection was also wrong in both
+directions: it excluded a line only if the literal `requireRole` appeared on it,
+but 44 route files declare `const mgr = requireRole("manager")` and pass `mgr`,
+so guarded routes read as violations; and `-A1` meant middleware on a later line
+read as guarded.
+
+A regex over line pairs cannot answer this. This script walks from
+`router.<method>(` to the balanced closing paren (string- and comment-aware),
+splits the top-level arguments, and treats everything between the path (first
+argument) and the handler (last) as the middleware chain — resolving per-file
+`const x = requireRole(...)` aliases and `router.use(...)` router-level guards.
+
+**The allowlist is a debt register, not a mute button.** Every entry states why,
+categorised `open-by-design:` / `in-handler:` / `GAP:` — the third being an
+admission of real debt, each one a numbered finding in
+`WORK/audits/AUDIT_2026-08-06T170650Z-erp-infrastructure-audit.md` §4. **Stale
+entries fail**: a key that no longer matches an unguarded route is an error, so
+the list cannot decay into things that were fixed years ago.
+
+Gating policy for this and every other check here: **ADR-008.**
+
+## `license-scan.mjs` — licence inventory over a CycloneDX SBOM (report-only)
+
+```bash
+npm sbom --sbom-format=cyclonedx > sbom.cdx.json
+node tools/license-scan.mjs sbom.cdx.json
+node tools/license-scan.mjs --fail-on copyleft,unknown sbom.cdx.json
+```
+
+Classifies every component into permissive / weak-copyleft / copyleft / other /
+unknown. Run against the real tree 2026-08-06: **858 unique components, 851
+permissive, 2 weak-copyleft (MPL-2.0), 0 copyleft, 2 with no declared licence.**
+
+It deliberately encodes **no policy** — which licence families are acceptable is
+a business decision, so it exits 0 unless `--fail-on` says otherwise. `unknown`
+is not benign: an undeclared licence is legally "all rights reserved" until
+proven otherwise. Runs in `.github/workflows/security.yml` alongside SBOM
+generation.
+
 ## `new-worktree.sh` — one isolated checkout per session
 
 ```bash
