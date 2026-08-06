@@ -52,9 +52,38 @@ jobs:
           else
             echo "configured=true" >> "$GITHUB_OUTPUT"
           fi
+      # pg_dump refuses to dump from a server NEWER than itself
+      # ("aborting because of server version mismatch") — and only in that
+      # direction; a newer client reads older servers fine. ubuntu-latest ships
+      # postgresql-client 16, so the moment the production Supabase project is
+      # 17+ this job fails on its very first real run. Install the newest client
+      # from PGDG instead, which can dump any server version at or below it.
+      #
+      # Falls back to the distro package if PGDG is unreachable, so a repo-side
+      # outage degrades to "might hit the version wall" rather than "backup job
+      # cannot run at all". The version is echoed either way — if a mismatch
+      # ever does occur, the log says exactly which client was used.
       - name: Install postgresql-client (pg_dump)
         if: steps.check.outputs.configured == 'true'
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends postgresql-client
+        run: |
+          set -euo pipefail
+          install_from_pgdg() {
+            sudo install -d /usr/share/postgresql-common/pgdg
+            sudo curl -fsS --max-time 30 \
+              -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+              https://www.postgresql.org/media/keys/ACCC4CF8.asc
+            echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+              | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends postgresql-client
+          }
+          if ! install_from_pgdg; then
+            echo "⚠️  PGDG unavailable — falling back to the distro postgresql-client."
+            echo "    If the dump fails on a server version mismatch, that is why."
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends postgresql-client
+          fi
+          pg_dump --version
       - name: Run backup
         if: steps.check.outputs.configured == 'true'
         env:
