@@ -1,3 +1,15 @@
+## Active Claim (Claude Code web — launch-readiness prompts + mobile store audit)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-prompt-guide-6ol0p9` (same branch/PR #188 as the claim below) |
+| Queue item | Add a launch-readiness section to the prompt guide — one prompt per pre-store-submission check (store mechanics, auth/session, data correctness, security, reliability, compliance) — and record the verified `artifacts/ascend-mobile` submission blockers found while writing it as an append-only audit. |
+| Files/areas expected | `tools/AGENT_PROMPT.md` (new §5 + renumber), `AGENTS.md` (the onboarding bullet's section list only), `WORK/audits/AUDIT_2026-08-06T050023Z-mobile-store-readiness.md` (new), `WORK/LOCK.md`. NOT `artifacts/**` (another environment's tree — audited by reading only, not modified), NOT `src/**`, NOT `web/**`, NOT `WORK/FORWARD_PLAN.md`, NOT `WORK/LOOP_STATE.md`. |
+| Started | 2026-08-06T050023Z |
+| Status | RELEASED — pushed to `claude/ascend-prompt-guide-6ol0p9` (PR #188). Gates: `node tools/hygiene-check.mjs` PASS (2177 files — no junk, tracked env, conflict markers, secrets, or broken doc links). Guide sections renumbered 1–7 and every cross-reference re-checked (`AGENTS.md` onboarding bullet, the guide's own header). Audit citations verified to resolve to real files. |
+| Blockers | none |
+| Not run | Backend/web suites — unchanged from the claim below: empty `node_modules` in this container, and the diff is markdown only, zero TypeScript. CI covers it on the PR. `artifacts/ascend-mobile` was read, never modified, and never built — the audit says so explicitly and labels itself `partial` for that reason. |
+
 ## Active Claim (Claude Code web — prompt guide)
 
 | Field | Value |

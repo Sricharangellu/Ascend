@@ -5,6 +5,7 @@ How to start, shape, and end an AI session on this repo. Two audiences, one file
 - **Starting a session?** Paste §1 into the agent. That is the prompt.
 - **Writing the task line that goes with it?** §2 is what a good one carries, §3 has a
   fill-in-the-blank template per job, §4 is what not to ask for.
+- **Shipping to the app stores?** §5 is one prompt per pre-submission check.
 
 **Precedence.** `AGENTS.md` is the operating contract. This file is the onboarding prompt it
 sanctions ("New agent/session onboarding: paste `tools/AGENT_PROMPT.md`") — a working copy of
@@ -202,7 +203,171 @@ Each of these has produced real rework here. The fix is in the prompt, not in th
 
 ---
 
-## 5. Environment notes
+## 5. Launch readiness — prompts for shipping to the app stores
+
+One check per prompt, each run and reported separately. Two rules make this list different from a
+generic pre-launch checklist:
+
+- **A shipped mobile binary cannot be recalled.** Store review takes days, and users keep running an
+  old build against a moving backend. Every check below assumes the client and server are versioned
+  apart.
+- **Start from `docs/architecture/GAPS.md`.** The C-1…C-4 criticals are already verified open and
+  already labelled the operational floor — they outrank everything here. Don't re-derive them; run
+  them.
+
+Ascend Mobile lives in `artifacts/ascend-mobile` (Expo + expo-router). Note that `artifacts/` is a
+known duplicate tree (audit finding H-1 / backlog F-3) that active `LOCK.md` claims exclude — settle
+whether that is the shipping app before certifying anything in it. Current submission blockers are
+recorded in `WORK/audits/AUDIT_2026-08-06T050023Z-mobile-store-readiness.md`.
+
+### Store submission mechanics
+
+> **App identity & versioning.** Audit `artifacts/ascend-mobile/app.json` for submission readiness:
+> `ios.bundleIdentifier`, `android.package`, `ios.buildNumber`, `android.versionCode`, and an
+> `eas.json` with build + submit profiles for both stores. Confirm the `expo-router` `origin` is an
+> Ascend-owned URL. Report each field present/missing with its exact JSON path — do not infer
+> defaults the build would apply.
+
+> **Privacy manifest & data safety.** Produce the data-collection inventory this app must declare:
+> every category of user or device data read, transmitted, or stored, mapped to `file:line`. Check
+> whether an iOS privacy manifest exists and whether any Required Reason API is used without a
+> declared reason. Cross-check against what a Play Data Safety form needs. List what you could not
+> determine from code rather than guessing.
+
+> **Permission strings.** Find every native capability requested (camera for barcode scanning,
+> notifications, photos, location, biometrics). Verify each has a purpose string — iOS
+> `NS*UsageDescription`, Android manifest permission — explaining the retail use, not a placeholder.
+> A permission requested in code with no purpose string is a hard rejection; report those first.
+
+> **In-app account deletion.** Both stores require an in-app deletion path for any app with account
+> creation. Trace whether one exists, and what deleting an owner account would do to a tenant's
+> orders, inventory movements, and audit rows — which are retained records. Report the current
+> behaviour honestly; if there is no path, describe the smallest compliant design given retention.
+
+> **Payments & store billing rules.** Classify every purchase flow: physical goods sold to a
+> retailer's customer (exempt from in-app purchase) versus any Ascend subscription, tier upgrade, or
+> feature unlock sold to the retailer (which Apple will require to go through IAP). Cite `file:line`
+> per flow. A single in-app link to an external upgrade page can trigger rejection — flag those.
+
+### Auth & session
+
+> **Token storage at rest.** Trace where the mobile app persists access/refresh tokens, tenant id,
+> and cached PII, and whether that store is encrypted at rest on both platforms. A JWT in plain
+> async storage on a rooted or jailbroken device is readable — state plainly whether that is the
+> current state.
+
+> **Reauthentication.** Verify the 15-minute access token / single-use refresh rotation on mobile:
+> silent refresh, refresh-reuse detection, hours-long backgrounding, and forced step-up before
+> sensitive actions (refunds, voids, register close, permission changes, price overrides). Prove each
+> with a test, not a code reading. Report which sensitive actions have no step-up check today.
+
+> **Logout, revocation, device loss.** Test that logout invalidates server-side, not just locally;
+> that a revoked user is ejected on the next request rather than at token expiry; and that a lost
+> device can be cut off. Include the offline case — what a stolen device with a cached session can
+> still do with the network off. For a POS that is the real risk.
+
+### Data & correctness
+
+> **Data formats.** Audit every boundary where money, quantity, dates, and identifiers cross into the
+> mobile client. Money must be integer cents end to end — find anywhere it becomes a float, a string,
+> or a locale-formatted value before arithmetic. Check register-session and end-of-day timezone
+> handling (a sale at 23:58 must land in the right business day), decimal separators under non-US
+> locales, and barcode/SKU strings that could lose leading zeros. `file:line` per defect.
+
+> **API versioning & forced upgrade.** A shipped binary lives for months against a moving backend.
+> Verify a version handshake lets the server require a minimum client version, and that the "please
+> update" path is tested. Review recent API changes for anything that breaks an older client. Report
+> whether the backend can currently deploy without breaking a binary already in users' hands.
+
+> **Offline sync & conflict resolution.** Test the failure modes, not the happy path: the same
+> register offline on two devices; a sale recorded offline for a product whose price or stock changed
+> server-side; a sync interrupted midway; a clock-skewed device; a duplicate submit on retry. Prove
+> inventory movements stay immutable and no order is double-counted. Report each scenario's observed
+> result.
+
+> **Migration safety during rollout.** For every migration shipping with this release, verify both
+> directions and confirm it is safe while an older client is live — the deploy and the store rollout
+> are never simultaneous. Flag any column drop, rename, or NOT NULL addition that would break the
+> currently published binary during the rollout window.
+
+### Security
+
+> **Row-level security.** Verify tenant isolation at both layers — app-layer JWT scoping and the
+> Postgres policies in `db/rls/`. For each business table confirm a policy exists and that a forged or
+> swapped tenant id is denied at the database even when a handler forgets to scope. Test cross-tenant
+> reads *and* writes, including tables added since the policies were last reviewed.
+> `src/gateway/tenant-isolation.test.ts` is the starting point, not proof of completeness.
+
+> **Authorization / IDOR.** For every mobile-reachable endpoint, verify the object-level check: can a
+> cashier fetch, mutate, or delete a record belonging to another outlet, register, or user by changing
+> an id? Confirm `requireCapability`/`requireRole` is actually mounted, not just imported. Enumerate
+> unchecked routes as a ranked list.
+
+> **Secret management.** Scan the shipped bundle for anything that must not be in a client binary —
+> API keys, service tokens, service-role keys, signing material. Every `EXPO_PUBLIC_*` value is
+> readable by anyone who downloads the app. Verify no secret is committed to the repo or build config,
+> and that rotation is possible without a store resubmission. Report what an attacker extracts from
+> the built artifact.
+
+> **Transport security.** Confirm TLS is enforced with no debug bypass reachable in a release build,
+> and check GAPS.md **C-3** — production DB connections still trusting certificates in some paths
+> despite the code supporting `PG_CA_CERT` verification. Decide whether certificate pinning is
+> warranted for a client touching payment flows, and state the tradeoff rather than just recommending
+> it.
+
+> **Mock-backed surfaces must not ship.** `AGENTS.md` lists the mock-backed / partial API prefixes.
+> Verify none is reachable from a production mobile build, that `NEXT_PUBLIC_MOCK` is false in every
+> release path, and that no MSW handler or fake-auth shim is bundled. Anything partial must be hidden
+> from navigation, not merely unlinked.
+
+### Reliability & operations
+
+> **Load testing.** Load test the real backend at the design point — 600 RPS sustained, 3,000 RPS
+> peak, p95 < 200 ms read / < 400 ms write. Model retail shape: a checkout burst at open, end-of-day
+> close across many tenants at once, reports running concurrently. Report the breaking point and which
+> resource saturates first. GAPS.md **C-2** flags `setInterval`-based background workers, which behave
+> badly under load — include them.
+
+> **Rate limiting & abuse.** Verify rate limiting works in production rather than in-memory
+> per-instance. Test login brute force, refresh-token abuse, and a runaway client. Confirm limits are
+> keyed per tenant *and* per user so one busy retailer cannot exhaust another's budget.
+
+> **Backup & restore drill.** GAPS.md **C-1**: the restore drill has never run against real
+> infrastructure. Actually run it — restore to a scratch environment, measure RPO/RTO against the
+> ≤5 min / ≤30 min targets, and verify restored data is complete and tenant-isolated. A backup that
+> has never been restored is not a backup. Report measured numbers, not configuration.
+
+> **Monitoring, alerting, crash reporting.** GAPS.md **C-4**: no alerting between deploys beyond the
+> heartbeat. Define the minimum set required before launch — error rate, p95 latency, failed payments,
+> sync backlog, DB connection saturation — each with an owner and a runbook. Separately verify mobile
+> crash reporting is wired with source maps for release builds; a store binary cannot be debugged
+> without them.
+
+> **Rollback & kill switch.** A bad mobile release cannot be recalled. Verify an over-the-air update
+> path for JS-only fixes, a server-side feature flag to disable a broken flow without resubmission,
+> and a tested backend rollback that does not strand the published client. Describe exactly what you
+> would do if checkout broke for all users an hour after release.
+
+### Product & compliance
+
+> **Age verification.** This app sells age-restricted tobacco, vapor, and hemp products. Test that the
+> workflow cannot be bypassed offline, by a role without permission, or by cancelling mid-flow, and
+> that every verification is audit-logged. Verify the store age rating and content declarations match
+> what the app actually does.
+
+> **Tax & compliance correctness.** Verify MSA reporting and state-specific tobacco/vapor/hemp rules
+> produce correct output for the launch states, using known-good fixtures with expected totals.
+> Financial correctness has veto: any rounding, jurisdiction, or effective-date defect blocks release
+> regardless of schedule.
+
+> **Accessibility.** Audit against WCAG 2.1 AA and the platform accessibility APIs: screen-reader
+> labels on every interactive element, ≥44pt touch targets, contrast ratios, dynamic type without
+> clipping, no colour-only status signals. `app.json` sets a dark-only `userInterfaceStyle` — verify
+> contrast holds throughout. Report violations by screen and element.
+
+---
+
+## 6. Environment notes
 
 Same discipline everywhere; the tooling differs.
 
@@ -217,7 +382,7 @@ and `REPLIT.md` are pointers to `AGENTS.md`, never copies of it.
 
 ---
 
-## 6. Where the rules actually live
+## 7. Where the rules actually live
 
 Nothing here is authoritative on its own. Change the rule in its one home:
 

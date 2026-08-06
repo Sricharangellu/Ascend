@@ -480,7 +480,8 @@ lost-then-recovered work). These rules exist so it cannot recur:
 - **New agent/session onboarding:** paste §1 of `tools/AGENT_PROMPT.md` — the prompt guide.
   §1 is the copy-paste session brief (read order, queue, duplicate-check, worktree, lock
   claim, branch base, gates, PR flow, honest reporting); §2–§4 cover how to write the task
-  prompt that goes with it, a template per job type, and the anti-prompts to avoid.
+  prompt that goes with it, a template per job type, and the anti-prompts to avoid; §5 is one
+  prompt per app-store pre-submission check.
 - Before ending a session: `git status` must show no untracked ` 2.` / backup junk.
 
 ## Local runbook (macOS dev machine)
