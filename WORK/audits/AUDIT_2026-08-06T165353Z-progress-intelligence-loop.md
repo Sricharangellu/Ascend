@@ -245,11 +245,10 @@ feature"):
   decision.
 - **Load/stress testing.** Same blocker as the 2026-08-05 audit: no reachable
   TESTING tier. Reported as not done, not softened.
-- **E2E (Playwright).** Not run — this container has no built+served real-stack
-  pair, and CI runs the golden paths on the PR. The feature's own behaviour is
-  covered by 4 backend integration tests against real Postgres and 18 component
-  tests; the untested layer is specifically "this page inside a real browser
-  against a real server." Stated plainly rather than implied green.
+- ~~**E2E (Playwright).** Not run.~~ **SUPERSEDED — e2e was run, and a spec for
+  this feature was added.** See §9 below. The original claim was written while
+  CI was expected to cover it; when Actions stopped scheduling runs entirely
+  (§9), the real stack was stood up in this container instead.
 
 ---
 
@@ -264,8 +263,84 @@ feature"):
 | Frontend UI, states, a11y, responsive | `built_verified` (typecheck + lint + 18 tests + production build) |
 | Integration with existing modules | `built_verified` |
 | Unit + integration tests | `built_verified` — 894 backend, 206 web, all green |
-| End-to-end (Playwright) | **not run** — see §7 |
+| End-to-end (Playwright) | `built_verified` — **28 passed / 1 skipped / 1 pre-existing failure**, against the real stack (see §9). Includes a new `e2e/progress.spec.ts` walking the whole loop. |
 | Performance | `built_verified` for query shape (bounded, indexed); **no profiling under load** — see §7 |
 | Security review | `built_verified` for this diff's surface |
 | Documentation | `built_verified` — this audit, `ARCHITECTURE.md`, `GAPS.md`, `LOOP_STATE.md` |
 | Deployment readiness | **unchanged by this work.** The release blockers are still the operational ones in `AUDIT_2026-08-05T054800Z` (no production backup has ever run; heartbeat probes a dead host). This feature does not move that verdict, and does not claim to. |
+
+---
+
+## 9. Addendum 2026-08-06T22:1x — E2E run locally after CI stopped scheduling
+
+### Why this was needed
+
+`ci.yml` never produced a verdict for PR #196. Its first run had three of four
+jobs **cancelled after ~2h queued with no runner assigned**, and the fourth
+(Docker build) hung 45 minutes before failing. Then GitHub Actions stopped
+*creating* runs for the repository altogether — a push produced no run, a
+`rerun_workflow_run` returned `201 Created` and then zero jobs, and the
+`uptime.yml` heartbeat missed ~9 consecutive 15-minute firings. Rather than
+keep waiting on a gate that could not report, the real stack was stood up here.
+
+### Stack actually exercised (no mocks)
+
+PostgreSQL 16 (system service) → backend on `:3001` via `tsx src/server.ts`
+(`/readyz` → `db:connected`) → seeded with `ALLOW_E2E_SEED=1 scripts/seed-e2e.ts`
+→ frontend built with **`NEXT_PUBLIC_MOCK=false`** and served from
+`.next/standalone` on `:3000`, proxying `/api/*` to the backend. Chromium came
+from the image (`/opt/pw-browsers/chromium`, build 1194) via a throwaway config,
+because `@playwright/test` 1.61.0 wants build 1228 and refuses to launch
+otherwise; that config was deleted afterwards and is not in the diff.
+
+### Result
+
+| | |
+|---|---|
+| Full suite | **28 passed · 1 skipped · 1 failed** |
+| New `e2e/progress.spec.ts` | **2/2 passed** (full loop in 3.1s) |
+| Regressions introduced | **none** — the one failure predates this branch and is unchanged |
+
+`e2e/progress.spec.ts` walks the whole loop against the real backend: log in →
+state a hypothesis → **assert the decision is refused with no evidence** (both
+buttons disabled + the explanation) → attach evidence → assert the decision
+becomes available → validate with a reason → assert the controls disappear →
+**reload and assert it all persisted**. That last step is what proves the loop
+is database-backed rather than component state.
+
+The evidence-gate assertion is the point of the spec: the backend rejects a
+decision on an evidence-less hypothesis and the UI mirrors that rule. Asserting
+both sides in one flow is what would catch them drifting apart.
+
+### Two pre-existing defects found, recorded and NOT fixed here
+
+Both are filed in `WORK/LOOP_STATE.md`; neither is touched by this PR (one
+concern per PR, per Phase 9.2c).
+
+1. **No e2e spec can see a manager-gated control — a whole-suite blind spot.**
+   `web/lib/auth.ts` persists the user profile to `sessionStorage`, which
+   Playwright's `storageState` does not capture. Every spec reusing
+   `e2e/.auth/owner.json` therefore starts with `getUser()` null →
+   `hasRole("manager")` false → all manager-gated controls hidden. **Proven by
+   probe, not inferred:** the shipped dashboard `ProgressPanel`'s "New task"
+   form reported `count=0` with `sessionStorage` keys `[]`, identically to the
+   new progress form. So "e2e passed" has, to date, meant "read-only surfaces
+   passed." `progress.spec.ts` works around it by logging in through the form.
+2. **`inventory-receive.spec.ts:38` is deterministically broken.** It calls
+   `.count()` — which does not auto-wait — to branch on whether POs exist, reads
+   0 before the fetch resolves, takes the "no POs" path, then waits 8s for
+   empty-state text that never appears because the table has rendered by then.
+   The failure screenshot shows the seeded PO row present. Fails identically on
+   retry. The product is fine; the test is wrong.
+
+### What this changes about the honest status
+
+The one layer previously reported as unverified is now verified, and by a
+stronger method than CI would have used — CI's `e2e` job only runs on
+`push` to `master`/`staging` (`if: github.event_name == 'push'`), so it would
+**never** have run on this PR at all. The PR body's original claim that "CI runs
+the golden paths on this PR" was wrong on that point too, independent of the
+Actions outage.
+
+Still not done: **load/stress testing** (no reachable TESTING tier) and any
+verdict from CI itself.
