@@ -1,0 +1,114 @@
+# Static application security testing + supply-chain review.
+#
+# WHY: before this file, the repo had no SAST of any kind. `ci.yml`'s `guard`
+# job carries hand-written pattern checks (raw SQL interpolation, unguarded
+# mutation routes, console.* in production source) which are valuable but are
+# grep-shaped — they catch the specific mistakes this repo has already made, by
+# construction. Nothing looked for the classes it has not made yet: taint flow
+# from `req` into a sink, path traversal, unsafe deserialization, prototype
+# pollution, ReDoS. That is what CodeQL does, and for a codebase handling money,
+# auth and multi-tenant data it is the floor, not the ceiling.
+#
+# Both actions here are GitHub first-party (`github/`, `actions/`) — the same
+# trust level as `actions/checkout`, which every job in `ci.yml` already runs.
+# No third-party action, no new vendor account, no new secret. That is a
+# deliberate constraint: this repo pins even actionlint to an immutable release
+# tag rather than piping a script from a mutable ref, and an audit PR is the
+# wrong place to unilaterally widen the supply-chain surface.
+#
+# NOT COVERED HERE, and deliberately so — see the audit's Security section:
+#   - Container image scanning (Trivy/Grype). `ci.yml`'s docker-build job
+#     already produces the image; scanning it needs a third-party action, which
+#     is Sri's supply-chain call to make, not an audit's.
+#   - Secret scanning + push protection. GitHub-native, but a repo *setting*
+#     (Settings → Code security), not a workflow — cannot be enabled from here.
+#     `tools/hygiene-check.mjs` covers the committed-secret case in the
+#     meantime; it cannot cover history or push-time.
+#   - License compliance. Needs a policy decision (which licenses are
+#     acceptable) before a tool can enforce anything.
+name: Security
+
+on:
+  push:
+    branches: [develop, staging, master]
+  pull_request:
+    branches: [develop, staging, master]
+  schedule:
+    # Weekly re-scan on a fixed branch: CodeQL's query packs improve over time,
+    # so code that was clean at merge can be newly-flagged months later without
+    # anyone touching it. Monday 07:00 UTC, ahead of the 09:00 backup job.
+    - cron: "0 7 * * 1"
+
+# `security-events: write` is what lets CodeQL upload its SARIF results into the
+# repo's Security tab. Everything else stays read-only, matching the
+# least-privilege default the other three workflows already set.
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codeql:
+    name: CodeQL — JavaScript/TypeScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          # security-and-quality adds maintainability queries on top of the
+          # default security set. Chosen over `security-extended` because this
+          # codebase's dominant real defect class (found repeatedly in its own
+          # audits) is duplication and drift, not exotic injection — and the
+          # extended set's extra false-positive rate on a 140k-line tree would
+          # bury the findings that matter.
+          queries: security-and-quality
+          # Analyse the shipping application only. `artifacts/` is a 1,005-file
+          # parallel codebase that is not built, not tested, not deployed and
+          # not reachable from any entry point in this repo (see the audit's
+          # Technology Inventory) — scanning it would triple the runtime and
+          # every finding would be unactionable.
+          config: |
+            paths:
+              - src
+              - web
+              - scripts
+              - tools
+              - api
+            paths-ignore:
+              - "**/*.test.ts"
+              - "**/*.test.tsx"
+              - web/mocks
+              - web/e2e
+      # No `autobuild`: this is an interpreted-language analysis, and both
+      # halves of the app already typecheck in ci.yml. Skipping the build keeps
+      # this job independent of ci.yml's install/build steps and roughly halves
+      # its runtime.
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
+
+  dependency-review:
+    name: Dependency review (PRs — block new high/critical)
+    # PR-only by design: this action diffs the base and head manifests, so it
+    # has nothing to compare on a push. It is the complement to ci.yml's
+    # `npm audit` gate, which only ever sees the merged end state — this one
+    # catches the advisory *arriving*, and names the PR that brought it.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          # Matches ci.yml's root `npm audit --audit-level=high` gate, so a
+          # dependency cannot enter through the PR path at a severity the
+          # merged-state gate would then reject.
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure

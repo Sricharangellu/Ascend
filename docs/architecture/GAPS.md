@@ -44,6 +44,32 @@ describes correcting once already):
 - **Sales velocity / reorder suggestion inputs**: `inventory/pipeline-views.ts::reorderAlerts()` already computes 30-day units sold → `avg_daily_sales` → `days_until_stockout` → `suggested_qty`, and `ai_assistant/service.ts`'s `gatherBestSellersSignal`/`gatherSlowMoversSignal` already rank products by 30-day revenue/units. A "Sales Velocity Service" proposal should be checked against these first — the core calculation exists; a real gap here would be narrower (e.g. unit-normalized velocity, per-location breakdown), not a new service.
 - **Stock movement ledger**: `inventory_movements` (`id, tenant_id, product_id, delta, reason ∈ {receiving, sale, adjustment, return, cycle_count}, ref, created_at`, indexed by tenant+product+time) is real and actively written to by `inventory/service.ts` — not an unused stub (unlike `product_units` or `product_barcodes.pack_size` were before this session's UOM work). Sufficient to reconstruct stock-qty-over-time and detect stockout moments (replay deltas, find when the running balance hits zero) without introducing a new movement table.
 
+## Platform/infrastructure gaps (added 2026-08-06, enterprise platform audit)
+
+Verified by command against this checkout, not carried over from an older doc. Full
+evidence: `WORK/audits/AUDIT_2026-08-06T170227Z-enterprise-platform-audit.md`.
+
+| Item | Status | What's actually missing |
+|---|---|---|
+| Infrastructure as Code | Open — **zero** | No Terraform/Pulumi/`render.yaml`/`fly.toml`/Helm anywhere. Every environment (Vercel projects, the backend host, both Supabase projects, all env vars) is dashboard-only state. Already bit once: the staging Vercel projects were deleted and `scripts/deploy.sh` still holds their IDs. **Deliberately not fixed by that audit** — codifying a host nobody has confirmed would add a *fourth* conflicting picture of production; resolve `DEPLOYMENTS.md` first, then IaC the winner. |
+| Nothing scrapes `/metrics` | Open | The endpoint emits correct Prometheus exposition and, since the 2026-08-06 audit, covers DB pool, job-queue depth, outbox backlog, event-loop delay and build sha. **No collector reads it, so none of it is retained or alertable.** This is a configuration task, not an engineering one — Grafana Cloud free tier + `METRICS_TOKEN`. Highest-leverage open observability item. |
+| Alert fan-out (C-4) | Open | Still only "a GitHub Actions run went red". No paging, no routing, no on-call, no status page. |
+| Load / capacity data | Open — none exists | No load test has ever run. Throughput, p95, and the concurrency at which the pool exhausts are all unknown. For a product pitched on high-volume POS, "how many tills can check out at once" is currently unanswerable. `scripts/smoke.ts` already scripts the full lifecycle — it is ~90% of a k6 script. |
+| Restore validation in CI | Open | The backup→restore mechanism was drilled by hand once (2026-08-05) and works. Nothing re-proves it, so the path can rot silently. |
+| Down-migrations for module migrations | Open | `db/migrations/` has 3 `.down.sql` files; the 53 module migration sets that actually run at boot have none. Neither rollback mechanism (Vercel promote, `git revert` on `master`) covers a schema change. |
+| `web` dependency advisories | Open — 1 critical, 6 high | All resolve only through `next` 14→16 and `vitest` 2→4 (F-24/F-25). The `next` advisories include **SSRF and HTTP request smuggling in `rewrites()`** — the mechanism this app proxies *all* backend traffic through — and middleware-bypass/cache-poisoning against `middleware.ts`, its auth gate. Root is at 0 and is now a CI gate at `high`. |
+| Audit logging coverage | Open — 14 of 53 modules | The money paths `AGENTS.md` names are covered. Privileged mutations elsewhere are unattributable. Best fixed with a helper at the `requireRole`-guarded route layer so coverage follows authorization instead of being remembered per-module. |
+| Frontend CSP allows `'unsafe-inline'` scripts | Open | Required by the current Next App Router setup; nonce-based CSP is materially easier on Next 15+, so fold it into the 14→16 migration rather than doing it twice. |
+| GDPR erasure / export | Open | Tenant isolation, transit encryption and audit logging exist. No right-to-erasure, no data-portability export, no retention policy. Blocks EU enterprise sales. |
+| `artifacts/` — 1,005 tracked files | Open — NEEDS-SRI | Five complete projects on an incompatible stack (Vite/Radix/Drizzle/pnpm), 55% of tracked files, built and deployed by nothing. Direct cause of five root-manifest-hijack CI incidents in two days; `hygiene-check.mjs` check 8 guards the symptom, not the cause. Extraction needs sign-off — it is user work. |
+
+**Closed by the 2026-08-06 audit:** two CI guards that could never fail (F-1 SQL injection,
+fixed earlier in `c00a485`; **F-2 unguarded mutation routes**, replaced with
+`tools/route-authz-scan.mjs` — which found 4 genuine unguarded mutations the grep never
+could, one of them fixed in code). No SAST of any kind existed; CodeQL + dependency review
+now run per-PR and weekly. `/metrics` had no visibility into the pool, job queue or outbox.
+The container image declared no health probe. There was no `SECURITY.md`.
+
 ## Known open criticals (operational floor, outrank feature work)
 
 From `docs/architecture/CTO_CHARTER.md` / `PLATFORM_ROADMAP.md`, still true as of this pass:
