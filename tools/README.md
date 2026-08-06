@@ -124,12 +124,14 @@ worktree shares one object store, a clone diverges.
 
 ## PR protection on `master` — already on
 
-No session pushes to `master` directly. Branch protection requires the CI checks
-(`Production guard`, `Backend — typecheck + test`, `Frontend — typecheck + lint +
-build`) and is **admin-enforced** — there is no bypass, including for repo admins —
-and no workflow auto-merges anything, so a human clicks merge every time. The
-authoritative description of what is enforced, and the config registry behind it,
-live in `docs/architecture/PIPELINE.md`; don't restate them here.
+No session pushes to `master` directly. Branch protection requires the CI checks and is
+**admin-enforced** — there is no bypass, including for repo admins — and no workflow
+auto-merges anything, so a human clicks merge every time. The authoritative description
+of what is enforced, and the config registry behind it, live in
+`docs/architecture/PIPELINE.md`; the check names themselves are the `name:` fields in
+`.github/workflows/ci.yml`. Read them there rather than copying the list here — a copy
+made on 2026-08-05 was stale within a day, when the frontend job gained a `test` step
+and became `Frontend — typecheck + lint + test + build`.
 
 Every session therefore follows: branch off `develop` → PR into `develop` → green CI
 → Sri merges. See `AGENTS.md` "Git: where and how" and `tools/AGENT_PROMPT.md`.
