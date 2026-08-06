@@ -48,14 +48,20 @@ jobs:
       # WORK/audits/AUDIT_2026-08-03T110000Z-replit-pnpm-root-hijack-incident.md.
       - name: Root manifest integrity (package.json / lockfiles / tsconfig)
         run: node tools/hygiene-check.mjs
-      - name: No unguarded mutation routes (router.patch/delete without requireRole)
-        run: |
-          ! grep -rn --include="*routes.ts" -A1 "router\.\(patch\|delete\|put\)" src/ \
-            | grep -B1 "handler(" \
-            | grep -v "requireRole\|//\s*no auth" \
-            | grep "router\.\(patch\|delete\|put\)" \
-            | grep -v "test\|spec" \
-            || echo "All mutation routes have role guards ✓"
+      # This step used to be a grep pipeline. It never worked, for two
+      # independent reasons, and both are why it is a script now:
+      #   1. It could not fail — `! grep … || echo "…✓"` inverted a successful
+      #      match into non-zero and then swallowed it into exit 0. Reproduced
+      #      2026-08-06: it printed 39 matching lines AND the ✓, exit 0.
+      #   2. Even unlaundered it was wrong both ways — it excluded a line only
+      #      if the literal `requireRole` was on it, but 44 route files declare
+      #      `const mgr = requireRole("manager")` once and pass `mgr`, so every
+      #      guarded route read as a violation; and `-A1` meant middleware on a
+      #      later line read as guarded.
+      # tools/route-guard-scan.mjs parses the real argument list instead, and
+      # carries a documented, shrink-only allowlist. See its header.
+      - name: No unguarded mutation routes
+        run: npm run route:scan
       - name: No console.log/error in production source (modules + gateway)
         run: |
           # shellcheck disable=SC2126 # grep|wc -l keeps this symmetric with the identical pattern below (AGENTS.md count)
@@ -567,7 +573,7 @@ jobs:
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     environment:
       name: Production
-      url: https://ascendhq-app.vercel.app
+      url: ${{ vars.PROD_FRONTEND_URL || 'https://ascendhq-app.vercel.app' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -588,25 +594,39 @@ jobs:
     needs: [deploy-production]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    # Probe targets come from the SAME repo variables uptime.yml already uses,
+    # with the same historical fallbacks. Before this, the release smoke test
+    # hardcoded `ascendhq-api.vercel.app` — which has returned
+    # DEPLOYMENT_NOT_FOUND since 2026-07-23 (docs/architecture/DEPLOYMENTS.md).
+    # That left the two production probes in this repo disagreeing about where
+    # production is: setting PROD_BACKEND_URL fixed the heartbeat and did
+    # nothing for the release gate. One variable, both probes.
+    env:
+      BACKEND: ${{ vars.PROD_BACKEND_URL || 'https://ascendhq-api.vercel.app' }}
+      FRONTEND: ${{ vars.PROD_FRONTEND_URL || 'https://ascendhq-app.vercel.app' }}
     steps:
+      - name: Show probe targets
+        run: |
+          echo "backend:  $BACKEND"
+          echo "frontend: $FRONTEND"
       - name: Wait for Vercel propagation
         run: sleep 15
       - name: Health check — backend liveness
         run: |
           curl -f --retry 3 --retry-delay 5 \
-            https://ascendhq-api.vercel.app/healthz \
-            || (echo "❌ /healthz failed" && exit 1)
+            "$BACKEND/healthz" \
+            || (echo "❌ /healthz failed against $BACKEND" && exit 1)
       - name: Health check — backend readiness
         run: |
           curl -f --retry 3 --retry-delay 5 \
-            https://ascendhq-api.vercel.app/readyz \
-            || (echo "❌ /readyz failed" && exit 1)
+            "$BACKEND/readyz" \
+            || (echo "❌ /readyz failed against $BACKEND" && exit 1)
       - name: Health check — feature flags auth boundary
         run: |
           http_status="$(curl -sS --retry 2 --retry-delay 5 \
             -o /tmp/flags-response.json \
             -w '%{http_code}' \
-            https://ascendhq-api.vercel.app/api/v1/flags)"
+            "$BACKEND/api/v1/flags")"
           if [ "$http_status" != "401" ]; then
             echo "❌ /api/v1/flags without auth returned $http_status, expected 401"
             cat /tmp/flags-response.json
@@ -615,5 +635,5 @@ jobs:
       - name: Health check — frontend
         run: |
           curl -f --retry 3 --retry-delay 5 \
-            https://ascendhq-app.vercel.app/ \
-            || (echo "❌ frontend failed" && exit 1)
+            "$FRONTEND/" \
+            || (echo "❌ frontend failed against $FRONTEND" && exit 1)

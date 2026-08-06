@@ -1,0 +1,125 @@
+{
+  "_readme": [
+    "Mutating routes (POST/PUT/PATCH/DELETE) that tools/route-guard-scan.mjs finds",
+    "with no authorization middleware between the path and the handler.",
+    "",
+    "Every entry states WHY, using one of three prefixes:",
+    "  open-by-design: — the route is meant to be callable by any authenticated",
+    "                    user (POS/floor operations, self-service) or by an",
+    "                    unauthenticated caller (public auth handshakes). Not debt.",
+    "  in-handler:     — authorization IS enforced, inside the handler, where a",
+    "                    middleware-position scanner cannot see it. Not debt, but",
+    "                    the non-standard shape is why the scanner has to be told.",
+    "  GAP:            — no authorization anywhere. Real debt. Each of these is a",
+    "                    finding in the 2026-08-06 infrastructure audit under",
+    "                    WORK/audits/ and must be closed by adding a guard, not by",
+    "                    reclassifying the entry.",
+    "",
+    "Shrink-only. Adding an entry to silence the scan without one of the three",
+    "justifications above is forbidden — that turns a security check back into the",
+    "decoration it was before 2026-08-06 (the shell step it replaced could not fail",
+    "and had never once evaluated this codebase).",
+    "",
+    "Keys are '<file>:<METHOD> <path>' so entries survive surrounding code moving.",
+    "A key that no longer matches an unguarded route fails the scan as STALE —",
+    "delete it when the route gains a guard."
+  ],
+  "routes": {
+    "src/identity/routes.ts:POST /register": "open-by-design: public signup. Brute force is controlled by the dedicated /api/identity/register limiter in app.ts (5 burst, ~3/min).",
+    "src/identity/routes.ts:POST /login": "open-by-design: public login. There is no token yet to authorize against. Per-IP limiter in app.ts.",
+    "src/identity/routes.ts:POST /login/mfa": "open-by-design: second leg of public login; carries only a short-lived MFA challenge token.",
+    "src/identity/routes.ts:POST /refresh": "open-by-design: authorizes on the httpOnly refresh cookie, not a Bearer role.",
+    "src/identity/routes.ts:POST /logout": "open-by-design: revoking your own session must work even with an expired access token.",
+    "src/identity/routes.ts:POST /devices": "in-handler: app.ts mounts makeAuthMiddleware on /api/identity/devices; the handler is self-scoped to res.locals.auth.userId.",
+    "src/identity/routes.ts:POST /mfa/setup": "in-handler: app.ts mounts makeAuthMiddleware on /api/identity/mfa; self-scoped to the calling user.",
+    "src/identity/routes.ts:POST /mfa/verify": "in-handler: same /api/identity/mfa auth mount; self-scoped.",
+    "src/identity/routes.ts:POST /mfa/disable": "in-handler: same /api/identity/mfa auth mount; self-scoped.",
+    "src/identity/routes.ts:POST /mfa/backup-codes/regenerate": "in-handler: same /api/identity/mfa auth mount; self-scoped.",
+    "src/identity/routes.ts:POST /forgot-password": "open-by-design: unauthenticated by definition; the response is uniform so it cannot enumerate accounts.",
+    "src/identity/routes.ts:POST /reset-password": "open-by-design: authorizes on the emailed single-use reset token, not a role.",
+
+    "src/modules/billing/routes.ts:POST /bills": "GAP: any cashier can create an AP bill. The sibling POST /bills/:id/pay IS mgr-guarded, so money movement is covered but document creation is not.",
+    "src/modules/billing/routes.ts:POST /invoices": "GAP: any cashier can raise an AR invoice against a customer.",
+
+    "src/modules/business/routes.ts:POST /me/switch-business-unit": "in-handler: service.setActiveBusinessUnit receives the caller's role and enforces which units that role may switch into.",
+
+    "src/modules/catalog/routes.ts:POST /import": "in-handler: rejects any role other than owner/manager. Non-standard shape — it throws badRequest (400) where the rest of the codebase returns 403.",
+    "src/modules/catalog/routes.ts:POST /import-csv": "in-handler: same owner/manager check, and the same 400-instead-of-403 shape as POST /import.",
+    "src/modules/catalog/routes.ts:POST /": "GAP: any cashier can create a product. Every sibling bulk path (/bulk-update, /bulk-price, /bulk-barcodes) is requireRole('manager'); single-product create is not.",
+    "src/modules/catalog/routes.ts:POST /:id/barcodes": "GAP: any cashier can attach a barcode — and therefore a pack-size/UOM conversion (ADR-006) — to a product.",
+    "src/modules/catalog/routes.ts:PUT /:id/categories": "GAP: any cashier can re-categorise a product, which moves it in reporting and in package/mode gating.",
+
+    "src/modules/customers/routes.ts:POST /": "open-by-design: creating a customer at the till is a routine cashier action.",
+    "src/modules/customers/routes.ts:POST /:id/addresses": "open-by-design: capturing a delivery address at the till is a routine cashier action.",
+    "src/modules/customers/routes.ts:PATCH /:id/addresses/:addressId": "GAP: correcting an address is plausibly cashier-level, but nothing says so — unlike the contact routes beside it, this carries no capability or role gate at all.",
+    "src/modules/customers/routes.ts:DELETE /:id/addresses/:addressId": "GAP: destructive and ungated — a cashier can delete any customer address in the tenant.",
+    "src/modules/customers/routes.ts:POST /:id/notes": "open-by-design: appending a customer note is a routine cashier action, and notes are append-only.",
+    "src/modules/customers/routes.ts:POST /:id/store-credit": "in-handler: positive deltas (issuing credit) are rejected for cashiers with 403; negative deltas (redeeming at checkout) are allowed.",
+
+    "src/modules/discounts/routes.ts:POST /:id/redeem": "open-by-design: applying an existing discount at the till is the cashier's job. Creating and editing discounts are mgr-guarded.",
+    "src/modules/discounts/routes.ts:POST /evaluate": "open-by-design: pure evaluation against the cart, no persistence.",
+
+    "src/modules/ecommerce/routes.ts:POST /checkout": "open-by-design: storefront checkout — a customer-facing surface gated as Preview (NEXT_PUBLIC_STORE_AUTH_ENABLED), not by staff role.",
+
+    "src/modules/giftcards/routes.ts:POST /:code/redeem": "open-by-design: redeeming a gift card at the till is the cashier's job. Issuing is mgr-guarded.",
+
+    "src/modules/inventory/pipeline-routes.ts:POST /pipeline/reorder-alerts/:id/create-po": "GAP: creates a real purchase order from a reorder alert with no role check, while purchasing's own PO routes are mgr-guarded. Inconsistent with the owning module.",
+    "src/modules/inventory/pipeline-routes.ts:POST /pipeline/receiving/:id/update": "GAP: mutates receiving progress with no role check.",
+    "src/modules/inventory/routes.ts:POST /deduct": "open-by-design: called automatically by TerminalInner after every cashier-completed sale, with the response deliberately swallowed. Gating it would silently stop stock decrementing rather than fail loudly — documented in the route's own comment.",
+    "src/modules/inventory/routes.ts:POST /counts/:id/lines": "open-by-design: recording counted quantities is floor-staff work; closing the count (which posts variances) is mgr-guarded.",
+
+    "src/modules/notifications/routes.ts:POST /mark-all-read": "open-by-design: read-state only, tenant-scoped, no business effect.",
+    "src/modules/notifications/routes.ts:PATCH /:id/read": "open-by-design: read-state only, tenant-scoped, no business effect.",
+
+    "src/modules/orders/routes.ts:POST /": "open-by-design: ringing up a sale is the cashier's primary action.",
+    "src/modules/orders/routes.ts:PUT /:id": "open-by-design: amending an in-progress order at the till. Refunds and voids are separately guarded.",
+    "src/modules/orders/routes.ts:POST /:id/email-receipt": "open-by-design: emailing the customer their own receipt at the till.",
+    "src/modules/orders/routes.ts:PATCH /:id/lines/:lineId/course": "open-by-design: restaurant coursing, a floor-staff action.",
+    "src/modules/orders/routes.ts:POST /:id/split": "open-by-design: splitting a bill is a floor-staff action.",
+
+    "src/modules/outlets/routes.ts:POST /": "GAP: creating an outlet is a setup action, not a till action — store_locations' equivalents are all mgr-guarded.",
+    "src/modules/outlets/routes.ts:POST /:outletId/registers": "GAP: registering a new till is a setup action with no role check.",
+    "src/modules/outlets/routes.ts:POST /registers/:registerId/status": "open-by-design: a cashier taking their own register online/offline.",
+    "src/modules/outlets/routes.ts:POST /registers/:registerId/open": "open-by-design: opening a register with a float is the start of a cashier's shift.",
+    "src/modules/outlets/routes.ts:POST /registers/:registerId/close": "open-by-design: closing and counting down a register ends a cashier's shift; the variance it records is auditable.",
+    "src/modules/outlets/routes.ts:POST /shifts/:shiftId/movements": "open-by-design: cash drops and pickups during a shift, recorded immutably.",
+
+    "src/modules/payments/routes.ts:POST /connection-token": "open-by-design: Stripe Terminal reader handshake, needed by every till.",
+    "src/modules/payments/routes.ts:POST /terminal/start": "open-by-design: starting a card-present payment is the cashier's job.",
+    "src/modules/payments/routes.ts:POST /terminal/cancel/:intentId": "open-by-design: cancelling an in-flight card prompt at the till.",
+    "src/modules/payments/routes.ts:POST /": "open-by-design: taking payment is the cashier's primary action. Refunds and voids are separately guarded.",
+
+    "src/modules/permission_requests/routes.ts:POST /": "open-by-design: self-service access request. Approve and revoke are guarded; asking is not.",
+
+    "src/modules/purchasing/routes.ts:POST /requisitions": "open-by-design: raising a requisition is deliberately open to any employee — approval is the control point, and the approval routes are guarded.",
+    "src/modules/purchasing/routes.ts:PATCH /requisitions/:id": "open-by-design: editing your own draft requisition before submission.",
+    "src/modules/purchasing/routes.ts:POST /requisitions/:id/submit": "open-by-design: submitting your own requisition into the approval chain.",
+
+    "src/modules/quotes/routes.ts:POST /": "open-by-design: quoting a customer at the counter is a cashier action.",
+    "src/modules/quotes/routes.ts:PATCH /:id/status": "GAP: a cashier can mark any quote accepted, rejected or expired. The module imports no guard at all.",
+    "src/modules/quotes/routes.ts:POST /:id/convert": "GAP: converting a quote creates a real order at quoted prices, with no role check.",
+    "src/modules/quotes/routes.ts:DELETE /:id": "GAP: destructive and ungated — a cashier can delete any quote in the tenant.",
+
+    "src/modules/restaurant/routes.ts:PATCH /tables/:id/status": "open-by-design: seating and clearing a table is floor-staff work.",
+    "src/modules/restaurant/routes.ts:POST /tables/:id/open-session": "open-by-design: seating a party is floor-staff work.",
+    "src/modules/restaurant/routes.ts:POST /sessions/:id/close": "open-by-design: closing a table session is floor-staff work.",
+    "src/modules/restaurant/routes.ts:POST /tabs": "open-by-design: opening a bar tab is floor-staff work.",
+    "src/modules/restaurant/routes.ts:POST /tabs/:id/add-round": "open-by-design: adding to a tab is floor-staff work.",
+    "src/modules/restaurant/routes.ts:POST /tabs/:id/close": "open-by-design: closing a tab settles through the guarded payment path.",
+    "src/modules/restaurant/routes.ts:PATCH /kitchen/:lineId/bump": "open-by-design: bumping a kitchen ticket is line-cook work.",
+
+    "src/modules/sales/routes.ts:POST /quotations": "open-by-design: B2B quoting at the counter, consistent with quotes POST /.",
+    "src/modules/sales/routes.ts:POST /sales-orders": "open-by-design: taking a sales order is a cashier/rep action; fulfilment transitions are guarded.",
+
+    "src/modules/sso/routes.ts:POST /initiate": "open-by-design: pre-login OIDC handshake, mounted publicly in app.ts precisely because no token exists yet. Rate-limited like /api/identity.",
+    "src/modules/sso/routes.ts:POST /callback": "open-by-design: OIDC redirect target. Authorizes on the IdP state/code, not a role.",
+
+    "src/modules/team/routes.ts:POST /": "in-handler: requireManagement(res) throws before any service call.",
+    "src/modules/team/routes.ts:POST /:id/clock-in": "open-by-design: self-or-management rule enforced in the service; an employee clocking themselves in is the normal case.",
+    "src/modules/team/routes.ts:POST /:id/clock-out": "open-by-design: same self-or-management rule as clock-in.",
+
+    "src/modules/workforce/routes.ts:POST /time-off": "open-by-design: requesting your own time off. Approval (PATCH /time-off/:id) is mgr-guarded.",
+    "src/modules/workforce/routes.ts:POST /clock-in": "open-by-design: an employee clocking themselves in.",
+    "src/modules/workforce/routes.ts:POST /clock-out/:entryId": "open-by-design: an employee clocking themselves out."
+  }
+}
