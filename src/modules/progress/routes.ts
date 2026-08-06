@@ -61,6 +61,18 @@ const createDecisionSchema = z.object({
   nextAction: z.string().max(1000).nullable().optional(),
 });
 
+/** `?limit=` — bad input falls back to the service default rather than 400ing a
+ *  read. `clampLimit` caps the ceiling; this only has to reject non-numbers. */
+function queryLimit(req: Request): number | undefined {
+  const raw = typeof req.query["limit"] === "string" ? Number(req.query["limit"]) : NaN;
+  return Number.isFinite(raw) && raw > 0 ? raw : undefined;
+}
+
+function queryString(req: Request, key: string): string | undefined {
+  const raw = req.query[key];
+  return typeof raw === "string" && raw.trim() ? raw.trim() : undefined;
+}
+
 export function registerRoutes(router: Router, service: ProgressService): void {
   const mgr = requireRole("manager");
 
@@ -68,13 +80,33 @@ export function registerRoutes(router: Router, service: ProgressService): void {
     res.json(await service.summary(tenantId(res)));
   }));
 
-  router.get("/hypotheses", handler(async (_req, res) => {
-    res.json(await service.listHypotheses(tenantId(res)));
+  router.get("/hypotheses", handler(async (req: Request, res) => {
+    res.json(await service.listHypotheses(tenantId(res), queryLimit(req)));
   }));
 
   router.post("/hypotheses", mgr, handler(async (req, res) => {
     const body = parseBody(createHypothesisSchema, req.body);
     res.status(201).json(await service.createHypothesis(body, tenantId(res), actorId(res)));
+  }));
+
+  // The whole loop for one hypothesis — hypothesis + its tasks, evidence, and
+  // decisions — so the UI renders a complete loop or none of it, never a
+  // half-stitched one. Read-only: visible to any authenticated tenant user.
+  router.get("/hypotheses/:id", handler(async (req, res) => {
+    res.json(await service.getHypothesisDetail(String(req.params.id), tenantId(res)));
+  }));
+
+  router.get("/hypotheses/:id/decisions", handler(async (req: Request, res) => {
+    res.json(await service.listDecisions(tenantId(res), String(req.params.id), queryLimit(req)));
+  }));
+
+  // Evidence is filtered, never listed tenant-wide — see service.listEvidence.
+  router.get("/evidence", handler(async (req: Request, res) => {
+    res.json(await service.listEvidence(
+      tenantId(res),
+      { taskId: queryString(req, "taskId"), hypothesisId: queryString(req, "hypothesisId") },
+      queryLimit(req),
+    ));
   }));
 
   router.post("/hypotheses/:id/decisions", mgr, handler(async (req, res) => {
@@ -88,9 +120,14 @@ export function registerRoutes(router: Router, service: ProgressService): void {
   }));
 
   router.get("/tasks", handler(async (req: Request, res) => {
-    const raw = typeof req.query.status === "string" ? req.query.status : undefined;
+    const raw = queryString(req, "status");
     const parsed = raw ? statusSchema.parse(raw) as ProgressStatus : undefined;
-    res.json(await service.listTasks(tenantId(res), parsed));
+    res.json(await service.listTasks(
+      tenantId(res),
+      parsed,
+      { hypothesisId: queryString(req, "hypothesisId") },
+      queryLimit(req),
+    ));
   }));
 
   router.post("/tasks", mgr, handler(async (req, res) => {

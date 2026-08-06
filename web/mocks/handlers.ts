@@ -1276,9 +1276,34 @@ export const handlers = [
       "not_started", "planned", "in_progress", "self_reported_done", "evidence_attached",
       "system_verified", "validated", "invalidated", "blocked", "skipped",
     ];
+    interface MockProgressHypothesis {
+      id: string; tenant_id: string; statement: string; category: string; status: string;
+      confidence_score: number; success_criteria: string | null;
+      created_by: string; created_at: number; updated_at: number;
+    }
+    interface MockProgressEvidence {
+      id: string; tenant_id: string; task_id: string | null; hypothesis_id: string | null;
+      evidence_type: string; title: string; url: string | null; notes: string | null;
+      source: string; created_by: string; created_at: number;
+    }
+    interface MockProgressDecision {
+      id: string; tenant_id: string; hypothesis_id: string; decision: string;
+      reason: string | null; next_action: string | null; created_by: string; created_at: number;
+    }
     const now = Date.now();
     let seq = 0;
     let evidenceCount = 1;
+    const hypotheses: MockProgressHypothesis[] = [
+      {
+        id: "hyp_seed_1", tenant_id: "tnt_demo",
+        statement: "Our best sellers run out before the next delivery arrives.",
+        category: "inventory_health", status: "planned", confidence_score: 0,
+        success_criteria: "Two restock cycles with no stockouts on the top 10 SKUs.",
+        created_by: "usr_demo_owner", created_at: now, updated_at: now,
+      },
+    ];
+    const evidence: MockProgressEvidence[] = [];
+    const decisions: MockProgressDecision[] = [];
     const task = (over: Partial<MockProgressTask>): MockProgressTask => ({
       id: `tsk_seed_${++seq}`, tenant_id: "tnt_demo", hypothesis_id: null, title: "Task",
       description: null, category: "retail_readiness", status: "planned",
@@ -1293,24 +1318,147 @@ export const handlers = [
     ];
 
     const emptyCounts = (): Record<string, number> => Object.fromEntries(ALL_STATUSES.map((s) => [s, 0]));
+    const badRequest = (message: string) =>
+      HttpResponse.json({ error: { code: "bad_request", message } }, { status: 400 });
+    const notFound = () => HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+
+    /** Evidence counts toward a hypothesis directly OR through one of its tasks.
+     *  Same union the backend's EVIDENCE_FOR_HYPOTHESIS uses — the mock must not
+     *  be looser than the real gate, or the UI passes here and 400s in prod. */
+    const evidenceForHypothesis = (hypothesisId: string): MockProgressEvidence[] => {
+      const taskIds = new Set(tasks.filter((t) => t.hypothesis_id === hypothesisId).map((t) => t.id));
+      return evidence.filter(
+        (e) => e.hypothesis_id === hypothesisId || (e.task_id !== null && taskIds.has(e.task_id)),
+      );
+    };
+    const byNewest = <T extends { created_at: number }>(items: T[]): T[] =>
+      [...items].sort((a, b) => b.created_at - a.created_at);
 
     return [
       http.get(`${V1}/progress/summary`, async () => {
         await latency();
         const taskCounts = emptyCounts();
         for (const t of tasks) taskCounts[t.status] = (taskCounts[t.status] ?? 0) + 1;
+        const hypothesisCounts = emptyCounts();
+        for (const h of hypotheses) hypothesisCounts[h.status] = (hypothesisCounts[h.status] ?? 0) + 1;
         return HttpResponse.json({
-          hypotheses: emptyCounts(),
+          hypotheses: hypothesisCounts,
           tasks: taskCounts,
           evidenceCount,
-          decisionsCount: 0,
+          decisionsCount: decisions.length,
         });
+      }),
+      http.get(`${V1}/progress/hypotheses`, async () => {
+        await latency();
+        return HttpResponse.json({ items: byNewest(hypotheses), limit: 50 });
+      }),
+      http.post(`${V1}/progress/hypotheses`, async ({ request }) => {
+        await latency();
+        const body = (await request.json()) as {
+          statement?: string; category?: string; confidenceScore?: number; successCriteria?: string | null;
+        };
+        const statement = body.statement?.trim() ?? "";
+        if (statement.length < 3) return badRequest("statement must be at least 3 characters");
+        const ts = Date.now();
+        const created: MockProgressHypothesis = {
+          id: `hyp_mock_${++seq}`, tenant_id: "tnt_demo", statement,
+          category: body.category?.trim() || "business_validation", status: "planned",
+          confidence_score: body.confidenceScore ?? 0,
+          success_criteria: body.successCriteria?.trim() || null,
+          created_by: "usr_demo_owner", created_at: ts, updated_at: ts,
+        };
+        hypotheses.push(created);
+        return HttpResponse.json(created, { status: 201 });
+      }),
+      http.get(`${V1}/progress/hypotheses/:id`, async ({ params }) => {
+        await latency();
+        const id = String(params["id"]);
+        const hypothesis = hypotheses.find((h) => h.id === id);
+        if (!hypothesis) return notFound();
+        return HttpResponse.json({
+          hypothesis,
+          tasks: byNewest(tasks.filter((t) => t.hypothesis_id === id)),
+          evidence: byNewest(evidenceForHypothesis(id)),
+          decisions: byNewest(decisions.filter((d) => d.hypothesis_id === id)),
+        });
+      }),
+      http.get(`${V1}/progress/hypotheses/:id/decisions`, async ({ params }) => {
+        await latency();
+        const id = String(params["id"]);
+        return HttpResponse.json({ items: byNewest(decisions.filter((d) => d.hypothesis_id === id)), limit: 50 });
+      }),
+      http.post(`${V1}/progress/hypotheses/:id/decisions`, async ({ request, params }) => {
+        await latency();
+        const id = String(params["id"]);
+        const hypothesis = hypotheses.find((h) => h.id === id);
+        if (!hypothesis) return notFound();
+        const body = (await request.json()) as { decision?: string; reason?: string | null; nextAction?: string | null };
+        if (body.decision !== "validated" && body.decision !== "invalidated") {
+          return badRequest("decision must be 'validated' or 'invalidated'");
+        }
+        if (evidenceForHypothesis(id).length === 0) {
+          return badRequest("a hypothesis needs attached evidence before it can be validated or invalidated");
+        }
+        const ts = Date.now();
+        const created: MockProgressDecision = {
+          id: `dec_mock_${++seq}`, tenant_id: "tnt_demo", hypothesis_id: id, decision: body.decision,
+          reason: body.reason?.trim() || null, next_action: body.nextAction?.trim() || null,
+          created_by: "usr_demo_owner", created_at: ts,
+        };
+        decisions.push(created);
+        hypothesis.status = body.decision;
+        if (body.decision === "validated") hypothesis.confidence_score = 100;
+        hypothesis.updated_at = ts;
+        return HttpResponse.json(created, { status: 201 });
+      }),
+      http.get(`${V1}/progress/evidence`, async ({ request }) => {
+        await latency();
+        const q = new URL(request.url).searchParams;
+        const taskId = q.get("taskId");
+        const hypothesisId = q.get("hypothesisId");
+        if (taskId) {
+          return HttpResponse.json({ items: byNewest(evidence.filter((e) => e.task_id === taskId)), limit: 50 });
+        }
+        if (hypothesisId) {
+          return HttpResponse.json({ items: byNewest(evidenceForHypothesis(hypothesisId)), limit: 50 });
+        }
+        return badRequest("taskId or hypothesisId is required");
+      }),
+      http.post(`${V1}/progress/evidence`, async ({ request }) => {
+        await latency();
+        const body = (await request.json()) as {
+          taskId?: string | null; hypothesisId?: string | null; title?: string;
+          url?: string | null; notes?: string | null; source?: string; evidenceType?: string;
+        };
+        if (!body.taskId && !body.hypothesisId) return badRequest("evidence must link to a task or hypothesis");
+        if (body.hypothesisId && !hypotheses.some((h) => h.id === body.hypothesisId)) return notFound();
+        if (body.taskId && !tasks.some((t) => t.id === body.taskId)) return notFound();
+        const ts = Date.now();
+        evidenceCount += 1;
+        const created: MockProgressEvidence = {
+          id: `evd_mock_${evidenceCount}`, tenant_id: "tnt_demo",
+          task_id: body.taskId ?? null, hypothesis_id: body.hypothesisId ?? null,
+          evidence_type: body.evidenceType?.trim() || "note", title: body.title?.trim() || "Evidence",
+          url: body.url?.trim() || null, notes: body.notes?.trim() || null,
+          source: body.source?.trim() || "manual", created_by: "usr_demo_owner", created_at: ts,
+        };
+        evidence.push(created);
+        const hypothesis = hypotheses.find((h) => h.id === body.hypothesisId);
+        if (hypothesis && hypothesis.status !== "validated" && hypothesis.status !== "invalidated") {
+          hypothesis.status = "evidence_attached";
+          hypothesis.updated_at = ts;
+        }
+        return HttpResponse.json(created, { status: 201 });
       }),
       http.get(`${V1}/progress/tasks`, async ({ request }) => {
         await latency();
-        const status = new URL(request.url).searchParams.get("status");
-        const items = status ? tasks.filter((t) => t.status === status) : tasks;
-        return HttpResponse.json({ items: [...items].sort((a, b) => b.created_at - a.created_at) });
+        const q = new URL(request.url).searchParams;
+        const status = q.get("status");
+        const hypothesisId = q.get("hypothesisId");
+        let items = tasks;
+        if (status) items = items.filter((t) => t.status === status);
+        if (hypothesisId) items = items.filter((t) => t.hypothesis_id === hypothesisId);
+        return HttpResponse.json({ items: byNewest(items), limit: 50 });
       }),
       http.post(`${V1}/progress/tasks`, async ({ request }) => {
         await latency();
@@ -1359,12 +1507,17 @@ export const handlers = [
         t.status = "evidence_attached";
         t.completed_at = t.completed_at ?? ts;
         t.updated_at = ts;
-        return HttpResponse.json({
+        const created: MockProgressEvidence = {
           id: `evd_mock_${evidenceCount}`, tenant_id: "tnt_demo", task_id: t.id, hypothesis_id: null,
           evidence_type: body.evidenceType?.trim() || "note", title: body.title?.trim() || "Evidence",
           url: body.url?.trim() || null, notes: body.notes?.trim() || null, source: body.source?.trim() || "manual",
           created_by: "usr_demo_owner", created_at: ts,
-        }, { status: 201 });
+        };
+        // Recorded in the shared store, not just returned: evidence attached to
+        // a task must also show up on that task's hypothesis, exactly as it does
+        // against the real backend.
+        evidence.push(created);
+        return HttpResponse.json(created, { status: 201 });
       }),
       http.post(`${V1}/progress/tasks/:id/system-verify`, async ({ params }) => {
         await latency();
@@ -1375,6 +1528,14 @@ export const handlers = [
         }
         const ts = Date.now();
         evidenceCount += 1;
+        // The real service records a `source: "system"` evidence row as part of
+        // verifying — mirror it so the hypothesis view shows the same proof.
+        evidence.push({
+          id: `evd_mock_${evidenceCount}`, tenant_id: "tnt_demo", task_id: t.id, hypothesis_id: null,
+          evidence_type: "system_verification", title: `Verified by ${t.verification_source}`,
+          url: null, notes: "Ascend verified this from tenant-scoped operating data.",
+          source: "system", created_by: "usr_demo_owner", created_at: ts,
+        });
         t.status = "system_verified";
         t.completed_at = ts;
         t.updated_at = ts;

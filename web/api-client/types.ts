@@ -1955,3 +1955,69 @@ export interface AttachEvidenceInput {
   notes?: string | null;
   source?: string;
 }
+
+/** A belief about the business, stated so it can be proven or disproven. */
+export interface ProgressHypothesis {
+  id: string;
+  tenant_id: string;
+  statement: string;
+  category: string;
+  status: ProgressStatus;
+  confidence_score: number;
+  success_criteria: string | null;
+  created_by: string;
+  created_at: number;
+  updated_at: number;
+}
+
+/**
+ * The closing move on a hypothesis. Append-only: recording a decision never
+ * edits or replaces an earlier one, so the reasoning trail stays intact.
+ */
+export interface ProgressDecision {
+  id: string;
+  tenant_id: string;
+  hypothesis_id: string;
+  decision: "validated" | "invalidated";
+  reason: string | null;
+  next_action: string | null;
+  created_by: string;
+  created_at: number;
+}
+
+/** `GET /progress/hypotheses/:id` — the whole loop in one response. */
+export interface ProgressHypothesisDetail {
+  hypothesis: ProgressHypothesis;
+  tasks: ProgressTask[];
+  evidence: ProgressEvidence[];
+  decisions: ProgressDecision[];
+}
+
+/** List envelopes. `limit` is the bound the backend actually applied. */
+export interface ProgressHypothesesResponse {
+  items: ProgressHypothesis[];
+  limit: number;
+}
+
+export interface ProgressEvidenceResponse {
+  items: ProgressEvidence[];
+  limit: number;
+}
+
+export interface ProgressDecisionsResponse {
+  items: ProgressDecision[];
+  limit: number;
+}
+
+export interface CreateHypothesisInput {
+  statement: string;
+  category?: string;
+  confidenceScore?: number;
+  successCriteria?: string | null;
+}
+
+export interface RecordDecisionInput {
+  decision: "validated" | "invalidated";
+  reason?: string | null;
+  nextAction?: string | null;
+}
