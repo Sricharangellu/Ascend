@@ -153,6 +153,7 @@ no single owner says so rather than being assigned a plausible one.
 | Document numbering | `src/shared/docnumber.ts` | Race-free `document_counters` |
 | Keyset pagination | `src/shared/pagination.ts` | |
 | Sales velocity / demand rate | `src/shared/sales-velocity.ts`, `src/shared/demand-rate.ts` | Consolidated 2026-07-28 from 5 divergent call sites — the precedent this table exists to prevent repeating |
+| Progress intelligence (hypothesis → evidence → decision) | `src/modules/progress/service.ts` — `ProgressService` | Owns all four `progress_*` tables. `EVIDENCE_FOR_HYPOTHESIS` is the single predicate for "what counts as evidence" — the decision gate and every evidence read share it, so they cannot disagree. Statuses `evidence_attached` / `system_verified` / `validated` / `invalidated` are earned through their own endpoints, never settable via `PATCH /tasks/:id/status`. Frontend display vocabulary: `web/lib/progress.ts` |
 | **Tax** | **CONTESTED — no single owner** | See below. |
 | **Pricing (price selection)** | **NO OWNER — does not exist** | There is no `src/modules/pricing`. `/api/v1/pricing` is an allowlisted UI-only Preview prefix. Catalog owns price *storage*; nothing owns price *derivation* (rules, tiers, promos). Do not cite a "PricingEngine" — it is not there. |
 

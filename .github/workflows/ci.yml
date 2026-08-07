@@ -3,7 +3,7 @@ name: CI
 # ─── Trigger rules (3-tier promotion pipeline) ────────────────────────────────
 # develop → full CI + deploy to DEV      (Vercel preview, own dedicated Supabase)
 # staging → full CI + deploy to TESTING  (Vercel preview alias, TESTING Supabase)
-# master  → full CI + deploy to PROD      (Vercel --prod, PROD Supabase, ascendhq-app.vercel.app)
+# master  → full CI + deploy to PROD      (Vercel --prod, PROD Supabase, ascendhqweb.vercel.app)
 # PRs     → full CI, no deploy
 # feature → no CI (local dev + pre-push hook); PR into develop to run CI
 # Promotion is forward-only: feature/* → develop → staging → master.
@@ -573,7 +573,7 @@ jobs:
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     environment:
       name: Production
-      url: ${{ vars.PROD_FRONTEND_URL || 'https://ascendhq-app.vercel.app' }}
+      url: ${{ vars.PROD_FRONTEND_URL || 'https://ascendhqweb.vercel.app' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -594,16 +594,23 @@ jobs:
     needs: [deploy-production]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-    # Probe targets come from the SAME repo variables uptime.yml already uses,
-    # with the same historical fallbacks. Before this, the release smoke test
-    # hardcoded `ascendhq-api.vercel.app` — which has returned
-    # DEPLOYMENT_NOT_FOUND since 2026-07-23 (docs/architecture/DEPLOYMENTS.md).
-    # That left the two production probes in this repo disagreeing about where
-    # production is: setting PROD_BACKEND_URL fixed the heartbeat and did
-    # nothing for the release gate. One variable, both probes.
+    # Probe targets come from the SAME repo variables uptime.yml already uses.
+    # Before this, the release smoke test hardcoded its hostnames, which left the
+    # two production probes in this repo able to disagree about where production
+    # is: setting PROD_BACKEND_URL fixed the heartbeat and did nothing for the
+    # release gate. One variable, both probes (ADR-009).
+    #
+    # Fallbacks are deliberately asymmetric, because the two halves are:
+    #   FRONTEND — `ascendhqweb.vercel.app`, CONFIRMED live by Sri 2026-08-07
+    #              (Vercel project `ascend_hq_web`, PR #201). A working default.
+    #   BACKEND  — `ascendhq-api.vercel.app`, known DEAD (DEPLOYMENT_NOT_FOUND
+    #              since 2026-07-23). Kept only so this file changes no behaviour
+    #              on its own; the real prod backend host is still the open P0 in
+    #              docs/architecture/DEPLOYMENTS.md. Setting PROD_BACKEND_URL is
+    #              what fixes both this gate and the heartbeat, in one edit.
     env:
       BACKEND: ${{ vars.PROD_BACKEND_URL || 'https://ascendhq-api.vercel.app' }}
-      FRONTEND: ${{ vars.PROD_FRONTEND_URL || 'https://ascendhq-app.vercel.app' }}
+      FRONTEND: ${{ vars.PROD_FRONTEND_URL || 'https://ascendhqweb.vercel.app' }}
     steps:
       - name: Show probe targets
         run: |

@@ -85,9 +85,16 @@ supersession.
 - Repointing production is a two-variable edit, applying to both probes at once.
   They cannot drift apart, because there is one value.
 - The fallback defaults are now the only hostnames left in the workflows, and
-  they are all known-dead. That is deliberate: they preserve exact current
-  behaviour, and their staleness is documented at each use so nobody mistakes a
-  fallback for a fact.
+  each one is annotated at its use site with whether it is live or dead, so
+  nobody mistakes a fallback for a fact. **Updated 2026-08-07:** when this ADR
+  was written both fallbacks were dead. PR #201 then confirmed the production
+  frontend with Sri — `ascendhqweb.vercel.app`, Vercel project `ascend_hq_web` —
+  so the frontend fallback is now a *working* default and only the backend one
+  (`ascendhq-api.vercel.app`, `DEPLOYMENT_NOT_FOUND` since 2026-07-23) is still
+  dead. That asymmetry is the point rather than a wart: this ADR's indirection is
+  what let a confirmed hostname land as a one-line default without touching the
+  probe logic, and it is what will let the backend do the same the moment
+  `DEPLOYMENTS.md` P1 is answered.
 - Anyone reading `ci.yml` can no longer learn the production URL from it. That
   is a real loss of local readability, accepted because the thing it previously
   told you was wrong.

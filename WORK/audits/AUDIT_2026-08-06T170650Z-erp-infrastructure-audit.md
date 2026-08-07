@@ -918,6 +918,13 @@ multiples of the entire monthly bill in unspent ops time.
    public, is it running, which branch, which database. **R2.**
 3. Set `PROD_BACKEND_URL` / `PROD_FRONTEND_URL` to the confirmed origins. Both
    the heartbeat and the release smoke test read them after this change. **R4.**
+   **Half-resolved 2026-08-07 by PR #201, which landed while this PR was open:**
+   Sri confirmed the production frontend is `ascendhqweb.vercel.app` (Vercel
+   project `ascend_hq_web`), and it is now the fallback in both probes — so the
+   frontend half needs no variable at all. **The backend half is unchanged and
+   still the blocker:** `ascendhq-api.vercel.app` remains
+   `DEPLOYMENT_NOT_FOUND`, so the heartbeat stays red on its backend probe until
+   item 2 is answered and `PROD_BACKEND_URL` is set.
 4. Merge this audit's CI fixes so the route guard actually runs. **Done — §12.6.**
 5. `gh repo edit --default-branch develop` — a one-line setting that has already
    caused one process violation.
