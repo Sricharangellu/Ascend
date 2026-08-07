@@ -134,3 +134,107 @@ jobs:
           # merged-state gate would then reject.
           fail-on-severity: high
           comment-summary-in-pr: on-failure
+
+  # ── Added by the ERP infrastructure audit (PR #197) ────────────────────────
+  # These three are complementary to the two above, not alternatives: CodeQL and
+  # dependency-review look at code and at *new* dependency edges; these look for
+  # committed credentials, the advisory state of what is already installed, and
+  # what is in the build at all. Two parallel audits (PR #198 and PR #197) landed
+  # on the same week and each found a different half of the gap — the union is
+  # what neither had alone. Gating policy for each is ADR-010.
+
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: a credential deleted in a later commit is still
+          # published — removing the line does not unpublish the secret. The
+          # scheduled run is the one that benefits most from this.
+          fetch-depth: 0
+      # Pinned to an immutable release tag and checksum-free-but-versioned,
+      # matching how ci.yml pins actionlint. Do NOT switch to a `latest` URL:
+      # piping an unpinned release into a privileged runner is the supply-chain
+      # risk this repo already decided against once.
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          GITLEAKS_VERSION=8.28.0
+          curl -fsSL -o /tmp/gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          /tmp/gitleaks version
+      - name: Scan working tree
+        run: /tmp/gitleaks dir . -c .gitleaks.toml --no-banner --redact --exit-code 1
+      - name: Scan git history
+        # Report-only for history specifically: a hit here means a credential
+        # was published at some point, which needs rotation and a decision, not
+        # a red build on an unrelated PR. The working-tree scan above is the
+        # gate. Promote this to --exit-code 1 once history has been reviewed once.
+        run: /tmp/gitleaks git . -c .gitleaks.toml --no-banner --redact --exit-code 0
+
+  dependency-scan:
+    name: Dependency vulnerabilities (report-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # `--omit=dev` is deliberately NOT used: the one critical advisory is
+      # vitest, a devDependency. Dev-only advisories still execute on this
+      # runner and on contributors' machines.
+      #
+      # Promotion: replace `|| true` with `--audit-level=high` once F-24/F-25
+      # (the next and vitest major migrations) have landed and the count is
+      # near zero. Do it for root and web independently — root is already at 2
+      # low and could gate today.
+      - name: npm audit — root
+        run: |
+          npm ci --no-audit --no-fund
+          npm audit --audit-level=low || true
+      - name: npm audit — web
+        run: |
+          npm ci --no-audit --no-fund --prefix web
+          npm audit --audit-level=low --prefix web || true
+
+  sbom:
+    name: SBOM (CycloneDX)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # `npm sbom` is built into npm 10+, so this needs no third-party tool and
+      # no registry fetch beyond the install that already happens. A CycloneDX
+      # SBOM is the artifact enterprise customers and SOC 2 auditors ask for by
+      # name; before this, the only answer to "what is in your build" was
+      # "read package-lock.json".
+      - name: Generate SBOMs
+        run: |
+          set -euo pipefail
+          mkdir -p sbom
+          npm ci --no-audit --no-fund
+          npm sbom --sbom-format=cyclonedx > sbom/backend-sbom.cdx.json
+          npm ci --no-audit --no-fund --prefix web
+          npm sbom --sbom-format=cyclonedx --prefix web > sbom/web-sbom.cdx.json
+          wc -c sbom/*.json
+      # Report-only: the point of the first run is to produce the inventory, not
+      # to adjudicate it. Promote to a failing gate once the licence policy has
+      # been agreed (which families are acceptable is a business decision, not
+      # an engineering default).
+      - name: Licence inventory (report-only)
+        run: node tools/license-scan.mjs sbom/backend-sbom.cdx.json sbom/web-sbom.cdx.json || true
+      - name: Upload SBOMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.run_id }}
+          path: sbom/
+          retention-days: 90

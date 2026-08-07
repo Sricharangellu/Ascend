@@ -86,8 +86,17 @@ the failure output:
 - **Money.** Integer cents everywhere; ledger and price-history tables are
   append-only. A path that mutates a posted financial record is a finding.
 - **Secrets.** Never committed. `tools/hygiene-check.mjs` fails the build on a
-  tracked `.env` or an embedded credential; the logger redacts `authorization`,
-  `cookie`, `password`, `token`, `secret` and `apiKey` paths at every level.
+  tracked `.env` or an embedded credential; a gitleaks scan of the working tree
+  (`.github/workflows/security.yml`, config in `.gitleaks.toml`) **gates** every
+  push and PR, and a second pass sweeps full git history; the logger redacts
+  `authorization`, `cookie`, `password`, `token`, `secret` and `apiKey` paths at
+  every level. A credential that reaches a commit is a finding even if it was
+  removed in a later commit — deleting the line does not unpublish it, so the
+  correct response is rotation.
+- **Supply chain.** A CycloneDX SBOM is produced for both packages on every run
+  and retained as a build artifact, and a licence inventory classifies every
+  component (`tools/license-scan.mjs`). Ask for the SBOM if you need to check
+  whether a given advisory applies.
 - **Transport.** Postgres TLS certificates are verified by default;
   `PG_SSL_NO_VERIFY` is an explicit escape hatch that logs a warning on every
   boot. Treat a deployment that sets it as a misconfiguration worth reporting.
@@ -110,6 +119,19 @@ tracked. Full reasoning and remediation plans live in
 - **No production database backup has ever run.** The mechanism is drilled and
   works; the `PROD_DATABASE_URL` secret is unset, so scheduled runs take no
   backup. This is an availability/recovery risk, not a confidentiality one.
+- **The container image is never scanned.** CI builds the `Dockerfile` as a
+  sanity check but runs no image vulnerability scan (Trivy or equivalent), so
+  advisories in the base image or in installed OS packages are unmonitored.
+- **No secrets manager.** Credentials live in GitHub Actions secrets and in the
+  host's environment variables; there is no central rotation, expiry or access
+  audit. The sharpest edge is that per-tenant OIDC client secrets are stored in
+  the application database (`settings_kv`) rather than a vault — a deliberate
+  architectural choice, recorded in `docs/architecture/ARCHITECTURE.md`, but one
+  worth knowing before assessing the blast radius of a database compromise.
+- **No penetration test has been performed**, and there is no compliance
+  attestation. Card data never touches this database — Stripe handles it end to
+  end, which holds PCI scope at SAQ-A — but that is a scope argument, not an
+  audit result.
 
 ## Supported versions
 

@@ -132,6 +132,24 @@ framework conventions before touching anything.
 Next.js App Router files (`page`/`layout`/`route`/…), `middleware.ts` and
 `src/server.ts` are excluded — the framework calls them, so nothing imports them.
 
+## `license-scan.mjs` — licence inventory over a CycloneDX SBOM (report-only)
+
+```bash
+npm sbom --sbom-format=cyclonedx > sbom.cdx.json
+node tools/license-scan.mjs sbom.cdx.json
+node tools/license-scan.mjs --fail-on copyleft,unknown sbom.cdx.json
+```
+
+Classifies every component into permissive / weak-copyleft / copyleft / other /
+unknown. Run against the real tree 2026-08-06: **858 unique components, 851
+permissive, 2 weak-copyleft (MPL-2.0), 0 copyleft, 2 with no declared licence.**
+
+It deliberately encodes **no policy** — which licence families are acceptable is
+a business decision, so it exits 0 unless `--fail-on` says otherwise. `unknown`
+is not benign: an undeclared licence is legally "all rights reserved" until
+proven otherwise. Runs in `.github/workflows/security.yml` alongside SBOM
+generation.
+
 ## `new-worktree.sh` — one isolated checkout per session
 
 ```bash

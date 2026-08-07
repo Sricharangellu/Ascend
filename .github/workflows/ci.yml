@@ -641,7 +641,7 @@ jobs:
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     environment:
       name: Production
-      url: https://ascendhqweb.vercel.app
+      url: ${{ vars.PROD_FRONTEND_URL || 'https://ascendhqweb.vercel.app' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -662,25 +662,46 @@ jobs:
     needs: [deploy-production]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    # Probe targets come from the SAME repo variables uptime.yml already uses.
+    # Before this, the release smoke test hardcoded its hostnames, which left the
+    # two production probes in this repo able to disagree about where production
+    # is: setting PROD_BACKEND_URL fixed the heartbeat and did nothing for the
+    # release gate. One variable, both probes (ADR-009).
+    #
+    # Fallbacks are deliberately asymmetric, because the two halves are:
+    #   FRONTEND — `ascendhqweb.vercel.app`, CONFIRMED live by Sri 2026-08-07
+    #              (Vercel project `ascend_hq_web`, PR #201). A working default.
+    #   BACKEND  — `ascendhq-api.vercel.app`, known DEAD (DEPLOYMENT_NOT_FOUND
+    #              since 2026-07-23). Kept only so this file changes no behaviour
+    #              on its own; the real prod backend host is still the open P0 in
+    #              docs/architecture/DEPLOYMENTS.md. Setting PROD_BACKEND_URL is
+    #              what fixes both this gate and the heartbeat, in one edit.
+    env:
+      BACKEND: ${{ vars.PROD_BACKEND_URL || 'https://ascendhq-api.vercel.app' }}
+      FRONTEND: ${{ vars.PROD_FRONTEND_URL || 'https://ascendhqweb.vercel.app' }}
     steps:
+      - name: Show probe targets
+        run: |
+          echo "backend:  $BACKEND"
+          echo "frontend: $FRONTEND"
       - name: Wait for Vercel propagation
         run: sleep 15
       - name: Health check — backend liveness
         run: |
           curl -f --retry 3 --retry-delay 5 \
-            https://ascendhq-api.vercel.app/healthz \
-            || (echo "❌ /healthz failed" && exit 1)
+            "$BACKEND/healthz" \
+            || (echo "❌ /healthz failed against $BACKEND" && exit 1)
       - name: Health check — backend readiness
         run: |
           curl -f --retry 3 --retry-delay 5 \
-            https://ascendhq-api.vercel.app/readyz \
-            || (echo "❌ /readyz failed" && exit 1)
+            "$BACKEND/readyz" \
+            || (echo "❌ /readyz failed against $BACKEND" && exit 1)
       - name: Health check — feature flags auth boundary
         run: |
           http_status="$(curl -sS --retry 2 --retry-delay 5 \
             -o /tmp/flags-response.json \
             -w '%{http_code}' \
-            https://ascendhq-api.vercel.app/api/v1/flags)"
+            "$BACKEND/api/v1/flags")"
           if [ "$http_status" != "401" ]; then
             echo "❌ /api/v1/flags without auth returned $http_status, expected 401"
             cat /tmp/flags-response.json
@@ -689,5 +710,5 @@ jobs:
       - name: Health check — frontend
         run: |
           curl -f --retry 3 --retry-delay 5 \
-            https://ascendhqweb.vercel.app/ \
-            || (echo "❌ frontend failed" && exit 1)
+            "$FRONTEND/" \
+            || (echo "❌ frontend failed against $FRONTEND" && exit 1)
