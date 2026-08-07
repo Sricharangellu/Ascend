@@ -1,4 +1,4 @@
-# ADR-009: Every deploy and probe target is a repo variable, never a hardcoded hostname
+# ADR-011: Every deploy and probe target is a repo variable, never a hardcoded hostname
 
 Date: 2026-08-06 · Status: Accepted
 Owner: Claude Code session — ERP infrastructure audit

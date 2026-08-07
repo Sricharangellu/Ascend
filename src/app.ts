@@ -24,6 +24,7 @@ import {
   renderMetrics,
   requireRole,
 } from "./gateway/index.js";
+import type { RuntimeGauges } from "./gateway/metrics.js";
 import { handler } from "./shared/http.js";
 import { bootstrapOrchestration, ORCHESTRATION_MIGRATIONS } from "./orchestration/index.js";
 import { SseBroker } from "./shared/sse.js";
@@ -60,6 +61,63 @@ function secretsMatch(provided: string | undefined, expected: string): boolean {
   const a = createHash("sha256").update(provided).digest();
   const b = createHash("sha256").update(expected).digest();
   return timingSafeEqual(a, b);
+}
+
+/**
+ * Read the live pool / job-queue / outbox depths for GET /metrics.
+ *
+ * Fail-soft by contract: a scrape must never 500, and it must never be the
+ * thing that takes the service down under load. Every read is individually
+ * wrapped, so a missing table (a fresh schema mid-migration), a permissions
+ * problem, or a slow query degrades that one gauge to "absent" — which
+ * Prometheus reads as no sample, not as a healthy zero — while the rest of the
+ * payload still renders.
+ *
+ * Both queries are index-backed (`job_queue_ready_idx`,
+ * `event_outbox_pending_idx`) and unauthenticated, so they run with no
+ * app.tenant_id set and therefore count across all tenants. That is what an
+ * operator gauge should report; per-tenant queue depth belongs on the
+ * owner-only /api/v1/jobs endpoint, which already exists.
+ */
+async function collectRuntimeGauges(db: DB): Promise<RuntimeGauges> {
+  const gauges: RuntimeGauges = {
+    pool: db.poolStats(),
+    poolMax: Number(process.env["PG_POOL_MAX"] ?? 10),
+    buildSha: buildInfo().sha,
+  };
+  const now = Date.now();
+
+  try {
+    const rows = await db.query<{ status: string; n: number }>(
+      "SELECT status, COUNT(*)::int AS n FROM job_queue GROUP BY status",
+    );
+    const byStatus: Record<string, number> = { pending: 0, running: 0, completed: 0, failed: 0 };
+    for (const r of rows) byStatus[r.status] = Number(r.n);
+    gauges.jobsByStatus = byStatus;
+
+    const oldest = await db.one<{ run_at: number | null }>(
+      "SELECT MIN(run_at) AS run_at FROM job_queue WHERE status = 'pending' AND run_at <= @now",
+      { now },
+    );
+    if (oldest?.run_at != null) gauges.oldestDueJobAgeMs = Math.max(0, now - Number(oldest.run_at));
+    else gauges.oldestDueJobAgeMs = 0;
+  } catch (err) {
+    logger.debug({ err }, "metrics: job_queue gauges unavailable");
+  }
+
+  try {
+    const row = await db.one<{ n: number; oldest: number | null }>(
+      "SELECT COUNT(*)::int AS n, MIN(created_at) AS oldest FROM event_outbox WHERE dispatched = FALSE",
+    );
+    if (row) {
+      gauges.outboxPending = Number(row.n);
+      gauges.outboxOldestPendingAgeMs = row.oldest == null ? 0 : Math.max(0, now - Number(row.oldest));
+    }
+  } catch (err) {
+    logger.debug({ err }, "metrics: event_outbox gauges unavailable");
+  }
+
+  return gauges;
 }
 
 /**
@@ -267,7 +325,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
 
   // ── Prometheus metrics — bearer token required in production. In development
   // and tests, an unset METRICS_TOKEN keeps local smoke checks simple.
-  app.get("/metrics", (req, res) => {
+  app.get("/metrics", async (req, res) => {
     const expected = process.env["METRICS_TOKEN"];
     if (!expected && process.env["NODE_ENV"] === "production") {
       res.status(503).type("text/plain").send("metrics_unconfigured\n");
@@ -277,7 +335,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
       const provided = req.headers.authorization?.replace(/^Bearer\s+/i, "");
       if (!secretsMatch(provided, expected)) { res.status(401).end(); return; }
     }
-    res.set("content-type", "text/plain; version=0.0.4").send(renderMetrics());
+    res
+      .set("content-type", "text/plain; version=0.0.4")
+      .send(renderMetrics(await collectRuntimeGauges(db)));
   });
 
   // ── Service health (documented in README; lists the domain modules)

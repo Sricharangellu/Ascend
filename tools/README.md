@@ -47,6 +47,33 @@ This stricter guard blocks the local patterns that create unrelated dirty code:
 
 Run this before opening a PR or handing off a session. CI also runs it in the guard job.
 
+## `route-authz-scan.mjs` — every mutating route must carry an authz guard
+
+```bash
+npm run authz:scan
+```
+
+Fails if any `PUT`/`PATCH`/`DELETE` route in `src/` reaches its handler with no
+`requireRole` / `requirePermission` / `requireScope` / `requireCapability` /
+`requireModule` in front of it. A guard counts whether it is applied inline,
+through a `const mgr = requireRole("manager")` alias declared in the same file,
+or through an earlier `router.use(...)`.
+
+Replaces a CI grep step that was inert twice over: it ended in `|| echo "…✓"`,
+so it exited 0 on every run it ever made, and it only matched the literal text
+`requireRole` on the route's own line — which meant the 20+ files using the
+hoisted-alias convention all read as unguarded. Repaired as written it reported
+39 findings, ~35 of them false. This scanner reports **4**, all real, and one
+(`quotes DELETE /:id` — a hard delete of a commercial document by any cashier,
+with no soft-delete column and no audit entry) was fixed rather than
+allowlisted. Full reasoning in `docs/architecture/ADR/ADR-008`.
+
+`POST` is deliberately out of scope: in a POS it is the ordinary cashier action
+(ring a sale, take payment, open a tab), so gating it would be wrong for the
+product. The allowlist is **shrink-only** — an entry means "reviewed, and
+cashier-level access is correct here", and carries the reason. Never add one to
+make CI green.
+
 ## `duplicate-code-scan.mjs` — copy-paste detector (report-only)
 
 ```bash
@@ -104,42 +131,6 @@ framework conventions before touching anything.
 
 Next.js App Router files (`page`/`layout`/`route`/…), `middleware.ts` and
 `src/server.ts` are excluded — the framework calls them, so nothing imports them.
-
-## `route-guard-scan.mjs` — mutating routes with no authorization (gating)
-
-```bash
-npm run route:scan
-```
-
-Fails when a `router.post/put/patch/delete` registers no authorization
-middleware between its path and its handler. Everything unguarded is listed, with
-its reason, in `route-guard-allowlist.json` — read the count off a real run
-rather than from here (2026-08-06: 314 mutating routes, 49 files, 76 allowlisted).
-
-**This replaced a CI grep step that could never fail.** The old step ended
-`! grep … || echo "All mutation routes have role guards ✓"` — the `!` inverts a
-successful match into non-zero and `|| echo` swallows that into exit 0.
-Reproduced 2026-08-06: it printed 39 matching lines *and* the ✓ *and* exited 0.
-It had never once evaluated this codebase. Its detection was also wrong in both
-directions: it excluded a line only if the literal `requireRole` appeared on it,
-but 44 route files declare `const mgr = requireRole("manager")` and pass `mgr`,
-so guarded routes read as violations; and `-A1` meant middleware on a later line
-read as guarded.
-
-A regex over line pairs cannot answer this. This script walks from
-`router.<method>(` to the balanced closing paren (string- and comment-aware),
-splits the top-level arguments, and treats everything between the path (first
-argument) and the handler (last) as the middleware chain — resolving per-file
-`const x = requireRole(...)` aliases and `router.use(...)` router-level guards.
-
-**The allowlist is a debt register, not a mute button.** Every entry states why,
-categorised `open-by-design:` / `in-handler:` / `GAP:` — the third being an
-admission of real debt, each one a numbered finding in
-`WORK/audits/AUDIT_2026-08-06T170650Z-erp-infrastructure-audit.md` §4. **Stale
-entries fail**: a key that no longer matches an unguarded route is an error, so
-the list cannot decay into things that were fixed years ago.
-
-Gating policy for this and every other check here: **ADR-008.**
 
 ## `license-scan.mjs` — licence inventory over a CycloneDX SBOM (report-only)
 

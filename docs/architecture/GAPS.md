@@ -45,6 +45,32 @@ describes correcting once already):
 - **Progress intelligence (truth-tracking) loop**: complete end-to-end as of 2026-08-06. `src/modules/progress` owns all four `progress_*` tables and the whole `Hypothesis → Plan → Task → Evidence → Verified Result → Decision` model; `/progress` (hypotheses, evidence, decisions) and the dashboard's `ProgressPanel` (tasks, evidence, system-verify) are the two frontends. A decision **requires** attached evidence, and `evidence_attached`/`system_verified`/`validated`/`invalidated` can only be earned through their own endpoints — never set by hand. Do not propose "add a progress/OKR/task-verification model"; extend this one. See `AUDIT_2026-08-06T165353Z-progress-intelligence-loop.md`.
 - **Stock movement ledger**: `inventory_movements` (`id, tenant_id, product_id, delta, reason ∈ {receiving, sale, adjustment, return, cycle_count}, ref, created_at`, indexed by tenant+product+time) is real and actively written to by `inventory/service.ts` — not an unused stub (unlike `product_units` or `product_barcodes.pack_size` were before this session's UOM work). Sufficient to reconstruct stock-qty-over-time and detect stockout moments (replay deltas, find when the running balance hits zero) without introducing a new movement table.
 
+## Platform/infrastructure gaps (added 2026-08-06, enterprise platform audit)
+
+Verified by command against this checkout, not carried over from an older doc. Full
+evidence: `WORK/audits/AUDIT_2026-08-06T170227Z-enterprise-platform-audit.md`.
+
+| Item | Status | What's actually missing |
+|---|---|---|
+| Infrastructure as Code | Open — **zero** | No Terraform/Pulumi/`render.yaml`/`fly.toml`/Helm anywhere. Every environment (Vercel projects, the backend host, both Supabase projects, all env vars) is dashboard-only state. Already bit once: the staging Vercel projects were deleted and `scripts/deploy.sh` still holds their IDs. **Deliberately not fixed by that audit** — codifying a host nobody has confirmed would add a *fourth* conflicting picture of production; resolve `DEPLOYMENTS.md` first, then IaC the winner. |
+| Nothing scrapes `/metrics` | Open | The endpoint emits correct Prometheus exposition and, since the 2026-08-06 audit, covers DB pool, job-queue depth, outbox backlog, event-loop delay and build sha. **No collector reads it, so none of it is retained or alertable.** This is a configuration task, not an engineering one — Grafana Cloud free tier + `METRICS_TOKEN`. Highest-leverage open observability item. |
+| Alert fan-out (C-4) | Open | Still only "a GitHub Actions run went red". No paging, no routing, no on-call, no status page. |
+| Load / capacity data | Open — none exists | No load test has ever run. Throughput, p95, and the concurrency at which the pool exhausts are all unknown. For a product pitched on high-volume POS, "how many tills can check out at once" is currently unanswerable. `scripts/smoke.ts` already scripts the full lifecycle — it is ~90% of a k6 script. |
+| Restore validation in CI | Open | The backup→restore mechanism was drilled by hand once (2026-08-05) and works. Nothing re-proves it, so the path can rot silently. |
+| Down-migrations for module migrations | Open | `db/migrations/` has 3 `.down.sql` files; the 53 module migration sets that actually run at boot have none. Neither rollback mechanism (Vercel promote, `git revert` on `master`) covers a schema change. |
+| `web` dependency advisories | Open — 1 critical, 6 high | All resolve only through `next` 14→16 and `vitest` 2→4 (F-24/F-25). The `next` advisories include **SSRF and HTTP request smuggling in `rewrites()`** — the mechanism this app proxies *all* backend traffic through — and middleware-bypass/cache-poisoning against `middleware.ts`, its auth gate. Root is at 0 and is now a CI gate at `high`. |
+| Audit logging coverage | Open — 14 of 53 modules | The money paths `AGENTS.md` names are covered. Privileged mutations elsewhere are unattributable. Best fixed with a helper at the `requireRole`-guarded route layer so coverage follows authorization instead of being remembered per-module. |
+| Frontend CSP allows `'unsafe-inline'` scripts | Open | Required by the current Next App Router setup; nonce-based CSP is materially easier on Next 15+, so fold it into the 14→16 migration rather than doing it twice. |
+| GDPR erasure / export | Open | Tenant isolation, transit encryption and audit logging exist. No right-to-erasure, no data-portability export, no retention policy. Blocks EU enterprise sales. |
+| `artifacts/` — 1,005 tracked files | Open — NEEDS-SRI | Five complete projects on an incompatible stack (Vite/Radix/Drizzle/pnpm), 55% of tracked files, built and deployed by nothing. Direct cause of five root-manifest-hijack CI incidents in two days; `hygiene-check.mjs` check 8 guards the symptom, not the cause. Extraction needs sign-off — it is user work. |
+
+**Closed by the 2026-08-06 audit:** two CI guards that could never fail (F-1 SQL injection,
+fixed earlier in `c00a485`; **F-2 unguarded mutation routes**, replaced with
+`tools/route-authz-scan.mjs` — which found 4 genuine unguarded mutations the grep never
+could, one of them fixed in code). No SAST of any kind existed; CodeQL + dependency review
+now run per-PR and weekly. `/metrics` had no visibility into the pool, job queue or outbox.
+The container image declared no health probe. There was no `SECURITY.md`.
+
 ## Known open criticals (operational floor, outrank feature work)
 
 From `docs/architecture/CTO_CHARTER.md` / `PLATFORM_ROADMAP.md`, still true as of this pass:
@@ -63,11 +89,11 @@ From `docs/architecture/CTO_CHARTER.md` / `PLATFORM_ROADMAP.md`, still true as o
 From the 12-phase infrastructure audit —
 `WORK/audits/AUDIT_2026-08-06T170650Z-erp-infrastructure-audit.md`. Only items
 still open are listed; what that pass fixed is in the audit's §12.6 and in
-ADR-008/009/010, not repeated here.
+ADR-010/011/012, not repeated here.
 
 | Item | Status | What's actually missing |
 |---|---|---|
-| Authorization: 14 ungated mutating routes | Open | `tools/route-guard-scan.mjs` finds 76 mutating routes with no authorization middleware; 62 are correct (POS/floor/self-service/public-auth), 14 are real debt — every one classified `GAP:` in `tools/route-guard-allowlist.json`. Worst: `catalog POST /` (a cashier can create products), `billing POST /bills` + `/invoices` (a cashier can create AP/AR documents while the *pay* route is guarded), `quotes DELETE /:id` and `PATCH /:id/status` (that module imports no guard at all). Not a wiring gap — each needs a product decision about who may do it. |
+| Authorization: ungated **POST** mutations are covered by no scanner | Open | `tools/route-authz-scan.mjs` (ADR-008) deliberately checks only `PUT`/`PATCH`/`DELETE`, on the sound reasoning that in a POS a `POST` is usually the normal cashier action. That is right for most of them and leaves a real hole for the rest. A parallel sweep (PR #197) that *did* include `POST` found 314 mutating routes, 76 with no authorization middleware — 62 correctly open, and these still-open POST-side gaps that no CI check will catch today: **`catalog POST /`** (a cashier can create a product; every sibling bulk path is `requireRole("manager")`), **`catalog POST /:id/barcodes`** (attaches a pack-size/UOM conversion, ADR-006), **`catalog PUT /:id/categories`**, **`billing POST /bills`** and **`POST /invoices`** (a cashier can raise AP/AR documents, while the sibling *pay* route **is** guarded), **`outlets POST /`** and **`POST /:outletId/registers`** (setup actions, not till actions), and **`inventory POST /pipeline/reorder-alerts/:id/create-po`** (creates a real PO while purchasing's own PO routes are mgr-guarded). `quotes DELETE /:id` from that list was fixed in PR #198. Not a wiring gap — each needs a product decision about who may do it. Two options when it is picked up: extend the scanner to POST with a per-route allowlist, or gate these individually. |
 | Object storage | Open — **blocks 4 other items** | No S3/R2/GCS/Blob credential or SDK anywhere. This is why EDI import can never parse a file (the frontend has nowhere to upload bytes to), and it equally blocks invoice OCR, receipt OCR, product images and document search. Highest-leverage single prerequisite in the integration backlog. |
 | Observability: signals produced, nothing consumes them | Open | `/metrics` renders Prometheus text that nothing scrapes; W3C `traceparent` is generated and exported nowhere; structured JSON logs go to stdout with no aggregator; the Sentry integration is a hand-rolled envelope with no releases, source maps, breadcrumbs or user context, and no frontend coverage at all (`web/app/error.tsx` still says "when wired in production"). Worse than absent — it reads as covered. |
 | No IaC | Open — **root cause of the DEPLOYMENTS.md incident** | No Terraform, Pulumi or `render.yaml`. Every piece of infrastructure was created by hand in a dashboard, which is exactly why nobody can say where production runs. Deliberately NOT added in the 2026-08-06 pass: codifying a topology this repo cannot confirm is worse than codifying none. Blocked on `DEPLOYMENTS.md` P1. |

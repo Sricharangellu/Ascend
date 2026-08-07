@@ -1,6 +1,7 @@
 import type { Router, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody } from "../../shared/http.js";
+import { requireRole } from "../../gateway/auth.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import type { QuotesService } from "./service.js";
 
@@ -52,7 +53,15 @@ export function registerRoutes(router: Router, service: QuotesService) {
     res.json(await service.convertToOrder(String(req.params.id), tenantId(res)));
   }));
 
-  router.delete("/:id", handler(async (req, res) => {
+  // Manager-gated: this is a hard DELETE of a customer-facing commercial
+  // document (service.delete() issues a real `DELETE FROM customer_quotations`,
+  // cascading its lines), the quotes module writes no audit_log entry, and
+  // there is no soft-delete column to recover from — so a mis-click by a
+  // cashier is unrecoverable and leaves no trace of what was removed.
+  // Creating, sending and converting a quote deliberately stay cashier-level:
+  // those are ordinary sales-floor actions, and conversion produces an order
+  // that is itself auditable. Only the irreversible one is gated.
+  router.delete("/:id", requireRole("manager"), handler(async (req, res) => {
     await service.delete(String(req.params.id), tenantId(res));
     res.status(204).end();
   }));

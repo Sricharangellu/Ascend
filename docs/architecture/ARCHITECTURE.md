@@ -243,7 +243,7 @@ already happened at least once here:
 | `hygiene-check.mjs` | Copy-junk, collision backups, merge leftovers, duplicate `AGENTS.md`, **root-manifest hijack** (check 8 — the pnpm/workspace incident, 5 occurrences) |
 | `api-gap-scan.mjs` | Frontend calling a route that has no backend (pages shipping on MSW mocks while prod 404s) |
 | `table-collision-scan.mjs` | Two modules declaring the same table — silently makes the losing module 100% non-functional (3 real occurrences) |
-| `route-guard-scan.mjs` | Mutating routes registered with no authorization middleware. Added 2026-08-06, replacing a CI grep step that could not fail and had never evaluated the codebase (ADR-008) |
+| `route-authz-scan.mjs` | Mutating `PUT`/`PATCH`/`DELETE` routes registered with no authorization guard. Added 2026-08-06, replacing a CI grep step that could not fail and had never evaluated the codebase (ADR-008) |
 | `duplicate-code-scan.mjs` / `dead-code-scan.mjs` | Report-only |
 
 Security scanning lives in `.github/workflows/security.yml` (secret scan —

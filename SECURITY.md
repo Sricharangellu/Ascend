@@ -1,114 +1,140 @@
 # Security Policy
 
-Ascend handles payment tender, inventory valuation, payroll-adjacent time
-records and customer PII for retail, wholesale and distribution businesses. A
-vulnerability here has a cash value. This document says how to report one and
-what the platform's security controls currently are — honestly, including where
-they are incomplete.
+Ascend is a multi-tenant POS / business operating platform. It processes card
+payments, holds customer records, and is the book of record for inventory and
+money movement for the businesses that run on it. Security reports are handled
+accordingly.
 
 ## Reporting a vulnerability
 
-Report privately. Do **not** open a public issue, and do not include a working
-exploit in the first message.
+**Do not open a public GitHub issue for a security problem.**
 
-- **Preferred:** GitHub → Security → Advisories → *Report a vulnerability*
-  (private disclosure, visible only to repository maintainers).
-- **Fallback:** email the repository owner directly.
+Report privately through GitHub's coordinated disclosure flow:
+**[Security → Report a vulnerability](https://github.com/Sricharangellu/Ascend/security/advisories/new)**.
+That creates a private advisory visible only to the maintainers, and gives us a
+place to work on a fix and credit you before anything is public.
 
-Please include: affected endpoint or module, the version/commit, what an
-attacker gains, and the smallest reproduction you have. If you have tested
-against a live deployment, say which one.
+Please include, where you can:
 
-**Targets:** only your own tenant on a deployment you control, or a local
-checkout. Do not test against another tenant's data — tenant isolation is the
-control most worth reporting a hole in, and demonstrating one by reading real
-customer data is not an acceptable proof.
+- what the issue is and which component it affects (backend module, gateway,
+  frontend route, workflow, dependency);
+- reproduction steps or a proof of concept;
+- what an attacker gets out of it — cross-tenant data, privilege escalation,
+  money movement, denial of service;
+- the commit or deployed URL you tested against.
 
 ### What to expect
 
 | Stage | Target |
 |---|---|
 | Acknowledgement | 3 business days |
-| Initial assessment (severity + whether we can reproduce) | 10 business days |
+| Initial assessment + severity | 7 business days |
 | Fix or documented mitigation for critical/high | 30 days |
-| Public disclosure | Coordinated, after a fix ships |
+| Public advisory | After a fix ships, coordinated with the reporter |
 
-These are targets for a small team, not a contractual SLA. If a report goes
-unanswered past the acknowledgement window, escalate by replying on the same
-thread.
+This is a small team, not a 24/7 security operation. If something is being
+actively exploited, say so in the first line of the report and we will treat it
+as an incident rather than a queue item.
+
+## Scope
+
+**In scope** — anything in this repository that ships:
+
+- `src/` — the Express backend, gateway middleware, and all domain modules
+- `web/` — the Next.js frontend, its middleware, and its API client
+- `db/` — migrations, RLS policies, backup and restore scripts
+- `.github/workflows/` — CI/CD, including supply-chain and secret handling
+- `Dockerfile`, `docker-compose.yml`, `scripts/deploy.sh`
+
+**Out of scope:**
+
+- `artifacts/` — a parallel, unbuilt, undeployed codebase kept in-tree for
+  historical reasons. Nothing in it is reachable from any entry point of the
+  shipping application, and it is excluded from CodeQL analysis for that reason.
+- Findings that require an already-compromised host, an already-stolen
+  credential, or physical access to POS hardware.
+- Missing security headers or configuration on hosts we do not control
+  (Vercel/Supabase/Stripe platform surfaces — report those to those vendors).
+- Automated scanner output with no demonstrated impact. Volumetric denial of
+  service against a preview deployment is not a finding.
+
+## Security properties this codebase is meant to hold
+
+These are the invariants worth testing against. A break in any of them is a
+valid report, and several are enforced by CI checks that will name themselves in
+the failure output:
+
+- **Tenant isolation.** Every business table is tenant-scoped, every business
+  query filters by tenant, and Postgres row-level security is enabled on every
+  table carrying a `tenant_id` as a backstop (`src/modules/rls`). Any path that
+  returns another tenant's row is critical, with or without RLS.
+- **Authentication.** All `/api/v1/*` routes require a verified JWT (HS256) or a
+  hashed API key; tokens missing `tenantId`/`sub` are rejected. Refresh tokens
+  are stored hashed, rotated on use, and single-use outside a short reuse-grace
+  window.
+- **Authorization.** Mutating routes carry a role, permission, scope, capability
+  or module guard. `npm run authz:scan` fails CI on a `PUT`/`PATCH`/`DELETE`
+  route with none of them, so an unguarded mutation reaching `develop` is itself
+  a reportable gap in that scanner.
+- **Business-package isolation.** `requireCapability` and `requireModule` fail
+  **closed** — a tenant without a capability gets 403 and is not told the surface
+  exists. (`requirePlan`, an entitlement gate rather than an isolation boundary,
+  deliberately fails open.)
+- **SQL.** All caller-supplied values are bound as parameters. CI rejects string
+  interpolation into `.query()` outside a reviewed, shrink-only allowlist of
+  identifier-only sites.
+- **Money.** Integer cents everywhere; ledger and price-history tables are
+  append-only. A path that mutates a posted financial record is a finding.
+- **Secrets.** Never committed. `tools/hygiene-check.mjs` fails the build on a
+  tracked `.env` or an embedded credential; a gitleaks scan of the working tree
+  (`.github/workflows/security.yml`, config in `.gitleaks.toml`) **gates** every
+  push and PR, and a second pass sweeps full git history; the logger redacts
+  `authorization`, `cookie`, `password`, `token`, `secret` and `apiKey` paths at
+  every level. A credential that reaches a commit is a finding even if it was
+  removed in a later commit — deleting the line does not unpublish it, so the
+  correct response is rotation.
+- **Supply chain.** A CycloneDX SBOM is produced for both packages on every run
+  and retained as a build artifact, and a licence inventory classifies every
+  component (`tools/license-scan.mjs`). Ask for the SBOM if you need to check
+  whether a given advisory applies.
+- **Transport.** Postgres TLS certificates are verified by default;
+  `PG_SSL_NO_VERIFY` is an explicit escape hatch that logs a warning on every
+  boot. Treat a deployment that sets it as a misconfiguration worth reporting.
+
+## Known accepted risks
+
+Listed so a reporter does not spend time on something already understood and
+tracked. Full reasoning and remediation plans live in
+`WORK/audits/` and `docs/architecture/GAPS.md`.
+
+- **RLS is permissive when the tenant context is unset.** The policy allows all
+  rows when `app.tenant_id` has no value, so RLS is a backstop for a forgotten
+  `WHERE` clause inside an authenticated request, not an independent boundary.
+  Application-layer tenant filtering is the primary control.
+- **`web` carries known dependency advisories.** They resolve only through the
+  `next` 14 → 16 and `vitest` 2 → 4 major migrations, tracked as F-24/F-25. The
+  root has zero advisories and is gated in CI at `high`.
+- **The frontend CSP allows `'unsafe-inline'` for scripts.** Required by the
+  current Next.js App Router setup; tightening it needs nonce-based CSP.
+- **No production database backup has ever run.** The mechanism is drilled and
+  works; the `PROD_DATABASE_URL` secret is unset, so scheduled runs take no
+  backup. This is an availability/recovery risk, not a confidentiality one.
+- **The container image is never scanned.** CI builds the `Dockerfile` as a
+  sanity check but runs no image vulnerability scan (Trivy or equivalent), so
+  advisories in the base image or in installed OS packages are unmonitored.
+- **No secrets manager.** Credentials live in GitHub Actions secrets and in the
+  host's environment variables; there is no central rotation, expiry or access
+  audit. The sharpest edge is that per-tenant OIDC client secrets are stored in
+  the application database (`settings_kv`) rather than a vault — a deliberate
+  architectural choice, recorded in `docs/architecture/ARCHITECTURE.md`, but one
+  worth knowing before assessing the blast radius of a database compromise.
+- **No penetration test has been performed**, and there is no compliance
+  attestation. Card data never touches this database — Stripe handles it end to
+  end, which holds PCI scope at SAQ-A — but that is a scope argument, not an
+  audit result.
 
 ## Supported versions
 
-Ascend is a continuously-deployed hosted platform, not a versioned download.
-Only the currently-deployed release (`master`) is supported. Fixes are not
-backported to older commits.
-
-## Security controls in place
-
-Code-verified, not aspirational. Each row names where it lives.
-
-| Control | Where |
-|---|---|
-| Authentication (JWT sessions + API keys) | `src/gateway/auth.ts`, `src/identity/` |
-| MFA (TOTP + backup codes) | `src/identity/` |
-| SSO / OIDC (per-tenant IdP config) | `src/modules/sso/` |
-| Role-based authorization (cashier < manager < owner) | `requireRole`, `src/gateway/auth.ts` |
-| Fine-grained permissions + custom roles | `requirePermission`, `src/modules/custom_roles/` |
-| API-key scope enforcement | `requireScope`, `src/gateway/auth.ts` |
-| Tenant isolation in SQL | every business query filters `tenant_id` |
-| Tenant isolation backstop (Postgres RLS) | `src/modules/rls/`, `db/rls/policies.sql` |
-| Parameterised SQL only (no string interpolation of values) | `src/shared/db.ts`, enforced by a CI guard |
-| Request validation | zod via `parseBody`, `src/shared/http.ts` |
-| Rate limiting (per-IP and per-tenant, Redis-backed when configured) | `src/gateway/rateLimit.ts` |
-| Brute-force limits on login / register / SSO | `src/app.ts` |
-| Account lockout | `src/identity/lockout.test.ts` |
-| Password hashing (bcrypt) | `src/identity/service.ts` |
-| Security headers + CSP | `src/app.ts` (API), `web/middleware.ts` (app) |
-| CORS allowlist | `src/app.ts` |
-| Database TLS with certificate verification | `sslConfig()`, `src/shared/db.ts` |
-| Webhook secret encryption (fails closed) | `src/modules/webhooks/` |
-| Stripe webhook signature verification | `src/app.ts` |
-| Constant-time comparison for infrastructure secrets | `secretsMatch()`, `src/app.ts` |
-| Audit logging | `src/modules/audit_log/`, `src/shared/audit.ts` |
-| Append-only financial records | `journal_entries`, `product_price_history`, `po_approvals` |
-| Secret scanning (gitleaks, gating) | `.github/workflows/security.yml`, `.gitleaks.toml` |
-| Dependency advisories | `.github/workflows/security.yml`, `.github/dependabot.yml` |
-| SBOM (CycloneDX) | `.github/workflows/security.yml` |
-| Unguarded-mutation-route guard | `tools/route-guard-scan.mjs` |
-| Non-root container runtime | `Dockerfile` |
-
-## Known gaps
-
-Stated plainly because a security policy that lists only strengths is not one.
-Full detail, with severities and a remediation order, is in the 2026-08-06
-infrastructure audit under `WORK/audits/`.
-
-- **No SAST.** No CodeQL or equivalent static analysis runs on this codebase.
-- **No container image scanning.** The image builds in CI but is never scanned.
-- **No penetration test** has been performed.
-- **Authorization debt.** A documented set of mutating routes carries no role
-  check; each is classified in `tools/route-guard-allowlist.json`, and the ones
-  marked `GAP:` are real.
-- **No production backup has ever run.** `PROD_DATABASE_URL` is unset, so the
-  honest RPO is total loss, not the ≤24h the workflow implies.
-- **No secrets manager.** Credentials live in GitHub Actions secrets and host
-  environment variables; there is no central rotation or access audit.
-- **No formal compliance certification.** Ascend is not SOC 2, PCI DSS or
-  HIPAA certified. Card data is handled by Stripe and never touches Ascend's
-  database, which keeps PCI scope at SAQ-A — but that is a scope argument, not
-  an attestation.
-
-## Out of scope
-
-- Findings against third-party services (Stripe, Supabase, Vercel, SendGrid) —
-  report those to the vendor.
-- Missing security headers on endpoints that serve no HTML.
-- Rate-limit thresholds you consider too generous, absent a demonstrated impact.
-- Automated scanner output with no analysis of exploitability.
-- Social engineering, physical access, or denial of service by volume.
-
-## Safe harbour
-
-Good-faith research conducted within this policy — private reporting, no access
-to other tenants' data, no service degradation, no data destruction — will not
-be pursued. Tell us before you publish.
+Only the current `master` tip is supported. This is a continuously-deployed
+application, not a versioned distribution — there are no backported security
+releases for older commits.

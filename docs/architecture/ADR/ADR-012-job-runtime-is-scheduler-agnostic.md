@@ -1,4 +1,4 @@
-# ADR-010: The job runtime is triggerable by any scheduler, not only Vercel Cron
+# ADR-012: The job runtime is triggerable by any scheduler, not only Vercel Cron
 
 Date: 2026-08-06 · Status: Accepted
 Owner: Claude Code session — ERP infrastructure audit

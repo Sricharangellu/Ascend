@@ -117,7 +117,7 @@ operator following this repo's documentation gets a silent failure.
 
 | Claimed | Reality | Impact |
 |---|---|---|
-| `JOBS_TICK_SECRET` (`.env.example`: "Set ONE of") | Read **nowhere** in `src/`, `scripts/` or `api/` | An operator on a non-Vercel host who set it got `503 cron_unconfigured` in production and **no background jobs at all**, silently. **Fixed in this change** — §12, ADR-010 |
+| `JOBS_TICK_SECRET` (`.env.example`: "Set ONE of") | Read **nowhere** in `src/`, `scripts/` or `api/` | An operator on a non-Vercel host who set it got `503 cron_unconfigured` in production and **no background jobs at all**, silently. **Fixed in this change** — §12, ADR-012 |
 | Object storage | No S3/R2/GCS/Blob credential or SDK anywhere | Files are referenced by URL; storage is external and un-integrated. Consistent with the repo's own doctrine, but it means **there is no upload path** — which is why EDI import can never parse a file (§9) |
 | CDN | Only Vercel's edge for frontend assets | No CDN in front of the API; no image pipeline |
 | Analytics | None | No product analytics of any kind |
@@ -380,7 +380,7 @@ it reads as covered.
 1. **Point the heartbeat at a real URL.** Blocked on `DEPLOYMENTS.md` P1, not on
    engineering. Until then the monitor is noise, and a monitor everyone has
    learned to ignore is worse than none. *(This change makes `smoke-test` read
-   the same variable so it cannot drift again — §12, ADR-009.)*
+   the same variable so it cannot drift again — §12, ADR-011.)*
 2. **Sentry SDK, both halves.** ~2 hours. Largest single jump in this table.
 3. **Scrape `/metrics`** with Grafana Cloud's free tier. The endpoint and token
    auth already exist.
@@ -464,7 +464,7 @@ codebase returns **403**. Clients cannot distinguish "malformed" from
 "forbidden".
 
 **F-3 — `JOBS_TICK_SECRET` was documented but never read. `HIGH`. FIXED in this change.**
-See §1.2, §12, ADR-010. Silent total loss of background job execution for anyone
+See §1.2, §12, ADR-012. Silent total loss of background job execution for anyone
 following the documentation on a non-Vercel host.
 
 **F-4 — No secret scanning existed. `HIGH`. FIXED in this change.**
@@ -483,22 +483,22 @@ secret is the only control. Now `secretsMatch()` — SHA-256 then `timingSafeEqu
 No CodeQL or equivalent. CodeQL on a private repository requires GitHub Advanced
 Security, which is a licensing decision and therefore Sri's. Semgrep is the
 no-GHAS alternative. Either must be proven green on a branch before gating
-(ADR-008).
+(ADR-010).
 
 **F-7 — No container image scanning. `MEDIUM`. NOT fixed — recommended.**
 CI builds the image and never scans it. Trivy in the `docker-build` job,
 report-only first. Not implemented here because the Docker daemon is unavailable
 in this session and shipping an unverified scanner into CI is exactly what
-ADR-008 prohibits.
+ADR-010 prohibits.
 
 **F-8 — dependency advisories in `web`. `MEDIUM`. Pre-existing, tracked.**
 **Corrected 2026-08-07** against this PR's own CI run rather than the 2026-08-04
 figure this section originally quoted: **root is at 0 vulnerabilities; `web` has
 10 (1 critical, 6 high, 3 moderate)**. Web's fixes are major migrations (`next`
 14→16, `vitest` 2→4), tracked as F-24/F-25, so web stays report-only in the new
-`security.yml`. **Root does not** — at zero it already satisfies ADR-008's
+`security.yml`. **Root does not** — at zero it already satisfies ADR-010's
 promotion bar and could gate immediately at any `--audit-level`; splitting the
-step so root gates without waiting on web is filed as a follow-up (see ADR-008's
+step so root gates without waiting on web is filed as a follow-up (see ADR-010's
 Consequences). Recording this here because the original number was a stale
 citation, not a measurement: the audit quoted a figure from an earlier pass
 instead of running the command, which is the same class of mistake §4's
@@ -614,7 +614,7 @@ needs its own PR with the full suite as the gate, not a drive-by in an audit.
 **Highest-value fixes, in order:**
 1. **Job tick cadence.** Daily → every 1–5 minutes. Left unchanged here on
    purpose: Vercel's Hobby plan permits only daily crons, so changing it could
-   break a deploy on a plan tier this session cannot observe (ADR-010). If the
+   break a deploy on a plan tier this session cannot observe (ADR-012). If the
    backend is on Render, `vercel.json`'s `crons` block should be **deleted**, not
    tuned, and the schedule moved to Render.
 2. **`compression` middleware** on Express. One line, immediate wire-size win on
@@ -987,7 +987,7 @@ All verified locally; commands and outputs are in the commit and summarised here
 | **Dependency advisory reporting** | `.github/workflows/security.yml` | Report-only with a written promotion condition |
 | **Container `HEALTHCHECK`** | `Dockerfile` | Uses node's global `fetch` — no curl/wget in `node:24-alpine` |
 | **Vulnerability disclosure policy** | `SECURITY.md` | — |
-| **3 ADRs** | `ADR-008/009/010` | — |
+| **3 ADRs** | `ADR-010/009/010` | — |
 
 **Deliberately not changed, with reasons:**
 
@@ -1002,7 +1002,7 @@ All verified locally; commands and outputs are in the commit and summarised here
   changing it could break a deploy on a plan tier this session cannot observe.
 - **Dockerfile `npm install` → `npm ci`.** Right fix (lockfile integrity), but
   the Docker daemon is unavailable here and CI's `docker-build` job is the only
-  thing that can prove it. Shipping an unverified build change is what ADR-008
+  thing that can prove it. Shipping an unverified build change is what ADR-010
   exists to prevent.
 - **`render.yaml`.** Would assert a production topology this repo cannot confirm.
   `DEPLOYMENTS.md` explicitly says not to pick a side yet.

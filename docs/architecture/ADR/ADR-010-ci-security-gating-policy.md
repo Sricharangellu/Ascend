@@ -1,4 +1,4 @@
-# ADR-008: Security checks gate on arrival only when the backlog is already zero
+# ADR-012: Security checks gate on arrival only when the backlog is already zero
 
 Date: 2026-08-06 · Status: Accepted
 Owner: Claude Code session — ERP infrastructure audit
@@ -36,7 +36,7 @@ Applied to what this audit added:
 |---|---|---|
 | Secret scan, working tree (`gitleaks`) | **Gates** | First full scan found 4 hits, all false positives, all justified in `.gitleaks.toml`. Zero real backlog, so it ships able to say no. Verified against planted AWS/Stripe/GitHub credentials before landing. |
 | Secret scan, git history | Report-only | A hit means a credential was published and needs rotating — a decision, not a red build on an unrelated PR. Promote once history has been reviewed once. |
-| Unguarded mutation routes (`route-guard-scan`) | **Gates** | Ships with the 76 currently-unguarded routes allowlisted and individually classified, so it is green today and fails on the 77th. |
+| Unguarded mutation routes (`route-authz-scan`, ADR-008) | **Gates** | Ships green with its exceptions allowlisted, so it fails on the next unguarded `PUT`/`PATCH`/`DELETE`. Landed by PR #198; this ADR states the policy it satisfies. |
 | Dependency advisories | Report-only | 10 open in `web` (1 critical, 6 high, 3 moderate); fixes are F-24/F-25 migrations. Promote to `--audit-level=high` when those land. **Root is at 0** — see the note below; the root half no longer needs to wait. |
 | Licence inventory | Report-only | Which licence families are acceptable is a business decision. Promote once a policy exists. |
 | SBOM | Artifact only | Evidence for security review, not a gate. |
@@ -50,10 +50,12 @@ regardless of what it prints.
 Two mechanisms make an allowlist an asset rather than a mute button, and both
 are required for any new allowlisted check:
 
-1. **Every entry carries its reason**, categorised. `route-guard-allowlist.json`
-   uses `open-by-design:` / `in-handler:` / `GAP:` — the third being an
-   admission of debt, not a justification, and each one is a numbered finding in
-   the audit that produced it.
+1. **Every entry carries its reason**, categorised rather than free-text — an
+   allowlist of bare keys is indistinguishable from a mute button. The
+   categories that proved useful when classifying 76 routes by hand were
+   `open-by-design:` (correct, a POS action), `in-handler:` (enforced somewhere
+   the scanner cannot see) and `GAP:` (an admission of debt, not a
+   justification), each `GAP:` tied to a numbered audit finding.
 2. **Stale entries fail.** An allowlist key that no longer matches a real
    violation is an error, not a no-op. Without this, an allowlist decays into a
    list of things that were fixed years ago and the check quietly stops covering
@@ -80,8 +82,8 @@ are required for any new allowlisted check:
 **Consequences:**
 
 - The count of allowlisted violations becomes the debt metric, and it is
-  shrink-only by construction. `route-guard-allowlist.json` says 76 today; any
-  future reader can see whether that number moved.
+  shrink-only by construction: any future reader can see whether that number
+  moved.
 - A new unguarded mutating route now fails CI. That is a real behavioural change
   for contributors and the intended one.
 - Report-only checks still cost CI minutes while proving nothing. Accepted
