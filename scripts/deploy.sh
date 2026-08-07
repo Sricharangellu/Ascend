@@ -56,16 +56,21 @@ TEAM="team_WNp8vBq1RmWTEH8WSnenP7jM"             # gellusricharan-4715s-projects
 # VERCEL_BACKEND_PROJECT_ID / VERCEL_FRONTEND_PROJECT_ID under
 # Settings → Secrets and variables → Actions → Variables (ci.yml passes them).
 #
-# The defaults below are the historical IDs. As of 2026-08-05 the frontend
-# default no longer exists — the staging deploy failed with
-# `Error: Project not found ({"VERCEL_PROJECT_ID":"prj_TiPX9UY…"})` — while a
-# live project `ascend_hq_web` (prj_MvvmpNkRQbKUAEOmh9ZvmRJa7ETN, root dir
-# `web`) is actively building previews and is what PIPELINE.md names as the
-# production frontend. Which project each tier should target is a Sri decision
-# (one project + aliases vs. separate per-tier projects), so the defaults are
-# left unchanged here and the override is what moves them.
-BACKEND_PID="${VERCEL_BACKEND_PROJECT_ID:-prj_krZ34CIFjzQrMvZ08PWqqbxzBf7d}"    # ascend-backend (rebrand Phase 3; formerly finder-pos-backend — project ID is immutable, never changed)
-FRONTEND_PID="${VERCEL_FRONTEND_PROJECT_ID:-prj_TiPX9UYctGKJbQr4Lb1WFwSsKiN1}"  # ascend-frontend (formerly finder-pos-frontend — project ID unchanged)
+# FRONTEND: the historical default `prj_TiPX9UY…` (ascend-frontend) no longer
+# exists — every deploy since 2026-08-05 died with
+# `Error: Project not found ({"VERCEL_PROJECT_ID":"prj_TiPX9UY…"})`, which is
+# what kept the testing tier from ever producing a deployment. Sri confirmed on
+# 2026-08-07 that the live production frontend is https://ascendhqweb.vercel.app,
+# i.e. Vercel project `ascend_hq_web` (root dir `web`), so the default now points
+# there and every tier deploys from that one project (preview for dev/testing,
+# --prod for master), differentiated by the *_ALIAS vars rather than by project.
+#
+# BACKEND: default left unchanged and still NOT verified — `prj_krZ34CI…` is
+# recorded in docs/architecture/DEPLOYMENTS.md as serving a bare, unrelated
+# Express app, and the prod backend host `ascendhq-api.vercel.app` returns
+# DEPLOYMENT_NOT_FOUND. That half of the P0 is still open.
+BACKEND_PID="${VERCEL_BACKEND_PROJECT_ID:-prj_krZ34CIFjzQrMvZ08PWqqbxzBf7d}"    # ascend-backend (rebrand Phase 3; formerly finder-pos-backend — project ID is immutable, never changed) — UNVERIFIED, see above
+FRONTEND_PID="${VERCEL_FRONTEND_PROJECT_ID:-prj_MvvmpNkRQbKUAEOmh9ZvmRJa7ETN}"  # ascend_hq_web → https://ascendhqweb.vercel.app (confirmed by Sri 2026-08-07; replaces the deleted ascend-frontend prj_TiPX9UY…)
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 : "${VERCEL_TOKEN:?Set VERCEL_TOKEN (a Vercel token with access to the team scope)}"
 

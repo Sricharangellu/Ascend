@@ -3,7 +3,7 @@ name: CI
 # ─── Trigger rules (3-tier promotion pipeline) ────────────────────────────────
 # develop → full CI + deploy to DEV      (Vercel preview, own dedicated Supabase)
 # staging → full CI + deploy to TESTING  (Vercel preview alias, TESTING Supabase)
-# master  → full CI + deploy to PROD      (Vercel --prod, PROD Supabase, ascendhq-app.vercel.app)
+# master  → full CI + deploy to PROD      (Vercel --prod, PROD Supabase, ascendhqweb.vercel.app)
 # PRs     → full CI, no deploy
 # feature → no CI (local dev + pre-push hook); PR into develop to run CI
 # Promotion is forward-only: feature/* → develop → staging → master.
@@ -567,7 +567,7 @@ jobs:
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     environment:
       name: Production
-      url: https://ascendhq-app.vercel.app
+      url: https://ascendhqweb.vercel.app
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -615,5 +615,5 @@ jobs:
       - name: Health check — frontend
         run: |
           curl -f --retry 3 --retry-delay 5 \
-            https://ascendhq-app.vercel.app/ \
+            https://ascendhqweb.vercel.app/ \
             || (echo "❌ frontend failed" && exit 1)

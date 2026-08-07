@@ -438,7 +438,7 @@ server/process. Treat unexplained failures as possible coordination conflicts un
   file). Two carried over from the retired `WORK_STATE.md` and are **not** currently recorded
   there, so they are parked here until someone re-verifies and files them: `NODE_ENV=production`
   / `METRICS_TOKEN` confirmation, and the orphaned legacy `finder-pos.vercel.app` deployment
-  returning 500 (the live frontend is `ascendhq-app.vercel.app` — the old host should be
+  returning 500 (the live frontend is `ascendhqweb.vercel.app` — the old host should be
   deleted, not fixed).
 
 ### Branch hygiene
