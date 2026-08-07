@@ -61,3 +61,61 @@ test("production metrics require the configured bearer token", async () => {
   await app.db.close();
   restoreEnv();
 });
+
+// The scrape has to carry the four subsystems that could previously fail with
+// no external signal at all: the Postgres pool, the job queue, the ADR-003
+// outbox, and the Node runtime. Before this, /metrics exposed HTTP RED counters
+// and POS/UOM counters only — a stalled job drain or a growing undispatched
+// outbox (money-adjacent side effects silently not happening) was observable
+// only by querying the database by hand.
+test("metrics expose pool, job-queue, outbox and runtime gauges", async () => {
+  const app = await buildApp({ schema: schema() });
+  const res = await request(app.express, "GET", "/metrics");
+  assert.equal(res.status, 200);
+  const body = String(res.json);
+
+  for (const metric of [
+    "db_pool_connections",
+    "db_pool_max",
+    "job_queue_depth",
+    "job_queue_oldest_due_age_ms",
+    "outbox_pending_events",
+    "outbox_oldest_pending_age_ms",
+    "process_uptime_seconds",
+    "nodejs_heap_used_bytes",
+    "nodejs_eventloop_delay_ms",
+    "ascend_build_info",
+  ]) {
+    assert.match(body, new RegExp(`^${metric}`, "m"), `${metric} must be exposed`);
+  }
+
+  // Every gauge needs its HELP/TYPE pair or a scraper rejects the exposition.
+  assert.match(body, /^# TYPE db_pool_connections gauge$/m);
+  assert.match(body, /^# TYPE outbox_pending_events gauge$/m);
+  // Empty tables must report a real 0, not be silently omitted — "no pending
+  // work" and "the collector is broken" have to look different on a dashboard.
+  assert.match(body, /^outbox_pending_events 0$/m);
+  assert.match(body, /^job_queue_depth\{status="pending"\} \d+$/m);
+
+  await app.db.close();
+});
+
+// A scrape must never take the service down with it. If the gauge queries fail
+// (fresh schema mid-migration, revoked grant, dropped table), the endpoint still
+// has to answer 200 with the counters it can render — a monitoring endpoint that
+// 500s during an incident removes the one signal you need most.
+test("metrics still render when the gauge queries fail", async () => {
+  const app = await buildApp({ schema: schema() });
+  await app.db.exec("DROP TABLE IF EXISTS job_queue CASCADE");
+  await app.db.exec("DROP TABLE IF EXISTS event_outbox CASCADE");
+
+  const res = await request(app.express, "GET", "/metrics");
+  assert.equal(res.status, 200, "a failed gauge collection must not fail the scrape");
+  const body = String(res.json);
+  assert.match(body, /^http_requests_total/m, "HTTP counters still render");
+  assert.match(body, /^process_uptime_seconds/m, "runtime gauges still render");
+  assert.doesNotMatch(body, /^job_queue_depth/m, "an uncollectable gauge is absent, never a fake 0");
+  assert.doesNotMatch(body, /^outbox_pending_events/m);
+
+  await app.db.close();
+});

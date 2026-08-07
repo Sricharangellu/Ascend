@@ -48,14 +48,28 @@ jobs:
       # WORK/audits/AUDIT_2026-08-03T110000Z-replit-pnpm-root-hijack-incident.md.
       - name: Root manifest integrity (package.json / lockfiles / tsconfig)
         run: node tools/hygiene-check.mjs
-      - name: No unguarded mutation routes (router.patch/delete without requireRole)
-        run: |
-          ! grep -rn --include="*routes.ts" -A1 "router\.\(patch\|delete\|put\)" src/ \
-            | grep -B1 "handler(" \
-            | grep -v "requireRole\|//\s*no auth" \
-            | grep "router\.\(patch\|delete\|put\)" \
-            | grep -v "test\|spec" \
-            || echo "All mutation routes have role guards ✓"
+      # Backlog F-2, the twin of the SQL-injection guard's F-1 (fixed in
+      # c00a485). This step used to be a grep pipeline ending in
+      # `|| echo "All mutation routes have role guards ✓"`, which discarded the
+      # pipeline's exit status — it printed a ✓ and exited 0 on every run since
+      # the pipeline was written, and had never once evaluated the codebase.
+      #
+      # Repairing the `|| echo` alone would not have been enough: the grep only
+      # recognised the literal text `requireRole` on the route's own line, while
+      # this repo's dominant convention is a hoisted `const mgr =
+      # requireRole("manager")` alias used across 20+ route files. Turned on
+      # as-written it went red with 39 findings, the large majority false. A
+      # check that cries wolf on arrival gets deleted, not fixed.
+      #
+      # Replaced with a real scanner that resolves local aliases, honours
+      # router-level `router.use(guard)`, and recognises all five authorization
+      # guards this codebase actually uses (requireRole / requirePermission /
+      # requireScope / requireCapability / requireModule). Same 39 route
+      # registrations, 4 genuine findings — one of which (quotes' hard DELETE)
+      # was fixed in this change; the rest are allowlisted with reasons.
+      # Shrink-only allowlist, same posture as the SQL guard's.
+      - name: No unguarded mutation routes (PUT/PATCH/DELETE without an authz guard)
+        run: npm run authz:scan
       - name: No console.log/error in production source (modules + gateway)
         run: |
           # shellcheck disable=SC2126 # grep|wc -l keeps this symmetric with the identical pattern below (AGENTS.md count)
@@ -162,11 +176,71 @@ jobs:
       - name: Dead-code scan (report-only)
         run: node tools/dead-code-scan.mjs
 
-      - name: Dependency advisories (report-only)
+      # Backlog F-16. The root and `web` halves are deliberately asymmetric now.
+      #
+      # ROOT IS A REAL GATE (`--audit-level=high`, no `|| true`). The 2026-08-04
+      # audit recorded "2 low at the root"; re-measured 2026-08-06 the root is at
+      # **0 advisories of any severity**, so gating it costs nothing today and
+      # means the next high/critical advisory to land on a backend dependency
+      # (express, pg, jsonwebtoken, bcryptjs, stripe — the ones that actually
+      # handle money, auth and untrusted input) fails the build instead of
+      # scrolling past in a log nobody reads. Low/moderate stay reported, not
+      # gated, so routine noise cannot block a release.
+      #
+      # WEB STAYS REPORT-ONLY, and this is not laziness — it is the honest
+      # status. 10 advisories (1 critical, 6 high, 3 moderate) and every single
+      # one resolves only through a semver-major migration: `next` 14 → 16 and
+      # `vitest` 2 → 4 (F-24/F-25). Gating it would fail every PR from the first
+      # run until those migrations land, and a check that blocks all work gets
+      # deleted rather than fixed — the same reasoning docker-build, e2e and the
+      # duplicate/dead-code scans were each introduced under.
+      #
+      # `--omit=dev` is NOT used on either half: the critical finding is vitest,
+      # a devDependency whose UI server reads and executes arbitrary files.
+      # Hiding dev-only advisories would defeat the point.
+      #
+      # Flip web to a gate in the same shape as root the moment F-24/F-25 land.
+      - name: Dependency advisories — root (gates on high and above)
         run: |
-          echo "── root ──"
+          # A bare `npm audit --audit-level=high` also exits non-zero when the
+          # registry is unreachable, and `guard` is the ONLY job here with no
+          # `npm ci` — i.e. the only one that currently survives a registry
+          # outage. Making it the first job to die on one would be a real
+          # regression in CI resilience, and it would fail with a message that
+          # reads like a vulnerability.
+          #
+          # So parse the report and decide from the counts: a genuine
+          # high/critical advisory fails the build; an inconclusive run (no
+          # report, unparseable JSON) warns and passes. The report-only step
+          # below still prints the full detail either way.
+          npm audit --json > /tmp/root-audit.json 2>/dev/null || true
+          node -e '
+            const fs = require("node:fs");
+            let v = null;
+            try { v = JSON.parse(fs.readFileSync("/tmp/root-audit.json", "utf8")).metadata.vulnerabilities; }
+            catch { v = null; }
+            if (!v) {
+              console.log("::warning title=Dependency audit inconclusive::npm audit returned no parseable report (registry unreachable?). Not failing the build on an inconclusive result.");
+              process.exit(0);
+            }
+            const n = (k) => Number(v[k] || 0);
+            console.log("root advisories — critical:" + n("critical") + " high:" + n("high") + " moderate:" + n("moderate") + " low:" + n("low"));
+            if (n("critical") + n("high") > 0) {
+              // No backticks anywhere inside this single-quoted script: actionlint
+              // runs shellcheck over the block and SC2016 reads a backtick in
+              // single quotes as an unexpanded command substitution. Same trap the
+              // SQL-injection guard step above documents.
+              console.error("high/critical advisory in the root dependency tree. Reproduce with: npm audit");
+              process.exit(1);
+            }
+            console.log("✓ no high or critical advisories in the root dependency tree");
+          '
+      - name: Dependency advisories — root + web (report-only detail)
+        if: always()
+        run: |
+          echo "── root (low+, informational) ──"
           npm audit --audit-level=low || true
-          echo "── web ──"
+          echo "── web (blocked on the next@16 / vitest@4 migrations, F-24/F-25) ──"
           npm audit --audit-level=low --prefix web || true
 
       - name: One canonical agent-instruction file

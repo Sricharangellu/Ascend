@@ -47,4 +47,20 @@ COPY api ./api
 RUN chown -R node:node /app
 USER node
 EXPOSE 3001
+# The app exposes /healthz (liveness) and /readyz (readiness — proves the DB is
+# reachable and the pool is not exhausted), but the image declared neither, so
+# any orchestrator running this container (Cloud Run, ECS, Fly, Kubernetes,
+# plain `docker run`) had no way to tell a booted-but-broken process from a
+# healthy one, and would route traffic to a container whose database was down.
+#
+# Probes /readyz, not /healthz: /healthz answers 200 from a process that cannot
+# reach Postgres, which is precisely the state a health check needs to catch.
+# start-period covers migrations, which run on first boot under an advisory lock
+# and can legitimately take tens of seconds on a cold database.
+#
+# node -e over curl/wget deliberately — neither is installed in node:*-alpine,
+# and adding one to a runtime image for a health check widens the attack surface
+# of a container that otherwise ships no shell utilities.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||3001)+'/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
 CMD ["node", "dist/src/server.js"]

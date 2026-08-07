@@ -47,6 +47,33 @@ This stricter guard blocks the local patterns that create unrelated dirty code:
 
 Run this before opening a PR or handing off a session. CI also runs it in the guard job.
 
+## `route-authz-scan.mjs` — every mutating route must carry an authz guard
+
+```bash
+npm run authz:scan
+```
+
+Fails if any `PUT`/`PATCH`/`DELETE` route in `src/` reaches its handler with no
+`requireRole` / `requirePermission` / `requireScope` / `requireCapability` /
+`requireModule` in front of it. A guard counts whether it is applied inline,
+through a `const mgr = requireRole("manager")` alias declared in the same file,
+or through an earlier `router.use(...)`.
+
+Replaces a CI grep step that was inert twice over: it ended in `|| echo "…✓"`,
+so it exited 0 on every run it ever made, and it only matched the literal text
+`requireRole` on the route's own line — which meant the 20+ files using the
+hoisted-alias convention all read as unguarded. Repaired as written it reported
+39 findings, ~35 of them false. This scanner reports **4**, all real, and one
+(`quotes DELETE /:id` — a hard delete of a commercial document by any cashier,
+with no soft-delete column and no audit entry) was fixed rather than
+allowlisted. Full reasoning in `docs/architecture/ADR/ADR-008`.
+
+`POST` is deliberately out of scope: in a POS it is the ordinary cashier action
+(ring a sale, take payment, open a tab), so gating it would be wrong for the
+product. The allowlist is **shrink-only** — an entry means "reviewed, and
+cashier-level access is correct here", and carries the reason. Never add one to
+make CI green.
+
 ## `duplicate-code-scan.mjs` — copy-paste detector (report-only)
 
 ```bash
