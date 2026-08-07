@@ -30,17 +30,21 @@ jobs:
     # Settings → Secrets and variables → Actions → Variables.
     #
     #   PROD_BACKEND_URL   e.g. https://ascend-prod.onrender.com
-    #   PROD_FRONTEND_URL  e.g. https://ascendhq-app.vercel.app
+    #   PROD_FRONTEND_URL  e.g. https://ascendhqweb.vercel.app
     #
-    # The fallbacks below are the historical Vercel hostnames. As of
-    # 2026-08-05 the backend one no longer resolves (production moved to
-    # Render per docs/architecture/DEPLOYMENTS.md), so this workflow has been
-    # failing every run at the first step — a DNS failure in ~1s, not a real
-    # outage. Setting PROD_BACKEND_URL is what fixes it; the fallback is kept
-    # only so this change alone alters no behaviour.
+    # FRONTEND fallback is now the real production host, confirmed by Sri on
+    # 2026-08-07: https://ascendhqweb.vercel.app (Vercel project `ascend_hq_web`).
+    # It replaces `ascendhq-app.vercel.app`, which returns DEPLOYMENT_NOT_FOUND
+    # and was half of why this heartbeat went red.
+    #
+    # BACKEND fallback is still a dead hostname. As of 2026-08-05 it no longer
+    # resolves (production moved to Render per docs/architecture/DEPLOYMENTS.md),
+    # so this workflow still fails at the first step — a DNS failure in ~1s, not
+    # a real outage. Setting PROD_BACKEND_URL is what fixes it; the fallback is
+    # kept so this change alters no behaviour on the backend side.
     env:
       BACKEND: ${{ vars.PROD_BACKEND_URL || 'https://ascendhq-api.vercel.app' }}
-      FRONTEND: ${{ vars.PROD_FRONTEND_URL || 'https://ascendhq-app.vercel.app' }}
+      FRONTEND: ${{ vars.PROD_FRONTEND_URL || 'https://ascendhqweb.vercel.app' }}
     steps:
       - name: Show probe targets
         run: |

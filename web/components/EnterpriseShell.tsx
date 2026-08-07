@@ -29,7 +29,7 @@ export type NavKey =
   | "restaurant-dashboard" | "restaurant-floor-plan" | "restaurant-tabs"
   | "permissions" | "modes" | "kiosk-settings" | "b2b-settings"
   | "warehouse" | "pricing" | "edi-imports" | "promotions" | "documents"
-  | "inventory-errors" | "bills" | "delivery" | "ai-assistant";
+  | "inventory-errors" | "bills" | "delivery" | "ai-assistant" | "progress";
 
 // ── Section / nav tree ────────────────────────────────────────────────────────
 
@@ -43,6 +43,7 @@ const SECTION_MAP: Record<NavKey, RailSection> = {
   returns: "sell", "service-orders": "sell",
   ecommerce: "online",
   reports: "reporting", insights: "reporting", "ai-assistant": "reporting", "tax-compliance": "reporting",
+  progress: "reporting",
   catalog: "catalog", discounts: "catalog", "gift-cards": "catalog",
   loyalty: "catalog", promotions: "catalog", pricing: "catalog",
   inventory: "inventory", operations: "inventory", purchasing: "inventory",
@@ -144,6 +145,7 @@ const NAV_TREE: NavSection[] = [
       { label: "Insights",       href: "/insights",       featureGate: "insights" },
       { label: "AI Assistant",   href: "/ai-assistant",   featureGate: "ai-assistant" },
       { label: "Tax Compliance", href: "/tax-compliance", featureGate: "tax-compliance" },
+      { label: "Progress",       href: "/progress",       featureGate: "progress" },
     ],
   },
   {
