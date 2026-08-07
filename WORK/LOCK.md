@@ -1,3 +1,27 @@
+## Active Claim (Claude Code web — launch-readiness prompts + mobile store audit)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-prompt-guide-6ol0p9` (same branch/PR #188 as the claim below) |
+| Queue item | Add a launch-readiness section to the prompt guide — one prompt per pre-store-submission check (store mechanics, auth/session, data correctness, security, reliability, compliance) — and record the verified `artifacts/ascend-mobile` submission blockers found while writing it as an append-only audit. |
+| Files/areas expected | `tools/AGENT_PROMPT.md` (new §5 + renumber), `AGENTS.md` (the onboarding bullet's section list only), `WORK/audits/AUDIT_2026-08-06T050023Z-mobile-store-readiness.md` (new), `WORK/LOCK.md`. NOT `artifacts/**` (another environment's tree — audited by reading only, not modified), NOT `src/**`, NOT `web/**`, NOT `WORK/FORWARD_PLAN.md`, NOT `WORK/LOOP_STATE.md`. |
+| Started | 2026-08-06T050023Z |
+| Status | RELEASED — pushed to `claude/ascend-prompt-guide-6ol0p9` (PR #188). Gates: `node tools/hygiene-check.mjs` PASS (2177 files — no junk, tracked env, conflict markers, secrets, or broken doc links). Guide sections renumbered 1–7 and every cross-reference re-checked (`AGENTS.md` onboarding bullet, the guide's own header). Audit citations verified to resolve to real files. |
+| Blockers | none |
+| Not run | Backend/web suites — unchanged from the claim below: empty `node_modules` in this container, and the diff is markdown only, zero TypeScript. CI covers it on the PR. `artifacts/ascend-mobile` was read, never modified, and never built — the audit says so explicitly and labels itself `partial` for that reason. |
+
+## Active Claim (Claude Code web — prompt guide)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-prompt-guide-6ol0p9` |
+| Queue item | Ascend prompt guide. Rewrite `tools/AGENT_PROMPT.md` (the sanctioned onboarding prompt) into the current, correct prompt guide + per-job prompt recipes, and fix the three places it depends on that are stale: `tools/new-worktree.sh` cuts branches off `origin/master` (violates the binding "never branch from master" directive), `tools/README.md` documents that same base plus an already-completed "Sri-only: turn on PR protection" step, and `AGENTS.md`'s Operational Reference still says "Current mode (Phase 1): direct-to-master". No new instruction file — every change updates a mapped file in place. |
+| Files/areas expected | `tools/AGENT_PROMPT.md`, `tools/new-worktree.sh`, `tools/README.md`, `AGENTS.md` ("Git: where and how" + the Sri-only list only), `WORK/README.md` (AGENT_PROMPT row only), `docs/architecture/ORCHESTRATION.md` (concurrency-protocol claim line only), `WORK/LOCK.md`. NOT `src/**`, NOT `web/**`, NOT `WORK/FORWARD_PLAN.md`, NOT `WORK/LOOP_STATE.md`, NOT `docs/architecture/PIPELINE.md`. |
+| Started | 2026-08-05T045427Z |
+| Status | RELEASED — pushed to `claude/ascend-prompt-guide-6ol0p9`. Gates: `node tools/hygiene-check.mjs` PASS (2176 files — no junk, tracked env, conflict markers, secrets, or **broken doc links**, which is the load-bearing check for a docs change), `bash -n tools/new-worktree.sh` PASS + branch/dir derivation exercised over 6 inputs incl. the empty-slug guard. Every path and identifier the guide cites verified present (11 design primitives, `requireCapability`/`requireRole`, the ARCHITECTURE.md owner table, all 12 doc targets, the 3 CI check names). |
+| Blockers | none |
+| Not run | `npm test` / `npm run smoke` / `tsc --noEmit` — this container has an empty `node_modules` (deps were never installed), so `tsc` fails on a missing `@types/node` rather than on anything in the diff. Justified: the change touches only `.md` and one `.sh`, zero TypeScript. CI runs the full gate on the PR. |
+
 ## Active Claim (Claude Code web — AI-slop / consistency audit)
 
 | Field | Value |
@@ -220,6 +244,27 @@ Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0
 | Started | 2026-08-02T200816Z |
 | Status | RELEASED — merged to develop via PR #141 (`0f30096`); see AUDIT_2026-08-02T200816Z-aging-party-names-deeplinks.md |
 | Blockers | none |
+
+## Active Claim (Claude session H — post-merge staging hardening + release go/no-go)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code (web), Opus — Sri-directed: post-merge hardening of the `develop → staging` promotion (PR #187) and a go/no-go on `staging → master` |
+| Queue item | Verify the merged `staging` tree `f0c1845`: tier-sync proof, full `npm run verify` + `ops:check`, CI guard anti-pattern checks, backup/restore drill (standing critical C-1), rollback procedure, and a structured release verdict. Fix what is found. |
+| Files/areas expected | `scripts/deploy.sh` (empty-URL guards only); NEW `src/shared/deploy-guard.test.ts`; NEW `WORK/audits/AUDIT_2026-08-05T054800Z-post-merge-staging-hardening.md`; `WORK/LOOP_STATE.md`; this LOCK. **No module/product code touched.** No pushes to `master`/`staging`/`develop` — PR only. |
+| Started | 2026-08-05 |
+| Status | RELEASED — verdict NO-GO (see audit). Fixed: `scripts/deploy.sh` reported `✓ frontend deployed` + exit 0 when the Vercel deploy failed with "Project not found" — same code path as `DEPLOY_ENV=prod`, so a production release could have reported green while shipping nothing. Regression test verified to fail without the fix. C-1 restore drill executed for the first time (backup 0.168s, restore ~1s, 193/193 tables and all sampled row counts identical, app boots against the restored DB). Gates on `f0c1845`: 852/852 tests, smoke, web typecheck/lint/build, CI E2E all green. |
+| Blockers | Load/stress testing (mandate §3) NOT done — no reachable TESTING tier (`deploy-staging` ran and failed; Vercel projects deleted), no Vercel/Supabase credentials, restricted egress. Reported as FAIL, not softened. |
+
+## Reconciliation note (session H, 2026-08-05)
+
+Board was clear before this claim: the session G coordinator entry below was
+already closed (`RELEASED — SUPERSEDED`, 2026-07-30 staleness review), and no
+other claim was `ACTIVE`. No overlapping claim was taken over.
+
+The file-header `Status:` line above still reads "ACTIVE — session G … Phase 0"
+and now contradicts session G's own closed Status row; left as-is rather than
+edited, since this session's remit was hardening, not board maintenance.
 
 ## Active Claim (Claude session G — Phase 0 coordinator: finish end-to-end + deployment readiness)
 

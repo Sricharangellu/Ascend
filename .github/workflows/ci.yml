@@ -23,6 +23,16 @@ permissions:
   contents: read
   deployments: write
 
+# Vercel project IDs for scripts/deploy.sh, sourced from repo variables so a
+# deleted or replaced project can be repointed WITHOUT a code change (Settings →
+# Secrets and variables → Actions → Variables). Empty = deploy.sh keeps its own
+# historical defaults, so this is a no-op until the variables are set.
+# See docs/architecture/DEPLOYMENTS.md — the frontend default currently points
+# at a project that returns "Project not found".
+env:
+  VERCEL_BACKEND_PROJECT_ID: ${{ vars.VERCEL_BACKEND_PROJECT_ID }}
+  VERCEL_FRONTEND_PROJECT_ID: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
+
 # ─── Shared test jobs (run on every trigger) ──────────────────────────────────
 jobs:
   guard:
@@ -482,8 +492,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Deploy dev (backend + frontend) → Vercel preview
-        run: ./scripts/deploy.sh both
+      - name: Deploy dev → Vercel preview
+        run: ./scripts/deploy.sh "${{ vars.DEV_DEPLOY_TARGET || 'both' }}"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           DEPLOY_ENV: dev
@@ -522,8 +532,13 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Deploy testing (backend + frontend) → Vercel preview alias
-        run: ./scripts/deploy.sh both
+      # Target is a repo variable (both | frontend | backend), default `both`.
+      # Set STAGING_DEPLOY_TARGET=frontend when the staging backend is hosted
+      # outside Vercel (e.g. Render git auto-deploy, as production already is) —
+      # otherwise deploy.sh tries to push the backend to a Vercel project that
+      # may not exist and fails the whole job.
+      - name: Deploy testing → Vercel preview alias
+        run: ./scripts/deploy.sh "${{ vars.STAGING_DEPLOY_TARGET || 'both' }}"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           DEPLOY_ENV: testing
@@ -560,8 +575,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Deploy production (backend + frontend) → Vercel --prod
-        run: ./scripts/deploy.sh both
+      - name: Deploy production → Vercel --prod
+        run: ./scripts/deploy.sh "${{ vars.PROD_DEPLOY_TARGET || 'both' }}"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN_PROD }}
           DEPLOY_ENV: prod

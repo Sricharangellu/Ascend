@@ -51,8 +51,21 @@ case "$DEPLOY_ENV" in
   *) echo "DEPLOY_ENV must be prod|testing|dev"; exit 1 ;;
 esac
 TEAM="team_WNp8vBq1RmWTEH8WSnenP7jM"             # gellusricharan-4715s-projects
-BACKEND_PID="prj_krZ34CIFjzQrMvZ08PWqqbxzBf7d"    # ascend-backend (rebrand Phase 3; formerly finder-pos-backend — project ID is immutable, never changed)
-FRONTEND_PID="prj_TiPX9UYctGKJbQr4Lb1WFwSsKiN1"   # ascend-frontend (formerly finder-pos-frontend — project ID unchanged)
+# Vercel project IDs. Overridable via env so a deleted/renamed/replaced project
+# can be repointed from repo variables WITHOUT editing this script — set
+# VERCEL_BACKEND_PROJECT_ID / VERCEL_FRONTEND_PROJECT_ID under
+# Settings → Secrets and variables → Actions → Variables (ci.yml passes them).
+#
+# The defaults below are the historical IDs. As of 2026-08-05 the frontend
+# default no longer exists — the staging deploy failed with
+# `Error: Project not found ({"VERCEL_PROJECT_ID":"prj_TiPX9UY…"})` — while a
+# live project `ascend_hq_web` (prj_MvvmpNkRQbKUAEOmh9ZvmRJa7ETN, root dir
+# `web`) is actively building previews and is what PIPELINE.md names as the
+# production frontend. Which project each tier should target is a Sri decision
+# (one project + aliases vs. separate per-tier projects), so the defaults are
+# left unchanged here and the override is what moves them.
+BACKEND_PID="${VERCEL_BACKEND_PROJECT_ID:-prj_krZ34CIFjzQrMvZ08PWqqbxzBf7d}"    # ascend-backend (rebrand Phase 3; formerly finder-pos-backend — project ID is immutable, never changed)
+FRONTEND_PID="${VERCEL_FRONTEND_PROJECT_ID:-prj_TiPX9UYctGKJbQr4Lb1WFwSsKiN1}"  # ascend-frontend (formerly finder-pos-frontend — project ID unchanged)
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 : "${VERCEL_TOKEN:?Set VERCEL_TOKEN (a Vercel token with access to the team scope)}"
 
@@ -103,6 +116,13 @@ deploy_backend() {
   url=$( cd "$S" && VERCEL_ORG_ID="$TEAM" VERCEL_PROJECT_ID="$BACKEND_PID" \
       npx --yes vercel deploy $PROD_FLAG --archive=tgz --yes --token "$VERCEL_TOKEN" "${DB_ENV_ARGS[@]}" \
       | grep -oE 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1 )
+  # An empty url means `vercel deploy` failed (e.g. "Project not found") — its
+  # non-zero status cannot propagate here, because `set -e` is suspended inside
+  # the `deploy_backend || backend_status=$?` call below. Fail explicitly.
+  if [[ -z "$url" ]]; then
+    echo "✗ backend deploy failed ($DEPLOY_ENV): vercel produced no deployment URL" >&2
+    return 1
+  fi
   echo "→ Backend deployed: $url"
   # Non-prod: pin the unique preview URL to a stable alias so the frontend can be
   # built against a durable backend origin (prod uses --prod's own alias).
@@ -138,6 +158,15 @@ deploy_frontend() {
   url=$( cd "$S" && VERCEL_ORG_ID="$TEAM" VERCEL_PROJECT_ID="$FRONTEND_PID" \
       npx --yes vercel deploy $PROD_FLAG --archive=tgz --yes --token "$VERCEL_TOKEN" \
       | grep -oE 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1 )
+  # Same failure mode as deploy_backend: without this guard a failed deploy
+  # ("Project not found") fell through to the alias step, which errored with
+  # `argument "" is not a valid ID or URL`, and the function still returned 0
+  # because its last command was the unconditional "✓ frontend deployed" echo.
+  # That reported a green deploy while shipping nothing — including for prod.
+  if [[ -z "$url" ]]; then
+    echo "✗ frontend deploy failed ($DEPLOY_ENV): vercel produced no deployment URL" >&2
+    return 1
+  fi
   echo "→ Frontend deployed: $url"
   if [[ "$DEPLOY_ENV" != "prod" && -n "${FRONTEND_ALIAS:-}" ]]; then
     echo "→ Frontend: aliasing $url → $FRONTEND_ALIAS"

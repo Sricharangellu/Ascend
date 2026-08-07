@@ -10,8 +10,9 @@
 #
 # Correct order for a fresh database:
 #   1. Put the connection string in .env  (DATABASE_URL=…)
-#   2. npm run dev            # boots the backend → provisions all 170+ tables
-#   3. ALLOW_DEMO_SEED=1 npm run db:setup   # this script — seeds the demo tenant
+#   2. npm run db:check       # verifies the connection before anything writes
+#   3. npm run dev            # boots the backend → provisions all 170+ tables
+#   4. ALLOW_DEMO_SEED=1 npm run db:setup   # this script — seeds the demo tenant
 #
 # The seed itself is gated by ALLOW_DEMO_SEED=1 so it can never run by accident
 # against a real database.
