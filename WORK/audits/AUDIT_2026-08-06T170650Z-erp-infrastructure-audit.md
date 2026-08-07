@@ -491,9 +491,18 @@ report-only first. Not implemented here because the Docker daemon is unavailable
 in this session and shipping an unverified scanner into CI is exactly what
 ADR-008 prohibits.
 
-**F-8 — 14 dependency advisories in `web` (1 critical, 9 high). `MEDIUM`. Pre-existing, tracked.**
-Fixes are major migrations (`next` 14→16, `vitest` 2→4), tracked as F-24/F-25.
-Report-only in the new `security.yml` with the promotion condition written down.
+**F-8 — dependency advisories in `web`. `MEDIUM`. Pre-existing, tracked.**
+**Corrected 2026-08-07** against this PR's own CI run rather than the 2026-08-04
+figure this section originally quoted: **root is at 0 vulnerabilities; `web` has
+10 (1 critical, 6 high, 3 moderate)**. Web's fixes are major migrations (`next`
+14→16, `vitest` 2→4), tracked as F-24/F-25, so web stays report-only in the new
+`security.yml`. **Root does not** — at zero it already satisfies ADR-008's
+promotion bar and could gate immediately at any `--audit-level`; splitting the
+step so root gates without waiting on web is filed as a follow-up (see ADR-008's
+Consequences). Recording this here because the original number was a stale
+citation, not a measurement: the audit quoted a figure from an earlier pass
+instead of running the command, which is the same class of mistake §4's
+introduction warns about.
 
 **F-9 — No secrets manager. `MEDIUM`.**
 Credentials live in GitHub Actions secrets and host env vars. No central

@@ -13,8 +13,10 @@ second one printed 39 real matches and a green ✓ in the same run and had
 therefore never once evaluated this codebase.
 
 Adding scanners to a repo that already carries findings creates the opposite
-failure. `web` has 14 dependency advisories (1 critical, 9 high) whose fixes are
-major-version migrations, not patches. A scanner switched on in gating mode
+failure. `web` carries dependency advisories — 10 as measured by CI on
+2026-08-06 (1 critical, 6 high, 3 moderate; an earlier 2026-08-04 count of 14 is
+superseded) — whose fixes are major-version migrations, not patches. A scanner
+switched on in gating mode
 against that backlog fails every PR on arrival, and this repo's own history shows
 what happens next: a check that blocks all work gets deleted or `|| true`'d, and
 the `|| true` outlives the reason for it. That is precisely how the two inert
@@ -35,7 +37,7 @@ Applied to what this audit added:
 | Secret scan, working tree (`gitleaks`) | **Gates** | First full scan found 4 hits, all false positives, all justified in `.gitleaks.toml`. Zero real backlog, so it ships able to say no. Verified against planted AWS/Stripe/GitHub credentials before landing. |
 | Secret scan, git history | Report-only | A hit means a credential was published and needs rotating — a decision, not a red build on an unrelated PR. Promote once history has been reviewed once. |
 | Unguarded mutation routes (`route-guard-scan`) | **Gates** | Ships with the 76 currently-unguarded routes allowlisted and individually classified, so it is green today and fails on the 77th. |
-| Dependency advisories | Report-only | 14 open in `web`; fixes are F-24/F-25 migrations. Promote to `--audit-level=high` when those land. |
+| Dependency advisories | Report-only | 10 open in `web` (1 critical, 6 high, 3 moderate); fixes are F-24/F-25 migrations. Promote to `--audit-level=high` when those land. **Root is at 0** — see the note below; the root half no longer needs to wait. |
 | Licence inventory | Report-only | Which licence families are acceptable is a business decision. Promote once a policy exists. |
 | SBOM | Artifact only | Evidence for security review, not a gate. |
 
@@ -60,9 +62,9 @@ are required for any new allowlisted check:
 **Alternatives considered:**
 
 - *Gate everything immediately.* Honest, and it would fail every PR from the
-  first run against 14 unfixable-today advisories. The predictable outcome is
-  the check being disabled, which is strictly worse than report-only because it
-  removes the visible reminder too.
+  first run against `web`'s unfixable-today advisories. The predictable outcome
+  is the check being disabled, which is strictly worse than report-only because
+  it removes the visible reminder too.
 - *Report-only for everything, promote later.* Simple and uniform, and it is
   what the repo did for `docker-build`, `e2e`, `duplicate-code-scan` and
   `dead-code-scan`. Rejected here because it wastes the one case that matters
@@ -92,6 +94,15 @@ are required for any new allowlisted check:
   when GHAS is purchased, or when a non-GHAS scanner has been proven green
   against this codebase on a branch first — same bar every other check in this
   ADR had to clear.
+- **First promotion condition is already met, and this is the policy working as
+  designed.** This ADR's rule is "gate when the codebase already passes", and the
+  guard job's own `npm audit` on 2026-08-06 reported **root: 0 vulnerabilities**.
+  Root therefore qualifies to gate *today*, at any `--audit-level`; only `web` is
+  blocked, on F-24/F-25. The step should be split so the two halves are promoted
+  independently rather than root waiting on web's major-version migrations —
+  filed as a follow-up rather than done here, because changing a gate's
+  pass/fail behaviour in the same PR that introduces the gate removes the
+  green-on-arrival evidence the policy depends on.
 
 **Supersedes:** none.
 

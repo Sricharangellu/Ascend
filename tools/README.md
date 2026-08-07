@@ -112,9 +112,9 @@ npm run route:scan
 ```
 
 Fails when a `router.post/put/patch/delete` registers no authorization
-middleware between its path and its handler. Current tree: **314 mutating routes
-across 49 route files, 76 unguarded, all allowlisted** in
-`route-guard-allowlist.json`.
+middleware between its path and its handler. Everything unguarded is listed, with
+its reason, in `route-guard-allowlist.json` — read the count off a real run
+rather than from here (2026-08-06: 314 mutating routes, 49 files, 76 allowlisted).
 
 **This replaced a CI grep step that could never fail.** The old step ended
 `! grep … || echo "All mutation routes have role guards ✓"` — the `!` inverts a

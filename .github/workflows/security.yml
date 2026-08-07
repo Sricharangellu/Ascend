@@ -15,11 +15,17 @@
 #                     no backlog to burn down, so there is no reason to accept a
 #                     check that cannot say no. Verified against planted AWS /
 #                     Stripe / GitHub credentials before landing.
-#   dependency-scan — REPORT-ONLY. `web` carries 14 advisories (1 critical,
-#                     9 high) as of 2026-08-04 and the fixes are major-version
-#                     migrations (next 14->16, vitest 2->4), tracked as F-24/F-25.
-#                     Gating today would fail every PR on arrival, and a check
-#                     that blocks all work gets deleted rather than fixed.
+#   dependency-scan — REPORT-ONLY, but only because of `web`. Measured by this
+#                     pipeline's own guard job on 2026-08-06: **root 0
+#                     vulnerabilities; web 10 (1 critical, 6 high, 3 moderate)**.
+#                     (An earlier 2026-08-04 count of 14 in web is superseded.)
+#                     Web's fixes are major-version migrations — next 14->16,
+#                     vitest 2->4 — tracked as F-24/F-25, so gating web today
+#                     would fail every PR on arrival, and a check that blocks all
+#                     work gets deleted rather than fixed.
+#                     NOTE: root is at zero, so the root half could gate right
+#                     now at any --audit-level. Split the step and gate root
+#                     first rather than waiting on web; see ADR-008.
 #   license-scan    — REPORT-ONLY until the inventory has been reviewed once.
 #   sbom            — Artifact only. This is evidence for SOC 2 / customer
 #                     security review, not a gate.
