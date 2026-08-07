@@ -344,3 +344,63 @@ Actions outage.
 
 Still not done: **load/stress testing** (no reachable TESTING tier) and any
 verdict from CI itself.
+
+---
+
+## 10. Addendum 2026-08-07T02:0x — CI finally ran, and is green
+
+### Getting CI to run at all
+
+Actions stopped creating runs for this repo around 19:50Z and recovered ~00:47Z
+(~5h). During the outage a push produced no run and `rerun_workflow_run`
+returned `201` with zero jobs. When it recovered, the branch's only run was the
+stale one pinned to `df2412b`, stuck queued and un-cancellable (`409 Cannot
+cancel a workflow re-run that has not yet queued`), so it could never give the
+PR a verdict.
+
+Rather than push a second empty commit, the PR was **closed and reopened** —
+`reopened` is a default `pull_request` activity type — which fired a run on the
+real head with no history pollution. Worth remembering as the clean way to
+re-trigger CI when the head is right but no run exists.
+
+### Result — run 31138020800 on `d4da1d1`
+
+| Job | Attempt 1 | Attempt 2 |
+|---|---|---|
+| Production guard — lint anti-patterns (15 checks) | ✅ 25s | ✅ |
+| Docker build (non-blocking) | ✅ 30s | ✅ |
+| Frontend — typecheck + lint + test + build | ✅ 2m13s | ✅ |
+| Backend — typecheck + test | ❌ **893/894** | ✅ **894/894, 16m20s** |
+| └ Smoke — full POS lifecycle on real Postgres | skipped (prior step failed) | ✅ |
+
+The Docker job passing in **30 seconds** retroactively confirms §9's diagnosis:
+its earlier 45-minute hang was a degraded runner, not the Dockerfile.
+
+### The one failure, and an honest accounting of it
+
+Attempt 1's single failure was `settings/settings.test.ts` "get and update
+feature flags" — **not an assertion**. It died at exactly 30014ms with pg code
+`57014` (statement timeout) raised inside `buildApp`'s migration transaction,
+and the server-side log names the statement: `SELECT
+pg_advisory_xact_lock(7381920)`.
+
+Root cause (structural, pre-existing, now filed in `WORK/LOOP_STATE.md`):
+`db.tx()` sets `SET LOCAL statement_timeout = 30s`, and the first statement in
+the migration transaction is a **blocking** advisory-lock acquisition — so the
+*queuing* time counts against the same budget as real work. 123 fresh-schema
+call sites across 86 test files all funnel through that one lock. The runner was
+I/O-crushed (checkpoints `write=70–140s`, ~195k file syncs), so one waiter ran
+out of budget.
+
+**This branch's contribution, stated plainly rather than waved away:** the four
+new `progress.test.ts` tests are 4 of those 123 fresh-schema builds — roughly a
+3% increase in load on precisely the bottleneck that broke. The failing test is
+in a module this branch does not touch, the mechanism predates it, and attempt 2
+passed 894/894 on a healthy runner — but "we added 3% to a saturated
+bottleneck" is a truer statement than "unrelated flake."
+
+### Status change
+
+`End-to-end (Playwright)` and every other row in §8 stand. The remaining
+unverified item is unchanged: **load/stress testing**, still blocked on there
+being no reachable TESTING tier.
