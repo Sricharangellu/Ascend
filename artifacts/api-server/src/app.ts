@@ -162,6 +162,10 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
         "https://finder-pos-frontend.vercel.app",
         "https://ascend-pos-frontend.vercel.app",
         "https://ascendhq-app.vercel.app",
+        // The live production frontend (Vercel project `ascend_hq_web`), confirmed
+        // by Sri 2026-08-07. The `ascendhq-app` host above it is dead
+        // (DEPLOYMENT_NOT_FOUND) but is kept per the additive policy in this block.
+        "https://ascendhqweb.vercel.app",
       ]);
 
   app.use((req, res, next) => {
