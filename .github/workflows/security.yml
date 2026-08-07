@@ -100,7 +100,29 @@ jobs:
     # has nothing to compare on a push. It is the complement to ci.yml's
     # `npm audit` gate, which only ever sees the merged end state — this one
     # catches the advisory *arriving*, and names the PR that brought it.
-    if: github.event_name == 'pull_request'
+    #
+    # SKIPS UNTIL EXPLICITLY ENABLED. On its first real run this job failed in
+    # 7 seconds with:
+    #
+    #   Dependency review is not supported on this repository.
+    #   Please ensure that Dependency graph is enabled
+    #
+    # The action requires GitHub's Dependency graph feature, which is a
+    # repository *setting* (Settings → Code security → Dependency graph), not
+    # something a workflow can turn on. Until it is enabled this job can only
+    # ever fail, and a check that always fails is as useless as one that can
+    # never fail — the exact anti-pattern ADR-008 was written about.
+    #
+    # So it is gated behind a repo variable, matching how every other
+    # not-yet-configured tier in this pipeline behaves (`deploy-dev` skips on an
+    # empty DEV_BACKEND_URL; `backup.yml` skips without PROD_DATABASE_URL):
+    # skip cleanly now, become a real gate the moment someone opts in.
+    #
+    # TO ENABLE (Sri): turn on Dependency graph at
+    # https://github.com/Sricharangellu/Ascend/settings/security_analysis, then
+    # set the repo variable DEPENDENCY_REVIEW_ENABLED=true under
+    # Settings → Secrets and variables → Actions → Variables.
+    if: github.event_name == 'pull_request' && vars.DEPENDENCY_REVIEW_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

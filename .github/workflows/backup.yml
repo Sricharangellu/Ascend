@@ -164,7 +164,13 @@ jobs:
             echo "|---|---|"
             for f in "$BACKUP_DIR"/*.pgdump; do
               [ -e "$f" ] || continue
-              printf '| `%s` | %s |\n' "$(basename "$f")" "$(du -h "$f" | cut -f1)"
+              # Backticks are escaped inside DOUBLE quotes, never placed in a
+              # single-quoted printf format: actionlint runs shellcheck over
+              # this block and SC2016 treats a backtick inside single quotes as
+              # a command substitution someone forgot to expand. Same trap
+              # ci.yml's SQL-guard step documents at length — matching the
+              # escaped-backtick style of the neighbouring echo below.
+              echo "| \`$(basename "$f")\` | $(du -h "$f" | cut -f1) |"
             done
             echo
             echo "Retained as workflow artifact \`db-backup-${{ github.run_id }}\` for 30 days."

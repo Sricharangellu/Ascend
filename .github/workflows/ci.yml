@@ -226,7 +226,11 @@ jobs:
             const n = (k) => Number(v[k] || 0);
             console.log("root advisories — critical:" + n("critical") + " high:" + n("high") + " moderate:" + n("moderate") + " low:" + n("low"));
             if (n("critical") + n("high") > 0) {
-              console.error("❌ high/critical advisory in the root dependency tree — run `npm audit` locally.");
+              // No backticks anywhere inside this single-quoted script: actionlint
+              // runs shellcheck over the block and SC2016 reads a backtick in
+              // single quotes as an unexpanded command substitution. Same trap the
+              // SQL-injection guard step above documents.
+              console.error("high/critical advisory in the root dependency tree. Reproduce with: npm audit");
               process.exit(1);
             }
             console.log("✓ no high or critical advisories in the root dependency tree");
