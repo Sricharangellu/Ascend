@@ -20,7 +20,7 @@ Supabase) and gated by CI. The Vercel projects are **not** git-connected — Git
 
 | Tier | What actually happens on a push | Evidence |
 |---|---|---|
-| **PROD** | Last release is `e55e743`; `master` is **245 commits behind `staging`**. `PROD_BACKEND_URL` is **unset**, so the prod build, the release smoke test and the heartbeat all fall through to `ascendhq-api.vercel.app` — HTTP 404. | run `31272326653` |
+| **PROD** | Last release is `e55e743`; `master` is **245 commits behind `staging`** — and the Render backend deploys from `master`, so the production *backend code* is stale by the same margin. `PROD_BACKEND_URL` is still **unset**; PR #206 repointed the fallback from the dead `ascendhq-api.vercel.app` (HTTP 404) to the Sri-confirmed `ascend-prod.onrender.com`, which runs on Render's **free plan** (~15 min idle → spin-down, ~50 s cold start). | run `31272326653`; PR #206 |
 | **TESTING** | Frontend deploys and aliases correctly; **backend deploy fails** (`Project not found` — the Vercel backend project is deleted). Net: a live staging frontend proxying `/api/*` at a host that does not exist. | run `31271109836` |
 | **DEV** | `Deploy → Dev` is **skipped every push** (`DEV_BACKEND_URL` unset). Green CI on `develop` means "tests passed", not "dev is updated". | run `31270468757`, job `93137531666` |
 | feature work | Works as designed — CI on the PR, no deploy. | run `31270468757` |

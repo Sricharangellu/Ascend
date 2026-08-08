@@ -41,7 +41,14 @@ jobs:
   heartbeat:
     name: Probe production endpoints
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # Sized against the real worst case, which changed when the probes stopped
+    # aborting at the first failure (see the Backend probes block below). Four
+    # probes now always run: /healthz carries the full Render cold-start budget
+    # (~10 min worst case, 6 attempts × 90s + 5 × 10s delay) and the other three
+    # carry a short one (~100s each), so ~15 min worst case, seconds when warm.
+    # At 5 minutes the job was killed mid-probe and the `if: always()` Verdict
+    # step never ran — a cancelled job reports neither a result nor a summary.
+    timeout-minutes: 20
     # Probe targets are repo variables so this heartbeat can be repointed
     # WITHOUT a code change — set them under
     # Settings → Secrets and variables → Actions → Variables.
@@ -54,24 +61,46 @@ jobs:
     # It replaces `ascendhq-app.vercel.app`, which returns DEPLOYMENT_NOT_FOUND
     # and was half of why this heartbeat went red.
     #
-    # BACKEND fallback is still a dead hostname (DEPLOYMENT_NOT_FOUND since
-    # 2026-07-23; re-confirmed 2026-08-08 — run 31272326653 got HTTP 404 from it
-    # in 90ms). It is kept rather than corrected because nobody has confirmed
-    # where the production backend actually runs — ADR-011's evidence bar is
-    # explicit that an unverified URL in a monitor is worse than a known-stale
-    # one, because it looks fixed. Setting PROD_BACKEND_URL is the fix.
+    # BACKEND fallback was `ascendhq-api.vercel.app` — DEPLOYMENT_NOT_FOUND
+    # since 2026-07-23, still returning HTTP 404 on run 31272326653 (2026-08-08).
+    # PR #206 repointed it at `ascend-prod.onrender.com` after Sri reconfirmed
+    # that origin the same day, so BOTH fallbacks are now live hosts rather than
+    # one live and one dead. `src/shared/deploy-guard.test.ts` fails the build if
+    # either regresses to a hostname DEPLOYMENTS.md records as dead.
     #
-    # BACKEND_CONFIGURED distinguishes "we have not been told where the backend
-    # is" from "the backend is down", which the run status alone cannot express.
-    # Both still fail the run — a heartbeat that goes green while monitoring
-    # nothing is the failure mode backup.yml already had (16 green runs, zero
-    # backups) — but the summary says which, so a reader can tell an unresolved
-    # configuration gap from a live incident without opening the log.
+    # BACKEND_CONFIGURED still distinguishes "the variable is unset, so we are
+    # probing a fallback nobody has re-verified today" from "the operator told us
+    # where production is and it did not answer". The repo variable remains
+    # unset as of 2026-08-08 (run 31272326653 printed the fallback), and the
+    # distinction stays useful for exactly the reason ADR-011 gives: a fallback
+    # is a best-known-value, not a confirmed one, and this repo has already spent
+    # two weeks unable to tell a stale target from an outage.
+    #
+    # Note the failure semantics differ from the pre-PR-#206 version of this
+    # comment: with a live fallback, a red backend probe is now genuine signal,
+    # not noise. The summary says which case applies so a reader does not have to
+    # remember which era they are in.
     env:
-      BACKEND: ${{ vars.PROD_BACKEND_URL || 'https://ascendhq-api.vercel.app' }}
+      BACKEND: ${{ vars.PROD_BACKEND_URL || 'https://ascend-prod.onrender.com' }}
       FRONTEND: ${{ vars.PROD_FRONTEND_URL || 'https://ascendhqweb.vercel.app' }}
       BACKEND_CONFIGURED: ${{ vars.PROD_BACKEND_URL != '' }}
     steps:
+      # Timeouts are sized for a Render FREE instance, which is what serves
+      # production ("Ascend Prod", srv-d9lo8jm7bikc739dnsn0, Docker). Free web
+      # services spin down after ~15 min idle and cold-start in ~50s, and this
+      # heartbeat runs every 15 min — so it is frequently the request that wakes
+      # the service. The previous `--max-time 15` could not outlast a cold start,
+      # which is very likely why this workflow has reported a "dead" backend
+      # since 2026-07-22 and why the same URL timed out with zero bytes from
+      # three independent networks. A timeout shorter than the cold start does
+      # not measure availability, it measures the timeout.
+      #
+      # Only /healthz carries the full cold-start budget (PR #206's values). It
+      # is the first request, so it is the one that pays the wake-up; by the time
+      # it returns the instance is warm, and giving the remaining three the same
+      # 10-minute worst case would make a fully-down production take ~40 min to
+      # report — longer than the 15-minute interval, so every run would be
+      # cancelled by the next before it could say anything. They get ~100s each.
       - name: Show probe targets
         run: |
           echo "backend:  $BACKEND (PROD_BACKEND_URL set: $BACKEND_CONFIGURED)"
@@ -94,21 +123,21 @@ jobs:
         id: be_health
         continue-on-error: true
         run: |
-          curl -fsS --max-time 15 --retry 3 --retry-delay 5 \
+          curl -fsS --max-time 90 --retry 5 --retry-delay 10 --retry-all-errors \
             "$BACKEND/healthz" \
             || (echo "❌ /healthz failed against $BACKEND" && exit 1)
       - name: Backend readiness (/readyz — DB reachable)
         id: be_ready
         continue-on-error: true
         run: |
-          curl -fsS --max-time 15 --retry 3 --retry-delay 5 \
+          curl -fsS --max-time 30 --retry 2 --retry-delay 5 --retry-all-errors \
             "$BACKEND/readyz" \
             || (echo "❌ /readyz failed against $BACKEND" && exit 1)
       - name: Auth boundary (/api/v1/flags must 401 unauthenticated)
         id: be_authz
         continue-on-error: true
         run: |
-          http_status="$(curl -sS --max-time 15 --retry 2 --retry-delay 5 \
+          http_status="$(curl -sS --max-time 30 --retry 2 --retry-delay 5 --retry-all-errors \
             -o /tmp/flags-response.json \
             -w '%{http_code}' \
             "$BACKEND/api/v1/flags")"
@@ -125,7 +154,7 @@ jobs:
         id: fe
         continue-on-error: true
         run: |
-          curl -fsS --max-time 15 --retry 3 --retry-delay 5 \
+          curl -fsS --max-time 30 --retry 2 --retry-delay 5 --retry-all-errors \
             "$FRONTEND/" >/dev/null \
             || (echo "❌ frontend failed against $FRONTEND" && exit 1)
 
@@ -166,16 +195,17 @@ jobs:
             if [ "$BACKEND_CONFIGURED" = "true" ]; then
               echo "| Backend | \`$BACKEND\` | $([ "$backend_ok" = true ] && echo '✅ up' || echo '❌ DOWN') |"
             else
-              echo "| Backend | \`$BACKEND\` (fallback) | ⚠️ NOT CONFIGURED — not an outage signal |"
+              echo "| Backend | \`$BACKEND\` (inline fallback, PROD_BACKEND_URL unset) | $([ "$backend_ok" = true ] && echo '✅ up' || echo '❌ DOWN') |"
             fi
             echo "| Frontend | \`$FRONTEND\` | $([ "$frontend_ok" = true ] && echo '✅ up' || echo '❌ DOWN') |"
             echo
             if [ "$BACKEND_CONFIGURED" != "true" ]; then
-              echo "\`PROD_BACKEND_URL\` is not set, so the backend probes ran against a hostname"
-              echo "known dead since 2026-07-23. **Their result carries no information about**"
-              echo "**production.** See \`docs/architecture/DEPLOYMENTS.md\` — the open P0 is"
-              echo "confirming where the production backend actually runs, then setting that"
-              echo "variable (Settings → Secrets and variables → Actions → Variables)."
+              echo "\`PROD_BACKEND_URL\` is not set, so the backend probes ran against the inline"
+              echo "fallback (\`ascend-prod.onrender.com\`, reconfirmed by Sri 2026-08-08, PR #206)."
+              echo "That is a live host, so the result above is real signal — but it is a"
+              echo "best-known value, not one this run verified. Set the variable to make the"
+              echo "target explicit (Settings → Secrets and variables → Actions → Variables)."
+              echo "See \`docs/architecture/DEPLOYMENTS.md\`."
               echo
               echo "Note: scheduled runs execute the **default branch** copy of this workflow."
               echo "Setting the variable is necessary but not sufficient until this file reaches"
@@ -190,7 +220,7 @@ jobs:
             echo "::error title=Production backend unhealthy::$BACKEND failed one or more probes"
           fi
           if [ "$BACKEND_CONFIGURED" != "true" ]; then
-            echo "::warning title=Backend probe target not configured::PROD_BACKEND_URL is unset — the backend result below is noise, not an outage signal."
+            echo "::warning title=Backend probe target not configured::PROD_BACKEND_URL is unset — probed the inline fallback ($BACKEND) instead. Live host, but not an operator-confirmed target."
           fi
 
           if [ "$backend_ok" = true ] && [ "$frontend_ok" = true ]; then

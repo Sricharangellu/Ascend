@@ -15,14 +15,36 @@ correction existed, but `develop` never had it, so every session reading `ARCHIT
 Render" claim with no caveat attached. PR #117 is now merged; `develop` carries the correction.
 This document's baseline is current as of that merge, not before it.
 
+> **Update 2026-08-08 — item 2 is answered.** Sri reconfirmed the production backend origin as
+> `https://ascend-prod.onrender.com`. It is now the in-repo default in three places that all
+> previously defaulted to the dead `ascendhq-api.vercel.app`: the prod branch of
+> `scripts/deploy.sh`'s `BACKEND_URL` (which is *compiled into the frontend bundle* — see below),
+> `ci.yml`'s `smoke-test`, and `uptime.yml`. `vars.PROD_BACKEND_URL` still overrides all three.
+>
+> **Why this was the bug that mattered:** `web/next.config.mjs` reads `BACKEND_URL` inside
+> `rewrites()`, which Next evaluates at build time and freezes into `routes-manifest.json`. Every
+> production build since the 2026-07-20 cutover therefore baked in an origin that answers
+> **HTTP 404** (`DEPLOYMENT_NOT_FOUND`, observed on heartbeat run `31266012547`, 2026-08-08T16:03Z).
+> A shipped frontend proxying every `/api/*` call to a dead host cannot log anyone in, and no amount
+> of correct backend hosting would have fixed it.
+>
+> Items 1 and 3 remain open. `ascend-prod.onrender.com` still does not answer from this sandbox, but
+> that is **not evidence** — the agent network policy returns `403` to `CONNECT` for
+> `*.onrender.com`, so no probe from here is informative either way. Item 3 in particular is
+> unchanged: `scripts/deploy.sh`'s `deploy_backend` targets **Vercel**, not Render, so this repo
+> still has no automation that deploys the backend to where the backend actually runs.
+
 ## Executive summary
 
 1. **Is production currently down?** UNKNOWN — pending Sri's manual browser check of
    `https://ascend-prod.onrender.com/healthz`. This is the single fact everything else forks on.
-2. **Where does production actually run?** UNCONFIRMED. Docs claim Render; zero deploy automation
-   in this repo supports that claim, and the URL doesn't respond from three independent networks
-   (this sandbox, a GitHub Actions runner via `workflow_dispatch` — run `30565267888` — and Cursor
-   Cloud, all three getting an identical complete-timeout/zero-bytes result).
+2. **Where does production actually run?** ~~UNCONFIRMED~~ → **Render, `https://ascend-prod.onrender.com`,
+   reconfirmed by Sri 2026-08-08** and now wired as the in-repo default (see the update box above).
+   Still true, and still the open half: zero deploy automation in this repo targets Render, and the
+   URL did not respond from three independent networks when last testable (this sandbox, a GitHub
+   Actions runner via `workflow_dispatch` — run `30565267888` — and Cursor Cloud, all three getting
+   an identical complete-timeout/zero-bytes result). Knowing the address is not the same as having
+   confirmed something answers at it.
 3. **What deployment path is authoritative?** None, currently. `ci.yml`/`scripts/deploy.sh` deploy
    backend to Vercel project IDs that are either dead (`DEPLOYMENT_NOT_FOUND`) or serving an
    unrelated app. Render is claimed as the real target but has no representation in this repo's
@@ -44,7 +66,7 @@ cites a GitHub Actions run ID that can be reopened.
 | Question this document left open | Answer, 2026-08-08 | Evidence |
 |---|---|---|
 | Is the non-prod backend Vercel project deleted (2026-07-20) or still resolving (2026-07-23)? | **CLOSED — deleted.** The 2026-07-20 claim was right; the 2026-07-23 finding is superseded. `prj_krZ34CIFjzQrMvZ08PWqqbxzBf7d` no longer exists. | `deploy-staging` on the `staging` push: `Error: Project not found ({"VERCEL_PROJECT_ID":"prj_krZ34CI…","VERCEL_ORG_ID":"team_WNp8v…"})` → `✗ backend deploy failed (testing)` → `✗ backend exit=1 frontend exit=0`. Run `31271109836`, job `93139035837` |
-| Is `PROD_BACKEND_URL` set? | **No.** So the P0 below is not merely "undocumented" — the repo-variable mechanism ADR-011 built for it is still empty. | Heartbeat dispatched on `develop` printed `backend: https://ascendhq-api.vercel.app` (the fallback) and got HTTP 404 in 90 ms. Run `31272326653` |
+| Is `PROD_BACKEND_URL` set? | **No** — the repo-variable mechanism ADR-011 built for it is still empty. What changed the same day is the *fallback*: PR #206 repointed it from the dead Vercel host to `ascend-prod.onrender.com`, so an unset variable is no longer equivalent to probing a dead host. | Heartbeat dispatched on `develop` printed `backend: https://ascendhq-api.vercel.app` (the then-current fallback) and got HTTP 404 in 90 ms. Run `31272326653`, 18:36Z — ~35 min before PR #206 merged |
 | Is `PROD_FRONTEND_URL` set? | **No** — but its fallback (`ascendhqweb.vercel.app`) is the confirmed-live host, so this half is benign. | Same run |
 | Has any production backup ever been taken? | **No.** The daily job has reported `success` while producing nothing. | Run `31250642991` (2026-08-08 09:28, conclusion `success`) → `list_workflow_run_artifacts` returns `total_count: 0` |
 | Does the staging frontend deploy work now? | **Yes** — since the `FRONTEND_PID` and Vercel root-directory fixes (PRs #201/#204). It aliases to `ascend-frontend-staging.vercel.app`, built with `BACKEND_URL=https://ascend-backend-staging.vercel.app`, which does not exist. **A live frontend with no backend.** | Same run `31271109836` |
@@ -66,6 +88,19 @@ ops-side fix landed on `develop` since 2026-07-20 is **inert for the runs that m
 **Consequence for this document's P3 (monitoring correction):** setting `PROD_BACKEND_URL` is
 *necessary but not sufficient*. Promoting the workflow files to `master` is the other half. Treat a
 `staging → master` release as part of the monitoring fix, not as unrelated feature work.
+
+**Two further consequences of the Render service identity recorded by PR #206** (free plan, Docker,
+deploys from `master` via Render's git integration) that are worth stating as their own findings:
+
+- **The production backend code is 245 commits stale, for the same reason the workflows are.** Render
+  deploys from `master`. Whatever is or is not running at `ascend-prod.onrender.com` is built from
+  `e55e743`, not from `staging`. A `staging → master` release is therefore not only the monitoring
+  fix — it is the only way the last three weeks of backend work reaches production at all.
+- **A free-tier instance makes availability unfalsifiable from the outside.** ~15 min idle →
+  spin-down, ~50 s cold start, against a heartbeat that runs every 15 min. PR #206's widened
+  timeouts stop the probe from measuring itself, but the underlying behaviour — a ~50 s first
+  request after any quiet period — is a product characteristic, not a monitoring artefact. It should
+  be treated as a P0 for a POS product, not as a cost line.
 
 ## Evidence table
 
@@ -152,11 +187,15 @@ conclusion, since no one on this investigation has had that access.
 | Backend URL | `https://ascend-prod.onrender.com` (supplied 2026-07-30) — unresponsive from 3 independent networks as of this writing | UNCONFIRMED LIVE |
 | Deploy trigger | Claimed: Render git-integration, auto-deploy on push to `master` (per 2026-07-20 doc). **Not verified** — could also be manual dashboard deploys; `scripts/deploy.sh`/`ci.yml` have no Render deploy step either way, so the repo's own CI/CD does not drive this regardless of which is true. | UNCONFIRMED |
 | Repository / branch | If git-integration: presumably this repo, `master`. UNKNOWN whether Render's dashboard actually has this configured, or to what branch. | UNKNOWN |
-| Build command | UNKNOWN | Needs Render dashboard |
-| Start command | Presumed `npm start` / `tsx src/server.ts` (repo convention — `package.json`'s `start` script), but not confirmed as what Render actually runs | UNCONFIRMED |
-| Public vs. private service | UNKNOWN — a Render *private* service (internal-network-only) would produce exactly the symptom seen (DNS resolves, no external response ever) | UNKNOWN, high relevance |
-| Running / suspended / crash-looping | UNKNOWN | Needs Render dashboard deploy/build logs |
+| Render service identity | **"Ascend Prod"**, service ID `srv-d9lo8jm7bikc739dnsn0`, runtime **Docker**, plan **Free**, deploying from `Sricharangellu/Ascend` branch **`master`**, serving `https://ascend-prod.onrender.com` | **CONFIRMED by Sri 2026-08-08** from the Render dashboard |
+| Build command | Docker runtime → Render builds the repo `Dockerfile`; there is no npm build/start command to discover | ~~UNKNOWN~~ **RESOLVED** by the Docker runtime above |
+| Start command | Whatever the `Dockerfile`'s `CMD`/`ENTRYPOINT` specifies — **not** `npm start` as previously presumed | ~~UNCONFIRMED~~ **RESOLVED** — supersedes the `package.json` guess |
+| Deploy trigger | Render git integration on push to `master`. **This is the backend's real deploy path**, and it is not `scripts/deploy.sh` — `deploy_backend` uploads to a *Vercel* project and always has. A release merge deploys the backend through Render and the frontend through Vercel, by two entirely separate mechanisms. | CONFIRMED (repo + branch shown in dashboard) |
+| Public vs. private service | Public — it is a Render **web service** with an external URL, not a private service | Effectively resolved by the dashboard entry |
+| Running / suspended / crash-looping | Not suspended. **But the Free plan is the likely explanation for the whole P0 symptom** — see the cold-start row below. | Needs a patient probe, not a dashboard check |
+| **Free-plan cold start — likely root cause of "production is unreachable"** | Render **Free** web services spin down after ~15 minutes of inactivity and take ~50s to cold-start. Every probe that concluded production was dead used a **15-second** timeout (`uptime.yml`: `curl --max-time 15`), and the heartbeat runs every 15 min — so it is frequently the very request that has to wake the service. DNS resolves, the connection hangs through the cold start, curl gives up at 15s with zero bytes. **That is precisely the recorded symptom, from all three "independent networks"** — they were independent in location but identical in timeout. A timeout shorter than the cold start does not measure availability, it measures the timeout. Probes widened to `--max-time 90 --retry 5 --retry-delay 10 --retry-all-errors` in `uptime.yml`. | **Hypothesis with strong fit — not yet confirmed.** Confirm by loading `https://ascend-prod.onrender.com/healthz` in a browser and *waiting a full minute* on the first request. |
 | Database (Supabase project) | Claimed: new isolated project, ref `kplruangtivthgqudjwt`, region `ca-central-1`, created 2026-07-20 specifically for prod, "connected only from Render." **Never confirmed as actually receiving a connection** — see Database section below. | UNCONFIRMED |
+| Render **outbound** IP ranges | `74.220.50.0/24`, `74.220.58.0/24` — supplied by Sri 2026-08-08 from the Render dashboard. These are the addresses the backend makes outbound connections *from*, so they are what **Supabase network restrictions must permit** for the prod backend to reach `kplruangtivthgqudjwt` at all. If restrictions are enabled there and these are absent, `/readyz` reports the DB unreachable even when the service itself is healthy — a candidate explanation for item 4 worth checking before anything more elaborate. **Two caveats, both load-bearing:** (1) Render states these ranges are **shared with other Render services in the same region**, so allowlisting them is a availability control, not a meaningful security boundary — the actual boundary stays the connection credentials and verified TLS (`PG_CA_CERT_B64`, ADR/C-3). (2) They are **outbound only** and therefore do *not* explain why `ascend-prod.onrender.com` answers nothing from any network; an inbound restriction or a private service still would. | Supplied by Sri, not yet entered anywhere or verified |
 | Frontend provider | Vercel, project `ascend_hq_web`, serving **https://ascendhqweb.vercel.app** | CONFIRMED by Sri 2026-08-07. Supersedes `ascendhq-app.vercel.app`, which is dead (`DEPLOYMENT_NOT_FOUND`) and was the value hardcoded across this repo. `scripts/deploy.sh`'s `FRONTEND_PID` default now points at `ascend_hq_web` (`prj_MvvmpNkRQbKUAEOmh9ZvmRJa7ETN`); the deleted `ascend-frontend` (`prj_TiPX9UY…`) was the cause of every `Project not found` deploy failure since 2026-08-05. **Project ID independently verified 2026-08-07** — Vercel's own GitHub integration commented on PR #201 with `projectId: prj_MvvmpNkRQbKUAEOmh9ZvmRJa7ETN`, `teamId: team_WNp8vBq1RmWTEH8WSnenP7jM`, matching `deploy.sh` exactly. |
 | Frontend deploy trigger | **RESOLVED 2026-08-07 in `PIPELINE.md`'s favour: `ascend_hq_web` IS git-connected.** Vercel's GitHub integration opened a preview build on PR #201 (`ascendhqweb-git-claude-bra-556214-…vercel.app`) without any CLI invocation, which only a git-connected project does. `scripts/deploy.sh`'s header comment ("These Vercel projects are NOT git-connected, so deploys are manual CLI uploads") is therefore wrong for the frontend and should be corrected. Note the consequence: both triggers are live at once — git push builds a preview *and* `deploy.sh` uploads via CLI, so a `master` merge fires two deploys of the same commit. Untested for the backend project. | CONFIRMED git-connected; double-deploy risk newly identified |
 | Monitoring | `.github/workflows/uptime.yml`, every 15 min — currently probes stale/dead URLs (see `fix/uptime-heartbeat-stale-endpoints`, held unmerged pending this reconciliation) | Confirmed broken, fix pending confirmation of the real URL |

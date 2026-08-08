@@ -62,51 +62,80 @@ test("deploy.sh guards both deploy functions against an empty deployment URL", (
 });
 
 /**
- * `BACKEND_URL` fail-closed on every tier, including production.
+ * `BACKEND_URL` — the value compiled into the production frontend bundle.
  *
- * Until 2026-08-08 the prod tier alone defaulted to
- * `https://ascendhq-api.vercel.app` — a hostname returning DEPLOYMENT_NOT_FOUND
- * since 2026-07-23 (re-confirmed 2026-08-08 by heartbeat run 31272326653: HTTP
- * 404). `web/next.config.mjs` reads BACKEND_URL inside `rewrites()`, which Next
- * evaluates at BUILD time and freezes into routes-manifest.json, so that
- * default was baked irreversibly into the shipped production bundle: a
- * successful-looking release nobody could log in to.
+ * `web/next.config.mjs` reads it inside `rewrites()`, which Next evaluates at
+ * BUILD time and freezes into `routes-manifest.json`, so whatever this resolves
+ * to at deploy time IS the origin the shipped app proxies every `/api/*` call
+ * to. It cannot be corrected from the Vercel dashboard afterwards.
  *
- * These tests fail if the fallback is reintroduced on any tier.
+ * That made the prod tier's fallback load-bearing in a way the other tiers' are
+ * not. It sat at `https://ascendhq-api.vercel.app` — DEPLOYMENT_NOT_FOUND since
+ * 2026-07-23 — for two weeks, so every release in that window shipped a
+ * frontend nobody could log in to, and reported success doing it. PR #206
+ * repointed it at the Sri-confirmed Render origin.
+ *
+ * ADR-011 deliberately keeps an inline fallback ("setting nothing changes
+ * nothing"), so the guard here is NOT "no fallback" — it is "the fallback is
+ * not a host this repo has already recorded as dead". That is the specific
+ * failure ADR-011's indirection cannot catch by itself.
  */
-test("deploy.sh refuses to deploy production without an explicit BACKEND_URL", () => {
+const KNOWN_DEAD_HOSTS = [
+  "ascendhq-api.vercel.app", // prod backend, DEPLOYMENT_NOT_FOUND since 2026-07-23
+  "ascendhq-app.vercel.app", // prod frontend it was paired with, also dead
+  "ascend-backend-staging.vercel.app", // testing backend, project deleted
+  "ascend-frontend-staging.vercel.app", // alias of a deleted project
+];
+
+/** Executable lines only — comments cite the dead hostnames as history, correctly. */
+function executableLines(src: string): string {
+  return src
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("#"))
+    .join("\n");
+}
+
+test("deploy.sh's production BACKEND_URL fallback is not a host recorded as dead", () => {
+  const executable = executableLines(fs.readFileSync(deployScript, "utf8"));
+  const fallback = /BACKEND_URL="\$\{BACKEND_URL:-([^}"]+)\}"/.exec(executable);
+  assert.ok(fallback, "the prod tier is expected to carry an inline fallback (ADR-011)");
+  for (const host of KNOWN_DEAD_HOSTS) {
+    assert.doesNotMatch(
+      fallback[1] ?? "",
+      new RegExp(host.replace(/\./g, "\\.")),
+      `the prod fallback resolves to ${host}, which docs/architecture/DEPLOYMENTS.md records as dead. ` +
+        "Next bakes this into routes-manifest.json at build time, so a release would ship a frontend " +
+        "that can reach no API. Repoint it, or set vars.PROD_BACKEND_URL.",
+    );
+  }
+});
+
+test("no probe or deploy target in the workflows resolves to a host recorded as dead", () => {
+  // ADR-011's companion check: the fallbacks live in ci.yml and uptime.yml too,
+  // and PR #191 fixing only uptime.yml is precisely how the two production
+  // probes came to disagree about where production is.
+  for (const wf of ["ci.yml", "uptime.yml"]) {
+    const src = fs.readFileSync(path.join(repoRoot, ".github", "workflows", wf), "utf8");
+    for (const [, fallback] of src.matchAll(/vars\.PROD_(?:BACKEND|FRONTEND)_URL\s*\|\|\s*'([^']+)'/g)) {
+      for (const host of KNOWN_DEAD_HOSTS) {
+        assert.ok(
+          !fallback.includes(host),
+          `.github/workflows/${wf} falls back to ${host}, recorded as dead in DEPLOYMENTS.md`,
+        );
+      }
+    }
+  }
+});
+
+test("deploy.sh refuses non-prod tiers without an explicit BACKEND_URL", () => {
   // VERCEL_TOKEN is asserted before BACKEND_URL is resolved, so a dummy is
   // needed to reach the guard. The guard exits before any `vercel` invocation,
   // so this performs no network call and deploys nothing.
   const { status, stdout } = bash(
-    `cd ${JSON.stringify(repoRoot)} && VERCEL_TOKEN=dummy-token DEPLOY_ENV=prod bash scripts/deploy.sh both 2>&1`,
-  );
-  assert.equal(status, 1, "a prod deploy with no BACKEND_URL must fail closed, not fall back");
-  assert.match(stdout, /requires BACKEND_URL/);
-  assert.match(stdout, /PROD_BACKEND_URL/, "the error must name the repo variable that fixes it");
-});
-
-test("deploy.sh still refuses non-prod tiers without BACKEND_URL", () => {
-  const { status, stdout } = bash(
     `cd ${JSON.stringify(repoRoot)} && VERCEL_TOKEN=dummy-token DEPLOY_ENV=testing bash scripts/deploy.sh both 2>&1`,
   );
-  assert.equal(status, 1);
+  assert.equal(status, 1, "a non-prod deploy must never silently fall back to the prod backend/DB");
   assert.match(stdout, /would fall back to the prod backend\/DB/);
-});
-
-test("no tier carries a hardcoded BACKEND_URL fallback default", () => {
-  const src = fs.readFileSync(deployScript, "utf8");
-  // Comments may (and do) cite the dead hostname as history. Executable lines
-  // must not assign it — that assignment is the defect.
-  const executable = src
-    .split("\n")
-    .filter((line) => !line.trimStart().startsWith("#"))
-    .join("\n");
-  assert.doesNotMatch(
-    executable,
-    /BACKEND_URL="\$\{BACKEND_URL:-/,
-    "BACKEND_URL must be supplied per tier, never defaulted — see docs/architecture/DEPLOYMENTS.md",
-  );
 });
 
 test("a function ending in echo returns 0 despite inner failure — the defect being guarded", () => {

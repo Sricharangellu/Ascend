@@ -19,17 +19,33 @@ documents are stale, and this audit contradicts three of them with evidence.
    skipped. Real RPO is **total loss**, not the ≤24h the workflow's docstring claims. This is
    standing critical **C-1** and it is the single highest-severity item in this audit.
 
-2. **Nobody can say where the production backend runs, and the repo now proves the variable that
-   would answer it is unset.** `PROD_BACKEND_URL` is **not set**: heartbeat run `31272326653`
-   (dispatched from `develop` during this audit) printed `backend: https://ascendhq-api.vercel.app`
-   — the ADR-011 fallback — and got **HTTP 404** in 90 ms. `PROD_FRONTEND_URL` is also unset (it fell
-   through to `ascendhqweb.vercel.app`, which *is* the confirmed-live host, so that half is benign).
+2. **Where production runs was answered mid-audit — and the answer is a free-tier instance.**
+   When this audit began, `PROD_BACKEND_URL` was **unset** and the fallback was
+   `https://ascendhq-api.vercel.app`, which returned **HTTP 404** in 90 ms (run `31272326653`,
+   dispatched from `develop` during this audit). **PR #206 then landed on `develop`** with Sri's
+   reconfirmation: production is Render service **"Ascend Prod" (`srv-d9lo8jm7bikc739dnsn0`), Docker
+   runtime, public web service, deploying from `master` via Render's own git integration, on the
+   FREE plan** at `https://ascend-prod.onrender.com`. That is now the inline fallback in
+   `deploy.sh`, `ci.yml`'s `smoke-test` and `uptime.yml`.
+
+   Two consequences that are **new findings, not resolutions**:
+   - **Free-plan Render spins down after ~15 min idle and cold-starts in ~50 s.** For a POS/ERP the
+     first request after any quiet period takes ~50 s — a cashier opening a till, a webhook from
+     Stripe, a scheduled job tick. It also means the "unreachable from three independent networks"
+     evidence in `DEPLOYMENTS.md` may always have been a 15-second timeout measuring itself rather
+     than an outage. Upgrading off the free plan is now a **P0 product-behaviour item**, not a cost
+     optimisation.
+   - **Render deploys from `master`**, which is 245 commits behind `staging` — so the production
+     *backend code* is stale by the same margin as the workflows in finding 4. `PROD_BACKEND_URL`
+     the repo variable is still unset; only the in-repo fallback changed.
 
 3. **The production monitor has never once checked the one production surface that is alive.** Every
-   scheduled heartbeat since ~2026-07-22 dies at step 1 against the dead backend host, and steps 2–4
-   — including the frontend probe — never execute. `ascendhqweb.vercel.app` is confirmed live and is
-   monitored by **nothing**. A real frontend outage today would be indistinguishable, in the Actions
-   list, from the existing noise. **Fixed in this change.**
+   scheduled heartbeat since ~2026-07-22 dies at step 1 — first against a dead hostname, and now
+   plausibly against a free-tier cold start outlasting a 15-second timeout — so steps 2–4, including
+   the frontend probe, never execute. `ascendhqweb.vercel.app` is confirmed live and is monitored by
+   **nothing**. A real frontend outage today would be indistinguishable, in the Actions list, from
+   the existing noise. **Fixed in this change**, and the fix is independent of both causes: it is the
+   sequencing that was wrong, not the target.
 
 4. **Scheduled workflows run the default branch's copy, and the default branch is 245 commits
    stale.** GitHub executes `schedule:` workflows from `master` only. `master` is **245 commits
@@ -87,7 +103,7 @@ Legend: **V** verified by command/run this session · **CNV** configured but not
 | **TESTING** | `staging` | `Deploy → Testing` | **B** — frontend deploys + aliases OK; backend fails `Project not found`; frontend built against a dead backend origin |
 | **STAGING (separate)** | — | — | **M** — does not exist. "staging" the branch maps to the "testing" tier; there is no production-like pre-prod. |
 | Preview (per-PR) | any PR | Vercel GitHub App on `ascend_hq_web` | **CNV** — git-connected previews confirmed on PR #201; not isolated (shares Preview env → testing DB) |
-| **PROD** | `master` | `Deploy → Production` + `smoke-test` | **B/CNV** — last release `e55e743`; 245 commits behind `staging`. Backend host unknown/unreachable. |
+| **PROD** | `master` | `Deploy → Production` + `smoke-test` (Vercel frontend) · **Render git integration (backend)** | **P** — last release `e55e743`, 245 commits behind `staging`. Backend = Render "Ascend Prod" (`srv-d9lo8jm7bikc739dnsn0`, Docker, **FREE plan**), deployed by Render's own git integration on `master` — **no automation in this repo deploys it**. |
 
 ### 1.3 CI/CD
 
@@ -196,7 +212,7 @@ master ──── CI + Security ─┬─▶ Deploy → Production (Vercel --p
 | Source branch | any | any of 3 | `develop` | `staging` | `master` |
 | Platform | Docker / host | GH runners | **none (skipped)** | Vercel Preview | Vercel (fe) + **unknown** (be) |
 | App URL | `localhost:3000` | — | none | `ascend-frontend-staging.vercel.app` **V** | `ascendhqweb.vercel.app` **V** |
-| API URL | `localhost:3001` | `localhost:3001` | none | `ascend-backend-staging.vercel.app` **B dead** | **UNKNOWN** — `PROD_BACKEND_URL` unset **V** |
+| API URL | `localhost:3001` | `localhost:3001` | none | `ascend-backend-staging.vercel.app` **B dead** | `ascend-prod.onrender.com` **CNV** (Sri-confirmed 2026-08-08, PR #206; repo variable still unset, and unprobeable from here — the agent network policy 403s `CONNECT` to `*.onrender.com`) |
 | Database | local PG / embedded | ephemeral PG16 service | *(would be)* Supabase `lqaicxibgrlxwkvxsaji` | Supabase `lqaicxibgrlxwkvxsaji` (us-west-2) **CNV** | Supabase `kplruangtivthgqudjwt` (ca-central-1) **CNV — never confirmed to have received a connection** |
 | Redis | none | none | none | none | none |
 | Storage | none | none | none | none | none |
@@ -258,7 +274,8 @@ master ──── CI + Security ─┬─▶ Deploy → Production (Vercel --p
 | # | Failure mode | Severity | Verified? | Root cause | First breaking point |
 |---|---|---|---|---|---|
 | 1 | **Total data loss on a DB incident** | **Critical** | **V** — run `31250642991`, 0 artifacts | `PROD_DATABASE_URL` unset; master's `backup.yml` exits 0 silently | Any Supabase incident, bad migration, or errant `DELETE` |
-| 2 | **Production location unknown; monitor blind** | **Critical** | **V** — run `31272326653`, 404 | `PROD_BACKEND_URL` unset + no IaC + dashboard-only cutover | Already broken; an outage would go unnoticed |
+| 2 | **Production backend runs on a FREE Render instance: ~15 min idle → spin-down, ~50 s cold start** | **Critical** | **V** — Sri-confirmed service identity, PR #206 | Free plan chosen at cutover; never revisited | Every first request after a quiet period — a cashier's first sale, a Stripe webhook, a job tick. Also makes availability data ambiguous |
+| 2b | **No automation in this repo deploys the production backend** | **High** | **V** — `deploy_backend` targets Vercel | Render cutover was dashboard-only; no `render.yaml`, no deploy hook | A rollback or redeploy has to be done by hand in a dashboard |
 | 3 | **Ops hardening inert in prod (default-branch rule)** | **Critical** | **V** — runs `31270958830` vs `31272326653` | `master` 245 commits behind; `schedule:` runs default branch | Already broken; will silently absorb future "fixes" too |
 | 4 | **A bad release ships a frontend that cannot reach any API** | **Critical** | **V** — ci.yml's own comment + `deploy.sh` default | `BACKEND_URL` baked at build time by `next.config.mjs` `rewrites()`; prod defaulted to a dead host | Next `master` release — **fixed here** |
 | 5 | **Staging cannot validate anything** | **High** | **V** — run `31271109836` | Vercel backend project deleted; `STAGING_DEPLOY_TARGET` unset → `both` | Already broken; every QA sign-off on staging is meaningless |
@@ -290,8 +307,10 @@ platform already produces", which is cheaper and lower-risk than adding a servic
 | Integration | Current state | Problem solved (row #) | Benefit | Complexity | Cost | Priority |
 |---|---|---|---|---|---|---|
 | **Set `PROD_DATABASE_URL` + `BACKUP_REQUIRED=true`** | job exists, unconfigured | #1 | RPO total-loss → ≤24h; the job stops lying | Trivial (1 secret, 1 var) | $0 | **P0** |
+| **Upgrade Render "Ascend Prod" off the FREE plan** | free instance, spins down at ~15 min idle | #2 | Removes a ~50 s cold start from the first request after any quiet period, and makes availability data mean something | Trivial (dashboard) | ~$7/mo | **P0** |
 | **Supabase PITR** (paid tier) | not enabled | #1, #6 | RPO ≤24h → minutes; makes a bad migration survivable | Low (dashboard) | ~$25/mo | **P0** |
-| **Confirm prod backend host → set `PROD_BACKEND_URL`** | unset (**V**) | #2, #4 | Monitor + release gate + prod build all become truthful, in one edit (ADR-011) | Trivial once known | $0 | **P0** |
+| **Set `PROD_BACKEND_URL`** | host confirmed by Sri and wired as the inline fallback (PR #206); the repo variable itself is still unset | #2, #4 | Makes the target explicit rather than a best-known default; one edit covers monitor, release gate and prod build (ADR-011) | Trivial | $0 | **P1** (downgraded from P0 — the fallback is live now) |
+| **A deploy path for the Render backend** (`render.yaml` or a deploy hook in `ci.yml`) | none — `deploy_backend` targets Vercel | #2b | The backend's deploy stops being invisible to this repo; rollback stops being a dashboard-only action | Medium | $0 | **P1** |
 | **Promote `develop` → `staging` → `master`** | 245 commits behind | #3 | Makes every ops fix since 2026-07-20 actually run | Low (a release, Sri-only) | $0 | **P0** |
 | **Set `STAGING_DEPLOY_TARGET=frontend` or recreate the backend project** | unset → `both` → fails | #5 | Staging becomes usable for QA | Trivial or Low | $0–$7/mo | **P0** |
 | Restore drill in CI (monthly, restore the artifact into a throwaway PG + boot the app) | drilled by hand once | #1, #6 | Proves the backup is restorable; stops silent rot | Low — `smoke.ts` already boots the app | $0 (runner min) | **P1** |
@@ -408,13 +427,16 @@ are the strongest part of this list.
 
 ## 14. Prioritized Roadmap
 
-**Phase 1 — Critical (this week; five of six are Sri-only dashboard/variable actions)**
+**Phase 1 — Critical (this week; all but one are Sri-only dashboard/variable actions)**
 1. Set `PROD_DATABASE_URL`; set `BACKUP_REQUIRED=true`; confirm an artifact appears.
-2. Confirm where the production backend runs; set `PROD_BACKEND_URL`.
-3. Release `staging → master` — this is what makes the ops workflows real (§0.4).
+2. **Upgrade "Ascend Prod" off Render's free plan.** ~50 s cold starts after 15 min idle are not
+   viable for a POS, and they make every availability measurement ambiguous.
+3. Release `staging → master` — this is what makes the ops workflows real (§0.4), and it is also
+   how 245 commits of backend work reach the Render service, which deploys from `master`.
 4. Set `STAGING_DEPLOY_TARGET=frontend` (or recreate the Vercel backend project).
 5. Set `DEV_BACKEND_URL` or accept and document that `develop` is CI-only.
 6. Enable Supabase PITR on the production project.
+7. Set `PROD_BACKEND_URL` so the target is explicit rather than a fallback.
 
 **Phase 2 — Reliability (2–4 weeks)**
 Restore drill in CI · Grafana Cloud scraping `/metrics` + first five alerts · log aggregator ·
@@ -454,37 +476,35 @@ reaches `master`.
 (configured × backend × frontend) — exit 0 only when both surfaces pass; job-summary output rendered
 and inspected.
 
-**B. `scripts/deploy.sh` — production can no longer ship a frontend wired to a dead backend.**
-*Problem (verified):* prod was the only tier whose `BACKEND_URL` fell back to a literal,
-`https://ascendhq-api.vercel.app` — `DEPLOYMENT_NOT_FOUND` since 2026-07-23, HTTP 404 again today.
-`web/next.config.mjs` reads `BACKEND_URL` inside `rewrites()`, which Next evaluates at **build time**
-and freezes into `routes-manifest.json`, so the value is baked into the shipped bundle and cannot be
-changed from the Vercel dashboard afterwards. A release taking that default reports success and ships
-a product nobody can log in to — `ci.yml`'s own `deploy-production` comment says exactly this.
-*Fix:* all three tiers now fail closed, with a prod-specific message naming `PROD_BACKEND_URL`.
-This is a narrow, documented deviation from ADR-011's "keep the historical hostname as a fallback":
-that rule assumes the fallback is merely stale, and ADR-011's own reasoning ("an unverified URL is
-worse than a known-stale one, because it looks fixed") applies with more force to a build input than
-to a probe. The probes keep their annotated fallbacks.
-*Verified:* three new tests in `src/shared/deploy-guard.test.ts` — prod fails closed and names the
-variable; non-prod still fails closed; and a static assertion that no tier reintroduces a
-`BACKEND_URL="${BACKEND_URL:-…}"` default. 6/6 pass. `shellcheck --severity=error` clean on
-`deploy.sh` and the other three gated ops scripts.
+**B. `scripts/deploy.sh` — SUPERSEDED mid-audit by PR #206; replaced with a regression guard.**
+*What I originally did:* prod was the only tier whose `BACKEND_URL` fell back to a literal, and that
+literal was `https://ascendhq-api.vercel.app` — dead since 2026-07-23. Since `web/next.config.mjs`
+reads `BACKEND_URL` inside `rewrites()`, which Next evaluates at **build time** and freezes into
+`routes-manifest.json`, a release taking that default shipped a frontend nobody could log in to and
+reported success. I made all three tiers fail closed.
 
-*Scope boundary — the other half of this defect is left open, deliberately.* `web/next.config.mjs`
-carries its **own independent copy** of the same dead fallback:
+*What happened:* PR #206 landed on `develop` while this audit was in progress, with Sri's
+reconfirmation of the real host, and repointed the fallback at `https://ascend-prod.onrender.com`
+instead. **I dropped my change and took `develop`'s.** My justification for deviating from ADR-011
+("a fallback confirmed dead is not a default, it is a defect") was conditional on the fallback being
+dead. It no longer is, so the deviation is no longer warranted, and ADR-011's considered decision —
+made with Sri's direct input — stands.
 
-```js
-const backendUrl = process.env.BACKEND_URL
-  ?? (process.env.VERCEL_ENV ? "https://ascendhq-api.vercel.app" : "http://localhost:3001");
-```
+*What I kept, because it guards the failure ADR-011 cannot catch by itself:* two tests in
+`src/shared/deploy-guard.test.ts` asserting that no deploy or probe fallback — in `deploy.sh`,
+`ci.yml` or `uptime.yml` — resolves to a hostname `DEPLOYMENTS.md` records as dead. ADR-011 keeps
+fallbacks deliberately; the gap is that nothing noticed when one silently rotted, which is how a dead
+host sat in the production build path for two weeks. The workflow test is not vacuous: it currently
+inspects five real fallbacks across the two files.
 
-`ascend_hq_web` is git-connected (confirmed on PR #201), so a `master` push also triggers a Vercel
-build that **does not run `deploy.sh` at all** — and if `BACKEND_URL` is not set in that project's
-Vercel environment, it takes this fallback and ships the same dead origin. Fix B closes the CLI path;
-this one stays open. Not changed here for two reasons: `web/**` is claimed by two ACTIVE Cursor Cloud
-locks, and making `next.config.mjs` throw would break every git-connected preview build if the
-variable is unset there — a change that cannot be validated from this container. It is task 13 in §17.
+*One defect this merge created, found and fixed here:* with `continue-on-error`, all four probes now
+run instead of aborting at the first — and PR #206 had widened each to a ~10-minute retry budget for
+the cold start. Against `timeout-minutes: 5` the job would be killed mid-probe and the `if: always()`
+Verdict step would never run, reporting neither result nor summary. Fixed by giving only `/healthz`
+(the request that actually pays the wake-up) the full cold-start budget, leaving the other three at
+~100 s, and raising the job timeout to 20 minutes. Without that split, a fully-down production would
+take ~40 minutes to report — longer than the 15-minute interval, so every run would be cancelled by
+the next before saying anything.
 
 **C. Documentation reconciled with today's evidence** — `docs/architecture/DEPLOYMENTS.md` and
 `docs/architecture/PIPELINE.md`. Most consequentially, DEPLOYMENTS.md's **open contradiction is now
@@ -500,9 +520,13 @@ Vercel/Render/Supabase/GitHub-settings credential.
 
 ## 16. Remaining Risks
 
-- **Production may be down right now and nobody would know.** The backend origin is unconfirmed and
-  the monitor cannot reach it. Fix A makes the *frontend* half honest; the backend half stays blind
-  until `PROD_BACKEND_URL` is set.
+- **Production availability is still unmeasured.** The origin is now known, but nothing in this
+  session could probe it: the agent network policy answers `403` to `CONNECT` for `*.onrender.com`.
+  Fix A makes the monitor capable of telling the truth; the first scheduled run from `master` after a
+  release is what will actually establish whether production answers.
+- **A free-tier cold start and a real outage look the same to a probe.** PR #206's widened timeouts
+  mitigate this; upgrading the plan removes it. Until then, treat a single red heartbeat as
+  "investigate", not "production is down".
 - **Zero restorable backups.** Unchanged by this PR — it needs a secret only Sri holds.
 - **Fixes A and B do not take effect for the scheduled heartbeat until `master` is released.**
   Fix A's own header says so; that is the point of §0.4.
@@ -512,15 +536,11 @@ Vercel/Render/Supabase/GitHub-settings credential.
   not an estimate.
 - **`STAGING_BACKEND_URL` still points at a dead host**, so even after the backend deploy is
   repaired, the staging frontend's baked origin needs the variable updated in the same edit.
-- **Fix B closes the CLI deploy path only.** `web/next.config.mjs` has an independent copy of the
-  same dead fallback, and the git-connected Vercel build bypasses `deploy.sh` entirely — so a
-  `master` push can still ship the dead origin through that route until `BACKEND_URL` is set in the
-  `ascend_hq_web` project environment (§15.B, task 13).
-- **After this lands, a `master` release will fail at `deploy-production` unless `PROD_BACKEND_URL`
-  is set.** That is the intended behaviour — failing loudly beats shipping a frontend that cannot
-  reach an API — but it is a behaviour change and whoever runs the next release needs to know it.
-  Note `deploy-production` has no `vars.… != ''` skip guard (unlike `deploy-dev`/`deploy-staging`),
-  and should not get one: a production deploy that silently skips is worse than one that fails.
+- **`web/next.config.mjs` can still ship the dead origin.** It holds a third copy of the fallback
+  that neither PR #206 nor this change touched, and the git-connected Vercel build bypasses
+  `deploy.sh` entirely (§15.B, task 13).
+- **No automation in this repo deploys the production backend.** Render's git integration on `master`
+  does it, invisibly to CI. A rollback of the backend is a dashboard action nobody has drilled.
 - **This audit could not read GitHub repo variables, secrets, branch-protection rules, or the
   Vercel/Render/Supabase dashboards.** Everything about them here is inferred from workflow behaviour
   (which is strong evidence for *unset*, weaker for *set-and-correct*) and is labelled accordingly.
