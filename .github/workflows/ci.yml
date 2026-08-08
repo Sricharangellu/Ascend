@@ -697,7 +697,7 @@ jobs:
     #              docs/architecture/DEPLOYMENTS.md. Setting PROD_BACKEND_URL is
     #              what fixes both this gate and the heartbeat, in one edit.
     env:
-      BACKEND: ${{ vars.PROD_BACKEND_URL || 'https://ascendhq-api.vercel.app' }}
+      BACKEND: ${{ vars.PROD_BACKEND_URL || 'https://ascend-prod.onrender.com' }}
       FRONTEND: ${{ vars.PROD_FRONTEND_URL || 'https://ascendhqweb.vercel.app' }}
     steps:
       - name: Show probe targets

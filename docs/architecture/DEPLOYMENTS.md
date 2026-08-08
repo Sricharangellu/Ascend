@@ -15,14 +15,36 @@ correction existed, but `develop` never had it, so every session reading `ARCHIT
 Render" claim with no caveat attached. PR #117 is now merged; `develop` carries the correction.
 This document's baseline is current as of that merge, not before it.
 
+> **Update 2026-08-08 — item 2 is answered.** Sri reconfirmed the production backend origin as
+> `https://ascend-prod.onrender.com`. It is now the in-repo default in three places that all
+> previously defaulted to the dead `ascendhq-api.vercel.app`: the prod branch of
+> `scripts/deploy.sh`'s `BACKEND_URL` (which is *compiled into the frontend bundle* — see below),
+> `ci.yml`'s `smoke-test`, and `uptime.yml`. `vars.PROD_BACKEND_URL` still overrides all three.
+>
+> **Why this was the bug that mattered:** `web/next.config.mjs` reads `BACKEND_URL` inside
+> `rewrites()`, which Next evaluates at build time and freezes into `routes-manifest.json`. Every
+> production build since the 2026-07-20 cutover therefore baked in an origin that answers
+> **HTTP 404** (`DEPLOYMENT_NOT_FOUND`, observed on heartbeat run `31266012547`, 2026-08-08T16:03Z).
+> A shipped frontend proxying every `/api/*` call to a dead host cannot log anyone in, and no amount
+> of correct backend hosting would have fixed it.
+>
+> Items 1 and 3 remain open. `ascend-prod.onrender.com` still does not answer from this sandbox, but
+> that is **not evidence** — the agent network policy returns `403` to `CONNECT` for
+> `*.onrender.com`, so no probe from here is informative either way. Item 3 in particular is
+> unchanged: `scripts/deploy.sh`'s `deploy_backend` targets **Vercel**, not Render, so this repo
+> still has no automation that deploys the backend to where the backend actually runs.
+
 ## Executive summary
 
 1. **Is production currently down?** UNKNOWN — pending Sri's manual browser check of
    `https://ascend-prod.onrender.com/healthz`. This is the single fact everything else forks on.
-2. **Where does production actually run?** UNCONFIRMED. Docs claim Render; zero deploy automation
-   in this repo supports that claim, and the URL doesn't respond from three independent networks
-   (this sandbox, a GitHub Actions runner via `workflow_dispatch` — run `30565267888` — and Cursor
-   Cloud, all three getting an identical complete-timeout/zero-bytes result).
+2. **Where does production actually run?** ~~UNCONFIRMED~~ → **Render, `https://ascend-prod.onrender.com`,
+   reconfirmed by Sri 2026-08-08** and now wired as the in-repo default (see the update box above).
+   Still true, and still the open half: zero deploy automation in this repo targets Render, and the
+   URL did not respond from three independent networks when last testable (this sandbox, a GitHub
+   Actions runner via `workflow_dispatch` — run `30565267888` — and Cursor Cloud, all three getting
+   an identical complete-timeout/zero-bytes result). Knowing the address is not the same as having
+   confirmed something answers at it.
 3. **What deployment path is authoritative?** None, currently. `ci.yml`/`scripts/deploy.sh` deploy
    backend to Vercel project IDs that are either dead (`DEPLOYMENT_NOT_FOUND`) or serving an
    unrelated app. Render is claimed as the real target but has no representation in this repo's

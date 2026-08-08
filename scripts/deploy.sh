@@ -78,8 +78,22 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 #   prod           → the stable production backend domain (default).
 #   testing / dev  → MUST be supplied (fail closed): a non-prod frontend pointing
 #                    at the prod backend would write to the prod database.
+#
+# This value is compiled into the frontend bundle: web/next.config.mjs reads it
+# inside rewrites(), which Next evaluates at build time and freezes into
+# routes-manifest.json. It is the origin the shipped app proxies every /api/*
+# call to, so a wrong value here means users cannot log in.
+#
+# The prod default was https://ascendhq-api.vercel.app, which has returned
+# DEPLOYMENT_NOT_FOUND (HTTP 404, observed on heartbeat run 31266012547) since
+# the 2026-07-20 Render cutover — every production build since has baked in a
+# dead origin. Sri confirmed the real production backend on 2026-08-08:
+# https://ascend-prod.onrender.com. Render deploys it from its own git
+# integration on push to master; scripts/deploy.sh does not and never did
+# deploy the backend to Render (deploy_backend targets Vercel), which is the
+# reconciliation docs/architecture/PIPELINE.md already flagged as outstanding.
 if [[ "$DEPLOY_ENV" == "prod" ]]; then
-  BACKEND_URL="${BACKEND_URL:-https://ascendhq-api.vercel.app}"
+  BACKEND_URL="${BACKEND_URL:-https://ascend-prod.onrender.com}"
 else
   if [[ -z "${BACKEND_URL:-}" ]]; then
     echo "✗ DEPLOY_ENV=$DEPLOY_ENV requires BACKEND_URL (the TESTING backend origin)."
