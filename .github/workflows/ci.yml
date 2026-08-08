@@ -655,6 +655,26 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN_PROD }}
           DEPLOY_ENV: prod
           NEXT_PUBLIC_MOCK: "false"
+          # `web/next.config.mjs` reads BACKEND_URL inside `rewrites()`, which
+          # Next evaluates at BUILD time and freezes into routes-manifest.json.
+          # It is therefore the origin the shipped production bundle proxies
+          # every /api/* call to, and it cannot be changed afterwards from the
+          # Vercel dashboard — only by rebuilding with a different value.
+          #
+          # This job never passed one, so production fell through to deploy.sh's
+          # default, https://ascendhq-api.vercel.app, dead since the 2026-07-20
+          # Render cutover. That is not a red check, it is a dead product: the
+          # release ships a frontend whose every API call resolves to a host
+          # that does not exist, so no user can log in. deploy-staging has read
+          # `vars.STAGING_BACKEND_URL` since it was written — production is the
+          # one tier that never got the same wiring. The repointable prod
+          # *probes* landed in PR #197; the prod *build* was left behind.
+          #
+          # Unset resolves to empty and deploy.sh's own default still applies,
+          # so this changes no behaviour on its own. Setting PROD_BACKEND_URL —
+          # the same variable smoke-test and uptime.yml already read — is what
+          # makes production reachable.
+          BACKEND_URL: ${{ vars.PROD_BACKEND_URL }}
 
   # ─── Production smoke test ─────────────────────────────────────────────────
   smoke-test:

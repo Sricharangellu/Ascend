@@ -1,3 +1,15 @@
+## Active Claim (Claude Code web — release staging → master)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/push-staging-to-master-1m38lt` (PR #202) |
+| Queue item | Sri directive 2026-08-08: release `staging` to `master`. `deploy-production` never passed `BACKEND_URL`, and `web/next.config.mjs` reads it inside `rewrites()` — build-time, frozen into `routes-manifest.json` — so every release ships a production frontend proxying `/api/*` at the dead `ascendhq-api.vercel.app` and nobody can log in. `deploy-staging` has read `vars.STAGING_BACKEND_URL` all along. Wire `vars.PROD_BACKEND_URL` into the prod build. |
+| Files/areas expected | `.github/workflows/ci.yml` (`deploy-production` env block only), `WORK/LOCK.md`. NOT `src/**`, NOT `web/**`, NOT `scripts/deploy.sh`, NOT `uptime.yml`. |
+| Started | 2026-08-08T162602Z |
+| Status | ACTIVE — implementing |
+| Duplicate-work check | Ran per AGENTS.md before re-cutting this branch, and it caught a real collision. This claim originally also made `smoke-test`'s probes repointable; `develop` moved to `dcf6033` mid-session and PR #197's `d294041` had already landed exactly that. The duplicate commit was **dropped, not merged** — develop's version stands, including its deliberate asymmetric fallback. Only the `deploy-production` half, which #197 left behind, remains here. |
+| Blockers | `PROD_BACKEND_URL`, `PROD_DATABASE_URL` and the Render/Vercel/Supabase dashboards are Sri-only. The no-restorable-backup blocker and the `DEPLOYMENTS.md` P0 on where the prod backend runs stay OPEN and are not worked around here. |
+
 ## Active Claim (Claude Code web — enterprise infrastructure/platform audit)
 
 | Field | Value |
