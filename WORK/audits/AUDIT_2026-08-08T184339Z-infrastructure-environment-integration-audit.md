@@ -58,6 +58,20 @@ documents are stale, and this audit contradicts three of them with evidence.
    form. This finding appears in no existing document and it changes the fix order: **setting
    `PROD_BACKEND_URL` alone will not turn the heartbeat green.**
 
+   **And `master` cannot currently be released to — PR #209 found the mechanism while this audit was
+   open.** `master`'s branch protection requires a status check named
+   `Frontend — typecheck + lint + build`; commit `1a4b989` (2026-08-05) renamed that job to
+   `Frontend — typecheck + lint + test + build` without updating protection. A required check that
+   no job emits is never satisfied *and never fails* — it sits permanently "expected", so the merge
+   button is dead for every PR into `master`. GitHub's own words on the attempted release of PR #200:
+   `405 Required status check "Frontend — typecheck + lint + build" is expected.` Independently
+   confirmed here by reading both job names (`master`'s `ci.yml:171` vs `develop`'s `ci.yml:330`).
+
+   This turns finding 4 from "nobody has released" into **"nobody can release"**, and it is why
+   findings 1–3 have stayed open: the fix for each of them has to travel through a merge that has
+   been structurally impossible for three days. Repairing the required-check name is now the single
+   highest-leverage action in this audit — it is a prerequisite for almost everything else.
+
 5. **Two of the three tiers deploy nothing, and the third half-deploys.** `develop`'s `Deploy → Dev`
    job is **skipped** on every push (`DEV_BACKEND_URL` unset — job `93137531666`, conclusion
    `skipped`), so a green `develop` CI means "tests passed", not "dev is updated". `staging`'s
@@ -277,6 +291,7 @@ master ──── CI + Security ─┬─▶ Deploy → Production (Vercel --p
 | 2 | **Production backend runs on a FREE Render instance: ~15 min idle → spin-down, ~50 s cold start** | **Critical** | **V** — Sri-confirmed service identity, PR #206 | Free plan chosen at cutover; never revisited | Every first request after a quiet period — a cashier's first sale, a Stripe webhook, a job tick. Also makes availability data ambiguous |
 | 2b | **No automation in this repo deploys the production backend** | **High** | **V** — `deploy_backend` targets Vercel | Render cutover was dashboard-only; no `render.yaml`, no deploy hook | A rollback or redeploy has to be done by hand in a dashboard |
 | 3 | **Ops hardening inert in prod (default-branch rule)** | **Critical** | **V** — runs `31270958830` vs `31272326653` | `master` 245 commits behind; `schedule:` runs default branch | Already broken; will silently absorb future "fixes" too |
+| 3b | **`master` cannot accept any merge — the release path is structurally dead** | **Critical** | **V** — PR #209's `405` + both job names read here | A required status check was renamed (`1a4b989`, 2026-08-05) without updating branch protection; the check sits permanently "expected" | Already broken since 2026-08-05. Blocks the fix for rows 1, 3 and 7, since each has to reach `master` |
 | 4 | **A bad release ships a frontend that cannot reach any API** | **Critical** | **V** — ci.yml's own comment + `deploy.sh` default | `BACKEND_URL` baked at build time by `next.config.mjs` `rewrites()`; prod defaulted to a dead host | Next `master` release — **fixed here** |
 | 5 | **Staging cannot validate anything** | **High** | **V** — run `31271109836` | Vercel backend project deleted; `STAGING_DEPLOY_TARGET` unset → `both` | Already broken; every QA sign-off on staging is meaningless |
 | 6 | **Schema change is irreversible** | **High** | **V** — 3 `.down.sql` vs 53 module sets | Runtime migrations have no down path; no restorable backup | First bad `ALTER TABLE` in production |
@@ -428,6 +443,11 @@ are the strongest part of this list.
 ## 14. Prioritized Roadmap
 
 **Phase 1 — Critical (this week; all but one are Sri-only dashboard/variable actions)**
+0. **Unblock `master` first — everything else queues behind it.** Settings → Branches → `master` →
+   required status checks: replace `Frontend — typecheck + lint + build` with
+   `Frontend — typecheck + lint + test + build`. Sri-only: protection is admin-enforced and the API
+   returns `403` to agents. (The alternative — renaming the job back — is agent-doable but makes the
+   name understate what the job runs. Do one, not both, and keep `PIPELINE.md`'s list in sync.)
 1. Set `PROD_DATABASE_URL`; set `BACKUP_REQUIRED=true`; confirm an artifact appears.
 2. **Upgrade "Ascend Prod" off Render's free plan.** ~50 s cold starts after 15 min idle are not
    viable for a POS, and they make every availability measurement ambiguous.
@@ -530,8 +550,13 @@ Vercel/Render/Supabase/GitHub-settings credential.
 - **Zero restorable backups.** Unchanged by this PR — it needs a secret only Sri holds.
 - **Fixes A and B do not take effect for the scheduled heartbeat until `master` is released.**
   Fix A's own header says so; that is the point of §0.4.
-- **`master` is 245 commits behind**, so production is running ~3 weeks of superseded code including
-  the pre-audit security posture.
+- **`master` is 245 commits behind and cannot currently be merged into**, so production is running
+  ~3 weeks of superseded code including the pre-audit security posture — and will keep doing so until
+  the required-check name is repaired. That repair is Sri-only.
+- **The same failure mode can recur silently.** Renaming a required CI job raises no error anywhere
+  until someone attempts a merge, which on a release branch may be weeks later. Nothing in the repo
+  cross-checks job names against branch protection, and nothing can — the protection API is not
+  readable by agents.
 - **Load behaviour is unknown.** No capacity claim in this document is measured; #11 is a finding,
   not an estimate.
 - **`STAGING_BACKEND_URL` still points at a dead host**, so even after the backend deploy is
@@ -549,7 +574,9 @@ Vercel/Render/Supabase/GitHub-settings credential.
 
 ## 17. Exact next tasks for the next agent
 
-**Sri-only (blocking, in this order — 1–3 are one sitting):**
+**Sri-only (blocking, in this order — 0 gates the rest):**
+0. **Repair `master`'s required-check name** (see Phase 1 item 0 and `PIPELINE.md`'s warning box).
+   Until this is done, task 3 below is impossible and every ops fix on `develop` stays inert.
 1. Answer DEPLOYMENTS.md's P0: open the Render (or whichever) dashboard and record the production
    backend's service name, URL, branch, build/start command, public-vs-private, and running state.
    Then set repo variable `PROD_BACKEND_URL`.
