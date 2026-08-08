@@ -6,6 +6,23 @@
 # GitHub notifies repo watchers. Zero external accounts or secrets.
 # Richer channels (Slack webhook, PagerDuty, Sentry cron monitors) are a
 # follow-up decision — this is the floor, not the ceiling.
+#
+# ─── READ THIS BEFORE EDITING (2026-08-08) ──────────────────────────────────
+# GitHub runs `schedule:` workflows from the DEFAULT BRANCH only. This repo's
+# default branch is `master`, which is currently 245 commits behind `staging`.
+# So every edit made to this file on `develop` — including the repo-variable
+# indirection of ADR-011 (PRs #191/#197/#201) — is INERT for the every-15-min
+# run until it is promoted all the way to `master`.
+#
+# Proven, not assumed: scheduled run 31270958830 (2026-08-08 18:03) executed the
+# hardcoded `curl … https://ascendhq-api.vercel.app/healthz` form that only
+# exists on `master`, while workflow_dispatch run 31272326653 on `develop`
+# executed the `"$BACKEND/healthz"` form below. Two different files, same
+# workflow name.
+#
+# Consequence for whoever sets PROD_BACKEND_URL: setting the variable alone will
+# NOT turn the scheduled heartbeat green, because master's copy does not read
+# it. Promoting this file to master is the other half of that fix.
 name: Production heartbeat
 
 on:
@@ -32,35 +49,64 @@ jobs:
     #   PROD_BACKEND_URL   e.g. https://ascend-prod.onrender.com
     #   PROD_FRONTEND_URL  e.g. https://ascendhqweb.vercel.app
     #
-    # FRONTEND fallback is now the real production host, confirmed by Sri on
+    # FRONTEND fallback is the real production host, confirmed by Sri on
     # 2026-08-07: https://ascendhqweb.vercel.app (Vercel project `ascend_hq_web`).
     # It replaces `ascendhq-app.vercel.app`, which returns DEPLOYMENT_NOT_FOUND
     # and was half of why this heartbeat went red.
     #
-    # BACKEND fallback is still a dead hostname. As of 2026-08-05 it no longer
-    # resolves (production moved to Render per docs/architecture/DEPLOYMENTS.md),
-    # so this workflow still fails at the first step — a DNS failure in ~1s, not
-    # a real outage. Setting PROD_BACKEND_URL is what fixes it; the fallback is
-    # kept so this change alters no behaviour on the backend side.
+    # BACKEND fallback is still a dead hostname (DEPLOYMENT_NOT_FOUND since
+    # 2026-07-23; re-confirmed 2026-08-08 — run 31272326653 got HTTP 404 from it
+    # in 90ms). It is kept rather than corrected because nobody has confirmed
+    # where the production backend actually runs — ADR-011's evidence bar is
+    # explicit that an unverified URL in a monitor is worse than a known-stale
+    # one, because it looks fixed. Setting PROD_BACKEND_URL is the fix.
+    #
+    # BACKEND_CONFIGURED distinguishes "we have not been told where the backend
+    # is" from "the backend is down", which the run status alone cannot express.
+    # Both still fail the run — a heartbeat that goes green while monitoring
+    # nothing is the failure mode backup.yml already had (16 green runs, zero
+    # backups) — but the summary says which, so a reader can tell an unresolved
+    # configuration gap from a live incident without opening the log.
     env:
       BACKEND: ${{ vars.PROD_BACKEND_URL || 'https://ascendhq-api.vercel.app' }}
       FRONTEND: ${{ vars.PROD_FRONTEND_URL || 'https://ascendhqweb.vercel.app' }}
+      BACKEND_CONFIGURED: ${{ vars.PROD_BACKEND_URL != '' }}
     steps:
       - name: Show probe targets
         run: |
-          echo "backend:  $BACKEND"
+          echo "backend:  $BACKEND (PROD_BACKEND_URL set: $BACKEND_CONFIGURED)"
           echo "frontend: $FRONTEND"
+
+      # ── Backend probes ──────────────────────────────────────────────────────
+      # `continue-on-error` on the three backend steps, NOT to soften them: the
+      # job still fails, via the verdict step at the end. It is what stops the
+      # first backend failure from aborting the job before the FRONTEND is ever
+      # probed.
+      #
+      # That abort is a real, measured defect, not a hypothetical: this job has
+      # been red on every scheduled run since ~2026-07-22, and every one of those
+      # runs died at step 1 in under a second. `ascendhqweb.vercel.app` — the one
+      # production surface confirmed live — has therefore never actually been
+      # checked by the monitor that exists to check it. A prod frontend outage
+      # today would look identical, in the Actions list, to the dead-backend-URL
+      # noise: red.
       - name: Backend liveness (/healthz)
+        id: be_health
+        continue-on-error: true
         run: |
           curl -fsS --max-time 15 --retry 3 --retry-delay 5 \
             "$BACKEND/healthz" \
             || (echo "❌ /healthz failed against $BACKEND" && exit 1)
       - name: Backend readiness (/readyz — DB reachable)
+        id: be_ready
+        continue-on-error: true
         run: |
           curl -fsS --max-time 15 --retry 3 --retry-delay 5 \
             "$BACKEND/readyz" \
             || (echo "❌ /readyz failed against $BACKEND" && exit 1)
       - name: Auth boundary (/api/v1/flags must 401 unauthenticated)
+        id: be_authz
+        continue-on-error: true
         run: |
           http_status="$(curl -sS --max-time 15 --retry 2 --retry-delay 5 \
             -o /tmp/flags-response.json \
@@ -71,8 +117,85 @@ jobs:
             cat /tmp/flags-response.json
             exit 1
           fi
+
+      # ── Frontend probe ──────────────────────────────────────────────────────
+      # Runs regardless of the backend outcome. This is the whole point of the
+      # `continue-on-error` above.
       - name: Frontend reachable
+        id: fe
+        continue-on-error: true
         run: |
           curl -fsS --max-time 15 --retry 3 --retry-delay 5 \
             "$FRONTEND/" >/dev/null \
             || (echo "❌ frontend failed against $FRONTEND" && exit 1)
+
+      # ── Verdict ─────────────────────────────────────────────────────────────
+      # One place decides pass/fail, and writes a summary that says WHICH surface
+      # is down and whether the backend result is even meaningful. Without this,
+      # "Production heartbeat: failure" has meant the same thing for two weeks
+      # regardless of what production was actually doing.
+      - name: Verdict
+        if: always()
+        env:
+          BE_HEALTH: ${{ steps.be_health.outcome }}
+          BE_READY: ${{ steps.be_ready.outcome }}
+          BE_AUTHZ: ${{ steps.be_authz.outcome }}
+          FE: ${{ steps.fe.outcome }}
+        run: |
+          # Explicit `if` rather than `cond && assign`: GitHub runs `run:` blocks
+          # under `bash -e`, where a bare `A && B` whose A is false is a failed
+          # command and aborts the step — which would take out the very summary
+          # this step exists to write.
+          set -uo pipefail
+          backend_ok=true
+          for outcome in "$BE_HEALTH" "$BE_READY" "$BE_AUTHZ"; do
+            if [ "$outcome" != "success" ]; then
+              backend_ok=false
+            fi
+          done
+          frontend_ok=false
+          if [ "$FE" = "success" ]; then
+            frontend_ok=true
+          fi
+
+          {
+            echo "## Production heartbeat"
+            echo
+            echo "| Surface | Target | Result |"
+            echo "|---|---|---|"
+            if [ "$BACKEND_CONFIGURED" = "true" ]; then
+              echo "| Backend | \`$BACKEND\` | $([ "$backend_ok" = true ] && echo '✅ up' || echo '❌ DOWN') |"
+            else
+              echo "| Backend | \`$BACKEND\` (fallback) | ⚠️ NOT CONFIGURED — not an outage signal |"
+            fi
+            echo "| Frontend | \`$FRONTEND\` | $([ "$frontend_ok" = true ] && echo '✅ up' || echo '❌ DOWN') |"
+            echo
+            if [ "$BACKEND_CONFIGURED" != "true" ]; then
+              echo "\`PROD_BACKEND_URL\` is not set, so the backend probes ran against a hostname"
+              echo "known dead since 2026-07-23. **Their result carries no information about**"
+              echo "**production.** See \`docs/architecture/DEPLOYMENTS.md\` — the open P0 is"
+              echo "confirming where the production backend actually runs, then setting that"
+              echo "variable (Settings → Secrets and variables → Actions → Variables)."
+              echo
+              echo "Note: scheduled runs execute the **default branch** copy of this workflow."
+              echo "Setting the variable is necessary but not sufficient until this file reaches"
+              echo "\`master\`."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$frontend_ok" != true ]; then
+            echo "::error title=Production frontend unreachable::$FRONTEND did not respond"
+          fi
+          if [ "$BACKEND_CONFIGURED" = "true" ] && [ "$backend_ok" != true ]; then
+            echo "::error title=Production backend unhealthy::$BACKEND failed one or more probes"
+          fi
+          if [ "$BACKEND_CONFIGURED" != "true" ]; then
+            echo "::warning title=Backend probe target not configured::PROD_BACKEND_URL is unset — the backend result below is noise, not an outage signal."
+          fi
+
+          if [ "$backend_ok" = true ] && [ "$frontend_ok" = true ]; then
+            echo "✅ all production probes passed"
+            exit 0
+          fi
+          echo "❌ heartbeat failed — see the job summary for which surface"
+          exit 1

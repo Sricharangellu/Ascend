@@ -74,18 +74,48 @@ FRONTEND_PID="${VERCEL_FRONTEND_PROJECT_ID:-prj_MvvmpNkRQbKUAEOmh9ZvmRJa7ETN}"  
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 : "${VERCEL_TOKEN:?Set VERCEL_TOKEN (a Vercel token with access to the team scope)}"
 
-# Resolve the backend origin the frontend will proxy to.
-#   prod           → the stable production backend domain (default).
-#   testing / dev  → MUST be supplied (fail closed): a non-prod frontend pointing
-#                    at the prod backend would write to the prod database.
-if [[ "$DEPLOY_ENV" == "prod" ]]; then
-  BACKEND_URL="${BACKEND_URL:-https://ascendhq-api.vercel.app}"
-else
-  if [[ -z "${BACKEND_URL:-}" ]]; then
-    echo "✗ DEPLOY_ENV=$DEPLOY_ENV requires BACKEND_URL (the TESTING backend origin)."
+# Resolve the backend origin the frontend will proxy to. EVERY tier must supply
+# it — fail closed, no fallback.
+#
+#   testing / dev  → a non-prod frontend that fell back to the prod backend
+#                    would write to the prod database. (Original rule.)
+#   prod           → until 2026-08-08 this tier was the exception: it defaulted
+#                    to https://ascendhq-api.vercel.app. That hostname has
+#                    returned DEPLOYMENT_NOT_FOUND since 2026-07-23 (re-confirmed
+#                    2026-08-08, run 31272326653 — HTTP 404), so the "safe
+#                    default" was a guaranteed-broken one.
+#
+#                    Why that mattered more than a red check: web/next.config.mjs
+#                    reads BACKEND_URL inside `rewrites()`, which Next evaluates
+#                    at BUILD time and freezes into routes-manifest.json. The
+#                    value is therefore baked into the shipped bundle and cannot
+#                    be changed from the Vercel dashboard afterwards. A prod
+#                    release taking this default ships a frontend whose every
+#                    /api/* call resolves to a host that does not exist — the
+#                    deploy reports success and nobody can log in. ci.yml's
+#                    deploy-production job says the same thing at its BACKEND_URL
+#                    line: "not a red check, it is a dead product."
+#
+#                    Failing here instead is strictly better: the release stops
+#                    with an actionable message rather than shipping that.
+#
+# This is a deliberate, narrow deviation from ADR-011's "keep the historical
+# hostname as an inline fallback so setting nothing changes nothing" — that rule
+# assumes the fallback is merely *stale*. A fallback confirmed dead is not a
+# default, it is a defect, and ADR-011's own evidence bar ("an unverified URL is
+# worse than a known-stale one, because it looks fixed") applies with more force
+# to a build input than to a probe. The probes keep their annotated fallbacks.
+if [[ -z "${BACKEND_URL:-}" ]]; then
+  echo "✗ DEPLOY_ENV=$DEPLOY_ENV requires BACKEND_URL (the backend origin this frontend proxies to)."
+  if [[ "$DEPLOY_ENV" == "prod" ]]; then
+    echo "  Set the repo variable PROD_BACKEND_URL (Settings → Secrets and variables → Actions"
+    echo "  → Variables); ci.yml's deploy-production passes it through as BACKEND_URL."
+    echo "  Refusing to bake a dead backend origin into the production build — see"
+    echo "  docs/architecture/DEPLOYMENTS.md (open P0: where does the prod backend run?)."
+  else
     echo "  Refusing to deploy a non-prod frontend that would fall back to the prod backend/DB."
-    exit 1
   fi
+  exit 1
 fi
 
 deploy_backend() {

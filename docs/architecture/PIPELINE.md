@@ -7,12 +7,31 @@ Supabase) and gated by CI. The Vercel projects are **not** git-connected — Git
 
 ## Environments
 
+**Design (what this pipeline is built to do):**
+
 | Tier | Git branch | Vercel env | Database | Frontend URL |
 |---|---|---|---|---|
-| **PROD** | `master` (default) | Production (`vercel --prod`) | Supabase **A** (prod) | finder-pos-frontend.vercel.app |
+| **PROD** | `master` (default) | Production (`vercel --prod`) | Supabase **A** (prod) | ascendhqweb.vercel.app |
 | **TESTING** | `staging` | Preview (stable alias) | Supabase **B** (testing) | `STAGING_FRONTEND_ALIAS` |
 | **DEV** | `develop` | Preview (unique per deploy) | Supabase **B** (shared) | per-deploy preview URL |
 | feature work | `feature/*` | — (CI tests only) | ephemeral CI Postgres | — |
+
+**Reality (verified against live runs 2026-08-08 — read this before trusting the table above):**
+
+| Tier | What actually happens on a push | Evidence |
+|---|---|---|
+| **PROD** | Last release is `e55e743`; `master` is **245 commits behind `staging`**. `PROD_BACKEND_URL` is **unset**, so the prod build, the release smoke test and the heartbeat all fall through to `ascendhq-api.vercel.app` — HTTP 404. | run `31272326653` |
+| **TESTING** | Frontend deploys and aliases correctly; **backend deploy fails** (`Project not found` — the Vercel backend project is deleted). Net: a live staging frontend proxying `/api/*` at a host that does not exist. | run `31271109836` |
+| **DEV** | `Deploy → Dev` is **skipped every push** (`DEV_BACKEND_URL` unset). Green CI on `develop` means "tests passed", not "dev is updated". | run `31270468757`, job `93137531666` |
+| feature work | Works as designed — CI on the PR, no deploy. | run `31270468757` |
+
+> **Scheduled workflows run the DEFAULT BRANCH's copy.** `uptime.yml`, `backup.yml` and
+> `security.yml`'s weekly arm execute whatever is on `master`, not on `develop`. With `master` 245
+> commits behind, every ops fix merged to `develop` since 2026-07-20 is inert for those runs —
+> including the repo-variable indirection of ADR-011 and the backup job's honesty fix, and
+> `security.yml` does not exist on `master` at all. See `DEPLOYMENTS.md`'s 2026-08-08
+> re-verification section and
+> `WORK/audits/AUDIT_2026-08-08T184339Z-infrastructure-environment-integration-audit.md`.
 
 `develop` and `staging` both deploy as Vercel **Preview** builds, so they share the Preview
 environment variables → the same **testing** database (Supabase B). Production is fully isolated on

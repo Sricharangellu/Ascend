@@ -35,6 +35,38 @@ This document's baseline is current as of that merge, not before it.
    deploy automation (disconnected from whatever's actually real, if anything, in production).
    Possibly broken: production itself — unconfirmed pending item 1.
 
+## Re-verification 2026-08-08 — three open items closed, one new finding
+
+Gathered live during the infrastructure/environment audit
+(`WORK/audits/AUDIT_2026-08-08T184339Z-infrastructure-environment-integration-audit.md`). Every row
+cites a GitHub Actions run ID that can be reopened.
+
+| Question this document left open | Answer, 2026-08-08 | Evidence |
+|---|---|---|
+| Is the non-prod backend Vercel project deleted (2026-07-20) or still resolving (2026-07-23)? | **CLOSED — deleted.** The 2026-07-20 claim was right; the 2026-07-23 finding is superseded. `prj_krZ34CIFjzQrMvZ08PWqqbxzBf7d` no longer exists. | `deploy-staging` on the `staging` push: `Error: Project not found ({"VERCEL_PROJECT_ID":"prj_krZ34CI…","VERCEL_ORG_ID":"team_WNp8v…"})` → `✗ backend deploy failed (testing)` → `✗ backend exit=1 frontend exit=0`. Run `31271109836`, job `93139035837` |
+| Is `PROD_BACKEND_URL` set? | **No.** So the P0 below is not merely "undocumented" — the repo-variable mechanism ADR-011 built for it is still empty. | Heartbeat dispatched on `develop` printed `backend: https://ascendhq-api.vercel.app` (the fallback) and got HTTP 404 in 90 ms. Run `31272326653` |
+| Is `PROD_FRONTEND_URL` set? | **No** — but its fallback (`ascendhqweb.vercel.app`) is the confirmed-live host, so this half is benign. | Same run |
+| Has any production backup ever been taken? | **No.** The daily job has reported `success` while producing nothing. | Run `31250642991` (2026-08-08 09:28, conclusion `success`) → `list_workflow_run_artifacts` returns `total_count: 0` |
+| Does the staging frontend deploy work now? | **Yes** — since the `FRONTEND_PID` and Vercel root-directory fixes (PRs #201/#204). It aliases to `ascend-frontend-staging.vercel.app`, built with `BACKEND_URL=https://ascend-backend-staging.vercel.app`, which does not exist. **A live frontend with no backend.** | Same run `31271109836` |
+| Does `develop` deploy anywhere? | **No.** `Deploy → Dev` is skipped on every push because `DEV_BACKEND_URL` is unset. A green `develop` CI means "tests passed", not "dev is updated". | Run `31270468757`, job `93137531666`, conclusion `skipped` |
+
+**New finding — scheduled workflows execute the DEFAULT BRANCH's copy.** GitHub runs `schedule:`
+workflows from `master` only, and `master` is **245 commits behind `staging`**. Therefore every
+ops-side fix landed on `develop` since 2026-07-20 is **inert for the runs that matter**:
+
+- `uptime.yml`'s repo-variable indirection (PRs #191/#197/#201, ADR-011) — the 15-minute run still
+  executes master's hardcoded `curl … ascendhq-api.vercel.app` form. Proof: scheduled run
+  `31270958830` (18:03) logged the hardcoded step text; the `develop` dispatch `31272326653` logged
+  the `"$BACKEND/healthz"` form. Same workflow name, two different files.
+- `backup.yml`'s "green lie" fix (warning annotation + job summary) — master still has the version
+  that exits 0 silently.
+- `security.yml` **does not exist on `master` at all**, so its weekly CodeQL/gitleaks/SBOM re-scan
+  has never run and cannot run. (The per-push/PR arm on `develop`/`staging` does run.)
+
+**Consequence for this document's P3 (monitoring correction):** setting `PROD_BACKEND_URL` is
+*necessary but not sufficient*. Promoting the workflow files to `master` is the other half. Treat a
+`staging → master` release as part of the monitoring fix, not as unrelated feature work.
+
 ## Evidence table
 
 | Finding | Evidence | Impact |

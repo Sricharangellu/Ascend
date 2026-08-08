@@ -1,3 +1,18 @@
+## Active Claim (Claude Code web — infrastructure & environment integration audit)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-infrastructure-audit-mehnrd` |
+| Queue item | Sri directive 2026-08-08: full audit of the current infrastructure and environment integrations — what is integrated, where, how the tiers connect, what is missing/broken, and what should be integrated next — verified against the live repo and CI/CD rather than against documentation; plus implement the fixes that are safe without dashboard access. |
+| Base branch | Cut from `origin/develop` (`0919f37`), **not** `master`. The branch was created off `master` by the harness; `master` is a strict ancestor of `develop`, so it was fast-forwarded — no history rewritten, no force-push. PR targets `develop`, per the forward-only rule. |
+| Files/areas expected | `.github/workflows/uptime.yml`; `scripts/deploy.sh` (**top-level `BACKEND_URL` tier guard only**); `src/shared/deploy-guard.test.ts`; `docs/architecture/DEPLOYMENTS.md` (new dated re-verification section, append-only); `docs/architecture/PIPELINE.md` (the Environments table + a scheduled-workflow note); `WORK/audits/AUDIT_2026-08-08T184339Z-infrastructure-environment-integration-audit.md` (new); `WORK/LOCK.md`. **NOT** `src/modules/**`, NOT `web/**`, NOT `artifacts/**`, NOT `.github/workflows/ci.yml`, NOT `deploy_backend`/`deploy_frontend`'s bodies, NOT `WORK/FORWARD_PLAN.md`. |
+| Started | 2026-08-08T184339Z |
+| Overlap check (honest) | The `release staging → master` claim below is ACTIVE and lists `scripts/deploy.sh`. Its stated scope is **`deploy_frontend`'s staging layout only**, and explicitly **NOT `uptime.yml`** and **NOT `deploy_backend`**. This claim edits neither function — only the top-level per-tier `BACKEND_URL` resolution above them. The two are complementary rather than competing: that claim wires `vars.PROD_BACKEND_URL` **into** the prod build; this one removes the dead fallback the build used **when that variable is empty**. Landing both means a prod release either has a real backend origin or fails loudly, instead of silently shipping `ascendhq-api.vercel.app`. Flagged rather than silently merged, per this file's rules. |
+| Status | RELEASED — pushed to `claude/ascend-infrastructure-audit-mehnrd`. |
+| Blockers (not worked around) | `PROD_BACKEND_URL`, `PROD_DATABASE_URL`, `DEV_BACKEND_URL`, `STAGING_DEPLOY_TARGET`, Supabase PITR, and the `staging → master` release are all Sri-only. The audit names each one as a discrete next task with the evidence behind it; none is faked, defaulted, or worked around here. |
+| Gates | Backend `typecheck` PASS · `hygiene` PASS (2203 files) · `gap:scan` PASS (474/382, 17 allowlisted) · `table:scan` PASS (166 names) · full backend suite on **real PostgreSQL 16** (system PG on :5433 — embedded-postgres cannot `initdb` as root in this container, same constraint as prior sessions) · `deploy-guard` isolated **6/6** (3 new) · Web `typecheck` PASS · `lint` 0 warnings · `vitest` **206/206 across 29 files** · `NEXT_PUBLIC_MOCK=false npm run build` PASS · `actionlint` 1.7.12 clean on all four workflows · `shellcheck --severity=error` clean on the four gated ops scripts · the new `Verdict` step extracted and exercised under `bash -e` across all 8 outcome permutations. Node here is 22, not the pinned 24 — the documented jsdom/FileReader gap did not trigger. |
+| Not run | Playwright e2e — no built-and-served real-stack pair in this container; CI runs it on the PR, and the diff touches no `web/**` file. `npm run smoke` — CI runs it in the same job and the POS path is untouched. |
+
 ## Active Claim (Claude Code web — release staging → master)
 
 | Field | Value |
