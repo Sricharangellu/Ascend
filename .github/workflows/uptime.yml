@@ -46,23 +46,32 @@ jobs:
       BACKEND: ${{ vars.PROD_BACKEND_URL || 'https://ascend-prod.onrender.com' }}
       FRONTEND: ${{ vars.PROD_FRONTEND_URL || 'https://ascendhqweb.vercel.app' }}
     steps:
+      # Timeouts are sized for a Render FREE instance, which is what serves
+      # production ("Ascend Prod", srv-d9lo8jm7bikc739dnsn0, Docker). Free web
+      # services spin down after ~15 min idle and cold-start in ~50s, and this
+      # heartbeat runs every 15 min — so it is frequently the request that wakes
+      # the service. The previous `--max-time 15` could not outlast a cold start,
+      # which is very likely why this workflow has reported a "dead" backend
+      # since 2026-07-22 and why the same URL timed out with zero bytes from
+      # three independent networks. A timeout shorter than the cold start does
+      # not measure availability, it measures the timeout.
       - name: Show probe targets
         run: |
           echo "backend:  $BACKEND"
           echo "frontend: $FRONTEND"
       - name: Backend liveness (/healthz)
         run: |
-          curl -fsS --max-time 15 --retry 3 --retry-delay 5 \
+          curl -fsS --max-time 90 --retry 5 --retry-delay 10 --retry-all-errors \
             "$BACKEND/healthz" \
             || (echo "❌ /healthz failed against $BACKEND" && exit 1)
       - name: Backend readiness (/readyz — DB reachable)
         run: |
-          curl -fsS --max-time 15 --retry 3 --retry-delay 5 \
+          curl -fsS --max-time 90 --retry 5 --retry-delay 10 --retry-all-errors \
             "$BACKEND/readyz" \
             || (echo "❌ /readyz failed against $BACKEND" && exit 1)
       - name: Auth boundary (/api/v1/flags must 401 unauthenticated)
         run: |
-          http_status="$(curl -sS --max-time 15 --retry 2 --retry-delay 5 \
+          http_status="$(curl -sS --max-time 90 --retry 5 --retry-delay 10 --retry-all-errors \
             -o /tmp/flags-response.json \
             -w '%{http_code}' \
             "$BACKEND/api/v1/flags")"
@@ -73,6 +82,6 @@ jobs:
           fi
       - name: Frontend reachable
         run: |
-          curl -fsS --max-time 15 --retry 3 --retry-delay 5 \
+          curl -fsS --max-time 90 --retry 5 --retry-delay 10 --retry-all-errors \
             "$FRONTEND/" >/dev/null \
             || (echo "❌ frontend failed against $FRONTEND" && exit 1)
