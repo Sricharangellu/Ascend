@@ -3,7 +3,7 @@ name: CI
 # ─── Trigger rules (3-tier promotion pipeline) ────────────────────────────────
 # develop → full CI + deploy to DEV      (Vercel preview, own dedicated Supabase)
 # staging → full CI + deploy to TESTING  (Vercel preview alias, TESTING Supabase)
-# master  → full CI + deploy to PROD      (Vercel --prod, PROD Supabase, ascendhq-app.vercel.app)
+# master  → full CI + deploy to PROD      (Vercel --prod, PROD Supabase, ascendhqweb.vercel.app)
 # PRs     → full CI, no deploy
 # feature → no CI (local dev + pre-push hook); PR into develop to run CI
 # Promotion is forward-only: feature/* → develop → staging → master.
@@ -48,14 +48,28 @@ jobs:
       # WORK/audits/AUDIT_2026-08-03T110000Z-replit-pnpm-root-hijack-incident.md.
       - name: Root manifest integrity (package.json / lockfiles / tsconfig)
         run: node tools/hygiene-check.mjs
-      - name: No unguarded mutation routes (router.patch/delete without requireRole)
-        run: |
-          ! grep -rn --include="*routes.ts" -A1 "router\.\(patch\|delete\|put\)" src/ \
-            | grep -B1 "handler(" \
-            | grep -v "requireRole\|//\s*no auth" \
-            | grep "router\.\(patch\|delete\|put\)" \
-            | grep -v "test\|spec" \
-            || echo "All mutation routes have role guards ✓"
+      # Backlog F-2, the twin of the SQL-injection guard's F-1 (fixed in
+      # c00a485). This step used to be a grep pipeline ending in
+      # `|| echo "All mutation routes have role guards ✓"`, which discarded the
+      # pipeline's exit status — it printed a ✓ and exited 0 on every run since
+      # the pipeline was written, and had never once evaluated the codebase.
+      #
+      # Repairing the `|| echo` alone would not have been enough: the grep only
+      # recognised the literal text `requireRole` on the route's own line, while
+      # this repo's dominant convention is a hoisted `const mgr =
+      # requireRole("manager")` alias used across 20+ route files. Turned on
+      # as-written it went red with 39 findings, the large majority false. A
+      # check that cries wolf on arrival gets deleted, not fixed.
+      #
+      # Replaced with a real scanner that resolves local aliases, honours
+      # router-level `router.use(guard)`, and recognises all five authorization
+      # guards this codebase actually uses (requireRole / requirePermission /
+      # requireScope / requireCapability / requireModule). Same 39 route
+      # registrations, 4 genuine findings — one of which (quotes' hard DELETE)
+      # was fixed in this change; the rest are allowlisted with reasons.
+      # Shrink-only allowlist, same posture as the SQL guard's.
+      - name: No unguarded mutation routes (PUT/PATCH/DELETE without an authz guard)
+        run: npm run authz:scan
       - name: No console.log/error in production source (modules + gateway)
         run: |
           # shellcheck disable=SC2126 # grep|wc -l keeps this symmetric with the identical pattern below (AGENTS.md count)
@@ -162,11 +176,71 @@ jobs:
       - name: Dead-code scan (report-only)
         run: node tools/dead-code-scan.mjs
 
-      - name: Dependency advisories (report-only)
+      # Backlog F-16. The root and `web` halves are deliberately asymmetric now.
+      #
+      # ROOT IS A REAL GATE (`--audit-level=high`, no `|| true`). The 2026-08-04
+      # audit recorded "2 low at the root"; re-measured 2026-08-06 the root is at
+      # **0 advisories of any severity**, so gating it costs nothing today and
+      # means the next high/critical advisory to land on a backend dependency
+      # (express, pg, jsonwebtoken, bcryptjs, stripe — the ones that actually
+      # handle money, auth and untrusted input) fails the build instead of
+      # scrolling past in a log nobody reads. Low/moderate stay reported, not
+      # gated, so routine noise cannot block a release.
+      #
+      # WEB STAYS REPORT-ONLY, and this is not laziness — it is the honest
+      # status. 10 advisories (1 critical, 6 high, 3 moderate) and every single
+      # one resolves only through a semver-major migration: `next` 14 → 16 and
+      # `vitest` 2 → 4 (F-24/F-25). Gating it would fail every PR from the first
+      # run until those migrations land, and a check that blocks all work gets
+      # deleted rather than fixed — the same reasoning docker-build, e2e and the
+      # duplicate/dead-code scans were each introduced under.
+      #
+      # `--omit=dev` is NOT used on either half: the critical finding is vitest,
+      # a devDependency whose UI server reads and executes arbitrary files.
+      # Hiding dev-only advisories would defeat the point.
+      #
+      # Flip web to a gate in the same shape as root the moment F-24/F-25 land.
+      - name: Dependency advisories — root (gates on high and above)
         run: |
-          echo "── root ──"
+          # A bare `npm audit --audit-level=high` also exits non-zero when the
+          # registry is unreachable, and `guard` is the ONLY job here with no
+          # `npm ci` — i.e. the only one that currently survives a registry
+          # outage. Making it the first job to die on one would be a real
+          # regression in CI resilience, and it would fail with a message that
+          # reads like a vulnerability.
+          #
+          # So parse the report and decide from the counts: a genuine
+          # high/critical advisory fails the build; an inconclusive run (no
+          # report, unparseable JSON) warns and passes. The report-only step
+          # below still prints the full detail either way.
+          npm audit --json > /tmp/root-audit.json 2>/dev/null || true
+          node -e '
+            const fs = require("node:fs");
+            let v = null;
+            try { v = JSON.parse(fs.readFileSync("/tmp/root-audit.json", "utf8")).metadata.vulnerabilities; }
+            catch { v = null; }
+            if (!v) {
+              console.log("::warning title=Dependency audit inconclusive::npm audit returned no parseable report (registry unreachable?). Not failing the build on an inconclusive result.");
+              process.exit(0);
+            }
+            const n = (k) => Number(v[k] || 0);
+            console.log("root advisories — critical:" + n("critical") + " high:" + n("high") + " moderate:" + n("moderate") + " low:" + n("low"));
+            if (n("critical") + n("high") > 0) {
+              // No backticks anywhere inside this single-quoted script: actionlint
+              // runs shellcheck over the block and SC2016 reads a backtick in
+              // single quotes as an unexpanded command substitution. Same trap the
+              // SQL-injection guard step above documents.
+              console.error("high/critical advisory in the root dependency tree. Reproduce with: npm audit");
+              process.exit(1);
+            }
+            console.log("✓ no high or critical advisories in the root dependency tree");
+          '
+      - name: Dependency advisories — root + web (report-only detail)
+        if: always()
+        run: |
+          echo "── root (low+, informational) ──"
           npm audit --audit-level=low || true
-          echo "── web ──"
+          echo "── web (blocked on the next@16 / vitest@4 migrations, F-24/F-25) ──"
           npm audit --audit-level=low --prefix web || true
 
       - name: One canonical agent-instruction file
@@ -567,7 +641,7 @@ jobs:
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     environment:
       name: Production
-      url: https://ascendhq-app.vercel.app
+      url: ${{ vars.PROD_FRONTEND_URL || 'https://ascendhqweb.vercel.app' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -581,6 +655,26 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN_PROD }}
           DEPLOY_ENV: prod
           NEXT_PUBLIC_MOCK: "false"
+          # `web/next.config.mjs` reads BACKEND_URL inside `rewrites()`, which
+          # Next evaluates at BUILD time and freezes into routes-manifest.json.
+          # It is therefore the origin the shipped production bundle proxies
+          # every /api/* call to, and it cannot be changed afterwards from the
+          # Vercel dashboard — only by rebuilding with a different value.
+          #
+          # This job never passed one, so production fell through to deploy.sh's
+          # default, https://ascendhq-api.vercel.app, dead since the 2026-07-20
+          # Render cutover. That is not a red check, it is a dead product: the
+          # release ships a frontend whose every API call resolves to a host
+          # that does not exist, so no user can log in. deploy-staging has read
+          # `vars.STAGING_BACKEND_URL` since it was written — production is the
+          # one tier that never got the same wiring. The repointable prod
+          # *probes* landed in PR #197; the prod *build* was left behind.
+          #
+          # Unset resolves to empty and deploy.sh's own default still applies,
+          # so this changes no behaviour on its own. Setting PROD_BACKEND_URL —
+          # the same variable smoke-test and uptime.yml already read — is what
+          # makes production reachable.
+          BACKEND_URL: ${{ vars.PROD_BACKEND_URL }}
 
   # ─── Production smoke test ─────────────────────────────────────────────────
   smoke-test:
@@ -588,25 +682,46 @@ jobs:
     needs: [deploy-production]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    # Probe targets come from the SAME repo variables uptime.yml already uses.
+    # Before this, the release smoke test hardcoded its hostnames, which left the
+    # two production probes in this repo able to disagree about where production
+    # is: setting PROD_BACKEND_URL fixed the heartbeat and did nothing for the
+    # release gate. One variable, both probes (ADR-009).
+    #
+    # Fallbacks are deliberately asymmetric, because the two halves are:
+    #   FRONTEND — `ascendhqweb.vercel.app`, CONFIRMED live by Sri 2026-08-07
+    #              (Vercel project `ascend_hq_web`, PR #201). A working default.
+    #   BACKEND  — `ascendhq-api.vercel.app`, known DEAD (DEPLOYMENT_NOT_FOUND
+    #              since 2026-07-23). Kept only so this file changes no behaviour
+    #              on its own; the real prod backend host is still the open P0 in
+    #              docs/architecture/DEPLOYMENTS.md. Setting PROD_BACKEND_URL is
+    #              what fixes both this gate and the heartbeat, in one edit.
+    env:
+      BACKEND: ${{ vars.PROD_BACKEND_URL || 'https://ascendhq-api.vercel.app' }}
+      FRONTEND: ${{ vars.PROD_FRONTEND_URL || 'https://ascendhqweb.vercel.app' }}
     steps:
+      - name: Show probe targets
+        run: |
+          echo "backend:  $BACKEND"
+          echo "frontend: $FRONTEND"
       - name: Wait for Vercel propagation
         run: sleep 15
       - name: Health check — backend liveness
         run: |
           curl -f --retry 3 --retry-delay 5 \
-            https://ascendhq-api.vercel.app/healthz \
-            || (echo "❌ /healthz failed" && exit 1)
+            "$BACKEND/healthz" \
+            || (echo "❌ /healthz failed against $BACKEND" && exit 1)
       - name: Health check — backend readiness
         run: |
           curl -f --retry 3 --retry-delay 5 \
-            https://ascendhq-api.vercel.app/readyz \
-            || (echo "❌ /readyz failed" && exit 1)
+            "$BACKEND/readyz" \
+            || (echo "❌ /readyz failed against $BACKEND" && exit 1)
       - name: Health check — feature flags auth boundary
         run: |
           http_status="$(curl -sS --retry 2 --retry-delay 5 \
             -o /tmp/flags-response.json \
             -w '%{http_code}' \
-            https://ascendhq-api.vercel.app/api/v1/flags)"
+            "$BACKEND/api/v1/flags")"
           if [ "$http_status" != "401" ]; then
             echo "❌ /api/v1/flags without auth returned $http_status, expected 401"
             cat /tmp/flags-response.json
@@ -615,5 +730,5 @@ jobs:
       - name: Health check — frontend
         run: |
           curl -f --retry 3 --retry-delay 5 \
-            https://ascendhq-app.vercel.app/ \
-            || (echo "❌ frontend failed" && exit 1)
+            "$FRONTEND/" \
+            || (echo "❌ frontend failed against $FRONTEND" && exit 1)

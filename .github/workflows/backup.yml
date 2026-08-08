@@ -41,16 +41,54 @@ jobs:
     if: vars.BACKUP_ENABLED != 'false'
     steps:
       - uses: actions/checkout@v4
+      # This step used to print a ⚠️ into the job log and exit 0, so a run that
+      # took no backup at all was indistinguishable, from the Actions list, from
+      # one that did: green check, ~5 seconds, every step after it `skipped`.
+      # It reported success that way 16 consecutive times (confirmed live
+      # 2026-08-05) while the real RPO was not ≤24h but total loss.
+      #
+      # A monitoring job that lies by omission is worse than one that is absent,
+      # because the green tick is read as evidence. So the not-configured path
+      # now (a) raises a ::warning:: annotation, which surfaces on the run page
+      # and in the Actions list rather than only inside a collapsed log, and
+      # (b) writes the state into the job summary, which is the first thing
+      # rendered on the run page. The run still succeeds by default — failing it
+      # unprompted would turn every scheduled run red for a repo whose owner has
+      # not yet chosen to configure it, which is how a workflow gets disabled.
+      #
+      # Set the repo variable BACKUP_REQUIRED=true (Settings → Secrets and
+      # variables → Actions → Variables) to make an unconfigured backup a hard
+      # failure instead. That is the setting to turn on the moment production
+      # carries real customer data — from then on, "no backup" should be an
+      # incident, not a warning.
       - name: Check PROD_DATABASE_URL is configured
         id: check
         env:
           PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          BACKUP_REQUIRED: ${{ vars.BACKUP_REQUIRED }}
         run: |
-          if [ -z "$PROD_DATABASE_URL" ]; then
-            echo "⚠️  PROD_DATABASE_URL secret not set — skipping (see this workflow's header)."
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-          else
+          if [ -n "$PROD_DATABASE_URL" ]; then
             echo "configured=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "configured=false" >> "$GITHUB_OUTPUT"
+          echo "::warning title=No backup taken::PROD_DATABASE_URL is not set — this run backed up nothing. Recovery point objective is currently unbounded (total loss)."
+          {
+            echo "## ⚠️ No backup was taken"
+            echo
+            echo "\`PROD_DATABASE_URL\` is not configured, so every step in this job was skipped."
+            echo "**This run is green but produced no artifact — the production RPO is unbounded, not ≤24h.**"
+            echo
+            echo "To fix: set the repo secret \`PROD_DATABASE_URL\` to the production Supabase"
+            echo "Session-pooler connection string (Settings → Secrets and variables → Actions)."
+            echo "Then re-run this workflow and confirm a \`db-backup-*\` artifact is attached."
+            echo
+            echo "To make this state fail the build instead of warning, set the repo variable"
+            echo "\`BACKUP_REQUIRED=true\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$BACKUP_REQUIRED" = "true" ]; then
+            echo "❌ BACKUP_REQUIRED=true and no PROD_DATABASE_URL is configured."
+            exit 1
           fi
       # pg_dump refuses to dump from a server NEWER than itself
       # ("aborting because of server version mismatch") — and only in that
@@ -109,3 +147,31 @@ jobs:
           name: db-backup-${{ github.run_id }}
           path: ${{ runner.temp }}/backup/*.pgdump
           retention-days: 30
+      # Symmetry with the not-configured summary above: a run that DID back
+      # something up says so on the run page, with the dump's real size. A
+      # dump that is suspiciously small (an empty database, a permissions
+      # problem that produced schema-only output) is then visible at a glance
+      # instead of requiring someone to download the artifact to find out.
+      - name: Record backup in job summary
+        if: steps.check.outputs.configured == 'true'
+        env:
+          BACKUP_DIR: ${{ runner.temp }}/backup
+        run: |
+          {
+            echo "## ✅ Backup taken"
+            echo
+            echo "| File | Size |"
+            echo "|---|---|"
+            for f in "$BACKUP_DIR"/*.pgdump; do
+              [ -e "$f" ] || continue
+              # Backticks are escaped inside DOUBLE quotes, never placed in a
+              # single-quoted printf format: actionlint runs shellcheck over
+              # this block and SC2016 treats a backtick inside single quotes as
+              # a command substitution someone forgot to expand. Same trap
+              # ci.yml's SQL-guard step documents at length — matching the
+              # escaped-backtick style of the neighbouring echo below.
+              echo "| \`$(basename "$f")\` | $(du -h "$f" | cut -f1) |"
+            done
+            echo
+            echo "Retained as workflow artifact \`db-backup-${{ github.run_id }}\` for 30 days."
+          } >> "$GITHUB_STEP_SUMMARY"

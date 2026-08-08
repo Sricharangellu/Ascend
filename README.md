@@ -12,7 +12,7 @@ Built for the tobacco, vapor, hemp, and specialty retail distribution industry â
 
 | Service | URL |
 |---------|-----|
-| Frontend | https://ascendhq-app.vercel.app |
+| Frontend | https://ascendhqweb.vercel.app |
 | Backend API | https://ascendhq-api.vercel.app |
 
 **Demo credentials:**
