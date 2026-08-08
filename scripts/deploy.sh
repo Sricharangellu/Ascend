@@ -149,17 +149,41 @@ deploy_frontend() {
     exit 1
   fi
 
-  ( cd "$REPO/web" && tar --exclude=node_modules --exclude=.next --exclude=.vercel -cf - . ) | ( cd "$S" && tar -xf - )
+  # Stage the app under `web/`, NOT at the root of the upload.
+  #
+  # The Vercel project `ascend_hq_web` has its Root Directory set to `web` —
+  # it has to, because the same project is git-connected to this repo and its
+  # PR previews build from the repo root, where the app genuinely lives at
+  # `web/`. This script used to unpack the CONTENTS of `web/` at the top of the
+  # temp dir and upload that, so Vercel resolved its root directory against the
+  # upload and looked for `<tmp>/web`, which did not exist:
+  #
+  #   Error: The provided path “/tmp/tmp.upl5y1upwa/web” does not exist.
+  #
+  # That is the failure the testing tier hit on 2026-08-08 once the deleted
+  # project ID was corrected (staging run 31268669760) — a second, independent
+  # break sitting behind the first. deploy_frontend is shared, so DEPLOY_ENV=prod
+  # fails identically; the release deploy could not have worked either.
+  #
+  # Mirroring the repo layout inside the upload satisfies the project setting
+  # without touching the dashboard, which would break the git-connected
+  # previews that currently work.
+  local APP="$S/web"
+  mkdir -p "$APP"
+  ( cd "$REPO/web" && tar --exclude=node_modules --exclude=.next --exclude=.vercel -cf - . ) | ( cd "$APP" && tar -xf - )
+  # .vercelignore sits at the upload root; bare patterns match at any depth.
   printf 'node_modules\n.next\n' > "$S/.vercelignore"
   # Build locally first to catch errors before uploading (the mounted FS can segfault next build;
   # mktemp is on the local FS so this is safe).
   echo "→ Frontend: NEXT_PUBLIC_MOCK=$FRONTEND_MOCK_MODE BACKEND_URL=$BACKEND_URL"
-  ( cd "$S" && npm install --no-audit --no-fund --loglevel=error && BACKEND_URL="$BACKEND_URL" NEXT_PUBLIC_MOCK="$FRONTEND_MOCK_MODE" npm run build )
+  ( cd "$APP" && npm install --no-audit --no-fund --loglevel=error && BACKEND_URL="$BACKEND_URL" NEXT_PUBLIC_MOCK="$FRONTEND_MOCK_MODE" npm run build )
   echo "→ Frontend: deploying…"
   local url
   # See the matching comment in deploy_backend: extract the URL by pattern,
   # not by assuming a fixed "last line" shape (newer Vercel CLI versions
   # print a JSON summary to stdout instead of a plain URL line).
+  # Upload from $S (the repo-shaped root), not $APP — Vercel appends the
+  # project's Root Directory to whatever is uploaded.
   url=$( cd "$S" && VERCEL_ORG_ID="$TEAM" VERCEL_PROJECT_ID="$FRONTEND_PID" \
       npx --yes vercel deploy $PROD_FLAG --archive=tgz --yes --token "$VERCEL_TOKEN" \
       | grep -oE 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1 )
