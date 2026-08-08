@@ -54,6 +54,39 @@ staging    ──PR──▶  master    → CI + deploy PROD    (--prod, prod DB
 Every branch requires the CI status checks (`Production guard`, `Backend — typecheck + test`,
 `Frontend — typecheck + lint + build`) to pass before merge. Force-push is blocked.
 
+> **⚠ BROKEN SINCE 2026-08-05 — `master` cannot accept any merge. Read before attempting a release.**
+>
+> The third name above is what `master`'s branch protection actually requires, and **nothing produces
+> it any more.** Commit `1a4b989` ("test(web): add route-integrity guard and run web tests in CI",
+> 2026-08-05) renamed that job to **`Frontend — typecheck + lint + test + build`** without updating
+> branch protection or this line. A required check that no job emits is never satisfied and never
+> fails — it sits permanently "expected", so the merge button is dead for every PR into `master`.
+>
+> Verified 2026-08-08 by attempting the release merge of PR #200. GitHub's answer, verbatim:
+>
+> ```
+> 405 Required status check "Frontend — typecheck + lint + build" is expected.
+> ```
+>
+> This is why `master` has not moved since 2026-07-23. It also means the release PR's other red
+> checks are **red herrings** for the merge block: `CodeQL` (17 pre-existing alerts, all against a
+> `master` baseline CodeQL has never analysed — it passes on every `develop`-based PR with identical
+> code) and `Deploy → Testing` (fails only on its backend half, which uploads to Vercel while the
+> backend runs on Render). Neither is what GitHub names when the merge is refused.
+>
+> **Two remedies, either one sufficient — pick one, do not do both:**
+> 1. *Preferred.* Settings → Branches → `master` → required status checks: replace
+>    `Frontend — typecheck + lint + build` with `Frontend — typecheck + lint + test + build`, then
+>    correct the list above. Keeps the accurate job name. **Sri-only** — protection is
+>    admin-enforced and the API returns `403 Resource not accessible by integration` to agents.
+> 2. Rename the job back to `Frontend — typecheck + lint + build`, restoring the contract both this
+>    document and branch protection already record. Agent-doable, but the name then understates the
+>    job, which does run the web tests.
+>
+> **Whichever is chosen, keep this line and the protection setting in sync.** The failure mode is
+> silent by construction: renaming a required job produces no error anywhere until someone tries to
+> merge, which on a release branch may be weeks later.
+
 ## Release policy (standing rule, confirmed 2026-07-19)
 
 **Nothing reaches `master`/production without Sri's explicit command.** This isn't a convention —
