@@ -1,3 +1,14 @@
+## Active Claim (Claude Code web — fix migration advisory-lock statement_timeout flake)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `fix/migration-lock-statement-timeout` |
+| Queue item | `WORK/LOOP_STATE.md` backlog row "NEW 2026-08-07 — the backend suite's 30s statement timeout covers an unbounded migration-lock WAIT (flake source)". `buildApp()`'s migration transaction sets `statement_timeout` at `BEGIN`, then its first statement is the *blocking* `pg_advisory_xact_lock(7381920)` — so queueing time for that lock is charged against the same 30s budget as real migration DDL. 123 call sites / 86 test files all serialize on this one global lock; CI run 31138020800 failed 893/894 on exactly this (a test at 30014ms, pg code 57014, while Postgres was checkpointing). Fix: uncap `statement_timeout` for the lock-wait statement only, restore it before running migration DDL. |
+| Files/areas expected | `src/shared/db.ts` (export the tx-timeout default so it isn't duplicated), `src/app.ts` (migration lock block only), NEW regression test (`src/app.migration-lock.test.ts`), `WORK/LOOP_STATE.md`, `WORK/LOCK.md`. NOT `web/**`, NOT other `src/modules/**`. |
+| Started | 2026-08-10T190450Z |
+| Status | ACTIVE — implementing |
+| Blockers | none |
+
 ## Active Claim (Claude Code web — release staging → master)
 
 | Field | Value |
