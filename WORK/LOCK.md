@@ -1,3 +1,16 @@
+## Active Claim (Claude Code web — production-readiness remediation: unblock the release path)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/status-master-staging-develop-en9r8k` |
+| Queue item | Sri directive 2026-08-10, following a `master` vs `staging` vs `develop` status review: build the remediation task board for "what does `master` need to be a working end-to-end application after the release", then fix everything on it that an agent can actually fix and verify. Fifteen tasks filed; five are Sri-only (Render/Vercel/Supabase dashboards, repo secrets, branch protection) and are filed with full prompts rather than worked around. |
+| Files/areas expected | `.github/workflows/ci.yml`, NEW `.github/workflows/jobs-tick.yml`, `vercel.json`, `src/shared/http.ts`, `src/app.ts` (error-handler mount + import only), `src/gateway/index.ts`, DELETED `src/gateway/errorEnvelope.ts`, NEW `src/gateway/errorEnvelope.test.ts`, `docs/architecture/{PIPELINE,GAPS}.md`, `docs/architecture/ADR/ADR-012-*.md`, `WORK/{LOCK,LOOP_STATE}.md`. **NOT** `web/**`, NOT `scripts/deploy.sh`, NOT `src/modules/**`, NOT `artifacts/**`. |
+| Started | 2026-08-10T173832Z |
+| Status | ACTIVE — implementing |
+| Scope change (honest) | This claim listed **NOT `web/**`**, and two `web/` files were touched anyway: `web/contexts/StoreAuthContext.tsx` and `web/tests/storeAuthErrorEnvelope.test.tsx`. **Comment-only, one line each** — both cited `src/gateway/errorEnvelope.ts` by path, and this change deletes that file, so leaving them would have created two dangling references to a file that no longer exists. Repointed to `src/shared/http.ts`. Widening rather than deferring was the right call precisely because stale cross-references are the drift mechanism this repo keeps getting caught by (`DEPLOYMENTS.md` exists for that reason). No behaviour, no logic, no test assertion changed. Worth noting: those comments asserted the gateway sends `requestId` — which was **only true after this change**; they were describing a contract that had never actually been delivered. |
+| Duplicate-work check | Ran per AGENTS.md. The claim directly below (release `staging → master`, `claude/push-staging-to-master-1m38lt`) is RELEASED, not active, and explicitly stopped at the branch-protection block; this claim starts where it stopped and does not redo its work. No open claim in this file scopes `ci.yml`, `vercel.json` or the error-handler path. Branch re-cut from `origin/develop`, not from the staging-based branch this session started on — a PR into `develop` from a staging-based branch would have back-merged staging's merge commits, which is not forward-only. |
+| Blockers | Five Sri-only items block the release from being *verifiable*, none block this work: Render `/healthz` confirmation + Free-plan upgrade, Render env vars, the prod Supabase decision + first-tenant seed, the repo variables/secrets (`PROD_BACKEND_URL`, `PROD_DEPLOY_TARGET`, `PROD_DATABASE_URL`, `JOBS_TICK_SECRET`), and the `master` branch-protection required-check name. All five are filed as tasks with the evidence and the exact steps. |
+
 ## Active Claim (Claude Code web — release staging → master)
 
 | Field | Value |
