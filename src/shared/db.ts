@@ -60,6 +60,17 @@ interface Queryable {
   query(text: string, values?: unknown[]): Promise<{ rows: any[] }>;
 }
 
+/**
+ * Per-transaction `statement_timeout` (ms), tunable via `PG_TX_TIMEOUT_MS`.
+ * Exported so callers that must temporarily override `statement_timeout`
+ * inside an open transaction (e.g. `app.ts`'s migration advisory-lock wait)
+ * can restore the same default `tx()` uses, instead of duplicating it.
+ */
+export function txTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = Number(env["PG_TX_TIMEOUT_MS"] ?? 30_000);
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 30_000;
+}
+
 /** Compile `?`/`@name` placeholders to Postgres `$n`, returning text + ordered values. */
 export function compile(sql: string, params: Params): { text: string; values: unknown[] } {
   if (params === undefined) return { text: sql, values: [] };
@@ -119,9 +130,7 @@ function makeDb(q: Queryable, opts: { isTx: boolean; pool?: pg.Pool }): DB {
         // 30 s is generous for any single business transaction; tune via PG_TX_TIMEOUT_MS.
         // SET LOCAL must run inside the transaction, so BEGIN and the timeout
         // travel in one combined statement (also saves a round trip).
-        const rawTimeout = Number(process.env["PG_TX_TIMEOUT_MS"] ?? 30_000);
-        const txTimeoutMs = Number.isFinite(rawTimeout) && rawTimeout > 0 ? Math.floor(rawTimeout) : 30_000;
-        await client.query(`BEGIN; SET LOCAL statement_timeout = ${txTimeoutMs}`);
+        await client.query(`BEGIN; SET LOCAL statement_timeout = ${txTimeoutMs()}`);
         // Tenant context (if any) applies to the whole transaction. Explicit
         // withTenant() views set their own value afterwards and take precedence.
         const ctxTenant = currentTenantId();
