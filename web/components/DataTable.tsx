@@ -75,6 +75,21 @@ export interface DataTableProps<T> {
   /** Rendered in place of the toolbar when rows are selected. */
   bulkActions?: (selected: T[], clear: () => void) => React.ReactNode;
   pageSize?: number;
+  /**
+   * Opt into SERVER-driven paging: `rows` is one page, the caller owns the
+   * offset, and the table renders the pager + true counts instead of slicing.
+   *
+   * Caveat worth knowing before you also pass `searchable` or `sortValue`:
+   * both filter/sort only the rows currently loaded, so with server paging they
+   * silently operate on one page and look like they searched everything. Either
+   * leave them off, or wire the equivalent server-side query.
+   */
+  serverPagination?: {
+    total: number;
+    offset: number;
+    limit: number;
+    onOffsetChange: (offset: number) => void;
+  };
   onRowClick?: (row: T) => void;
   /** Filters / actions rendered on the toolbar's right. */
   toolbar?: React.ReactNode;
@@ -116,6 +131,7 @@ export function DataTable<T>({
   selectable = false,
   bulkActions,
   pageSize = 25,
+  serverPagination,
   onRowClick,
   toolbar,
   stickyHeader = true,
@@ -182,11 +198,20 @@ export function DataTable<T>({
     return [...filtered].sort((a, b) => dir * compare(col.sortValue!(a), col.sortValue!(b)));
   }, [filtered, sortKey, sortDir, columns]);
 
-  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
-  const safePage = Math.min(page, pageCount - 1);
+  // With server paging the caller already handed us exactly one page, so
+  // slicing again would hide rows. Render what we were given.
+  const pageCount = serverPagination
+    ? Math.max(1, Math.ceil(serverPagination.total / serverPagination.limit))
+    : Math.max(1, Math.ceil(sorted.length / pageSize));
+  const safePage = serverPagination
+    ? Math.floor(serverPagination.offset / serverPagination.limit)
+    : Math.min(page, pageCount - 1);
   const paged = useMemo(
-    () => sorted.slice(safePage * pageSize, safePage * pageSize + pageSize),
-    [sorted, safePage, pageSize]
+    () =>
+      serverPagination
+        ? sorted
+        : sorted.slice(safePage * pageSize, safePage * pageSize + pageSize),
+    [sorted, safePage, pageSize, serverPagination]
   );
 
   // Any change to the result set invalidates the current page offset.
@@ -520,27 +545,56 @@ export function DataTable<T>({
       {!loading && sorted.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-content-secondary">
           <p aria-live="polite" className="tnum">
-            {sorted.length === rows.length
-              ? `${sorted.length} ${sorted.length === 1 ? "row" : "rows"}`
-              : `${sorted.length} of ${rows.length} rows`}
+            {serverPagination
+              ? `Showing ${serverPagination.offset + 1}–${Math.min(
+                  serverPagination.offset + serverPagination.limit,
+                  serverPagination.total
+                )} of ${serverPagination.total}`
+              : sorted.length === rows.length
+                ? `${sorted.length} ${sorted.length === 1 ? "row" : "rows"}`
+                : `${sorted.length} of ${rows.length} rows`}
           </p>
           {pageCount > 1 && (
             <nav className="flex items-center gap-1" aria-label="Pagination">
               <button
                 type="button"
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                disabled={safePage === 0}
+                onClick={() =>
+                  serverPagination
+                    ? serverPagination.onOffsetChange(
+                        Math.max(0, serverPagination.offset - serverPagination.limit)
+                      )
+                    : setPage((p) => Math.max(0, p - 1))
+                }
+                // Derived from the offset, not a page index: an offset that is
+                // not a multiple of limit (deep link, changed page size, rows
+                // deleted) floors to page 0 and would strand the user with
+                // earlier rows unreachable.
+                disabled={serverPagination ? serverPagination.offset <= 0 : safePage === 0}
                 className="focus-ring min-h-touch rounded-control border border-line px-3 text-sm font-medium text-content-primary disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-2"
               >
                 Previous
               </button>
-              <span className="px-2 tnum" aria-current="page">
-                Page {safePage + 1} of {pageCount}
-              </span>
+              {/* Server paging already states the exact range on the left, and
+                  a page index is wrong for a non-multiple-of-limit offset. */}
+              {!serverPagination && (
+                <span className="px-2 tnum" aria-current="page">
+                  Page {safePage + 1} of {pageCount}
+                </span>
+              )}
               <button
                 type="button"
-                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
-                disabled={safePage >= pageCount - 1}
+                onClick={() =>
+                  serverPagination
+                    ? serverPagination.onOffsetChange(
+                        serverPagination.offset + serverPagination.limit
+                      )
+                    : setPage((p) => Math.min(pageCount - 1, p + 1))
+                }
+                disabled={
+                  serverPagination
+                    ? serverPagination.offset + serverPagination.limit >= serverPagination.total
+                    : safePage >= pageCount - 1
+                }
                 className="focus-ring min-h-touch rounded-control border border-line px-3 text-sm font-medium text-content-primary disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-2"
               >
                 Next

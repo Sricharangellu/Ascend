@@ -200,4 +200,51 @@ describe("DataTable", () => {
     expect(screen.queryByText(/nothing here yet/i)).not.toBeInTheDocument();
     expect(screen.getByRole("table")).toBeInTheDocument();
   });
+
+  describe("server-side pagination", () => {
+    const server = { total: 80, offset: 25, limit: 25, onOffsetChange: vi.fn() };
+
+    it("renders every supplied row instead of slicing them again", () => {
+      // The caller already fetched exactly one page. Slicing by pageSize here
+      // would silently hide rows the server did return.
+      setup({ serverPagination: { ...server, offset: 0 }, pageSize: 2 });
+      expect(bodyRows()).toHaveLength(3);
+    });
+
+    it("reports the true server range, not the loaded row count", () => {
+      setup({ serverPagination: server });
+      expect(screen.getByText("Showing 26–50 of 80")).toBeInTheDocument();
+    });
+
+    it("steps the offset by the page size rather than its own page index", async () => {
+      const user = userEvent.setup();
+      const onOffsetChange = vi.fn();
+      setup({ serverPagination: { ...server, onOffsetChange } });
+
+      await user.click(screen.getByRole("button", { name: "Next" }));
+      expect(onOffsetChange).toHaveBeenCalledWith(50);
+
+      await user.click(screen.getByRole("button", { name: "Previous" }));
+      expect(onOffsetChange).toHaveBeenCalledWith(0);
+    });
+
+    it("disables Previous on the first page and Next on the last", () => {
+      const { unmount } = setup({ serverPagination: { ...server, offset: 0 } });
+      expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
+      unmount();
+
+      setup({ serverPagination: { ...server, offset: 75 } });
+      expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    });
+
+    it("never clamps the offset below zero", async () => {
+      const user = userEvent.setup();
+      const onOffsetChange = vi.fn();
+      // offset 10 with limit 25 would compute 10-25 = -15 without clamping.
+      setup({ serverPagination: { total: 80, offset: 10, limit: 25, onOffsetChange } });
+      await user.click(screen.getByRole("button", { name: "Previous" }));
+      expect(onOffsetChange).toHaveBeenCalledWith(0);
+    });
+  });
 });

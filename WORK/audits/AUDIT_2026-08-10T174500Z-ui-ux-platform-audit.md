@@ -285,6 +285,32 @@ routes twice.
 | 1 | Identity decision (§8.6) + unified token layer; delete the duplicate systems | Contrast table, visual diff of 3 reference pages |
 | 2 | `PageShell`, `DataTable`, form primitives, `StatusBadge`, `EmptyState` | Unit tests + a11y tests per component |
 | 3 | Migrate the 8 highest-traffic routes (Dashboard, Terminal, Catalog, Inventory, Purchasing, Receiving, Orders, Customers) — one at a time, complete before next | Full gate + browser QA at 1280/1366/1440/1920 per page |
+
+### Phase 3 progress
+
+| Route | Status | Notes |
+|---|---|---|
+| `/orders` | **done (code-verified, no browser QA)** | 44 raw-palette classes → 0; hand-rolled `<table>` → `DataTable`; `max-w-7xl` → `PageShell`; 409 → 249 lines. Removed a dead, unreachable second refund/void implementation (see below). Drove two real fixes into the primitives: `DataTable.serverPagination`, and `PageShell.titleAs` (EnterpriseShell already emits an `sr-only` h1, so an h1 here made two per page). |
+| `/dashboard` | not started | |
+| `/terminal` | not started | POS — needs its own workflow treatment, not a list layout |
+| `/catalog` | not started | 52-line shell; the work is in `_components/ProductsTab`/`CategoriesTab` |
+| `/inventory` | not started | 514 lines, **0 loading-state markers** — worst state coverage of the candidates |
+| `/purchasing` | not started | |
+| `/purchasing/receiving` | not started | resolve against `/inventory/receive-stock` first (§5 — two receiving destinations) |
+| `/customers` | not started | |
+
+**Bug found and fixed during `/orders` (not a styling issue):** the page carried an
+`OrderDetailModal` with its own refund and void handlers that **could never open** — `setSelectedOrder`
+was only ever called with `null`, while row clicks navigated to `/orders/[id]`. So a second
+implementation of two money-moving operations sat in the tree, unreachable and free to drift from the
+live one on the detail page (the dead copy reported failures with `alert()`; the live one uses toasts
+and confirm dialogs). The file's own doc comment asserted the inline flow worked. Removed, and the
+comment corrected. This is the duplicate-business-logic failure `AGENTS.md` calls the costliest kind.
+
+**Primitive defect found by a test while wiring server paging:** `Previous` was disabled from
+`Math.floor(offset / limit) === 0`, so an offset that is not a multiple of the page size (deep link,
+changed page size, rows deleted between loads) floored to page 0 and left every earlier row
+unreachable. Pagination state is now derived from the offset directly, never a page index.
 | 4 | Remaining routes by traffic; each closes its loading/empty/error gap | Same |
 | 5 | Enforcement: lint rule banning raw palette classes + raw `<button>/<input>/<select>/<table>` in `app/**` | CI gate — this is what stops system 3 growing back |
 

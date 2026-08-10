@@ -46,6 +46,16 @@ export interface PageShellProps {
   /** KPI row, filter bar, or tabs — sits directly under the header. */
   summary?: React.ReactNode;
   width?: PageWidth;
+  /**
+   * Heading element for the title. Defaults to `h1`.
+   *
+   * Pass `"h2"` when rendering inside `EnterpriseShell`: that shell already
+   * emits its own `sr-only` `<h1>{title}</h1>` (relied on by screen readers and
+   * existing tests), so an `h1` here would make two per page. `h2` keeps the
+   * outline valid. Once every route uses PageShell, the shell's sr-only h1
+   * should be retired and this can go back to defaulting everywhere.
+   */
+  titleAs?: "h1" | "h2";
   /** Sticks the header to the top while the content scrolls. */
   stickyHeader?: boolean;
   children: React.ReactNode;
@@ -100,6 +110,7 @@ export function PageShell({
   secondaryActions,
   summary,
   width = "default",
+  titleAs: TitleTag = "h1",
   stickyHeader = false,
   children,
   className,
@@ -120,7 +131,7 @@ export function PageShell({
           )}
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="text-lg font-semibold text-content-primary">{title}</h1>
+              <TitleTag className="text-lg font-semibold text-content-primary">{title}</TitleTag>
               {description && (
                 <p className="mt-1 max-w-prose text-sm text-content-secondary">{description}</p>
               )}
