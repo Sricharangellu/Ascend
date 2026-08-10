@@ -201,6 +201,52 @@ describe("DataTable", () => {
     expect(screen.getByRole("table")).toBeInTheDocument();
   });
 
+  describe("expandable rows", () => {
+    it("toggles a detail panel and wires aria-expanded/aria-controls", async () => {
+      const user = userEvent.setup();
+      setup({ expandedContent: (r) => <div>Detail for {r.name}</div> });
+
+      const toggle = screen.getAllByRole("button", { name: /expand details/i })[0];
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByText("Detail for Banana")).not.toBeInTheDocument();
+
+      await user.click(toggle);
+      expect(screen.getByText("Detail for Banana")).toBeInTheDocument();
+
+      const open = screen.getByRole("button", { name: /collapse details/i });
+      expect(open).toHaveAttribute("aria-expanded", "true");
+      // The control must point at the panel it reveals, or SR users can't find it.
+      expect(open.getAttribute("aria-controls")).toBe(
+        screen.getByText("Detail for Banana").closest("td")!.id
+      );
+
+      await user.click(open);
+      expect(screen.queryByText("Detail for Banana")).not.toBeInTheDocument();
+    });
+
+    it("keeps only one row expanded at a time", async () => {
+      const user = userEvent.setup();
+      setup({ expandedContent: (r) => <div>Detail for {r.name}</div> });
+
+      const toggles = screen.getAllByRole("button", { name: /expand details/i });
+      await user.click(toggles[0]);
+      expect(screen.getByText("Detail for Banana")).toBeInTheDocument();
+
+      await user.click(screen.getAllByRole("button", { name: /expand details/i })[0]);
+      expect(screen.queryByText("Detail for Banana")).not.toBeInTheDocument();
+      expect(screen.getByText("Detail for Apple")).toBeInTheDocument();
+    });
+
+    it("spans the panel across every rendered column", async () => {
+      const user = userEvent.setup();
+      setup({ selectable: true, expandedContent: () => <div>Panel</div> });
+
+      await user.click(screen.getAllByRole("button", { name: /expand details/i })[0]);
+      // 3 data columns + selection column + disclosure column.
+      expect(screen.getByText("Panel").closest("td")).toHaveAttribute("colspan", "5");
+    });
+  });
+
   describe("server-side pagination", () => {
     const server = { total: 80, offset: 25, limit: 25, onOffsetChange: vi.fn() };
 

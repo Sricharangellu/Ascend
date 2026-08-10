@@ -297,7 +297,7 @@ routes twice.
 | `/inventory` | not started | 514 lines, **0 loading-state markers** — worst state coverage of the candidates |
 | `/purchasing` | not started | |
 | `/purchasing/receiving` | not started | resolve against `/inventory/receive-stock` first (§5 — two receiving destinations) |
-| `/customers` | not started | |
+| `/customers` | **done (code-verified, no browser QA)** | Page + `CustomerTable`: 21 raw-palette classes and all hard-coded hex → 0; hand-rolled `<table>`/`<input>`/`<select>` → `DataTable`/`Input`/`Select`; `max-w-7xl` → `PageShell`. **Removed three dead buttons** — "Search" (no handler; the filter is already live, so it implied stale results), "More filters" (no handler, nothing behind it) and "Export" (no handler). **Fixed a real contrast failure:** segment badges used `text-emerald-400`/`blue-400`/`amber-400`/`slate-400` on white (≈2.5:1) — now the `Badge` primitive. **Fixed unreadable avatars:** the palette included `#EAB308` at 1.9:1 with the white initials on it; replaced with six identity colours all ≥4.5:1. Drove `DataTable.expandedContent` into the primitive so the expand-in-place detail pattern survived the migration. |
 
 **Bug found and fixed during `/orders` (not a styling issue):** the page carried an
 `OrderDetailModal` with its own refund and void handlers that **could never open** — `setSelectedOrder`

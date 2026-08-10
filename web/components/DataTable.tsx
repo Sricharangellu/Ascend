@@ -97,6 +97,14 @@ export interface DataTableProps<T> {
   /** Persist column visibility under this key. */
   storageKey?: string;
   className?: string;
+  /**
+   * Expand-in-place detail. When provided, each row gets a disclosure control
+   * and returning non-null renders a full-width panel beneath it.
+   *
+   * Preferred over navigating away when the user is comparing rows — they keep
+   * their scroll position, filters and place in the list.
+   */
+  expandedContent?: (row: T) => React.ReactNode;
 }
 
 function defaultSearchText<T>(row: T): string {
@@ -137,8 +145,10 @@ export function DataTable<T>({
   stickyHeader = true,
   storageKey,
   className,
+  expandedContent,
 }: DataTableProps<T>) {
   const tableId = useId();
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDirection>("asc");
   const [query, setQuery] = useState("");
@@ -402,6 +412,11 @@ export function DataTable<T>({
                     />
                   </th>
                 )}
+                {expandedContent && (
+                  <th scope="col" className="w-10 cell-pad">
+                    <span className="sr-only">Expand row</span>
+                  </th>
+                )}
                 {visibleColumns.map((col) => {
                   const isSorted = sortKey === col.key;
                   return (
@@ -452,6 +467,7 @@ export function DataTable<T>({
                 Array.from({ length: Math.min(pageSize, 8) }).map((_, i) => (
                   <tr key={`sk-${i}`} className="border-b border-line-subtle">
                     {selectable && <td className="cell-pad" />}
+                    {expandedContent && <td className="cell-pad" />}
                     {visibleColumns.map((col) => (
                       <td key={col.key} className="cell-pad">
                         <div
@@ -467,9 +483,10 @@ export function DataTable<T>({
                 paged.map((row) => {
                   const key = rowKey(row);
                   const isSelected = selected.has(key);
+                  const isExpanded = expanded === key;
                   return (
+                    <React.Fragment key={key}>
                     <tr
-                      key={key}
                       onClick={onRowClick ? () => onRowClick(row) : undefined}
                       aria-selected={selectable ? isSelected : undefined}
                       className={clsx(
@@ -494,6 +511,24 @@ export function DataTable<T>({
                           />
                         </td>
                       )}
+                      {expandedContent && (
+                        <td className="cell-pad" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => setExpanded(isExpanded ? null : key)}
+                            aria-expanded={isExpanded}
+                            aria-controls={`${tableId}-panel-${key}`}
+                            className="focus-ring flex h-6 w-6 items-center justify-center rounded-control text-content-secondary hover:bg-surface-2 hover:text-content-primary"
+                          >
+                            <span className="sr-only">
+                              {isExpanded ? "Collapse details" : "Expand details"}
+                            </span>
+                            <span aria-hidden="true" className="text-2xs">
+                              {isExpanded ? "▾" : "▸"}
+                            </span>
+                          </button>
+                        </td>
+                      )}
                       {visibleColumns.map((col) => (
                         <td
                           key={col.key}
@@ -509,6 +544,20 @@ export function DataTable<T>({
                         </td>
                       ))}
                     </tr>
+                    {expandedContent && isExpanded && (
+                      <tr>
+                        <td
+                          id={`${tableId}-panel-${key}`}
+                          colSpan={
+                            visibleColumns.length + (selectable ? 1 : 0) + 1
+                          }
+                          className="border-b border-line-subtle bg-surface-2 p-0"
+                        >
+                          {expandedContent(row)}
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   );
                 })}
             </tbody>
