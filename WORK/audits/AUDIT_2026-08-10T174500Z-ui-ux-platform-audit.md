@@ -294,7 +294,7 @@ routes twice.
 | `/dashboard` | not started | |
 | `/terminal` | not started | POS — needs its own workflow treatment, not a list layout |
 | `/catalog` | not started | 52-line shell; the work is in `_components/ProductsTab`/`CategoriesTab` |
-| `/inventory` | not started | 514 lines, **0 loading-state markers** — worst state coverage of the candidates |
+| `/inventory` | **done (code-verified, no browser QA)** | 23 raw-palette classes + all `[#hex]` arbitraries → **0**; hand-rolled `<table>`/7 `<input>`/2 `<select>`/bare-div modal → `DataTable`/`Input`/`Select`/`Modal`; skeleton loading replaces a bare spinner. **Four correctness bugs fixed — see below.** Logic extracted to `_lib/movements.ts` (Next.js forbids arbitrary named exports from `page.tsx`; the build caught it) and unit-tested. |
 | `/purchasing` | not started | |
 | `/purchasing/receiving` | not started | resolve against `/inventory/receive-stock` first (§5 — two receiving destinations) |
 | `/customers` | **done (code-verified, no browser QA)** | Page + `CustomerTable`: 21 raw-palette classes and all hard-coded hex → 0; hand-rolled `<table>`/`<input>`/`<select>` → `DataTable`/`Input`/`Select`; `max-w-7xl` → `PageShell`. **Removed three dead buttons** — "Search" (no handler; the filter is already live, so it implied stale results), "More filters" (no handler, nothing behind it) and "Export" (no handler). **Fixed a real contrast failure:** segment badges used `text-emerald-400`/`blue-400`/`amber-400`/`slate-400` on white (≈2.5:1) — now the `Badge` primitive. **Fixed unreadable avatars:** the palette included `#EAB308` at 1.9:1 with the white initials on it; replaced with six identity colours all ≥4.5:1. Drove `DataTable.expandedContent` into the primitive so the expand-in-place detail pattern survived the migration. |
@@ -306,6 +306,29 @@ implementation of two money-moving operations sat in the tree, unreachable and f
 live one on the detail page (the dead copy reported failures with `alert()`; the live one uses toasts
 and confirm dialogs). The file's own doc comment asserted the inline flow worked. Removed, and the
 comment corrected. This is the duplicate-business-logic failure `AGENTS.md` calls the costliest kind.
+
+**Four bugs found and fixed during `/inventory` (none of them styling):**
+
+1. **The summary line reported unknown data as zero.** Purchase orders carry no quantity
+   (`listOrders` is `SELECT * FROM purchase_orders` — no qty column) and transfers carry no cost, but
+   both were normalised to `0`. So the Orders tab asserted "total qty **0**" and Transfers asserted
+   "total cost **$0.00**" — on the page whose entire job is answering *what is in stock and what did it
+   cost*. `total_qty`/`total_cost_cents` are now `number | null`, aggregation ignores `null`, and the
+   UI says "quantity not tracked for orders" instead of inventing a zero. A genuine `0` still
+   aggregates as `0` — that case is asserted.
+2. **Supplier names came from a hard-coded map of two demo ids** (`sup_acme` → "Acme Coffee Co"), so
+   every real supplier rendered as a raw `sup_…` id. Now resolved from `/api/v1/purchasing/vendors`,
+   which already existed. Falls back to the id if that call fails.
+3. **"More filters" revealed a date input wired to nothing** — pure decoration. Now a real
+   "Created from" filter.
+4. **The create dialog was a bare `fixed inset-0` div** — no focus trap, no `role="dialog"`, no
+   Escape, no focus restore, while the repo's `Modal` primitive (a real `<dialog>` with `showModal()`)
+   provides all four. Validation also moved from a toast ("Fill in all required fields") to inline
+   per-field errors, since a toast cannot say *which* field and vanishes before the user reaches it.
+
+Also corrected mid-task: resolving supplier names inside `normalize` made the page's `load` change
+identity the moment the vendor map arrived, **refetching the whole list a second time**. Names are
+resolved at render instead, and `normalize` is pure.
 
 **Primitive defect found by a test while wiring server paging:** `Previous` was disabled from
 `Math.floor(offset / limit) === 0`, so an offset that is not a multiple of the page size (deep link,

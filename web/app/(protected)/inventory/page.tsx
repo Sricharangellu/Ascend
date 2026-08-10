@@ -1,27 +1,40 @@
 "use client";
 
 /**
- * /inventory — Stock movement management.
+ * /inventory — Stock movements: purchase orders, transfers and returns.
  *
- * Spec:
- *   Tabs: Orders | Transfers | Returns
- *   Filter: Show dropdown | Search | Outlet | More filters
- *   Summary: "Displaying X total qty and $Y total cost"
- *   Table: Order # + due date | From | To | Status | Created (sortable) | Total qty | Total cost
+ * Migrated to the design system 2026-08-10. Four correctness problems were
+ * fixed alongside the visual work; they are documented at their call sites:
+ *   1. The summary line reported "total qty 0" / "total cost $0.00" for tabs
+ *      where the field does not exist, presenting *unknown* as *zero*.
+ *   2. Supplier names came from a hard-coded two-entry map of demo IDs, so any
+ *      real supplier rendered as a raw `sup_…` id.
+ *   3. "More filters" revealed a date input wired to nothing.
+ *   4. The create dialog was a bare fixed div: no focus trap, no role, no
+ *      Escape, no focus restore.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
+import { PageShell } from "@/components/PageShell";
+import { DataTable, type DataColumn } from "@/components/DataTable";
+import { Modal } from "@/components/Modal";
+import { Input } from "@/components/Input";
+import { Select } from "@/components/Select";
+import { Button } from "@/components/Button";
+import { Badge } from "@/components/Badge";
+import { useToast } from "@/components/Toast";
+import {
+  normalize,
+  resolveParty,
+  summarizeMovements,
+  type TabKey,
+  type StockMovement,
+} from "./_lib/movements";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import { fmtDate, fmtDateShort } from "@/lib/date";
-import { useToast } from "@/components/Toast";
-import { Button } from "@/components/Button";
-
-// ── Types ──────────────────────────────────────────────────────────────────────
-
-type TabKey = "orders" | "transfers" | "returns";
 
 // Returns hits allowlisted `/api/v1/inventory/returns` (no BE) — Preview only.
 const SHOW_PARTIAL_PAGES = process.env["NEXT_PUBLIC_SHOW_PARTIAL_PAGES"] === "true";
@@ -34,206 +47,194 @@ function isVisibleTabKey(v: string | null): v is TabKey {
   return isTabKey(v) && (v !== "returns" || SHOW_PARTIAL_PAGES);
 }
 
-interface StockMovement {
+interface Vendor {
   id: string;
-  number: string;
-  due_date?: number | null;
-  from_location: string;
-  to_location: string;
-  status: string;
-  created_at: number;
-  total_qty: number;
-  total_cost_cents: number;
-  note?: string | null;
+  name: string;
 }
 
-// Raw shapes returned from each endpoint — normalised into StockMovement
-interface RawOrder {
-  id: string; po_number: number; supplier_id: string; status: string;
-  total_cost_cents: number; created_at: number; received_at: number | null;
-}
-interface RawTransfer {
-  id: string; transfer_number: string; from_location: string; to_location: string;
-  status: string; qty: number; created_at: number; due_date: number | null; note?: string | null;
-}
-interface RawReturn {
-  id: string; number: string; from_location: string; to_location: string;
-  status: string; total_qty: number; total_cost_cents: number; created_at: number;
-  due_date?: number | null; note?: string | null;
-}
-
-// ── Status styles ─────────────────────────────────────────────────────────────
-
-const STATUS_STYLE: Record<string, string> = {
-  pending:    "bg-amber-50 text-amber-700",
-  ordered:    "bg-blue-50 text-blue-700",
-  in_transit: "bg-blue-50 text-blue-700",
-  received:   "bg-emerald-50 text-emerald-700",
-  completed:  "bg-emerald-50 text-emerald-700",
-  credited:   "bg-emerald-50 text-emerald-700",
-  partial:    "bg-purple-50 text-purple-700",
-  sent:       "bg-indigo-50 text-indigo-700",
-  draft:      "bg-gray-100 text-gray-500",
-  cancelled:  "bg-gray-100 text-gray-400",
+/** Status → Badge variant. Colour is never the only signal; the label ships with it. */
+const STATUS_VARIANT: Record<string, "green" | "blue" | "yellow" | "gray" | "red"> = {
+  pending: "yellow",
+  ordered: "blue",
+  in_transit: "blue",
+  sent: "blue",
+  received: "green",
+  completed: "green",
+  credited: "green",
+  partial: "yellow",
+  draft: "gray",
+  cancelled: "red",
 };
-
-const SUPPLIER_NAME: Record<string, string> = {
-  "sup_acme": "Acme Coffee Co",
-  "sup_tea":  "Tea Traders",
-};
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-// ── Normalise raw API shapes → StockMovement ──────────────────────────────────
-
-function normOrders(items: RawOrder[]): StockMovement[] {
-  return items.map(o => ({
-    id:               o.id,
-    number:           `PO-${o.po_number}`,
-    due_date:         o.received_at,
-    from_location:    SUPPLIER_NAME[o.supplier_id] ?? o.supplier_id,
-    to_location:      "Main Store",
-    status:           o.status,
-    created_at:       o.created_at,
-    total_qty:        0,
-    total_cost_cents: o.total_cost_cents,
-  }));
-}
-
-function normTransfers(items: RawTransfer[]): StockMovement[] {
-  return items.map(t => ({
-    id:               t.id,
-    number:           t.transfer_number,
-    due_date:         t.due_date,
-    from_location:    t.from_location,
-    to_location:      t.to_location,
-    status:           t.status,
-    created_at:       t.created_at,
-    total_qty:        t.qty,
-    total_cost_cents: 0,
-    note:             t.note,
-  }));
-}
-
-function normReturns(items: RawReturn[]): StockMovement[] {
-  return items.map(r => ({
-    id:               r.id,
-    number:           r.number,
-    due_date:         r.due_date ?? null,
-    from_location:    r.from_location,
-    to_location:      r.to_location,
-    status:           r.status,
-    created_at:       r.created_at,
-    total_qty:        r.total_qty,
-    total_cost_cents: r.total_cost_cents,
-    note:             r.note,
-  }));
-}
-
-// ── Tab config ────────────────────────────────────────────────────────────────
 
 const TABS: { key: TabKey; label: string; partial?: boolean }[] = [
-  { key: "orders",    label: "Orders"    },
+  { key: "orders", label: "Orders" },
   { key: "transfers", label: "Transfers" },
-  { key: "returns",   label: "Returns", partial: true },
+  { key: "returns", label: "Returns", partial: true },
 ];
 
 const TAB_ENDPOINT: Record<TabKey, string> = {
-  orders:    "/api/v1/purchasing/orders",
+  orders: "/api/v1/purchasing/orders",
   transfers: "/api/v1/inventory/transfers",
-  returns:   "/api/v1/inventory/returns",
+  returns: "/api/v1/inventory/returns",
 };
 
 const TAB_PREFIX: Record<TabKey, string> = {
-  orders:    "PO",
+  orders: "PO",
   transfers: "TRF",
-  returns:   "RET",
+  returns: "RET",
 };
 
-// ── New movement modal ────────────────────────────────────────────────────────
+const STATUS_OPTIONS: Record<TabKey, { value: string; label: string }[]> = {
+  orders: [
+    { value: "all", label: "All statuses" },
+    { value: "pending", label: "Pending" },
+    { value: "ordered", label: "Ordered" },
+    { value: "received", label: "Received" },
+    { value: "draft", label: "Draft" },
+    { value: "cancelled", label: "Cancelled" },
+  ],
+  transfers: [
+    { value: "all", label: "All statuses" },
+    { value: "pending", label: "Pending" },
+    { value: "in_transit", label: "In transit" },
+    { value: "completed", label: "Completed" },
+    { value: "cancelled", label: "Cancelled" },
+  ],
+  returns: [
+    { value: "all", label: "All statuses" },
+    { value: "pending", label: "Pending" },
+    { value: "sent", label: "Sent" },
+    { value: "credited", label: "Credited" },
+    { value: "cancelled", label: "Cancelled" },
+  ],
+};
 
-function NewMovementModal({ tab, onClose, onCreated }: { tab: TabKey; onClose: () => void; onCreated: () => void }) {
+const OUTLET_OPTIONS = [
+  { value: "all", label: "All outlets" },
+  { value: "Main Store", label: "Main Store" },
+  { value: "Warehouse", label: "Warehouse" },
+  { value: "Downtown", label: "Downtown" },
+];
+
+// ── Create dialog ─────────────────────────────────────────────────────────────
+
+function NewMovementModal({
+  tab,
+  open,
+  onClose,
+  onCreated,
+}: {
+  tab: TabKey;
+  open: boolean;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
   const { addToast } = useToast();
-  const [from, setFrom]   = useState("");
-  const [to, setTo]       = useState("");
-  const [qty, setQty]     = useState("1");
-  const [cost, setCost]   = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [qty, setQty] = useState("1");
+  const [cost, setCost] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [touched, setTouched] = useState(false);
 
   const cfg = {
-    orders:    { title: "New purchase order",  fromLabel: "Supplier",    toLabel: "Outlet"   },
-    transfers: { title: "New transfer",        fromLabel: "From outlet", toLabel: "To outlet" },
-    returns:   { title: "New return",          fromLabel: "From outlet", toLabel: "Supplier" },
+    orders: { title: "New purchase order", fromLabel: "Supplier", toLabel: "Outlet" },
+    transfers: { title: "New transfer", fromLabel: "From outlet", toLabel: "To outlet" },
+    returns: { title: "New return", fromLabel: "From outlet", toLabel: "Supplier" },
   }[tab];
 
+  const fromError = touched && !from.trim() ? `${cfg.fromLabel} is required` : undefined;
+  const toError = touched && !to.trim() ? `${cfg.toLabel} is required` : undefined;
+
   const handleSubmit = async () => {
-    if (!from.trim() || !to.trim()) { addToast({ title: "Fill in all required fields", variant: "error" }); return; }
+    setTouched(true);
+    // Inline field errors instead of a toast: a toast cannot tell the user
+    // WHICH field is missing, and disappears before they reach it.
+    if (!from.trim() || !to.trim()) return;
     setSubmitting(true);
     try {
       await apiPost(TAB_ENDPOINT[tab], {
-        from_location: from.trim(), to_location: to.trim(),
+        from_location: from.trim(),
+        to_location: to.trim(),
         total_qty: Math.max(1, parseInt(qty, 10) || 1),
         total_cost_cents: Math.round(parseFloat(cost.replace(/,/g, "")) * 100 || 0),
         notes: notes.trim() || undefined,
       });
       addToast({ title: "Created successfully", variant: "success" });
-      onCreated(); onClose();
+      onCreated();
+      onClose();
     } catch (e) {
-      addToast({ title: "Failed to create", description: e instanceof Error ? e.message : undefined, variant: "error" });
-    } finally { setSubmitting(false); }
+      addToast({
+        title: "Failed to create",
+        description: e instanceof Error ? e.message : undefined,
+        variant: "error",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-xl bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-[#F0F0F0] px-5 py-4">
-          <h2 className="text-base font-semibold text-[#111]">{cfg.title}</h2>
-          <button type="button" onClick={onClose} className="text-[#888] hover:text-[#555]">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12" /></svg>
-          </button>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={cfg.title}
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button loading={submitting} onClick={() => void handleSubmit()}>
+            Create
+          </Button>
         </div>
-        <div className="px-5 py-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-[#555] mb-1">{cfg.fromLabel}</label>
-              <input type="text" value={from} onChange={e => setFrom(e.target.value)} placeholder="Name…"
-                className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-brand-600 focus:outline-none" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[#555] mb-1">{cfg.toLabel}</label>
-              <input type="text" value={to} onChange={e => setTo(e.target.value)} placeholder="Name…"
-                className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-brand-600 focus:outline-none" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-[#555] mb-1">Total qty</label>
-              <input type="number" value={qty} min="1" onChange={e => setQty(e.target.value)}
-                className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-brand-600 focus:outline-none" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[#555] mb-1">Total cost ($)</label>
-              <input type="number" value={cost} min="0" step="0.01" onChange={e => setCost(e.target.value)}
-                className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-brand-600 focus:outline-none" />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-[#555] mb-1">Notes</label>
-            <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional…"
-              className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-brand-600 focus:outline-none" />
-          </div>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label={cfg.fromLabel}
+            required
+            value={from}
+            error={fromError}
+            onChange={(e) => setFrom(e.target.value)}
+            placeholder="Name…"
+          />
+          <Input
+            label={cfg.toLabel}
+            required
+            value={to}
+            error={toError}
+            onChange={(e) => setTo(e.target.value)}
+            placeholder="Name…"
+          />
         </div>
-        <div className="flex justify-end gap-2 border-t border-[#F0F0F0] px-5 py-4">
-          <button type="button" onClick={onClose}
-            className="rounded border border-[#D9D9D9] px-3 py-1.5 text-sm text-[#555] hover:bg-[#F5F5F5]">Cancel</button>
-          <button type="button" onClick={() => void handleSubmit()} disabled={submitting}
-            className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-[#4849d0] disabled:opacity-50">
-            {submitting ? "Creating…" : "Create"}
-          </button>
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="Total qty"
+            type="number"
+            min="1"
+            value={qty}
+            onChange={(e) => setQty(e.target.value)}
+          />
+          <Input
+            label="Total cost ($)"
+            type="number"
+            min="0"
+            step="0.01"
+            value={cost}
+            onChange={(e) => setCost(e.target.value)}
+          />
         </div>
+        <Input
+          label="Notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Optional…"
+        />
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -242,273 +243,369 @@ function NewMovementModal({ tab, onClose, onCreated }: { tab: TabKey; onClose: (
 export default function InventoryPage() {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab");
-  const visibleTabs = useMemo(
-    () => TABS.filter((t) => !t.partial || SHOW_PARTIAL_PAGES),
-    [],
-  );
+  const visibleTabs = useMemo(() => TABS.filter((t) => !t.partial || SHOW_PARTIAL_PAGES), []);
+
   const [activeTab, setActiveTab] = useState<TabKey>(
-    isVisibleTabKey(initialTab) ? initialTab : "orders",
+    isVisibleTabKey(initialTab) ? initialTab : "orders"
   );
-  const [data, setData]           = useState<StockMovement[]>([]);
-  const [loading, setLoading]     = useState(true);
+  const [data, setData] = useState<StockMovement[]>([]);
+  const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [nextCursor, setNextCursor]   = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [sortDir, setSortDir]     = useState<"asc" | "desc">("desc");
 
-  // Filter state
-  const [filterShow,   setFilterShow]   = useState("all");
-  const [filterSearch, setFilterSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
   const [filterOutlet, setFilterOutlet] = useState("all");
-  const [moreFilters,  setMoreFilters]  = useState(false);
+  const [filterFrom, setFilterFrom] = useState("");
 
-  function clearFilters() { setFilterShow("all"); setFilterSearch(""); setFilterOutlet("all"); }
+  /**
+   * Supplier id → name. Previously a hard-coded two-entry map of demo ids
+   * (`sup_acme` → "Acme Coffee Co"), so every real supplier rendered as a raw
+   * `sup_…` id. `listOrders` is `SELECT * FROM purchase_orders` and carries no
+   * supplier name, so the names are resolved here. Non-fatal: on failure the id
+   * is shown, which is what the old map did for anything outside its two keys.
+   */
+  const [vendorNames, setVendorNames] = useState<Record<string, string>>({});
 
-  function normalize(raw: unknown[]): StockMovement[] {
-    if (activeTab === "orders")    return normOrders(raw as RawOrder[]);
-    if (activeTab === "transfers") return normTransfers(raw as RawTransfer[]);
-    return normReturns(raw as RawReturn[]);
-  }
+  useEffect(() => {
+    apiGet<{ items: Vendor[] }>("/api/v1/purchasing/vendors")
+      .then((r) =>
+        setVendorNames(
+          Object.fromEntries((r.items ?? []).map((v) => [v.id, v.name]))
+        )
+      )
+      .catch(() => {
+        /* non-fatal — fall back to showing the raw supplier id */
+      });
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setFilterStatus("all");
+    setFilterOutlet("all");
+    setFilterFrom("");
+  }, []);
 
   const load = useCallback(() => {
     setLoading(true);
     setLoadError(null);
-    const ep = TAB_ENDPOINT[activeTab];
-    apiGet<{ items: unknown[]; nextCursor: string | null }>(ep).then(r => {
-      setData(normalize(r.items ?? []));
-      setNextCursor(r.nextCursor ?? null);
-    }).catch((err) => {
-      setData([]);
-      setNextCursor(null);
-      setLoadError(err instanceof ApiResponseError ? err.message : "Failed to load inventory movements.");
-    }).finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    apiGet<{ items: unknown[]; nextCursor: string | null }>(TAB_ENDPOINT[activeTab])
+      .then((r) => {
+        setData(normalize(r.items ?? [], activeTab));
+        setNextCursor(r.nextCursor ?? null);
+      })
+      .catch((err) => {
+        setData([]);
+        setNextCursor(null);
+        setLoadError(
+          err instanceof ApiResponseError ? err.message : "Failed to load inventory movements."
+        );
+      })
+      .finally(() => setLoading(false));
   }, [activeTab]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const loadMore = useCallback(() => {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
-    const ep = `${TAB_ENDPOINT[activeTab]}?cursor=${encodeURIComponent(nextCursor)}`;
-    apiGet<{ items: unknown[]; nextCursor: string | null }>(ep).then(r => {
-      setData(prev => [...prev, ...normalize(r.items ?? [])]);
-      setNextCursor(r.nextCursor ?? null);
-    }).catch((err) => {
-      setLoadError(err instanceof ApiResponseError ? err.message : "Failed to load more movements.");
-    }).finally(() => setLoadingMore(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    apiGet<{ items: unknown[]; nextCursor: string | null }>(
+      `${TAB_ENDPOINT[activeTab]}?cursor=${encodeURIComponent(nextCursor)}`
+    )
+      .then((r) => {
+        setData((prev) => [...prev, ...normalize(r.items ?? [], activeTab)]);
+        setNextCursor(r.nextCursor ?? null);
+      })
+      .catch((err) => {
+        setLoadError(
+          err instanceof ApiResponseError ? err.message : "Failed to load more movements."
+        );
+      })
+      .finally(() => setLoadingMore(false));
   }, [activeTab, nextCursor, loadingMore]);
 
   const visible = useMemo(() => {
     let rows = data;
-    if (filterShow !== "all") rows = rows.filter(r => r.status === filterShow);
-    if (filterSearch) {
-      const q = filterSearch.toLowerCase();
-      rows = rows.filter(r =>
-        r.number.toLowerCase().includes(q) ||
-        r.from_location.toLowerCase().includes(q) ||
-        r.to_location.toLowerCase().includes(q)
-      );
-    }
+    if (filterStatus !== "all") rows = rows.filter((r) => r.status === filterStatus);
     if (filterOutlet !== "all") {
-      rows = rows.filter(r =>
-        r.to_location.toLowerCase().includes(filterOutlet.toLowerCase()) ||
-        r.from_location.toLowerCase().includes(filterOutlet.toLowerCase())
+      const o = filterOutlet.toLowerCase();
+      rows = rows.filter(
+        (r) =>
+          r.to_location.toLowerCase().includes(o) ||
+          resolveParty(r.from_location, vendorNames).toLowerCase().includes(o)
       );
     }
-    return [...rows].sort((a, b) =>
-      sortDir === "desc" ? b.created_at - a.created_at : a.created_at - b.created_at
-    );
-  }, [data, filterShow, filterSearch, filterOutlet, sortDir]);
+    if (filterFrom) {
+      // Previously this input existed but filtered nothing.
+      const from = new Date(`${filterFrom}T00:00:00`).getTime();
+      if (!Number.isNaN(from)) rows = rows.filter((r) => r.created_at >= from);
+    }
+    return rows;
+  }, [data, filterStatus, filterOutlet, filterFrom, vendorNames]);
 
-  const totalQty  = visible.reduce((s, r) => s + r.total_qty, 0);
-  const totalCost = visible.reduce((s, r) => s + r.total_cost_cents, 0);
+  const summary = useMemo(() => summarizeMovements(visible), [visible]);
 
-  const tabLabel  = activeTab === "orders" ? "orders" : activeTab === "transfers" ? "transfers" : "returns";
+  const tabLabel = activeTab;
+  const filtersActive = filterStatus !== "all" || filterOutlet !== "all" || filterFrom !== "";
+
+  const columns = useMemo<DataColumn<StockMovement>[]>(
+    () => [
+      {
+        key: "number",
+        header: `${TAB_PREFIX[activeTab]} # / Due date`,
+        hideable: false,
+        sticky: true,
+        minWidth: "160px",
+        sortValue: (r) => r.number,
+        render: (r) => (
+          <>
+            <p className="font-mono text-xs font-semibold text-accent-600 tnum">{r.number}</p>
+            {r.due_date ? (
+              <p className="text-2xs text-content-secondary">Due {fmtDateShort(r.due_date)}</p>
+            ) : (
+              <p className="text-2xs text-content-muted">No due date</p>
+            )}
+          </>
+        ),
+      },
+      {
+        key: "from",
+        header: "From",
+        minWidth: "140px",
+        sortValue: (r) => resolveParty(r.from_location, vendorNames),
+        render: (r) => (
+          <span className="text-content-primary">{resolveParty(r.from_location, vendorNames)}</span>
+        ),
+      },
+      {
+        key: "to",
+        header: "To",
+        minWidth: "140px",
+        sortValue: (r) => r.to_location,
+        render: (r) => <span className="text-content-primary">{r.to_location}</span>,
+      },
+      {
+        key: "status",
+        header: "Status",
+        minWidth: "120px",
+        sortValue: (r) => r.status,
+        render: (r) => (
+          <Badge variant={STATUS_VARIANT[r.status] ?? "gray"}>{r.status.replace(/_/g, " ")}</Badge>
+        ),
+      },
+      {
+        key: "created",
+        header: "Created",
+        minWidth: "130px",
+        sortValue: (r) => r.created_at,
+        render: (r) => (
+          <span className="whitespace-nowrap text-xs text-content-secondary">
+            {fmtDate(r.created_at)}
+          </span>
+        ),
+      },
+      {
+        key: "qty",
+        header: "Total qty",
+        numeric: true,
+        minWidth: "110px",
+        sortValue: (r) => r.total_qty,
+        render: (r) =>
+          r.total_qty === null ? (
+            <span className="text-content-muted" title="Not tracked for purchase orders">
+              —
+            </span>
+          ) : (
+            <span className="font-semibold text-content-primary">
+              {r.total_qty.toLocaleString()}
+            </span>
+          ),
+      },
+      {
+        key: "cost",
+        header: "Total cost",
+        numeric: true,
+        minWidth: "120px",
+        sortValue: (r) => r.total_cost_cents,
+        render: (r) =>
+          r.total_cost_cents === null ? (
+            <span className="text-content-muted" title="Not tracked for transfers">
+              —
+            </span>
+          ) : (
+            <span className="font-semibold text-content-primary">
+              {formatMoney(r.total_cost_cents)}
+            </span>
+          ),
+      },
+    ],
+    [activeTab, vendorNames]
+  );
 
   return (
-    <EnterpriseShell active="inventory" title="Movements" subtitle="Stock movements — orders, transfers, and returns">
+    <EnterpriseShell
+      active="inventory"
+      title="Movements"
+      subtitle="Stock movements — orders, transfers, and returns"
+    >
+      <PageShell
+        titleAs="h2"
+        title="Stock movements"
+        description="Purchase orders, transfers between outlets, and supplier returns."
+        breadcrumbs={[{ label: "Inventory" }, { label: "Movements" }]}
+        primaryAction={
+          <Button onClick={() => setShowModal(true)}>New {tabLabel.slice(0, -1)}</Button>
+        }
+        summary={
+          <div className="flex flex-col gap-3">
+            {/* Real tabs: each switches the panel below, so the ARIA
+                tab/tabpanel relationship is accurate here. */}
+            <div role="tablist" aria-label="Movement type" className="flex gap-1 border-b border-line">
+              {visibleTabs.map((t) => {
+                const selected = activeTab === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    role="tab"
+                    id={`tab-${t.key}`}
+                    aria-selected={selected}
+                    aria-controls="movements-panel"
+                    onClick={() => {
+                      setActiveTab(t.key);
+                      clearFilters();
+                      setLoadError(null);
+                    }}
+                    className={[
+                      "focus-ring -mb-px min-h-touch border-b-2 px-5 text-sm font-medium transition-colors",
+                      selected
+                        ? "border-accent-600 text-accent-600"
+                        : "border-transparent text-content-secondary hover:text-content-primary",
+                    ].join(" ")}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
 
-      {/* ── Spec tab bar ─────────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-erp-table-border px-6 flex items-end justify-between">
-        <div className="flex">
-          {visibleTabs.map(t => (
-            <button key={t.key} type="button"
-              onClick={() => { setActiveTab(t.key); clearFilters(); setLoadError(null); }}
-              className={`px-5 py-3.5 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
-                activeTab === t.key
-                  ? "border-brand-600 text-brand-600"
-                  : "border-transparent text-erp-text-secondary hover:text-erp-text-primary"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <Button type="button" variant="primary" size="sm" className="mb-2" onClick={() => setShowModal(true)}>
-          + New {tabLabel.slice(0, -1)}
-        </Button>
-      </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="w-44">
+                <Select
+                  label="Show"
+                  size="lg"
+                  options={STATUS_OPTIONS[activeTab]}
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                />
+              </div>
+              <div className="w-44">
+                <Select
+                  label="Outlet"
+                  size="lg"
+                  options={OUTLET_OPTIONS}
+                  value={filterOutlet}
+                  onChange={(e) => setFilterOutlet(e.target.value)}
+                />
+              </div>
+              <div className="w-44">
+                <Input
+                  label="Created from"
+                  type="date"
+                  value={filterFrom}
+                  onChange={(e) => setFilterFrom(e.target.value)}
+                />
+              </div>
+              {filtersActive && (
+                <Button variant="secondary" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              )}
+              {/* Labelled "Refresh", not "Search": it refetches from the server.
+                  Filtering is already live, so a "Search" button implied the
+                  list was stale until clicked, which was never true. */}
+              <Button variant="secondary" className="ml-auto" onClick={load} loading={loading}>
+                Refresh
+              </Button>
+            </div>
 
-      {loadError && (
-        <div
-          role="alert"
-          className="mx-6 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger-100 bg-danger-50 px-4 py-3 text-sm text-danger-700"
-        >
-          <p>{loadError}</p>
-          <Button type="button" variant="secondary" size="sm" onClick={load}>
-            Retry
-          </Button>
-        </div>
-      )}
+            {!loading && !loadError && (
+              <p className="text-xs text-content-secondary" aria-live="polite">
+                Displaying <strong className="tnum">{summary.count}</strong> {tabLabel}
+                {" — "}
+                {summary.qty !== null ? (
+                  <>
+                    total qty <strong className="tnum">{summary.qty.toLocaleString()}</strong>
+                  </>
+                ) : (
+                  <>quantity not tracked for {tabLabel}</>
+                )}
+                {" and "}
+                {summary.cost !== null ? (
+                  <>
+                    total cost <strong className="tnum">{formatMoney(summary.cost)}</strong>
+                  </>
+                ) : (
+                  <>cost not tracked for {tabLabel}</>
+                )}
+              </p>
+            )}
+          </div>
+        }
+      >
+        <div id="movements-panel" role="tabpanel" aria-labelledby={`tab-${activeTab}`}>
+          <DataTable
+            caption={`${TABS.find((t) => t.key === activeTab)?.label ?? "Stock"} movements`}
+            columns={columns}
+            rows={visible}
+            rowKey={(r) => r.id}
+            loading={loading}
+            error={loadError}
+            onRetry={load}
+            searchable
+            searchPlaceholder={`${TAB_PREFIX[activeTab]}-00001 or location…`}
+            // Search the RESOLVED supplier name, not the raw id — otherwise
+            // typing the supplier the user can see would match nothing.
+            searchText={(r) =>
+              `${r.number} ${resolveParty(r.from_location, vendorNames)} ${r.to_location} ${r.status}`
+            }
+            // All loaded rows stay on screen; "Load more" below appends the next
+            // cursor page, matching the pre-migration behaviour.
+            pageSize={500}
+            storageKey={`inventory-${activeTab}`}
+            emptyTitle={filtersActive ? `No matching ${tabLabel}` : `No ${tabLabel} yet`}
+            emptyDescription={
+              filtersActive
+                ? "Try clearing the filters — other movements may exist."
+                : `Create one with the New ${tabLabel.slice(0, -1)} button.`
+            }
+            emptyAction={
+              filtersActive ? (
+                <Button variant="secondary" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              ) : undefined
+            }
+          />
 
-      {/* ── Spec filter bar ───────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-[#E8E8E8] px-6 py-3">
-        <div className="flex flex-wrap items-end gap-3">
-          {/* Show */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-[#555]">Show</label>
-            <select value={filterShow} onChange={e => setFilterShow(e.target.value)}
-              className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
-              <option value="all">All statuses</option>
-              <option value="pending">Pending</option>
-              {activeTab === "orders"    && <option value="ordered">Ordered</option>}
-              {activeTab === "orders"    && <option value="received">Received</option>}
-              {activeTab === "orders"    && <option value="draft">Draft</option>}
-              {activeTab === "transfers" && <option value="in_transit">In transit</option>}
-              {activeTab === "transfers" && <option value="completed">Completed</option>}
-              {activeTab === "returns"   && <option value="sent">Sent</option>}
-              {activeTab === "returns"   && <option value="credited">Credited</option>}
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
-          {/* Search */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-[#555]">Search</label>
-            <input type="text" value={filterSearch} onChange={e => setFilterSearch(e.target.value)}
-              placeholder={`${TAB_PREFIX[activeTab]}-00001 or location…`}
-              className="h-8 w-44 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none" />
-          </div>
-          {/* Outlet */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-[#555]">Outlet</label>
-            <select value={filterOutlet} onChange={e => setFilterOutlet(e.target.value)}
-              className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
-              <option value="all">All outlets</option>
-              <option value="Main Store">Main Store</option>
-              <option value="Warehouse">Warehouse</option>
-              <option value="Downtown">Downtown</option>
-            </select>
-          </div>
-          {/* More filters — date range */}
-          {moreFilters && (
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[#555]">From date</label>
-              <input type="date"
-                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none" />
+          {nextCursor && !loading && (
+            <div className="mt-4 flex justify-center">
+              <Button variant="secondary" onClick={loadMore} loading={loadingMore}>
+                Load more
+              </Button>
             </div>
           )}
-          {/* Actions */}
-          <div className="flex items-center gap-2 ml-auto">
-            <button type="button" onClick={clearFilters} className="text-sm text-brand-600 hover:underline">Clear filters</button>
-            <button type="button" onClick={() => setMoreFilters(m => !m)} className="text-sm text-brand-600 hover:underline">
-              {moreFilters ? "Fewer filters" : "More filters"}
-            </button>
-            <button type="button" onClick={load}
-              className="h-8 rounded bg-brand-600 px-4 text-sm font-medium text-white hover:bg-[#4849d0] transition-colors">
-              Search
-            </button>
-          </div>
         </div>
-        {/* Spec summary line */}
-        {!loading && (
-          <p className="mt-2 text-xs text-[#666]">
-            Displaying <strong>{visible.length}</strong> {tabLabel} —
-            total qty <strong>{totalQty.toLocaleString()}</strong> and
-            total cost <strong>{formatMoney(totalCost)}</strong>
-          </p>
-        )}
-      </div>
+      </PageShell>
 
-      {/* ── Spec table ────────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-[#F0F0F0] bg-[#FAFAFA] text-left text-xs font-semibold text-[#888] uppercase tracking-wider">
-              <th className="px-4 py-3">{TAB_PREFIX[activeTab]} # / Due date</th>
-              <th className="px-4 py-3">From</th>
-              <th className="px-4 py-3">To</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3 cursor-pointer select-none hover:text-[#555]"
-                onClick={() => setSortDir(d => d === "desc" ? "asc" : "desc")}>
-                Created {sortDir === "desc" ? "↓" : "↑"}
-              </th>
-              <th className="px-4 py-3 text-right">Total qty</th>
-              <th className="px-4 py-3 text-right">Total cost</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan={7} className="px-4 py-12 text-center text-[#888]">
-                <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
-              </td></tr>
-            )}
-            {!loading && visible.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-12 text-center text-[#888]">
-                No {tabLabel} found.
-                {(filterShow !== "all" || filterSearch || filterOutlet !== "all") && (
-                  <button type="button" onClick={clearFilters} className="ml-2 text-brand-600 hover:underline">Clear filters</button>
-                )}
-              </td></tr>
-            )}
-            {visible.map(row => (
-              <tr key={row.id} className="border-b border-[#F5F5F5] hover:bg-[#FAFAFA]">
-                {/* # / Due date */}
-                <td className="px-4 py-3">
-                  <p className="font-semibold text-brand-600 font-mono text-xs">{row.number}</p>
-                  {row.due_date
-                    ? <p className="text-xs text-[#888]">Due {fmtDateShort(row.due_date)}</p>
-                    : <p className="text-xs text-[#ccc]">No due date</p>
-                  }
-                </td>
-                {/* From */}
-                <td className="px-4 py-3 text-sm text-[#333]">{row.from_location}</td>
-                {/* To */}
-                <td className="px-4 py-3 text-sm text-[#333]">{row.to_location}</td>
-                {/* Status */}
-                <td className="px-4 py-3">
-                  <span className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold capitalize ${STATUS_STYLE[row.status] ?? "bg-gray-100 text-gray-500"}`}>
-                    {row.status.replace(/_/g, " ")}
-                  </span>
-                </td>
-                {/* Created — sortable */}
-                <td className="px-4 py-3 text-xs text-[#666]">{fmtDate(row.created_at)}</td>
-                {/* Total qty */}
-                <td className="px-4 py-3 text-right font-semibold tabular-nums text-[#111]">
-                  {row.total_qty > 0 ? row.total_qty.toLocaleString() : "—"}
-                </td>
-                {/* Total cost */}
-                <td className="px-4 py-3 text-right font-semibold tabular-nums text-[#111]">
-                  {row.total_cost_cents > 0 ? formatMoney(row.total_cost_cents) : "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {nextCursor && !loading && (
-        <div className="flex justify-center border-t border-[#F0F0F0] bg-[#FAFAFA] py-3">
-          <button type="button" onClick={loadMore} disabled={loadingMore}
-            className="h-8 rounded border border-[#D9D9D9] bg-white px-4 text-sm text-[#555] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
-            {loadingMore ? "Loading…" : "Load more"}
-          </button>
-        </div>
-      )}
-
-      {showModal && <NewMovementModal tab={activeTab} onClose={() => setShowModal(false)} onCreated={load} />}
+      <NewMovementModal
+        tab={activeTab}
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        onCreated={load}
+      />
     </EnterpriseShell>
   );
 }
