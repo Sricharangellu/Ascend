@@ -6,7 +6,7 @@ import { Button } from "@/components/Button";
 import { apiGet, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type { ProShopItem } from "@/api-client/types";
-import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
+import { ListControls, type ListSearchField } from "@/components/ListControls";
 
 /** Columns a pro-shop search can be scoped to. Filters the fully-loaded item list. */
 const PROSHOP_SEARCH_FIELDS: ListSearchField[] = [

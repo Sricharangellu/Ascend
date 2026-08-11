@@ -7,7 +7,7 @@ import { Button } from "@/components/Button";
 import { apiGet, apiPost, apiPatch, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type { GolfBooking, BookingStatus, GolfMember } from "@/api-client/types";
-import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
+import { ListControls, type ListSearchField } from "@/components/ListControls";
 
 /** Columns a booking search can be scoped to. Filters the fully-loaded booking list. */
 const BOOKING_SEARCH_FIELDS: ListSearchField[] = [

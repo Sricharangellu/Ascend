@@ -6,7 +6,6 @@ import { apiGet, apiPost, safeLoad } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import { fmtDate } from "@/lib/date";
 import { Can } from "@/components/rbac";
-import { Button } from "@/components/Button";
 import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
 
 /** Columns the customer-price search can be scoped to. Filters loaded products. */

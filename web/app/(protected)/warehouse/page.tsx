@@ -6,7 +6,6 @@ import { apiGet } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import { fmtDate, fmtDateTime } from "@/lib/date";
 import { Can } from "@/components/rbac";
-import { Button } from "@/components/Button";
 import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
 
 /** Columns a warehouse-location search can be scoped to. Filters the loaded set. */
