@@ -517,19 +517,25 @@ lost-then-recovered work). These rules exist so it cannot recur:
 
 ## Cursor Cloud specific instructions
 
-These are non-obvious environment caveats for Cursor Cloud VMs. Dependencies are
-installed automatically on VM start (`npm install` at root + in `web/`). Standard
-commands live in **Command Gates** above and
+These are non-obvious environment caveats for Cursor Cloud VMs (Ubuntu/Linux, not the
+macOS runbook above). Dependencies are refreshed automatically on VM start by the
+environment update script (`npm ci` at root + in `web/`), so you normally do NOT need to
+install anything yourself. Standard commands live in **Command Gates** above and
 [`docs/getting-started/local-development.md`](docs/getting-started/local-development.md) —
 don't duplicate them; the notes below only cover what bites you on these VMs.
 
 - **Backend tests/smoke need a larger `/dev/shm` (biggest gotcha).** The VM ships
   `/dev/shm` at 64 MB. The embedded-Postgres suite (`npm test`, `npm run smoke`
   with `DATABASE_URL` unset) exhausts it mid-run and ~295 of 759 backend tests
-  fail with `could not resize shared memory segment … No space left on device`.
-  This is the same issue CI solves with `--shm-size=1g`. Remount before running
-  them (persists only for the session, re-run after a reboot):
+  fail with `could not resize shared memory segment … No space left on device`
+  (Postgres `dsm_impl_posix`). This is the same issue CI solves with `--shm-size=1g`.
+  Remount before running them (persists only for the session, re-run after a reboot):
   `sudo mount -o remount,size=1g /dev/shm`. With this, all 759 backend tests pass.
+- **`npm ci` prints benign `allow-scripts` warnings** (embedded-postgres, esbuild, msw
+  postinstalls "not covered"). npm 11 blocks those postinstalls, but the platform packages
+  ship prebuilt binaries, so `tsx`, embedded-postgres, `next build`, and the smoke test all
+  work regardless — ignore the warnings. Prefer `npm ci` over `npm install`; `npm install`
+  needlessly rewrites `web/package-lock.json` (`peer` flags) and dirties the tree.
 - **Use Node 24 (matches `.nvmrc`/CI).** The default shell `node` is v22
   (`/exec-daemon/node`); the full `web` vitest suite has 3 jsdom `Blob`/`FileReader`
   tests that only pass on Node 24. Activate it in a fresh shell with
@@ -539,12 +545,15 @@ don't duplicate them; the notes below only cover what bites you on these VMs.
   Postgres 16 is installed with role/db matching `.env.example`
   (`finder:finder@localhost:5432/finder_dev`). Start it with
   `sudo pg_ctlcluster 16 main start` if `curl localhost:3001/readyz` can't connect.
-- **The dev backend does NOT auto-load `.env`** — export `DATABASE_URL` and
-  `JWT_SECRET` (≥32 chars) before `npm run dev`, or every authed request 500s.
-  Migrations auto-apply on boot; `/readyz` must show `"db":"connected"`.
-- **To log in via the UI, seed the demo tenant** into your dev DB:
-  `ALLOW_E2E_SEED=1 DATABASE_URL=… npx tsx scripts/seed-e2e.ts`
-  (owner `owner@ascend.dev` / `AscendDemo!2026`).
+- **The dev backend auto-loads `.env` only when the file exists** (`tsx watch
+  --env-file-if-exists=.env`). There is no `.env` by default, so either create one or
+  export `DATABASE_URL` and `JWT_SECRET` (≥32 chars) before `npm run dev`, or every authed
+  request 500s. Migrations auto-apply on boot; `/readyz` must show `"db":"connected"`.
+- **Logging in via the UI needs no manual seed.** On first boot with an empty `users`
+  table the backend auto-seeds the demo owner `owner@ascend.dev` / `AscendDemo!2026`
+  (tenant `tnt_demo`) — see `src/identity/index.ts`. Run
+  `ALLOW_E2E_SEED=1 DATABASE_URL=… npx tsx scripts/seed-e2e.ts` only when you also want
+  richer product / purchase-order fixtures.
 - **Frontend against the real backend:** `next dev` defaults to MSW mocks. Run
   `NEXT_PUBLIC_MOCK=false BACKEND_URL=http://localhost:3001 npm run dev` in `web/`;
   it proxies `/api/*` and `/readyz` to the backend (no browser CORS).
