@@ -1,7 +1,7 @@
 import express, { Router, type Express } from "express";
 import { createHash, timingSafeEqual } from "node:crypto";
 import helmet from "helmet";
-import { openDb, type DB } from "./shared/db.js";
+import { openDb, txTimeoutMs, type DB } from "./shared/db.js";
 import { openRedis } from "./shared/redis.js";
 import { EventBus } from "./shared/events.js";
 import { Outbox } from "./shared/outbox.js";
@@ -289,7 +289,16 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   // duration of the transaction. Concurrent instances wait here and then skip
   // all migrations (hash-checked above). Prevents simultaneous ALTER TABLE races.
   await db.tx(async (tdb) => {
+    // db.tx() already set statement_timeout for this transaction (default 30s,
+    // PG_TX_TIMEOUT_MS). Postgres charges time spent blocking on a lock against
+    // the statement that's waiting for it, so under contention (many processes
+    // racing to migrate a shared database, e.g. the test suite's 100+ callers)
+    // a perfectly healthy wait here reads as a bogus "statement timeout" rather
+    // than real runaway work. Lift the cap only for the blocking wait, then
+    // restore it before running any actual migration DDL.
+    await tdb.exec("SET LOCAL statement_timeout = 0");
     await tdb.exec("SELECT pg_advisory_xact_lock(7381920)"); // stable magic int for finder migrations
+    await tdb.exec(`SET LOCAL statement_timeout = ${txTimeoutMs()}`);
     logger.info("migration lock acquired");
 
     for (const sql of identityModule.migrations) await runIfNew(sql, `identity`, tdb);

@@ -1,3 +1,14 @@
+## Active Claim (Claude Code web — fix migration advisory-lock statement_timeout flake)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `fix/migration-lock-statement-timeout` |
+| Queue item | `WORK/LOOP_STATE.md` backlog row "NEW 2026-08-07 — the backend suite's 30s statement timeout covers an unbounded migration-lock WAIT (flake source)". `buildApp()`'s migration transaction sets `statement_timeout` at `BEGIN`, then its first statement is the *blocking* `pg_advisory_xact_lock(7381920)` — so queueing time for that lock is charged against the same 30s budget as real migration DDL. 123 call sites / 86 test files all serialize on this one global lock; CI run 31138020800 failed 893/894 on exactly this (a test at 30014ms, pg code 57014, while Postgres was checkpointing). Fix: uncap `statement_timeout` for the lock-wait statement only, restore it before running migration DDL. |
+| Files/areas expected | `src/shared/db.ts` (export the tx-timeout default so it isn't duplicated), `src/app.ts` (migration lock block only), NEW regression test (`src/app.migration-lock.test.ts`), `WORK/LOOP_STATE.md`, `WORK/LOCK.md`. NOT `web/**`, NOT other `src/modules/**`. |
+| Started | 2026-08-10T190450Z |
+| Status | RELEASED — pushed to `fix/migration-lock-statement-timeout`. Root cause confirmed exactly as filed; fix is `SET LOCAL statement_timeout = 0` around the advisory-lock wait only, restored via new exported `txTimeoutMs()` before running migration DDL. New regression test (`src/app.migration-lock.test.ts`) verified to fail on pre-fix code with the exact CI error (pg `57014`, statement timeout) and pass with the fix. Gates: `typecheck` PASS, `hygiene` PASS (2203 files), `gap:scan` PASS (474/382, 17 allowlisted), `authz:scan` PASS (49 files, 6 allowlisted), `table:scan` PASS (166 names), full backend suite run against real Postgres 16 clean throughout (every test calls `buildApp()`, so the whole suite exercises this path, not just the new test). `npm run smoke` and web checks not touched — zero `web/**` change. |
+| Blockers | none |
+
 ## Active Claim (Claude Code web — release staging → master)
 
 | Field | Value |
