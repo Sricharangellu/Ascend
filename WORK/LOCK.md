@@ -75,6 +75,19 @@
 | Duplicate-work check | Ran per AGENTS.md before re-cutting this branch, and it caught a real collision. This claim originally also made `smoke-test`'s probes repointable; `develop` moved to `dcf6033` mid-session and PR #197's `d294041` had already landed exactly that. The duplicate commit was **dropped, not merged** — develop's version stands, including its deliberate asymmetric fallback. Only the `deploy-production` half, which #197 left behind, remains here. |
 | Blockers | `PROD_BACKEND_URL`, `PROD_DATABASE_URL` and the Render/Vercel/Supabase dashboards are Sri-only. The no-restorable-backup blocker and the `DEPLOYMENTS.md` P0 on where the prod backend runs stay OPEN and are not worked around here. |
 
+## Released Claim (Claude Code web — migration-lock statement-timeout flake) — SUPERSEDED, NOT SHIPPED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-erp-platform-audit-a80478` (PR #214) |
+| Queue item | `WORK/LOOP_STATE.md` "NEW 2026-08-07 — the backend suite's 30s statement timeout covers an unbounded migration-lock WAIT (flake source)". |
+| Outcome | **Superseded. None of this session's implementation shipped, and that is the correct outcome.** THREE sessions fixed this one row within about an hour of each other: this one, PR #213, and PR #212 — which merged to `develop` first. On finding #212 landed, this branch took `develop`'s `src/app.ts`, `src/shared/db.ts`, `.env.example` and `src/app.migration-lock.test.ts` **byte-identical** rather than merging a competing mechanism over a fix that was already in. Only documentation and backlog rows remain here. |
+| Why the merge was abandoned rather than forced | #212 bounds the lock wait with its own large `SET LOCAL statement_timeout`, restores the normal budget before the DDL, and translates `57014` into a message naming the lock. It fixes the reported defect. It also argues against this session's polling mechanism with a measurement — Postgres wakes a blocked waiter in ~4 ms, whereas a poll adds up to its interval to every one of the hundreds of acquisitions a suite makes. That is a fair point, and it was decisive: merging PR #214 would have reverted a better-argued fix that had already landed. |
+| The one piece that did NOT land, filed not forced | This session also keyed the lock by SCHEMA, which removes the contention rather than bounding the wait for it. `develop` still uses one global key, so all 123 boot sites across 86 parallel files still serialise. It was **not** pushed: `develop`'s new test holds the single-key form and asserts on its exact message, so per-schema keying would have required rewriting a test merged minutes earlier — that is taking over another session's change, not adding to it. Filed as a `WORK/LOOP_STATE.md` row with the full reasoning so the idea is not lost. |
+| Kept from this session | The `refunded_cents` finding (a live workflow querying a column no migration creates, invisible to its own test), plus the migration-lock troubleshooting entry in `docs/getting-started/local-development.md`, rewritten to describe #212's mechanism rather than this one's. |
+| Protocol lesson (the real finding) | The lock protocol does not prevent this. All three sessions claimed correctly in `WORK/LOCK.md`; the claims simply landed minutes apart, and none could see the others. Claiming is not the same as reserving. Three sessions' work on one 30-line block produced one shipped fix and two discarded ones. |
+| Blockers | none |
+
 ## Active Claim (Claude Code web — enterprise infrastructure/platform audit)
 
 | Field | Value |
