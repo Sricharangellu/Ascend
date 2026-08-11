@@ -7,6 +7,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { TableSkeleton } from "@/components/TableSkeleton";
+import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { formatMoney, parseToCents } from "@/lib/money";
 import { hasRole } from "@/lib/auth";
@@ -59,6 +60,22 @@ interface VendorReturn {
 
 type VendorFilter = "all" | "active" | "inactive" | "compliance" | "credits";
 
+/**
+ * Columns a vendor search can be scoped to.
+ *
+ * This page loads the full vendor list (`/api/v1/purchasing/vendors` returns
+ * every vendor, no paging), so scoping in the browser searches the whole set,
+ * not one page. If that endpoint ever paginates, these must move server-side.
+ */
+const VENDOR_SEARCH_FIELDS: ListSearchField[] = [
+  { value: "all", label: "All columns" },
+  { value: "name", label: "Vendor name" },
+  { value: "company", label: "Company" },
+  { value: "email", label: "Email" },
+  { value: "phone", label: "Phone" },
+  { value: "type", label: "Vendor type" },
+];
+
 const creditTypeLabel = {
   chargeback: "Chargeback",
   credit_memo: "Credit memo",
@@ -71,6 +88,7 @@ export default function VendorsPage() {
   const [returns, setReturns] = useState<VendorReturn[]>([]);
   const [filter, setFilter] = useState<VendorFilter>("all");
   const [query, setQuery] = useState("");
+  const [searchField, setSearchField] = useState("all");
   const [selectedVendorId, setSelectedVendorId] = useState("");
   const [creditAmount, setCreditAmount] = useState("");
   const [creditReason, setCreditReason] = useState("");
@@ -124,11 +142,24 @@ export default function VendorsPage() {
       if (filter === "compliance" && vendor.tax_id && vendor.fein_number && vendor.vendor_type) return false;
       if (filter === "credits" && vendor.openCreditsCents <= 0) return false;
       if (!q) return true;
-      return [vendor.name, vendor.company, vendor.dba, vendor.email, vendor.phone, vendor.vendor_type, vendor.msa_type]
+      // Scoped search narrows which of these is compared. The whole vendor list
+      // is loaded here, so scoping in the browser is the real thing rather than
+      // a page-local approximation — see the note on VENDOR_SEARCH_FIELDS.
+      const fields: Record<string, unknown[]> = {
+        name: [vendor.name, vendor.dba],
+        company: [vendor.company],
+        email: [vendor.email],
+        phone: [vendor.phone],
+        type: [vendor.vendor_type, vendor.msa_type],
+      };
+      const haystack = searchField === "all"
+        ? Object.values(fields).flat()
+        : (fields[searchField] ?? []);
+      return haystack
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(q));
     });
-  }, [filter, query, vendors]);
+  }, [filter, query, searchField, vendors]);
 
   const selectedVendor = vendors.find((vendor) => vendor.id === selectedVendorId);
   const recentCredits = credits.slice(0, 6);
@@ -179,32 +210,38 @@ export default function VendorsPage() {
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
           <Card className="overflow-hidden p-0">
-            <div className="grid gap-3 border-b border-slate-200 px-4 py-3 lg:grid-cols-[minmax(220px,1fr)_auto]">
-              <label className="min-w-0">
-                <span className="sr-only">Search vendors</span>
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search vendors by name, email, type..."
-                  className="min-h-[40px] w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
-                />
-              </label>
-              <div className="flex gap-1 overflow-x-auto" role="group" aria-label="Vendor filters">
-                {(["all", "active", "inactive", "compliance", "credits"] as const).map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setFilter(item)}
-                    aria-pressed={filter === item}
-                    className={`min-h-[40px] whitespace-nowrap rounded-md px-3 text-sm font-medium capitalize transition-colors ${
-                      filter === item ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                  >
-                    {item === "compliance" ? "Gaps" : item === "credits" ? "Credits" : item}
-                  </button>
-                ))}
-              </div>
+            <div className="border-b border-line px-4 py-3">
+              <ListControls
+                search={query}
+                onSearchChange={setQuery}
+                searchPlaceholder="Search vendors by name, company, email, phone…"
+                searchLabel="Search vendors"
+                searchFields={VENDOR_SEARCH_FIELDS}
+                searchField={searchField}
+                onSearchFieldChange={setSearchField}
+                activeFilterCount={filter !== "all" ? 1 : 0}
+                onReset={() => { setQuery(""); setSearchField("all"); setFilter("all"); }}
+                canReset={query.trim() !== "" || filter !== "all" || searchField !== "all"}
+                resultCount={filteredVendors.length}
+                totalCount={vendors.length}
+                loading={loading}
+                filters={
+                  <FilterField label="Vendor status" htmlFor="vendor-filter">
+                    <select
+                      id="vendor-filter"
+                      value={filter}
+                      onChange={(event) => setFilter(event.target.value as VendorFilter)}
+                      className={filterControlClass}
+                    >
+                      <option value="all">All vendors</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                      <option value="compliance">Compliance gaps</option>
+                      <option value="credits">Open credits</option>
+                    </select>
+                  </FilterField>
+                }
+              />
             </div>
 
             {loading ? (

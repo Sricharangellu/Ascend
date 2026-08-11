@@ -17,10 +17,8 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { DataTable, type DataColumn } from "@/components/DataTable";
-import { Input } from "@/components/Input";
-import { Select } from "@/components/Select";
-import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
+import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
 import { formatMoney } from "@/lib/money";
 import { CustomerDetailPanel } from "./CustomerDetailPanel";
 import type { CustomerView } from "./CustomerDetailPanel";
@@ -85,24 +83,51 @@ interface Props {
   error: string | null;
 }
 
+/**
+ * Columns a customer search can be scoped to.
+ *
+ * This list filters an already-loaded set in the browser, so unlike the catalog
+ * these values map to fields compared here rather than to a query parameter.
+ * That is honest as long as the whole set is loaded — the moment this list is
+ * paginated server-side, these must become real query parameters or the scope
+ * will silently mean "within this page".
+ */
+const SEARCH_FIELDS: ListSearchField[] = [
+  { value: "all", label: "All columns" },
+  { value: "name", label: "Name" },
+  { value: "email", label: "Email" },
+  { value: "phone", label: "Phone" },
+  { value: "code", label: "Customer code" },
+];
+
 export function CustomerTable({ customers, loading, error }: Props) {
   const [query, setQuery] = useState("");
+  const [searchField, setSearchField] = useState("all");
   const [groupFilter, setGroupFilter] = useState<SegmentFilter>("All");
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return customers.filter((c) => {
-      const matchQ =
-        !q ||
-        c.name.toLowerCase().includes(q) ||
-        (c.email ?? "").toLowerCase().includes(q) ||
-        (c.phone ?? "").toLowerCase().includes(q) ||
-        customerCode(c.id, c.name).toLowerCase().includes(q);
+      const fields: Record<string, string> = {
+        name: c.name,
+        email: c.email ?? "",
+        phone: c.phone ?? "",
+        code: customerCode(c.id, c.name),
+      };
+      const haystack =
+        searchField === "all" ? Object.values(fields) : [fields[searchField] ?? ""];
+      const matchQ = !q || haystack.some((v) => v.toLowerCase().includes(q));
       return matchQ && (groupFilter === "All" || c.segment === groupFilter);
     });
-  }, [customers, query, groupFilter]);
+  }, [customers, query, searchField, groupFilter]);
 
-  const filtersActive = query.trim() !== "" || groupFilter !== "All";
+  const filtersActive = query.trim() !== "" || groupFilter !== "All" || searchField !== "all";
+
+  const reset = () => {
+    setQuery("");
+    setSearchField("all");
+    setGroupFilter("All");
+  };
 
   const columns = useMemo<DataColumn<CustomerView>[]>(
     () => [
@@ -195,38 +220,39 @@ export function CustomerTable({ customers, loading, error }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Filters. Live — there is no submit step, so there is no submit button. */}
-      <div className="flex flex-wrap items-end gap-3 rounded-container border border-line bg-surface-1 p-4">
-        <div className="min-w-[200px] flex-1">
-          <Input
-            type="search"
-            label="Search"
-            hint="Name, email, phone, or customer code"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search customers…"
-          />
-        </div>
-        <div className="w-48">
-          <Select
-            label="Customer group"
-            size="lg"
-            options={SEGMENT_OPTIONS}
-            value={groupFilter}
-            onChange={(e) => setGroupFilter(e.target.value as SegmentFilter)}
-          />
-        </div>
-        {filtersActive && (
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setQuery("");
-              setGroupFilter("All");
-            }}
-          >
-            Clear filters
-          </Button>
-        )}
+      {/* The shared list bar. Live — there is no submit step, so no submit button. */}
+      <div className="rounded-container border border-line bg-surface-1 p-4">
+        <ListControls
+          search={query}
+          onSearchChange={setQuery}
+          searchPlaceholder="Search customers by name, email, phone, code…"
+          searchLabel="Search customers"
+          searchFields={SEARCH_FIELDS}
+          searchField={searchField}
+          onSearchFieldChange={setSearchField}
+          activeFilterCount={groupFilter !== "All" ? 1 : 0}
+          onReset={reset}
+          canReset={filtersActive}
+          resultCount={visible.length}
+          totalCount={customers.length}
+          loading={loading}
+          filters={
+            <FilterField label="Customer group" htmlFor="customer-group">
+              <select
+                id="customer-group"
+                value={groupFilter}
+                onChange={(e) => setGroupFilter(e.target.value as SegmentFilter)}
+                className={filterControlClass}
+              >
+                {SEGMENT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </FilterField>
+          }
+        />
       </div>
 
       <DataTable

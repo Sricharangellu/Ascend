@@ -4,8 +4,12 @@ import { handler, parseBody, notFound, badRequest } from "../../shared/http.js";
 import type {
   CatalogService, ProductStatus, TaxClass, VariantChannel, VariantSortMode,
   PriceTarget, PriceOp, ProductTypeFilter, ProductSort, ListProductsQuery,
+  ProductSearchField,
 } from "./service.js";
-import { VARIANT_SORT_MODES, PRICE_OPS, PRODUCT_TYPE_FILTERS, PRODUCT_SORTS } from "./service.js";
+import {
+  VARIANT_SORT_MODES, PRICE_OPS, PRODUCT_TYPE_FILTERS, PRODUCT_SORTS,
+  PRODUCT_SEARCH_FIELDS,
+} from "./service.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import { requireRole } from "../../gateway/auth.js";
 import { parseCsv, toCsv } from "../../shared/csv.js";
@@ -264,6 +268,23 @@ function readSort(value: unknown): ProductSort | undefined {
 }
 
 /**
+ * Which column a search term is scoped to.
+ *
+ * Rejected rather than ignored on an unknown value: silently widening a scoped
+ * search back to every column returns MORE rows than the user asked for, and
+ * looks like the filter simply does not work.
+ */
+function readSearchField(value: unknown): ProductSearchField | undefined {
+  if (typeof value !== "string" || value === "") return undefined;
+  if (!PRODUCT_SEARCH_FIELDS.includes(value as ProductSearchField)) {
+    throw badRequest(
+      `invalid searchField '${value}'; expected one of ${PRODUCT_SEARCH_FIELDS.join(", ")}`,
+    );
+  }
+  return value as ProductSearchField;
+}
+
+/**
  * Read every product-list filter off the query string.
  *
  * Until 2026-08-11 this read only category/status/limit/offset — `q` and every
@@ -274,6 +295,7 @@ function readSort(value: unknown): ProductSort | undefined {
 function readQuery(req: Request): ListProductsQuery {
   return {
     q: readString(req.query.q),
+    searchField: readSearchField(req.query.searchField),
     category: readString(req.query.category),
     status: readStatusFilter(req.query.status),
     brand: readString(req.query.brand),

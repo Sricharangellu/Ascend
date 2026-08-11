@@ -296,6 +296,13 @@ export interface ListProductsQuery {
   excludeMasters?: boolean;
   /** Free-text search across identity, brand and every registered barcode. */
   q?: string;
+  /**
+   * Narrow `q` to one column ("Search → SKU"). Defaults to `all`.
+   *
+   * Without this the list UI's column selector would be decorative — the
+   * server would search every column whatever the user picked.
+   */
+  searchField?: ProductSearchField;
   brand?: string;
   taxClass?: TaxClass;
   ageRestricted?: boolean;
@@ -829,7 +836,7 @@ export class CatalogService {
 
     let rank: string | null = null;
     if (query.q && use("q")) {
-      const search = buildProductSearch(query.q, tenantId, params);
+      const search = buildProductSearch(query.q, tenantId, params, query.searchField ?? "all");
       if (search) {
         where.push(`(${search.predicate})`);
         rank = search.rank;
@@ -1945,6 +1952,40 @@ const SEARCH_COLUMNS: readonly string[] = [
   "alternative_name", "model_name", "tags", "vendor_upc", "category",
 ];
 
+/**
+ * Column-scoped search: what each selectable field actually matches.
+ *
+ * The list UI lets the user narrow a search to one column ("Search → SKU").
+ * That control is only honest if the narrowing happens in SQL, so each option
+ * maps here to the concrete product columns it searches. `all` is the default
+ * and keeps the historical behaviour (every column in SEARCH_COLUMNS plus the
+ * alternate-barcode table).
+ *
+ * `barcode` is deliberately more than `products.barcode`: alternate, case and
+ * vendor UPCs live in `product_barcodes`, and a user who scopes a search to
+ * "UPC" means any of them — scoping to the column would make scanning a case
+ * UPC return nothing while "All columns" found it, which reads as a bug.
+ */
+const SEARCH_FIELD_COLUMNS = {
+  name: ["name", "alternative_name", "model_name"],
+  sku: ["sku"],
+  barcode: ["barcode", "vendor_upc"],
+  brand: ["brand", "manufacturer"],
+  category: ["category"],
+  tags: ["tags"],
+} as const satisfies Record<string, readonly string[]>;
+
+/** Search fields the catalog list accepts, `all` plus every scoped column. */
+export const PRODUCT_SEARCH_FIELDS = [
+  "all",
+  ...(Object.keys(SEARCH_FIELD_COLUMNS) as (keyof typeof SEARCH_FIELD_COLUMNS)[]),
+] as const;
+
+export type ProductSearchField = (typeof PRODUCT_SEARCH_FIELDS)[number];
+
+/** Fields whose scope includes the alternate-barcode table. */
+const FIELDS_SEARCHING_BARCODE_TABLE: readonly ProductSearchField[] = ["all", "barcode"];
+
 /** More tokens than this stops adding signal and starts costing scans. */
 const MAX_SEARCH_TOKENS = 5;
 
@@ -1968,8 +2009,17 @@ interface SearchSql {
  * burying it under name matches.
  *
  * Returns null for a blank query (caller then applies no search at all).
+ *
+ * `field` narrows which columns are matched. It only changes the predicate —
+ * ranking is left alone, because relevance ordering within a scoped result set
+ * is still the ordering the user wants (an exact SKU hit above a prefix one).
  */
-function buildProductSearch(raw: string, tenantId: string, params: Record<string, unknown>): SearchSql | null {
+function buildProductSearch(
+  raw: string,
+  tenantId: string,
+  params: Record<string, unknown>,
+  field: ProductSearchField = "all",
+): SearchSql | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
 
@@ -1982,11 +2032,15 @@ function buildProductSearch(raw: string, tenantId: string, params: Record<string
   const tokens = trimmed.split(/\s+/).filter(Boolean).slice(0, MAX_SEARCH_TOKENS);
   if (tokens.length === 0) return null;
 
+  const searchColumns: readonly string[] =
+    field === "all" ? SEARCH_COLUMNS : SEARCH_FIELD_COLUMNS[field];
+  const searchesBarcodeTable = FIELDS_SEARCHING_BARCODE_TABLE.includes(field);
+
   const clauses: string[] = [];
   tokens.forEach((token, i) => {
     const key = `sq${i}`;
     params[key] = `%${escapeLike(token)}%`;
-    const cols = SEARCH_COLUMNS.map((c) => `products.${c} ILIKE @${key}`);
+    const cols = searchColumns.map((c) => `products.${c} ILIKE @${key}`);
     // Alternate/case/vendor UPCs live in their own table; a scan of any of them
     // has to find the product, not just a scan of products.barcode.
     //
@@ -1998,11 +2052,13 @@ function buildProductSearch(raw: string, tenantId: string, params: Record<string
     // 50k catalog: 202ms → 122ms for the row query, 182ms → 163ms for the
     // count. Identical results, including for a term that matches only an
     // alternate barcode — see the barcode tests in catalog.test.ts.
-    cols.push(
-      `products.id IN (SELECT pbs.product_id FROM product_barcodes pbs
-                        WHERE pbs.tenant_id = @tenantId
-                          AND pbs.barcode ILIKE @${key})`,
-    );
+    if (searchesBarcodeTable) {
+      cols.push(
+        `products.id IN (SELECT pbs.product_id FROM product_barcodes pbs
+                          WHERE pbs.tenant_id = @tenantId
+                            AND pbs.barcode ILIKE @${key})`,
+      );
+    }
     clauses.push(`(${cols.join(" OR ")})`);
   });
 

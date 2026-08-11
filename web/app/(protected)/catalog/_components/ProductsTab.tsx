@@ -13,8 +13,9 @@ import { apiGet, apiPost, apiDelete, ApiResponseError } from "@/api-client/clien
 import { formatMoney } from "@/lib/money";
 import type {
   CatalogProduct, Category, ProductStatus, ProductsResponse,
-  ProductFacets, ProductSort, ProductTypeFilter,
+  ProductFacets, ProductSort, ProductTypeFilter, ProductSearchField,
 } from "@/api-client/types";
+import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
 import { ProductFormModal } from "./ProductFormModal";
 import { PrintLabelsModal } from "./PrintLabelsModal";
 import { ImportCSVModal } from "./ImportCSVModal";
@@ -139,6 +140,9 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   const [filterCategory, setFilterCategory] = useState("");
   const [search, setSearch]                 = useState("");
   const [debouncedQ, setDebouncedQ]         = useState("");
+  // Which column the term is matched against. Sent to the server, which 400s on
+  // a value it does not implement — so this list may only offer real columns.
+  const [searchField, setSearchField]       = useState<ProductSearchField>("all");
 
   const [filterTaxClass, setFilterTaxClass]           = useState("");
   const [filterBrand, setFilterBrand]                 = useState("");
@@ -200,7 +204,10 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
     return "Standalone";
   }, []);
 
-  const hasFilters = Boolean(filterStatus || filterCategory || debouncedQ || filterTaxClass || filterBrand || filterSupplier || filterAgeRestricted || filterProductType !== "all" || priceMin || priceMax);
+  // Drives whether Reset does anything. Includes the search scope and an
+  // explicit sort: both change what the user sees, so leaving them out would
+  // make Reset look spent while the list was still narrowed or reordered.
+  const hasFilters = Boolean(filterStatus || filterCategory || debouncedQ || filterTaxClass || filterBrand || filterSupplier || filterAgeRestricted || filterProductType !== "all" || priceMin || priceMax || searchField !== "all" || sortCol);
 
   /**
    * The active filters, as removable chips. Each carries its own `clear` so one
@@ -236,11 +243,36 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
 
   const clearFilters = () => {
     setFilterStatus(""); setFilterCategory(""); setSearch(""); setDebouncedQ("");
+    setSearchField("all");
     setFilterTaxClass(""); setFilterBrand(""); setFilterSupplier(""); setFilterAgeRestricted(false);
     setFilterProductType("all");
     setPriceMin(""); setPriceMax("");
+    setSortCol(null); setSortDir("asc");
     setPage(0);
   };
+
+  /**
+   * Columns the user can scope a search to.
+   *
+   * Every value here is one the catalog endpoint implements; adding an option
+   * the server does not know would make the search 400 the moment it is picked.
+   */
+  const SEARCH_FIELDS: ListSearchField[] = [
+    { value: "all",      label: "All columns" },
+    { value: "name",     label: "Product name" },
+    { value: "sku",      label: "SKU" },
+    { value: "barcode",  label: "UPC / barcode" },
+    { value: "brand",    label: "Brand" },
+    { value: "category", label: "Category" },
+    { value: "tags",     label: "Tags" },
+  ];
+
+  // Search text is shown separately (in the box, and as its own chip), so the
+  // badge counts filters only — otherwise typing appears to add a filter.
+  const activeFilterCount =
+    (filterStatus ? 1 : 0) + (filterCategory ? 1 : 0) + (filterBrand ? 1 : 0) +
+    (filterSupplier ? 1 : 0) + (filterTaxClass ? 1 : 0) + (filterAgeRestricted ? 1 : 0) +
+    (filterProductType !== "all" ? 1 : 0) + (priceMin || priceMax ? 1 : 0);
 
   const openCreate = () => {
     setActionError(null);
@@ -295,6 +327,9 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   const filterParams = useCallback(() => {
     const params = new URLSearchParams();
     if (debouncedQ)     params.set("q",           debouncedQ);
+    // Only meaningful alongside a term, and omitting it when unscoped keeps the
+    // request identical to what it was before column search existed.
+    if (debouncedQ && searchField !== "all") params.set("searchField", searchField);
     if (filterStatus)   params.set("status",      filterStatus);
     if (filterCategory) params.set("category",    filterCategory);
     if (filterBrand)    params.set("brand",       filterBrand);
@@ -305,7 +340,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
     if (priceMin)       params.set("minPrice",    priceMin);
     if (priceMax)       params.set("maxPrice",    priceMax);
     return params;
-  }, [debouncedQ, filterStatus, filterCategory, filterBrand, filterSupplier,
+  }, [debouncedQ, searchField, filterStatus, filterCategory, filterBrand, filterSupplier,
       filterTaxClass, filterAgeRestricted, filterProductType, priceMin, priceMax]);
 
   const load = useCallback(async () => {
@@ -475,119 +510,130 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
           </button>
         </div>
 
-        {/* ── Spec: standard filter bar ────────────────────────────────────── */}
-        <div className="border-b border-[#E8E8E8] bg-white px-5 py-3">
-          <div className="flex flex-wrap items-end gap-3">
-            {/* Name / SKU */}
-            <div className="flex flex-col gap-1">
-              <label htmlFor="catalog-search" className="text-xs font-medium text-[#555]">Name or SKU</label>
-              <input id="catalog-search" type="search" value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="Search…"
-                className="h-9 w-full rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600 sm:w-44" />
-            </div>
-            {/* Category — options come from the catalog's own data, with counts,
-                so the list only ever offers a refinement that returns rows. */}
-            <div className="flex flex-col gap-1">
-              <label htmlFor="catalog-category" className="text-xs font-medium text-[#555]">Category</label>
-              <select id="catalog-category" value={filterCategory} onChange={e => withPageReset(setFilterCategory)(e.target.value)}
-                className="h-9 min-w-36 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
-                <option value="">All categories</option>
-                {(facets?.category.length ? facets.category.map(b => ({ id: b.value, name: b.value, count: b.count }))
-                                          : categories.map(c => ({ id: c.id, name: c.name, count: null as number | null })))
-                  .map(c => (
-                    <option key={c.id} value={c.name}>
-                      {c.name}{c.count != null ? ` (${c.count})` : ""}
-                    </option>
-                  ))}
-              </select>
-            </div>
-            {/* Product type */}
-            <div className="flex flex-col gap-1">
-              <label htmlFor="catalog-type" className="text-xs font-medium text-[#555]">Product type</label>
-              <select id="catalog-type" value={filterProductType} onChange={e => withPageReset(setFilterProductType)(e.target.value as typeof filterProductType)}
-                className="h-9 min-w-36 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
-                <option value="all">All types</option>
-                <option value="standalone">Standalone{facets ? ` (${standaloneCount})` : ""}</option>
-                <option value="master">Master{facets ? ` (${masterCount})` : ""}</option>
-                <option value="variant">Variant{facets ? ` (${variantCount})` : ""}</option>
-              </select>
-            </div>
-            {/* Brand — a datalist keeps free-text matching while surfacing the
-                brands this catalog actually carries. */}
-            <div className="flex flex-col gap-1">
-              <label htmlFor="catalog-brand" className="text-xs font-medium text-[#555]">Brand</label>
-              <input id="catalog-brand" type="text" list="catalog-brand-options" value={filterBrand}
-                onChange={e => withPageReset(setFilterBrand)(e.target.value)} placeholder="Brand…"
-                className="h-9 w-full rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none sm:w-32" />
-              <datalist id="catalog-brand-options">
-                {facets?.brand.map(b => <option key={b.value} value={b.value}>{`${b.value} (${b.count})`}</option>)}
-              </datalist>
-            </div>
-            {/* Status */}
-            <div className="flex flex-col gap-1">
-              <label htmlFor="catalog-status" className="text-xs font-medium text-[#555]">Status</label>
-              <select id="catalog-status" value={filterStatus} onChange={e => withPageReset(setFilterStatus)(e.target.value)}
-                className="h-9 min-w-32 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
-                <option value="">All</option>
-                <option value="active">Active{facets ? ` (${activeCount})` : ""}</option>
-                <option value="draft">Draft{facets ? ` (${draftCount})` : ""}</option>
-                <option value="archived">Archived{facets ? ` (${archivedCount})` : ""}</option>
-              </select>
-            </div>
-            {/* More filters */}
-            {showMoreFilters && (
+        {/* ── Search, column scope, filters, reset — the shared ListControls ──
+            This bar used to be hand-rolled here: nine controls laid out inline,
+            a "More filters" disclosure, and a bespoke "Clear filters". It is the
+            shared component now so the catalog, customers and every other list
+            behave identically, and so the column selector below maps to a real
+            server parameter rather than being decoration. */}
+        <div className="border-b border-line bg-surface-1 px-5 py-3">
+          <ListControls
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search products, SKU, UPC, brand…"
+            searchLabel="Search products"
+            searchFields={SEARCH_FIELDS}
+            searchField={searchField}
+            onSearchFieldChange={(value) => {
+              setSearchField(value as ProductSearchField);
+              setPage(0);
+            }}
+            activeFilterCount={activeFilterCount}
+            onReset={clearFilters}
+            canReset={hasFilters}
+            resultCount={products.length}
+            totalCount={total}
+            loading={loading}
+            filters={
               <>
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="catalog-supplier" className="text-xs font-medium text-[#555]">Supplier</label>
+                {/* Options come from the catalog's own data, with counts, so the
+                    list only ever offers a refinement that returns rows. */}
+                <FilterField label="Category" htmlFor="catalog-category">
+                  <select id="catalog-category" value={filterCategory} onChange={e => withPageReset(setFilterCategory)(e.target.value)}
+                    className={filterControlClass}>
+                    <option value="">All categories</option>
+                    {(facets?.category.length ? facets.category.map(b => ({ id: b.value, name: b.value, count: b.count }))
+                                              : categories.map(c => ({ id: c.id, name: c.name, count: null as number | null })))
+                      .map(c => (
+                        <option key={c.id} value={c.name}>
+                          {c.name}{c.count != null ? ` (${c.count})` : ""}
+                        </option>
+                      ))}
+                  </select>
+                </FilterField>
+
+                <FilterField label="Status" htmlFor="catalog-status">
+                  <select id="catalog-status" value={filterStatus} onChange={e => withPageReset(setFilterStatus)(e.target.value)}
+                    className={filterControlClass}>
+                    <option value="">All</option>
+                    <option value="active">Active{facets ? ` (${activeCount})` : ""}</option>
+                    <option value="draft">Draft{facets ? ` (${draftCount})` : ""}</option>
+                    <option value="archived">Archived{facets ? ` (${archivedCount})` : ""}</option>
+                  </select>
+                </FilterField>
+
+                <FilterField label="Product type" htmlFor="catalog-type">
+                  <select id="catalog-type" value={filterProductType} onChange={e => withPageReset(setFilterProductType)(e.target.value as typeof filterProductType)}
+                    className={filterControlClass}>
+                    <option value="all">All types</option>
+                    <option value="standalone">Standalone{facets ? ` (${standaloneCount})` : ""}</option>
+                    <option value="master">Master{facets ? ` (${masterCount})` : ""}</option>
+                    <option value="variant">Variant{facets ? ` (${variantCount})` : ""}</option>
+                  </select>
+                </FilterField>
+
+                {/* A datalist keeps free-text matching while surfacing the
+                    brands this catalog actually carries. */}
+                <FilterField label="Brand" htmlFor="catalog-brand">
+                  <input id="catalog-brand" type="text" list="catalog-brand-options" value={filterBrand}
+                    onChange={e => withPageReset(setFilterBrand)(e.target.value)} placeholder="Any brand"
+                    className={filterControlClass} />
+                  <datalist id="catalog-brand-options">
+                    {facets?.brand.map(b => <option key={b.value} value={b.value}>{`${b.value} (${b.count})`}</option>)}
+                  </datalist>
+                </FilterField>
+
+                <FilterField label="Supplier" htmlFor="catalog-supplier">
                   <input id="catalog-supplier" type="text" list="catalog-supplier-options" value={filterSupplier}
-                    onChange={e => withPageReset(setFilterSupplier)(e.target.value)} placeholder="Supplier…"
-                    className="h-9 w-full rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none sm:w-36" />
+                    onChange={e => withPageReset(setFilterSupplier)(e.target.value)} placeholder="Any supplier"
+                    className={filterControlClass} />
                   <datalist id="catalog-supplier-options">
                     {facets?.supplier.map(b => <option key={b.value} value={b.value}>{`${b.value} (${b.count})`}</option>)}
                   </datalist>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="catalog-tax" className="text-xs font-medium text-[#555]">Tax class</label>
+                </FilterField>
+
+                <FilterField label="Tax class" htmlFor="catalog-tax">
                   <select id="catalog-tax" value={filterTaxClass} onChange={e => withPageReset(setFilterTaxClass)(e.target.value)}
-                    className="h-9 min-w-32 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
+                    className={filterControlClass}>
                     <option value="">All</option>
                     <option value="standard">Standard</option>
                     <option value="exempt">Exempt</option>
                   </select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="catalog-age" className="text-xs font-medium text-[#555]">Age restricted</label>
+                </FilterField>
+
+                <FilterField label="Age restricted" htmlFor="catalog-age">
                   <select id="catalog-age" value={filterAgeRestricted ? "1" : "0"} onChange={e => withPageReset(setFilterAgeRestricted)(e.target.value === "1")}
-                    className="h-9 min-w-32 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
+                    className={filterControlClass}>
                     <option value="0">All</option>
                     <option value="1">18+ only{facets ? ` (${restrictedCount})` : ""}</option>
                   </select>
-                </div>
+                </FilterField>
+
                 <fieldset className="flex flex-col gap-1">
-                  <legend className="text-xs font-medium text-[#555]">
+                  <legend className="text-xs font-medium text-content-secondary">
                     Price range{facets?.priceRange ? ` (${formatMoney(facets.priceRange.min)}–${formatMoney(facets.priceRange.max)})` : ""}
                   </legend>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-2">
                     <input type="number" min="0" step="0.01" value={priceMin} onChange={e => withPageReset(setPriceMin)(e.target.value)}
-                      aria-label="Minimum price in dollars" placeholder="Min"
-                      className="h-9 w-20 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none" />
-                    <span aria-hidden="true" className="text-xs text-[#888]">–</span>
+                      aria-label="Minimum price in dollars" placeholder="Min" className={filterControlClass} />
+                    <span aria-hidden="true" className="text-xs text-content-muted">–</span>
                     <input type="number" min="0" step="0.01" value={priceMax} onChange={e => withPageReset(setPriceMax)(e.target.value)}
-                      aria-label="Maximum price in dollars" placeholder="Max"
-                      className="h-9 w-20 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none" />
+                      aria-label="Maximum price in dollars" placeholder="Max" className={filterControlClass} />
                   </div>
                 </fieldset>
               </>
-            )}
-            {/* Actions */}
-            <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
-              <button type="button" onClick={clearFilters} disabled={!hasFilters} className="min-h-9 text-sm text-brand-600 hover:underline disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600">Clear filters</button>
-              <button type="button" onClick={() => setShowMoreFilters(v => !v)} aria-expanded={showMoreFilters}
-                className="min-h-9 text-sm text-brand-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600">
-                {showMoreFilters ? "Fewer filters" : "More filters"}
-              </button>
-            </div>
-          </div>
+            }
+            trailing={
+              <>
+                {someSelected && (
+                  <Button size="sm" variant="secondary" onClick={() => setShowPrintLabels(true)}>
+                    Labels ({selectedIds.size})
+                  </Button>
+                )}
+                <Button size="sm" variant="secondary" onClick={handleExportCSV}>Export CSV</Button>
+              </>
+            }
+          />
 
           {/* Active filters — each chip removes only itself. Filters apply as
               they change (debounced for text), so there is no "Search" button
@@ -595,35 +641,26 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
           {activeChips.length > 0 && (
             <div className="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label="Active filters">
               {activeChips.map(chip => (
-                <span key={chip.key} className="inline-flex items-center gap-1 rounded-full bg-brand-50 py-0.5 pl-2.5 pr-1 text-xs font-medium text-brand-700 ring-1 ring-brand-200">
+                <span key={chip.key} className="inline-flex items-center gap-1 rounded-full bg-accent-50 py-0.5 pl-2.5 pr-1 text-xs font-medium text-accent-700 ring-1 ring-accent-200">
                   {chip.label}
                   <button type="button" onClick={() => { chip.clear(); setPage(0); }} aria-label={`Remove filter ${chip.label}`}
-                    className="flex h-5 w-5 items-center justify-center rounded-full text-brand-600 hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600">
+                    className="focus-ring flex h-5 w-5 items-center justify-center rounded-full text-accent-600 hover:bg-accent-100">
                     <span aria-hidden="true">×</span>
                   </button>
                 </span>
               ))}
               <button type="button" onClick={clearFilters}
-                className="text-xs text-[#666] underline hover:text-[#111] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600">
+                className="focus-ring rounded-control text-xs text-content-secondary underline hover:text-content-primary">
                 Clear all
               </button>
             </div>
           )}
 
-          {/* Results count */}
-          <div className="mt-2 flex items-center justify-between text-xs text-[#666]">
-            <span aria-live="polite">
-              {total === 0 ? "No products" : <>Showing <strong>{products.length}</strong> of {total} product{total === 1 ? "" : "s"}</>}
-              {someSelected && <span className="ml-2 text-brand-600">· {selectedIds.size} selected</span>}
-            </span>
-            <div className="flex items-center gap-3">
-              {someSelected && (
-                <button type="button" onClick={() => setShowPrintLabels(true)}
-                  className="text-brand-600 hover:underline">Labels ({selectedIds.size})</button>
-              )}
-              <button type="button" onClick={handleExportCSV} className="text-brand-600 hover:underline">Export CSV</button>
-            </div>
-          </div>
+          {someSelected && (
+            <p className="mt-2 text-xs font-medium text-accent-700 tnum" aria-live="polite">
+              {selectedIds.size} selected
+            </p>
+          )}
         </div>
 
 

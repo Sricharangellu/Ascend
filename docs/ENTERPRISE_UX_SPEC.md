@@ -69,6 +69,42 @@ only; new work uses `DataTable`.
 
 Every empty state must offer a next action. On a new tenant the entire first session is empty states.
 
+### List controls — search, column scope, filters, reset
+
+`ListControls` is the one toolbar above a list. Before it, 24 pages had a search box and no
+two behaved the same: some debounced and some did not, some queried the server and some
+filtered the page React happened to be holding, "Clear filters" existed on a handful and
+reset a different subset on each, and **none** let the user choose which column they were
+searching. It renders:
+
+```
+[ 🔍 Search products, SKU, UPC…  ×] [ All columns ▾ ]   [ Filter · 3 ]  [ Reset ]
+```
+
+- **Column scope is a contract, not a control.** `searchFields` values must be ones the
+  data source actually implements. For a server-backed list that means a real query
+  parameter — `GET /api/v1/catalog?searchField=sku` — which **400s** on a field it does not
+  know rather than silently widening to `all`. For a list that loads its whole set and
+  filters in the browser, scoping the compared fields is equally honest, but the page must
+  say so in a comment and move it server-side the moment that endpoint paginates. An
+  option the data source ignores is the fake control this component exists to remove.
+- **Filters are contextual.** Pass only filters that apply to the current dataset, wrapped
+  in `FilterField` with `filterControlClass` so every page's popover matches. The popover
+  is a labelled `role="dialog"`: Escape closes it and focus returns to the trigger.
+- **Reset clears everything** — search text, column scope, every filter, sort where the
+  page owns one, and back to page 1. It is **disabled, not hidden**, when nothing is
+  active, so the toolbar does not reflow as filters come and go.
+- The active-filter count is announced (`3 active filters`), not left as a bare number,
+  and the result count sits in a polite live region that names the active scope.
+
+`useListQuery` is the matching state model, and the rules it guarantees are the ones that
+were being re-decided per page: any change to search / scope / filter / sort / page size
+returns to page 1 **in the same render** (doing it in an effect fetches twice and flashes
+the wrong rows), the search term debounces separately from the input, `reset()` restores
+from `defaultFilters` wholesale so a filter added later is covered without editing it, and
+URL sync — opt in with `urlKey` — uses `history.replaceState`, never a router push, because
+filters are view state and a push puts a history entry behind every keystroke.
+
 ---
 
 ## 1. Global UI/UX Principles

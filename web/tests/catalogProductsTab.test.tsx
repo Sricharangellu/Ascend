@@ -91,13 +91,25 @@ function lastListQuery(): URLSearchParams {
   return new URLSearchParams(listCalls[listCalls.length - 1].split("?")[1] ?? "");
 }
 
+/**
+ * Open the shared filter popover.
+ *
+ * The nine filters used to sit inline in a bespoke bar (with a "More filters"
+ * disclosure hiding four of them). They live in `ListControls`' popover now, so
+ * every filter is one click away instead of two-for-some-and-one-for-others.
+ */
+async function openFilters(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: /^filter/i }));
+  await screen.findByRole("dialog", { name: /filters/i });
+}
+
 describe("ProductsTab — server-side query", () => {
   it("sends the search term to the API instead of filtering locally", async () => {
     const user = userEvent.setup();
     render(<ProductsTab categories={CATEGORIES} />);
     await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
 
-    await user.type(screen.getByLabelText("Name or SKU"), "coke");
+    await user.type(screen.getByLabelText("Search products"), "coke");
     await waitFor(() => expect(lastListQuery().get("q")).toBe("coke"), { timeout: 3000 });
   });
 
@@ -105,6 +117,7 @@ describe("ProductsTab — server-side query", () => {
     const user = userEvent.setup();
     render(<ProductsTab categories={CATEGORIES} />);
     await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
+    await openFilters(user);
 
     await user.selectOptions(screen.getByLabelText("Product type"), "master");
     await waitFor(() => expect(lastListQuery().get("productType")).toBe("master"));
@@ -112,7 +125,6 @@ describe("ProductsTab — server-side query", () => {
     await user.type(screen.getByLabelText("Brand"), "Coca");
     await waitFor(() => expect(lastListQuery().get("brand")).toBe("Coca"));
 
-    await user.click(screen.getByRole("button", { name: "More filters" }));
     await user.selectOptions(screen.getByLabelText("Tax class"), "exempt");
     await waitFor(() => expect(lastListQuery().get("taxClass")).toBe("exempt"));
 
@@ -121,6 +133,44 @@ describe("ProductsTab — server-side query", () => {
 
     await user.type(screen.getByLabelText("Supplier"), "ABC");
     await waitFor(() => expect(lastListQuery().get("supplier")).toBe("ABC"));
+  });
+
+  it("sends the chosen search column, and only alongside a term", async () => {
+    const user = userEvent.setup();
+    render(<ProductsTab categories={CATEGORIES} />);
+    await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
+
+    // Scoping with an empty box must not narrow anything — there is nothing to
+    // narrow, and sending it would make the request differ from the old one for
+    // no reason.
+    await user.selectOptions(screen.getByLabelText(/search in which column/i), "sku");
+    await waitFor(() => expect(lastListQuery().get("searchField")).toBeNull());
+
+    await user.type(screen.getByLabelText("Search products"), "BEV");
+    await waitFor(() => {
+      const q = lastListQuery();
+      expect(q.get("q")).toBe("BEV");
+      // The parameter the server implements. If this is ever dropped, the
+      // column selector becomes decoration again.
+      expect(q.get("searchField")).toBe("sku");
+    }, { timeout: 3000 });
+  });
+
+  it("keeps the facet request scoped to the same search column as the list", async () => {
+    const user = userEvent.setup();
+    render(<ProductsTab categories={CATEGORIES} />);
+    await waitFor(() => expect(facetCalls.length).toBeGreaterThan(0));
+
+    await user.selectOptions(screen.getByLabelText(/search in which column/i), "brand");
+    await user.type(screen.getByLabelText("Search products"), "Coca");
+
+    await waitFor(() => {
+      const facetQuery = new URLSearchParams(facetCalls[facetCalls.length - 1].split("?")[1] ?? "");
+      // Counts drawn from a wider set than the rows beneath them is the bug
+      // this asserts against.
+      expect(facetQuery.get("searchField")).toBe("brand");
+      expect(facetQuery.get("q")).toBe("Coca");
+    }, { timeout: 3000 });
   });
 
   it("sends sort and direction to the API, and toggles direction on re-click", async () => {
@@ -144,7 +194,7 @@ describe("ProductsTab — server-side query", () => {
     render(<ProductsTab categories={CATEGORIES} />);
     await waitFor(() => expect(lastListQuery().get("sort")).toBe("name"));
 
-    await user.type(screen.getByLabelText("Name or SKU"), "049000028904");
+    await user.type(screen.getByLabelText("Search products"), "049000028904");
     await waitFor(() => expect(lastListQuery().get("sort")).toBe("relevance"), { timeout: 3000 });
   });
 
@@ -164,6 +214,7 @@ describe("ProductsTab — server-side query", () => {
     render(<ProductsTab categories={CATEGORIES} />);
     await waitFor(() => expect(facetCalls.length).toBeGreaterThan(0));
 
+    await openFilters(userEvent.setup());
     const select = screen.getByLabelText("Category") as HTMLSelectElement;
     const labels = [...select.options].map((o) => o.textContent);
     expect(labels).toContain("beverages (420)");
@@ -175,6 +226,7 @@ describe("ProductsTab — server-side query", () => {
     render(<ProductsTab categories={CATEGORIES} />);
     await waitFor(() => expect(facetCalls.length).toBeGreaterThan(0));
 
+    await openFilters(user);
     await user.selectOptions(screen.getByLabelText("Status"), "draft");
     await waitFor(() => {
       const facetQuery = new URLSearchParams(facetCalls[facetCalls.length - 1].split("?")[1] ?? "");
@@ -189,6 +241,7 @@ describe("ProductsTab — active filter chips", () => {
     render(<ProductsTab categories={CATEGORIES} />);
     await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
 
+    await openFilters(user);
     await user.selectOptions(screen.getByLabelText("Status"), "active");
     await user.selectOptions(screen.getByLabelText("Product type"), "variant");
     await waitFor(() => {
