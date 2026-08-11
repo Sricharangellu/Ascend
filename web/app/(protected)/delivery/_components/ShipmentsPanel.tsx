@@ -12,6 +12,7 @@ import { Input } from "@/components/Input";
 import { apiGet, apiPost } from "@/api-client/client";
 import { useToast } from "@/components/Toast";
 import type { Shipment } from "@/api-client/types";
+import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
 
 const STATUS_BADGE: Record<string, "yellow" | "blue" | "green" | "red" | "gray"> = {
   pending_shipment: "yellow",
@@ -31,6 +32,14 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
+/** Columns a shipment search can be scoped to. Filters the loaded shipment list. */
+const SHIPMENT_SEARCH_FIELDS: ListSearchField[] = [
+  { value: "all", label: "All columns" },
+  { value: "ship", label: "Ship #" },
+  { value: "carrier", label: "Carrier" },
+  { value: "tracking", label: "Tracking #" },
+];
+
 export function ShipmentsPanel() {
   const [items, setItems] = useState<Shipment[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +49,7 @@ export function ShipmentsPanel() {
   const [trackingNumber, setTrackingNumber] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
+  const [searchField, setSearchField] = useState("all");
   const { addToast } = useToast();
 
   const load = useCallback(async () => {
@@ -116,11 +126,15 @@ export function ShipmentsPanel() {
     if (statusFilter !== "all" && s.status !== statusFilter) return false;
     if (search.trim()) {
       const q = search.toLowerCase();
-      return (
-        s.ship_number.toLowerCase().includes(q) ||
-        (s.carrier ?? "").toLowerCase().includes(q) ||
-        (s.tracking_number ?? "").toLowerCase().includes(q)
-      );
+      // Scoped search narrows which column is compared, across the whole
+      // loaded shipment list.
+      const fields: Record<string, string> = {
+        ship: s.ship_number,
+        carrier: s.carrier ?? "",
+        tracking: s.tracking_number ?? "",
+      };
+      const haystack = searchField === "all" ? Object.values(fields) : [fields[searchField] ?? ""];
+      return haystack.some((v) => v.toLowerCase().includes(q));
     }
     return true;
   });
@@ -155,33 +169,30 @@ export function ShipmentsPanel() {
       )}
 
       <Card className="overflow-hidden p-0">
-        <div className="flex flex-wrap items-center gap-3 border-b border-erp-table-border px-4 py-3">
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search ship #, carrier, tracking…"
-            className="w-56"
-            aria-label="Search shipments"
+        <div className="border-b border-line px-4 py-3">
+          <ListControls
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search ship #, carrier, tracking…"
+            searchLabel="Search shipments"
+            searchFields={SHIPMENT_SEARCH_FIELDS}
+            searchField={searchField}
+            onSearchFieldChange={setSearchField}
+            activeFilterCount={statusFilter !== "all" ? 1 : 0}
+            onReset={() => { setSearch(""); setSearchField("all"); setStatusFilter("all"); }}
+            canReset={search.trim() !== "" || searchField !== "all" || statusFilter !== "all"}
+            resultCount={filtered.length}
+            totalCount={items.length}
+            filters={
+              <FilterField label="Shipment status" htmlFor="ship-status">
+                <select id="ship-status" value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                  className={filterControlClass}>
+                  {STATUS_FILTERS.map((f) => <option key={f} value={f}>{STATUS_LABEL[f]}</option>)}
+                </select>
+              </FilterField>
+            }
           />
-          <div className="flex overflow-hidden rounded-lg border border-erp-table-border text-xs" role="group" aria-label="Status filter">
-            {STATUS_FILTERS.map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setStatusFilter(f)}
-                className={`min-h-touch px-3 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 ${
-                  statusFilter === f
-                    ? "bg-brand-600 text-white"
-                    : "bg-white text-erp-text-secondary hover:bg-erp-page"
-                }`}
-              >
-                {STATUS_LABEL[f]}
-              </button>
-            ))}
-          </div>
-          <span className="ml-auto text-xs text-erp-text-secondary">
-            {filtered.length} of {items.length}
-          </span>
         </div>
 
         <div className="overflow-x-auto">

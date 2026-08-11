@@ -6,6 +6,15 @@ import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import type { StoreLocation, StoreMap, ProductLocation } from "@/api-client/types";
+import { ListControls, type ListSearchField } from "@/components/ListControls";
+
+/** Columns a product-location search can be scoped to. Filters the loaded set. */
+const LOCATION_SEARCH_FIELDS: ListSearchField[] = [
+  { value: "all", label: "All columns" },
+  { value: "product", label: "Product name" },
+  { value: "sku", label: "SKU" },
+  { value: "location", label: "Location" },
+];
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -183,6 +192,7 @@ export default function InventoryLocationsPage() {
   const [showBulk, setShowBulk] = useState(false);
   const [expandedAisle, setExpandedAisle] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [searchField, setSearchField] = useState("all");
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -206,7 +216,11 @@ export default function InventoryLocationsPage() {
   const filteredLocs = productLocs.filter((pl) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
-    return pl.product_name.toLowerCase().includes(q) || pl.product_sku.toLowerCase().includes(q) || pl.label.toLowerCase().includes(q);
+    const fields: Record<string, string> = {
+      product: pl.product_name, sku: pl.product_sku, location: pl.label,
+    };
+    const haystack = searchField === "all" ? Object.values(fields) : [fields[searchField] ?? ""];
+    return haystack.some((v) => v.toLowerCase().includes(q));
   });
 
   const totalProducts = productLocs.length;
@@ -329,12 +343,19 @@ export default function InventoryLocationsPage() {
         ) : (
           /* ── Product List View ── */
           <div className="space-y-3">
-            <input
-              type="search"
-              placeholder="Search by product name, SKU, or location…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full max-w-md rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <ListControls
+              search={search}
+              onSearchChange={setSearch}
+              searchPlaceholder="Search by product name, SKU, or location…"
+              searchLabel="Search product locations"
+              searchFields={LOCATION_SEARCH_FIELDS}
+              searchField={searchField}
+              onSearchFieldChange={setSearchField}
+              onReset={() => { setSearch(""); setSearchField("all"); }}
+              canReset={search.trim() !== "" || searchField !== "all"}
+              resultCount={filteredLocs.length}
+              totalCount={productLocs.length}
+              loading={loading}
             />
             <Card className="overflow-hidden p-0">
               {filteredLocs.length === 0 ? (

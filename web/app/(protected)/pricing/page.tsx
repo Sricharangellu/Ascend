@@ -6,6 +6,23 @@ import { apiGet, apiPost, safeLoad } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import { fmtDate } from "@/lib/date";
 import { Can } from "@/components/rbac";
+import { Button } from "@/components/Button";
+import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
+
+/** Columns the customer-price search can be scoped to. Filters loaded products. */
+const PRICING_PRODUCT_FIELDS: ListSearchField[] = [
+  { value: "all", label: "All columns" },
+  { value: "name", label: "Product name" },
+  { value: "sku", label: "SKU" },
+];
+
+/** Columns the contract search can be scoped to. Filters loaded contracts. */
+const CONTRACT_SEARCH_FIELDS: ListSearchField[] = [
+  { value: "all", label: "All columns" },
+  { value: "contract", label: "Contract #" },
+  { value: "customer", label: "Customer" },
+  { value: "product", label: "Product" },
+];
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -238,6 +255,7 @@ function CustomerOverridesTab() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [searchField, setSearchField] = useState("all");
 
   useEffect(() => {
     setLoading(true);
@@ -278,35 +296,43 @@ function CustomerOverridesTab() {
     }
   };
 
-  const filtered = products.filter((p) =>
-    !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = products.filter((p) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    const fields: Record<string, string> = { name: p.name, sku: p.sku };
+    const haystack = searchField === "all" ? Object.values(fields) : [fields[searchField] ?? ""];
+    return haystack.some((v) => v.toLowerCase().includes(q));
+  });
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <select
-          value={selectedCustomer}
-          onChange={(e) => setSelectedCustomer(e.target.value)}
-          className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#5D5FEF]"
-          aria-label="Customer"
-        >
-          <option value="">Select customer to edit prices</option>
-          {customers.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-        <input
-          type="text"
-          placeholder="Search products…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9 w-48 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[#5D5FEF]"
-        />
-        {!selectedCustomer && (
-          <p className="text-xs text-slate-400">Select a customer to view and edit their custom prices.</p>
-        )}
-      </div>
+      <ListControls
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search products by name or SKU…"
+        searchLabel="Search products"
+        searchFields={PRICING_PRODUCT_FIELDS}
+        searchField={searchField}
+        onSearchFieldChange={setSearchField}
+        activeFilterCount={selectedCustomer ? 1 : 0}
+        onReset={() => { setSearch(""); setSearchField("all"); setSelectedCustomer(""); }}
+        canReset={search.trim() !== "" || searchField !== "all" || selectedCustomer !== ""}
+        resultCount={filtered.length}
+        totalCount={products.length}
+        filters={
+          <FilterField
+            label="Customer"
+            htmlFor="pricing-customer"
+            hint={!selectedCustomer ? "Select a customer to view and edit their custom prices." : undefined}
+          >
+            <select id="pricing-customer" value={selectedCustomer}
+              onChange={(e) => setSelectedCustomer(e.target.value)} className={filterControlClass}>
+              <option value="">Select customer to edit prices</option>
+              {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </FilterField>
+        }
+      />
 
       <TableShell cols={["SKU", "Product", "Category", "Standard", "Custom", "Discount", ""]} empty={!loading && filtered.length === 0}>
         {loading
@@ -459,6 +485,7 @@ function ContractPricesTab() {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
   const [search, setSearch]       = useState("");
+  const [contractField, setContractField] = useState("all");
 
   useEffect(() => {
     void apiGet<{ items: ContractPrice[] }>("/api/v1/pricing/contracts").then(r => {
@@ -468,26 +495,39 @@ function ContractPricesTab() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return contracts.filter(c => !q || c.customerName.toLowerCase().includes(q) || c.productName.toLowerCase().includes(q) || c.contractNumber.toLowerCase().includes(q));
-  }, [contracts, search]);
+    return contracts.filter(c => {
+      if (!q) return true;
+      const fields: Record<string, string> = {
+        customer: c.customerName, product: c.productName, contract: c.contractNumber,
+      };
+      const haystack = contractField === "all" ? Object.values(fields) : [fields[contractField] ?? ""];
+      return haystack.some((v) => v.toLowerCase().includes(q));
+    });
+  }, [contracts, search, contractField]);
 
   if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
   if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <input
-          value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Search contracts..."
-          className="h-9 w-64 rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
-        />
-        <Can permission="pricing.manage">
-          <button className="ml-auto rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
-            + New Contract
-          </button>
-        </Can>
-      </div>
+      <ListControls
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search contracts by #, customer or product…"
+        searchLabel="Search contracts"
+        searchFields={CONTRACT_SEARCH_FIELDS}
+        searchField={contractField}
+        onSearchFieldChange={setContractField}
+        onReset={() => { setSearch(""); setContractField("all"); }}
+        canReset={search.trim() !== "" || contractField !== "all"}
+        resultCount={filtered.length}
+        totalCount={contracts.length}
+        trailing={
+          <Can permission="pricing.manage">
+            <Button variant="primary" size="sm">+ New Contract</Button>
+          </Can>
+        }
+      />
 
       <TableShell
         cols={["Contract #", "Customer", "Product", "SKU", "Retail", "Contract", "Discount", "Effective", "Expires", "Status", ""]}
