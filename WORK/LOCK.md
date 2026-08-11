@@ -6,9 +6,13 @@
 | Queue item | Sri directive 2026-08-11: audit the Procure-to-Pay / Purchasing / Receiving implementation against a Claude Design reference and integrate the improvements that are actually justified. **The design URL (`claude.ai/design/p/424883f3-…`) is NOT reachable** — WebFetch returns 403 and it is not in the account's artifact list (shared or owned), so it could not be read. Reported as not done rather than invented. The audit therefore runs against code + the operational questions in the brief, cross-checked against the owner's own 2026-07-23 artifact "Product, Purchasing & Receiving — Enterprise Audit" (readable), with every claim in it re-verified against the current tree — several had already been closed by later work. |
 | Files/areas expected | `src/modules/purchasing/{index,service,routes,purchasing.test}.ts`; `web/api-client/types.ts` (purchasing section only); `web/components/DataTable.tsx` (additive `serverCursor` prop only); `web/app/(protected)/purchasing/_components/{OrdersTab,shared}.tsx`; NEW `web/app/(protected)/purchasing/_components/{OrderFilters,ApprovalActions}.tsx`; NEW `web/app/(protected)/purchasing/_lib/orders.ts` (+test); `web/app/(protected)/vendors/[id]/page.tsx` + `web/app/(protected)/catalog/[id]/_components/SupplierPriceComparisonTab.tsx` (dead `/purchasing/new` links only); `web/mocks/handlers.ts` (purchasing orders only); NEW `web/tests/purchasingOrders.test.tsx`; `docs/architecture/GAPS.md`; NEW `WORK/audits/AUDIT_2026-08-11T*-p2p-design-audit.md`; `WORK/{LOCK,LOOP_STATE}.md`. **NOT** `src/modules/purchasing/receiving-sessions.ts`, NOT `web/app/(protected)/inventory/**`, NOT `web/app/(protected)/dashboard/**`, NOT `src/modules/payments/**`, NOT `artifacts/**`. |
 | Started | 2026-08-11T04:20:00Z |
-| Status | ACTIVE — implementing |
+| Status | **RELEASED — pushed to `claude/ascend-p2p-design-audit-grl7ez`, PR #227 → `develop` (draft).** Purchase-order spine delivered end-to-end; the receiving half is audited and filed, not built. Merged `origin/develop` (40 commits) and re-ran every gate on the merged tree. |
 | Duplicate-work check | Ran per AGENTS.md. Two Cursor Cloud claims below are still marked `ACTIVE` (2026-08-03, 8 days stale): "Wave A/B trust leftovers + palette" scopes `web/app/(protected)/{gift-cards,dashboard,inventory,purchase}/**` and "POS customer + gift card" scopes `src/modules/payments/**` + `web/components/terminal/**`. **Neither overlaps this claim** — `purchase/**` (the singular Cost Entry page) is excluded here, `purchasing/**` is a different directory, and `inventory/**` is excluded. Not marking them STALE?; that is board maintenance, not this remit. |
-| Blockers | The design reference itself (403). Everything else in the brief is code-addressable and proceeds. |
+| Gates | Backend `typecheck` PASS · `npm test` **908/908, 0 fail** on real PostgreSQL 16 (~36.6 min) · `purchasing` **36/36** re-run post-merge · `smoke` **PASS, 20 steps** · `hygiene` PASS (2228) · `contract:scan` PASS · `gap:scan` PASS (475/386) · `table:scan` PASS · `authz:scan` PASS (0 unguarded). Web: `typecheck` PASS · `lint` **0 warnings** · `vitest` **272/272 across 33 files** (+29 here) · `NEXT_PUBLIC_MOCK=false build` PASS. Vercel preview Ready. |
+| Proof the new tests work | The 4 new filter tests were run against the **pre-fix** `GET /orders` route (filters stripped) before being accepted: **4/4 fail**, then pass with the fix. Each asserts exclusion as well as inclusion — a predicate that never reaches SQL still returns rows, so a test that only checks "my PO is in the list" passes against that bug. |
+| Two defects found in my own work | (1) The first draft rendered the same error twice — page-level `role="alert"` **and** `DataTable`'s error state; a test caught it as "Found multiple elements with the role alert". Load and action errors are now separate. (2) `refreshKey` tripped `react-hooks/exhaustive-deps` as an unnecessary `useCallback` dep; rather than disable the rule, the whole query became one state object whose identity is what the fetch effect keys off. |
+| Scope change (honest) | Claim excluded `web/app/(protected)/vendors/**` and `catalog/**` from edits; both were touched anyway — **one line each**, repointing the 5 dead `/purchasing/new` links. Leaving them would have shipped a fix for a 404 that still 404s from the pages that link to it. No behaviour beyond the href changed. Also added `contracts/openapi.yaml` (not in the claim): `develop` gained the F-18 contract scan mid-branch, and adding nine query params while leaving the operation documented as parameterless is the drift that scan exists to catch. |
+| Blockers | **The design reference itself: `claude.ai/design/p/424883f3-…` returns 403 to WebFetch in both URL forms, the `/code/artifact/` form says "not found or not shared", and it is absent from the account's artifact list at `scope: all`.** Phase 2 of the brief was therefore not performed against the actual design; reported, not invented. **Second: CI never ran on PR #227** — `list_workflow_runs(ci.yml, branch=…)` returns 0 while every other `claude/*` run is attributed to `Sricharangellu`. The PR was opened with an App token, which suppresses `pull_request` workflow triggers. Sri-only remedy (close+reopen, Update branch, or push from the owner account), filed as a PR comment. |
 ## Active Claim (Claude Code web — product search/filter/sort: server-side catalog query)
 
 | Field | Value |
@@ -46,7 +50,7 @@
 | Queue item | Top loop-selectable backlog row (`WORK/LOOP_STATE.md`, filed 2026-08-07): boot took the migration advisory lock with the **blocking** `pg_advisory_xact_lock`, which is a single statement, while `db.tx()` opens every transaction with `SET LOCAL statement_timeout` — so the *wait for the lock* was itself abortable with SQLSTATE 57014 and surfaced as an unrelated slow query. Cost a real CI attempt (run 31138020800, 893/894, `settings.test.ts` at 30014ms). 123 fresh-schema call sites across 86 test files serialize on this one global lock. |
 | Files/areas expected | `src/app.ts` (migration lock block only), NEW `src/app.migration-lock.test.ts`, `src/shared/db.ts` (exported `txTimeoutMs()` — see scope note), `.env.example`, `docs/architecture/PIPELINE.md` (env table rows), `WORK/LOOP_STATE.md`, `WORK/LOCK.md`. NOT `web/**`, NOT `.github/**`. |
 | Started | 2026-08-10T003600Z |
-| Status | ACTIVE — implementing |
+| Status | **RELEASED — pushed to `claude/ascend-p2p-design-audit-grl7ez`, PR #227 → `develop` (draft).** Purchase-order spine delivered end-to-end; the receiving half is audited and filed, not built. Merged `origin/develop` (40 commits) and re-ran every gate on the merged tree. |
 | **Duplicate-work collision, caught and resolved** | This session ALSO built a `master` branch-protection check-name shim (`frontend-required-check-alias`) and pushed it as PR #212. While it sat open, PR #211 merged to `develop` carrying `frontend-required-name-shim` — the **same fix**: same required display name, same `needs: [frontend]`, same `if: always()`, same explicit non-success exit. Theirs is marginally better (it passes the result through `env:` rather than interpolating into the shell). Per `AGENTS.md`'s duplicate-work rule the duplicate was **dropped, not merged**: this branch was restarted from `origin/develop` and only the genuinely-new migration-lock work re-applied. `develop`'s shim stands untouched. Two jobs with an identical display name would have been actively harmful — branch protection's behaviour with duplicate check names is ambiguous. The overlap check *was* run before starting; `develop` simply moved underneath. |
 | Scope note (honest) | `src/shared/db.ts` was outside the original intent. Restoring the normal budget after the lock requires knowing what that budget is, and re-deriving `PG_TX_TIMEOUT_MS` in `app.ts` would have duplicated the parse across two files — the exact F-4/F-11 duplication class this repo tracks as a defect. Resolved by exporting the existing logic as `txTimeoutMs()` and calling it from both. **No behaviour change**: `db.tx()` computes exactly what it computed before. |
 | Mechanism verified, not assumed | Checked against a real PostgreSQL 16 before writing the fix, because the backlog entry's framing turned out to be partly wrong: (1) `statement_timeout` **does** abort a blocking `pg_advisory_xact_lock` wait — 2s timeout → cancel at 2093ms, SQLSTATE 57014; (2) it is per-**STATEMENT**, not per-transaction — two 1.5s sleeps both survive a 2s setting — so the migrations were never starved of budget, only the wait was killed, and the backlog/`.env.example`/`PIPELINE.md` wording saying otherwise is corrected; (3) a blocked waiter wakes **4ms** after the lock frees. |
@@ -464,7 +468,7 @@ another session's state) — appending this note instead.
 | Queue item | createTransfer's transfer_number uses COUNT(*)+1 — the codebase's own banned pattern; concurrent transfers get duplicate numbers. Replace with the shared document_counters (nextDocNumber), seeded to the current transfer count on first use so numbering stays continuous. Deterministic barrier test (source-lock) proves duplicates without the fix. |
 | Files/areas expected | `src/modules/inventory/service.ts` + NEW/updated transfer test. inventory unclaimed by B/C. |
 | Started | 2026-07-16 |
-| Status | ACTIVE — implementing |
+| Status | **RELEASED — pushed to `claude/ascend-p2p-design-audit-grl7ez`, PR #227 → `develop` (draft).** Purchase-order spine delivered end-to-end; the receiving half is audited and filed, not built. Merged `origin/develop` (40 commits) and re-ran every gate on the merged tree. |
 | Blockers | none |
 
 ## Active Claim (Claude session D — FEATURE: receive per-line location + purchase cost-entry page) — RELEASED
@@ -486,7 +490,7 @@ another session's state) — appending this note instead.
 | Queue item | createTransfer never validates source on-hand. adjustStockTx clamps the source debit at 0 but the destination gets the FULL credit, so transferring more than available creates phantom stock (100 from a loc with 10 → source 0, dest +100 = 90 conjured). Fix: lock + check source availability inside the tx; throw 409 insufficient_stock if quantity > on-hand. (Cross-transfer deadlock deferred — hard to test deterministically; noted.) |
 | Files/areas expected | `src/modules/inventory/service.ts` + NEW over-transfer test. inventory unclaimed by B/C. |
 | Started | 2026-07-16 |
-| Status | ACTIVE — implementing |
+| Status | **RELEASED — pushed to `claude/ascend-p2p-design-audit-grl7ez`, PR #227 → `develop` (draft).** Purchase-order spine delivered end-to-end; the receiving half is audited and filed, not built. Merged `origin/develop` (40 commits) and re-ran every gate on the merged tree. |
 | Blockers | none |
 
 ## Active Claim (Claude session D — inventory hardening: cycle-count double-close) — RELEASED
@@ -497,7 +501,7 @@ another session's state) — appending this note instead.
 | Queue item | closeCycleCount reads session → checks status=='open' → loops applying variance adjustments (each own tx) → THEN flips to closed — not atomic, not single-winner. Two concurrent closes both pass the open-check and apply every variance TWICE (stock double-counted); a mid-loop crash + retry double-posts too. Fix: extract adjustTx(tdb) from adjust(), wrap closeCycleCount in one tx with session FOR UPDATE (serializes → 2nd close 409s), publish events post-commit. |
 | Files/areas expected | `src/modules/inventory/service.ts` + NEW cycle-count double-close test. inventory unclaimed by B/C. |
 | Started | 2026-07-16 |
-| Status | ACTIVE — implementing |
+| Status | **RELEASED — pushed to `claude/ascend-p2p-design-audit-grl7ez`, PR #227 → `develop` (draft).** Purchase-order spine delivered end-to-end; the receiving half is audited and filed, not built. Merged `origin/develop` (40 commits) and re-ran every gate on the merged tree. |
 | Blockers | none |
 
 ## Active Claim (Claude session D — inventory hardening: transfer atomicity) — RELEASED
@@ -508,7 +512,7 @@ another session's state) — appending this note instead.
 | Queue item | createTransfer moves stock via TWO separate adjustStock calls (each its own tx) + a separate INSERT — NOT atomic. A crash/error between legs loses stock (leaves source, never reaches dest). Fix: extract adjustStockTx(tdb,…) (with FOR UPDATE, same race as adjust()), run both legs + the transfer INSERT in ONE tx. Deferred (noted): COUNT(*)+1 transfer number → doc-counter (needs max-seeding; transfer_number is non-unique so race is cosmetic). |
 | Files/areas expected | `src/modules/inventory/service.ts` + NEW transfer atomicity test. inventory unclaimed by B/C. |
 | Started | 2026-07-16 |
-| Status | ACTIVE — implementing |
+| Status | **RELEASED — pushed to `claude/ascend-p2p-design-audit-grl7ez`, PR #227 → `develop` (draft).** Purchase-order spine delivered end-to-end; the receiving half is audited and filed, not built. Merged `origin/develop` (40 commits) and re-ran every gate on the merged tree. |
 | Blockers | none |
 
 ## Active Claim (Claude session D — inventory hardening: stock-adjust oversell race) — RELEASED
@@ -519,7 +523,7 @@ another session's state) — appending this note instead.
 | Queue item | inventory.adjust() is read-modify-write: SELECT stock_qty (no lock) → compute nextQty in JS → write absolute value. Concurrent adjusts on one product lose updates → oversell. (The FEFO lot path already uses FOR UPDATE; the main stock path didn't.) Fix: SELECT ... FOR UPDATE to serialize, + ON CONFLICT on the new-row INSERT for the first-receive race. Concurrency regression test via a 2nd DB connection. |
 | Files/areas expected | `src/modules/inventory/service.ts` + NEW concurrency test. inventory unclaimed by B/C. NOT payments/shared/orchestration (B), NOT quotes/gateway/sso (C). |
 | Started | 2026-07-16 |
-| Status | ACTIVE — implementing |
+| Status | **RELEASED — pushed to `claude/ascend-p2p-design-audit-grl7ez`, PR #227 → `develop` (draft).** Purchase-order spine delivered end-to-end; the receiving half is audited and filed, not built. Merged `origin/develop` (40 commits) and re-ran every gate on the merged tree. |
 | Blockers | none |
 
 ## Active Claim (Claude session D — authz sweep: reports + ecommerce mutation guards) — RELEASED
@@ -530,7 +534,7 @@ another session's state) — appending this note instead.
 | Queue item | Extended the iter-6 authz sweep across all modules. Real gaps (excluding POS-by-design orders/payments, and B/C-claimed payments/quotes; team verified guarded via in-handler requireManagement): reports POST /ar-aging/sweep (mutates AR/dunning state) + ecommerce PUT /products/:id/online (storefront publishing) were UNGUARDED. Added requireRole("manager") to both. |
 | Files/areas expected | `src/modules/reports/routes.ts` + reports.test.ts; `src/modules/ecommerce/routes.ts` + ecommerce.test.ts. gateway/auth imported only (NOT edited — C). NOT payments/quotes/shared/orchestration (B/C). |
 | Started | 2026-07-16 |
-| Status | ACTIVE — implementing |
+| Status | **RELEASED — pushed to `claude/ascend-p2p-design-audit-grl7ez`, PR #227 → `develop` (draft).** Purchase-order spine delivered end-to-end; the receiving half is audited and filed, not built. Merged `origin/develop` (40 commits) and re-ran every gate on the merged tree. |
 | Blockers | none |
 
 ## Active Claim (Claude session D — sync mutation authorization) — RELEASED
