@@ -346,13 +346,43 @@ Direct evidence gathered this pass, without Vercel/Render dashboard access:
 
 ## Rollback
 
-Every change here is a branch/CI/protection edit — no data migrations, and the prod DB (Supabase A)
-is never touched by pipeline work.
+> **Read this first: reverting a release rolls back CODE, not the DATABASE.** The sentence that
+> used to open this section — "Every change here is a branch/CI/protection edit — no data
+> migrations" — was true of the *pipeline* work it was written for and is false of a release. A
+> release carries module migrations, and `buildApp` applies every one of them the moment the new
+> backend boots. `git revert` on `master` then redeploys the old code against a database that has
+> already moved. That is worse than having no rollback story, because it reads as solved.
+
+**Code rollback — these work, and are all that works today:**
 
 - **Bad release:** re-run the last known-good `master` deploy, or `git revert` the release merge and
   push `master` (redeploys prod). Vercel also keeps prior deployments — promote a previous one in the
-  dashboard for an instant rollback.
+  dashboard for an instant frontend rollback. Render keeps prior deploys for the backend.
 - **Bad pipeline change:** revert the CI commit on `master`.
+
+**Schema rollback — there is none, by decision.** Only the 3 foundation migrations have
+`.down.sql`; the 186 module-owned tables have none, and will not get any. See
+[ADR-013](ADR/ADR-013-schema-is-forward-only-recovery-is-by-restore.md): schema is **forward-only**
+and the recovery mechanism for a data-affecting mistake is a **point-in-time restore**, not a schema
+reversal — because reversing a migration that dropped a column recreates an empty column and does
+not bring the values back either. Down-migrations solve schema *shape* drift, which is not the
+failure this repo is exposed to.
+
+The obligation that comes with that policy: **a migration that destroys data — dropping a column or
+table, narrowing a type, deleting rows — requires an explicit pre-migration backup checkpoint**,
+taken and verified before the release that carries it. "We have daily backups" is not a checkpoint.
+
+**Is restore actually trustworthy?** The mechanism, yes, and it is continuously proven rather than
+assumed: `db/backup/drill.sh` runs backup → verify → restore → compare → boot-the-app, and
+`.github/workflows/restore-drill.yml` runs it weekly *and* on every change to `db/backup/**`. The
+comparison is a per-table row count **and content checksum**, so `users.password_hash` is proven
+intact byte for byte, not merely present.
+
+**But production has nothing to restore from yet.** `PROD_DATABASE_URL` is unset, so `backup.yml`
+reports success in ~5 seconds having backed up nothing and the production RPO is unbounded — total
+loss, not ≤24h. Until that secret is set (`WORK/LOOP_STATE.md`, NEEDS-SRI), the policy above is
+correct and the artifact it depends on does not exist. A drill proves the path works; it cannot
+conjure a backup nobody took.
 
 ## Known issue — E2E login flake: ROOT CAUSE CONFIRMED (2026-07-18)
 
