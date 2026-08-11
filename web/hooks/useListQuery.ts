@@ -53,6 +53,14 @@ export interface UseListQueryOptions<F extends FilterMap> {
    * the state local to the component (no URL involvement at all).
    */
   urlKey?: string;
+  /**
+   * localStorage key for the page size, matching `usePersistedPageSize`.
+   *
+   * Page size is a per-user preference rather than part of the query — someone
+   * who works at 100 rows wants 100 rows tomorrow too — so it persists instead
+   * of living in the URL beside the filters.
+   */
+  pageSizeStorageKey?: string;
 }
 
 export interface ListQuery<F extends FilterMap> {
@@ -100,6 +108,7 @@ export function useListQuery<F extends FilterMap>({
   pageSize: initialPageSize = 50,
   debounceMs = 300,
   urlKey,
+  pageSizeStorageKey,
 }: UseListQueryOptions<F>): ListQuery<F> {
   const searchParams = useSearchParams();
 
@@ -177,10 +186,25 @@ export function useListQuery<F extends FilterMap>({
     setPage(0);
   }, []);
 
-  const setPageSize = useCallback((size: number) => {
-    setPageSizeRaw(size);
-    setPage(0);
-  }, []);
+  // Restore the saved page size. Done in an effect rather than in the useState
+  // initializer so the server and the first client render agree — localStorage
+  // does not exist on the server, and a mismatch here would hydrate wrong.
+  useEffect(() => {
+    if (!pageSizeStorageKey || typeof window === "undefined") return;
+    const saved = Number(window.localStorage.getItem(pageSizeStorageKey));
+    if (Number.isFinite(saved) && saved > 0) setPageSizeRaw(saved);
+  }, [pageSizeStorageKey]);
+
+  const setPageSize = useCallback(
+    (size: number) => {
+      setPageSizeRaw(size);
+      setPage(0);
+      if (pageSizeStorageKey && typeof window !== "undefined") {
+        window.localStorage.setItem(pageSizeStorageKey, String(size));
+      }
+    },
+    [pageSizeStorageKey],
+  );
 
   const toggleSort = useCallback((column: string) => {
     // Re-sorting reorders the whole result set, so the old page 3 means nothing

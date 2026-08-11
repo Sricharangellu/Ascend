@@ -79,11 +79,16 @@ export function ProductGrid({ onAddProduct }: ProductGridProps) {
   const [lotPicker, setLotPicker] = useState<Product | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Initial load — fetch full catalog
+  // Initial load — the browse grid.
+  //
+  // `limit`, not `pageSize`: the catalog endpoint reads `limit`, so the old
+  // `?pageSize=200` was dropped on the floor and the register silently browsed
+  // the default 50 products. On any catalog bigger than that, the grid showed
+  // a fraction of what the shop sells and nothing said so.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    apiGet<CatalogListResponse>("/api/v1/catalog?pageSize=200")
+    apiGet<CatalogListResponse>("/api/v1/catalog?limit=200&status=active")
       .then((data) => {
         if (!cancelled) {
           // Normalize: the real backend returns snake_case (price_cents);
@@ -105,22 +110,57 @@ export function ProductGrid({ onAddProduct }: ProductGridProps) {
     };
   }, []);
 
-  // Re-filter locally for instant UX; the real backend also supports params.
+  /**
+   * Search the whole catalog, not the loaded page.
+   *
+   * This used to be a `.filter()` over `allProducts`, which meant the register's
+   * search box only ever saw the first page. Scanning a barcode for the 201st
+   * product returned "no results" at the till — with the product sitting in
+   * stock — and the cashier had no way to tell that from a genuinely unknown
+   * item. A POS search that silently covers part of the catalog is worse than
+   * no search.
+   *
+   * The local filter is kept as the immediate response so the grid still reacts
+   * on the first keystroke; the server result replaces it when it lands. Ranked
+   * server-side, so an exact UPC hit comes back first.
+   */
   useEffect(() => {
-    let filtered = allProducts;
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      filtered = filtered.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.sku.toLowerCase().includes(q) ||
-          p.barcode?.toLowerCase().includes(q)
-      );
-    }
-    if (category !== "All") {
-      filtered = filtered.filter((p) => p.category === category);
-    }
-    setProducts(filtered);
+    const q = search.trim();
+    const applyLocal = () => {
+      let filtered = allProducts;
+      if (q) {
+        const lower = q.toLowerCase();
+        filtered = filtered.filter(
+          (p) =>
+            p.name.toLowerCase().includes(lower) ||
+            p.sku.toLowerCase().includes(lower) ||
+            p.barcode?.toLowerCase().includes(lower)
+        );
+      }
+      if (category !== "All") filtered = filtered.filter((p) => p.category === category);
+      return filtered;
+    };
+
+    setProducts(applyLocal());
+    if (!q) return;
+
+    let cancelled = false;
+    const params = new URLSearchParams({ q, limit: "100", status: "active" });
+    if (category !== "All") params.set("category", category);
+    const t = setTimeout(() => {
+      apiGet<CatalogListResponse>(`/api/v1/catalog?${params}`)
+        .then((data) => {
+          if (!cancelled) setProducts(data.items.map(normalizeTerminalProduct));
+        })
+        // A failed lookup must not blank the grid — the local matches stay on
+        // screen so the cashier keeps whatever the register already knows.
+        .catch(() => {});
+    }, 200);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, [search, category, allProducts]);
 
   const categories = getCategories(allProducts);

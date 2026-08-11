@@ -65,6 +65,7 @@ let apiPost: ReturnType<typeof vi.fn>;
 let listResponse: () => unknown;
 
 beforeEach(() => {
+  window.history.replaceState({}, "", "/catalog");
   listCalls = [];
   facetCalls = [];
   searchParams = new URLSearchParams();
@@ -232,6 +233,97 @@ describe("ProductsTab — server-side query", () => {
       const facetQuery = new URLSearchParams(facetCalls[facetCalls.length - 1].split("?")[1] ?? "");
       expect(facetQuery.get("status")).toBe("draft");
     });
+  });
+});
+
+describe("ProductsTab — unified query state (useListQuery migration)", () => {
+  it("returns to page 1 when a filter changes, and does it in one request", async () => {
+    const user = userEvent.setup();
+    listResponse = () => ({ items: [product()], total: 863, limit: 50, offset: 100 });
+    render(<ProductsTab categories={CATEGORIES} />);
+    await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
+
+    await user.click(screen.getByRole("button", { name: /next page|next/i }));
+    await waitFor(() => expect(lastListQuery().get("offset")).toBe("50"));
+
+    const before = listCalls.length;
+    await openFilters(user);
+    await user.selectOptions(screen.getByLabelText("Status"), "active");
+
+    await waitFor(() => {
+      const q = lastListQuery();
+      expect(q.get("status")).toBe("active");
+      // Page 3 of the old result set is meaningless in the new one.
+      expect(q.get("offset")).toBe("0");
+    });
+
+    // The old code reset the page in an effect, which fetched once for the
+    // stale offset and again once the reset landed. One filter change must
+    // produce exactly one list request.
+    const listRequestsForThisChange = listCalls
+      .slice(before)
+      .filter((c) => c.includes("status=active"));
+    expect(listRequestsForThisChange).toHaveLength(1);
+    // Specifically: no request went out carrying the old offset with the new filter.
+    expect(listCalls.slice(before).some((c) => c.includes("offset=50") && c.includes("status=active")))
+      .toBe(false);
+  });
+
+  it("restores a deep-linked query from the URL on first render", async () => {
+    // A filtered catalog view is a shareable URL. Everything here must be in
+    // the FIRST request — fetching the unfiltered list first and correcting it
+    // afterwards would flash the wrong rows.
+    searchParams = new URLSearchParams(
+      "products_q=pepsi&products_field=sku&products_status=draft&products_ageRestricted=true",
+    );
+    render(<ProductsTab categories={CATEGORIES} />);
+    await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
+
+    const first = new URLSearchParams(listCalls[0].split("?")[1] ?? "");
+    expect(first.get("q")).toBe("pepsi");
+    expect(first.get("searchField")).toBe("sku");
+    expect(first.get("status")).toBe("draft");
+    expect(first.get("ageRestricted")).toBe("true");
+  });
+
+  it("writes active filters to the URL without a history entry per keystroke", async () => {
+    const user = userEvent.setup();
+    const historyLength = window.history.length;
+    render(<ProductsTab categories={CATEGORIES} />);
+    await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
+
+    await openFilters(user);
+    await user.selectOptions(screen.getByLabelText("Status"), "draft");
+
+    await waitFor(() =>
+      expect(new URLSearchParams(window.location.search).get("products_status")).toBe("draft"),
+    );
+    // replaceState, not push: Back must not walk through every filter change.
+    expect(window.history.length).toBe(historyLength);
+  });
+
+  it("Reset clears the query, the URL and the sort together", async () => {
+    const user = userEvent.setup();
+    searchParams = new URLSearchParams("products_q=pepsi&products_status=draft");
+    render(<ProductsTab categories={CATEGORIES} />);
+    await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
+
+    // Sort by something explicit so we can prove Reset clears it too — the old
+    // hand-written clearFilters left the list reordered.
+    await user.click(screen.getByRole("button", { name: /Sort by Retail price/ }));
+    await waitFor(() => expect(lastListQuery().get("sort")).toBe("price_cents"));
+
+    await user.click(screen.getByRole("button", { name: /^reset$/i }));
+
+    await waitFor(() => {
+      const q = lastListQuery();
+      expect(q.get("q")).toBeNull();
+      expect(q.get("status")).toBeNull();
+      // Back to the contextual default rather than the column the user picked.
+      expect(q.get("sort")).toBe("name");
+      expect(q.get("offset")).toBe("0");
+    });
+    expect(window.location.search).toBe("");
   });
 });
 

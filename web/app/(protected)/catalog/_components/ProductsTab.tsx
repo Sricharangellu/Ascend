@@ -8,7 +8,7 @@ import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/TableSkeleton";
-import { Pagination, usePersistedPageSize } from "@/components/Pagination";
+import { Pagination } from "@/components/Pagination";
 import { apiGet, apiPost, apiDelete, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type {
@@ -16,6 +16,7 @@ import type {
   ProductFacets, ProductSort, ProductTypeFilter, ProductSearchField,
 } from "@/api-client/types";
 import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
+import { useListQuery } from "@/hooks/useListQuery";
 import { ProductFormModal } from "./ProductFormModal";
 import { PrintLabelsModal } from "./PrintLabelsModal";
 import { ImportCSVModal } from "./ImportCSVModal";
@@ -112,6 +113,24 @@ function ProductListCard({ product, productType, onEdit, onArchive }: {
   );
 }
 
+/**
+ * Every filter this list supports, with the value that means "not filtering".
+ *
+ * `reset()` restores from this object wholesale rather than clearing named
+ * fields, so adding a filter here is enough — nothing else has to remember it.
+ */
+const DEFAULT_FILTERS = {
+  status: "",
+  category: "",
+  brand: "",
+  supplier: "",
+  taxClass: "",
+  ageRestricted: false,
+  productType: "all",
+  priceMin: "",
+  priceMax: "",
+};
+
 // ── ProductsTab ───────────────────────────────────────────────────────────────
 
 /**
@@ -136,32 +155,40 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   const [error, setError]           = useState<string | null>(null);
   const [facets, setFacets]         = useState<ProductFacets | null>(null);
 
-  const [filterStatus, setFilterStatus]     = useState("");
-  const [filterCategory, setFilterCategory] = useState("");
-  const [search, setSearch]                 = useState("");
-  const [debouncedQ, setDebouncedQ]         = useState("");
-  // Which column the term is matched against. Sent to the server, which 400s on
-  // a value it does not implement — so this list may only offer real columns.
-  const [searchField, setSearchField]       = useState<ProductSearchField>("all");
+  /**
+   * The whole query — search text, which column it is scoped to, every filter,
+   * the sort and the page — as one state model.
+   *
+   * This was 14 separate `useState`s plus a `withPageReset` wrapper that each
+   * setter had to remember to be wrapped in, and a `clearFilters` that listed
+   * the filters by hand. The hook makes the two rules structural instead of
+   * per-call-site: anything that changes the result set returns to page 1 in the
+   * same render, and `reset()` restores from `DEFAULT_FILTERS` wholesale, so a
+   * filter added later cannot be forgotten by it.
+   *
+   * `urlKey` makes the state deep-linkable — a filtered catalog view is now a
+   * URL someone can send to a colleague.
+   */
+  const query = useListQuery({
+    defaultFilters: DEFAULT_FILTERS,
+    urlKey: "products",
+    pageSizeStorageKey: "catalog-products-page-size",
+    pageSize: 50,
+  });
+  const { filters, setFilter, page, setPage, pageSize, setPageSize, searchField } = query;
+  const debouncedQ = query.debouncedSearch;
 
-  const [filterTaxClass, setFilterTaxClass]           = useState("");
-  const [filterBrand, setFilterBrand]                 = useState("");
-  const [filterSupplier, setFilterSupplier]           = useState("");
-  const [filterAgeRestricted, setFilterAgeRestricted] = useState(false);
-  const [filterProductType, setFilterProductType]     = useState<"all" | ProductTypeFilter>("all");
-  const [priceMin, setPriceMin]                       = useState("");
-  const [priceMax, setPriceMax]                       = useState("");
-  const [showMoreFilters, setShowMoreFilters]          = useState(false);
-
-  // null = the user hasn't picked a column, so the sort follows context:
-  // relevance while searching, name otherwise. Derived rather than stored in an
-  // effect — writing it back into state would re-run the loader and fetch the
-  // list twice on the first keystroke of every search.
-  const [sortCol, setSortCol] = useState<ProductSort | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = usePersistedPageSize("catalog-products-page-size", 50);
+  // Local aliases keep the JSX and the request builder readable; each is just a
+  // view onto the single query object above.
+  const filterStatus       = filters.status;
+  const filterCategory     = filters.category;
+  const filterTaxClass     = filters.taxClass;
+  const filterBrand        = filters.brand;
+  const filterSupplier     = filters.supplier;
+  const filterAgeRestricted = filters.ageRestricted;
+  const filterProductType  = filters.productType as "all" | ProductTypeFilter;
+  const priceMin           = filters.priceMin;
+  const priceMax           = filters.priceMax;
 
   const [selectedIds, setSelectedIds]     = useState<Set<string>>(new Set());
   const [showPrintLabels, setShowPrintLabels] = useState(false);
@@ -207,49 +234,36 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   // Drives whether Reset does anything. Includes the search scope and an
   // explicit sort: both change what the user sees, so leaving them out would
   // make Reset look spent while the list was still narrowed or reordered.
-  const hasFilters = Boolean(filterStatus || filterCategory || debouncedQ || filterTaxClass || filterBrand || filterSupplier || filterAgeRestricted || filterProductType !== "all" || priceMin || priceMax || searchField !== "all" || sortCol);
+  // Anything non-default — search text, scope, any filter, or an explicit sort.
+  // The hook computes it, so it cannot drift from what `reset()` actually clears.
+  const hasFilters = query.isDirty;
 
   /**
    * The active filters, as removable chips. Each carries its own `clear` so one
    * filter can be dropped without resetting the rest.
    */
   const activeChips: { key: string; label: string; clear: () => void }[] = [
-    debouncedQ          ? { key: "q",     label: `Search: "${debouncedQ}"`,   clear: () => { setSearch(""); setDebouncedQ(""); } } : null,
-    filterStatus        ? { key: "status", label: `Status: ${filterStatus}`,  clear: () => setFilterStatus("") } : null,
-    filterCategory      ? { key: "cat",   label: filterCategory,              clear: () => setFilterCategory("") } : null,
-    filterBrand         ? { key: "brand", label: `Brand: ${filterBrand}`,     clear: () => setFilterBrand("") } : null,
-    filterSupplier      ? { key: "supp",  label: `Supplier: ${filterSupplier}`, clear: () => setFilterSupplier("") } : null,
-    filterTaxClass      ? { key: "tax",   label: `Tax: ${filterTaxClass}`,    clear: () => setFilterTaxClass("") } : null,
-    filterAgeRestricted ? { key: "age",   label: "Age restricted",            clear: () => setFilterAgeRestricted(false) } : null,
-    filterProductType !== "all" ? { key: "type", label: `Type: ${filterProductType}`, clear: () => setFilterProductType("all") } : null,
+    debouncedQ          ? { key: "q",     label: `Search: "${debouncedQ}"`,   clear: () => query.setSearch("") } : null,
+    filterStatus        ? { key: "status", label: `Status: ${filterStatus}`,  clear: () => setFilter("status", "") } : null,
+    filterCategory      ? { key: "cat",   label: filterCategory,              clear: () => setFilter("category", "") } : null,
+    filterBrand         ? { key: "brand", label: `Brand: ${filterBrand}`,     clear: () => setFilter("brand", "") } : null,
+    filterSupplier      ? { key: "supp",  label: `Supplier: ${filterSupplier}`, clear: () => setFilter("supplier", "") } : null,
+    filterTaxClass      ? { key: "tax",   label: `Tax: ${filterTaxClass}`,    clear: () => setFilter("taxClass", "") } : null,
+    filterAgeRestricted ? { key: "age",   label: "Age restricted",            clear: () => setFilter("ageRestricted", false) } : null,
+    filterProductType !== "all" ? { key: "type", label: `Type: ${filterProductType}`, clear: () => setFilter("productType", "all") } : null,
     priceMin || priceMax ? {
       key: "price",
       label: priceMin && priceMax ? `Price: $${priceMin}–$${priceMax}` : priceMin ? `Price ≥ $${priceMin}` : `Price ≤ $${priceMax}`,
-      clear: () => { setPriceMin(""); setPriceMax(""); },
+      clear: () => { setFilter("priceMin", ""); setFilter("priceMax", ""); },
     } : null,
   ].filter(Boolean) as { key: string; label: string; clear: () => void }[];
 
   /**
-   * Wrap a filter setter so changing it also returns to the first page.
-   *
-   * Done in the setter rather than in an effect on the filter values: an effect
-   * runs *after* the render that changed the filter, so the list would fetch
-   * once for the stale page and again once the reset landed — two round trips
-   * (four, now that facets load alongside) and a flash of the wrong rows.
+   * `setFilter` already returns to page 1 in the same render, so the old
+   * `withPageReset` wrapper is gone — the guarantee moved from "every call site
+   * remembered to wrap" to "the hook does it".
    */
-  function withPageReset<T>(setter: (value: T) => void): (value: T) => void {
-    return (value: T) => { setter(value); setPage(0); };
-  }
-
-  const clearFilters = () => {
-    setFilterStatus(""); setFilterCategory(""); setSearch(""); setDebouncedQ("");
-    setSearchField("all");
-    setFilterTaxClass(""); setFilterBrand(""); setFilterSupplier(""); setFilterAgeRestricted(false);
-    setFilterProductType("all");
-    setPriceMin(""); setPriceMax("");
-    setSortCol(null); setSortDir("asc");
-    setPage(0);
-  };
+  const clearFilters = query.reset;
 
   /**
    * Columns the user can scope a search to.
@@ -289,11 +303,6 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
     }
   };
 
-  useEffect(() => {
-    const t = setTimeout(() => { setDebouncedQ(search); setPage(0); }, 300);
-    return () => clearTimeout(t);
-  }, [search]);
-
   // `products` is already the filtered, sorted page the server returned — there
   // is deliberately no client-side pass over it. Anything added here would once
   // again only apply to the loaded page.
@@ -309,14 +318,22 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   };
   // With a search term, rank by relevance so exact SKU/UPC hits come first; an
   // explicit column choice always wins over that default.
-  const effectiveSort: ProductSort = sortCol ?? (debouncedQ ? "relevance" : "name");
+  // null = the user hasn't picked a column, so the sort follows context:
+  // relevance while searching, name otherwise. Still derived rather than
+  // written back into state — storing it would re-run the loader and fetch the
+  // list twice on the first keystroke of every search.
+  const effectiveSort: ProductSort = (query.sort as ProductSort | null) ?? (debouncedQ ? "relevance" : "name");
+  const sortDir = query.dir;
 
+  // Re-sorting reorders the whole catalog, so page 3 of the old order is
+  // meaningless in the new one — the hook returns to page 1 for us.
+  //
+  // Passing `effectiveSort` rather than the raw stored sort matters: with no
+  // explicit choice the header shows "name" (or "relevance"), and clicking that
+  // same header has to toggle direction rather than re-select a column the hook
+  // does not think is active.
   function handleSort(col: ProductSort) {
-    // Re-sorting reorders the whole catalog, so page 3 of the old order is
-    // meaningless in the new one.
-    setPage(0);
-    if (col === effectiveSort) { setSortDir(d => d === "asc" ? "desc" : "asc"); }
-    else { setSortCol(col); setSortDir("asc"); }
+    query.toggleSort(col === effectiveSort ? effectiveSort : col);
   }
 
   /**
@@ -487,25 +504,25 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
         </div>
 
         <div className="grid gap-3 border-b border-[#E8E8E8] bg-slate-50 px-5 py-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-          <button type="button" aria-pressed={!filterStatus && filterProductType === "all" && !filterAgeRestricted} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => { setFilterStatus(""); setFilterProductType("all"); setFilterAgeRestricted(false); setPage(0); }}>
+          <button type="button" aria-pressed={!filterStatus && filterProductType === "all" && !filterAgeRestricted} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => { setFilter("status", ""); setFilter("productType", "all"); setFilter("ageRestricted", false); }}>
             <CatalogMetric label="Total" value={total} helper={hasFilters ? "matching filters" : "in catalog"} active={!filterStatus && filterProductType === "all" && !filterAgeRestricted} />
           </button>
-          <button type="button" aria-pressed={filterStatus === "active"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => withPageReset(setFilterStatus)("active")}>
+          <button type="button" aria-pressed={filterStatus === "active"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilter("status", "active")}>
             <CatalogMetric label="Active" value={activeCount} helper="sellable" tone="success" active={filterStatus === "active"} />
           </button>
-          <button type="button" aria-pressed={filterStatus === "draft"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => withPageReset(setFilterStatus)("draft")}>
+          <button type="button" aria-pressed={filterStatus === "draft"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilter("status", "draft")}>
             <CatalogMetric label="Draft" value={draftCount} helper="needs review" tone="warning" active={filterStatus === "draft"} />
           </button>
-          <button type="button" aria-pressed={filterStatus === "archived"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => withPageReset(setFilterStatus)("archived")}>
+          <button type="button" aria-pressed={filterStatus === "archived"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilter("status", "archived")}>
             <CatalogMetric label="Archived" value={archivedCount} helper="hidden" tone="muted" active={filterStatus === "archived"} />
           </button>
-          <button type="button" aria-pressed={filterProductType === "master"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => withPageReset(setFilterProductType)("master")}>
+          <button type="button" aria-pressed={filterProductType === "master"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilter("productType", "master")}>
             <CatalogMetric label="Masters" value={masterCount} helper="variant groups" active={filterProductType === "master"} />
           </button>
-          <button type="button" aria-pressed={filterProductType === "variant"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => withPageReset(setFilterProductType)("variant")}>
+          <button type="button" aria-pressed={filterProductType === "variant"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilter("productType", "variant")}>
             <CatalogMetric label="Variants" value={variantCount} helper="sellable SKUs" active={filterProductType === "variant"} />
           </button>
-          <button type="button" aria-pressed={filterAgeRestricted} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => { setFilterAgeRestricted((v) => !v); setPage(0); }}>
+          <button type="button" aria-pressed={filterAgeRestricted} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilter("ageRestricted", !filterAgeRestricted)}>
             <CatalogMetric label="Restricted" value={restrictedCount} helper="ID required" tone="restricted" active={filterAgeRestricted} />
           </button>
         </div>
@@ -518,19 +535,16 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
             server parameter rather than being decoration. */}
         <div className="border-b border-line bg-surface-1 px-5 py-3">
           <ListControls
-            search={search}
-            onSearchChange={setSearch}
+            search={query.search}
+            onSearchChange={query.setSearch}
             searchPlaceholder="Search products, SKU, UPC, brand…"
             searchLabel="Search products"
             searchFields={SEARCH_FIELDS}
             searchField={searchField}
-            onSearchFieldChange={(value) => {
-              setSearchField(value as ProductSearchField);
-              setPage(0);
-            }}
+            onSearchFieldChange={query.setSearchField}
             activeFilterCount={activeFilterCount}
             onReset={clearFilters}
-            canReset={hasFilters}
+            canReset={query.isDirty}
             resultCount={products.length}
             totalCount={total}
             loading={loading}
@@ -539,7 +553,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                 {/* Options come from the catalog's own data, with counts, so the
                     list only ever offers a refinement that returns rows. */}
                 <FilterField label="Category" htmlFor="catalog-category">
-                  <select id="catalog-category" value={filterCategory} onChange={e => withPageReset(setFilterCategory)(e.target.value)}
+                  <select id="catalog-category" value={filterCategory} onChange={e => setFilter("category", e.target.value)}
                     className={filterControlClass}>
                     <option value="">All categories</option>
                     {(facets?.category.length ? facets.category.map(b => ({ id: b.value, name: b.value, count: b.count }))
@@ -553,7 +567,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                 </FilterField>
 
                 <FilterField label="Status" htmlFor="catalog-status">
-                  <select id="catalog-status" value={filterStatus} onChange={e => withPageReset(setFilterStatus)(e.target.value)}
+                  <select id="catalog-status" value={filterStatus} onChange={e => setFilter("status", e.target.value)}
                     className={filterControlClass}>
                     <option value="">All</option>
                     <option value="active">Active{facets ? ` (${activeCount})` : ""}</option>
@@ -563,7 +577,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                 </FilterField>
 
                 <FilterField label="Product type" htmlFor="catalog-type">
-                  <select id="catalog-type" value={filterProductType} onChange={e => withPageReset(setFilterProductType)(e.target.value as typeof filterProductType)}
+                  <select id="catalog-type" value={filterProductType} onChange={e => setFilter("productType", e.target.value)}
                     className={filterControlClass}>
                     <option value="all">All types</option>
                     <option value="standalone">Standalone{facets ? ` (${standaloneCount})` : ""}</option>
@@ -576,7 +590,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                     brands this catalog actually carries. */}
                 <FilterField label="Brand" htmlFor="catalog-brand">
                   <input id="catalog-brand" type="text" list="catalog-brand-options" value={filterBrand}
-                    onChange={e => withPageReset(setFilterBrand)(e.target.value)} placeholder="Any brand"
+                    onChange={e => setFilter("brand", e.target.value)} placeholder="Any brand"
                     className={filterControlClass} />
                   <datalist id="catalog-brand-options">
                     {facets?.brand.map(b => <option key={b.value} value={b.value}>{`${b.value} (${b.count})`}</option>)}
@@ -585,7 +599,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
 
                 <FilterField label="Supplier" htmlFor="catalog-supplier">
                   <input id="catalog-supplier" type="text" list="catalog-supplier-options" value={filterSupplier}
-                    onChange={e => withPageReset(setFilterSupplier)(e.target.value)} placeholder="Any supplier"
+                    onChange={e => setFilter("supplier", e.target.value)} placeholder="Any supplier"
                     className={filterControlClass} />
                   <datalist id="catalog-supplier-options">
                     {facets?.supplier.map(b => <option key={b.value} value={b.value}>{`${b.value} (${b.count})`}</option>)}
@@ -593,7 +607,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                 </FilterField>
 
                 <FilterField label="Tax class" htmlFor="catalog-tax">
-                  <select id="catalog-tax" value={filterTaxClass} onChange={e => withPageReset(setFilterTaxClass)(e.target.value)}
+                  <select id="catalog-tax" value={filterTaxClass} onChange={e => setFilter("taxClass", e.target.value)}
                     className={filterControlClass}>
                     <option value="">All</option>
                     <option value="standard">Standard</option>
@@ -602,7 +616,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                 </FilterField>
 
                 <FilterField label="Age restricted" htmlFor="catalog-age">
-                  <select id="catalog-age" value={filterAgeRestricted ? "1" : "0"} onChange={e => withPageReset(setFilterAgeRestricted)(e.target.value === "1")}
+                  <select id="catalog-age" value={filterAgeRestricted ? "1" : "0"} onChange={e => setFilter("ageRestricted", e.target.value === "1")}
                     className={filterControlClass}>
                     <option value="0">All</option>
                     <option value="1">18+ only{facets ? ` (${restrictedCount})` : ""}</option>
@@ -614,10 +628,10 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                     Price range{facets?.priceRange ? ` (${formatMoney(facets.priceRange.min)}–${formatMoney(facets.priceRange.max)})` : ""}
                   </legend>
                   <div className="flex items-center gap-2">
-                    <input type="number" min="0" step="0.01" value={priceMin} onChange={e => withPageReset(setPriceMin)(e.target.value)}
+                    <input type="number" min="0" step="0.01" value={priceMin} onChange={e => setFilter("priceMin", e.target.value)}
                       aria-label="Minimum price in dollars" placeholder="Min" className={filterControlClass} />
                     <span aria-hidden="true" className="text-xs text-content-muted">–</span>
-                    <input type="number" min="0" step="0.01" value={priceMax} onChange={e => withPageReset(setPriceMax)(e.target.value)}
+                    <input type="number" min="0" step="0.01" value={priceMax} onChange={e => setFilter("priceMax", e.target.value)}
                       aria-label="Maximum price in dollars" placeholder="Max" className={filterControlClass} />
                   </div>
                 </fieldset>
