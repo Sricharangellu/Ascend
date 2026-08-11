@@ -477,7 +477,10 @@ audit-log coverage to all privileged mutations · GDPR erasure/export · WAF · 
 
 ## 15. Changes Implemented in This Change
 
-Two verified defects fixed; both are in-repo, need no dashboard access, and change no working path.
+Three verified defects fixed, plus an ADR and a documentation reconciliation. All are in-repo, need
+no dashboard access, and change no working path. A fourth fix (the error envelope) was landed
+independently on `develop` by PR #211 while this branch was open and **theirs was taken** — see §17
+row 8, which records the collision rather than quietly absorbing it.
 
 **A. `.github/workflows/uptime.yml` — the heartbeat now actually monitors production.**
 *Problem (verified):* steps run sequentially, so the first backend failure aborted the job. Run
@@ -526,7 +529,35 @@ Verdict step would never run, reporting neither result nor summary. Fixed by giv
 take ~40 minutes to report — longer than the 15-minute interval, so every run would be cancelled by
 the next before saying anything.
 
-**C. Documentation reconciled with today's evidence** — `docs/architecture/DEPLOYMENTS.md` and
+**C. `src/gateway/accessLog.ts` — one structured log line per completed request.**
+*Problem (verified):* §4's risk #9. `pino` was configured and redacting correctly, but nothing logged
+requests, so a ten-minute production run emitted **three lines, all from boot**. PIPELINE.md's own
+diagnostic walkthrough ends at "check the logs"; there was nothing in them to check. A customer
+reporting "it failed around 3pm" left an operator with no record that the request had ever arrived.
+*Fix:* a `res.on("finish")` hook mirroring the idiom `metricsMiddleware` already establishes —
+mounted as layer 2b, after metrics and before rate limiting, so a rate-limited request is still
+logged. Severity is derived, not fixed: probe paths (`/healthz`, `/readyz`, `/health`, `/metrics`)
+log at `debug` so a 15-minute heartbeat cannot bury real traffic, 5xx at `error`, 4xx at `warn`,
+everything else at `info`. The line carries method, normalised path, status, duration, `requestId`,
+`traceId` and auth/tenant context — and **never** a body, header or query string, so it cannot become
+a new way to leak a credential past `pino`'s redaction.
+*Design note:* the decision is a pure function, `buildAccessLogLine(req, res, durationMs)`, with the
+middleware a four-line wrapper. That was not a stylistic preference — the first version tested the
+middleware by capturing `process.stdout.write`, and captured **zero lines**, because in development
+`pino` writes through a worker-thread transport straight to fd 1 and never touches the patched
+function. Extracting the decision made it testable against no sink at all.
+*Verified:* 5 tests in `src/gateway/accessLog.test.ts`, all passing — severity mapping including
+`429 → warn` and probes → `debug`; correlation ids and auth context present; no credential-carrying
+field emitted; and end-to-end through a real server that the logged `requestId` equals the
+`x-request-id` response header, which is the property that makes the log joinable to a customer
+report. `pino-http` was deliberately not added (see §17 row 8).
+
+**D. `ADR-014-master-is-the-operations-runtime.md`** — writes down §0's central finding as a standing
+rule, since it is the one thing in this audit that no existing document stated and that silently
+invalidates ops work: a scheduled-workflow change is not done when it merges, it is done when it
+reaches the default branch and a scheduled run from there demonstrates it.
+
+**E. Documentation reconciled with today's evidence** — `docs/architecture/DEPLOYMENTS.md` and
 `docs/architecture/PIPELINE.md`. Most consequentially, DEPLOYMENTS.md's **open contradiction is now
 closed**: the 2026-07-20 claim ("the non-prod backend Vercel project was deleted") is correct and the
 2026-07-23 finding ("it still resolves") is superseded — run `31271109836` proves the project ID is
@@ -591,14 +622,18 @@ Vercel/Render/Supabase/GitHub-settings credential.
    the `deploy-dev` job so a green run stops implying a deployment.
 6. Enable Supabase PITR on the production project.
 
-**Progress on the agent-actionable list (updated 2026-08-10, PR #208):**
+**Progress on the agent-actionable list (updated 2026-08-11, PR #208 — reconciled against `develop`):**
+
+Three of these rows changed meaning after they were first written, because concurrent sessions landed
+overlapping work on `develop` while this branch was in flight. The rows are corrected in place rather
+than left as they were filed; where another PR's version won, that is stated and the reason given.
 
 | # | Item | State |
 |---|---|---|
-| 8 | `pino-http` request logging + repair `errorEnvelopeMiddleware` | **DONE.** Both halves. The envelope is now the single error handler and every error response carries `requestId`; `gateway/accessLog.ts` emits one structured line per request. Request logging was implemented **without** `pino-http` — `metricsMiddleware` already establishes the `res.on("finish")` idiom, so matching it cost ~40 lines and no new dependency, which also avoids a supply-chain decision in a repo that pins even actionlint by release tag. |
+| 8 | `pino-http` request logging + repair `errorEnvelopeMiddleware` | **DONE — one half here, one half by PR #211.** *Request logging* is this PR's: `gateway/accessLog.ts` emits one structured line per completed request, `develop` had none. It was implemented **without** `pino-http` — `metricsMiddleware` already establishes the `res.on("finish")` idiom, so matching it cost ~40 lines and no new dependency, which also avoids a supply-chain decision in a repo that pins even actionlint by release tag. *The envelope repair* was landed independently by **PR #211** while this branch was open, consolidating in the opposite direction: it folded the envelope into `errorMiddleware` and deleted `src/gateway/errorEnvelope.ts`, where this branch had deleted `errorMiddleware` and kept the gateway file. **Theirs was taken wholesale on merge** — it is the merged incumbent, and it found a defect this branch missed: `contextFromRequest` reads `req.id` and the `x-trace-id`/`x-span-id` *request* headers, none of which this app sets, so **every 500 ever logged also carried `requestId: undefined`**. Both sides of the correlation were broken, not just the response side. This branch's envelope change, its `CONTRACTS.md` edit and its `errorEnvelope.test.ts` are dropped. |
 | 9 | DLQ surface (`/metrics` gauge for `job_queue` failures) | **ALREADY DONE on `develop` — this audit was wrong to list it.** `collectRuntimeGauges` emits `job_queue_depth{status="failed"}` plus `job_queue_oldest_due_age_ms` and the outbox backlog. The error was mine: §1.5's "no DLQ surface" came from reading `master`'s `app.ts`/`metrics.ts` before this branch was rebased onto `develop`, and I did not re-check it after. The genuinely open half is the *alert*, which needs a collector (task in Phase 2). |
-| 12 | ADR for the default-branch rule | **DONE.** `ADR-013-master-is-the-operations-runtime.md` — states the invariant (a scheduled-workflow change is not done until it reaches `master`), a drift budget, and the rule that a monitoring "fix" is pending until a scheduled run from `master` demonstrates it. Records why making `develop` the default branch — the tempting fix — is worse: the heartbeat exists to test production, and running it from `develop` would monitor production with unreleased configuration, and would point `backup.yml` at the production database from unreviewed code. |
-| 7 | Restore drill in CI | **ATTEMPTED, NOT SHIPPED — deliberately withheld.** A `scripts/restore-drill.sh` was written (verify archive via `pg_restore --list` → restore into a throwaway DB with `--exit-on-error` → assert the schema is populated → **boot the app against the restored database and run `scripts/smoke.ts`**, which is the step that separates "the file restored" from "we can trade on it"). It is **not** in this PR because it could not be proven: the sandbox Postgres was killed three times mid-run and ended in a slow crash-recovery loop, so the drill never completed once. Shipping an ops check that has never executed is the exact failure this audit spends its length arguing against — `backup.yml` reported success 18 times while backing up nothing. The draft is sound and re-runnable; whoever picks it up needs only a stable Postgres. Note `--exit-on-error` is load-bearing: `pg_restore` defaults to logging errors and exiting 0, which would produce a green drill over a partial restore. |
+| 12 | ADR for the default-branch rule | **DONE.** `ADR-014-master-is-the-operations-runtime.md` — states the invariant (a scheduled-workflow change is not done until it reaches `master`), a drift budget, and the rule that a monitoring "fix" is pending until a scheduled run from `master` demonstrates it. Records why making `develop` the default branch — the tempting fix — is worse: the heartbeat exists to test production, and running it from `develop` would monitor production with unreleased configuration, and would point `backup.yml` at the production database from unreviewed code. **Renumbered 013 → 014 on merge:** `develop` took ADR-013 for a different subject (schema is forward-only, recovery is by restore) while this branch was open. Two ADRs numbered 013 is exactly the ambiguity the numbering exists to prevent, so this one moved; the incumbent on `develop` kept its number. |
+| 7 | Restore drill in CI | **CLOSED on `develop` by PR #212 — this PR's draft was withheld and is now obsolete.** This session wrote a `scripts/restore-drill.sh` and **deliberately did not ship it**: the sandbox Postgres was killed three times mid-run and ended in a slow crash-recovery loop, so the drill never once completed. Shipping an ops check that has never executed is the exact failure this audit spends its length arguing against — `backup.yml` reported success 18 times while backing up nothing. That judgement stands, and it turned out to cost nothing: `develop` now carries `db/backup/drill.sh` + `.github/workflows/restore-drill.yml`, which run on a real `postgres:16` service container, and they are **stronger than the withheld draft** on three counts — a per-table *content checksum* rather than a row count (so `users.password_hash` is provably intact byte for byte), an enforced RTO budget, and a refusal to run against an empty source (which would otherwise pass trivially). Their scope note is also the correct one and matches this audit's C-1: a green run proves the *mechanism*, not that production is recoverable, because `PROD_DATABASE_URL` is still unset. **C-1's production half remains OPEN** — a drill proves the path, it cannot conjure a backup nobody took. |
 | 10 | Trivy image scan | **DEFERRED — blocked, with a reason.** Not for the reason `security.yml` records ("needs a third-party action, which is Sri's call"): that objection is answerable, since a pinned release binary is the same trust model this repo already accepted for `gitleaks` and `actionlint`. The actual blocker is narrower — this session's GitHub access is scoped to `Sricharangellu/Ascend`, so `api.github.com/repos/aquasecurity/trivy/releases` returns "access to this repository is not enabled". I cannot resolve a real version to pin, and pinning a guessed tag ships a step that 404s at runtime — an unverified value that *looks* fixed, which ADR-011's evidence bar exists to prevent. Any session with wider network access can finish this in one step. |
 
 **Agent-actionable now (no credentials needed, in dependency order):**
@@ -613,8 +648,9 @@ Vercel/Render/Supabase/GitHub-settings credential.
 10. Add Trivy to the existing `docker-build` job (report-only first, per ADR-008/010).
 11. Write the k6 script from `scripts/smoke.ts` and run it against a tier that exists (blocked on
     task 4 — there is currently nowhere to point it).
-12. Extend ADR-011 with the default-branch caveat, or open ADR-013: "scheduled workflows execute the
-    default branch; `master` is the operations runtime, not just production's code."
+12. Extend ADR-011 with the default-branch caveat, or open a new ADR: "scheduled workflows execute the
+    default branch; `master` is the operations runtime, not just production's code." *(Shipped as
+    ADR-014 — 013 was taken by `develop` in the meantime.)*
 13. Close the second half of Fix B: `web/next.config.mjs`'s `rewrites()` has its own
     `VERCEL_ENV ? "https://ascendhq-api.vercel.app" : …` fallback, and the git-connected Vercel build
     never runs `deploy.sh`. Either set `BACKEND_URL` in the `ascend_hq_web` Vercel project

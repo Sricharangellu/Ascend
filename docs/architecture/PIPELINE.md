@@ -54,13 +54,15 @@ staging    ──PR──▶  master    → CI + deploy PROD    (--prod, prod DB
 Every branch requires the CI status checks (`Production guard`, `Backend — typecheck + test`,
 `Frontend — typecheck + lint + build`) to pass before merge. Force-push is blocked.
 
-> **⚠ BROKEN SINCE 2026-08-05 — `master` cannot accept any merge. Read before attempting a release.**
+> **⚠ WAS BROKEN 2026-08-05 → 2026-08-10 — `master` could not accept any merge. Now unblocked by a
+> shim; the permanent fix is still open and is Sri's.**
 >
-> The third name above is what `master`'s branch protection actually requires, and **nothing produces
-> it any more.** Commit `1a4b989` ("test(web): add route-integrity guard and run web tests in CI",
-> 2026-08-05) renamed that job to **`Frontend — typecheck + lint + test + build`** without updating
-> branch protection or this line. A required check that no job emits is never satisfied and never
-> fails — it sits permanently "expected", so the merge button is dead for every PR into `master`.
+> The third name above is what `master`'s branch protection actually requires, and for five days
+> **nothing produced it.** Commit `1a4b989` ("test(web): add route-integrity guard and run web tests
+> in CI", 2026-08-05) renamed that job to **`Frontend — typecheck + lint + test + build`** without
+> updating branch protection or this line. A required check that no job emits is never satisfied and
+> never fails — it sits permanently "expected", so the merge button was dead for every PR into
+> `master`.
 >
 > Verified 2026-08-08 by attempting the release merge of PR #200. GitHub's answer, verbatim:
 >
@@ -68,20 +70,27 @@ Every branch requires the CI status checks (`Production guard`, `Backend — typ
 > 405 Required status check "Frontend — typecheck + lint + build" is expected.
 > ```
 >
-> This is why `master` has not moved since 2026-07-23. It also means the release PR's other red
-> checks are **red herrings** for the merge block: `CodeQL` (17 pre-existing alerts, all against a
-> `master` baseline CodeQL has never analysed — it passes on every `develop`-based PR with identical
-> code) and `Deploy → Testing` (fails only on its backend half, which uploads to Vercel while the
-> backend runs on Render). Neither is what GitHub names when the merge is refused.
+> This is why `master` did not move between 2026-07-23 and the fix. It also means the release PR's
+> other red checks were **red herrings** for the merge block: `CodeQL` (17 pre-existing alerts, all
+> against a `master` baseline CodeQL has never analysed — it passes on every `develop`-based PR with
+> identical code) and `Deploy → Testing` (fails only on its backend half, which uploads to Vercel
+> while the backend runs on Render). Neither is what GitHub names when the merge is refused.
 >
-> **Two remedies, either one sufficient — pick one, do not do both:**
-> 1. *Preferred.* Settings → Branches → `master` → required status checks: replace
->    `Frontend — typecheck + lint + build` with `Frontend — typecheck + lint + test + build`, then
->    correct the list above. Keeps the accurate job name. **Sri-only** — protection is
->    admin-enforced and the API returns `403 Resource not accessible by integration` to agents.
-> 2. Rename the job back to `Frontend — typecheck + lint + build`, restoring the contract both this
->    document and branch protection already record. Agent-doable, but the name then understates the
->    job, which does run the web tests.
+> **Applied 2026-08-10 (remedy 2, variant):** `ci.yml` now carries a
+> `frontend-required-name-shim` job named `Frontend — typecheck + lint + build` that mirrors the real
+> frontend job's result. The real job keeps its accurate name — the shim *adds* the required name
+> rather than renaming anything, which is the safe direction: adding a check name cannot break any
+> branch's protection, whereas renaming could have broken `develop`/`staging` if their protection
+> already required the new name. The shim uses `if: always()` plus an explicit result assertion,
+> because a bare `needs:` would make it **skip** on a frontend failure and GitHub can treat a skipped
+> required check as satisfied — which would have recreated the original bug in reverse.
+>
+> **Still open — the permanent fix, and it is Sri-only.** Settings → Branches → `master` → required
+> status checks: replace `Frontend — typecheck + lint + build` with
+> `Frontend — typecheck + lint + test + build`, correct the list above, **and delete the shim job
+> from `ci.yml`**. The protection API returns `403 Resource not accessible by integration` to agents,
+> so no agent can do this half. Until it happens the shim is load-bearing — do not remove it on
+> tidiness grounds.
 >
 > **Whichever is chosen, keep this line and the protection setting in sync.** The failure mode is
 > silent by construction: renaming a required job produces no error anywhere until someone tries to
@@ -118,8 +127,21 @@ time, even if CI is green.
 - **push `develop`** → `deploy-dev` → `DEPLOY_ENV=dev scripts/deploy.sh both` (preview, testing DB).
 - **push `staging`** → `deploy-staging` → `DEPLOY_ENV=testing scripts/deploy.sh both` (preview aliased
   to stable staging domains) → smoke `/healthz` + `/readyz` on the testing backend.
-- **push `master`** → `deploy-production` → `DEPLOY_ENV=prod scripts/deploy.sh both` (`--prod`) →
+- **push `master`** → `deploy-production` → `DEPLOY_ENV=prod scripts/deploy.sh frontend` (`--prod`) →
   `smoke-test` (`/healthz`, `/readyz`, `/api/v1/flags`→401, frontend 200).
+
+  **The prod target is `frontend`, not `both` — changed 2026-08-10, deliberately.** `both` invokes
+  `deploy_backend`, which uploads to Vercel project `prj_krZ34CIFjzQrMvZ08PWqqbxzBf7d` —
+  `DEPLOYMENTS.md` records that project as CONFIRMED BROKEN (it resolves, but serves a bare unrelated
+  Express app). The real production backend is the Render service, deployed by **Render's own git
+  integration on push to `master`**, not by anything in this repo. So a release ships the backend
+  through Render and the frontend through Vercel, by two entirely separate mechanisms, and only the
+  second belongs in CI. `smoke-test` still probes **both** halves — CI no longer deploys the backend
+  but must keep verifying it. `vars.PROD_DEPLOY_TARGET` overrides, so the old behaviour is one repo
+  variable away if `DEPLOYMENTS.md` P1 ever resolves the other way.
+- **schedule** → `jobs-tick` (`*/15`) ticks `/jobs/tick` on the production backend, and `uptime`
+  (`*/15`) probes production. Neither is triggered by a push. `jobs-tick` replaced `vercel.json`'s
+  cron, which could never reach a Render-hosted backend — see ADR-012.
 
 ## Configuration (GitHub + Vercel + Supabase + Render)
 
@@ -176,7 +198,8 @@ for the full investigation this depends on.
 |---|---|---|---|---|---|
 | `DATABASE_URL` | Postgres connection string | `src/shared/db.ts`, every module | Render/Vercel env (backend host — see `DEPLOYMENTS.md` for which), or `DEV_DATABASE_URL` GH secret override for dev tier | Regenerate via Supabase dashboard; update wherever the real backend host stores env vars | VERIFIED present + actively used; **which host actually holds the live value is UNVERIFIED — see `DEPLOYMENTS.md`** |
 | `PG_POOL_MAX` | Postgres connection pool size cap | `src/shared/db.ts` | Same as `DATABASE_URL`'s host | No rotation — a tuning value, not a credential | VERIFIED (code reference) |
-| `PG_TX_TIMEOUT_MS` | Per-transaction statement timeout | `src/shared/db.ts` | Same | No rotation — tuning value | VERIFIED — actively tuned per-environment (CI got its own headroom, PR #118) |
+| `PG_TX_TIMEOUT_MS` | Per-**statement** timeout, applied as `SET LOCAL statement_timeout` at BEGIN. Each statement in a transaction gets its own budget — verified against PG 16; the previous "per-transaction" wording here was wrong, and that misreading is what let the migration-lock flake hide | `src/shared/db.ts` | Same | No rotation — tuning value | VERIFIED — actively tuned per-environment (CI got its own headroom, PR #118) |
+| `PG_MIGRATION_LOCK_WAIT_MS` | Bound on how long boot waits for the migration advisory lock (default 300000). Concurrent instances queue here; exceeding it raises an explicit "migration lock not acquired" error instead of a misleading statement timeout | `src/app.ts` | Same | No rotation — tuning value | VERIFIED (code reference + regression tests in `src/app.migration-lock.test.ts`) |
 | `PG_SSL` | Enable/disable TLS to Postgres | `src/shared/db.ts` | Same | No rotation — config flag | VERIFIED (code reference) |
 | `PG_CA_CERT` / `PG_CA_CERT_B64` | Custom CA certificate for DB TLS verification (raw PEM / base64) — **two distinct formats, not a duplicate** | `src/shared/db.ts` (C-3 hardening) | Same | Regenerate alongside the Supabase project's cert chain if it rotates | VERIFIED — real fix, `WORK/LOCK.md` "session D — C-3: verified DB TLS" |
 | `PG_SSL_NO_VERIFY` | Explicit escape hatch to skip cert verification (logs a loud warning) | `src/shared/db.ts` | Same | Should not be set in production outside a documented exception | VERIFIED (C-3 fix) |
@@ -186,7 +209,7 @@ for the full investigation this depends on.
 | `TRUST_PROXY_DEPTH` | Express `trust proxy` depth, for correct client-IP detection behind a reverse proxy | Gateway/rate-limiting middleware, inferred from name | Backend host env | No rotation — config value | UNVERIFIED (present, purpose inferred, not traced to a specific call site) |
 | `WEBHOOK_SECRET_KEY` | Encrypts stored webhook secrets; fails closed in production if unset | `src/modules/webhooks/service.ts` | Backend host env | Rotating re-encrypts stored webhook secrets — needs a migration, not just a value swap | VERIFIED — real fail-closed behavior, `WORK/audits/AUDIT_2026-07-12T013607Z-webhook-secret-fail-closed.md` |
 | `CRON_SECRET` | Authenticates scheduled/cron-triggered endpoints | Scheduled job routes | Backend host env (Vercel Cron or equivalent) | Rotate + update wherever the scheduler is configured to send it | VERIFIED as a real concept (`WORK/LOOP_STATE.md`'s "C-2 completion" item); live value not re-checked |
-| `JOBS_TICK_SECRET` | Authenticates the `/jobs/tick` endpoint (ACPA M1.2 job-runtime) | `src/orchestration/*` | Backend host env | Rotate + update wherever `/jobs/tick` is triggered from | VERIFIED (referenced in `ARCHITECTURE.md`'s ACPA M1.2 note) |
+| `JOBS_TICK_SECRET` | Authenticates the `/jobs/tick` endpoint (ACPA M1.2 job-runtime) | `src/orchestration/*` | Backend host env **and** the repo secret of the same name — `.github/workflows/jobs-tick.yml` sends it as `X-Jobs-Tick-Secret`. Both halves required; setting only one yields 401 (repo-only) or 503 `cron_unconfigured` (server-only). | Rotate in both places together | VERIFIED (referenced in `ARCHITECTURE.md`'s ACPA M1.2 note); **live value NOT set as of 2026-08-10 — background jobs do not run in production until it is** |
 | `REDIS_URL` | Optional Redis connection — **falls back to in-memory if unset**, per this repo's own architecture doctrine | Queue/cache layer | Backend host env | Rotate via Redis provider dashboard | VERIFIED (code reference + explicit doctrine: Redis is optional, not required) |
 | `STRIPE_SECRET_KEY` | Stripe API authentication for payments | `payments` module | Backend host env | Rotate via Stripe dashboard; update immediately, no grace period on live-mode keys | VERIFIED (`stripe` is a real `package.json` dependency) |
 | `STRIPE_TERMINAL_READER_ID` | Stripe Terminal (physical card reader) device identifier for POS hardware | POS/payments, inferred from name | Backend host env | Reissue via Stripe Terminal dashboard if the physical reader is replaced | UNVERIFIED (present, purpose inferred, not traced to a specific call site) |
@@ -207,6 +230,49 @@ script (with hardcoded demo defaults, e.g. `PASSWORD` defaults to a demo credent
 application runtime config, not a rotation concern. Worth noting: its hardcoded default `BASE` URL
 is `https://ascendhq-api.vercel.app` — the same dead URL found everywhere else in this investigation,
 one more independent confirmation that URL is obsolete repo-wide, not just in the heartbeat workflow.
+
+### Production backend host — Render service env vars (added 2026-08-10)
+
+`GAPS.md` recorded this hole in its own words: "no record anywhere of what Render env vars would need
+to be set even if the platform were confirmed real … its required env vars should be added to this
+table by name, same as every other row." Render **is** now confirmed — service **"Ascend Prod"**,
+`srv-d9lo8jm7bikc739dnsn0`, Docker runtime, Free plan, deploying from `Sricharangellu/Ascend` branch
+`master` (Sri, from the dashboard, 2026-08-08) — so the precondition is met and the table belongs here.
+
+**This table is derived from `src/app.ts:129-155`, which is the authority — not from memory, and not
+from `.env.example`.** That code is what actually decides whether the server boots. It only runs when
+`NODE_ENV=production`, which is why that variable leads the list: if it is unset, the fail-fast never
+fires and the server boots happily with no `JWT_SECRET`, which is strictly worse than crashing.
+
+Values are never listed here — names, purposes and severities only.
+
+| Severity | Var | What happens if it is missing |
+|---|---|---|
+| **Gates every check below** | `NODE_ENV=production` | The startup validation does not run at all. The server boots misconfigured and silent. Confirm this one first. |
+| **Crash on boot** | `JWT_SECRET` | `buildApp` throws. Every authenticated request would fail anyway. Generate with `crypto.randomBytes(64).toString('hex')`; rotating invalidates every live session, so choose before launch. |
+| **Crash on boot** | `DATABASE_URL` | `buildApp` throws. Which Supabase project this should point at is itself unresolved — see `DEPLOYMENTS.md` item 4. |
+| **Fail closed (503)** | `WEBHOOK_SECRET_KEY` | Creating or rotating any webhook subscription 503s. Rotating later re-encrypts stored secrets — a migration, not a value swap. |
+| **Fail closed (503)** | `STRIPE_SECRET_KEY` | Card payments 503. For a POS this is the difference between selling and not selling. |
+| **Fail closed (503)** | `CRON_SECRET` **or** `JOBS_TICK_SECRET` | `/jobs/tick` 503s `cron_unconfigured`, so background jobs and outbox redelivery never run. Either satisfies the endpoint; `JOBS_TICK_SECRET` is the one `.github/workflows/jobs-tick.yml` sends, and it must ALSO exist as a repo secret. |
+| Silently degrades | `SENDGRID_API_KEY` | Password reset and transactional email fail with no error surfaced. |
+| Silently degrades | `APP_URL` | Password-reset links fall back to `ascendhq-api.vercel.app`, which is dead. |
+| Silently degrades | `REDIS_URL` | Rate limiting falls back to per-instance in-memory state — limits are not shared across replicas. Not a crash, just quietly wrong at scale. |
+| Silently degrades | `METRICS_TOKEN` | `/metrics` scraping disabled (the endpoint requires a bearer token in production by design). |
+| **Browser-blocking, not in the startup check** | `ALLOWED_ORIGINS` | Must include `https://ascendhqweb.vercel.app`. Omit it and the browser is CORS-blocked against a perfectly healthy backend — a failure that looks like an outage and is not one. |
+| Security posture | `PG_SSL`, `PG_CA_CERT_B64` | Verified TLS to Supabase (C-3). Do **not** set `PG_SSL_NO_VERIFY` in production. |
+| Feature-specific | `STRIPE_TERMINAL_READER_ID`, `STRIPE_WEBHOOK_SECRET`, `EMAIL_FROM`, `TRUST_PROXY_DEPTH`, `STORE_NAME` | Per-feature; see the application env var table above. |
+| Platform-injected | `PORT` | Render injects it; `src/server.ts` reads it and binds without a host restriction. Nothing to set. |
+
+**Verification status: UNVERIFIED for every row.** Nobody has confirmed which of these are actually
+set on the live service — the Render dashboard is Sri-only. Do not upgrade any row to VERIFIED
+without a dashboard check; writing VERIFIED for something nobody looked at is the precise failure
+this registry exists to prevent.
+
+**Not represented in this repo at all:** there is no `render.yaml` and no IaC of any kind, so every
+value above is dashboard-only state. `GAPS.md` keeps that open deliberately — codifying a topology
+before `DEPLOYMENTS.md`'s remaining questions are answered would add another conflicting picture of
+production rather than removing one. Documenting the names is not the same as codifying the
+infrastructure, and this section does not close that gap.
 
 ### Configuration Ownership Matrix
 
@@ -300,13 +366,43 @@ Direct evidence gathered this pass, without Vercel/Render dashboard access:
 
 ## Rollback
 
-Every change here is a branch/CI/protection edit — no data migrations, and the prod DB (Supabase A)
-is never touched by pipeline work.
+> **Read this first: reverting a release rolls back CODE, not the DATABASE.** The sentence that
+> used to open this section — "Every change here is a branch/CI/protection edit — no data
+> migrations" — was true of the *pipeline* work it was written for and is false of a release. A
+> release carries module migrations, and `buildApp` applies every one of them the moment the new
+> backend boots. `git revert` on `master` then redeploys the old code against a database that has
+> already moved. That is worse than having no rollback story, because it reads as solved.
+
+**Code rollback — these work, and are all that works today:**
 
 - **Bad release:** re-run the last known-good `master` deploy, or `git revert` the release merge and
   push `master` (redeploys prod). Vercel also keeps prior deployments — promote a previous one in the
-  dashboard for an instant rollback.
+  dashboard for an instant frontend rollback. Render keeps prior deploys for the backend.
 - **Bad pipeline change:** revert the CI commit on `master`.
+
+**Schema rollback — there is none, by decision.** Only the 3 foundation migrations have
+`.down.sql`; the 186 module-owned tables have none, and will not get any. See
+[ADR-013](ADR/ADR-013-schema-is-forward-only-recovery-is-by-restore.md): schema is **forward-only**
+and the recovery mechanism for a data-affecting mistake is a **point-in-time restore**, not a schema
+reversal — because reversing a migration that dropped a column recreates an empty column and does
+not bring the values back either. Down-migrations solve schema *shape* drift, which is not the
+failure this repo is exposed to.
+
+The obligation that comes with that policy: **a migration that destroys data — dropping a column or
+table, narrowing a type, deleting rows — requires an explicit pre-migration backup checkpoint**,
+taken and verified before the release that carries it. "We have daily backups" is not a checkpoint.
+
+**Is restore actually trustworthy?** The mechanism, yes, and it is continuously proven rather than
+assumed: `db/backup/drill.sh` runs backup → verify → restore → compare → boot-the-app, and
+`.github/workflows/restore-drill.yml` runs it weekly *and* on every change to `db/backup/**`. The
+comparison is a per-table row count **and content checksum**, so `users.password_hash` is proven
+intact byte for byte, not merely present.
+
+**But production has nothing to restore from yet.** `PROD_DATABASE_URL` is unset, so `backup.yml`
+reports success in ~5 seconds having backed up nothing and the production RPO is unbounded — total
+loss, not ≤24h. Until that secret is set (`WORK/LOOP_STATE.md`, NEEDS-SRI), the policy above is
+correct and the artifact it depends on does not exist. A drill proves the path works; it cannot
+conjure a backup nobody took.
 
 ## Known issue — E2E login flake: ROOT CAUSE CONFIRMED (2026-07-18)
 

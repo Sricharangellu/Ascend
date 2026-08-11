@@ -70,9 +70,8 @@ export function registerRoutes(router: Router, svc: CustomerInvoicesService): vo
 
   router.patch("/customer-invoices/:id/status", mgr, handler(async (req, res) => {
     // Uses parseBody (not raw zod .parse()) so a malformed status value is a
-    // clean 400 through errorEnvelopeMiddleware's HttpError branch, not an
-    // unhandled ZodError that falls through to a generic 500 (see
-    // CODING_STANDARDS.md).
+    // clean 400 through errorMiddleware's HttpError branch, not an unhandled
+    // ZodError that falls through to a generic 500 (see CODING_STANDARDS.md).
     const b = parseBody(statusUpdateSchema, req.body);
     res.json(await svc.updateStatus(String(req.params.id), b.status, b.paid_cents, tid(res)));
   }));
