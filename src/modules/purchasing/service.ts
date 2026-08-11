@@ -5,7 +5,7 @@ import { HttpError } from "../../shared/http.js";
 import { nextDocSeq, nextDocNumber } from "../../shared/docnumber.js";
 import { computeSalesVelocityForProduct } from "../../shared/sales-velocity.js";
 
-import { clampLimit, decodeCursor, toPage } from "../../shared/pagination.js";
+import { clampLimit, decodeCursor, encodeCursor, toPage } from "../../shared/pagination.js";
 export type { CursorPage } from "../../shared/pagination.js";
 import type { CursorPage } from "../../shared/pagination.js";
 import { recordUomUnitNotConfigured } from "../../gateway/metrics.js";
@@ -179,8 +179,46 @@ export interface PurchaseOrder {
   freight_cost_cents: number;
   other_charges_cents: number;
   notes: string | null;
+  expected_date: number | null;
   created_at: number;
   received_at: number | null;
+}
+
+/**
+ * A purchase order plus the roll-ups the list view needs to answer, per row,
+ * "what has been ordered / received / invoiced, and is it late?".
+ *
+ * These are derived by `listOrders` in the SAME query as the page, not by a
+ * per-row follow-up fetch — the caller renders a whole page from one round trip.
+ */
+export interface PurchaseOrderListRow extends PurchaseOrder {
+  supplier_name: string | null;
+  line_count: number;
+  ordered_qty: number;
+  received_qty: number;
+  /** Never negative: over-receipt is blocked per line, but a legacy row could still exceed. */
+  remaining_qty: number;
+  bill_count: number;
+  /** none → nothing entered · open → a draft/held bill awaits · posted → all bills posted. */
+  invoice_status: "none" | "open" | "posted";
+  /** True only when an ETA exists and has passed while the PO is still open. */
+  is_overdue: boolean;
+}
+
+/** Filters accepted by `listOrders`. Every one is applied in SQL, never in the caller. */
+export interface OrderListFilters {
+  cursor?: string;
+  limit?: number;
+  status?: POStatus;
+  receiveStatus?: string;
+  approvalStatus?: POApprovalStatus;
+  supplierId?: string;
+  /** Matches a PO number exactly (digits) or a substring of the notes. */
+  search?: string;
+  createdFrom?: number;
+  createdTo?: number;
+  /** Open POs whose expected_date is in the past. Implies "still open". */
+  overdue?: boolean;
 }
 
 /** Approval state, orthogonal to the fulfillment status. Legacy rows default to 'approved'. */
@@ -727,7 +765,13 @@ export class PurchasingService {
     if (po.approval_status === "rejected") throw new HttpError(409, "rejected", "a rejected purchase order cannot be received");
   }
 
-  async createOrder(supplierId: string, lines: POLineInput[], tenantId: string, actor?: Actor): Promise<PurchaseOrderWithLines> {
+  async createOrder(
+    supplierId: string,
+    lines: POLineInput[],
+    tenantId: string,
+    actor?: Actor,
+    opts: { expectedDate?: number | null; notes?: string | null } = {},
+  ): Promise<PurchaseOrderWithLines> {
     if (lines.length === 0) throw new HttpError(400, "bad_request", "at least one line is required");
     const supplier = await this.db.one("SELECT id FROM suppliers WHERE id = @supplierId AND tenant_id = @tenantId", { supplierId, tenantId });
     if (!supplier) throw new HttpError(404, "not_found", `supplier '${supplierId}' not found`);
@@ -764,9 +808,9 @@ export class PurchasingService {
     const approvalStatus: POApprovalStatus = tier === "auto" ? "approved" : "pending";
     await this.db.withTenant(tenantId).tx(async (tdb) => {
       await tdb.query(
-        `INSERT INTO purchase_orders (id, tenant_id, supplier_id, status, approval_status, approved_at, total_cost_cents, po_number, created_at, received_at)
-         VALUES (@id,@tenant_id,@supplier_id,'ordered',@approval_status,@approved_at,@total,@po_number,@created_at,NULL)`,
-        { id: poId, tenant_id: tenantId, supplier_id: supplierId, approval_status: approvalStatus, approved_at: approvalStatus === "approved" ? now : null, total, po_number: poNumber, created_at: now },
+        `INSERT INTO purchase_orders (id, tenant_id, supplier_id, status, approval_status, approved_at, total_cost_cents, po_number, notes, expected_date, created_at, received_at)
+         VALUES (@id,@tenant_id,@supplier_id,'ordered',@approval_status,@approved_at,@total,@po_number,@notes,@expected_date,@created_at,NULL)`,
+        { id: poId, tenant_id: tenantId, supplier_id: supplierId, approval_status: approvalStatus, approved_at: approvalStatus === "approved" ? now : null, total, po_number: poNumber, notes: opts.notes ?? null, expected_date: opts.expectedDate ?? null, created_at: now },
       );
       for (const l of poLines) {
         await tdb.query(
@@ -788,33 +832,117 @@ export class PurchasingService {
       status: "ordered", receive_status: "pending",
       approval_status: approvalStatus, approved_at: approvalStatus === "approved" ? now : null,
       total_cost_cents: total,
-      freight_cost_cents: 0, other_charges_cents: 0, notes: null,
+      freight_cost_cents: 0, other_charges_cents: 0, notes: opts.notes ?? null,
+      expected_date: opts.expectedDate ?? null,
       created_at: now, received_at: null, lines: poLines,
     };
   }
 
-  async listOrders(tenantId: string, query: { cursor?: string; limit?: number } = {}): Promise<CursorPage<PurchaseOrder>> {
+  /**
+   * List purchase orders, newest first, keyset-paginated.
+   *
+   * Two things this deliberately does in SQL rather than leaving to the caller:
+   *
+   * 1. **Filtering.** Every filter below is a predicate on the same keyset scan,
+   *    so "show me POs awaiting approval" reads one page of matches. Filtering a
+   *    single fetched page in the browser instead would silently search only the
+   *    newest 50 rows and present the result as if it had searched everything.
+   * 2. **Roll-ups.** supplier name, line/qty totals and bill state come from two
+   *    aggregate sub-selects over the page, not a request per row.
+   */
+  async listOrders(tenantId: string, query: OrderListFilters = {}): Promise<CursorPage<PurchaseOrderListRow>> {
     const limit = clampLimit(query.limit);
-    const cur = query.cursor
-      ? (JSON.parse(Buffer.from(query.cursor, "base64url").toString()) as { at: number; id: string })
-      : null;
-    const where = ["tenant_id = @tenantId"];
+    const cur = decodeCursor(query.cursor);
+    const where = ["po.tenant_id = @tenantId"];
     const params: Record<string, unknown> = { tenantId };
     if (cur) {
-      where.push("(created_at, id) < (@curAt, @curId)");
+      where.push("(po.created_at, po.id) < (@curAt, @curId)");
       params.curAt = cur.at;
       params.curId = cur.id;
     }
-    const items = await this.db.query<PurchaseOrder>(
-      `SELECT * FROM purchase_orders WHERE ${where.join(" AND ")} ORDER BY created_at DESC, id DESC LIMIT @limit`,
-      { ...params, limit },
+    if (query.status) {
+      where.push("po.status = @status");
+      params.status = query.status;
+    }
+    if (query.receiveStatus) {
+      where.push("po.receive_status = @receiveStatus");
+      params.receiveStatus = query.receiveStatus;
+    }
+    if (query.approvalStatus) {
+      where.push("po.approval_status = @approvalStatus");
+      params.approvalStatus = query.approvalStatus;
+    }
+    if (query.supplierId) {
+      where.push("po.supplier_id = @supplierId");
+      params.supplierId = query.supplierId;
+    }
+    if (query.createdFrom != null) {
+      where.push("po.created_at >= @createdFrom");
+      params.createdFrom = query.createdFrom;
+    }
+    if (query.createdTo != null) {
+      where.push("po.created_at <= @createdTo");
+      params.createdTo = query.createdTo;
+    }
+    if (query.overdue) {
+      // "Overdue" is only meaningful for a PO that is still expecting goods, and
+      // only when someone actually recorded an ETA. A NULL expected_date is
+      // unknown, not late — reporting it as late would invent a fact.
+      where.push("po.expected_date IS NOT NULL AND po.expected_date < @now AND po.status IN ('ordered','partially_received')");
+      params.now = Date.now();
+    }
+    if (query.search) {
+      const term = query.search.trim();
+      if (term) {
+        // A PO is found by its human number; notes are the only other free text
+        // on the row. ILIKE is escaped so a user typing "%" searches for "%".
+        const digits = /^\d+$/.test(term) ? Number(term) : null;
+        where.push(digits != null ? "(po.po_number = @poNumber OR po.notes ILIKE @like)" : "po.notes ILIKE @like");
+        if (digits != null) params.poNumber = digits;
+        params.like = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+      }
+    }
+    const items = await this.db.query<PurchaseOrderListRow>(
+      `SELECT po.*,
+              s.name AS supplier_name,
+              COALESCE(l.line_count, 0)::int   AS line_count,
+              COALESCE(l.ordered_qty, 0)::int  AS ordered_qty,
+              COALESCE(l.received_qty, 0)::int AS received_qty,
+              GREATEST(COALESCE(l.ordered_qty, 0) - COALESCE(l.received_qty, 0), 0)::int AS remaining_qty,
+              COALESCE(b.bill_count, 0)::int   AS bill_count,
+              CASE WHEN COALESCE(b.bill_count, 0) = 0 THEN 'none'
+                   WHEN COALESCE(b.open_count, 0) > 0 THEN 'open'
+                   ELSE 'posted' END           AS invoice_status,
+              (po.expected_date IS NOT NULL
+                 AND po.expected_date < @nowTs
+                 AND po.status IN ('ordered','partially_received')) AS is_overdue
+         FROM purchase_orders po
+         LEFT JOIN suppliers s
+                ON s.tenant_id = po.tenant_id AND s.id = po.supplier_id
+         LEFT JOIN LATERAL (
+              SELECT COUNT(*) AS line_count,
+                     SUM(pol.quantity) AS ordered_qty,
+                     SUM(COALESCE(pol.received_qty, 0)) AS received_qty
+                FROM purchase_order_lines pol
+               WHERE pol.tenant_id = po.tenant_id AND pol.po_id = po.id
+         ) l ON TRUE
+         LEFT JOIN LATERAL (
+              SELECT COUNT(*) AS bill_count,
+                     COUNT(*) FILTER (WHERE pb.status <> 'posted') AS open_count
+                FROM po_bills pb
+               WHERE pb.tenant_id = po.tenant_id AND pb.po_id = po.id
+         ) b ON TRUE
+        WHERE ${where.join(" AND ")}
+        ORDER BY po.created_at DESC, po.id DESC
+        LIMIT @limit`,
+      { ...params, nowTs: Date.now(), limit },
     );
     const last = items[items.length - 1];
-    const nextCursor =
-      items.length === limit && last
-        ? Buffer.from(JSON.stringify({ at: last.created_at, id: last.id })).toString("base64url")
-        : null;
-    return { items, nextCursor, limit };
+    return {
+      items,
+      nextCursor: items.length === limit && last ? encodeCursor({ at: last.created_at, id: last.id }) : null,
+      limit,
+    };
   }
 
   async getOrder(id: string, tenantId: string): Promise<PurchaseOrderWithLines> {

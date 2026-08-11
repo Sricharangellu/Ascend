@@ -778,3 +778,164 @@ test("invoice line with no matching PO line is flagged unexpected", async () => 
   assert.equal(unexpected.product_id, pB);
   assert.equal(unexpected.invoiced_cents, 999);
 });
+
+// ── P2P-1: order-list filters, roll-ups and expected date ────────────────────
+// These cover the list surface the purchasing page renders from. Each filter is
+// asserted to EXCLUDE as well as include — a predicate that is silently dropped
+// (a typo'd column, a param that never reaches SQL) still returns rows, and a
+// test that only checks "my PO is in the list" passes against that bug.
+
+test("order list returns per-row roll-ups without a request per row", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app, "Roll-up Supply Co");
+  const productId = await makeProduct(app, "ROLLUP-A", 500);
+
+  const po = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId,
+    lines: [
+      { productId, quantity: 10, unitCostCents: 300 },
+      { productId, quantity: 5, unitCostCents: 300 },
+    ],
+  })).json;
+
+  const before = await call(app, "GET", "/api/purchasing/orders");
+  const rowBefore = before.json.items.find((o: any) => o.id === po.id);
+  assert.ok(rowBefore, "PO missing from list");
+  assert.equal(rowBefore.supplier_name, "Roll-up Supply Co", "supplier name must be joined, not left to the client");
+  assert.equal(rowBefore.line_count, 2);
+  assert.equal(rowBefore.ordered_qty, 15);
+  assert.equal(rowBefore.received_qty, 0);
+  assert.equal(rowBefore.remaining_qty, 15);
+  assert.equal(rowBefore.invoice_status, "none");
+  assert.equal(rowBefore.bill_count, 0);
+
+  // Receive part of the first line — the roll-up must move with it.
+  const recv = await call(app, "POST", `/api/purchasing/orders/${po.id}/receive`, {
+    lines: [{ lineId: po.lines[0].id, qty: 4 }],
+  });
+  assert.equal(recv.status, 200, `receive failed: ${JSON.stringify(recv.json)}`);
+
+  const after = await call(app, "GET", "/api/purchasing/orders");
+  const rowAfter = after.json.items.find((o: any) => o.id === po.id);
+  assert.equal(rowAfter.received_qty, 4);
+  assert.equal(rowAfter.remaining_qty, 11);
+  assert.equal(rowAfter.status, "partially_received");
+});
+
+test("order list filters by status, supplier and PO number — and excludes non-matches", async () => {
+  const app = await freshApp();
+  const supA = await makeSupplier(app, "Filter Supplier A");
+  const supB = await makeSupplier(app, "Filter Supplier B");
+  const productId = await makeProduct(app, "FILTER-A", 500);
+
+  const poA = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId: supA, lines: [{ productId, quantity: 3, unitCostCents: 100 }],
+  })).json;
+  const poB = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId: supB, lines: [{ productId, quantity: 3, unitCostCents: 100 }],
+  })).json;
+
+  const bySupplier = await call(app, "GET", `/api/purchasing/orders?supplierId=${supA}`);
+  assert.equal(bySupplier.status, 200);
+  const ids = bySupplier.json.items.map((o: any) => o.id);
+  assert.ok(ids.includes(poA.id), "supplier filter dropped a matching PO");
+  assert.ok(!ids.includes(poB.id), "supplier filter returned another supplier's PO");
+
+  // Fully receive A so the two POs differ by status.
+  await call(app, "POST", `/api/purchasing/orders/${poA.id}/receive`, {});
+  const ordered = await call(app, "GET", "/api/purchasing/orders?status=ordered");
+  const orderedIds = ordered.json.items.map((o: any) => o.id);
+  assert.ok(orderedIds.includes(poB.id));
+  assert.ok(!orderedIds.includes(poA.id), "status filter returned a received PO");
+
+  const byNumber = await call(app, "GET", `/api/purchasing/orders?search=${poB.po_number}`);
+  const numberIds = byNumber.json.items.map((o: any) => o.id);
+  assert.deepEqual(numberIds, [poB.id], "PO-number search must match exactly one PO");
+});
+
+test("an unknown filter value is rejected, not silently ignored", async () => {
+  const app = await freshApp();
+  const bad = await call(app, "GET", "/api/purchasing/orders?status=not_a_status");
+  assert.equal(bad.status, 400, "a bad filter must 400 rather than return an unfiltered list");
+});
+
+test("expected date drives the overdue filter; a PO with no ETA is never 'overdue'", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app);
+  const productId = await makeProduct(app, "ETA-A", 500);
+
+  const late = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId,
+    expectedDate: Date.now() - 3 * 24 * 60 * 60 * 1000,
+    lines: [{ productId, quantity: 2, unitCostCents: 100 }],
+  })).json;
+  const future = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId,
+    expectedDate: Date.now() + 3 * 24 * 60 * 60 * 1000,
+    lines: [{ productId, quantity: 2, unitCostCents: 100 }],
+  })).json;
+  const noEta = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId,
+    lines: [{ productId, quantity: 2, unitCostCents: 100 }],
+  })).json;
+
+  assert.equal(late.expected_date != null, true, "expectedDate must round-trip on create");
+  assert.equal(noEta.expected_date, null);
+
+  const overdue = await call(app, "GET", "/api/purchasing/orders?overdue=true");
+  const ids = overdue.json.items.map((o: any) => o.id);
+  assert.ok(ids.includes(late.id), "a past-ETA open PO must be overdue");
+  assert.ok(!ids.includes(future.id), "a future-ETA PO must not be overdue");
+  assert.ok(!ids.includes(noEta.id), "a PO with no ETA is unknown, not late");
+
+  const all = await call(app, "GET", "/api/purchasing/orders");
+  const lateRow = all.json.items.find((o: any) => o.id === late.id);
+  const noEtaRow = all.json.items.find((o: any) => o.id === noEta.id);
+  assert.equal(lateRow.is_overdue, true);
+  assert.equal(noEtaRow.is_overdue, false);
+
+  // Receiving it in full closes it out — a completed PO is not "late" any more.
+  await call(app, "POST", `/api/purchasing/orders/${late.id}/receive`, {});
+  const afterReceive = await call(app, "GET", "/api/purchasing/orders?overdue=true");
+  assert.ok(
+    !afterReceive.json.items.some((o: any) => o.id === late.id),
+    "a fully received PO must drop out of the overdue list",
+  );
+});
+
+test("approval filter surfaces exactly the POs blocking receiving", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app);
+  const productId = await makeProduct(app, "APPR-A", 500);
+
+  // Enable the amount tiers so a large PO lands in 'pending'.
+  const cfg = await call(app, "PUT", "/api/purchasing/approval-config",
+    { autoLimitCents: 1000, managerLimitCents: 100000, enabled: true }, "owner");
+  assert.equal(cfg.status, 200, `approval config failed: ${JSON.stringify(cfg.json)}`);
+
+  const small = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId, lines: [{ productId, quantity: 1, unitCostCents: 500 }],
+  })).json;
+  const large = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId, lines: [{ productId, quantity: 10, unitCostCents: 500 }],
+  })).json;
+
+  assert.equal(small.approval_status, "approved");
+  assert.equal(large.approval_status, "pending");
+
+  const pending = await call(app, "GET", "/api/purchasing/orders?approvalStatus=pending");
+  const ids = pending.json.items.map((o: any) => o.id);
+  assert.deepEqual(ids, [large.id], "the pending-approval filter must return exactly the blocked PO");
+
+  // The gate is real: receiving is refused until it is approved.
+  const blocked = await call(app, "POST", `/api/purchasing/orders/${large.id}/receive`, {});
+  assert.equal(blocked.status, 409);
+  assert.equal(blocked.json.error.code, "approval_pending");
+
+  const approved = await call(app, "POST", `/api/purchasing/orders/${large.id}/approve`, {});
+  assert.equal(approved.status, 200);
+  assert.equal(approved.json.approval_status, "approved");
+
+  const nowOk = await call(app, "POST", `/api/purchasing/orders/${large.id}/receive`, {});
+  assert.equal(nowOk.status, 200, "approval must actually unblock receiving");
+});
