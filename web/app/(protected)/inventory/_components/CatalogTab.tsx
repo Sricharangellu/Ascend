@@ -16,6 +16,7 @@ import type {
 import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
 import { StatusBadge, DropdownItem, buildCategoryName } from "./ui";
 import type { CatalogStatusFilter, LocalProductStatus } from "./shared";
+import { DataTable, type DataColumn } from "@/components/DataTable";
 
 /**
  * Columns an inventory catalog search can be scoped to.
@@ -70,7 +71,8 @@ export function CatalogTab() {
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+  
+  return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [actionsOpen]);
 
   const catalogCategoryOptions = useMemo(() => {
@@ -93,22 +95,8 @@ export function CatalogTab() {
     });
   }, [products, categories, catalogQuery, searchField, catalogCategory, catalogStatus]);
 
-  function toggleSelectAll() {
-    if (selectedIds.size === filteredProducts.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filteredProducts.map((p) => p.id)));
-    }
-  }
-
-  function toggleSelectOne(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  // Selection toggles and the all/indeterminate derivation used to live here;
+  // DataTable owns them now, driven by `selectedKeys`/`onSelectionChange`.
 
   async function handleBulkStatus(status: LocalProductStatus) {
     const ids = Array.from(selectedIds);
@@ -140,8 +128,45 @@ export function CatalogTab() {
     a.click();
   }
 
-  const allChecked = filteredProducts.length > 0 && selectedIds.size === filteredProducts.length;
-  const someChecked = selectedIds.size > 0 && !allChecked;
+  /**
+   * Catalog columns. Client-side sorting is right here — this tab loads one
+   * page of 200 and filters it locally, so a header click reorders every row
+   * it holds.
+   */
+  const catalogColumns: DataColumn<CatalogProduct>[] = [
+    {
+      key: "sku", header: "SKU", hideable: false, sticky: true,
+      sortValue: (p) => p.sku,
+      render: (p) => (
+        <Link
+          href={`/catalog/${p.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="focus-ring rounded-control font-mono text-xs font-semibold text-content-primary underline-offset-2 hover:underline"
+        >
+          {p.sku}
+        </Link>
+      ),
+    },
+    {
+      key: "name", header: "Name", sortValue: (p) => p.name, minWidth: "200px",
+      render: (p) => (
+        <>
+          <span className="font-medium text-content-primary">{p.name}</span>
+          {p.parent_product_id && (
+            <span className="ml-2 inline-flex rounded bg-surface-3 px-1.5 py-0.5 text-xs text-content-secondary">variant</span>
+          )}
+        </>
+      ),
+    },
+    { key: "brand", header: "Brand", sortValue: (p) => p.brand ?? null,
+      render: (p) => <span className="text-content-secondary">{p.brand ?? "-"}</span> },
+    { key: "category", header: "Category", sortValue: (p) => p.category || null,
+      render: (p) => <span className="text-content-secondary">{p.category || "-"}</span> },
+    { key: "price", header: "Price", numeric: true, sortValue: (p) => p.price_cents,
+      render: (p) => <span className="font-semibold text-content-primary">{formatMoney(p.price_cents)}</span> },
+    { key: "status", header: "Status", sortValue: (p) => p.status,
+      render: (p) => <StatusBadge status={p.status} /> },
+  ];
 
   return (
     <Card className="overflow-hidden p-0">
@@ -235,74 +260,21 @@ export function CatalogTab() {
         />
       </div>
 
-      {catalogLoading ? (
-        <div className="p-6 text-sm text-slate-500" aria-busy="true">Loading...</div>
-      ) : catalogError ? (
-        <div className="p-6 text-sm text-danger-700" role="alert">{catalogError}</div>
-      ) : filteredProducts.length === 0 ? (
-        <div className="p-6 text-sm text-slate-500">No products match the current filters.</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={allChecked}
-                    ref={(el) => { if (el) el.indeterminate = someChecked; }}
-                    onChange={toggleSelectAll}
-                    aria-label="Select all products"
-                    className="h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-slate-950"
-                  />
-                </th>
-                <th className="px-4 py-3">SKU</th>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Brand</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3 text-right">Price</th>
-                <th className="px-4 py-3">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
-              {filteredProducts.map((product) => (
-                <tr
-                  key={product.id}
-                  className={selectedIds.has(product.id) ? "bg-slate-100" : "hover:bg-slate-50"}
-                >
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(product.id)}
-                      onChange={() => toggleSelectOne(product.id)}
-                      aria-label={`Select ${product.name}`}
-                      className="h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-slate-950"
-                    />
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <Link
-                      href={`/catalog/${product.id}`}
-                      className="font-mono text-xs font-semibold text-slate-900 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-950"
-                    >
-                      {product.sku}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 font-medium text-slate-950">
-                    {product.name}
-                    {product.parent_product_id && (
-                      <span className="ml-2 inline-flex rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">variant</span>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">{product.brand ?? "-"}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">{product.category || "-"}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-950">{formatMoney(product.price_cents)}</td>
-                  <td className="whitespace-nowrap px-4 py-3"><StatusBadge status={product.status} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable<CatalogProduct>
+        caption="Catalog products with brand, category, price and status"
+        columns={catalogColumns}
+        rows={filteredProducts}
+        rowKey={(p) => p.id}
+        loading={catalogLoading}
+        error={catalogError}
+        emptyTitle="No products match the current filters"
+        emptyDescription="Try clearing the search, category or status filter."
+        selectable
+        selectedKeys={selectedIds}
+        onSelectionChange={setSelectedIds}
+        storageKey="inventory-catalog"
+        className="px-0"
+      />
     </Card>
   );
 }

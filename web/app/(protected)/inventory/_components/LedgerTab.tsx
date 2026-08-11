@@ -9,6 +9,7 @@ import { AdjustModal } from "./AdjustModal";
 import { MovementsDrawer } from "./MovementsDrawer";
 import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
 import { ClockIcon, Detail, LedgerStatus } from "./ui";
+import { DataTable, type DataColumn } from "@/components/DataTable";
 import {
   formatCost,
   formatMargin,
@@ -68,6 +69,62 @@ export function LedgerTab({
     [rows, selectedSku, filteredRows],
   );
 
+
+  /**
+   * Ledger columns. Sorting is client-side (`sortValue`) and correct here: the
+   * parent loads the whole ledger, so a header click reorders every row rather
+   * than a page — unlike the product list, which is server-paginated.
+   */
+  const ledgerColumns: DataColumn<InventoryRow>[] = [
+    {
+      key: "sku", header: "SKU", hideable: false, sticky: true,
+      sortValue: (r) => r.sku,
+      render: (r) => (
+        <button
+          type="button"
+          onClick={() => setSelectedSku(r.sku)}
+          className="focus-ring rounded-control font-mono text-xs font-semibold text-content-primary underline-offset-2 hover:underline"
+        >
+          {r.sku}
+        </button>
+      ),
+    },
+    { key: "name", header: "Product", sortValue: (r) => r.name, minWidth: "180px",
+      render: (r) => <span className="font-medium text-content-primary">{r.name}</span> },
+    { key: "category", header: "Category", sortValue: (r) => r.category,
+      render: (r) => <span className="text-content-secondary">{r.category}</span> },
+    { key: "available", header: "Available", numeric: true, sortValue: (r) => r.available,
+      render: (r) => <span className="font-semibold text-content-primary">{r.available}</span> },
+    { key: "onHand", header: "On hand", numeric: true, sortValue: (r) => r.onHand,
+      render: (r) => <span className="text-content-secondary">{r.onHand}</span> },
+    { key: "committed", header: "Committed", numeric: true, sortValue: (r) => r.committed,
+      render: (r) => <span className="text-content-secondary">{r.committed}</span> },
+    { key: "cost", header: "Avg cost", numeric: true, sortValue: (r) => r.costCents,
+      render: (r) => <span className="text-content-secondary">{formatCost(r.costCents)}</span> },
+    { key: "margin", header: "Margin", numeric: true,
+      sortValue: (r) => (r.priceCents && r.costCents ? r.priceCents - r.costCents : null),
+      render: (r) => <span className="text-content-secondary">{formatMargin(r.priceCents, r.costCents)}</span> },
+    { key: "status", header: "Status", sortValue: (r) => r.stockStatus,
+      render: (r) => <LedgerStatus label={r.stockStatus} /> },
+    {
+      key: "actions", header: "Actions", hideable: false,
+      render: (r) => (
+        <div className="flex gap-1">
+          <Button size="sm" variant="secondary"
+            onClick={() => setAdjustProduct({ id: r.id, name: r.name, sku: r.sku, onHand: r.onHand })}>
+            Adjust
+          </Button>
+          <Button size="sm" variant="secondary"
+            onClick={() => setMovementsProduct({ id: r.id, name: r.name, sku: r.sku })}
+            aria-label={`View movement history for ${r.name}`}>
+            <ClockIcon />
+            History
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <>
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
@@ -125,81 +182,18 @@ export function LedgerTab({
             />
           </div>
 
-          {loading ? (
-            <TableSkeleton headers={["SKU", "Product", "Category", "Available", "On hand", "Committed", "Avg cost", "Margin", "Status", "Actions"]} rows={8} />
-          ) : error ? (
-            <div className="p-6 text-sm text-danger-700" role="alert">{error}</div>
-          ) : filteredRows.length === 0 ? (
-            <div className="flex flex-col items-center py-16 text-center">
-              <p className="text-sm font-medium text-[var(--color-text-primary)]">No inventory rows match the current filters.</p>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Try clearing the search or category filter.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
-                  <tr>
-                    <th className="px-4 py-3">SKU</th>
-                    <th className="px-4 py-3">Product</th>
-                    <th className="px-4 py-3">Category</th>
-                    <th className="px-4 py-3 text-right">Available</th>
-                    <th className="px-4 py-3 text-right">On hand</th>
-                    <th className="px-4 py-3 text-right">Committed</th>
-                    <th className="px-4 py-3 text-right">Avg cost</th>
-                    <th className="px-4 py-3 text-right">Margin</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
-                  {filteredRows.map((row) => (
-                    <tr
-                      key={row.sku}
-                      className={selectedRow?.sku === row.sku ? "bg-slate-100" : "hover:bg-slate-50"}
-                    >
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedSku(row.sku)}
-                          className="font-mono text-xs font-semibold text-slate-900 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-950"
-                        >
-                          {row.sku}
-                        </button>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-950">{row.name}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">{row.category}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-950">{row.available}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">{row.onHand}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">{row.committed}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">{formatCost(row.costCents)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">{formatMargin(row.priceCents, row.costCents)}</td>
-                      <td className="whitespace-nowrap px-4 py-3"><LedgerStatus label={row.stockStatus} /></td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex gap-1">
-                          <button
-                            type="button"
-                            onClick={() => setAdjustProduct({ id: row.id, name: row.name, sku: row.sku, onHand: row.onHand })}
-                            className="inline-flex min-h-[32px] items-center rounded border border-slate-200 bg-white px-2 text-xs font-medium text-slate-600 hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-950"
-                          >
-                            Adjust
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setMovementsProduct({ id: row.id, name: row.name, sku: row.sku })}
-                            className="inline-flex min-h-[32px] items-center gap-1 rounded border border-slate-200 bg-white px-2 text-xs font-medium text-slate-600 hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-950"
-                            aria-label={`View movement history for ${row.name}`}
-                          >
-                            <ClockIcon />
-                            History
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <DataTable<InventoryRow>
+            caption="Inventory ledger: stock on hand, committed quantity, cost and margin per SKU"
+            columns={ledgerColumns}
+            rows={filteredRows}
+            rowKey={(r) => r.sku}
+            loading={loading}
+            error={error}
+            emptyTitle="No inventory rows match the current filters"
+            emptyDescription="Try clearing the search or category filter."
+            storageKey="inventory-ledger"
+            className="px-0"
+          />
         </Card>
 
         <Card className="h-fit">
