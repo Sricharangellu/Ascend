@@ -57,6 +57,51 @@ This document's baseline is current as of that merge, not before it.
    deploy automation (disconnected from whatever's actually real, if anything, in production).
    Possibly broken: production itself — unconfirmed pending item 1.
 
+## Re-verification 2026-08-08 — three open items closed, one new finding
+
+Gathered live during the infrastructure/environment audit
+(`WORK/audits/AUDIT_2026-08-08T184339Z-infrastructure-environment-integration-audit.md`). Every row
+cites a GitHub Actions run ID that can be reopened.
+
+| Question this document left open | Answer, 2026-08-08 | Evidence |
+|---|---|---|
+| Is the non-prod backend Vercel project deleted (2026-07-20) or still resolving (2026-07-23)? | **CLOSED — deleted.** The 2026-07-20 claim was right; the 2026-07-23 finding is superseded. `prj_krZ34CIFjzQrMvZ08PWqqbxzBf7d` no longer exists. | `deploy-staging` on the `staging` push: `Error: Project not found ({"VERCEL_PROJECT_ID":"prj_krZ34CI…","VERCEL_ORG_ID":"team_WNp8v…"})` → `✗ backend deploy failed (testing)` → `✗ backend exit=1 frontend exit=0`. Run `31271109836`, job `93139035837` |
+| Is `PROD_BACKEND_URL` set? | **No** — the repo-variable mechanism ADR-011 built for it is still empty. What changed the same day is the *fallback*: PR #206 repointed it from the dead Vercel host to `ascend-prod.onrender.com`, so an unset variable is no longer equivalent to probing a dead host. | Heartbeat dispatched on `develop` printed `backend: https://ascendhq-api.vercel.app` (the then-current fallback) and got HTTP 404 in 90 ms. Run `31272326653`, 18:36Z — ~35 min before PR #206 merged |
+| Is `PROD_FRONTEND_URL` set? | **No** — but its fallback (`ascendhqweb.vercel.app`) is the confirmed-live host, so this half is benign. | Same run |
+| Has any production backup ever been taken? | **No.** The daily job has reported `success` while producing nothing. | Run `31250642991` (2026-08-08 09:28, conclusion `success`) → `list_workflow_run_artifacts` returns `total_count: 0` |
+| Does the staging frontend deploy work now? | **Yes** — since the `FRONTEND_PID` and Vercel root-directory fixes (PRs #201/#204). It aliases to `ascend-frontend-staging.vercel.app`, built with `BACKEND_URL=https://ascend-backend-staging.vercel.app`, which does not exist. **A live frontend with no backend.** | Same run `31271109836` |
+| Does `develop` deploy anywhere? | **No.** `Deploy → Dev` is skipped on every push because `DEV_BACKEND_URL` is unset. A green `develop` CI means "tests passed", not "dev is updated". | Run `31270468757`, job `93137531666`, conclusion `skipped` |
+
+**New finding — scheduled workflows execute the DEFAULT BRANCH's copy.** GitHub runs `schedule:`
+workflows from `master` only, and `master` is **245 commits behind `staging`**. Therefore every
+ops-side fix landed on `develop` since 2026-07-20 is **inert for the runs that matter**:
+
+- `uptime.yml`'s repo-variable indirection (PRs #191/#197/#201, ADR-011) — the 15-minute run still
+  executes master's hardcoded `curl … ascendhq-api.vercel.app` form. Proof: scheduled run
+  `31270958830` (18:03) logged the hardcoded step text; the `develop` dispatch `31272326653` logged
+  the `"$BACKEND/healthz"` form. Same workflow name, two different files.
+- `backup.yml`'s "green lie" fix (warning annotation + job summary) — master still has the version
+  that exits 0 silently.
+- `security.yml` **does not exist on `master` at all**, so its weekly CodeQL/gitleaks/SBOM re-scan
+  has never run and cannot run. (The per-push/PR arm on `develop`/`staging` does run.)
+
+**Consequence for this document's P3 (monitoring correction):** setting `PROD_BACKEND_URL` is
+*necessary but not sufficient*. Promoting the workflow files to `master` is the other half. Treat a
+`staging → master` release as part of the monitoring fix, not as unrelated feature work.
+
+**Two further consequences of the Render service identity recorded by PR #206** (free plan, Docker,
+deploys from `master` via Render's git integration) that are worth stating as their own findings:
+
+- **The production backend code is 245 commits stale, for the same reason the workflows are.** Render
+  deploys from `master`. Whatever is or is not running at `ascend-prod.onrender.com` is built from
+  `e55e743`, not from `staging`. A `staging → master` release is therefore not only the monitoring
+  fix — it is the only way the last three weeks of backend work reaches production at all.
+- **A free-tier instance makes availability unfalsifiable from the outside.** ~15 min idle →
+  spin-down, ~50 s cold start, against a heartbeat that runs every 15 min. PR #206's widened
+  timeouts stop the probe from measuring itself, but the underlying behaviour — a ~50 s first
+  request after any quiet period — is a product characteristic, not a monitoring artefact. It should
+  be treated as a P0 for a POS product, not as a cost line.
+
 ## Evidence table
 
 | Finding | Evidence | Impact |
