@@ -1,0 +1,152 @@
+# Background-job tick scheduler.
+#
+# WHY THIS EXISTS
+# `/jobs/tick` (src/app.ts) drains due background jobs and reconciles the
+# transactional outbox. Something has to call it on a schedule. Until now the
+# only caller was `vercel.json`'s `crons` block — and the production backend
+# runs on **Render**, not Vercel (service "Ascend Prod", srv-d9lo8jm7bikc739dnsn0,
+# confirmed by Sri from the Render dashboard 2026-08-08). A Vercel cron cannot
+# reach a Render service, so in production that entry called nothing, ever.
+#
+# The effect was silent and not cosmetic:
+#   • the outbox (ACPA M1 — financially-critical events persisted before
+#     dispatch) never redelivered, so any event whose dispatch failed stayed
+#     undispatched indefinitely;
+#   • every scheduled job never ran, including the DEMO-1 trial-expiry sweep.
+#
+# GAPS.md already recorded the diagnosis — "If the backend is on Render, the
+# `crons` block should be deleted, not tuned (ADR-010)". Deleting it alone would
+# have made the gap silent rather than fixed, so this workflow replaces it in
+# the same change.
+#
+# WHY `X-Jobs-Tick-Secret` AND NOT `Authorization: Bearer`
+# The endpoint accepts two credentials, and they are not interchangeable:
+#   CRON_SECRET      → `Authorization: Bearer`, Vercel Cron's convention.
+#   JOBS_TICK_SECRET → `X-Jobs-Tick-Secret`, for "any other scheduler (Render
+#                      cron job, GitHub Actions, an external uptime service)" —
+#                      src/app.ts's own words. This workflow is that caller.
+#
+# Worth knowing, because it already bit once: `.env.example` documented both
+# secrets from the start but only CRON_SECRET was ever read, so an operator on a
+# non-Vercel host who followed the documentation got a 503 and no background
+# jobs at all, silently. Both are honoured now.
+name: Background job tick
+
+on:
+  schedule:
+    # Every 15 minutes, matching the production heartbeat's cadence.
+    #
+    # The old `0 6 * * *` was NOT a considered interval — it was the Vercel
+    # Hobby plan's daily-cron limit, which is why worst-case outbox redelivery
+    # latency was ~24h. That constraint does not exist on Render, so the
+    # interval is now chosen on merit: 15 minutes bounds how long a failed
+    # financially-critical event stays undispatched. Tune freely; nothing here
+    # depends on this exact value, and each tick is bounded server-side (max 20
+    # batches / 10s deadline) so overlapping ticks are safe — FOR UPDATE SKIP
+    # LOCKED plus consumer idempotency make concurrency a non-issue.
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: none
+
+concurrency:
+  group: jobs-tick
+  # false, unlike uptime.yml's heartbeat: this job does real work (draining the
+  # job queue and reconciling the outbox), so cancelling an in-flight run to
+  # start a fresh one would abort a drain part-way. backup.yml uses false for
+  # the same reason. A hung run cannot block the next one — timeout-minutes: 10
+  # is well inside the 15-minute schedule.
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    name: Tick background jobs (drain queue + reconcile outbox)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: vars.JOBS_TICK_ENABLED != 'false'
+    env:
+      BACKEND: ${{ vars.PROD_BACKEND_URL || 'https://ascend-prod.onrender.com' }}
+      JOBS_TICK_SECRET: ${{ secrets.JOBS_TICK_SECRET }}
+      JOBS_TICK_REQUIRED: ${{ vars.JOBS_TICK_REQUIRED }}
+    steps:
+      # This guard follows backup.yml's precedent deliberately, and for the same
+      # reason it was hardened there: a scheduled job that reports success while
+      # having done nothing is worse than one that is absent, because the green
+      # tick gets read as evidence. backup.yml reported success 16 consecutive
+      # times while the real RPO was total loss. Do not reproduce that here — an
+      # unconfigured run must be visibly unconfigured, not quietly green.
+      - name: Check JOBS_TICK_SECRET is configured
+        id: check
+        run: |
+          if [ -n "$JOBS_TICK_SECRET" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "configured=false" >> "$GITHUB_OUTPUT"
+          echo "::warning title=No jobs were ticked::JOBS_TICK_SECRET is not set — background jobs and outbox redelivery are NOT running in production."
+          {
+            echo "## ⚠️ No background jobs were ticked"
+            echo
+            echo "\`JOBS_TICK_SECRET\` is not configured, so this run called nothing."
+            echo "**This run is green but production background jobs are not running.**"
+            echo
+            echo "Concretely, while this is unset:"
+            echo "- the transactional outbox never redelivers — a financially-critical"
+            echo "  event whose dispatch failed stays undispatched indefinitely;"
+            echo "- no scheduled job runs, including the trial-expiry sweep."
+            echo
+            echo "To fix, both halves are required:"
+            echo "1. Set \`JOBS_TICK_SECRET\` on the Render service (Ascend Prod) env vars."
+            echo "2. Set the repo secret \`JOBS_TICK_SECRET\` to the same value"
+            echo "   (Settings → Secrets and variables → Actions)."
+            echo
+            echo "Then re-run this workflow and confirm the response reports \`status: ok\`."
+            echo
+            echo "To make this state fail the build instead of warning, set the repo"
+            echo "variable \`JOBS_TICK_REQUIRED=true\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$JOBS_TICK_REQUIRED" = "true" ]; then
+            echo "❌ JOBS_TICK_REQUIRED=true and no JOBS_TICK_SECRET is configured."
+            exit 1
+          fi
+
+      # Timeouts match uptime.yml's, and for the same reason: production is a
+      # Render FREE instance that spins down after ~15 min idle and cold-starts
+      # in ~50s. A 15s timeout does not measure availability, it measures the
+      # timeout — that mistake is why this repo believed production was dead
+      # from three "independent" networks that were independent in location and
+      # identical in timeout. Do not shorten these without moving off Free.
+      - name: Tick
+        if: steps.check.outputs.configured == 'true'
+        run: |
+          echo "backend: $BACKEND"
+          http_status="$(curl -sS --max-time 90 --retry 5 --retry-delay 10 --retry-all-errors \
+            -o /tmp/tick-response.json \
+            -w '%{http_code}' \
+            -H "X-Jobs-Tick-Secret: $JOBS_TICK_SECRET" \
+            "$BACKEND/jobs/tick")" || true
+          echo "status: $http_status"
+          cat /tmp/tick-response.json 2>/dev/null || true
+          echo
+          case "$http_status" in
+            2*) ;;
+            401) echo "❌ 401 — the repo secret and the Render env var do not match."; exit 1 ;;
+            503) echo "❌ 503 cron_unconfigured — neither CRON_SECRET nor JOBS_TICK_SECRET is set ON THE SERVER. Setting the repo secret alone is not enough."; exit 1 ;;
+            *)   echo "❌ /jobs/tick returned $http_status against $BACKEND"; exit 1 ;;
+          esac
+
+      - name: Report what was processed
+        if: steps.check.outputs.configured == 'true'
+        run: |
+          {
+            echo "## Background job tick"
+            echo
+            echo "Backend: \`$BACKEND\`"
+            echo
+            echo '```json'
+            cat /tmp/tick-response.json 2>/dev/null || echo '(no response body)'
+            echo '```'
+            echo
+            echo "\`jobsProcessed\` is jobs drained this tick; \`outbox\` is events reconciled."
+          } >> "$GITHUB_STEP_SUMMARY"

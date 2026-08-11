@@ -19,7 +19,6 @@ import {
   tenantRateLimitMiddleware,
   makeAuthMiddleware,
   tenantResolver,
-  errorEnvelopeMiddleware,
   metricsMiddleware,
   renderMetrics,
   requireRole,
@@ -665,9 +664,22 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     }),
   );
 
-  // ── Error handling (errorEnvelope must be last)
+  // ── Error handling — ONE handler, deliberately.
+  // This used to be two: `errorMiddleware` followed by `errorEnvelopeMiddleware`,
+  // with a comment claiming the envelope "must be last". It was last, and it was
+  // never reached: errorMiddleware always responds and never calls next(err), so
+  // the envelope was unreachable dead code from the day it was mounted. The
+  // visible consequence was that the documented `{error:{code,message,requestId}}`
+  // contract was never delivered — no error response carried a requestId, so a
+  // customer reporting an error gave you nothing to correlate against the logs.
+  // The frontend had been reading that field all along (web/contexts/StoreAuthContext.tsx).
+  //
+  // Fixed by folding the envelope's one genuine advantage (requestId, plus
+  // logging 5xx HttpErrors) into errorMiddleware rather than by reordering the
+  // two: swapping them would have been a breaking change, since the envelope
+  // renames 5xx `internal` → `internal_error` and drops the `details` array that
+  // validation errors carry.
   app.use(errorMiddleware);
-  app.use(errorEnvelopeMiddleware);
 
   return { express: app, db, events, outbox, cleanup: cleanupEventBridge };
 }
