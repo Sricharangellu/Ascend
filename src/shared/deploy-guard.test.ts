@@ -114,9 +114,20 @@ test("no probe or deploy target in the workflows resolves to a host recorded as 
   // ADR-011's companion check: the fallbacks live in ci.yml and uptime.yml too,
   // and PR #191 fixing only uptime.yml is precisely how the two production
   // probes came to disagree about where production is.
+  //
+  // The per-file minimum below is the load-bearing part. Without it this test is
+  // a `matchAll` loop whose body never runs if the regex stops matching — it
+  // would go green while checking nothing, which is the exact failure this whole
+  // audit is about (`backup.yml` reported success 18 times while backing up
+  // nothing). Rewriting a fallback into a form this regex misses must fail here
+  // and force the regex to be updated, not silently disarm the check.
+  const MIN_FALLBACKS: Record<string, number> = { "ci.yml": 3, "uptime.yml": 2 };
+
   for (const wf of ["ci.yml", "uptime.yml"]) {
     const src = fs.readFileSync(path.join(repoRoot, ".github", "workflows", wf), "utf8");
+    let inspected = 0;
     for (const [, fallback] of src.matchAll(/vars\.PROD_(?:BACKEND|FRONTEND)_URL\s*\|\|\s*'([^']+)'/g)) {
+      inspected++;
       for (const host of KNOWN_DEAD_HOSTS) {
         assert.ok(
           !fallback.includes(host),
@@ -124,6 +135,13 @@ test("no probe or deploy target in the workflows resolves to a host recorded as 
         );
       }
     }
+    assert.ok(
+      inspected >= (MIN_FALLBACKS[wf] ?? 1),
+      `expected at least ${MIN_FALLBACKS[wf]} PROD_* fallback(s) in .github/workflows/${wf}, found ` +
+        `${inspected}. Either a fallback was removed (update MIN_FALLBACKS) or it was rewritten into ` +
+        "a form this regex no longer matches — in which case this test is now checking nothing and " +
+        "the regex must be fixed.",
+    );
   }
 });
 
