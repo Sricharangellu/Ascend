@@ -1,7 +1,7 @@
 import express, { Router, type Express } from "express";
 import { createHash, timingSafeEqual } from "node:crypto";
 import helmet from "helmet";
-import { openDb, type DB } from "./shared/db.js";
+import { openDb, txTimeoutMs, type DB } from "./shared/db.js";
 import { openRedis } from "./shared/redis.js";
 import { EventBus } from "./shared/events.js";
 import { Outbox } from "./shared/outbox.js";
@@ -60,140 +60,6 @@ function secretsMatch(provided: string | undefined, expected: string): boolean {
   const a = createHash("sha256").update(provided).digest();
   const b = createHash("sha256").update(expected).digest();
   return timingSafeEqual(a, b);
-}
-
-/** Namespace for every Ascend migration advisory lock (the historical magic int). */
-const MIGRATION_LOCK_NAMESPACE = 7381920;
-
-/** The schema a real deployment runs in. Only test suites ever pass another. */
-const DEFAULT_SCHEMA = "public";
-
-/**
- * Read a positive-integer millisecond budget from the environment.
- *
- * Read at CALL time, not at module load. `buildApp()` is a function the test
- * suite calls many times in one process, so a module-level constant would
- * freeze whatever the environment happened to hold at import — which silently
- * ignores any later override and makes a test that thinks it set a 300 ms
- * budget actually sit on the 120 s default.
- */
-function envMs(name: string, fallback: number): number {
-  const raw = Number(process.env[name] ?? fallback);
-  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : fallback;
-}
-
-/**
- * Statement timeout for the migration transaction (`PG_MIGRATION_TIMEOUT_MS`).
- *
- * Deliberately NOT the 30 s `PG_TX_TIMEOUT_MS` default. That budget exists to
- * stop a runaway *business* transaction from sitting on row locks and starving
- * the pool — a rationale that inverts for boot-time DDL, which is supposed to
- * be slow and to hold its lock. Charging migrations the business budget is what
- * turned a slow-but-healthy runner into a red build.
- */
-const migrationTimeoutMs = () => envMs("PG_MIGRATION_TIMEOUT_MS", 300_000);
-
-/** How long to wait for the migration lock before giving up (`PG_MIGRATION_LOCK_WAIT_MS`). */
-const migrationLockWaitMs = () => envMs("PG_MIGRATION_LOCK_WAIT_MS", 120_000);
-
-/**
- * Stable 32-bit signed hash of a schema name, for the advisory lock's second key.
- * Deterministic across processes and restarts — that is the only property
- * required, so a small FNV-1a is enough; this is not security-sensitive.
- */
-function schemaLockKey(schema: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < schema.length; i++) {
-    h ^= schema.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h | 0; // coerce to int4 range, which is what pg_advisory_xact_lock takes
-}
-
-/**
- * Advisory-lock arguments for one schema.
- *
- * `public` deliberately keeps the historical SINGLE-key form. Postgres holds
- * one-key and two-key advisory locks in entirely separate spaces — they never
- * conflict with each other — so moving `public` to the two-key form would mean
- * that during a rolling deploy an old instance (single key) and a new one (two
- * keys) could migrate the same schema at the same time: precisely the race the
- * lock exists to prevent, silently un-serialised by a change meant to be safe.
- *
- * Keeping the historical key for the only schema a deployment ever uses makes
- * this change a no-op in production — where per-schema keying would buy nothing
- * anyway, there being exactly one schema. The throwaway schemas the test suite
- * builds, which is where the contention actually was, get their own key.
- */
-function migrationLockArgs(schema: string): number[] {
-  return schema === DEFAULT_SCHEMA
-    ? [MIGRATION_LOCK_NAMESPACE]
-    : [MIGRATION_LOCK_NAMESPACE, schemaLockKey(schema)];
-}
-
-/**
- * Take the migration lock for one schema, waiting explicitly and reporting
- * honestly if the wait runs out.
- *
- * TWO BUGS ARE FIXED HERE, both of which showed up as the same symptom: a test
- * that did nothing wrong failing with pg `57014 statement timeout` at almost
- * exactly 30 s. (Observed live: CI run 31138020800 attempt 1, 893/894, the
- * loser being settings.test.ts at 30014 ms while the Postgres container was
- * checkpointing; attempt 2 on a healthy runner passed 894/894.)
- *
- * 1. THE LOCK WAS FAR BROADER THAN THE INVARIANT IT PROTECTS. The old call was
- *    `pg_advisory_xact_lock(7381920)` — one key for the entire database. The
- *    invariant is only ever "two processes must not migrate the SAME schema at
- *    once": migrations are `CREATE TABLE IF NOT EXISTS`-style DDL scoped by
- *    `search_path`, so two different schemas cannot collide. But the backend
- *    suite builds 86 fresh schemas across 86 files that `node --test` runs in
- *    PARALLEL, and every one of them queued on that single key. Adding the
- *    schema as a second lock key lets disjoint test schemas migrate
- *    concurrently, which removes the contention rather than just widening the
- *    timeout around it. Production is untouched: `public` keeps the historical
- *    single key — see migrationLockArgs() for why that matters.
- *
- * 2. THE WAIT WAS DISGUISED AS QUERY TIME. `pg_advisory_xact_lock` BLOCKS, and
- *    a blocking statement is charged against `statement_timeout` like any
- *    other — so time spent *queuing* was indistinguishable from time spent
- *    *working*, and surfaced as a generic query timeout naming an innocent
- *    test. `lock_timeout` does not help: it governs table/row locks, not
- *    advisory ones. Polling `pg_try_advisory_xact_lock` instead makes the wait
- *    explicit, bounded, and reportable in its own words.
- */
-async function acquireMigrationLock(tdb: DB, schema: string): Promise<void> {
-  const lockArgs = migrationLockArgs(schema);
-  const lockSql = `SELECT pg_try_advisory_xact_lock(${lockArgs.map(() => "?").join(", ")}) AS locked`;
-  const waitMs = migrationLockWaitMs();
-  const deadline = Date.now() + waitMs;
-  const startedAt = Date.now();
-  let attempts = 0;
-
-  for (;;) {
-    attempts += 1;
-    const row = await tdb.one<{ locked: boolean }>(lockSql, lockArgs);
-    if (row?.locked) {
-      const waitedMs = Date.now() - startedAt;
-      // Only worth a line when it actually queued — a clean boot says so once.
-      if (waitedMs > 1_000) {
-        logger.info({ schema, waitedMs, attempts }, "migration lock acquired after waiting");
-      } else {
-        logger.info({ schema }, "migration lock acquired");
-      }
-      return;
-    }
-    if (Date.now() >= deadline) {
-      throw new Error(
-        `Timed out after ${waitMs}ms waiting for the migration lock on schema "${schema}" ` +
-          `(${attempts} attempts). Another process is migrating this schema and has not finished. ` +
-          `If that process is stuck, check pg_locks for advisory lock (${lockArgs.join(", ")}); ` +
-          `raise PG_MIGRATION_LOCK_WAIT_MS only once you know the holder is legitimately slow.`,
-      );
-    }
-    // Back off gently: 50ms → 500ms. Long enough not to spin a connection hot,
-    // short enough that a normal handover is not noticeably delayed.
-    await new Promise((r) => setTimeout(r, Math.min(500, 50 * attempts)));
-  }
 }
 
 /**
@@ -287,7 +153,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     }
   }
 
-  const schema = options.schema ?? DEFAULT_SCHEMA;
+  const schema = options.schema ?? "public";
   const db = openDb({ connectionString: options.connectionString, schema });
   const events = new EventBus();
   // ACPA M1: transactional outbox — financially-critical events are persisted
@@ -417,16 +283,66 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     await tdb.query("INSERT INTO schema_migrations (hash, name, ran_at) VALUES (@hash, @name, @now)", { hash, name, now: Date.now() });
   }
 
-  // Acquire a transaction-level advisory lock before running any migrations, so
-  // two instances booting at once cannot race each other's ALTER TABLEs. The
-  // lock is transaction-scoped, so it releases automatically at COMMIT/ROLLBACK
-  // and cannot leak if this process dies mid-migration.
+  // Acquire a transaction-level advisory lock before running any migrations.
+  // The lock is held for the duration of the transaction, so concurrent
+  // instances wait here and then skip all migrations (hash-checked above).
+  // Prevents simultaneous ALTER TABLE races.
   //
-  // The lock is keyed by SCHEMA, and the statement timeout is raised for the
-  // duration — both deliberate, and both fixes for a real CI flake. See
-  // acquireMigrationLock() and migrationTimeoutMs() for the full reasoning.
+  // The wait gets its own, much larger statement timeout. `db.tx()` opens every
+  // transaction with `SET LOCAL statement_timeout` (30s by default), and the
+  // lock wait is itself a single statement — so queuing behind another instance
+  // was abortable with SQLSTATE 57014, "canceling statement due to statement
+  // timeout". That surfaced as a query timeout in whichever test was unlucky,
+  // rather than as the contention it actually was. Widening the timeout for
+  // just this statement separates "waiting for a peer" from "this query hung",
+  // which are the same signal to Postgres but very different to an operator.
+  //
+  // It is not hypothetical: CI run 31138020800 attempt 1 failed 893/894, the
+  // loser being settings.test.ts "get and update feature flags" at exactly
+  // 30014ms with code 57014, while the Postgres service container was
+  // checkpointing heavily. Attempt 2 on a healthy runner passed 894/894. The
+  // backend suite builds a fresh schema at 123 call sites across 86 files, and
+  // every one of them serializes on this single global lock.
+  //
+  // Verified against PostgreSQL 16 rather than assumed:
+  //   - statement_timeout DOES abort a blocking pg_advisory_xact_lock wait
+  //     (2s timeout → "canceling statement due to statement timeout" at 2093ms,
+  //     SQLSTATE 57014);
+  //   - statement_timeout is per-STATEMENT, not per-transaction, so the
+  //     migrations themselves were never starved of budget — only the wait was;
+  //   - a later `SET LOCAL statement_timeout` overrides an earlier one, so the
+  //     normal budget can be restored for the migrations that follow.
+  //
+  // A bounded *blocking* wait is used rather than polling pg_try_advisory_xact_lock:
+  // Postgres wakes a blocked waiter the instant the lock frees (measured at 4ms),
+  // whereas a poll loop adds up to its own interval of latency to every one of
+  // the hundreds of acquisitions a full test run makes.
+  const MIGRATION_LOCK_KEY = 7381920; // stable magic int for finder migrations
+  const rawLockWait = Number(process.env["PG_MIGRATION_LOCK_WAIT_MS"] ?? 300_000);
+  const lockWaitMs = Number.isFinite(rawLockWait) && rawLockWait > 0 ? Math.floor(rawLockWait) : 300_000;
+
   await db.tx(async (tdb) => {
-    await acquireMigrationLock(tdb, schema);
+    const startedAt = Date.now();
+    try {
+      await tdb.exec(`SET LOCAL statement_timeout = ${lockWaitMs}`);
+      await tdb.exec(`SELECT pg_advisory_xact_lock(${MIGRATION_LOCK_KEY})`);
+    } catch (err) {
+      // 57014 = query_canceled. Here it can only mean the wait hit lockWaitMs,
+      // so translate it into the cause rather than letting a boot blocked behind
+      // a peer report itself as an unrelated slow query.
+      if ((err as { code?: string }).code === "57014") {
+        throw new Error(
+          `migration lock ${MIGRATION_LOCK_KEY} not acquired after ${Date.now() - startedAt}ms — ` +
+          `another instance is holding it. Raise PG_MIGRATION_LOCK_WAIT_MS (currently ${lockWaitMs}) ` +
+          `if this is expected contention, or check for a stuck migration transaction.`,
+        );
+      }
+      throw err;
+    }
+    // Restore the normal per-statement budget for the migrations themselves, so
+    // the widened timeout covers only the queuing and never the DDL.
+    await tdb.exec(`SET LOCAL statement_timeout = ${txTimeoutMs()}`);
+    logger.info({ waitedMs: Date.now() - startedAt }, "migration lock acquired");
 
     for (const sql of identityModule.migrations) await runIfNew(sql, `identity`, tdb);
     for (const mod of modules) {
@@ -439,7 +355,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     }
 
     logger.info("migrations complete");
-  }, { statementTimeoutMs: migrationTimeoutMs() });
+  });
 
   // ── Global gateway middleware (applied before all /api routes)
   app.use(requestIdMiddleware);
