@@ -205,13 +205,34 @@ cluster on port 55432 was used via `DATABASE_URL`).
 | Gate | Result |
 |---|---|
 | `npm run typecheck` (backend) | exit 0 |
-| `npm run hygiene` | PASS — 2181 files |
+| `npm run hygiene` | PASS — 2216 files |
 | `npm run gap:scan` | PASS — no unexplained FE→BE gaps |
-| `npm run contract:scan` | PASS — 148 documented, 0 phantom |
+| `npm run authz:scan` | PASS — every mutating route carries a guard |
+| `npm run contract:scan` | PASS — 148 documented operations, 626 backend routes, 0 phantom |
 | `npm run table:scan` | PASS — 166 table names, no collisions |
 | `npm run prevent:drift` | PASS (after commit; it correctly flagged this session's own uncommitted edits first) |
-| `npm test` (backend) | see §5a |
-| web typecheck / lint / build | see §5a |
+| `npm test` (backend) | **CI: PASS.** Locally 902/903 — see the flake note below |
+| web typecheck / lint / test / build | exit 0 / clean / **234 pass across 31 files** / build succeeds |
+
+**The one local test failure, and why it is not a regression.** The final local
+run reported `not ok 229 - list returns created roles`
+(`custom_roles.test.ts`). It is not an assertion failure: the error is
+`canceling statement due to statement timeout` (SQLSTATE 57014) after 30s,
+raised inside `buildApp`'s migration transaction — the harness never reached
+the test body. Three independent checks say environmental:
+
+1. Tests 230, 231 and 232 in the **same file** passed immediately after, in
+   4–6s each.
+2. Re-running `custom_roles.test.ts` alone: **10/10 pass**.
+3. **CI's own backend job passed the full suite** on its Postgres service
+   container.
+
+Cause is local: this sandbox's Postgres had just completed a 160-second crash
+recovery over a data directory carrying ~105k files from repeated full-suite
+runs, so a migration transaction that normally takes ~1.5s exceeded the
+statement timeout once. Same class as PR #118 (`ci(backend): CI-only headroom
+for the tx statement_timeout`). Recorded rather than re-run-until-green and
+reported as 903/903, which would have hidden it.
 
 ### 5a. Verification of the scanner itself
 
