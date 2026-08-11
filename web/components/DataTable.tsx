@@ -26,6 +26,7 @@
 
 import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { clsx } from "clsx";
+import { Pagination } from "./Pagination";
 
 export type SortDirection = "asc" | "desc";
 
@@ -34,8 +35,19 @@ export interface DataColumn<T> {
   key: string;
   header: string;
   render: (row: T) => React.ReactNode;
-  /** Providing this makes the column sortable. */
+  /**
+   * Providing this makes the column sortable CLIENT-side, over loaded rows.
+   *
+   * For a server-paginated list use `serverSort` instead — sorting one page of
+   * a 5,000-row catalog reorders 50 rows and looks like it reordered the
+   * catalog.
+   */
   sortValue?: (row: T) => string | number | null | undefined;
+  /**
+   * Sort key sent to the server when `serverSort` is active. Providing this
+   * makes the column sortable; `sortValue` is then ignored for this column.
+   */
+  sortKey?: string;
   /** Numeric columns get tabular numerals + right alignment automatically. */
   numeric?: boolean;
   align?: "left" | "center" | "right";
@@ -74,6 +86,14 @@ export interface DataTableProps<T> {
   selectable?: boolean;
   /** Rendered in place of the toolbar when rows are selected. */
   bulkActions?: (selected: T[], clear: () => void) => React.ReactNode;
+  /**
+   * Controlled selection. Supply both to own the selection outside the table —
+   * needed whenever something other than `bulkActions` reads it (a bulk bar
+   * above the table, a print-labels modal, a count in the page header).
+   * Omit both and the table keeps its own selection state.
+   */
+  selectedKeys?: Set<string>;
+  onSelectionChange?: (keys: Set<string>) => void;
   pageSize?: number;
   /**
    * Opt into SERVER-driven paging: `rows` is one page, the caller owns the
@@ -89,7 +109,36 @@ export interface DataTableProps<T> {
     offset: number;
     limit: number;
     onOffsetChange: (offset: number) => void;
+    /**
+     * Opt into the full pager (rows-per-page + range + page numbers) instead of
+     * bare Prev/Next. Supply this and the table renders the shared `Pagination`,
+     * so a server-paginated list does not have to bring its own — which is how
+     * the catalog ended up with a pager the other lists did not have.
+     */
+    onLimitChange?: (limit: number) => void;
+    pageSizeOptions?: number[];
   };
+  /**
+   * Server-driven sorting. When provided, columns with a `sortKey` render sort
+   * buttons that call back instead of reordering the loaded page.
+   *
+   * `activeKey` is the column currently sorted. Pass the key the server is
+   * actually using — including a default the user has not clicked — so the
+   * header reflects the real order rather than appearing unsorted.
+   */
+  serverSort?: {
+    activeKey: string | null;
+    direction: SortDirection;
+    onSortChange: (key: string) => void;
+  };
+  /**
+   * Suppress the built-in footer (count + pager).
+   *
+   * For a page that renders one shared pager beneath BOTH a desktop table and a
+   * mobile card list — the table's own footer would be a second pager in the
+   * DOM, which is duplicated output for a screen reader even when CSS hides one.
+   */
+  hideFooter?: boolean;
   onRowClick?: (row: T) => void;
   /** Filters / actions rendered on the toolbar's right. */
   toolbar?: React.ReactNode;
@@ -138,8 +187,12 @@ export function DataTable<T>({
   searchText,
   selectable = false,
   bulkActions,
+  selectedKeys,
+  onSelectionChange,
   pageSize = 25,
   serverPagination,
+  serverSort,
+  hideFooter = false,
   onRowClick,
   toolbar,
   stickyHeader = true,
@@ -153,7 +206,17 @@ export function DataTable<T>({
   const [sortDir, setSortDir] = useState<SortDirection>("asc");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [internalSelected, setInternalSelected] = useState<Set<string>>(new Set());
+  // Controlled when the caller supplies both halves; otherwise self-managed.
+  const isControlledSelection = selectedKeys !== undefined && onSelectionChange !== undefined;
+  const selected = isControlledSelection ? selectedKeys : internalSelected;
+  const setSelected = useCallback(
+    (next: Set<string>) => {
+      if (isControlledSelection) onSelectionChange(next);
+      else setInternalSelected(next);
+    },
+    [isControlledSelection, onSelectionChange],
+  );
   const [hidden, setHidden] = useState<Set<string>>(
     () => new Set(columns.filter((c) => c.defaultHidden).map((c) => c.key))
   );
@@ -227,7 +290,17 @@ export function DataTable<T>({
   // Any change to the result set invalidates the current page offset.
   useEffect(() => setPage(0), [query, sortKey, sortDir, rows]);
 
+  /** Is this column sortable, and by which mechanism? */
+  const columnSortKey = (col: DataColumn<T>): string | null =>
+    serverSort ? (col.sortKey ?? null) : col.sortValue ? col.key : null;
+
   const toggleSort = (col: DataColumn<T>) => {
+    if (serverSort) {
+      // The server owns the order; re-clicking the active column flips it,
+      // which is the caller's job since it knows the current direction.
+      if (col.sortKey) serverSort.onSortChange(col.sortKey);
+      return;
+    }
     if (!col.sortValue) return;
     if (sortKey === col.key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -237,7 +310,7 @@ export function DataTable<T>({
     }
   };
 
-  const clearSelection = useCallback(() => setSelected(new Set()), []);
+  const clearSelection = useCallback(() => setSelected(new Set()), [setSelected]);
   const selectedRows = useMemo(
     () => rows.filter((r) => selected.has(rowKey(r))),
     [rows, selected, rowKey]
@@ -418,17 +491,21 @@ export function DataTable<T>({
                   </th>
                 )}
                 {visibleColumns.map((col) => {
-                  const isSorted = sortKey === col.key;
+                  const colSortKey = columnSortKey(col);
+                  const isSorted = serverSort
+                    ? colSortKey !== null && serverSort.activeKey === colSortKey
+                    : sortKey === col.key;
+                  const dir = serverSort ? serverSort.direction : sortDir;
                   return (
                     <th
                       key={col.key}
                       scope="col"
                       style={{ width: col.width, minWidth: col.minWidth }}
                       aria-sort={
-                        !col.sortValue
+                        colSortKey === null
                           ? undefined
                           : isSorted
-                            ? sortDir === "asc"
+                            ? dir === "asc"
                               ? "ascending"
                               : "descending"
                             : "none"
@@ -439,10 +516,11 @@ export function DataTable<T>({
                         col.sticky && "sticky left-0 z-[1] bg-surface-3"
                       )}
                     >
-                      {col.sortValue ? (
+                      {colSortKey !== null ? (
                         <button
                           type="button"
                           onClick={() => toggleSort(col)}
+                          aria-label={`Sort by ${col.header}`}
                           className={clsx(
                             "focus-ring inline-flex items-center gap-1 rounded-control uppercase tracking-wide hover:text-content-primary",
                             col.align === "right" || col.numeric ? "flex-row-reverse" : ""
@@ -450,7 +528,7 @@ export function DataTable<T>({
                         >
                           {col.header}
                           <span aria-hidden="true" className="text-2xs">
-                            {isSorted ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+                            {isSorted ? (dir === "asc" ? "↑" : "↓") : "↕"}
                           </span>
                         </button>
                       ) : (
@@ -590,8 +668,22 @@ export function DataTable<T>({
         )}
       </div>
 
-      {/* ── Footer: count + pagination ──────────────────────────────────── */}
-      {!loading && sorted.length > 0 && (
+      {/* ── Footer: the full shared pager when the caller owns page size ─── */}
+      {!loading && !hideFooter && serverPagination?.onLimitChange && (
+        <Pagination
+          page={Math.floor(serverPagination.offset / serverPagination.limit)}
+          pageSize={serverPagination.limit}
+          total={serverPagination.total}
+          onPageChange={(p) => serverPagination.onOffsetChange(p * serverPagination.limit)}
+          onPageSizeChange={serverPagination.onLimitChange}
+          {...(serverPagination.pageSizeOptions
+            ? { pageSizeOptions: serverPagination.pageSizeOptions }
+            : {})}
+        />
+      )}
+
+      {/* ── Footer: count + simple pager ────────────────────────────────── */}
+      {!loading && !hideFooter && !serverPagination?.onLimitChange && sorted.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-content-secondary">
           <p aria-live="polite" className="tnum">
             {serverPagination

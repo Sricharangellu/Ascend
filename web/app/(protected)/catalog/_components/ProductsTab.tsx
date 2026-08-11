@@ -15,12 +15,12 @@ import type {
   CatalogProduct, Category, ProductStatus, ProductsResponse,
   ProductFacets, ProductSort, ProductTypeFilter, ProductSearchField,
 } from "@/api-client/types";
+import { DataTable, type DataColumn } from "@/components/DataTable";
 import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
 import { useListQuery } from "@/hooks/useListQuery";
 import { ProductFormModal } from "./ProductFormModal";
 import { PrintLabelsModal } from "./PrintLabelsModal";
 import { ImportCSVModal } from "./ImportCSVModal";
-import { SortTh } from "./SortTh";
 import { BulkActionBar } from "./BulkActionBar";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -360,6 +360,145 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   }, [debouncedQ, searchField, filterStatus, filterCategory, filterBrand, filterSupplier,
       filterTaxClass, filterAgeRestricted, filterProductType, priceMin, priceMax]);
 
+
+  /**
+   * Column definitions for the product table.
+   *
+   * Each cell renderer is the markup that used to sit inline in the <td>; the
+   * behaviours around them (sort, selection, paging, states) now belong to
+   * DataTable. `sortKey` is the value the catalog endpoint accepts, so a header
+   * click reorders the whole catalog rather than the loaded page.
+   */
+  const productColumns: DataColumn<CatalogProduct>[] = [
+    {
+      key: "name",
+      header: "Name",
+      sortKey: "name",
+      hideable: false,
+      sticky: true,
+      minWidth: "260px",
+      render: (p) => (
+        <div className="flex items-center gap-2.5">
+          {p.image_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={p.image_url} alt="" className="h-9 w-9 shrink-0 rounded-control object-cover" aria-hidden="true" />
+          ) : (
+            <span className={clsx("flex h-9 w-9 shrink-0 items-center justify-center rounded-control text-xs font-bold text-white",
+              p.status === "active" ? "bg-accent-600" : p.status === "draft" ? "bg-warning-500" : "bg-slate-300")}
+              aria-hidden="true">
+              {p.name.charAt(0).toUpperCase()}
+            </span>
+          )}
+          <div className="min-w-0">
+            <p className={clsx("font-medium leading-snug", p.status === "archived" ? "text-content-muted line-through" : "text-content-primary")}>{p.name}</p>
+            <p className="font-mono text-2xs text-content-muted">{p.sku}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "type",
+      header: "Type",
+      render: (p) => {
+        const productType = getProductType(p);
+        return (
+          <span className={clsx(
+            "rounded-full px-2 py-0.5 text-2xs font-semibold",
+            productType === "Variant" ? "bg-info-bg text-info-700"
+              : productType === "Master" ? "bg-accent-50 text-accent-700"
+              : "bg-surface-3 text-content-secondary",
+          )}>
+            {productType}
+          </span>
+        );
+      },
+    },
+    {
+      key: "brand",
+      header: "Brand",
+      sortKey: "brand",
+      render: (p) => p.brand ?? <span className="text-content-muted">—</span>,
+    },
+    {
+      key: "supplier",
+      header: "Supplier",
+      render: (p) => p.preferred_vendor_name ?? <span className="text-content-muted">—</span>,
+    },
+    {
+      key: "available",
+      header: "Available",
+      render: (p) => {
+        const isAvailable = p.status === "active";
+        return (
+          <div className="flex items-center gap-1.5">
+            {/* Shape + text, never colour alone — the dot repeats what the
+                label already says for anyone who cannot separate the hues. */}
+            <span className={clsx("h-2 w-2 shrink-0 rounded-full",
+              isAvailable ? "bg-success-500" : p.status === "draft" ? "bg-warning-500" : "bg-slate-300",
+            )} aria-hidden="true" />
+            <span className={clsx("text-xs font-medium capitalize",
+              isAvailable ? "text-success-700" : p.status === "draft" ? "text-warning-700" : "text-content-muted",
+            )}>
+              {p.status}
+            </span>
+            {p.age_restricted === 1 && (
+              <span className="rounded bg-warning-bg px-1 py-0.5 text-2xs font-semibold text-warning-700">18+</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "price",
+      header: "Retail price",
+      sortKey: "price_cents",
+      numeric: true,
+      render: (p) => <span className="font-semibold text-content-primary">{formatMoney(p.price_cents)}</span>,
+    },
+    {
+      key: "channels",
+      header: "Channels",
+      render: (p) => (
+        <div className="flex flex-wrap gap-1">
+          <span className="rounded-full bg-surface-3 px-2 py-0.5 text-2xs font-medium text-content-secondary">In-store</span>
+          {p.ecommerce === 1 && (
+            <span className="rounded-full bg-info-bg px-2 py-0.5 text-2xs font-medium text-info-700">Online</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "created",
+      header: "Created",
+      sortKey: "created_at",
+      render: (p) => (
+        <span className="text-xs text-content-muted tnum">
+          {p.created_at
+            ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "2-digit" }).format(new Date(p.created_at))
+            : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "",
+      hideable: false,
+      align: "right",
+      width: "56px",
+      render: (p) => (
+        <button type="button"
+          onClick={(e) => { e.stopPropagation(); router.push(`/catalog/${p.id}`); }}
+          aria-label={`Edit ${p.name}`}
+          className="focus-ring inline-flex min-h-touch min-w-touch items-center justify-center rounded-control text-content-muted transition-colors hover:text-accent-600">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+          </svg>
+        </button>
+      ),
+    },
+  ];
+
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
@@ -690,171 +829,93 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
         )}
 
 
-        {loading ? (
-          <TableSkeleton headers={["", "Product", "Type", "Brand", "Supplier", "Available", "Retail price", "Channels", "Created", ""]} rows={8} />
-        ) : error ? (
-          <div className="px-4 py-10">
-            <EmptyState
-              title="Products could not load"
-              description={error}
-              action={<Button size="sm" variant="secondary" onClick={() => void load()}>Retry</Button>}
-            />
-          </div>
-        ) : products.length === 0 ? (
-          <div className="px-4 py-10">
-            <EmptyState
-              title={hasFilters ? "No products match these filters" : "No products yet"}
-              description={hasFilters ? "Clear filters or adjust the search to see more catalog items." : "Create your first product to start building the catalog."}
-              action={hasFilters
-                ? <Button size="sm" variant="secondary" onClick={clearFilters}>Clear filters</Button>
-                : <Button size="sm" variant="primary" onClick={openCreate}>Add product</Button>}
-            />
-          </div>
-        ) : (
-          <>
-            <div className="hidden overflow-x-auto md:block">
-              {/* ── Spec: checkbox | thumbnail+Name | Brand | Supplier | Available | Retail price | Channels | Created | ✎ */}
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[#F0F0F0] bg-[#FAFAFA] text-left text-xs font-semibold uppercase tracking-wider text-[#888]">
-                    <th className="px-4 py-3">
-                      <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} aria-label="Select all products" className="h-4 w-4 rounded border-slate-300" />
-                    </th>
-                    <SortTh col="name"        label="Name"          cur={effectiveSort} dir={sortDir} onSort={handleSort} />
-                    <th className="px-4 py-3">Type</th>
-                    <SortTh col="brand"       label="Brand"         cur={effectiveSort} dir={sortDir} onSort={handleSort} />
-                    <th className="px-4 py-3">Supplier</th>
-                    <th className="px-4 py-3">Available</th>
-                    <SortTh col="price_cents" label="Retail price"  cur={effectiveSort} dir={sortDir} onSort={handleSort} right />
-                    <th className="px-4 py-3">Channels</th>
-                    <SortTh col="created_at"  label="Created"       cur={effectiveSort} dir={sortDir} onSort={handleSort} />
-                    <th className="w-10 px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#F5F5F5]">
-                  {products.map(p => {
-                    const isSelected = selectedIds.has(p.id);
-                    const isAvailable = p.status === "active";
-                    const productType = getProductType(p);
-                    const createdDate = p.created_at
-                      ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "2-digit" }).format(new Date(p.created_at))
-                      : "—";
-                    return (
-                      <tr key={p.id}
-                        className={clsx("hover:bg-[#FAFAFA] transition-colors", isSelected && "bg-blue-50")}
-                        onClick={() => router.push(`/catalog/${p.id}`)}
-                        style={{ cursor: "pointer" }}
-                      >
-                        {/* Checkbox */}
-                        <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                          <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(p.id)}
-                            aria-label={`Select ${p.name}`} className="h-4 w-4 rounded border-slate-300" />
-                        </td>
+        {/* ── Desktop: the shared DataTable ──────────────────────────────────
+            Was a hand-rolled <table> with its own header casing, hover, padding
+            and a bespoke SortTh. Every behaviour it had is preserved as a
+            capability of the shared primitive instead: server sort (the sort
+            reorders the catalog, not the loaded page), controlled selection
+            (the bulk bar and the labels modal live outside the table and read
+            it), server pagination with rows-per-page, and built-in
+            loading/empty/error. */}
+        <div className="hidden md:block">
+          <DataTable<CatalogProduct>
+            caption="Products in this catalog, with brand, supplier, availability, price and channels"
+            columns={productColumns}
+            rows={products}
+            rowKey={(p) => p.id}
+            loading={loading}
+            error={error}
+            onRetry={() => void load()}
+            emptyTitle={hasFilters ? "No products match these filters" : "No products yet"}
+            emptyDescription={hasFilters
+              ? "Clear filters or adjust the search to see more catalog items."
+              : "Create your first product to start building the catalog."}
+            emptyAction={hasFilters
+              ? <Button size="sm" variant="secondary" onClick={clearFilters}>Clear filters</Button>
+              : <Button size="sm" variant="primary" onClick={openCreate}>Add product</Button>}
+            selectable
+            selectedKeys={selectedIds}
+            onSelectionChange={setSelectedIds}
+            serverSort={{
+              activeKey: effectiveSort,
+              direction: sortDir,
+              onSortChange: (key) => handleSort(key as ProductSort),
+            }}
+            serverPagination={{
+              total,
+              offset: page * pageSize,
+              limit: pageSize,
+              onOffsetChange: (offset) => setPage(Math.floor(offset / pageSize)),
+            }}
+            // One pager serves both layouts — see below. Two would be duplicate
+            // output for a screen reader even with CSS hiding one.
+            hideFooter
+            onRowClick={(p) => router.push(`/catalog/${p.id}`)}
+            storageKey="catalog-products"
+          />
+        </div>
 
-                        {/* thumbnail + Name + SKU */}
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2.5">
-                            {p.image_url ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={p.image_url} alt="" className="h-9 w-9 shrink-0 rounded-md object-cover" aria-hidden="true" />
-                            ) : (
-                              <span className={clsx("flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white",
-                                p.status === "active" ? "bg-brand-600" : p.status === "draft" ? "bg-amber-400" : "bg-slate-300")}
-                                aria-hidden="true">
-                                {p.name.charAt(0).toUpperCase()}
-                              </span>
-                            )}
-                            <div className="min-w-0">
-                              <p className={clsx("font-medium text-[#111] leading-snug", p.status === "archived" && "text-[#888] line-through")}>{p.name}</p>
-                              <p className="text-[11px] text-[#888] font-mono">{p.sku}</p>
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-3">
-                          <span className={clsx(
-                            "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                            productType === "Variant" ? "bg-blue-50 text-blue-700"
-                              : productType === "Master" ? "bg-violet-50 text-violet-700"
-                              : "bg-slate-100 text-slate-600"
-                          )}>
-                            {productType}
-                          </span>
-                        </td>
-
-                        {/* Brand */}
-                        <td className="px-4 py-3 text-[#555]">{p.brand ?? <span className="text-[#ccc]">—</span>}</td>
-
-                        {/* Supplier */}
-                        <td className="px-4 py-3 text-[#555]">
-                          {p.preferred_vendor_name ?? <span className="text-[#ccc]">—</span>}
-                        </td>
-
-                        {/* Available indicator */}
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5">
-                            <span className={clsx("h-2 w-2 rounded-full shrink-0",
-                              isAvailable ? "bg-emerald-500" : p.status === "draft" ? "bg-amber-400" : "bg-slate-300"
-                            )} aria-hidden="true" />
-                            <span className={clsx("text-xs font-medium capitalize",
-                              isAvailable ? "text-emerald-700" : p.status === "draft" ? "text-amber-700" : "text-[#888]"
-                            )}>
-                              {p.status}
-                            </span>
-                            {p.age_restricted === 1 && (
-                              <span className="rounded bg-orange-100 px-1 py-0.5 text-[10px] font-semibold text-orange-700">18+</span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Retail price */}
-                        <td className="px-4 py-3 text-right font-semibold tabular-nums text-[#111]">
-                          {formatMoney(p.price_cents)}
-                        </td>
-
-                        {/* Channels */}
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-1">
-                            <span className="rounded-full bg-[#F0F0F0] px-2 py-0.5 text-[11px] font-medium text-[#555]">In-store</span>
-                            {p.ecommerce === 1 && (
-                              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">Online</span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Created */}
-                        <td className="px-4 py-3 text-xs text-[#888] tabular-nums">{createdDate}</td>
-
-                        {/* Edit icon */}
-                        <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                          <button type="button"
-                            onClick={() => router.push(`/catalog/${p.id}`)}
-                            aria-label={`Edit ${p.name}`}
-                            className="text-[#aaa] hover:text-brand-600 transition-colors">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                            </svg>
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+        {/* ── Mobile: card list. A ten-column table does not shrink into a
+            phone; it becomes a card per product with the same actions. */}
+        <div className="md:hidden">
+          {loading ? (
+            <TableSkeleton headers={["Product", "Price"]} rows={6} />
+          ) : error ? (
+            <div className="px-4 py-10">
+              <EmptyState
+                title="Products could not load"
+                description={error}
+                action={<Button size="sm" variant="secondary" onClick={() => void load()}>Retry</Button>}
+              />
             </div>
-            <div className="divide-y divide-slate-100 md:hidden">
-              {products.map(p => (
-                <ProductListCard key={p.id} product={p}
-                  productType={getProductType(p)}
-                  onEdit={() => router.push(`/catalog/${p.id}`)}
-                  onArchive={() => { setArchiveTarget(p); setActionError(null); }} />
-              ))}
+          ) : products.length === 0 ? (
+            <div className="px-4 py-10">
+              <EmptyState
+                title={hasFilters ? "No products match these filters" : "No products yet"}
+                description={hasFilters ? "Clear filters or adjust the search to see more catalog items." : "Create your first product to start building the catalog."}
+                action={hasFilters
+                  ? <Button size="sm" variant="secondary" onClick={clearFilters}>Clear filters</Button>
+                  : <Button size="sm" variant="primary" onClick={openCreate}>Add product</Button>}
+              />
             </div>
-          </>
-        )}
+          ) : (
+            <>
+              <div className="divide-y divide-line-subtle">
+                {products.map(p => (
+                  <ProductListCard key={p.id} product={p}
+                    productType={getProductType(p)}
+                    onEdit={() => router.push(`/catalog/${p.id}`)}
+                    onArchive={() => { setArchiveTarget(p); setActionError(null); }} />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* One pager for the table and the card list alike. */}
         {!loading && !error && total > 0 && (
-          <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(0); }} />
+          <Pagination page={page} pageSize={pageSize} total={total}
+            onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(0); }} />
         )}
       </Card>
 

@@ -351,6 +351,51 @@ describe("ProductsTab — active filter chips", () => {
   });
 });
 
+describe("ProductsTab — DataTable migration", () => {
+  it("keeps sorting server-side after the table moved to DataTable", async () => {
+    const user = userEvent.setup();
+    render(<ProductsTab categories={CATEGORIES} />);
+    await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
+
+    // DataTable's default sorting reorders the LOADED page. This list must not
+    // use it: one page of a 5,000-row catalog reordered locally looks exactly
+    // like the catalog being reordered, which is the defect this page already
+    // had once. A header click has to reach the server.
+    await user.click(screen.getByRole("button", { name: /Sort by Brand/ }));
+    await waitFor(() => {
+      const q = lastListQuery();
+      expect(q.get("sort")).toBe("brand");
+      expect(q.get("dir")).toBe("asc");
+    });
+  });
+
+  it("marks the contextual default column as sorted, not just explicit choices", async () => {
+    render(<ProductsTab categories={CATEGORIES} />);
+    await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
+
+    // With no click, the server is ordering by name. The header must say so —
+    // showing every column as unsorted would misdescribe the list.
+    const nameHeader = screen.getAllByRole("columnheader")
+      .find((h) => h.textContent?.includes("Name"));
+    expect(nameHeader).toHaveAttribute("aria-sort", "ascending");
+  });
+
+  it("still drives the bulk bar from the table's selection", async () => {
+    const user = userEvent.setup();
+    listResponse = () => ({
+      items: [product({ id: "prod_1" }), product({ id: "prod_2", sku: "BEV-2", name: "Sprite" })],
+      total: 2, limit: 50, offset: 0,
+    });
+    render(<ProductsTab categories={CATEGORIES} />);
+    await waitFor(() => expect(screen.getByLabelText("Select all rows on this page")).toBeInTheDocument());
+
+    // The bulk bar lives OUTSIDE the table, so selection has to be controlled —
+    // an internally-managed selection would leave the bar empty.
+    await user.click(screen.getByLabelText("Select all rows on this page"));
+    expect(await screen.findByText("2 products selected")).toBeInTheDocument();
+  });
+});
+
 describe("ProductsTab — bulk actions", () => {
   it("updates the whole selection in one request, not one PATCH per product", async () => {
     const user = userEvent.setup();
@@ -361,8 +406,11 @@ describe("ProductsTab — bulk actions", () => {
     });
 
     render(<ProductsTab categories={CATEGORIES} />);
-    await waitFor(() => expect(screen.getByLabelText("Select all products")).toBeInTheDocument());
-    await user.click(screen.getByLabelText("Select all products"));
+    // DataTable's own label. More precise than the old "Select all products":
+    // it selects the loaded page, which is what it has always actually done.
+    const selectAll = "Select all rows on this page";
+    await waitFor(() => expect(screen.getByLabelText(selectAll)).toBeInTheDocument());
+    await user.click(screen.getByLabelText(selectAll));
 
     const bulkBar = await screen.findByText("2 products selected");
     const scope = within(bulkBar.parentElement!.parentElement!);
