@@ -1890,11 +1890,20 @@ paths:
       summary: List appointments
       operationId: listAppointments
       tags: [Appointments]
+      description: >
+        `date` selects a single day and takes precedence; otherwise `from`/`to`
+        bound the range. Capped at 200, earliest first.
       parameters:
         - name: date
           in: query
           schema: { type: string, format: date }
-        - name: employee_id
+        - name: from
+          in: query
+          schema: { type: integer }
+        - name: to
+          in: query
+          schema: { type: integer }
+        - name: employeeId
           in: query
           schema: { type: string }
       responses:
@@ -1918,14 +1927,14 @@ paths:
           application/json:
             schema:
               type: object
-              required: [service, starts_at, ends_at]
+              required: [service, startsAt, endsAt]
               properties:
-                service: { type: string }
-                customer_id: { type: string }
-                employee_id: { type: string }
-                starts_at: { type: integer }
-                ends_at: { type: integer }
-                notes: { type: string }
+                service: { type: string, maxLength: 100 }
+                startsAt: { type: integer }
+                endsAt: { type: integer }
+                customerId: { type: string }
+                employeeId: { type: string }
+                notes: { type: string, maxLength: 500 }
       responses:
         "201":
           description: Appointment created
@@ -1933,11 +1942,12 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Appointment" }
 
-  /api/v1/appointments/{id}/status:
+  /api/v1/appointments/{id}:
     patch:
-      summary: Update appointment status
-      operationId: updateAppointmentStatus
+      summary: Update an appointment
+      operationId: updateAppointment
       tags: [Appointments]
+      description: Partial update — send only the fields being changed.
       parameters:
         - name: id
           in: path
@@ -1949,11 +1959,29 @@ paths:
           application/json:
             schema:
               type: object
-              required: [status]
               properties:
                 status: { type: string, enum: [scheduled, confirmed, in_progress, completed, cancelled, no_show] }
+                notes: { type: string, maxLength: 500 }
+                startsAt: { type: integer }
+                endsAt: { type: integer }
       responses:
-        "200": { description: Status updated }
+        "200":
+          description: Updated appointment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Appointment" }
+    delete:
+      summary: Delete an appointment
+      operationId: deleteAppointment
+      tags: [Appointments]
+      description: Manager or above.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Deleted }
 
   # ── Healthcare ──────────────────────────────────────────────────────────────
   /api/v1/healthcare/patients:
@@ -2024,27 +2052,52 @@ paths:
                         type: array
                         items: { $ref: "#/components/schemas/Prescription" }
 
-  /api/v1/healthcare/prescriptions:
+  /api/v1/healthcare/patients/{id}/prescriptions:
+    get:
+      summary: List a patient's prescriptions
+      operationId: listPatientPrescriptions
+      tags: [Healthcare]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Prescription list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Prescription" }
     post:
-      summary: Create prescription
+      summary: Create prescription for a patient
       operationId: createPrescription
       tags: [Healthcare]
-      description: Manager or above.
+      description: Manager or above. The patient is identified by the path, not the body.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [patient_id, drug_name, refills_authorized]
+              required: [drugName, dosage]
               properties:
-                patient_id: { type: string }
-                drug_name: { type: string }
-                strength: { type: string }
-                prescriber: { type: string }
-                refills_authorized: { type: integer }
-                instructions: { type: string }
-                expires_at: { type: integer }
+                drugName: { type: string, maxLength: 200 }
+                dosage: { type: string, maxLength: 100 }
+                prescriber: { type: string, maxLength: 100 }
+                instructions: { type: string, maxLength: 500 }
+                quantity: { type: integer, minimum: 1, default: 1 }
+                refillsRemaining: { type: integer, minimum: 0, default: 0 }
+                expiryDate: { type: integer }
       responses:
         "201":
           description: Prescription created
@@ -2072,10 +2125,8 @@ paths:
       summary: List vehicles
       operationId: listVehicles
       tags: [Automotive]
+      description: Free-text `q` matches licence plate, VIN, make or model. Capped at 200.
       parameters:
-        - name: customer_id
-          in: query
-          schema: { type: string }
         - name: q
           in: query
           schema: { type: string }
@@ -2100,16 +2151,17 @@ paths:
           application/json:
             schema:
               type: object
-              required: [make, model, year]
+              required: [make, model]
               properties:
-                vin: { type: string, minLength: 17, maxLength: 17 }
-                plate: { type: string }
-                make: { type: string }
-                model: { type: string }
+                make: { type: string, maxLength: 100 }
+                model: { type: string, maxLength: 100 }
                 year: { type: integer }
-                color: { type: string }
-                mileage: { type: integer }
-                customer_id: { type: string }
+                vin: { type: string, maxLength: 50 }
+                licensePlate: { type: string, maxLength: 20 }
+                color: { type: string, maxLength: 30 }
+                mileage: { type: integer, minimum: 0 }
+                customerId: { type: string }
+                notes: { type: string, maxLength: 500 }
       responses:
         "201":
           description: Vehicle created
@@ -2125,10 +2177,7 @@ paths:
       parameters:
         - name: status
           in: query
-          schema: { type: string, enum: [open, in_progress, completed, invoiced] }
-        - name: vehicle_id
-          in: query
-          schema: { type: string }
+          schema: { type: string, enum: [open, in_progress, completed] }
       responses:
         "200":
           description: Work orders
@@ -2150,12 +2199,15 @@ paths:
           application/json:
             schema:
               type: object
-              required: [vehicle_id, description]
+              required: [vehicleId, description]
               properties:
-                vehicle_id: { type: string }
-                description: { type: string }
-                labour_cents: { type: integer }
-                parts_cents: { type: integer }
+                vehicleId: { type: string }
+                description: { type: string, maxLength: 500 }
+                technicianId: { type: string }
+                labourCents: { type: integer, minimum: 0, default: 0 }
+                partsCents: { type: integer, minimum: 0, default: 0 }
+                mileageIn: { type: integer, minimum: 0 }
+                notes: { type: string, maxLength: 1000 }
       responses:
         "201":
           description: Work order created
@@ -2163,17 +2215,30 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/WorkOrder" }
 
-  /api/v1/automotive/work-orders/{id}/status:
+  /api/v1/automotive/work-orders/{id}:
     patch:
-      summary: Advance work order status
-      operationId: advanceWorkOrderStatus
+      summary: Update a work order
+      operationId: updateWorkOrder
       tags: [Automotive]
-      description: Advances to the next status in sequence (open→in_progress→completed).
+      description: >
+        Partial update. Setting status to `in_progress` stamps `started_at` on first
+        transition; `completed` stamps `completed_at`. Sending `labourCents`
+        recalculates `total_cents` from the stored parts total.
       parameters:
         - name: id
           in: path
           required: true
           schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string, enum: [open, in_progress, completed] }
+                mileageOut: { type: integer }
+                labourCents: { type: integer }
       responses:
         "200":
           description: Updated work order
@@ -2214,11 +2279,14 @@ paths:
           application/json:
             schema:
               type: object
-              required: [room_number, rate_cents]
+              required: [roomNumber]
               properties:
-                room_number: { type: string }
-                room_type: { type: string }
-                rate_cents: { type: integer }
+                roomNumber: { type: string, maxLength: 20 }
+                type: { type: string, enum: [standard, deluxe, suite, penthouse, dormitory], default: standard }
+                floor: { type: string, maxLength: 10 }
+                rateCents: { type: integer, minimum: 0, default: 0 }
+                outletId: { type: string }
+                notes: { type: string, maxLength: 500 }
       responses:
         "201":
           description: Room created
@@ -2245,7 +2313,6 @@ paths:
               required: [status]
               properties:
                 status: { type: string, enum: [available, occupied, checkout, cleaning, maintenance] }
-                guest_name: { type: string }
       responses:
         "200":
           description: Updated room
@@ -2253,7 +2320,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Room" }
 
-  /api/v1/hospitality/rooms/{id}/charges:
+  /api/v1/hospitality/rooms/{id}/charge:
     post:
       summary: Post charge to room folio
       operationId: postRoomCharge
@@ -2269,37 +2336,46 @@ paths:
           application/json:
             schema:
               type: object
-              required: [description, amount_cents, category]
+              required: [description, amountCents]
               properties:
-                description: { type: string }
-                amount_cents: { type: integer }
-                category: { type: string }
+                description: { type: string, maxLength: 200 }
+                amountCents: { type: integer, minimum: 1 }
+                orderId: { type: string }
       responses:
         "201":
           description: Charge posted
           content:
             application/json:
               schema: { $ref: "#/components/schemas/RoomCharge" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/v1/hospitality/rooms/{id}/settle:
     post:
       summary: Settle all pending folio charges
       operationId: settleRoomFolio
       tags: [Hospitality]
-      description: Marks all charges with settled_at = now and flips room to Checkout.
+      description: Manager or above. Stamps `settled_at` on every unsettled charge for the room.
       parameters:
         - name: id
           in: path
           required: true
           schema: { type: string }
       responses:
-        "200": { description: Settled — total amount collected }
+        "200":
+          description: Settled — count of charges settled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settled: { type: integer }
 
-  /api/v1/hospitality/rooms/{id}/folio:
+  /api/v1/hospitality/rooms/{id}/charges:
     get:
-      summary: Get room folio (all charges)
-      operationId: getRoomFolio
+      summary: List a room's folio charges
+      operationId: listRoomCharges
       tags: [Hospitality]
+      description: Most recent first, capped at 100.
       parameters:
         - name: id
           in: path
@@ -2313,10 +2389,9 @@ paths:
               schema:
                 type: object
                 properties:
-                  charges:
+                  items:
                     type: array
                     items: { $ref: "#/components/schemas/RoomCharge" }
-                  totalPending: { type: integer }
 
   # ── Manufacturing ───────────────────────────────────────────────────────────
   /api/v1/manufacturing/orders:
@@ -2350,18 +2425,21 @@ paths:
           application/json:
             schema:
               type: object
-              required: [product_id, quantity, bomLines]
+              required: [productId, quantity, bom]
               properties:
-                product_id: { type: string }
-                quantity: { type: integer }
-                bomLines:
+                productId: { type: string }
+                quantity: { type: integer, minimum: 1 }
+                notes: { type: string, maxLength: 500 }
+                bom:
                   type: array
+                  minItems: 1
                   items:
                     type: object
-                    required: [material_id, qty_required]
+                    required: [rawMaterialId, qtyRequired]
                     properties:
-                      material_id: { type: string }
-                      qty_required: { type: number }
+                      rawMaterialId: { type: string }
+                      qtyRequired: { type: number, exclusiveMinimum: 0 }
+                      unit: { type: string, maxLength: 20, default: unit }
       responses:
         "201":
           description: Production order created with BOM lines
@@ -2398,9 +2476,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [qty_consumed]
+              required: [qtyConsumed]
               properties:
-                qty_consumed: { type: number }
+                qtyConsumed: { type: number, minimum: 0 }
       responses:
         "200":
           description: BOM line updated
@@ -2440,12 +2518,15 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name, daily_rate_cents]
+              required: [name]
               properties:
-                name: { type: string }
-                category: { type: string }
-                daily_rate_cents: { type: integer }
-                serial_number: { type: string }
+                name: { type: string, maxLength: 150 }
+                sku: { type: string, maxLength: 50 }
+                category: { type: string, maxLength: 80 }
+                dailyRateCents: { type: integer, minimum: 0, default: 0 }
+                depositCents: { type: integer, minimum: 0, default: 0 }
+                serialNumber: { type: string, maxLength: 80 }
+                notes: { type: string, maxLength: 500 }
       responses:
         "201":
           description: Asset created
@@ -2484,13 +2565,13 @@ paths:
           application/json:
             schema:
               type: object
-              required: [asset_id, starts_at, ends_at, customer_name]
+              required: [assetId, startsAt, endsAt]
               properties:
-                asset_id: { type: string }
-                customer_id: { type: string }
-                customer_name: { type: string }
-                starts_at: { type: integer }
-                ends_at: { type: integer }
+                assetId: { type: string }
+                startsAt: { type: integer }
+                endsAt: { type: integer }
+                customerId: { type: string }
+                notes: { type: string, maxLength: 500 }
       responses:
         "201":
           description: Contract created; asset status flipped to Rented
@@ -2504,22 +2585,22 @@ paths:
       summary: Return rental asset
       operationId: returnRentalAsset
       tags: [Rental]
-      description: Flips asset status back to Available.
+      description: >
+        Flips asset status back to Available. Takes no request body. 409
+        `contract_not_active` if the contract has already been returned or cancelled.
       parameters:
         - name: id
           in: path
           required: true
           schema: { type: string }
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                condition: { type: string, enum: [good, damaged] }
-                damage_cents: { type: integer }
       responses:
-        "200": { description: Returned }
+        "200":
+          description: Returned
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RentalContract" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
   # ── Entertainment ───────────────────────────────────────────────────────────
   /api/v1/entertainment/events:
@@ -2553,12 +2634,15 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name, starts_at, ticket_price_cents, capacity]
+              required: [name, startsAt, endsAt]
               properties:
-                name: { type: string }
-                starts_at: { type: integer }
-                ticket_price_cents: { type: integer }
-                capacity: { type: integer }
+                name: { type: string, maxLength: 150 }
+                startsAt: { type: integer }
+                endsAt: { type: integer }
+                venue: { type: string, maxLength: 150 }
+                capacity: { type: integer, minimum: 1, default: 100 }
+                priceCents: { type: integer, minimum: 0, default: 0 }
+                description: { type: string, maxLength: 1000 }
       responses:
         "201":
           description: Event created
@@ -2566,11 +2650,37 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Event" }
 
-  /api/v1/entertainment/events/{id}/status:
-    patch:
-      summary: Update event status
-      operationId: updateEventStatus
+  /api/v1/entertainment/events/{id}/tickets:
+    get:
+      summary: List an event's issued tickets
+      operationId: listEventTickets
       tags: [Entertainment]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Ticket list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Ticket" }
+
+  /api/v1/entertainment/events/{id}/sell:
+    post:
+      summary: Sell tickets for an event (atomic capacity check)
+      operationId: sellTickets
+      tags: [Entertainment]
+      description: >
+        409 `event_not_on_sale` unless the event status is `on_sale`; 409
+        `insufficient_capacity` when the sale would exceed remaining capacity.
+        Each ticket is issued with a generated QR code.
       parameters:
         - name: id
           in: path
@@ -2582,32 +2692,12 @@ paths:
           application/json:
             schema:
               type: object
-              required: [status]
               properties:
-                status: { type: string, enum: [draft, on_sale, completed, cancelled] }
-      responses:
-        "200": { description: Status updated }
-
-  /api/v1/entertainment/tickets:
-    post:
-      summary: Sell tickets (atomic capacity check)
-      operationId: sellTickets
-      tags: [Entertainment]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [event_id, quantity]
-              properties:
-                event_id: { type: string }
-                quantity: { type: integer, minimum: 1 }
-                customer_name: { type: string }
-                customer_email: { type: string }
+                quantity: { type: integer, minimum: 1, default: 1 }
+                customerId: { type: string }
       responses:
         "201":
-          description: Tickets issued with QR codes
+          description: Tickets issued — id and QR code per ticket
           content:
             application/json:
               schema:
@@ -2615,7 +2705,12 @@ paths:
                 properties:
                   tickets:
                     type: array
-                    items: { $ref: "#/components/schemas/Ticket" }
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        qr_code: { type: string }
+        "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
 
   /api/v1/entertainment/tickets/redeem:
@@ -2629,11 +2724,16 @@ paths:
           application/json:
             schema:
               type: object
-              required: [qr_code]
+              required: [qrCode]
               properties:
-                qr_code: { type: string }
+                qrCode: { type: string }
       responses:
-        "200": { description: Redeemed — entry granted }
+        "200":
+          description: Redeemed — entry granted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ticket" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
 
   # ── Education ───────────────────────────────────────────────────────────────
@@ -2707,25 +2807,28 @@ paths:
                         type: array
                         items: { $ref: "#/components/schemas/StudentFee" }
 
-  /api/v1/education/fees:
+  /api/v1/education/students/{id}/fees:
     post:
-      summary: Create student fee
+      summary: Create a fee for a student
       operationId: createStudentFee
       tags: [Education]
-      description: Manager or above.
+      description: Manager or above. The student is identified by the path, not the body.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [student_id, fee_type, amount_cents, due_date]
+              required: [description, amountCents]
               properties:
-                student_id: { type: string }
-                fee_type: { type: string, enum: [tuition, registration, material, exam, late_fee] }
-                amount_cents: { type: integer }
-                due_date: { type: integer }
-                description: { type: string }
+                description: { type: string, maxLength: 200 }
+                amountCents: { type: integer, minimum: 1 }
+                dueDate: { type: integer }
       responses:
         "201":
           description: Fee created
@@ -2954,11 +3057,15 @@ paths:
         "200": { description: Payment recorded; early discount applied if eligible }
 
   # ── Audit Log ───────────────────────────────────────────────────────────────
-  /api/v1/audit_log:
+  /api/v1/audit-log:
     get:
       summary: List audit log entries
       operationId: listAuditLog
       tags: [Audit]
+      description: >
+        Offset-paginated by default. Passing `cursor` (empty value = first page)
+        switches to keyset pagination, which is stable under concurrent inserts
+        and skips the COUNT(*) scan; `offset` is ignored in that mode.
       parameters:
         - name: actor
           in: query
@@ -2971,10 +3078,13 @@ paths:
           schema: { type: string }
         - name: limit
           in: query
-          schema: { type: integer, default: 50 }
+          schema: { type: integer, default: 20 }
         - name: offset
           in: query
-          schema: { type: integer }
+          schema: { type: integer, default: 0 }
+        - name: cursor
+          in: query
+          schema: { type: string }
       responses:
         "200": { description: Audit log entries }
 

@@ -124,6 +124,18 @@ jobs:
         # entry. No deps; plain ESM on the runner's Node.
         run: npm run gap:scan
 
+      # Backlog F-18. GATING, unlike the three report-only scans below, and it can
+      # be because it is green on arrival: the 9 phantom operations this check
+      # found on its first run were corrected in the same PR, so the count it
+      # gates on is already zero. Nothing generates code from contracts/openapi.yaml
+      # (orval reads a different, one-path lib/api-spec/openapi.yaml; web/api-client
+      # is hand-maintained per F-21), so no compiler or type error will ever catch
+      # drift here — this step is the only thing that does. The opposite direction
+      # (a real route nobody documented) is merely incomplete and is ratcheted
+      # report-only against tools/openapi-contract-baseline.json.
+      - name: OpenAPI contract scan — every documented operation is really served
+        run: npm run contract:scan
+
       # Backlog F-15. REPORT-ONLY on purpose — the script exits 0 regardless.
       # The 2026-08-04 audit found two duplication defects by hand (48 copies of
       # test-request.ts; a private apiFetch beside the canonical one) that no

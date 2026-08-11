@@ -1,0 +1,21 @@
+{
+  "_readme": [
+    "Baseline for tools/openapi-contract-scan.mjs (finding F-18, WORK/FORWARD_PLAN.md Phase 9.9).",
+    "",
+    "`undocumented` is the number of real backend routes that contracts/openapi.yaml",
+    "does not describe. It is a RATCHET: the scan fails when the number grows, so the",
+    "gap can only shrink. Document the new route in contracts/openapi.yaml rather than",
+    "raising this number. Raising it is allowed only with a stated reason, the same",
+    "discipline tools/api-gap-allowlist.json carries.",
+    "",
+    "`phantomAllowlist` holds `METHOD /path` entries the contract documents but the",
+    "backend does not serve. It is EMPTY and should stay that way. Nothing compiles",
+    "against contracts/openapi.yaml, so an entry here is invisible to every other",
+    "check in the repo — it just leaves the contract of record claiming an endpoint",
+    "that does not exist. It exists only so a deliberate contract-first workflow",
+    "(document, then implement) has a way to land the contract half first; every",
+    "entry must name a board item and should be removed the moment the route ships."
+  ],
+  "undocumented": 475,
+  "phantomAllowlist": []
+}
