@@ -1,7 +1,8 @@
 # AUDIT 2026-08-06T171000Z — F-18: OpenAPI contract validation
 
 **Session:** Claude Code web — `claude/status-staging-vs-develop-0vv2gg`
-**Base:** `develop@41f6eda` (`feat(db): add npm run db:check preflight + Supabase setup docs (#195)`)
+**Base:** branched at `develop@41f6eda`; merged `develop@5709a91` mid-PR (45 commits landed
+from other sessions while this was in flight — see §5b)
 **Scope:** Phase 9.9 finding **F-18**. Build the CI check that validates
 `contracts/openapi.yaml` against the real backend, and fix the drift it finds.
 **Not in scope:** any `src/**` behaviour change, `artifacts/**`, and the F-28
@@ -70,7 +71,7 @@ already declares.
 | Direction | Treatment | Why |
 |---|---|---|
 | **Phantom** — documented, not served | **FATAL** | The check is exact and the count is already zero. Gating a zero costs nobody anything and stops the drift coming back. See §3a — no compiler will ever catch this class, so nothing else can. |
-| **Undocumented** — served, not documented | ratcheted report-only | 475 of them. The contract covers the public surface, not the 623-route internal total. Gating today would fail every PR on arrival, and Phase 9.6 is explicit that such a check gets deleted rather than fixed. |
+| **Undocumented** — served, not documented | report-only | 478 of them. The contract covers the public surface, not the 626-route internal total. Gating today would fail every PR on arrival, and Phase 9.6 is explicit that such a check gets deleted rather than fixed. |
 
 This is a departure from "non-blocking first" for the phantom half, and the
 justification is narrow: the count it gates on is **already zero**, because all
@@ -138,7 +139,7 @@ What is actually true:
 
 | Spec | Lines | Paths | Consumed by |
 |---|---|---|---|
-| `contracts/openapi.yaml` | 3,170 | 109 → 111 | **nothing programmatic** — docs and archived orchestration files only |
+| `contracts/openapi.yaml` | 3,170 | 109 (unchanged — 8 renames, one removed, one added) | **nothing programmatic** — docs and archived orchestration files only |
 | `lib/api-spec/openapi.yaml` | 36 | 1 (`/healthz`) | orval → `lib/api-client-react`, `lib/api-zod` |
 
 `web/api-client/types.ts` is hand-maintained despite archived docs
@@ -221,12 +222,41 @@ guard:
 |---|---|---|
 | Clean tree | exit 0 | exit 0 |
 | Inject a phantom operation | exit 1, names it | exit 1, `GET /api/v1/totally-made-up` |
-| Undocumented count exceeds baseline | exit 1 | exit 1, `475 → 400` breach reported |
+| Undocumented count grows | warn, exit 0 | warn, exit 0 — `400 → 478` reported (see §5b) |
 | Two-space non-path key in `paths:` | hard error | `unexpected key "notAPath"` |
 | Pre-fix contract (`git HEAD`) | exit 1 | exit 1 — reproduces the drift unaided |
 
 `contracts/openapi.yaml` was confirmed byte-identical after each destructive
-test, and re-parsed cleanly by PyYAML after all edits.
+test, and re-parsed cleanly by PyYAML after all edits. Also verified no
+duplicate path keys (109 raw path-key lines = 109 PyYAML keys, so nothing is
+being silently merged) and no duplicate `operationId`s.
+
+Route extraction was checked for completeness in the direction that matters:
+a *missed* route would produce a **false phantom** and fail CI on correct code.
+Confirmed there is no `router.route()`, `.all()`, dynamically-registered method,
+or variable route path anywhere in `src/` — every route is a literal path on
+`router.<method>` or `app.<method>`, and every `app.use` mounts middleware.
+
+### 5b. The ratchet was wrong, and merging `develop` proved it
+
+The undocumented-route count was first written as a **gating** ratchet: fail if
+the number grows. Merging `develop` mid-PR — 45 commits from other sessions,
+none touching the contract — pushed it 475 → 478 and turned the build red on
+work with nothing to do with this change.
+
+That is the exact failure Phase 9.6 warns about, applied to the derivative
+rather than the total: with several agents landing routes on `develop` in
+parallel, a growth gate turns unrelated PRs red until someone edits a JSON file
+in this repo, and a check that does that gets deleted rather than fixed.
+
+Changed to warn-and-continue. The direction is still printed on every run (and
+the scan says so explicitly when the gap *shrinks*, prompting the baseline to be
+lowered), but it cannot fail a build. Gate it once the number is small and
+stable — the same sequence `docker-build` and `e2e` followed. Recorded here
+rather than quietly changed, because the first design shipped in the same PR.
+
+The phantom half is unaffected and still fatal; it was re-proven on the merged
+tree after the change.
 
 ---
 

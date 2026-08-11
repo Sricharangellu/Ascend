@@ -6,7 +6,7 @@ export type FeatureId =
   | "catalog" | "discounts" | "gift-cards" | "loyalty"
   | "inventory" | "purchasing" | "vendors" | "operations" | "delivery" | "shipping"
   | "customers" | "appointments"
-  | "reports" | "insights" | "ai-assistant" | "tax-compliance" | "finance" | "accounting" | "invoicing"
+  | "reports" | "insights" | "ai-assistant" | "tax-compliance" | "progress" | "finance" | "accounting" | "invoicing"
   | "ecommerce" | "workforce"
   | "team" | "settings" | "workflows" | "integrations" | "imports-exports" | "audit-log" | "notifications";
 
@@ -70,6 +70,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       { id: "insights",       label: "Insights",         description: "AI-powered analytics and trends" },
       { id: "ai-assistant",   label: "AI Assistant",     description: "Conversational menu & inventory recommendations grounded in your real data" },
       { id: "tax-compliance", label: "Tax Compliance",   description: "Tax reporting and regulatory compliance" },
+      { id: "progress",       label: "Progress & Proof",  description: "Track business hypotheses from evidence to a verified decision" },
       { id: "finance",        label: "Finance Overview",  description: "P&L, cash flow, and financial summary" },
       { id: "accounting",     label: "Accounting",        description: "Chart of accounts, journals, and reconciliation" },
       { id: "invoicing",      label: "Invoicing",         description: "Customer invoices and payment tracking" },

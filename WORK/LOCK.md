@@ -8,6 +8,69 @@
 | Started | 2026-08-06T17:10Z |
 | Status | RELEASED — pushed to `claude/status-staging-vs-develop-0vv2gg` |
 | Blockers | none. F-28 (the underlying request-field naming split) is recorded as NEEDS-SRI rather than resolved unilaterally — renaming accepted request fields is a breaking API change. |
+## Active Claim (Claude Code web — release staging → master)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/push-staging-to-master-1m38lt` (PR #202) |
+| Queue item | Sri directive 2026-08-08: release `staging` to `master`. `deploy-production` never passed `BACKEND_URL`, and `web/next.config.mjs` reads it inside `rewrites()` — build-time, frozen into `routes-manifest.json` — so every release ships a production frontend proxying `/api/*` at the dead `ascendhq-api.vercel.app` and nobody can log in. `deploy-staging` has read `vars.STAGING_BACKEND_URL` all along. Wire `vars.PROD_BACKEND_URL` into the prod build. |
+| Files/areas expected | `.github/workflows/ci.yml` (`deploy-production` env + `smoke-test`), `.github/workflows/uptime.yml` (probe timeouts + fallback), `scripts/deploy.sh` (`deploy_frontend` staging layout + prod `BACKEND_URL` default), `docs/architecture/{DEPLOYMENTS,PIPELINE}.md`, `WORK/LOCK.md`. NOT `src/**`, NOT `web/**`, NOT `deploy_backend`. |
+| Started | 2026-08-08T162602Z |
+| Status | **RELEASED — release NOT completed. `master` is unchanged at `e55e743` and the reason is not this work.** Merging PR #200 was attempted and refused by GitHub: `405 Required status check "Frontend — typecheck + lint + build" is expected`. Commit `1a4b989` (2026-08-05) renamed that job to `…+ test + build` without updating branch protection, so a required check that nothing emits sits permanently "expected" — **no PR into `master` has been mergeable since that date**, which is why `master` has not moved since 2026-07-23. Recorded with both remedies in `PIPELINE.md`; the preferred one (edit the required-check name) is Sri-only — the protection API returns `403 Resource not accessible by integration` to agents. Everything else is merged and safe: `develop` and `staging` are content-identical at `d26ccc7`. |
+| Shipped this claim | PR #202 (`deploy-production` passes `BACKEND_URL`, which `next.config.mjs` freezes into the bundle at build time — without it the shipped frontend proxies `/api/*` at a dead host and nobody can log in), PR #204 (stage the frontend under `web/` so Vercel's Root Directory resolves), PR #206 (prod `BACKEND_URL`/probe fallbacks → `https://ascend-prod.onrender.com`; `uptime.yml` timeouts widened past the Free-plan cold start; confirmed Render service identity recorded). Promotions #203/#205/#207. |
+| Verified, not asserted | The frontend deploy fix is **proven on a real Vercel deploy**, not just locally: staging run `31273743041` reports `✓ frontend deployed (testing)` and `Success! https://ascend-frontend-staging.vercel.app now points to …`, against `frontend exit=1` (`The provided path “…/web” does not exist`) before the fix. That is the TESTING tier producing a working deployment for the first time. |
+| Scope change (honest) | This claim originally excluded `scripts/deploy.sh`. Promoting the fixed `FRONTEND_PID` to `staging` uncovered a **second, independent break hiding behind the first**: with the project ID corrected, Vercel resolved `ascend_hq_web`'s Root Directory (`web`) against the upload and failed with `The provided path “/tmp/tmp.upl5y1upwa/web” does not exist` (staging run `31268669760`, 2026-08-08T173035Z). `deploy_frontend` unpacked the *contents* of `web/` at the upload root. Since `deploy_frontend` is shared across tiers, `DEPLOY_ENV=prod` fails identically — the release deploy could not have worked. Fixing it is inside the directive's intent ("release to master"), so the scope was widened rather than shipping a release with a knowingly broken deploy. The dashboard alternative (set Root Directory to `.`) was rejected: it would break the git-connected PR previews that currently work. |
+| Duplicate-work check | Ran per AGENTS.md before re-cutting this branch, and it caught a real collision. This claim originally also made `smoke-test`'s probes repointable; `develop` moved to `dcf6033` mid-session and PR #197's `d294041` had already landed exactly that. The duplicate commit was **dropped, not merged** — develop's version stands, including its deliberate asymmetric fallback. Only the `deploy-production` half, which #197 left behind, remains here. |
+| Blockers | `PROD_BACKEND_URL`, `PROD_DATABASE_URL` and the Render/Vercel/Supabase dashboards are Sri-only. The no-restorable-backup blocker and the `DEPLOYMENTS.md` P0 on where the prod backend runs stay OPEN and are not worked around here. |
+
+## Active Claim (Claude Code web — enterprise infrastructure/platform audit)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-erp-platform-audit-a80478` |
+| Queue item | Full enterprise infrastructure / platform / DevOps / technology-modernization audit (12 phases: technology discovery, alternatives evaluation, cloud architecture, observability, security, testing, performance, DevOps, integrations, AI, readiness scoring, deliverables) — plus implement the improvements it justifies, where they are backward-compatible and do not pre-empt a decision that is Sri's. |
+| Files/areas expected | `WORK/audits/AUDIT_2026-08-06T170227Z-enterprise-platform-audit.md` (new), `docs/architecture/ADR/ADR-00{8,9}-*.md` (new), `docs/architecture/GAPS.md`, `WORK/LOOP_STATE.md`, `WORK/LOCK.md`, `SECURITY.md` (new), `tools/route-authz-scan.mjs` (new) + `tools/README.md`, `.github/workflows/{ci,backup,security}.yml`, `Dockerfile`, `package.json`, `src/app.ts`, `src/gateway/{metrics,ops.test}.ts`, `src/modules/quotes/{routes,quotes.test}.ts`. **NOT** `artifacts/**` (another environment's tree — audited by reading only, never modified), NOT `web/**`, NOT `src/modules/payments/**` or `web/components/terminal/**` (the two live Cursor Cloud claims below), NOT `WORK/FORWARD_PLAN.md`, NOT `docs/architecture/{PIPELINE,DEPLOYMENTS,ARCHITECTURE}.md`. |
+| Started | 2026-08-06T170227Z |
+| Status | RELEASED — pushed to `claude/ascend-erp-platform-audit-a80478`. Overlap check: the two `ACTIVE` claims below (Cursor Cloud Wave A/B and POS customer + gift card) scope `web/**` and `src/modules/payments/**`; the only shared area is `WORK/**`, touched here as an append-only new `WORK/audits/` file with a collision-proof timestamp name plus new rows in `WORK/LOOP_STATE.md` — no existing content rewritten, no claimed file edited. |
+| Blockers | none. |
+| Gates | Backend: `typecheck` PASS, `hygiene` PASS (2187 files), **new `authz:scan` PASS** (49 route files, 6 allowlisted, 0 unguarded), `gap:scan` PASS (473/378, 17 allowlisted), `table:scan` PASS (166 names), `npm test` **893/893 on real Postgres 16**, 0 fail (3 added here) (embedded-postgres cannot `initdb` as root in this container — same constraint the 2026-08-04 session hit; used system PG 16 via `DATABASE_URL`, which is what CI does too). Web: `typecheck` PASS, `lint` PASS (0 warnings), `vitest` **188/188**, `NEXT_PUBLIC_MOCK=false npm run build` PASS (124 routes, 87.4 kB shared JS). Workflows: `actionlint` 1.7.12 PASS — it caught a real YAML syntax error in one of this change's own steps before commit. Both `npm audit` gate paths (advisories present / report unavailable) simulated locally. |
+| Proof the new guard works | `tools/route-authz-scan.mjs` was run against the tree **before** its allowlist existed: exit 1, naming 4 unguarded mutating routes. One (`quotes DELETE /:id`) fixed in code; three reviewed and allowlisted with reasons. The regression test for the fix was separately verified to **fail** against the pre-fix `routes.ts` (`not ok 11 … a cashier must not be able to hard-delete a quote`) and pass with it. The CI step it replaces exited 0 on every run it ever made. |
+| Not run | `npm run smoke` — CI runs it in the same job, and the smoke path (POS lifecycle) is untouched by this diff. Playwright e2e — same reason; no `web/` file changed. |
+## Active Claim (Claude Code web — FEATURE: progress intelligence, close the truth-tracking loop)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-erp-protocol-mbg7nv` |
+| Queue item | **Single-feature end-to-end delivery** (Sri protocol 2026-08-06): finish the Progress Intelligence model that `AGENTS.md` mandates (`Hypothesis → Plan → Task → Evidence → Verified Result → Decision`, forward-plan priority #5). Verified in code, not docs: Task/Evidence/System-verify are shipped end-to-end, but **Hypotheses and Decisions have real, tested, audited backend routes and ZERO frontend** — no type, no page, no component — and there is **no GET for evidence or decisions at all**, so attached evidence is write-only and invisible after saving. Deliver the missing halves across every layer (backend reads, types, UI, RBAC, nav, mocks, tests, docs). |
+| Files/areas expected | `src/modules/progress/{service,routes,progress.test}.ts`; `web/api-client/types.ts` (progress section only); NEW `web/app/(protected)/progress/**`; NEW `web/tests/progressHypotheses.test.tsx`; `web/lib/features.ts` (one new feature id); `web/components/EnterpriseShell.tsx` (one nav child under Reporting); `web/mocks/handlers.ts` (progress section only); `docs/architecture/GAPS.md`; `WORK/audits/AUDIT_2026-08-06T165353Z-progress-intelligence-loop.md` (new); `WORK/LOOP_STATE.md`; `WORK/LOCK.md`. **Deliberately NOT `web/app/(protected)/dashboard/**`** — the Cursor Cloud "Wave A/B trust leftovers + palette" claim below is still `ACTIVE` and lists `dashboard/**`; the new work is a separate page + separate components so there is no overlap. `ProgressPanel.tsx` is left untouched. NOT `artifacts/**`. |
+| Started | 2026-08-06T165353Z |
+| Status | RELEASED — pushed to `claude/ascend-erp-protocol-mbg7nv`. **Gates all green, run in this container against real PostgreSQL 16 (not embedded):** backend `typecheck` PASS · backend `npm test` **894/894, 0 fail** (~17.7 min) · `src/modules/progress` isolated **7/7** (3 pre-existing + 4 new) · web `typecheck` PASS · web `lint` **0 warnings/0 errors** · web `vitest` **206/206 across 29 files** (18 of them new) · web production `build` PASS (`/progress` emitted, 9.05 kB) · `hygiene-check.mjs` PASS (2188 files) · `gap:scan` PASS (474 backend / 382 frontend paths, 17 allowlisted, **no unexplained FE→BE gaps** — the check that proves the new page's calls hit real routes) · `table:scan` PASS (166 names, no collisions). Zero schema change: all four `progress_*` tables and their six indexes already existed. Full report: `WORK/audits/AUDIT_2026-08-06T165353Z-progress-intelligence-loop.md`. |
+| Blockers | none |
+| Not run | **Playwright e2e** — no built-and-served real-stack pair in this container; CI runs the golden paths on the PR. Feature behaviour is covered by 4 backend integration tests against real Postgres + 18 component tests; the untested layer is specifically "this page in a real browser against a real server." **Load/stress testing** — same blocker as `AUDIT_2026-08-05T054800Z`: no reachable TESTING tier. Both reported as not done rather than softened. Node here is 22, not the pinned 24 — the web suite passed 206/206 anyway (the 3 documented jsdom `Blob`/`FileReader` failures did not occur, and the suite now prints a version-gap banner naming the cause). |
+
+## Active Claim (Claude Code web — launch-readiness prompts + mobile store audit)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-prompt-guide-6ol0p9` (same branch/PR #188 as the claim below) |
+| Queue item | Add a launch-readiness section to the prompt guide — one prompt per pre-store-submission check (store mechanics, auth/session, data correctness, security, reliability, compliance) — and record the verified `artifacts/ascend-mobile` submission blockers found while writing it as an append-only audit. |
+| Files/areas expected | `tools/AGENT_PROMPT.md` (new §5 + renumber), `AGENTS.md` (the onboarding bullet's section list only), `WORK/audits/AUDIT_2026-08-06T050023Z-mobile-store-readiness.md` (new), `WORK/LOCK.md`. NOT `artifacts/**` (another environment's tree — audited by reading only, not modified), NOT `src/**`, NOT `web/**`, NOT `WORK/FORWARD_PLAN.md`, NOT `WORK/LOOP_STATE.md`. |
+| Started | 2026-08-06T050023Z |
+| Status | RELEASED — pushed to `claude/ascend-prompt-guide-6ol0p9` (PR #188). Gates: `node tools/hygiene-check.mjs` PASS (2177 files — no junk, tracked env, conflict markers, secrets, or broken doc links). Guide sections renumbered 1–7 and every cross-reference re-checked (`AGENTS.md` onboarding bullet, the guide's own header). Audit citations verified to resolve to real files. |
+| Blockers | none |
+| Not run | Backend/web suites — unchanged from the claim below: empty `node_modules` in this container, and the diff is markdown only, zero TypeScript. CI covers it on the PR. `artifacts/ascend-mobile` was read, never modified, and never built — the audit says so explicitly and labels itself `partial` for that reason. |
+
+## Active Claim (Claude Code web — prompt guide)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-prompt-guide-6ol0p9` |
+| Queue item | Ascend prompt guide. Rewrite `tools/AGENT_PROMPT.md` (the sanctioned onboarding prompt) into the current, correct prompt guide + per-job prompt recipes, and fix the three places it depends on that are stale: `tools/new-worktree.sh` cuts branches off `origin/master` (violates the binding "never branch from master" directive), `tools/README.md` documents that same base plus an already-completed "Sri-only: turn on PR protection" step, and `AGENTS.md`'s Operational Reference still says "Current mode (Phase 1): direct-to-master". No new instruction file — every change updates a mapped file in place. |
+| Files/areas expected | `tools/AGENT_PROMPT.md`, `tools/new-worktree.sh`, `tools/README.md`, `AGENTS.md` ("Git: where and how" + the Sri-only list only), `WORK/README.md` (AGENT_PROMPT row only), `docs/architecture/ORCHESTRATION.md` (concurrency-protocol claim line only), `WORK/LOCK.md`. NOT `src/**`, NOT `web/**`, NOT `WORK/FORWARD_PLAN.md`, NOT `WORK/LOOP_STATE.md`, NOT `docs/architecture/PIPELINE.md`. |
+| Started | 2026-08-05T045427Z |
+| Status | RELEASED — pushed to `claude/ascend-prompt-guide-6ol0p9`. Gates: `node tools/hygiene-check.mjs` PASS (2176 files — no junk, tracked env, conflict markers, secrets, or **broken doc links**, which is the load-bearing check for a docs change), `bash -n tools/new-worktree.sh` PASS + branch/dir derivation exercised over 6 inputs incl. the empty-slug guard. Every path and identifier the guide cites verified present (11 design primitives, `requireCapability`/`requireRole`, the ARCHITECTURE.md owner table, all 12 doc targets, the 3 CI check names). |
+| Blockers | none |
+| Not run | `npm test` / `npm run smoke` / `tsc --noEmit` — this container has an empty `node_modules` (deps were never installed), so `tsc` fails on a missing `@types/node` rather than on anything in the diff. Justified: the change touches only `.md` and one `.sh`, zero TypeScript. CI runs the full gate on the PR. |
 
 ## Active Claim (Claude Code web — AI-slop / consistency audit)
 
@@ -231,6 +294,27 @@ Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0
 | Started | 2026-08-02T200816Z |
 | Status | RELEASED — merged to develop via PR #141 (`0f30096`); see AUDIT_2026-08-02T200816Z-aging-party-names-deeplinks.md |
 | Blockers | none |
+
+## Active Claim (Claude session H — post-merge staging hardening + release go/no-go)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code (web), Opus — Sri-directed: post-merge hardening of the `develop → staging` promotion (PR #187) and a go/no-go on `staging → master` |
+| Queue item | Verify the merged `staging` tree `f0c1845`: tier-sync proof, full `npm run verify` + `ops:check`, CI guard anti-pattern checks, backup/restore drill (standing critical C-1), rollback procedure, and a structured release verdict. Fix what is found. |
+| Files/areas expected | `scripts/deploy.sh` (empty-URL guards only); NEW `src/shared/deploy-guard.test.ts`; NEW `WORK/audits/AUDIT_2026-08-05T054800Z-post-merge-staging-hardening.md`; `WORK/LOOP_STATE.md`; this LOCK. **No module/product code touched.** No pushes to `master`/`staging`/`develop` — PR only. |
+| Started | 2026-08-05 |
+| Status | RELEASED — verdict NO-GO (see audit). Fixed: `scripts/deploy.sh` reported `✓ frontend deployed` + exit 0 when the Vercel deploy failed with "Project not found" — same code path as `DEPLOY_ENV=prod`, so a production release could have reported green while shipping nothing. Regression test verified to fail without the fix. C-1 restore drill executed for the first time (backup 0.168s, restore ~1s, 193/193 tables and all sampled row counts identical, app boots against the restored DB). Gates on `f0c1845`: 852/852 tests, smoke, web typecheck/lint/build, CI E2E all green. |
+| Blockers | Load/stress testing (mandate §3) NOT done — no reachable TESTING tier (`deploy-staging` ran and failed; Vercel projects deleted), no Vercel/Supabase credentials, restricted egress. Reported as FAIL, not softened. |
+
+## Reconciliation note (session H, 2026-08-05)
+
+Board was clear before this claim: the session G coordinator entry below was
+already closed (`RELEASED — SUPERSEDED`, 2026-07-30 staleness review), and no
+other claim was `ACTIVE`. No overlapping claim was taken over.
+
+The file-header `Status:` line above still reads "ACTIVE — session G … Phase 0"
+and now contradicts session G's own closed Status row; left as-is rather than
+edited, since this session's remit was hardening, not board maintenance.
 
 ## Active Claim (Claude session G — Phase 0 coordinator: finish end-to-end + deployment readiness)
 

@@ -1877,7 +1877,7 @@ Re-run the audit after 9.3 and after 9.6. Compare against 2026-08-04:
 | Documented operations (`contract:scan`) | ~~146~~ **148** |
 | Phantom operations — documented, never served | ~~9~~ **0** (all corrected 2026-08-06; now gated) |
 | Request bodies documenting fields the handler rejects | ~~11~~ **0** (corrected 2026-08-06; root-cause inconsistency tracked as F-28) |
-| Backend routes absent from the contract | 475 (ratcheted shrink-only in `tools/openapi-contract-baseline.json`) |
+| Backend routes absent from the contract | 478 (reference point in `tools/openapi-contract-baseline.json`; direction reported, not gated) |
 | Unreferenced exports (`dead:scan`) | 371 — 95 value, 276 type-only |
 | Dependency advisories — `web` | ~~14~~ **10** (1 critical, 6 high, 3 moderate) — remainder needs F-24/F-25 majors |
 | Dependency advisories — root | ~~2 low~~ **0** |

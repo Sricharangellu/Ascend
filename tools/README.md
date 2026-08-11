@@ -47,6 +47,33 @@ This stricter guard blocks the local patterns that create unrelated dirty code:
 
 Run this before opening a PR or handing off a session. CI also runs it in the guard job.
 
+## `route-authz-scan.mjs` — every mutating route must carry an authz guard
+
+```bash
+npm run authz:scan
+```
+
+Fails if any `PUT`/`PATCH`/`DELETE` route in `src/` reaches its handler with no
+`requireRole` / `requirePermission` / `requireScope` / `requireCapability` /
+`requireModule` in front of it. A guard counts whether it is applied inline,
+through a `const mgr = requireRole("manager")` alias declared in the same file,
+or through an earlier `router.use(...)`.
+
+Replaces a CI grep step that was inert twice over: it ended in `|| echo "…✓"`,
+so it exited 0 on every run it ever made, and it only matched the literal text
+`requireRole` on the route's own line — which meant the 20+ files using the
+hoisted-alias convention all read as unguarded. Repaired as written it reported
+39 findings, ~35 of them false. This scanner reports **4**, all real, and one
+(`quotes DELETE /:id` — a hard delete of a commercial document by any cashier,
+with no soft-delete column and no audit entry) was fixed rather than
+allowlisted. Full reasoning in `docs/architecture/ADR/ADR-008`.
+
+`POST` is deliberately out of scope: in a POS it is the ordinary cashier action
+(ring a sale, take payment, open a tab), so gating it would be wrong for the
+product. The allowlist is **shrink-only** — an entry means "reviewed, and
+cashier-level access is correct here", and carries the reason. Never add one to
+make CI green.
+
 ## `duplicate-code-scan.mjs` — copy-paste detector (report-only)
 
 ```bash
@@ -105,34 +132,51 @@ framework conventions before touching anything.
 Next.js App Router files (`page`/`layout`/`route`/…), `middleware.ts` and
 `src/server.ts` are excluded — the framework calls them, so nothing imports them.
 
+## `license-scan.mjs` — licence inventory over a CycloneDX SBOM (report-only)
+
+```bash
+npm sbom --sbom-format=cyclonedx > sbom.cdx.json
+node tools/license-scan.mjs sbom.cdx.json
+node tools/license-scan.mjs --fail-on copyleft,unknown sbom.cdx.json
+```
+
+Classifies every component into permissive / weak-copyleft / copyleft / other /
+unknown. Run against the real tree 2026-08-06: **858 unique components, 851
+permissive, 2 weak-copyleft (MPL-2.0), 0 copyleft, 2 with no declared licence.**
+
+It deliberately encodes **no policy** — which licence families are acceptable is
+a business decision, so it exits 0 unless `--fail-on` says otherwise. `unknown`
+is not benign: an undeclared licence is legally "all rights reserved" until
+proven otherwise. Runs in `.github/workflows/security.yml` alongside SBOM
+generation.
+
 ## `new-worktree.sh` — one isolated checkout per session
 
 ```bash
-tools/new-worktree.sh expenses-mvp
+tools/new-worktree.sh expenses-mvp              # -> ../ascend-wt-expenses-mvp, branch wt/expenses-mvp
+tools/new-worktree.sh fix/expenses-cents        # a slug with a type prefix becomes the branch as-is
+tools/new-worktree.sh hotfix/readyz-500 master  # the one sanctioned master base; warns
 ```
 
-Creates `../finder-wt-expenses-mvp` on a fresh branch off `origin/master`. Use this
-(or run sessions one at a time) so parallel work does not share the primary tree —
-the single biggest source of the collisions. **Never make a second clone**; a
+Creates `../ascend-wt-<slug>` on a fresh branch off `origin/develop`. The base is
+`develop` by design — promotion is forward-only (`feature/* → develop → staging →
+master`) and `master` is a release target, not a starting point. Pass a second
+argument only for a real hotfix.
+
+Use this (or run sessions one at a time) so parallel work does not share the primary
+tree — the single biggest source of the collisions. **Never make a second clone**; a
 worktree shares one object store, a clone diverges.
 
-## Sri-only: turn on PR protection (ends direct-to-master racing)
+## PR protection on `master` — already on
 
-The deepest fix is that no session pushes to `master` directly — every change goes
-through a short-lived branch + PR, so conflicts surface *before* landing. Enable it
-once (GitHub Settings → Branches → `master`), or via API:
+No session pushes to `master` directly. Branch protection requires the CI checks and is
+**admin-enforced** — there is no bypass, including for repo admins — and no workflow
+auto-merges anything, so a human clicks merge every time. The authoritative description
+of what is enforced, and the config registry behind it, live in
+`docs/architecture/PIPELINE.md`; the check names themselves are the `name:` fields in
+`.github/workflows/ci.yml`. Read them there rather than copying the list here — a copy
+made on 2026-08-05 was stale within a day, when the frontend job gained a `test` step
+and became `Frontend — typecheck + lint + test + build`.
 
-```bash
-gh api -X PUT repos/Sricharangellu/Ascend/branches/master/protection \
-  -F required_pull_request_reviews.required_approving_review_count=0 \
-  -F 'required_status_checks.contexts[]=Backend' \
-  -F 'required_status_checks.contexts[]=Frontend' \
-  -F 'required_status_checks.contexts[]=Production guard' \
-  -F 'required_status_checks.contexts[]=E2E' \
-  -F required_status_checks.strict=true \
-  -F enforce_admins=false -F restrictions=
-```
-
-Also enable Settings → General → "Allow squash merging" only + "Automatically
-delete head branches". After that, every session follows: branch → PR →
-`gh pr merge --auto --squash --delete-branch` (see `AGENTS.md` "Git: where and how").
+Every session therefore follows: branch off `develop` → PR into `develop` → green CI
+→ Sri merges. See `AGENTS.md` "Git: where and how" and `tools/AGENT_PROMPT.md`.

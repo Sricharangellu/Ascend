@@ -371,16 +371,16 @@ Be honest. Do not overstate readiness.
 > The Operating Contract above is authoritative. This section fills in the concrete
 > details it points to and does not restate them. Where they conflict, the contract wins.
 
-## Transitional note — governance consolidation in progress
+## Transitional note — governance consolidation
 
 The contract mandates ONE agent file (`AGENTS.md`) and ONE plan (`WORK/FORWARD_PLAN.md`),
-and lists `RULES.md` / `WORK_STATE.md` among files that should not exist. Those two files
-**still exist on `master` and are still read by in-flight sessions** (`WORK/WORK_STATE.md`
-currently holds live state incl. the "Open Production Actions" block). Do NOT delete them
-piecemeal — folding their remaining content into `AGENTS.md` + `WORK/FORWARD_PLAN.md` and
-removing them is the pending **Foundation Hardening** restructure (`WORK/FOUNDATION_HARDENING.md`),
-which must run as a single exclusive `WORK/LOCK.md` claim when the board is clear. Until
-then, still check `WORK/WORK_STATE.md` for live state and open production actions.
+and lists `RULES.md` / `WORK_STATE.md` among files that should not exist. **That part is
+done** — verified 2026-08-05: neither `WORK/WORK_STATE.md` nor `WORK/RULES.md` exists on
+`master`, `staging`, or `develop`. Live state, including open production actions, is
+`WORK/LOOP_STATE.md`; do not go looking for `WORK_STATE.md`, and do not recreate it.
+
+The broader **Foundation Hardening** restructure (`WORK/FOUNDATION_HARDENING.md`) is still
+queued and must run as a single exclusive `WORK/LOCK.md` claim when the board is clear.
 
 ## Multi-agent coordination lock
 
@@ -410,28 +410,36 @@ overwrites, duplicate fixes, migration mismatches, and e2e failures caused by an
 server/process. Treat unexplained failures as possible coordination conflicts until
 `git status`, `git pull --ff-only`, ports, and `WORK/LOCK.md` are checked.
 
-## Git: where and how (trunk-based, staged toward PR gating)
+## Git: where and how (3-tier, PR-gated)
 
-- **Remote:** `origin` = https://github.com/Sricharangellu/Ascend.git · **trunk:** `master`
-  (protected: force-pushes and deletion are blocked). `staging` exists for preview deploys.
-- **Session start:** `git pull --ff-only origin master`. If it refuses, stop and reconcile —
-  never rebase/force-push master.
+- **Remote:** `origin` = https://github.com/Sricharangellu/Ascend.git. Three long-lived
+  branches: `develop` (where work lands) → `staging` (QA) → `master` (release target,
+  protected: PR required, CI checks required, admin-enforced, force-push and deletion blocked).
+- **Session start:** `git fetch origin develop`. Branch new work off `develop` — never off
+  `master` (see the Branch rules in the contract above). Never rebase or force-push any of the
+  three tiers.
 - **Commits:** conventional commits (`feat:`/`fix:`/`chore:`/`docs:`/`ci:`/`test:`), small
-  and scoped, one logical change each. Never commit secrets or generated artifacts.
-- **Current mode (Phase 1): direct-to-master.** Solo owner + coordinated AI sessions push
-  directly to `master` after the command gates and the `WORK/LOCK.md` claim protocol. CI
-  runs on every push and is the regression net.
-- **Target mode (switch when Sri enables PR protection):** short-lived `<type>/<scope>-<slug>`
-  branches → `gh pr create --fill` → green CI → `gh pr merge --auto --squash --delete-branch`.
+  and scoped, one logical change each. Stage only files you authored — never `git add -A`.
+  Never commit secrets or generated artifacts.
+- **Mode: PR-only, forward-only.** Short-lived `<type>/<slug>` branch (use
+  `tools/new-worktree.sh <slug>`) → PR into `develop` → green CI → merge. Promotion onward is
+  `develop → staging → master`, each by PR. There is no direct-push path to any tier, and no
+  workflow auto-merges anything — a human clicks merge every time.
+- **`master` merges are Sri's, every time.** Green CI is necessary, never sufficient, and a
+  prior approval never carries forward to a later merge. The full rulebook — what CI runs per
+  branch, what protection is enforced, rollback — is `docs/architecture/PIPELINE.md`.
 
 ### Sri-only actions (agents cannot do these)
 
-- Flip master to PR-required (Settings → Branches → master rule → require PR + status checks:
-  Backend, Frontend, Production guard, E2E).
+- Merge anything to `master` (branch protection is admin-enforced; there is no agent path).
 - Repo Settings → General: enable "Allow squash merging" only + "Automatically delete head branches".
 - Fix Actions secrets: `VERCEL_TOKEN`, `STAGING_BACKEND_URL`, staging DB secrets.
-- **Live production actions** tracked in `WORK/WORK_STATE.md` "Open Production Actions" (e.g. the
-  orphaned `finder-pos.vercel.app` 500, `NODE_ENV=production` / `METRICS_TOKEN` confirmation).
+- **Live production actions** are tracked in `WORK/LOOP_STATE.md` (the single live work-updates
+  file). Two carried over from the retired `WORK_STATE.md` and are **not** currently recorded
+  there, so they are parked here until someone re-verifies and files them: `NODE_ENV=production`
+  / `METRICS_TOKEN` confirmation, and the orphaned legacy `finder-pos.vercel.app` deployment
+  returning 500 (the live frontend is `ascendhqweb.vercel.app` — the old host should be
+  deleted, not fixed).
 
 ### Branch hygiene
 
@@ -453,12 +461,12 @@ lost-then-recovered work). These rules exist so it cannot recur:
   UTC-ISO-timestamp name, never the next-free letter. **Run `node tools/hygiene-check.mjs`
   before committing** — it fails on copy files, collision backups, merge leftovers, and a
   duplicate `AGENTS.md` (dependency-free; see `tools/README.md`).
-- **One canonical checkout.** Work only in the primary clone. Do NOT make a second clone
-  (e.g. `finder-pos-github`) — two clones of the same remote diverge and collide on push. For
-  parallel sessions run **`tools/new-worktree.sh <task-slug>`** (isolated worktree off
-  `origin/master`), never independent clones.
+- **One canonical checkout.** Work only in the primary clone. Do NOT make a second clone —
+  two clones of the same remote diverge and collide on push. For parallel sessions run
+  **`tools/new-worktree.sh <task-slug>`** (isolated worktree off `origin/develop`), never
+  independent clones.
 - **Before building any feature/module/endpoint, check it does not already exist** —
-  `git grep -n "<name>" origin/master` and scan `src/modules/`. Duplicate *work* (two
+  `git grep -n "<name>" origin/develop` and scan `src/modules/`. Duplicate *work* (two
   sessions building the same thing) is the costliest collision; extend, don't fork.
 - **Then find the OWNER before you write the code.** Look the business rule up in
   `docs/architecture/ARCHITECTURE.md`'s "Domain → owning implementation" table and extend
@@ -469,8 +477,11 @@ lost-then-recovered work). These rules exist so it cannot recur:
   long enough to diverge on error parsing (users saw `[object Object]`) and to read an
   env var that exists nowhere in the repo. If a domain has no owner listed, naming one
   is the first task, not the refactor.
-- **New agent/session onboarding:** paste `tools/AGENT_PROMPT.md` — the copy-paste
-  coordination brief (read order, lock claim, worktree, duplicate-check, gates, PR flow).
+- **New agent/session onboarding:** paste §1 of `tools/AGENT_PROMPT.md` — the prompt guide.
+  §1 is the copy-paste session brief (read order, queue, duplicate-check, worktree, lock
+  claim, branch base, gates, PR flow, honest reporting); §2–§4 cover how to write the task
+  prompt that goes with it, a template per job type, and the anti-prompts to avoid; §5 is one
+  prompt per app-store pre-submission check.
 - Before ending a session: `git status` must show no untracked ` 2.` / backup junk.
 
 ## Local runbook (macOS dev machine)

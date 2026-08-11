@@ -153,6 +153,7 @@ no single owner says so rather than being assigned a plausible one.
 | Document numbering | `src/shared/docnumber.ts` | Race-free `document_counters` |
 | Keyset pagination | `src/shared/pagination.ts` | |
 | Sales velocity / demand rate | `src/shared/sales-velocity.ts`, `src/shared/demand-rate.ts` | Consolidated 2026-07-28 from 5 divergent call sites — the precedent this table exists to prevent repeating |
+| Progress intelligence (hypothesis → evidence → decision) | `src/modules/progress/service.ts` — `ProgressService` | Owns all four `progress_*` tables. `EVIDENCE_FOR_HYPOTHESIS` is the single predicate for "what counts as evidence" — the decision gate and every evidence read share it, so they cannot disagree. Statuses `evidence_attached` / `system_verified` / `validated` / `invalidated` are earned through their own endpoints, never settable via `PATCH /tasks/:id/status`. Frontend display vocabulary: `web/lib/progress.ts` |
 | **Tax** | **CONTESTED — no single owner** | See below. |
 | **Pricing (price selection)** | **NO OWNER — does not exist** | There is no `src/modules/pricing`. `/api/v1/pricing` is an allowlisted UI-only Preview prefix. Catalog owns price *storage*; nothing owns price *derivation* (rules, tiers, promos). Do not cite a "PricingEngine" — it is not there. |
 
@@ -232,3 +233,22 @@ Kafka, K8s, multi-DB, schema-per-domain rename, low-code engine v1.
 (known parallel flakiness — single-file runs are authoritative; confirmed
 repeatedly this session via isolated re-runs). `npm run verify` aggregates
 all gates.
+
+Structural guards (each a dependency-free `tools/*.mjs`, run in CI's `guard`
+job and in `npm run verify`) — every one exists because the failure it catches
+already happened at least once here:
+
+| Guard | Catches |
+|---|---|
+| `hygiene-check.mjs` | Copy-junk, collision backups, merge leftovers, duplicate `AGENTS.md`, **root-manifest hijack** (check 8 — the pnpm/workspace incident, 5 occurrences) |
+| `api-gap-scan.mjs` | Frontend calling a route that has no backend (pages shipping on MSW mocks while prod 404s) |
+| `table-collision-scan.mjs` | Two modules declaring the same table — silently makes the losing module 100% non-functional (3 real occurrences) |
+| `route-authz-scan.mjs` | Mutating `PUT`/`PATCH`/`DELETE` routes registered with no authorization guard. Added 2026-08-06, replacing a CI grep step that could not fail and had never evaluated the codebase (ADR-008) |
+| `duplicate-code-scan.mjs` / `dead-code-scan.mjs` | Report-only |
+
+Security scanning lives in `.github/workflows/security.yml` (secret scan —
+gating; dependency advisories, licence inventory — report-only; CycloneDX SBOM —
+artifact). The gating policy is ADR-008: **a check either fails on a real
+violation or is explicitly labelled report-only at the step where it runs.**
+There is no third state, and a check that cannot fail is a defect regardless of
+what it prints.
