@@ -4,6 +4,7 @@
  * Mounting order in app.ts:
  *   1. requestIdMiddleware       — assign requestId + W3C traceparent
  *   2. metricsMiddleware         — RED metrics per route (exposed at /metrics)
+ *   2b. accessLogMiddleware      — one structured log line per completed request
  *   3. rateLimitMiddleware()     — token-bucket per IP (Wave 0: simple, Wave 2: Redis+tiers)
  *   4. authMiddleware            — verify JWT, populate res.locals.auth
  *   5. tenantResolver            — record tenant context (DB SET LOCAL happens in service layer)
@@ -16,5 +17,6 @@ export { rateLimitMiddleware, tenantRateLimitMiddleware, RATE_TIERS } from "./ra
 export type { TierLimit, TenantRateLimitOptions } from "./rateLimit.js";
 export { authMiddleware, makeAuthMiddleware, tenantResolver, requireRole, requireScope, requirePlan, requireCapability, requireModule } from "./auth.js";
 export { errorEnvelopeMiddleware } from "./errorEnvelope.js";
+export { accessLogMiddleware } from "./accessLog.js";
 export { metricsMiddleware, renderMetrics, recordRequest, normalizePath, resetMetrics } from "./metrics.js";
 export type { AuthPayload } from "./auth.js";

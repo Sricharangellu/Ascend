@@ -591,6 +591,15 @@ Vercel/Render/Supabase/GitHub-settings credential.
    the `deploy-dev` job so a green run stops implying a deployment.
 6. Enable Supabase PITR on the production project.
 
+**Progress on the agent-actionable list (updated 2026-08-10, PR #208):**
+
+| # | Item | State |
+|---|---|---|
+| 8 | `pino-http` request logging + repair `errorEnvelopeMiddleware` | **DONE.** Both halves. The envelope is now the single error handler and every error response carries `requestId`; `gateway/accessLog.ts` emits one structured line per request. Request logging was implemented **without** `pino-http` — `metricsMiddleware` already establishes the `res.on("finish")` idiom, so matching it cost ~40 lines and no new dependency, which also avoids a supply-chain decision in a repo that pins even actionlint by release tag. |
+| 9 | DLQ surface (`/metrics` gauge for `job_queue` failures) | **ALREADY DONE on `develop` — this audit was wrong to list it.** `collectRuntimeGauges` emits `job_queue_depth{status="failed"}` plus `job_queue_oldest_due_age_ms` and the outbox backlog. The error was mine: §1.5's "no DLQ surface" came from reading `master`'s `app.ts`/`metrics.ts` before this branch was rebased onto `develop`, and I did not re-check it after. The genuinely open half is the *alert*, which needs a collector (task in Phase 2). |
+| 12 | ADR for the default-branch rule | **DONE.** `ADR-013-master-is-the-operations-runtime.md` — states the invariant (a scheduled-workflow change is not done until it reaches `master`), a drift budget, and the rule that a monitoring "fix" is pending until a scheduled run from `master` demonstrates it. Records why making `develop` the default branch — the tempting fix — is worse: the heartbeat exists to test production, and running it from `develop` would monitor production with unreleased configuration, and would point `backup.yml` at the production database from unreviewed code. |
+| 10 | Trivy image scan | **DEFERRED — blocked, with a reason.** Not for the reason `security.yml` records ("needs a third-party action, which is Sri's call"): that objection is answerable, since a pinned release binary is the same trust model this repo already accepted for `gitleaks` and `actionlint`. The actual blocker is narrower — this session's GitHub access is scoped to `Sricharangellu/Ascend`, so `api.github.com/repos/aquasecurity/trivy/releases` returns "access to this repository is not enabled". I cannot resolve a real version to pin, and pinning a guessed tag ships a step that 404s at runtime — an unverified value that *looks* fixed, which ADR-011's evidence bar exists to prevent. Any session with wider network access can finish this in one step. |
+
 **Agent-actionable now (no credentials needed, in dependency order):**
 7. Add the monthly restore-drill job: download the latest `db-backup-*` artifact, `pg_restore` into a
    throwaway Postgres service, boot the app against it, run `scripts/smoke.ts`. Closes C-1's

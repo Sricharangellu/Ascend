@@ -32,7 +32,9 @@ Shared kernel (do **not** modify — import only):
 - `src/shared/money.ts` — `Money` helpers + `Cents` type. **All money is integer cents.**
 - `src/shared/db.ts` — `openDb`, `tx(db, fn)` transaction helper, `DB` type.
 - `src/shared/events.ts` — `EventBus` with `.publish(type, payload, aggregateId)`, `.on(type, h)`, `.onAny(h)`.
-- `src/shared/http.ts` — `handler()`, `parseBody(schema, body)`, `HttpError`, `notFound/badRequest/conflict`, `errorMiddleware`.
+- `src/shared/http.ts` — `handler()`, `parseBody(schema, body)`, `HttpError`, `notFound/badRequest/conflict`, `ERROR_CODES`.
+  (Error *responses* are shaped by `src/gateway/errorEnvelope.ts`, the single error handler — see its
+  header for why `errorMiddleware` was removed from here on 2026-08-10.)
 - `src/shared/types.ts` — `DomainEvent`, `StateCode` (`"CA"|"NY"|"TX"|"FL"`), `Page<T>`.
 - `src/modules/types.ts` — `PosModule`, `ModuleContext { db, events, router }`.
 

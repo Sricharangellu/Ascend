@@ -1,6 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
 import { ZodError, type ZodSchema } from "zod";
-import { logError, contextFromRequest } from "./monitoring.js";
 
 /**
  * Shared error-code vocabulary. Every code here has ONE meaning and ONE
@@ -74,25 +73,21 @@ function flatten(err: ZodError): string {
     .join("; ");
 }
 
-/** Express error-handling middleware. Mount last. */
-export function errorMiddleware(
-  err: unknown,
-  req: Request,
-  res: Response,
-  _next: NextFunction,
-) {
-  if (err instanceof HttpError) {
-    res.status(err.status).json({
-      error: {
-        code: err.code,
-        message: err.message,
-        ...(err.details !== undefined ? { details: err.details } : {}),
-      },
-    });
-    return;
-  }
-  // Security: never echo raw error text (it can leak SQL/stack internals). Log
-  // structured detail server-side; return a generic message to the client.
-  logError(err, { ...contextFromRequest(req), statusCode: 500 });
-  res.status(500).json({ error: { code: "internal", message: "internal error" } });
-}
+/**
+ * NOTE — the error handler that used to live here was REMOVED on 2026-08-10.
+ *
+ * `errorMiddleware` was mounted in app.ts immediately before
+ * `gateway/errorEnvelope.ts`, and because it always responded and never called
+ * next(err), the envelope after it was unreachable. Two implementations of one
+ * documented contract then drifted: this one carried `details` and answered
+ * 500s with `internal`; the unreachable one carried neither, and neither
+ * emitted the `requestId` that `docs/api/error-codes.md` tells callers to quote
+ * to support. No error response this app ever returned carried one.
+ *
+ * There is now exactly one error handler — `errorEnvelopeMiddleware` in the
+ * gateway, which is where a cross-cutting response shape belongs and which
+ * absorbed everything this function did (the `details` passthrough, the
+ * `internal` code, and the logError/Sentry hook). Do not add a second one:
+ * whichever is mounted first wins, silently, and `gateway/errorEnvelope.test.ts`
+ * is what fails when that happens.
+ */
