@@ -34,7 +34,8 @@ everything else is a symptom.
 
 ## F-0 — The FE→BE drift guard cannot see the mobile client (root cause)
 
-`tools/api-gap-scan.mjs:102`:
+`tools/api-gap-scan.mjs` (`const FE_DIRS`, line 53 as of the `develop` merge below — it was line 102
+when first read, so cite the symbol rather than the line):
 
 ```js
 const FE_DIRS = ["web/app", "web/api-client", "web/hooks", "web/lib", "web/components", "web/contexts"];

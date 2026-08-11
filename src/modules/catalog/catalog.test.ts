@@ -22,6 +22,25 @@ async function call(
   return request(app.express, method, path, body);
 }
 
+/**
+ * Same request, signed for a different tenant. `call` above always signs
+ * `tnt_demo`; this is for the cross-tenant assertions, where the whole point is
+ * that the caller is someone else.
+ */
+async function callAs(
+  app: App,
+  tenant: string,
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<{ status: number; json: any }> {
+  const { bearer, resolveApiPath, sendRequest } = await import("../../shared/test-request.js");
+  return sendRequest(app.express, method, resolveApiPath(path), {
+    body,
+    headers: bearer({ sub: "usr_other_owner", tenantId: tenant, role: "owner" }),
+  });
+}
+
 test("create product returns 201 with created product", async () => {
   const app = await freshApp();
   const { status, json } = await call(app, "POST", "/api/catalog/", {
@@ -916,4 +935,320 @@ test("bulk-price is atomic: one foreign id fails the whole batch with no changes
   assert.equal((await call(app, "GET", `/api/catalog/${b.json.id}`)).json.price_cents, 2000);
   const hist = await call(app, "GET", `/api/catalog/${a.json.id}/price-history`);
   assert.equal(hist.json.items.length, 0);
+});
+
+// ── Product search / filter / sort / facets ───────────────────────────────────
+// Regression cover for the 2026-08-11 defect: GET /catalog parsed only
+// category/status/limit/offset, so `?q=` — the catalog search box — was dropped
+// on the floor in production while MSW's mock implemented it and made dev look
+// correct. Filtering and sorting had the same shape of bug one layer up: they
+// ran in the browser over the loaded page, so they disagreed with the catalog
+// past row 50.
+
+/**
+ * `CatalogService.seed()` runs at module init and puts four demo products in
+ * tnt_demo before any test does anything. The search tests assert against a
+ * catalog that contains them rather than pretending it is empty — which is also
+ * the more realistic shape, since a filter has to behave correctly among rows it
+ * is not selecting.
+ */
+const DEMO_SEED = {
+  count: 4,
+  /** groceries auto-forces tax_class exempt on create. */
+  exemptSkus: ["GRO-COFFEE-001", "GRO-HONEY-001"],
+  categories: ["apparel", "groceries", "home"],
+  /** APP-TSHIRT-001 — the dearest seeded row, so it wins an unscoped price sort. */
+  maxPriceCents: 2200,
+};
+
+/** Seed a small, deliberately-collidey catalog for the search tests. */
+async function seedSearchCatalog(app: App) {
+  const mk = async (body: Record<string, unknown>) =>
+    (await call(app, "POST", "/api/catalog/", body)).json;
+
+  const coke12 = await mk({
+    sku: "BEV-COKE-12", name: "Coca-Cola Classic 12 Pack Cans", price_cents: 799,
+    category: "beverages", barcode: "049000028904", brand: "Coca-Cola",
+    manufacturer: "The Coca-Cola Company", tags: "soda,cola,multipack",
+  });
+  const coke2l = await mk({
+    sku: "BEV-COKE-2L", name: "Coca-Cola Classic 2 Liter", price_cents: 249,
+    category: "beverages", barcode: "049000050103", brand: "Coca-Cola",
+  });
+  const pepsi = await mk({
+    sku: "BEV-PEPSI-12", name: "Pepsi 12 Pack Cans", price_cents: 749,
+    category: "beverages", barcode: "012000001291", brand: "Pepsi",
+  });
+  const chips = await mk({
+    sku: "SNK-CHIP", name: "Salted Potato Chips", price_cents: 299,
+    category: "snacks", barcode: "038000845260", brand: "Pringles",
+    vendor_upc: "VEND-77123",
+  });
+  return { coke12, coke2l, pepsi, chips };
+}
+
+test("search: ?q= actually filters (regression — the param used to be ignored)", async () => {
+  const app = await freshApp();
+  await seedSearchCatalog(app);
+
+  const res = await call(app, "GET", "/api/catalog/?q=pepsi");
+  assert.equal(res.status, 200);
+  assert.equal(res.json.total, 1);
+  assert.equal(res.json.items[0].sku, "BEV-PEPSI-12");
+
+  // total must describe the filtered set, not the whole catalog — the pager
+  // reads it, so a stale total renders pages that resolve to nothing.
+  assert.equal(res.json.items.length, res.json.total);
+});
+
+test("search: multi-token queries AND together — '12 pack coke' finds the 12-pack", async () => {
+  const app = await freshApp();
+  const { coke12 } = await seedSearchCatalog(app);
+
+  const res = await call(app, "GET", "/api/catalog/?q=12%20pack%20coke");
+  assert.equal(res.status, 200);
+  assert.equal(res.json.total, 1, "every token must match, so the 2-litre Coke drops out");
+  assert.equal(res.json.items[0].id, coke12.id);
+});
+
+test("search: exact UPC outranks a name match, and alternate barcodes resolve", async () => {
+  const app = await freshApp();
+  const { coke12, chips } = await seedSearchCatalog(app);
+  // A case UPC registered on the chips, and a decoy whose *name* contains the digits.
+  await call(app, "POST", `/api/catalog/${chips.id}/barcodes`, { barcode: "10038000845267", kind: "case", packSize: 12 });
+  await call(app, "POST", "/api/catalog/", {
+    sku: "DECOY-1", name: "Promo bundle 049000028904 reference card", price_cents: 100, category: "misc",
+  });
+
+  const scan = await call(app, "GET", "/api/catalog/?q=049000028904");
+  assert.equal(scan.json.total, 2, "both the exact-UPC product and the name mention match");
+  assert.equal(scan.json.items[0].id, coke12.id, "exact UPC must rank first, ahead of the name match");
+
+  const caseScan = await call(app, "GET", "/api/catalog/?q=10038000845267");
+  assert.equal(caseScan.json.total, 1);
+  assert.equal(caseScan.json.items[0].id, chips.id, "a case-barcode scan must resolve to its product");
+});
+
+test("search: supplier SKU and brand are searchable surfaces", async () => {
+  const app = await freshApp();
+  const { chips } = await seedSearchCatalog(app);
+
+  const byVendorSku = await call(app, "GET", "/api/catalog/?q=VEND-77123");
+  assert.equal(byVendorSku.json.total, 1);
+  assert.equal(byVendorSku.json.items[0].id, chips.id);
+
+  const byBrand = await call(app, "GET", "/api/catalog/?q=Pringles");
+  assert.equal(byBrand.json.total, 1);
+  assert.equal(byBrand.json.items[0].id, chips.id);
+});
+
+test("search: results are found regardless of which page they'd fall on", async () => {
+  const app = await freshApp();
+  for (let i = 0; i < 60; i++) {
+    await call(app, "POST", "/api/catalog/", { sku: `PAD-${i}`, name: `Padding ${i}`, price_cents: 100, category: "misc" });
+  }
+  // Created first, so it sorts last by created_at DESC — off page 1 entirely.
+  await call(app, "POST", "/api/catalog/", { sku: "DEEP-1", name: "Deep Catalog Widget", price_cents: 500, category: "misc" });
+
+  const res = await call(app, "GET", "/api/catalog/?q=Deep%20Catalog&limit=50");
+  assert.equal(res.json.total, 1);
+  assert.equal(res.json.items[0].sku, "DEEP-1");
+});
+
+test("search: LIKE wildcards in user input are literals, not match-all", async () => {
+  const app = await freshApp();
+  await seedSearchCatalog(app);
+  await call(app, "POST", "/api/catalog/", { sku: "PCT-1", name: "50% Off Sticker", price_cents: 50, category: "misc" });
+
+  // Unescaped, "%" would match every product in the catalog.
+  const res = await call(app, "GET", "/api/catalog/?q=50%25");
+  assert.equal(res.json.total, 1);
+  assert.equal(res.json.items[0].sku, "PCT-1");
+
+  const underscore = await call(app, "GET", "/api/catalog/?q=_");
+  assert.equal(underscore.json.total, 0, "'_' must be a literal underscore, not a single-char wildcard");
+});
+
+test("filters: brand / price / tax class / age-restricted are applied server-side", async () => {
+  const app = await freshApp();
+  await seedSearchCatalog(app);
+  await call(app, "POST", "/api/catalog/", {
+    sku: "TOB-1", name: "Cigarettes 20pk", price_cents: 1299, category: "tobacco",
+    tax_class: "exempt", age_restricted: true, brand: "Marlboro",
+  });
+
+  const byBrand = await call(app, "GET", "/api/catalog/?brand=coca");
+  assert.equal(byBrand.json.total, 2, "brand filter is a case-insensitive contains");
+
+  const byPrice = await call(app, "GET", "/api/catalog/?minPrice=7&maxPrice=8");
+  assert.deepEqual(
+    byPrice.json.items.map((p: any) => p.sku).sort(),
+    ["BEV-COKE-12", "BEV-PEPSI-12"],
+    "price bounds are dollars in, cents compared",
+  );
+
+  const exempt = await call(app, "GET", "/api/catalog/?taxClass=exempt");
+  assert.deepEqual(
+    exempt.json.items.map((p: any) => p.sku).sort(),
+    [...DEMO_SEED.exemptSkus, "TOB-1"].sort(),
+    "exempt = the tobacco row plus the groceries the create path auto-exempts",
+  );
+
+  const restricted = await call(app, "GET", "/api/catalog/?ageRestricted=true");
+  assert.equal(restricted.json.total, 1);
+  assert.equal(restricted.json.items[0].sku, "TOB-1");
+});
+
+test("filters: productType is derived catalog-wide, not from the loaded page", async () => {
+  const app = await freshApp();
+  const master = (await call(app, "POST", "/api/catalog/", { sku: "M-1", name: "Tee Shirt", price_cents: 1500, category: "apparel" })).json;
+  const child = (await call(app, "POST", "/api/catalog/", { sku: "M-1-S", name: "Tee Shirt Small", price_cents: 1500, category: "apparel" })).json;
+  await call(app, "POST", `/api/catalog/${master.id}/variants/assign`, { productIds: [child.id], variant_label: "Small" });
+  await call(app, "POST", "/api/catalog/", { sku: "S-1", name: "Lone Item", price_cents: 100, category: "misc" });
+
+  const masters = await call(app, "GET", "/api/catalog/?productType=master");
+  assert.deepEqual(masters.json.items.map((p: any) => p.sku), ["M-1"]);
+
+  const variants = await call(app, "GET", "/api/catalog/?productType=variant");
+  assert.deepEqual(variants.json.items.map((p: any) => p.sku), ["M-1-S"]);
+
+  const standalone = await call(app, "GET", "/api/catalog/?productType=standalone");
+  const standaloneSkus = standalone.json.items.map((p: any) => p.sku);
+  assert.ok(standaloneSkus.includes("S-1"));
+  assert.ok(!standaloneSkus.includes("M-1"), "a master is not standalone");
+  assert.ok(!standaloneSkus.includes("M-1-S"), "a variant is not standalone");
+  assert.equal(standalone.json.total, DEMO_SEED.count + 1, "the seeded demo rows are standalone too");
+});
+
+test("filters: an unknown enum value 400s rather than being silently dropped", async () => {
+  const app = await freshApp();
+  assert.equal((await call(app, "GET", "/api/catalog/?productType=bogus")).status, 400);
+  assert.equal((await call(app, "GET", "/api/catalog/?sort=drop%20table")).status, 400);
+  assert.equal((await call(app, "GET", "/api/catalog/?taxClass=nope")).status, 400);
+  // "all" is the UI's neutral value and must mean "no filter", not an error.
+  assert.equal((await call(app, "GET", "/api/catalog/?productType=all")).status, 200);
+});
+
+test("sorting: server-side, whitelisted, and stable across pages", async () => {
+  const app = await freshApp();
+  await seedSearchCatalog(app);
+
+  const asc = await call(app, "GET", "/api/catalog/?sort=price_cents&dir=asc");
+  const prices = asc.json.items.map((p: any) => p.price_cents);
+  assert.deepEqual(prices, [...prices].sort((a: number, b: number) => a - b));
+
+  // Scoped to beverages so the assertion is about ordering, not about which
+  // seeded row happens to be the most expensive in the whole catalog.
+  const desc = await call(app, "GET", "/api/catalog/?category=beverages&sort=price_cents&dir=desc");
+  assert.equal(desc.json.items[0].sku, "BEV-COKE-12");
+
+  const unscoped = await call(app, "GET", "/api/catalog/?sort=price_cents&dir=desc");
+  assert.equal(unscoped.json.items[0].price_cents, DEMO_SEED.maxPriceCents, "sorting spans the catalog, not the page");
+
+  // Paging with a sort must not repeat or skip rows.
+  const p1 = await call(app, "GET", "/api/catalog/?sort=name&dir=asc&limit=2&offset=0");
+  const p2 = await call(app, "GET", "/api/catalog/?sort=name&dir=asc&limit=2&offset=2");
+  const ids = [...p1.json.items, ...p2.json.items].map((p: any) => p.id);
+  assert.equal(new Set(ids).size, ids.length, "no row appears on two pages");
+});
+
+test("sorting: NULL brands sort last in both directions, not first", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/catalog/", { sku: "NB-1", name: "No Brand", price_cents: 100, category: "misc" });
+  await call(app, "POST", "/api/catalog/", { sku: "WB-1", name: "With Brand", price_cents: 100, category: "misc", brand: "Acme" });
+
+  for (const dir of ["asc", "desc"]) {
+    const res = await call(app, "GET", `/api/catalog/?sort=brand&dir=${dir}`);
+    assert.equal(res.json.items[0].sku, "WB-1", `missing data must not fill the top of a ${dir} sort`);
+  }
+});
+
+test("facets: counts cover the whole matching set and adapt to the query", async () => {
+  const app = await freshApp();
+  await seedSearchCatalog(app);
+  await call(app, "POST", "/api/catalog/", { sku: "DR-1", name: "Draft Item", price_cents: 100, category: "misc", status: "draft" });
+
+  const created = 5; // 4 from seedSearchCatalog + the draft above
+  const all = await call(app, "GET", "/api/catalog/facets");
+  assert.equal(all.status, 200);
+  assert.equal(all.json.total, DEMO_SEED.count + created);
+  const statusCounts = Object.fromEntries(all.json.status.map((b: any) => [b.value, b.count]));
+  assert.equal(statusCounts.active, DEMO_SEED.count + created - 1);
+  assert.equal(statusCounts.draft, 1);
+
+  const brands = all.json.brand.map((b: any) => b.value);
+  assert.ok(brands.includes("Coca-Cola") && brands.includes("Pepsi"));
+  assert.equal(all.json.priceRange.min, 100, "the draft is the cheapest row");
+  assert.equal(all.json.priceRange.max, DEMO_SEED.maxPriceCents);
+
+  // Narrowing the search narrows every facet with it.
+  const scoped = await call(app, "GET", "/api/catalog/facets?q=coca");
+  assert.equal(scoped.json.total, 2);
+  assert.deepEqual(scoped.json.brand.map((b: any) => b.value), ["Coca-Cola"]);
+});
+
+test("facets: a dimension keeps its own alternatives visible when filtered on it", async () => {
+  const app = await freshApp();
+  await seedSearchCatalog(app);
+
+  // Selecting a category must not collapse the category facet to that one value,
+  // or the user can never switch to a different category from the filter list.
+  const res = await call(app, "GET", "/api/catalog/facets?category=snacks");
+  assert.equal(res.json.total, 1, "the result count reflects the active filter");
+  const cats = res.json.category.map((b: any) => b.value).sort();
+  assert.deepEqual(
+    cats,
+    ["beverages", "snacks", ...DEMO_SEED.categories].sort(),
+    "the category facet still offers every alternative to switch to",
+  );
+
+  // A different dimension IS narrowed by the active category filter.
+  assert.deepEqual(res.json.brand.map((b: any) => b.value), ["Pringles"]);
+});
+
+test("facets: tenant isolation — one tenant's values never appear in another's", async () => {
+  const app = await freshApp();
+  await seedSearchCatalog(app);
+  const other = await callAs(app, "tnt_other", "GET", "/api/catalog/facets");
+  assert.equal(other.json.total, 0);
+  assert.deepEqual(other.json.brand, []);
+  assert.equal(other.json.priceRange, null);
+});
+
+test("search: is tenant-scoped", async () => {
+  const app = await freshApp();
+  await seedSearchCatalog(app);
+  const res = await callAs(app, "tnt_other", "GET", "/api/catalog/?q=coca");
+  assert.equal(res.json.total, 0);
+});
+
+test("topLevel: returns masters and standalone products but never a child variant", async () => {
+  const app = await freshApp();
+  const master = (await call(app, "POST", "/api/catalog/", { sku: "TL-M", name: "Hoodie", price_cents: 4500, category: "apparel" })).json;
+  const child = (await call(app, "POST", "/api/catalog/", { sku: "TL-M-S", name: "Hoodie Small", price_cents: 4500, category: "apparel" })).json;
+  await call(app, "POST", `/api/catalog/${master.id}/variants/assign`, { productIds: [child.id], variant_label: "Small" });
+
+  const res = await call(app, "GET", "/api/catalog/?topLevel=true&category=apparel");
+  const skus = res.json.items.map((p: any) => p.sku);
+  assert.ok(skus.includes("TL-M"), "the master is top-level");
+  assert.ok(!skus.includes("TL-M-S"), "a child variant is not top-level");
+
+  // variant_count lets a browse card say 'Select variant' without fetching them.
+  const masterRow = res.json.items.find((p: any) => p.sku === "TL-M");
+  assert.equal(masterRow.variant_count, 1);
+});
+
+test("list rows carry variant_count so a master is identifiable from one row", async () => {
+  const app = await freshApp();
+  const master = (await call(app, "POST", "/api/catalog/", { sku: "VC-M", name: "Cap", price_cents: 1900, category: "apparel" })).json;
+  const solo = (await call(app, "POST", "/api/catalog/", { sku: "VC-S", name: "Scarf", price_cents: 900, category: "apparel" })).json;
+  const c1 = (await call(app, "POST", "/api/catalog/", { sku: "VC-M-A", name: "Cap A", price_cents: 1900, category: "apparel" })).json;
+  const c2 = (await call(app, "POST", "/api/catalog/", { sku: "VC-M-B", name: "Cap B", price_cents: 1900, category: "apparel" })).json;
+  await call(app, "POST", `/api/catalog/${master.id}/variants/assign`, { productIds: [c1.id, c2.id] });
+
+  const res = await call(app, "GET", "/api/catalog/?category=apparel&limit=200");
+  const byId = Object.fromEntries(res.json.items.map((p: any) => [p.id, p.variant_count]));
+  assert.equal(byId[master.id], 2);
+  assert.equal(byId[solo.id], 0);
+  assert.equal(byId[c1.id], 0, "a child has no children of its own");
 });
