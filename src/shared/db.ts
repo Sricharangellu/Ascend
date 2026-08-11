@@ -85,50 +85,20 @@ export function compile(sql: string, params: Params): { text: string; values: un
 }
 
 /**
- * Resolve the per-transaction `statement_timeout`, in milliseconds.
+ * Resolved per-STATEMENT timeout applied as `SET LOCAL statement_timeout` at
+ * every BEGIN. Note the scope: Postgres applies `statement_timeout` to each
+ * statement separately, so this is not a budget for the transaction as a whole
+ * (verified against PG 16 — two 1.5s sleeps both survive a 2s setting).
  *
- * Every `tx()` sets this on BEGIN so a runaway transaction cannot hold locks
- * indefinitely. Exported — rather than inlined — because a caller that has to
- * *suspend* the timeout for one statement still needs to restore this exact
- * value afterwards. `src/app.ts` does that around the migration advisory lock:
- * re-deriving the env parse there would be a second source of truth that drifts
- * silently the first time the default or the env var name changes.
- *
- * Non-numeric, zero, and negative values fall back to 30 s; `PG_TX_TIMEOUT_MS`
- * is an operator dial, not a way to disable the guard.
+ * Exported so callers that must legitimately widen it for one statement can
+ * restore *this* value afterwards rather than re-deriving it from the env and
+ * drifting. `src/app.ts` does exactly that around the migration advisory lock,
+ * where the wait is queuing time, not work, and must not be killed as if it
+ * were a hung query.
  */
-export function txTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
-  const raw = Number(env["PG_TX_TIMEOUT_MS"] ?? 30_000);
+export function txTimeoutMs(): number {
+  const raw = Number(process.env["PG_TX_TIMEOUT_MS"] ?? 30_000);
   return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 30_000;
-}
-
-/**
- * How long a booting instance may wait for the migration advisory lock, in
- * milliseconds. `0` means wait indefinitely.
- *
- * This is `lock_timeout`, not `statement_timeout` — a distinction that matters
- * for more than tidiness. Waiting your turn behind another instance's
- * migrations is correct behaviour, so it must not be charged against the
- * budget meant to bound your own DDL; but waiting *forever* would turn one
- * wedged instance into a silently hung deploy. `lock_timeout` bounds exactly
- * the wait and nothing else, and when it fires it raises `55P03`
- * ("canceling statement due to lock timeout") — which says the lock could not
- * be acquired, instead of `57014` falsely blaming a query for running long.
- *
- * Verified empirically against PostgreSQL 16: `lock_timeout` does apply to
- * `pg_advisory_xact_lock`, which is not obvious from the documentation's
- * "table, index, row, or other database object" wording.
- *
- * The default is deliberately generous. Real migrations finish in seconds, and
- * the test suite legitimately queues many instances on this one lock; five
- * minutes is far past any healthy queue but still fails a wedged deploy with a
- * clear error rather than hanging.
- */
-export function migrationLockTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
-  const raw = Number(env["PG_MIGRATION_LOCK_TIMEOUT_MS"] ?? 300_000);
-  // 0 is meaningful here (wait forever) — unlike PG_TX_TIMEOUT_MS, where it
-  // would disable the runaway guard and is therefore rejected.
-  return Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 300_000;
 }
 
 function makeDb(q: Queryable, opts: { isTx: boolean; pool?: pg.Pool }): DB {
@@ -162,8 +132,7 @@ function makeDb(q: Queryable, opts: { isTx: boolean; pool?: pg.Pool }): DB {
       const client = await pool.connect();
       const tdb = makeDb(client, { isTx: true });
       try {
-        // Prevent runaway transactions from holding locks indefinitely.
-        // 30 s is generous for any single business transaction; tune via PG_TX_TIMEOUT_MS.
+        // Prevent runaway statements from holding locks indefinitely.
         // SET LOCAL must run inside the transaction, so BEGIN and the timeout
         // travel in one combined statement (also saves a round trip).
         await client.query(`BEGIN; SET LOCAL statement_timeout = ${txTimeoutMs()}`);

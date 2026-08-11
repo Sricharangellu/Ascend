@@ -24,7 +24,7 @@ jobs:
   heartbeat:
     name: Probe production endpoints
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 12
     # Probe targets are repo variables so this heartbeat can be repointed
     # WITHOUT a code change — set them under
     # Settings → Secrets and variables → Actions → Variables.
@@ -55,23 +55,34 @@ jobs:
       # since 2026-07-22 and why the same URL timed out with zero bytes from
       # three independent networks. A timeout shorter than the cold start does
       # not measure availability, it measures the timeout.
+      #
+      # The retry budget is bounded to fit `timeout-minutes` above. Worst case
+      # per probe is (retry+1) attempts x max-time + retry x delay = 3x90 + 2x10
+      # = 290s, and a failing step aborts the job, so a genuine outage still
+      # reports "❌ /healthz failed against …" inside the job's budget. An
+      # earlier revision used `--retry 5`: 6x90 + 5x10 = 590s for a single probe
+      # against a 5-minute cap, so the job would have been CANCELLED for
+      # exceeding its runtime instead of failing with a message naming the
+      # endpoint — trading a useless timeout for a useless cancellation.
+      # Raising the cap without bounding the retries just moves that cliff;
+      # the two numbers have to be chosen together.
       - name: Show probe targets
         run: |
           echo "backend:  $BACKEND"
           echo "frontend: $FRONTEND"
       - name: Backend liveness (/healthz)
         run: |
-          curl -fsS --max-time 90 --retry 5 --retry-delay 10 --retry-all-errors \
+          curl -fsS --max-time 90 --retry 2 --retry-delay 10 --retry-all-errors \
             "$BACKEND/healthz" \
             || (echo "❌ /healthz failed against $BACKEND" && exit 1)
       - name: Backend readiness (/readyz — DB reachable)
         run: |
-          curl -fsS --max-time 90 --retry 5 --retry-delay 10 --retry-all-errors \
+          curl -fsS --max-time 90 --retry 2 --retry-delay 10 --retry-all-errors \
             "$BACKEND/readyz" \
             || (echo "❌ /readyz failed against $BACKEND" && exit 1)
       - name: Auth boundary (/api/v1/flags must 401 unauthenticated)
         run: |
-          http_status="$(curl -sS --max-time 90 --retry 5 --retry-delay 10 --retry-all-errors \
+          http_status="$(curl -sS --max-time 90 --retry 2 --retry-delay 10 --retry-all-errors \
             -o /tmp/flags-response.json \
             -w '%{http_code}' \
             "$BACKEND/api/v1/flags")"
@@ -82,6 +93,6 @@ jobs:
           fi
       - name: Frontend reachable
         run: |
-          curl -fsS --max-time 90 --retry 5 --retry-delay 10 --retry-all-errors \
+          curl -fsS --max-time 90 --retry 2 --retry-delay 10 --retry-all-errors \
             "$FRONTEND/" >/dev/null \
             || (echo "❌ frontend failed against $FRONTEND" && exit 1)

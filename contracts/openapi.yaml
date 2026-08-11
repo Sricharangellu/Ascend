@@ -2253,7 +2253,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Room" }
 
-  /api/v1/hospitality/rooms/{id}/charges:
+  /api/v1/hospitality/rooms/{id}/charge:
     post:
       summary: Post charge to room folio
       operationId: postRoomCharge
@@ -2295,7 +2295,7 @@ paths:
       responses:
         "200": { description: Settled — total amount collected }
 
-  /api/v1/hospitality/rooms/{id}/folio:
+  /api/v1/hospitality/rooms/{id}/charges:
     get:
       summary: Get room folio (all charges)
       operationId: getRoomFolio
@@ -2954,7 +2954,7 @@ paths:
         "200": { description: Payment recorded; early discount applied if eligible }
 
   # ── Audit Log ───────────────────────────────────────────────────────────────
-  /api/v1/audit_log:
+  /api/v1/audit-log:
     get:
       summary: List audit log entries
       operationId: listAuditLog
