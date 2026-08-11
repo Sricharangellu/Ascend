@@ -79,15 +79,34 @@ had the identical shape.
   schedulers overlapping) and should not outlive one — the tick is idempotent
   (`FOR UPDATE SKIP LOCKED` plus consumer idempotency), so concurrent ticks from
   two schedulers are safe, just wasteful.
-- `vercel.json` still declares the cron at `0 6 * * *` — **daily**. That is a
-  separate, unresolved problem this ADR does not fix: a daily tick means up to
-  24 hours of latency on outbox redelivery and every scheduled job. It is left
-  alone deliberately because Vercel's Hobby plan permits only daily crons, so
-  changing it could break a deploy on a plan tier this session cannot observe.
-  **Evidence bar for revisiting:** confirm the plan tier, or confirm the backend
-  is no longer on Vercel at all — at which point the schedule belongs to
-  whatever host actually runs it, and `vercel.json`'s `crons` block should be
-  deleted rather than tuned.
+- ~~`vercel.json` still declares the cron at `0 6 * * *` — **daily**.~~
+  **RESOLVED 2026-08-10 — the evidence bar below was met.** This ADR set the
+  bar as "confirm the backend is no longer on Vercel at all", and Sri confirmed
+  from the Render dashboard on 2026-08-08 that production is Render service
+  "Ascend Prod" (`srv-d9lo8jm7bikc739dnsn0`, Docker runtime, deploying from this
+  repo's `master` branch).
+
+  That confirmation makes the picture worse than "daily latency", which is how
+  it had been recorded. A Vercel cron cannot reach a Render service, so the
+  entry was not ticking `/jobs/tick` **at all** in production — the outbox never
+  redelivered and no scheduled job ever ran. The latency was not 24 hours; there
+  was no tick.
+
+  Applied, per this ADR's own prescription that the block "should be deleted
+  rather than tuned": `vercel.json`'s `crons` block is removed, and
+  `.github/workflows/jobs-tick.yml` replaces it — a scheduled GitHub Actions
+  caller using the `JOBS_TICK_SECRET` / `X-Jobs-Tick-Secret` path this ADR
+  created for exactly this case. Deleting the block without adding the
+  replacement would have converted a visible-in-config gap into a silent one.
+
+  The new interval is `*/15 * * * *`. The old daily schedule was never a
+  considered choice — it was the Vercel Hobby plan's cron limit, a platform
+  constraint that no longer applies.
+
+  **Still open:** the secret must be set in *two* places for the replacement to
+  do anything — on the Render service and as a repo secret. Until both exist the
+  workflow warns loudly and processes nothing, by design (see the guard comment
+  in the workflow, which follows `backup.yml`'s hardened precedent).
 
 **Supersedes:** none.
 

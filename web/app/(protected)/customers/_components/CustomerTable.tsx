@@ -1,20 +1,53 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+/**
+ * CustomerTable — the customers list.
+ *
+ * Migrated to the design system 2026-08-10. Three buttons were removed rather
+ * than restyled, because none of them did anything:
+ *   - "Search" had no handler, and the filter is already live as you type — so
+ *     it implied results were stale until clicked, which was never true.
+ *   - "More filters" had no handler and no additional filters behind it.
+ *   - "Export" had no handler.
+ * A control that looks actionable and does nothing is worse than an absent one:
+ * the user blames themselves. Export is a real need — it belongs on DataTable
+ * once there is an endpoint behind it, not as a decorative icon here.
+ */
+
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { TableSkeleton } from "@/components/TableSkeleton";
+import { DataTable, type DataColumn } from "@/components/DataTable";
+import { Input } from "@/components/Input";
+import { Select } from "@/components/Select";
+import { Button } from "@/components/Button";
+import { Badge } from "@/components/Badge";
 import { formatMoney } from "@/lib/money";
 import { CustomerDetailPanel } from "./CustomerDetailPanel";
 import type { CustomerView } from "./CustomerDetailPanel";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+/**
+ * Identity colours for avatars. These are deliberately NOT semantic tokens —
+ * they carry no meaning, they only need to be distinguishable from each other.
+ * Every value is ≥4.5:1 against white text (the previous set included #EAB308,
+ * which is 1.9:1 with white on it and was effectively unreadable).
+ */
+const AVATAR_COLORS = [
+  "#B54708", // orange
+  "#175CD3", // blue
+  "#6941C6", // purple
+  "#067647", // green
+  "#C11574", // pink
+  "#0E7090", // cyan
+];
 
-const AVATAR_COLORS = ["#F97316", "#EAB308", "#8B5CF6", "#10B981", "#EC4899", "#3B82F6"];
+function hash(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
 
 function avatarColor(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
-  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]!;
+  return AVATAR_COLORS[hash(name) % AVATAR_COLORS.length]!;
 }
 
 function avatarInitials(name: string): string {
@@ -25,29 +58,26 @@ function avatarInitials(name: string): string {
 
 function customerCode(id: string, name: string): string {
   const slug = (name.split(" ")[0] ?? "Customer").replace(/[^a-zA-Z]/g, "");
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-  return `${slug}-${String(Math.abs(h) % 10000).padStart(4, "0")}`;
+  return `${slug}-${String(hash(id) % 10000).padStart(4, "0")}`;
 }
-
-// ── GroupBadge ────────────────────────────────────────────────────────────────
-
-function GroupBadge({ segment }: { segment: CustomerView["segment"] }) {
-  const color =
-    segment === "Loyal" ? "border-emerald-500 text-emerald-400" :
-    segment === "New" ? "border-blue-500 text-blue-400" :
-    segment === "At risk" ? "border-amber-500 text-amber-400" :
-    "border-slate-400 text-slate-400";
-  return (
-    <span className={`inline-flex rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${color}`}>
-      {segment}
-    </span>
-  );
-}
-
-// ── CustomerTable ─────────────────────────────────────────────────────────────
 
 type SegmentFilter = "All" | "Loyal" | "Regular" | "New" | "At risk";
+
+const SEGMENT_OPTIONS = [
+  { value: "All", label: "All groups" },
+  { value: "Loyal", label: "Loyal" },
+  { value: "Regular", label: "Regular" },
+  { value: "New", label: "New" },
+  { value: "At risk", label: "At risk" },
+];
+
+/** Segment → Badge variant. Colour is never the only signal — the label ships with it. */
+const SEGMENT_VARIANT: Record<CustomerView["segment"], "green" | "blue" | "yellow" | "gray"> = {
+  Loyal: "green",
+  New: "blue",
+  "At risk": "yellow",
+  Regular: "gray",
+};
 
 interface Props {
   customers: CustomerView[];
@@ -58,168 +88,165 @@ interface Props {
 export function CustomerTable({ customers, loading, error }: Props) {
   const [query, setQuery] = useState("");
   const [groupFilter, setGroupFilter] = useState<SegmentFilter>("All");
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return customers.filter((c) => {
-      const code = customerCode(c.id, c.name).toLowerCase();
-      const matchQ = !q ||
+      const matchQ =
+        !q ||
         c.name.toLowerCase().includes(q) ||
         (c.email ?? "").toLowerCase().includes(q) ||
         (c.phone ?? "").toLowerCase().includes(q) ||
-        code.includes(q);
-      const matchGroup = groupFilter === "All" || c.segment === groupFilter;
-      return matchQ && matchGroup;
+        customerCode(c.id, c.name).toLowerCase().includes(q);
+      return matchQ && (groupFilter === "All" || c.segment === groupFilter);
     });
   }, [customers, query, groupFilter]);
 
-  return (
-    <>
-      {/* Filter bar */}
-      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-end gap-3 px-4 py-4">
-          <div className="min-w-[180px] flex-1">
-            <label className="mb-1 block text-xs font-medium text-slate-500">
-              Search by name / code / contact
-            </label>
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Name, phone, or code…"
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-            />
-          </div>
-          <div className="w-44">
-            <label className="mb-1 block text-xs font-medium text-slate-500">Customer group</label>
-            <select
-              value={groupFilter}
-              onChange={(e) => setGroupFilter(e.target.value as SegmentFilter)}
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-            >
-              <option value="All">All groups</option>
-              <option value="Loyal">Loyal</option>
-              <option value="Regular">Regular</option>
-              <option value="New">New</option>
-              <option value="At risk">At risk</option>
-            </select>
-          </div>
-          <div className="ml-auto flex items-center gap-4 pb-0.5">
-            <button
-              type="button"
-              onClick={() => { setQuery(""); setGroupFilter("All"); }}
-              className="text-sm text-brand-600 hover:underline"
-            >
-              Clear filters
-            </button>
-            <button type="button" className="text-sm text-slate-500 hover:text-slate-700">
-              More filters
-            </button>
-            <button
-              type="button"
-              className="rounded-md bg-brand-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0]"
-            >
-              Search
-            </button>
-          </div>
-        </div>
-      </div>
+  const filtersActive = query.trim() !== "" || groupFilter !== "All";
 
-      {/* Table card */}
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
-          <span className="text-sm text-slate-500">{visible.length} customers</span>
-          <button
-            type="button"
-            className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
+  const columns = useMemo<DataColumn<CustomerView>[]>(
+    () => [
+      {
+        key: "customer",
+        header: "Customer",
+        hideable: false,
+        minWidth: "260px",
+        sortValue: (c) => c.name,
+        render: (c) => (
+          <div className="flex items-center gap-3">
+            <div
+              aria-hidden="true"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-2xs font-bold text-white"
+              style={{ backgroundColor: avatarColor(c.name) }}
+            >
+              {avatarInitials(c.name)}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-content-primary">{c.name}</span>
+                <Badge variant={SEGMENT_VARIANT[c.segment]}>{c.segment}</Badge>
+              </div>
+              <div className="mt-0.5 text-xs text-content-secondary tnum">
+                {customerCode(c.id, c.name)}
+                {c.phone ? ` · ${c.phone}` : ""}
+              </div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "loyalty",
+        header: "Loyalty",
+        numeric: true,
+        minWidth: "110px",
+        sortValue: (c) => c.loyaltyPoints,
+        render: (c) => (
+          <>
+            <span className="font-medium text-content-primary">
+              {c.loyaltyPoints.toLocaleString()}
+            </span>
+            <span className="ml-1 text-xs text-content-secondary">pts</span>
+          </>
+        ),
+      },
+      {
+        key: "spend",
+        header: "Lifetime spend",
+        numeric: true,
+        minWidth: "140px",
+        sortValue: (c) => c.spendCents,
+        render: (c) => (
+          <span className="font-medium text-content-primary">{formatMoney(c.spendCents)}</span>
+        ),
+      },
+      {
+        key: "open",
+        header: "",
+        hideable: false,
+        align: "right",
+        width: "56px",
+        render: (c) => (
+          <Link
+            href={`/customers/${encodeURIComponent(c.id)}`}
+            aria-label={`Open ${c.name}`}
+            onClick={(e) => e.stopPropagation()}
+            className="focus-ring inline-flex min-h-touch min-w-touch items-center justify-center rounded-control text-content-secondary hover:text-accent-600"
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+              />
             </svg>
-            Export
-          </button>
+          </Link>
+        ),
+      },
+    ],
+    []
+  );
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Filters. Live — there is no submit step, so there is no submit button. */}
+      <div className="flex flex-wrap items-end gap-3 rounded-container border border-line bg-surface-1 p-4">
+        <div className="min-w-[200px] flex-1">
+          <Input
+            type="search"
+            label="Search"
+            hint="Name, email, phone, or customer code"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search customers…"
+          />
         </div>
-
-        {loading ? (
-          <TableSkeleton headers={["Customer", "Loyalty", "Account", ""]} rows={8} />
-        ) : error ? (
-          <div className="p-6 text-sm text-red-600" role="alert">{error}</div>
-        ) : visible.length === 0 ? (
-          <div className="py-16 text-center">
-            <p className="text-sm font-medium text-[#111]">No customers found.</p>
-            <p className="mt-1 text-sm text-[#666]">Try clearing the filters or add a new customer.</p>
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b border-erp-table-border bg-erp-table-header text-xs font-semibold uppercase tracking-wide text-erp-text-secondary">
-              <tr>
-                <th className="px-4 py-3 text-left">Customer</th>
-                <th className="px-4 py-3 text-left">Loyalty</th>
-                <th className="px-4 py-3 text-left">Account</th>
-                <th className="w-10 px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-erp-table-border">
-              {visible.map((c) => (
-                <Fragment key={c.id}>
-                  <tr
-                    className="cursor-pointer hover:bg-erp-table-header"
-                    onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
-                  >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white"
-                          style={{ backgroundColor: avatarColor(c.name) }}
-                        >
-                          {avatarInitials(c.name)}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-[#111]">{c.name}</span>
-                            <GroupBadge segment={c.segment} />
-                          </div>
-                          <div className="mt-0.5 text-xs text-[#666]">
-                            {customerCode(c.id, c.name)}{c.phone ? ` | ${c.phone}` : ""}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="font-medium text-[#111]">{c.loyaltyPoints.toLocaleString()}</span>
-                      <span className="ml-1 text-xs text-[#666]">pts</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="font-medium text-[#111]">{formatMoney(c.spendCents)}</span>
-                      <span className="ml-1 text-xs text-[#666]">lifetime</span>
-                    </td>
-                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      <Link
-                        href={`/customers/${encodeURIComponent(c.id)}`}
-                        aria-label={`Open ${c.name}`}
-                        className="inline-flex min-h-touch min-w-touch items-center justify-center text-erp-text-secondary hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-                      >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                        </svg>
-                      </Link>
-                    </td>
-                  </tr>
-
-                  {expandedId === c.id && (
-                    <tr>
-                      <td colSpan={4} className="p-0">
-                        <CustomerDetailPanel customer={c} />
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
+        <div className="w-48">
+          <Select
+            label="Customer group"
+            size="lg"
+            options={SEGMENT_OPTIONS}
+            value={groupFilter}
+            onChange={(e) => setGroupFilter(e.target.value as SegmentFilter)}
+          />
+        </div>
+        {filtersActive && (
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setQuery("");
+              setGroupFilter("All");
+            }}
+          >
+            Clear filters
+          </Button>
         )}
       </div>
-    </>
+
+      <DataTable
+        caption="Customers"
+        columns={columns}
+        rows={visible}
+        rowKey={(c) => c.id}
+        loading={loading}
+        error={error}
+        storageKey="customers"
+        emptyTitle={filtersActive ? "No matching customers" : "No customers yet"}
+        emptyDescription={
+          filtersActive
+            ? "Try clearing the filters — other customers may exist."
+            : "Customers are created at checkout, or with Add customer above."
+        }
+        // Expand in place rather than navigating: the point of this view is
+        // comparing customers, and a round trip loses scroll position and filters.
+        expandedContent={(c) => <CustomerDetailPanel customer={c} />}
+      />
+    </div>
   );
 }
