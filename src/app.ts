@@ -7,7 +7,6 @@ import { EventBus } from "./shared/events.js";
 import { Outbox } from "./shared/outbox.js";
 import { logger } from "./shared/logger.js";
 import { buildInfo } from "./shared/version.js";
-import { errorMiddleware } from "./shared/http.js";
 import { modules } from "./modules/index.js";
 import { parseCapabilitiesImpactQuery, SettingsService } from "./modules/settings/service.js";
 import { identityModule } from "./identity/index.js";
@@ -20,11 +19,12 @@ import {
   makeAuthMiddleware,
   tenantResolver,
   metricsMiddleware,
+  accessLogMiddleware,
   renderMetrics,
   requireRole,
 } from "./gateway/index.js";
 import type { RuntimeGauges } from "./gateway/metrics.js";
-import { handler } from "./shared/http.js";
+import { handler, errorMiddleware } from "./shared/http.js";
 import { bootstrapOrchestration, ORCHESTRATION_MIGRATIONS } from "./orchestration/index.js";
 import { SseBroker } from "./shared/sse.js";
 import type { AuthPayload } from "./gateway/auth.js";
@@ -367,6 +367,12 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     next();
   });
   app.use(metricsMiddleware);
+  // One structured line per completed request. Mounted BEFORE the rate limiter
+  // on purpose: a 429 is exactly the response that needs to be visible, and it
+  // is the one an earlier incident investigation could not see at all (see
+  // gateway/accessLog.ts). Logging happens in a `finish` hook, so a request
+  // rejected downstream is still logged, with the auth context resolved by then.
+  app.use(accessLogMiddleware);
   app.use(rateLimitMiddleware({ capacity: 120, refillRate: 40, redis }));
 
   // ── Liveness + readiness probes (no auth — infrastructure-level)

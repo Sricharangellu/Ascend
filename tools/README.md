@@ -74,6 +74,51 @@ product. The allowlist is **shrink-only** — an entry means "reviewed, and
 cashier-level access is correct here", and carries the reason. Never add one to
 make CI green.
 
+## `openapi-contract-scan.mjs` — every documented operation must have a route
+
+```bash
+npm run contract:scan
+```
+
+Fails if `contracts/openapi.yaml` documents a `<METHOD> <path>` that no backend
+route serves. The pair to `api-gap-scan`: that one asks "does the route the
+frontend *calls* exist?", this one asks "does the operation the contract
+*promises* exist?".
+
+Worth gating because the contract is not passive documentation here. Frontend
+work is written against it — "if it's not in the spec, you don't call it" — so a
+documented path with no route is a direction to build a call that 404s, which is
+the 2026-07-18 incident (pages green against MSW, real API 404) approached from
+the other side. `web/package.json` also still wires
+`generate:client: openapi-typescript ../contracts/openapi.yaml` at it, which
+would turn every documented path into a typed, autocompleting client method.
+(Read `web/api-client/types.ts`'s header before running that script: the file is
+hand-maintained, 218 files import named types from it, and the generator emits a
+different shape that would break all of them at once.)
+
+**One-way, deliberately.** The backend serves 626 operations and the contract
+documents 146. Checking code → contract as well would fail on arrival with ~480
+findings and be deleted inside a week. An undocumented route is a documentation
+gap; a documented-but-absent route is a lie told to whoever reads the spec.
+
+**Paths and methods only** — not request or response bodies. Those drift too
+(`POST /rooms/{id}/charge` takes camelCase `amountCents` and an `orderId`, while
+the contract says snake_case `amount_cents` and a `category` that does not
+exist), and reconciling them is F-19's job, not this scanner's.
+
+Express `:id` and OpenAPI `{id}` both normalize to `:p` via
+`lib/backend-routes.mjs`, shared with `api-gap-scan`. That is load-bearing:
+without it the first run reported 50 findings, 41 of them purely the
+brace-vs-colon difference.
+
+The allowlist follows the same rule as `api-gap-allowlist.json` — every entry
+carries a reason, and where the capability exists at a different address the
+reason names that route, so the fix is already researched for whoever takes it.
+A **stale** entry fails the scan too: once the route ships or the contract is
+corrected, the entry must go. The reader also asserts it parsed a plausible
+number of operations, so a change to the document's shape fails loudly instead
+of silently scanning nothing forever.
+
 ## `duplicate-code-scan.mjs` — copy-paste detector (report-only)
 
 ```bash
