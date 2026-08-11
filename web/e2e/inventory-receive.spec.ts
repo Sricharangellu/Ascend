@@ -34,11 +34,27 @@ test.describe("Purchasing — inventory receive", () => {
       .getByRole("row")
       .filter({ hasNot: page.getByRole("columnheader") })
       .first();
+    const emptyState = page.getByText(/no purchase orders|no orders|create your first/i);
+
+    // Wait for the table to SETTLE before branching on what it contains.
+    //
+    // This used to call `firstPO.count()` immediately after navigation, which
+    // races the client-side fetch: zero rows means "not loaded yet" just as
+    // often as it means "no POs". Losing that race sent the test down the
+    // no-data branch and then asserted an empty state that never appeared,
+    // because the table had meanwhile rendered its rows — a failure whose own
+    // trace snapshot showed the PO present and correct. Seen failing on a
+    // slower machine while passing in CI, which is the signature of a timing
+    // race rather than a product defect.
+    //
+    // `.or()` resolves as soon as EITHER outcome is real, so this waits for
+    // loading to finish without assuming which branch we are in.
+    await expect(firstPO.or(emptyState).first()).toBeVisible({ timeout: 15_000 });
 
     const hasPOs = (await firstPO.count()) > 0;
     if (!hasPOs) {
       // No demo POs — just verify the page loaded correctly.
-      await expect(page.getByText(/no purchase orders|no orders/i)).toBeVisible();
+      await expect(emptyState.first()).toBeVisible();
       return;
     }
 
