@@ -66,7 +66,7 @@ export function useStoreAuth() {
  *    so Next inlined it as `undefined` and every storefront call went
  *    same-origin regardless of how the backend origin was configured;
  *  - it treated the error envelope's `error` as a string, but the gateway sends
- *    `{ error: { code, message, requestId } }` (src/gateway/errorEnvelope.ts) —
+ *    `{ error: { code, message, requestId } }` (src/shared/http.ts) —
  *    an object, so the `?? "Request failed"` fallback never fired and users saw
  *    `[object Object]` on any failed sign-in;
  *  - it had none of the shared client's 429 `Retry-After` retry, network-error

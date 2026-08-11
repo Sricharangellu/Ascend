@@ -441,8 +441,11 @@ function TopBar({
 
       {/* Right controls */}
       <div className="flex items-center gap-3 shrink-0">
+        {/* White on --color-warning is 5.06:1 (AA). The status ramp collapses
+            500 and 900 onto near-identical dark ambers, so a tonal pair here
+            would render dark-on-dark. */}
         {isOffline && (
-          <span className="rounded-full bg-warning-500 px-2 py-0.5 text-[11px] font-semibold text-warning-900">
+          <span className="rounded-full bg-warning-500 px-2 py-0.5 text-[11px] font-semibold text-white">
             Offline
           </span>
         )}
@@ -471,7 +474,7 @@ function TopBar({
             <ChevronDown />
           </button>
           {userMenuOpen && (
-            <div className="absolute right-0 top-9 z-50 w-48 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-elev-lg">
+            <div className="absolute right-0 top-9 z-50 w-48 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-popover">
               <div className="border-b border-[var(--color-border-subtle)] px-3 py-2">
                 <p className="truncate text-xs font-semibold text-[var(--color-text-primary)]">{user?.name}</p>
                 <p className="truncate text-xs text-[var(--color-text-secondary)]">{user?.email}</p>

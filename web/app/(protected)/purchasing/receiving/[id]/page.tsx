@@ -315,7 +315,7 @@ export default function ScanReceivePage() {
                 squeezed into an unreadable column on a laptop. */}
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
               <div className="flex min-w-0 flex-col gap-4">
-                <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-elev-sm">
+                <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
                   {session.lines.length === 0 ? (
                     <EmptyState
                       title="Nothing on this session yet"
@@ -347,7 +347,7 @@ export default function ScanReceivePage() {
               </div>
 
               <aside className="xl:sticky xl:top-[152px] xl:self-start">
-                <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-elev-sm">
+                <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
                   <CostIntelligencePanel
                     line={activeLine}
                     intelligence={intelligence}

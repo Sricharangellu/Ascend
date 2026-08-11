@@ -7,7 +7,7 @@
  * Regression guard for the duplicated-helper bug found in the 2026-08-04 AI-slop
  * audit: this context carried its own 8-line `apiFetch` that read the error
  * envelope as `{ error: string }`. The gateway actually sends
- * `{ error: { code, message, requestId } }` (src/gateway/errorEnvelope.ts), so
+ * `{ error: { code, message, requestId } }` (src/shared/http.ts), so
  * the `?? "Request failed"` fallback never fired and `new Error(<object>)`
  * stringified to the literal text "[object Object]" — which is what a customer
  * saw on a failed storefront sign-in. The fork also read `NEXT_PUBLIC_API_BASE`,

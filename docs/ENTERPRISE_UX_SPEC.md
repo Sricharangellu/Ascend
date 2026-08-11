@@ -5,6 +5,72 @@
 
 ---
 
+## 0. Design system — "Structure & Signal" (2026-08-10)
+
+The identity comes from **structure, density and restraint**, not decoration. Generic admin UI is
+recognisable by soft shadows, many rounded cards, several accent colours and gradients; Ascend should
+read as an *instrument*. Motivating audit:
+`WORK/audits/AUDIT_2026-08-10T174500Z-ui-ux-platform-audit.md`.
+
+### The five rules that produce the look
+
+1. **One accent, spent only on meaning.** The accent is permitted on exactly five things: primary
+   action, active nav item, focus ring, selected row, links. Nowhere else.
+2. **Elevation by border, not shadow.** Three surfaces separated by a 1px border and a small
+   luminance step. `shadow-popover`/`shadow-modal` are reserved for things that genuinely float.
+3. **Tabular numerals wherever a number is compared.** Money, quantity, SKU, count → `.tnum` or
+   `.num-cell`, or `numeric: true` on a `DataTable` column.
+4. **Density is a setting.** `data-density="comfortable|standard|compact"` on `<html>` retunes
+   `--row-h`, `--control-h`, `--cell-px/py` app-wide.
+5. **Status is never colour alone** — always icon/shape + colour + text label.
+
+### Token layer — one source of truth
+
+`web/app/globals.css` holds every colour value. `web/tailwind.config.ts` points its `erp.*` and
+semantic namespaces at those CSS variables, so a Tailwind utility and a raw `var()` **cannot resolve
+to different colours** — that disagreement (e.g. `erp.sidebar` `#030B25` vs `--color-sidebar-bg`
+`#1a1a1a`) was the root cause of cross-module visual drift.
+
+| Use | Token |
+|---|---|
+| Page background | `bg-canvas` |
+| Cards, tables, panels | `bg-surface-1` / `-2` / `-3` |
+| Borders | `border-line-subtle` / `border-line` / `border-line-strong` |
+| Text | `text-content-primary` / `-secondary` / `-muted` / `-inverse` |
+| Accent | `bg-accent-600`, `text-accent-600` (`brand-*` is the legacy alias — same ramp) |
+| Chrome | `bg-chrome`, `bg-chrome-flyout`, `border-chrome-border` |
+| Status | `success` / `warning` / `danger` / `info` (`-bg`, `-border`, `700` = text) |
+
+**`erp.*` is legacy.** It still works (≈245 usages) but new code uses the semantic names above.
+
+Type scale: `2xs` 11 / `xs` 12 / `sm` 13 (body + table default) / `base` 14 / `md` 16 / `lg` 20
+(page title) / `xl` 28. Radius: `rounded-control` 4px, `rounded-container` 6px. Space: 4px ladder
+(4/8/12/16/24/32/48). Breakpoints add `3xl` 1600 and `4xl` 1920 on top of Tailwind's defaults.
+
+**Contrast:** every text and status token is AA (≥4.5:1) against its surface, annotated inline in
+`globals.css`. `--color-text-secondary` was `rgba(0,0,0,0.45)` (3.9:1, **failing**) and is now
+`#5A646E` (5.96:1). The focus ring derives from the accent, so it can no longer drift from the brand.
+
+### Layout
+
+`PageShell` owns page width, padding, breadcrumbs, title, description, primary/secondary actions and
+the summary slot. **Pages no longer set their own width** — the audit found six competing answers.
+Declare intent instead: `width="default"` (1600px, centred), `"narrow"` (72ch, reading/forms), or
+`"full"` (edge-to-edge — Terminal and wide report tables only). `PageActionBar` sticks Save to the
+bottom of long forms.
+
+### Lists
+
+`DataTable` is the list primitive: sort, search, paginate, row selection + bulk actions, column
+show/hide (persisted), sticky header, sticky first column, density, and built-in loading / empty /
+error states. **Do not hand-roll `<table>` in a feature page** — 107 files did, and that divergence is
+what made every module look slightly different. The old `Table` is retained for existing call sites
+only; new work uses `DataTable`.
+
+Every empty state must offer a next action. On a new tenant the entire first session is empty states.
+
+---
+
 ## 1. Global UI/UX Principles
 
 Ascend UI must be:

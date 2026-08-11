@@ -82,7 +82,7 @@ export function ReviewPanel({
   return (
     <section
       aria-label="Review receiving"
-      className="flex flex-col gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-elev-sm"
+      className="flex flex-col gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h3 className="text-[15px] font-semibold text-[var(--color-text-primary)]">
