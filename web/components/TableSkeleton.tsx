@@ -22,9 +22,12 @@ export function TableSkeleton({ cols = 4, rows = 8, headers }: TableSkeletonProp
           <thead style={{ backgroundColor: "var(--color-table-header)", borderBottom: "1px solid var(--color-table-border)" }}>
             <tr>
               {headers
-                ? headers.map((h) => (
+                // Index-suffixed: header labels are not unique — spacer columns
+                // (checkbox, row actions) are passed as "", which collided on
+                // key and made React warn about duplicate children.
+                ? headers.map((h, i) => (
                     <th
-                      key={h}
+                      key={`${h}-${i}`}
                       className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em]"
                       style={{ color: "var(--color-text-secondary)" }}
                     >
