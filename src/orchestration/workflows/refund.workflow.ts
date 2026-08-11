@@ -55,14 +55,19 @@ export const RefundWorkflow: WorkflowDefinition<RefundContext> = {
   triggers: [EventTypes.ORDER_REFUNDED],
 
   buildContext(payload: Record<string, unknown>, tenantId: string): RefundContext {
-    const p = payload as unknown as OrderRefundedPayload;
+    const p = payload as unknown as OrderRefundedPayload & { totalCents?: Cents };
+    // OrdersService.refund publishes { totalCents } (full-order refund), while
+    // the typed orchestration payload uses refundCents/originalTotalCents.
+    // Accept both so the live POS event does not drive a 0¢ workflow.
+    const totalCents = p.totalCents ?? p.originalTotalCents ?? 0;
+    const refundCents = p.refundCents ?? totalCents;
     return {
       workflowId: "",
       tenantId,
       correlationId: `refund_${p.id}`,
       orderId: p.id,
-      refundCents: p.refundCents ?? 0,
-      originalTotalCents: p.originalTotalCents ?? 0,
+      refundCents,
+      originalTotalCents: p.originalTotalCents ?? totalCents,
       customerId: p.customerId ?? null,
       lines: p.lines ?? [],
       refundId: null,
@@ -76,15 +81,17 @@ export const RefundWorkflow: WorkflowDefinition<RefundContext> = {
     };
   },
 
+
   steps: [
     {
       name: "validate_refund_eligibility",
       async execute(ctx, db) {
         // orders has no refunded_cents column — live POS refunds are a full-order
-        // status flip (OrdersService.refund). Prior refunded amounts are not stored
-        // on the order row; derive already-refunded as 0 here and rely on
-        // OrdersService's status='refunded' conflict + check_double_refund_guard
-        // for idempotency. (A refunds ledger table is not present in migrations.)
+        // status flip (OrdersService.refund). This step runs *after* that flip, so
+        // status is already 'refunded'; prior amounts are not on the order row.
+        // Treat already-refunded as 0 for the in-flight event and rely on
+        // OrdersService's status conflict + check_double_refund_guard for
+        // idempotency against a second attempt.
         const order = await db.one<{
           id: string;
           status: string;

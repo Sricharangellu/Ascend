@@ -2,6 +2,9 @@
  * Real-Postgres regression: validate_refund_eligibility must not SELECT
  * orders.refunded_cents (that column does not exist and is not migrated).
  * Fake-DB unit tests hid this forever by ignoring SQL.
+ *
+ * Also proves the refunds ledger table exists so check_double_refund_guard
+ * can insert (the next silent failure after refunded_cents was removed).
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -71,6 +74,50 @@ test("refund workflow validate_refund_eligibility runs against real orders schem
   const updated = await step.execute(ctx, app.db, events);
   assert.equal(updated.taxCents, order.tax_cents);
   assert.equal(updated.subtotalCents, order.total_cents - order.tax_cents);
+
+  await app.db.close();
+  await app.cleanup();
+});
+
+test("refund workflow check_double_refund_guard inserts into real refunds table", async () => {
+  const app = await freshApp();
+
+  const rel = await app.db.one<{ reg: string | null }>(
+    "SELECT to_regclass('refunds')::text AS reg",
+  );
+  assert.equal(rel?.reg, "refunds", "refunds table must be migrated");
+
+  const { json: product } = await call(app, "POST", "/api/catalog/", {
+    sku: "RF-LED",
+    name: "Refund Ledger Probe",
+    price_cents: 1800,
+    category: "general",
+  });
+  const { json: order } = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: product.id, quantity: 1 }],
+  });
+
+  const events = new EventBus();
+  const ctx = {
+    ...RefundWorkflow.buildContext(
+      { id: order.id, tenantId: "tnt_demo", totalCents: order.total_cents },
+      "tnt_demo",
+    ),
+    taxCents: order.tax_cents,
+    subtotalCents: order.total_cents - order.tax_cents,
+  };
+  const step = RefundWorkflow.steps.find((s) => s.name === "check_double_refund_guard")!;
+  // Before the migration this threw: relation "refunds" does not exist
+  const updated = await step.execute(ctx, app.db, events);
+  assert.ok(updated.refundId?.startsWith("ref_"));
+
+  const row = await app.db.one<{ amount_cents: string; status: string }>(
+    "SELECT amount_cents, status FROM refunds WHERE id = @id AND tenant_id = @tenantId",
+    { id: updated.refundId, tenantId: "tnt_demo" },
+  );
+  assert.equal(Number(row?.amount_cents), order.total_cents);
+  assert.equal(row?.status, "pending");
 
   await app.db.close();
   await app.cleanup();

@@ -31,6 +31,15 @@ test("refund: builds context from order.refunded payload", () => {
   assert.equal(ctx.customerId, "cust_1");
 });
 
+test("refund: buildContext accepts OrdersService totalCents alias", () => {
+  // Live POS publishes { id, tenantId, orderNumber, totalCents } — not refundCents.
+  const ctx = RefundWorkflow.buildContext({
+    id: "ord_2", tenantId: "t1", orderNumber: "ON-1", totalCents: 4500,
+  }, "t1");
+  assert.equal(ctx.refundCents, 4500);
+  assert.equal(ctx.originalTotalCents, 4500);
+});
+
 test("refund: validate_eligibility throws when order not found", async () => {
   const { events } = makeEvents();
   const db = makeDb({ one: undefined });
