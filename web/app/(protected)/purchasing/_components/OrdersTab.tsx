@@ -88,8 +88,6 @@ export function OrdersTab({
   const canManage = hasRole("manager");
   const noticeRef = useRef<HTMLParagraphElement>(null);
 
-  const cursor = query.cursorStack[query.cursorStack.length - 1] ?? null;
-
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
