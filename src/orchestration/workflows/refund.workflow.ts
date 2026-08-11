@@ -80,21 +80,25 @@ export const RefundWorkflow: WorkflowDefinition<RefundContext> = {
     {
       name: "validate_refund_eligibility",
       async execute(ctx, db) {
+        // orders has no refunded_cents column — live POS refunds are a full-order
+        // status flip (OrdersService.refund). Prior refunded amounts are not stored
+        // on the order row; derive already-refunded as 0 here and rely on
+        // OrdersService's status='refunded' conflict + check_double_refund_guard
+        // for idempotency. (A refunds ledger table is not present in migrations.)
         const order = await db.one<{
           id: string;
           status: string;
           total_cents: number;
           tax_cents: number;
-          refunded_cents: number;
         }>(
-          "SELECT id, status, total_cents, tax_cents, refunded_cents FROM orders WHERE id = @id AND tenant_id = @tenantId",
+          "SELECT id, status, total_cents, tax_cents FROM orders WHERE id = @id AND tenant_id = @tenantId",
           { id: ctx.orderId, tenantId: ctx.tenantId },
         );
         if (!order) throw new Error(`order '${ctx.orderId}' not found`);
-        if (["void", "cancelled"].includes(order.status)) {
+        if (["void", "voided", "cancelled"].includes(order.status)) {
           throw new Error(`order '${ctx.orderId}' in status '${order.status}' cannot be refunded`);
         }
-        const alreadyRefunded = order.refunded_cents ?? 0;
+        const alreadyRefunded = 0;
         const maxRefundable = order.total_cents - alreadyRefunded;
         if (ctx.refundCents > maxRefundable) {
           throw new Error(
