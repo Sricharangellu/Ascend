@@ -85,7 +85,9 @@ function EditableCell({
       }}
       className={clsx(
         width,
-        "min-h-[34px] rounded border px-2 py-1 text-[13px]",
+        // Full 44px target, not a compact 34px one: receiving is regularly done
+        // on a dock touchscreen, and AGENTS.md makes 44px a hard requirement.
+        "min-h-touch rounded border px-2 py-1 text-[13px]",
         align === "right" ? "text-right tabular-nums" : "text-left",
         mono && "font-mono text-[12px]",
         "bg-[var(--color-surface)] text-[var(--color-text-primary)]",
