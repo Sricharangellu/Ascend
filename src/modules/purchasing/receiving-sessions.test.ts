@@ -307,3 +307,121 @@ test("auto-bill only drafts AP after full receive", async () => {
   assert.equal(bills.status, 200);
   assert.equal(bills.json.items.length, 1, "full receive should auto-draft one bill");
 });
+
+// ── Case UPC → base-unit conversion ─────────────────────────────────────────
+// A case barcode carries `pack_size` on its `product_barcodes` row (ADR-006:
+// units live on the barcode). `resolveBarcode` used to SELECT only the product
+// columns and throw that pack size away, so scanning one case of 12 received
+// ONE each. Receiving is the path that writes inventory movements, so the
+// error compounds silently into stock-on-hand, COGS and reorder points.
+test("scan of a case UPC receives pack_size base units, not one", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app);
+  const productId = await makeProduct(app, "CASE-SKU", "CASE-EACH-BC");
+
+  // 12-unit case barcode alongside the each barcode.
+  const addBc = await call(app, "POST", `/api/catalog/${productId}/barcodes`, {
+    barcode: "CASE-UPC-12",
+    kind: "case",
+    packSize: 12,
+  });
+  assert.equal(addBc.status, 201, JSON.stringify(addBc.json));
+
+  // PO for two cases' worth of base units.
+  const po = (
+    await call(app, "POST", "/api/purchasing/orders", {
+      supplierId,
+      lines: [{ productId, quantity: 24, unitCostCents: 100 }],
+    })
+  ).json;
+  const begin = (
+    await call(app, "POST", "/api/purchasing/receiving/sessions", { poId: po.id })
+  ).json;
+
+  const scan = await call(app, "POST", `/api/purchasing/receiving/sessions/${begin.id}/scan`, {
+    barcode: "CASE-UPC-12",
+    qty: 1,
+  });
+  assert.equal(scan.status, 200, JSON.stringify(scan.json));
+  assert.equal(scan.json.result, "matched");
+  assert.equal(
+    scan.json.session.lines[0].accepted_qty,
+    12,
+    "one scan of a 12-pack case must accept 12 base units",
+  );
+  assert.equal(scan.json.unit?.kind, "case");
+  assert.equal(scan.json.unit?.pack_size, 12);
+  assert.equal(scan.json.unit?.scanned_units, 1);
+  assert.equal(scan.json.unit?.base_qty, 12);
+
+  // An each-barcode scan on the same product stays 1:1 — no regression.
+  const eachScan = await call(app, "POST", `/api/purchasing/receiving/sessions/${begin.id}/scan`, {
+    barcode: "CASE-EACH-BC",
+    qty: 1,
+  });
+  assert.equal(eachScan.status, 200, JSON.stringify(eachScan.json));
+  assert.equal(eachScan.json.session.lines[0].accepted_qty, 13);
+  assert.equal(eachScan.json.unit, null);
+});
+
+test("case-UPC scan converts unit cost per case to per base unit", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app);
+  const productId = await makeProduct(app, "CASECOST-SKU", "CASECOST-EACH");
+  await call(app, "POST", `/api/catalog/${productId}/barcodes`, {
+    barcode: "CASECOST-UPC",
+    kind: "case",
+    packSize: 10,
+  });
+  const po = (
+    await call(app, "POST", "/api/purchasing/orders", {
+      supplierId,
+      lines: [{ productId, quantity: 10, unitCostCents: 100 }],
+    })
+  ).json;
+  const begin = (
+    await call(app, "POST", "/api/purchasing/receiving/sessions", { poId: po.id })
+  ).json;
+
+  // 1000c for a case of 10 == the PO's 100c each. Without conversion this
+  // reads as a 900% cost overrun and is rejected as cost_override_required.
+  const scan = await call(app, "POST", `/api/purchasing/receiving/sessions/${begin.id}/scan`, {
+    barcode: "CASECOST-UPC",
+    qty: 1,
+    unitCostCents: 1000,
+  });
+  assert.equal(scan.status, 200, JSON.stringify(scan.json));
+  assert.equal(scan.json.result, "matched", "case cost must not trip the variance band");
+  assert.equal(scan.json.session.lines[0].unit_cost_cents, 100);
+  assert.equal(scan.json.session.lines[0].accepted_qty, 10);
+});
+
+test("over-qty check counts case scans in base units", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app);
+  const productId = await makeProduct(app, "CASEOVER-SKU", "CASEOVER-EACH");
+  await call(app, "POST", `/api/catalog/${productId}/barcodes`, {
+    barcode: "CASEOVER-UPC",
+    kind: "case",
+    packSize: 12,
+  });
+  // Only 6 base units expected — half a case. Scanning one case is over.
+  const po = (
+    await call(app, "POST", "/api/purchasing/orders", {
+      supplierId,
+      lines: [{ productId, quantity: 6, unitCostCents: 100 }],
+    })
+  ).json;
+  const begin = (
+    await call(app, "POST", "/api/purchasing/receiving/sessions", { poId: po.id })
+  ).json;
+
+  const scan = await call(app, "POST", `/api/purchasing/receiving/sessions/${begin.id}/scan`, {
+    barcode: "CASEOVER-UPC",
+    qty: 1,
+  });
+  assert.equal(scan.status, 200, JSON.stringify(scan.json));
+  assert.equal(scan.json.result, "over_qty", "12 base units into a 6-unit line is an overage");
+  assert.match(scan.json.detail, /12/);
+  assert.equal(scan.json.session.lines[0].accepted_qty, 0);
+});
