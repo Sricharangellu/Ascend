@@ -103,6 +103,19 @@ components:
         category_ids: { type: array, items: { type: string } }
         reorder_point: { type: integer }
         created_at: { type: integer }
+        variant_count:
+          type: integer
+          description: >-
+            How many variants hang off this product. Returned by the list
+            endpoint so a row identifies itself as a master without the client
+            inspecting its page neighbours.
+
+    FacetBucket:
+      type: object
+      description: A value the catalog contains, and how many products carry it.
+      properties:
+        value: { type: string }
+        count: { type: integer }
 
     # ── Orders ─────────────────────────────────────────────────────────────────
     OrderLine:
@@ -656,13 +669,68 @@ paths:
           schema: { type: string, enum: [active, draft, archived] }
         - name: q
           in: query
+          description: >-
+            Free-text search over name, SKU, barcode (including alternate and
+            case UPCs), brand, manufacturer, alternative name, model, tags,
+            supplier UPC and category. Tokens are ANDed. Results are ranked
+            exact barcode > exact SKU > exact supplier SKU > SKU prefix > name
+            prefix > brand prefix > name contains.
           schema: { type: string }
+        - name: brand
+          in: query
+          description: Case-insensitive contains match on brand.
+          schema: { type: string }
+        - name: supplier
+          in: query
+          description: Preferred vendor id/name, primary vendor, or a linked supplier id.
+          schema: { type: string }
+        - name: taxClass
+          in: query
+          schema: { type: string, enum: [standard, exempt] }
+        - name: ageRestricted
+          in: query
+          schema: { type: boolean }
+        - name: ecommerce
+          in: query
+          description: Only products flagged for the online storefront.
+          schema: { type: boolean }
+        - name: minPrice
+          in: query
+          description: Inclusive lower bound, in dollars (compared as integer cents).
+          schema: { type: number }
+        - name: maxPrice
+          in: query
+          description: Inclusive upper bound, in dollars (compared as integer cents).
+          schema: { type: number }
+        - name: productType
+          in: query
+          description: Position in the variant tree, derived across the whole catalog.
+          schema: { type: string, enum: [standalone, master, variant, all] }
+        - name: topLevel
+          in: query
+          description: >-
+            Only products with no parent — masters and standalone products,
+            never a child variant. For browse grids that show one card per
+            product family.
+          schema: { type: boolean }
+        - name: sort
+          in: query
+          description: relevance is only meaningful with `q`; it falls back to name without one.
+          schema:
+            type: string
+            enum: [relevance, name, sku, price_cents, category, brand, status, created_at, updated_at, cost]
+        - name: dir
+          in: query
+          schema: { type: string, enum: [asc, desc] }
         - name: excludeMasters
           in: query
           schema: { type: boolean }
         - name: limit
           in: query
           schema: { type: integer, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
         - name: cursor
           in: query
           schema: { type: string }
@@ -706,6 +774,72 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Product" }
         "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/v1/catalog/facets:
+    get:
+      summary: Product filter options for the current query
+      description: >-
+        Data-driven filter options, counted over the whole matching set rather
+        than one page. Accepts every filter `GET /api/v1/catalog` accepts; each
+        dimension ignores its own filter so a selected value still shows the
+        alternatives to switch to. Buckets only contain values the catalog
+        actually has.
+      operationId: listProductFacets
+      tags: [Catalog]
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, draft, archived] }
+        - name: brand
+          in: query
+          schema: { type: string }
+        - name: supplier
+          in: query
+          schema: { type: string }
+        - name: taxClass
+          in: query
+          schema: { type: string, enum: [standard, exempt] }
+        - name: ageRestricted
+          in: query
+          schema: { type: boolean }
+        - name: productType
+          in: query
+          schema: { type: string, enum: [standalone, master, variant, all] }
+        - name: minPrice
+          in: query
+          schema: { type: number }
+        - name: maxPrice
+          in: query
+          schema: { type: number }
+      responses:
+        "200":
+          description: Facet counts for the matching products
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: integer }
+                  status: { type: array, items: { $ref: "#/components/schemas/FacetBucket" } }
+                  productType: { type: array, items: { $ref: "#/components/schemas/FacetBucket" } }
+                  category: { type: array, items: { $ref: "#/components/schemas/FacetBucket" } }
+                  brand: { type: array, items: { $ref: "#/components/schemas/FacetBucket" } }
+                  supplier: { type: array, items: { $ref: "#/components/schemas/FacetBucket" } }
+                  taxClass: { type: array, items: { $ref: "#/components/schemas/FacetBucket" } }
+                  ageRestricted: { type: integer }
+                  ecommerce: { type: integer }
+                  priceRange:
+                    nullable: true
+                    type: object
+                    properties:
+                      min: { type: integer, description: cents }
+                      max: { type: integer, description: cents }
 
   /api/v1/catalog/{id}:
     get:
@@ -2253,7 +2387,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Room" }
 
-  /api/v1/hospitality/rooms/{id}/charges:
+  /api/v1/hospitality/rooms/{id}/charge:
     post:
       summary: Post charge to room folio
       operationId: postRoomCharge
@@ -2295,7 +2429,7 @@ paths:
       responses:
         "200": { description: Settled — total amount collected }
 
-  /api/v1/hospitality/rooms/{id}/folio:
+  /api/v1/hospitality/rooms/{id}/charges:
     get:
       summary: Get room folio (all charges)
       operationId: getRoomFolio
@@ -2954,7 +3088,7 @@ paths:
         "200": { description: Payment recorded; early discount applied if eligible }
 
   # ── Audit Log ───────────────────────────────────────────────────────────────
-  /api/v1/audit_log:
+  /api/v1/audit-log:
     get:
       summary: List audit log entries
       operationId: listAuditLog

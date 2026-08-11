@@ -43,12 +43,27 @@ jobs:
     runs-on: ubuntu-latest
     # Sized against the real worst case, which changed when the probes stopped
     # aborting at the first failure (see the Backend probes block below). Four
-    # probes now always run: /healthz carries the full Render cold-start budget
-    # (~10 min worst case, 6 attempts × 90s + 5 × 10s delay) and the other three
-    # carry a short one (~100s each), so ~15 min worst case, seconds when warm.
-    # At 5 minutes the job was killed mid-probe and the `if: always()` Verdict
-    # step never ran — a cancelled job reports neither a result nor a summary.
-    timeout-minutes: 20
+    # probes now ALWAYS run, so the budget is the SUM of four, not the max of one:
+    #
+    #   /healthz   4 attempts × 90s + 3 × 10s delay = 390s   (Render cold start)
+    #   /readyz    3 attempts × 30s + 2 ×  5s delay = 100s
+    #   /flags     100s
+    #   frontend   100s
+    #                                        worst case ≈ 690s ≈ 11.5 min
+    #
+    # `timeout-minutes` must exceed that, and the whole job must finish inside the
+    # 15-minute `cron` interval, because `concurrency.cancel-in-progress: true`
+    # means the next scheduled run CANCELS this one — and a cancelled job reports
+    # neither a result nor a summary. That is the same trap this file has fallen
+    # into twice: at `timeout-minutes: 5` the job was killed mid-probe and the
+    # `if: always()` Verdict step never ran. Raising the cap without bounding the
+    # retries just moves the cliff (PR #219's point, and it is correct) — the two
+    # numbers have to be chosen together, which is why /healthz went 5 → 3 retries
+    # when the other three probes stopped being skipped.
+    #
+    # 13 minutes leaves the Verdict step room to run and ~2 minutes of headroom
+    # before the next run cancels this one.
+    timeout-minutes: 13
     # Probe targets are repo variables so this heartbeat can be repointed
     # WITHOUT a code change — set them under
     # Settings → Secrets and variables → Actions → Variables.
@@ -95,12 +110,15 @@ jobs:
       # three independent networks. A timeout shorter than the cold start does
       # not measure availability, it measures the timeout.
       #
-      # Only /healthz carries the full cold-start budget (PR #206's values). It
-      # is the first request, so it is the one that pays the wake-up; by the time
-      # it returns the instance is warm, and giving the remaining three the same
-      # 10-minute worst case would make a fully-down production take ~40 min to
-      # report — longer than the 15-minute interval, so every run would be
-      # cancelled by the next before it could say anything. They get ~100s each.
+      # Only /healthz carries a cold-start budget. It is the first request, so it
+      # is the one that pays the wake-up; by the time it returns the instance is
+      # warm, and giving the remaining three the same budget would make a fully
+      # down production take far longer to report than the 15-minute interval, so
+      # every run would be cancelled by the next before it could say anything.
+      # They get ~100s each. `--max-time 90` on the first attempt alone already
+      # outlasts a ~50s cold start; the extra attempts buy transient-failure
+      # tolerance, not more wake-up time, which is why 3 retries is enough and 5
+      # only bought a cancelled job.
       - name: Show probe targets
         run: |
           echo "backend:  $BACKEND (PROD_BACKEND_URL set: $BACKEND_CONFIGURED)"
@@ -123,7 +141,7 @@ jobs:
         id: be_health
         continue-on-error: true
         run: |
-          curl -fsS --max-time 90 --retry 5 --retry-delay 10 --retry-all-errors \
+          curl -fsS --max-time 90 --retry 3 --retry-delay 10 --retry-all-errors \
             "$BACKEND/healthz" \
             || (echo "❌ /healthz failed against $BACKEND" && exit 1)
       - name: Backend readiness (/readyz — DB reachable)

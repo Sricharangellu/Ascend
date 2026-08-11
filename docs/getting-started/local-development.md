@@ -123,6 +123,12 @@ records each by content hash in a `schema_migrations` table, so a **fresh, empty
 database is fully provisioned the first time you start the backend**
 (`src/app.ts`). Subsequent starts skip already-applied migrations.
 
+Waiting for that lock gets its own, much larger statement timeout
+(`PG_MIGRATION_LOCK_WAIT_MS`, default 300 s), and the normal `PG_TX_TIMEOUT_MS`
+budget is restored the moment the lock is held — so the widened timeout covers
+only queuing behind another instance, never the migrations themselves. Exhausting
+it reports the lock by name rather than surfacing as an unrelated slow query.
+
 There is also a **separate, optional** canonical SQL path — `db/migrations/*.sql`
 applied via `db/migrations/run.sh` (tracked in its own `migrations_applied`
 table, requires `psql`). That path is the human-readable DDL of record and the
@@ -225,6 +231,7 @@ and the fix directly instead of leaving you to decode a driver error.
 | `Tenant or user not found` from Supabase | The pooler user must be `postgres.<project-ref>`; plain `postgres` only works on a direct connection. |
 | `too many connections` | Lower `PG_POOL_MAX`; use the provider's **pooled** connection string. On Supabase the limit is per project and shared across every process and tool. |
 | Tables missing after start | Check the logs for `migrations complete`. If migrations errored, the advisory lock/hash record prevents partial re-runs — inspect `schema_migrations`. |
+| `migration lock 7381920 not acquired after …ms` | Another instance is mid-migration and did not finish. That is the message doing its job: it names the lock instead of surfacing later as an unrelated query timeout. Find the holder (`SELECT * FROM pg_locks WHERE locktype = 'advisory'`) before raising `PG_MIGRATION_LOCK_WAIT_MS` — a stuck holder needs killing, not a longer wait. |
 | `/readyz` not `ok` | The pool can't reach Postgres — recheck `DATABASE_URL`, that the DB exists, and network/SSL. |
 
 ## Notes for changing auth, e2e, or tenant behavior
