@@ -463,3 +463,59 @@ describe("DataTable — controlled selection", () => {
     expect(screen.getByText("1 chosen")).toBeInTheDocument();
   });
 });
+
+// ── Controlled expansion ─────────────────────────────────────────────────────
+// For rows whose panel is opened by an action button rather than a disclosure —
+// the shipments list reveals its "confirm shipment" form from "Mark shipped".
+
+describe("DataTable — controlled expansion", () => {
+  it("opens the panel the caller nominates, with no disclosure column", () => {
+    render(
+      <DataTable
+        caption="Rows"
+        columns={COLUMNS}
+        rows={ROWS}
+        rowKey={(r) => r.id}
+        expandedKey="2"
+        onExpandedChange={vi.fn()}
+        hideExpandControl
+        expandedContent={(r) => (r.id === "2" ? <p>Panel for {r.name}</p> : null)}
+      />,
+    );
+    expect(screen.getByText("Panel for Apple")).toBeInTheDocument();
+    // A disclosure button that cannot open anything would be a dead control.
+    expect(screen.queryByRole("button", { name: /expand details/i })).not.toBeInTheDocument();
+  });
+
+  it("renders no panel row when the content function returns null", () => {
+    render(
+      <DataTable
+        caption="Rows"
+        columns={COLUMNS}
+        rows={ROWS}
+        rowKey={(r) => r.id}
+        expandedKey="1"
+        onExpandedChange={vi.fn()}
+        hideExpandControl
+        expandedContent={() => null}
+      />,
+    );
+    // 1 header + 3 body rows. An empty panel row would make 5.
+    expect(screen.getAllByRole("row")).toHaveLength(4);
+  });
+
+  it("still self-manages expansion when uncontrolled", async () => {
+    const user = userEvent.setup();
+    render(
+      <DataTable
+        caption="Rows"
+        columns={COLUMNS}
+        rows={ROWS}
+        rowKey={(r) => r.id}
+        expandedContent={(r) => <p>Detail {r.sku}</p>}
+      />,
+    );
+    await user.click(screen.getAllByRole("button", { name: /expand details/i })[0]);
+    expect(screen.getByText("Detail APL-002")).toBeInTheDocument();
+  });
+});

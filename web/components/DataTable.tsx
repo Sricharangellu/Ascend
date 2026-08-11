@@ -154,6 +154,19 @@ export interface DataTableProps<T> {
    * their scroll position, filters and place in the list.
    */
   expandedContent?: (row: T) => React.ReactNode;
+  /**
+   * Controlled expansion. Supply both when something other than the disclosure
+   * control opens a row — an action button ("Ship") that reveals an inline
+   * form, for instance. Omit both and the table manages expansion itself.
+   *
+   * With `expandedKey` controlled you usually also want `hideExpandControl`:
+   * a disclosure button beside a row whose panel only opens via an action is a
+   * control that appears to do nothing.
+   */
+  expandedKey?: string | null;
+  onExpandedChange?: (key: string | null) => void;
+  /** Drop the per-row disclosure column. Only meaningful with controlled expansion. */
+  hideExpandControl?: boolean;
 }
 
 function defaultSearchText<T>(row: T): string {
@@ -199,9 +212,21 @@ export function DataTable<T>({
   storageKey,
   className,
   expandedContent,
+  expandedKey,
+  onExpandedChange,
+  hideExpandControl = false,
 }: DataTableProps<T>) {
   const tableId = useId();
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [internalExpanded, setInternalExpanded] = useState<string | null>(null);
+  const isControlledExpansion = expandedKey !== undefined && onExpandedChange !== undefined;
+  const expanded = isControlledExpansion ? expandedKey : internalExpanded;
+  const setExpanded = useCallback(
+    (next: string | null) => {
+      if (isControlledExpansion) onExpandedChange(next);
+      else setInternalExpanded(next);
+    },
+    [isControlledExpansion, onExpandedChange],
+  );
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDirection>("asc");
   const [query, setQuery] = useState("");
@@ -485,7 +510,7 @@ export function DataTable<T>({
                     />
                   </th>
                 )}
-                {expandedContent && (
+                {expandedContent && !hideExpandControl && (
                   <th scope="col" className="w-10 cell-pad">
                     <span className="sr-only">Expand row</span>
                   </th>
@@ -545,7 +570,7 @@ export function DataTable<T>({
                 Array.from({ length: Math.min(pageSize, 8) }).map((_, i) => (
                   <tr key={`sk-${i}`} className="border-b border-line-subtle">
                     {selectable && <td className="cell-pad" />}
-                    {expandedContent && <td className="cell-pad" />}
+                    {expandedContent && !hideExpandControl && <td className="cell-pad" />}
                     {visibleColumns.map((col) => (
                       <td key={col.key} className="cell-pad">
                         <div
@@ -589,7 +614,7 @@ export function DataTable<T>({
                           />
                         </td>
                       )}
-                      {expandedContent && (
+                      {expandedContent && !hideExpandControl && (
                         <td className="cell-pad" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
@@ -622,12 +647,12 @@ export function DataTable<T>({
                         </td>
                       ))}
                     </tr>
-                    {expandedContent && isExpanded && (
+                    {expandedContent && isExpanded && expandedContent(row) !== null && (
                       <tr>
                         <td
                           id={`${tableId}-panel-${key}`}
                           colSpan={
-                            visibleColumns.length + (selectable ? 1 : 0) + 1
+                            visibleColumns.length + (selectable ? 1 : 0) + (hideExpandControl ? 0 : 1)
                           }
                           className="border-b border-line-subtle bg-surface-2 p-0"
                         >
