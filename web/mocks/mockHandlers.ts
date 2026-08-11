@@ -1365,25 +1365,133 @@ export const mockHandlers = [
       ),
     ];
 
-    function applyFilters(
-      list: typeof products,
-      category?: string,
-      status?: string,
-      q?: string,
-    ) {
+    /**
+     * Mirror of the real catalog list query (src/modules/catalog/service.ts).
+     *
+     * Keeping these two in step matters more than it looks: this mock used to
+     * implement `?q=` while the backend silently ignored it, so search worked
+     * in `npm run dev` and did nothing in production for as long as the feature
+     * existed. Anything added to the real query belongs here too.
+     */
+    interface CatalogQuery {
+      category?: string; status?: string; q?: string; brand?: string;
+      supplier?: string; taxClass?: string; ageRestricted?: boolean;
+      productType?: string; minPrice?: number; maxPrice?: number;
+      topLevel?: boolean;
+    }
+
+    const variantCountOf = (id: string) => products.filter((p) => p.parent_product_id === id).length;
+
+    const productTypeOf = (p: (typeof products)[number]) =>
+      p.parent_product_id ? "variant" : variantCountOf(p.id) > 0 ? "master" : "standalone";
+
+    /** Same precedence as the server: exact barcode, exact SKU, prefixes, then contains. */
+    function relevanceRank(p: (typeof products)[number], q: string): number {
+      const lq = q.trim().toLowerCase();
+      const digits = lq.replace(/\D/g, "");
+      const barcode = String(p.barcode ?? "").toLowerCase();
+      const sku = String(p.sku).toLowerCase();
+      const name = String(p.name).toLowerCase();
+      const brand = String(p.brand ?? "").toLowerCase();
+      if (barcode && (barcode === lq || (digits.length >= 6 && barcode === digits))) return 0;
+      if (sku === lq) return 1;
+      if (sku.startsWith(lq)) return 3;
+      if (name.startsWith(lq)) return 4;
+      if (brand.startsWith(lq)) return 5;
+      if (name.includes(lq)) return 6;
+      return 7;
+    }
+
+    function applyFilters(list: typeof products, f: CatalogQuery) {
       return list.filter((p) => {
-        if (category && p.category !== category) return false;
-        if (status && p.status !== status) return false;
-        if (q) {
-          const lq = q.toLowerCase();
-          if (
-            !String(p.name).toLowerCase().includes(lq) &&
-            !String(p.sku).toLowerCase().includes(lq) &&
-            !String(p.barcode ?? "").includes(lq)
-          ) return false;
+        if (f.topLevel && p.parent_product_id) return false;
+        if (f.category && p.category !== f.category) return false;
+        if (f.status && p.status !== f.status) return false;
+        if (f.brand && !String(p.brand ?? "").toLowerCase().includes(f.brand.toLowerCase())) return false;
+        if (f.taxClass && p.tax_class !== f.taxClass) return false;
+        if (f.ageRestricted && p.age_restricted !== 1) return false;
+        if (f.productType && productTypeOf(p) !== f.productType) return false;
+        if (f.minPrice !== undefined && p.price_cents < f.minPrice) return false;
+        if (f.maxPrice !== undefined && p.price_cents > f.maxPrice) return false;
+        if (f.supplier) {
+          const s = f.supplier.toLowerCase();
+          if (!String((p as { preferred_vendor_name?: string | null }).preferred_vendor_name ?? "").toLowerCase().includes(s)) return false;
+        }
+        if (f.q) {
+          // AND across tokens, OR across the searchable columns.
+          const tokens = f.q.trim().toLowerCase().split(/\s+/).filter(Boolean).slice(0, 5);
+          const haystack = [p.name, p.sku, p.barcode, p.brand, p.category,
+            (p as { manufacturer?: string | null }).manufacturer,
+            (p as { vendor_upc?: string | null }).vendor_upc,
+          ].map((v) => String(v ?? "").toLowerCase());
+          if (!tokens.every((t) => haystack.some((h) => h.includes(t)))) return false;
         }
         return true;
       });
+    }
+
+    function sortProducts(list: typeof products, sort: string, dir: string, q?: string) {
+      const sign = dir === "desc" ? -1 : 1;
+      const cmp = (a: unknown, b: unknown) => {
+        // NULLS LAST in both directions, matching the server.
+        const an = a === null || a === undefined || a === "";
+        const bn = b === null || b === undefined || b === "";
+        if (an && bn) return 0;
+        if (an) return 1;
+        if (bn) return -1;
+        if (typeof a === "number" && typeof b === "number") return (a - b) * sign;
+        return String(a).localeCompare(String(b)) * sign;
+      };
+      const key = (p: (typeof products)[number]) => {
+        switch (sort) {
+          case "sku":         return p.sku;
+          case "price_cents": return p.price_cents;
+          case "category":    return p.category;
+          case "brand":       return p.brand;
+          case "status":      return p.status;
+          case "created_at":  return p.createdAt;
+          case "updated_at":  return p.updatedAt;
+          case "cost":        return p.raw_cost_price_cents;
+          default:            return p.name;
+        }
+      };
+      if (sort === "relevance" && q) {
+        return [...list].sort((a, b) =>
+          relevanceRank(a, q) - relevanceRank(b, q)
+          || (a.status === "active" ? 0 : 1) - (b.status === "active" ? 0 : 1)
+          || String(a.name).localeCompare(String(b.name)));
+      }
+      return [...list].sort((a, b) => cmp(key(a), key(b)) || String(a.id).localeCompare(String(b.id)));
+    }
+
+    function readCatalogQuery(url: URL): CatalogQuery {
+      const str = (k: string) => url.searchParams.get(k) || undefined;
+      const money = (k: string) => {
+        const raw = url.searchParams.get(k);
+        return raw && raw.trim() !== "" && Number.isFinite(Number(raw)) ? Math.round(Number(raw) * 100) : undefined;
+      };
+      const type = str("productType");
+      return {
+        category: str("category"), status: str("status"), q: str("q"),
+        brand: str("brand"), supplier: str("supplier"), taxClass: str("taxClass"),
+        ageRestricted: url.searchParams.get("ageRestricted") === "true",
+        topLevel: url.searchParams.get("topLevel") === "true",
+        productType: type === "all" ? undefined : type,
+        minPrice: money("minPrice"), maxPrice: money("maxPrice"),
+      };
+    }
+
+    /** Buckets over a list, biggest first — the mock's version of the facets query. */
+    function bucketize(list: typeof products, pick: (p: (typeof products)[number]) => string | null | undefined) {
+      const counts = new Map<string, number>();
+      for (const p of list) {
+        const v = pick(p);
+        if (v == null || v === "") continue;
+        counts.set(v, (counts.get(v) ?? 0) + 1);
+      }
+      return [...counts.entries()]
+        .map(([value, count]) => ({ value, count }))
+        .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
     }
 
     return [
@@ -1391,17 +1499,44 @@ export const mockHandlers = [
       http.get(`${V1}/catalog`, async ({ request }) => {
         await lat();
         const url = new URL(request.url);
-        const category = url.searchParams.get("category") ?? undefined;
-        const status   = url.searchParams.get("status")   ?? undefined;
-        const q        = url.searchParams.get("q")        ?? undefined;
+        const query = readCatalogQuery(url);
         const limit    = Number(url.searchParams.get("limit") ?? 50);
         const offset   = Number(url.searchParams.get("offset") ?? 0);
-        const filtered = applyFilters(products, category, status, q);
+        const sort     = url.searchParams.get("sort") ?? (query.q ? "relevance" : "created_at");
+        const dir      = url.searchParams.get("dir") ?? "asc";
+        const filtered = sortProducts(applyFilters(products, query), sort, dir, query.q);
         return HttpResponse.json({
-          items: filtered.slice(offset, offset + limit),
+          items: filtered.slice(offset, offset + limit).map((p) => ({ ...p, variant_count: variantCountOf(p.id) })),
           total: filtered.length,
           limit,
           offset,
+        });
+      }),
+
+      // Facet counts for the current query. Each dimension drops its own filter
+      // so the UI can still offer the alternatives to switch to — same rule the
+      // server's buildListWhere(omit) applies.
+      http.get(`${V1}/catalog/facets`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const query = readCatalogQuery(url);
+        const scoped = (omit: keyof CatalogQuery) => applyFilters(products, { ...query, [omit]: undefined });
+        const matching = applyFilters(products, query);
+        const prices = matching.map((p) => p.price_cents);
+        return HttpResponse.json({
+          total: matching.length,
+          status: bucketize(scoped("status"), (p) => p.status),
+          productType: ["standalone", "master", "variant"].map((value) => ({
+            value,
+            count: scoped("productType").filter((p) => productTypeOf(p) === value).length,
+          })),
+          category: bucketize(scoped("category"), (p) => p.category),
+          brand: bucketize(scoped("brand"), (p) => p.brand),
+          supplier: bucketize(scoped("supplier"), (p) => (p as { preferred_vendor_name?: string | null }).preferred_vendor_name),
+          taxClass: bucketize(scoped("taxClass"), (p) => p.tax_class),
+          ageRestricted: matching.filter((p) => p.age_restricted === 1).length,
+          ecommerce: matching.filter((p) => (p as { ecommerce?: number }).ecommerce === 1).length,
+          priceRange: prices.length ? { min: Math.min(...prices), max: Math.max(...prices) } : null,
         });
       }),
 

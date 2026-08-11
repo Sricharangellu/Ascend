@@ -754,6 +754,12 @@ export interface CatalogProduct {
   qty_increment?: number | null;
   parent_product_id?: string | null;
   variant_label?: string | null;
+  /**
+   * How many variants hang off this product. Returned by the list endpoint so a
+   * row can say whether it is a master without the client inspecting its
+   * siblings — which only worked while every sibling was on the same page.
+   */
+  variant_count?: number;
   // Pricing extras
   msrp_cents?: number | null;
   raw_cost_price_cents?: number | null;
@@ -1171,6 +1177,41 @@ export interface ProductsResponse {
   total: number;
   limit: number;
   offset: number;
+}
+
+/** How the product list is ordered. `relevance` only means something with a search term. */
+export type ProductSort =
+  | "relevance" | "name" | "sku" | "price_cents" | "category" | "brand"
+  | "status" | "created_at" | "updated_at" | "cost";
+
+/** Position in the master/variant tree, derived server-side across the whole catalog. */
+export type ProductTypeFilter = "standalone" | "master" | "variant";
+
+/** One value the catalog actually contains, with how many products carry it. */
+export interface FacetBucket {
+  value: string;
+  count: number;
+}
+
+/**
+ * Filter options for the current query — GET /api/v1/catalog/facets.
+ *
+ * Counted over the whole matching set, not the loaded page, and each dimension
+ * ignores its own filter so the UI can always offer the alternatives to switch
+ * to. Buckets only ever contain values the catalog really has, which is what
+ * makes the filter panel adapt to the data instead of being hard-coded.
+ */
+export interface ProductFacets {
+  total: number;
+  status: FacetBucket[];
+  productType: FacetBucket[];
+  category: FacetBucket[];
+  brand: FacetBucket[];
+  supplier: FacetBucket[];
+  taxClass: FacetBucket[];
+  ageRestricted: number;
+  ecommerce: number;
+  priceRange: { min: number; max: number } | null;
 }
 
 export interface Category {

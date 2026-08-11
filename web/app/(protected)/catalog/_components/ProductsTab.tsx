@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { clsx } from "clsx";
 import { Card } from "@/components/Card";
@@ -9,9 +9,12 @@ import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { Pagination, usePersistedPageSize } from "@/components/Pagination";
-import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
+import { apiGet, apiPost, apiDelete, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
-import type { CatalogProduct, Category, ProductStatus, ProductsResponse } from "@/api-client/types";
+import type {
+  CatalogProduct, Category, ProductStatus, ProductsResponse,
+  ProductFacets, ProductSort, ProductTypeFilter,
+} from "@/api-client/types";
 import { ProductFormModal } from "./ProductFormModal";
 import { PrintLabelsModal } from "./PrintLabelsModal";
 import { ImportCSVModal } from "./ImportCSVModal";
@@ -56,7 +59,14 @@ function CatalogMetric({ label, value, helper, tone = "neutral", active = false 
   tone?: MetricTone; active?: boolean;
 }) {
   return (
-    <div className={clsx("h-full min-w-0 rounded-md border px-4 py-3 transition-colors", metricToneClass(tone), active && "ring-2 ring-brand-200")}>
+    <div
+      // Named so the count is announced with what it counts. Without it a
+      // screen reader hears "Active 812 sellable" as three loose strings, and
+      // the label alone is ambiguous against the Status filter's options.
+      role="group"
+      aria-label={`${label}: ${value} products`}
+      className={clsx("h-full min-w-0 rounded-md border px-4 py-3 transition-colors", metricToneClass(tone), active && "ring-2 ring-brand-200")}
+    >
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
       <div className="mt-1 flex items-baseline gap-2">
         <span className="text-xl font-semibold tabular-nums text-slate-950">{value}</span>
@@ -103,6 +113,19 @@ function ProductListCard({ product, productType, onEdit, onArchive }: {
 
 // ── ProductsTab ───────────────────────────────────────────────────────────────
 
+/**
+ * The back-office product list.
+ *
+ * Every filter, the sort and the header counts are resolved by the server. They
+ * used to run here in the browser over `products` — the one page React happened
+ * to be holding — so "Brand: Coca-Cola" meant "…among the 50 rows currently
+ * loaded", the column sort reordered a page rather than the catalog, and the
+ * metric tiles counted a page while displaying `total` from the whole catalog
+ * right beside it. Correct only while a catalog fits on one page.
+ *
+ * Anything that needs to be true of the catalog is therefore a query parameter,
+ * not a `.filter()` — see `/api/v1/catalog` and `/api/v1/catalog/facets`.
+ */
 export function ProductsTab({ categories }: { categories: Category[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -110,6 +133,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   const [total, setTotal]           = useState(0);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState<string | null>(null);
+  const [facets, setFacets]         = useState<ProductFacets | null>(null);
 
   const [filterStatus, setFilterStatus]     = useState("");
   const [filterCategory, setFilterCategory] = useState("");
@@ -118,13 +142,18 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
 
   const [filterTaxClass, setFilterTaxClass]           = useState("");
   const [filterBrand, setFilterBrand]                 = useState("");
+  const [filterSupplier, setFilterSupplier]           = useState("");
   const [filterAgeRestricted, setFilterAgeRestricted] = useState(false);
-  const [filterProductType, setFilterProductType]     = useState<"all" | "standalone" | "master" | "variant">("all");
+  const [filterProductType, setFilterProductType]     = useState<"all" | ProductTypeFilter>("all");
   const [priceMin, setPriceMin]                       = useState("");
   const [priceMax, setPriceMax]                       = useState("");
   const [showMoreFilters, setShowMoreFilters]          = useState(false);
 
-  const [sortCol, setSortCol] = useState("name");
+  // null = the user hasn't picked a column, so the sort follows context:
+  // relevance while searching, name otherwise. Derived rather than stored in an
+  // effect — writing it back into state would re-run the loader and fetch the
+  // list twice on the first keystroke of every search.
+  const [sortCol, setSortCol] = useState<ProductSort | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const [page, setPage] = useState(0);
@@ -148,40 +177,69 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   const [archiving, setArchiving]         = useState(false);
   const [actionError, setActionError]     = useState<string | null>(null);
 
-  const activeCount     = products.filter(p => p.status === "active").length;
-  const draftCount      = products.filter(p => p.status === "draft").length;
-  const archivedCount   = products.filter(p => p.status === "archived").length;
-  const restrictedCount = products.filter(p => p.age_restricted === 1).length;
+  // Header counts come from the facets endpoint: catalog-wide, and scoped to the
+  // filters currently applied. Counting `products` here would only ever describe
+  // the loaded page.
+  const facetCount = useCallback((buckets: { value: string; count: number }[] | undefined, value: string) =>
+    buckets?.find((b) => b.value === value)?.count ?? 0, []);
 
-  const masterIds = useMemo(() => new Set(products.map((p) => p.parent_product_id).filter(Boolean) as string[]), [products]);
+  const activeCount     = facetCount(facets?.status, "active");
+  const draftCount      = facetCount(facets?.status, "draft");
+  const archivedCount   = facetCount(facets?.status, "archived");
+  const restrictedCount = facets?.ageRestricted ?? 0;
+  const standaloneCount = facetCount(facets?.productType, "standalone");
+  const masterCount     = facetCount(facets?.productType, "master");
+  const variantCount    = facetCount(facets?.productType, "variant");
+
+  // A product's position in the variant tree is now returned per row rather than
+  // inferred from which siblings share the page — a master whose children landed
+  // on page 2 used to render as "Standalone".
   const getProductType = useCallback((product: CatalogProduct): "Standalone" | "Master" | "Variant" => {
     if (product.parent_product_id) return "Variant";
-    if (masterIds.has(product.id)) return "Master";
+    if (product.variant_count && product.variant_count > 0) return "Master";
     return "Standalone";
-  }, [masterIds]);
+  }, []);
 
-  const standaloneCount = products.filter((p) => !p.parent_product_id && !masterIds.has(p.id)).length;
-  const masterCount = products.filter((p) => !p.parent_product_id && masterIds.has(p.id)).length;
-  const variantCount = products.filter((p) => Boolean(p.parent_product_id)).length;
+  const hasFilters = Boolean(filterStatus || filterCategory || debouncedQ || filterTaxClass || filterBrand || filterSupplier || filterAgeRestricted || filterProductType !== "all" || priceMin || priceMax);
 
-  const hasFilters = Boolean(filterStatus || filterCategory || debouncedQ || filterTaxClass || filterBrand || filterAgeRestricted || filterProductType !== "all" || priceMin || priceMax);
+  /**
+   * The active filters, as removable chips. Each carries its own `clear` so one
+   * filter can be dropped without resetting the rest.
+   */
+  const activeChips: { key: string; label: string; clear: () => void }[] = [
+    debouncedQ          ? { key: "q",     label: `Search: "${debouncedQ}"`,   clear: () => { setSearch(""); setDebouncedQ(""); } } : null,
+    filterStatus        ? { key: "status", label: `Status: ${filterStatus}`,  clear: () => setFilterStatus("") } : null,
+    filterCategory      ? { key: "cat",   label: filterCategory,              clear: () => setFilterCategory("") } : null,
+    filterBrand         ? { key: "brand", label: `Brand: ${filterBrand}`,     clear: () => setFilterBrand("") } : null,
+    filterSupplier      ? { key: "supp",  label: `Supplier: ${filterSupplier}`, clear: () => setFilterSupplier("") } : null,
+    filterTaxClass      ? { key: "tax",   label: `Tax: ${filterTaxClass}`,    clear: () => setFilterTaxClass("") } : null,
+    filterAgeRestricted ? { key: "age",   label: "Age restricted",            clear: () => setFilterAgeRestricted(false) } : null,
+    filterProductType !== "all" ? { key: "type", label: `Type: ${filterProductType}`, clear: () => setFilterProductType("all") } : null,
+    priceMin || priceMax ? {
+      key: "price",
+      label: priceMin && priceMax ? `Price: $${priceMin}–$${priceMax}` : priceMin ? `Price ≥ $${priceMin}` : `Price ≤ $${priceMax}`,
+      clear: () => { setPriceMin(""); setPriceMax(""); },
+    } : null,
+  ].filter(Boolean) as { key: string; label: string; clear: () => void }[];
 
-  const filterSummary = [
-    filterStatus         ? `Status: ${filterStatus}`          : null,
-    filterCategory       ? `Category: ${filterCategory}`      : null,
-    debouncedQ           ? `Search: "${debouncedQ}"`          : null,
-    filterTaxClass       ? `Tax: ${filterTaxClass}`           : null,
-    filterBrand          ? `Brand: "${filterBrand}"`          : null,
-    filterAgeRestricted  ? "Age restricted only"              : null,
-    filterProductType !== "all" ? `Type: ${filterProductType}` : null,
-    priceMin && priceMax ? `Price: $${priceMin}–$${priceMax}` : priceMin ? `Price ≥ $${priceMin}` : priceMax ? `Price ≤ $${priceMax}` : null,
-  ].filter(Boolean);
+  /**
+   * Wrap a filter setter so changing it also returns to the first page.
+   *
+   * Done in the setter rather than in an effect on the filter values: an effect
+   * runs *after* the render that changed the filter, so the list would fetch
+   * once for the stale page and again once the reset landed — two round trips
+   * (four, now that facets load alongside) and a flash of the wrong rows.
+   */
+  function withPageReset<T>(setter: (value: T) => void): (value: T) => void {
+    return (value: T) => { setter(value); setPage(0); };
+  }
 
   const clearFilters = () => {
     setFilterStatus(""); setFilterCategory(""); setSearch(""); setDebouncedQ("");
-    setFilterTaxClass(""); setFilterBrand(""); setFilterAgeRestricted(false);
+    setFilterTaxClass(""); setFilterBrand(""); setFilterSupplier(""); setFilterAgeRestricted(false);
     setFilterProductType("all");
     setPriceMin(""); setPriceMax("");
+    setPage(0);
   };
 
   const openCreate = () => {
@@ -200,70 +258,85 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   };
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(search), 300);
+    const t = setTimeout(() => { setDebouncedQ(search); setPage(0); }, 300);
     return () => clearTimeout(t);
   }, [search]);
 
-  const visibleProducts = useMemo<CatalogProduct[]>(() => {
-    let result = products;
-    if (filterTaxClass)      result = result.filter(p => p.tax_class === filterTaxClass);
-    if (filterBrand)         result = result.filter(p => (p.brand ?? "").toLowerCase().includes(filterBrand.toLowerCase()));
-    if (filterAgeRestricted) result = result.filter(p => p.age_restricted === 1);
-    if (filterProductType !== "all") {
-      result = result.filter((p) => getProductType(p).toLowerCase() === filterProductType);
-    }
-    if (priceMin)            result = result.filter(p => p.price_cents >= parseFloat(priceMin) * 100);
-    if (priceMax)            result = result.filter(p => p.price_cents <= parseFloat(priceMax) * 100);
-    return [...result].sort((a, b) => {
-      let av: string | number, bv: string | number;
-      switch (sortCol) {
-        case "price_cents": av = a.price_cents; bv = b.price_cents; break;
-        case "sku":         av = a.sku.toLowerCase(); bv = b.sku.toLowerCase(); break;
-        case "category":    av = a.category.toLowerCase(); bv = b.category.toLowerCase(); break;
-        case "status":      av = a.status; bv = b.status; break;
-        default:            av = a.name.toLowerCase(); bv = b.name.toLowerCase();
-      }
-      if (av < bv) return sortDir === "asc" ? -1 : 1;
-      if (av > bv) return sortDir === "asc" ?  1 : -1;
-      return 0;
-    });
-  }, [products, filterTaxClass, filterBrand, filterAgeRestricted, filterProductType, getProductType, priceMin, priceMax, sortCol, sortDir]);
-
-  const selectedProducts = visibleProducts.filter(p => selectedIds.has(p.id));
-  const allSelected      = visibleProducts.length > 0 && visibleProducts.every(p => selectedIds.has(p.id));
+  // `products` is already the filtered, sorted page the server returned — there
+  // is deliberately no client-side pass over it. Anything added here would once
+  // again only apply to the loaded page.
+  const selectedProducts = products.filter(p => selectedIds.has(p.id));
+  const allSelected      = products.length > 0 && products.every(p => selectedIds.has(p.id));
   const someSelected     = selectedIds.size > 0;
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
   const toggleSelectAll = () => {
-    setSelectedIds(allSelected ? new Set<string>() : new Set<string>(visibleProducts.map(p => p.id)));
+    setSelectedIds(allSelected ? new Set<string>() : new Set<string>(products.map(p => p.id)));
   };
-  function handleSort(col: string) {
-    if (col === sortCol) { setSortDir(d => d === "asc" ? "desc" : "asc"); }
+  // With a search term, rank by relevance so exact SKU/UPC hits come first; an
+  // explicit column choice always wins over that default.
+  const effectiveSort: ProductSort = sortCol ?? (debouncedQ ? "relevance" : "name");
+
+  function handleSort(col: ProductSort) {
+    // Re-sorting reorders the whole catalog, so page 3 of the old order is
+    // meaningless in the new one.
+    setPage(0);
+    if (col === effectiveSort) { setSortDir(d => d === "asc" ? "desc" : "asc"); }
     else { setSortCol(col); setSortDir("asc"); }
   }
+
+  /**
+   * Every active filter as query parameters. Shared by the list request, the
+   * facet request and the CSV export so all three describe the same set — the
+   * export in particular used to serialise whatever rows were on screen.
+   */
+  const filterParams = useCallback(() => {
+    const params = new URLSearchParams();
+    if (debouncedQ)     params.set("q",           debouncedQ);
+    if (filterStatus)   params.set("status",      filterStatus);
+    if (filterCategory) params.set("category",    filterCategory);
+    if (filterBrand)    params.set("brand",       filterBrand);
+    if (filterSupplier) params.set("supplier",    filterSupplier);
+    if (filterTaxClass) params.set("taxClass",    filterTaxClass);
+    if (filterAgeRestricted) params.set("ageRestricted", "true");
+    if (filterProductType !== "all") params.set("productType", filterProductType);
+    if (priceMin)       params.set("minPrice",    priceMin);
+    if (priceMax)       params.set("maxPrice",    priceMax);
+    return params;
+  }, [debouncedQ, filterStatus, filterCategory, filterBrand, filterSupplier,
+      filterTaxClass, filterAgeRestricted, filterProductType, priceMin, priceMax]);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const params = new URLSearchParams({ limit: String(pageSize), offset: String(page * pageSize) });
-      if (filterStatus)   params.set("status",   filterStatus);
-      if (filterCategory) params.set("category", filterCategory);
-      if (debouncedQ)     params.set("q",        debouncedQ);
-      const data = await apiGet<ProductsResponse>(`/api/v1/catalog?${params}`);
+      const params = filterParams();
+      params.set("limit", String(pageSize));
+      params.set("offset", String(page * pageSize));
+      params.set("sort", effectiveSort);
+      params.set("dir", sortDir);
+
+      const facetParams = filterParams();
+      const [data, facetData] = await Promise.all([
+        apiGet<ProductsResponse>(`/api/v1/catalog?${params}`),
+        apiGet<ProductFacets>(`/api/v1/catalog/facets?${facetParams}`).catch(() => null),
+      ]);
       setProducts(data.items ?? []);
       setTotal(data.total ?? 0);
+      // Facets are decoration, not the result set: if they fail the list still
+      // renders, just without counts.
+      if (facetData) setFacets(facetData);
     } catch (err) {
       setError(err instanceof ApiResponseError ? err.message : "Failed to load products.");
     } finally { setLoading(false); }
-  }, [filterStatus, filterCategory, debouncedQ, page, pageSize]);
+  }, [filterParams, page, pageSize, effectiveSort, sortDir]);
 
   useEffect(() => { void load(); }, [load]);
 
-  // A filter/page-size change can leave `page` pointing past the end of the
-  // new result set — reset to the first page rather than fetching an empty one.
-  useEffect(() => { setPage(0); }, [filterStatus, filterCategory, debouncedQ, pageSize]);
+  // Selection is by id and the ids change with the page; keeping a stale
+  // selection would let a bulk action hit rows the user can no longer see.
+  useEffect(() => { setSelectedIds(new Set()); }, [filterParams, page, pageSize, effectiveSort, sortDir]);
 
   useEffect(() => {
     if (searchParams.get("new") === "product") {
@@ -284,32 +357,70 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
     finally { setArchiving(false); }
   };
 
+  /**
+   * One request for the whole selection. This used to fan out a PATCH per
+   * product — 147 selected products meant 147 round trips, no atomicity, and a
+   * partial failure the UI could only describe as "some updates failed".
+   */
   const handleBulkUpdate = async (field: string, value: string) => {
     setBulkLoading(true); setBulkError(null);
     try {
       const parsed = field === "age_restricted" ? value === "true" : value;
-      await Promise.all([...selectedIds].map(id => apiPatch(`/api/v1/catalog/${id}`, { [field]: parsed })));
+      await apiPost("/api/v1/catalog/bulk-update", {
+        ids: [...selectedIds],
+        update: { [field]: parsed },
+      });
       setSelectedIds(new Set()); await load();
-    } catch { setBulkError("Some updates failed — check individual products."); }
+    } catch (err) {
+      setBulkError(err instanceof ApiResponseError ? err.message : "Bulk update failed — no products were changed.");
+    }
     finally { setBulkLoading(false); }
   };
 
-  const handleExportCSV = () => {
-    const headers = ["SKU", "Name", "Brand", "Category", "Price ($)", "Cost ($)", "MSRP ($)", "Tax Class", "Status", "Barcode", "Age Restricted"];
-    const rows = visibleProducts.map(p => [
-      p.sku, p.name, p.brand ?? "", p.category,
-      (p.price_cents / 100).toFixed(2),
-      p.raw_cost_price_cents != null ? (p.raw_cost_price_cents / 100).toFixed(2) : "",
-      p.msrp_cents != null ? (p.msrp_cents / 100).toFixed(2) : "",
-      p.tax_class, p.status, p.barcode ?? "",
-      p.age_restricted === 1 ? "yes" : "no",
-    ]);
-    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `catalog-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
-    URL.revokeObjectURL(url);
+  /**
+   * Export what the filters describe, not what happens to be rendered.
+   *
+   * The previous implementation serialised `visibleProducts` — one page — under
+   * a button labelled "Export CSV", so exporting a 5,000-product catalog
+   * silently produced 50 rows. Selecting rows still exports just those.
+   */
+  const handleExportCSV = async () => {
+    setActionError(null);
+    try {
+      const rows: CatalogProduct[] = selectedIds.size > 0
+        ? selectedProducts
+        : await (async () => {
+            const params = filterParams();
+            params.set("limit", "200");
+            const collected: CatalogProduct[] = [];
+            for (let offset = 0; ; offset += 200) {
+              params.set("offset", String(offset));
+              const page = await apiGet<ProductsResponse>(`/api/v1/catalog?${params}`);
+              collected.push(...(page.items ?? []));
+              if (collected.length >= (page.total ?? 0) || (page.items ?? []).length === 0) break;
+              if (offset > 100_000) break; // hard stop; a browser download is not a bulk pipeline
+            }
+            return collected;
+          })();
+
+      const headers = ["SKU", "Name", "Brand", "Category", "Price ($)", "Cost ($)", "MSRP ($)", "Tax Class", "Status", "Barcode", "Age Restricted"];
+      const body = rows.map(p => [
+        p.sku, p.name, p.brand ?? "", p.category,
+        (p.price_cents / 100).toFixed(2),
+        p.raw_cost_price_cents != null ? (p.raw_cost_price_cents / 100).toFixed(2) : "",
+        p.msrp_cents != null ? (p.msrp_cents / 100).toFixed(2) : "",
+        p.tax_class, p.status, p.barcode ?? "",
+        p.age_restricted === 1 ? "yes" : "no",
+      ]);
+      const csv = [headers, ...body].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+      const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `catalog-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setActionError(err instanceof ApiResponseError ? err.message : "Export failed.");
+    }
   };
 
   const handleDuplicate = async (id: string) => {
@@ -341,25 +452,25 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
         </div>
 
         <div className="grid gap-3 border-b border-[#E8E8E8] bg-slate-50 px-5 py-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-          <button type="button" aria-pressed={!filterStatus && filterProductType === "all" && !filterAgeRestricted} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => { setFilterStatus(""); setFilterProductType("all"); setFilterAgeRestricted(false); }}>
-            <CatalogMetric label="Total" value={total} helper={`${products.length} loaded`} active={!filterStatus && filterProductType === "all" && !filterAgeRestricted} />
+          <button type="button" aria-pressed={!filterStatus && filterProductType === "all" && !filterAgeRestricted} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => { setFilterStatus(""); setFilterProductType("all"); setFilterAgeRestricted(false); setPage(0); }}>
+            <CatalogMetric label="Total" value={total} helper={hasFilters ? "matching filters" : "in catalog"} active={!filterStatus && filterProductType === "all" && !filterAgeRestricted} />
           </button>
-          <button type="button" aria-pressed={filterStatus === "active"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilterStatus("active")}>
+          <button type="button" aria-pressed={filterStatus === "active"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => withPageReset(setFilterStatus)("active")}>
             <CatalogMetric label="Active" value={activeCount} helper="sellable" tone="success" active={filterStatus === "active"} />
           </button>
-          <button type="button" aria-pressed={filterStatus === "draft"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilterStatus("draft")}>
+          <button type="button" aria-pressed={filterStatus === "draft"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => withPageReset(setFilterStatus)("draft")}>
             <CatalogMetric label="Draft" value={draftCount} helper="needs review" tone="warning" active={filterStatus === "draft"} />
           </button>
-          <button type="button" aria-pressed={filterStatus === "archived"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilterStatus("archived")}>
+          <button type="button" aria-pressed={filterStatus === "archived"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => withPageReset(setFilterStatus)("archived")}>
             <CatalogMetric label="Archived" value={archivedCount} helper="hidden" tone="muted" active={filterStatus === "archived"} />
           </button>
-          <button type="button" aria-pressed={filterProductType === "master"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilterProductType("master")}>
+          <button type="button" aria-pressed={filterProductType === "master"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => withPageReset(setFilterProductType)("master")}>
             <CatalogMetric label="Masters" value={masterCount} helper="variant groups" active={filterProductType === "master"} />
           </button>
-          <button type="button" aria-pressed={filterProductType === "variant"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilterProductType("variant")}>
+          <button type="button" aria-pressed={filterProductType === "variant"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => withPageReset(setFilterProductType)("variant")}>
             <CatalogMetric label="Variants" value={variantCount} helper="sellable SKUs" active={filterProductType === "variant"} />
           </button>
-          <button type="button" aria-pressed={filterAgeRestricted} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilterAgeRestricted((v) => !v)}>
+          <button type="button" aria-pressed={filterAgeRestricted} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => { setFilterAgeRestricted((v) => !v); setPage(0); }}>
             <CatalogMetric label="Restricted" value={restrictedCount} helper="ID required" tone="restricted" active={filterAgeRestricted} />
           </button>
         </div>
@@ -374,49 +485,70 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                 placeholder="Search…"
                 className="h-9 w-full rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600 sm:w-44" />
             </div>
-            {/* Category */}
+            {/* Category — options come from the catalog's own data, with counts,
+                so the list only ever offers a refinement that returns rows. */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[#555]">Category</label>
-              <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
+              <label htmlFor="catalog-category" className="text-xs font-medium text-[#555]">Category</label>
+              <select id="catalog-category" value={filterCategory} onChange={e => withPageReset(setFilterCategory)(e.target.value)}
                 className="h-9 min-w-36 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
                 <option value="">All categories</option>
-                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                {(facets?.category.length ? facets.category.map(b => ({ id: b.value, name: b.value, count: b.count }))
+                                          : categories.map(c => ({ id: c.id, name: c.name, count: null as number | null })))
+                  .map(c => (
+                    <option key={c.id} value={c.name}>
+                      {c.name}{c.count != null ? ` (${c.count})` : ""}
+                    </option>
+                  ))}
               </select>
             </div>
             {/* Product type */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[#555]">Product type</label>
-              <select value={filterProductType} onChange={e => setFilterProductType(e.target.value as typeof filterProductType)}
+              <label htmlFor="catalog-type" className="text-xs font-medium text-[#555]">Product type</label>
+              <select id="catalog-type" value={filterProductType} onChange={e => withPageReset(setFilterProductType)(e.target.value as typeof filterProductType)}
                 className="h-9 min-w-36 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
                 <option value="all">All types</option>
-                <option value="standalone">Standalone</option>
-                <option value="master">Master</option>
-                <option value="variant">Variant</option>
+                <option value="standalone">Standalone{facets ? ` (${standaloneCount})` : ""}</option>
+                <option value="master">Master{facets ? ` (${masterCount})` : ""}</option>
+                <option value="variant">Variant{facets ? ` (${variantCount})` : ""}</option>
               </select>
             </div>
-            {/* Brand */}
+            {/* Brand — a datalist keeps free-text matching while surfacing the
+                brands this catalog actually carries. */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[#555]">Brand</label>
-              <input type="text" value={filterBrand} onChange={e => setFilterBrand(e.target.value)} placeholder="Brand…"
+              <label htmlFor="catalog-brand" className="text-xs font-medium text-[#555]">Brand</label>
+              <input id="catalog-brand" type="text" list="catalog-brand-options" value={filterBrand}
+                onChange={e => withPageReset(setFilterBrand)(e.target.value)} placeholder="Brand…"
                 className="h-9 w-full rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none sm:w-32" />
+              <datalist id="catalog-brand-options">
+                {facets?.brand.map(b => <option key={b.value} value={b.value}>{`${b.value} (${b.count})`}</option>)}
+              </datalist>
             </div>
-            {/* Channel (ecommerce status) */}
+            {/* Status */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[#555]">Channel</label>
-              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+              <label htmlFor="catalog-status" className="text-xs font-medium text-[#555]">Status</label>
+              <select id="catalog-status" value={filterStatus} onChange={e => withPageReset(setFilterStatus)(e.target.value)}
                 className="h-9 min-w-32 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
                 <option value="">All</option>
-                <option value="active">Active</option>
-                <option value="draft">Draft</option>
-                <option value="archived">Archived</option>
+                <option value="active">Active{facets ? ` (${activeCount})` : ""}</option>
+                <option value="draft">Draft{facets ? ` (${draftCount})` : ""}</option>
+                <option value="archived">Archived{facets ? ` (${archivedCount})` : ""}</option>
               </select>
             </div>
             {/* More filters */}
             {showMoreFilters && (
               <>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-[#555]">Tax class</label>
-                  <select value={filterTaxClass} onChange={e => setFilterTaxClass(e.target.value)}
+                  <label htmlFor="catalog-supplier" className="text-xs font-medium text-[#555]">Supplier</label>
+                  <input id="catalog-supplier" type="text" list="catalog-supplier-options" value={filterSupplier}
+                    onChange={e => withPageReset(setFilterSupplier)(e.target.value)} placeholder="Supplier…"
+                    className="h-9 w-full rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none sm:w-36" />
+                  <datalist id="catalog-supplier-options">
+                    {facets?.supplier.map(b => <option key={b.value} value={b.value}>{`${b.value} (${b.count})`}</option>)}
+                  </datalist>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="catalog-tax" className="text-xs font-medium text-[#555]">Tax class</label>
+                  <select id="catalog-tax" value={filterTaxClass} onChange={e => withPageReset(setFilterTaxClass)(e.target.value)}
                     className="h-9 min-w-32 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
                     <option value="">All</option>
                     <option value="standard">Standard</option>
@@ -424,30 +556,64 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                   </select>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-[#555]">Age restricted</label>
-                  <select value={filterAgeRestricted ? "1" : "0"} onChange={e => setFilterAgeRestricted(e.target.value === "1")}
+                  <label htmlFor="catalog-age" className="text-xs font-medium text-[#555]">Age restricted</label>
+                  <select id="catalog-age" value={filterAgeRestricted ? "1" : "0"} onChange={e => withPageReset(setFilterAgeRestricted)(e.target.value === "1")}
                     className="h-9 min-w-32 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
                     <option value="0">All</option>
-                    <option value="1">18+ only</option>
+                    <option value="1">18+ only{facets ? ` (${restrictedCount})` : ""}</option>
                   </select>
                 </div>
+                <fieldset className="flex flex-col gap-1">
+                  <legend className="text-xs font-medium text-[#555]">
+                    Price range{facets?.priceRange ? ` (${formatMoney(facets.priceRange.min)}–${formatMoney(facets.priceRange.max)})` : ""}
+                  </legend>
+                  <div className="flex items-center gap-1">
+                    <input type="number" min="0" step="0.01" value={priceMin} onChange={e => withPageReset(setPriceMin)(e.target.value)}
+                      aria-label="Minimum price in dollars" placeholder="Min"
+                      className="h-9 w-20 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none" />
+                    <span aria-hidden="true" className="text-xs text-[#888]">–</span>
+                    <input type="number" min="0" step="0.01" value={priceMax} onChange={e => withPageReset(setPriceMax)(e.target.value)}
+                      aria-label="Maximum price in dollars" placeholder="Max"
+                      className="h-9 w-20 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none" />
+                  </div>
+                </fieldset>
               </>
             )}
             {/* Actions */}
             <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
-              <button type="button" onClick={clearFilters} disabled={!hasFilters} className="text-sm text-brand-600 hover:underline disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline">Clear filters</button>
-              <button type="button" onClick={() => setShowMoreFilters(v => !v)} className="text-sm text-brand-600 hover:underline">
+              <button type="button" onClick={clearFilters} disabled={!hasFilters} className="min-h-9 text-sm text-brand-600 hover:underline disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600">Clear filters</button>
+              <button type="button" onClick={() => setShowMoreFilters(v => !v)} aria-expanded={showMoreFilters}
+                className="min-h-9 text-sm text-brand-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600">
                 {showMoreFilters ? "Fewer filters" : "More filters"}
-              </button>
-              <button type="button" onClick={() => void load()}
-                className="h-9 rounded bg-brand-600 px-4 text-sm font-medium text-white transition-colors hover:bg-[#4849d0]">
-                Search
               </button>
             </div>
           </div>
+
+          {/* Active filters — each chip removes only itself. Filters apply as
+              they change (debounced for text), so there is no "Search" button
+              to press and no state where the list disagrees with the controls. */}
+          {activeChips.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label="Active filters">
+              {activeChips.map(chip => (
+                <span key={chip.key} className="inline-flex items-center gap-1 rounded-full bg-brand-50 py-0.5 pl-2.5 pr-1 text-xs font-medium text-brand-700 ring-1 ring-brand-200">
+                  {chip.label}
+                  <button type="button" onClick={() => { chip.clear(); setPage(0); }} aria-label={`Remove filter ${chip.label}`}
+                    className="flex h-5 w-5 items-center justify-center rounded-full text-brand-600 hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600">
+                    <span aria-hidden="true">×</span>
+                  </button>
+                </span>
+              ))}
+              <button type="button" onClick={clearFilters}
+                className="text-xs text-[#666] underline hover:text-[#111] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600">
+                Clear all
+              </button>
+            </div>
+          )}
+
           {/* Results count */}
           <div className="mt-2 flex items-center justify-between text-xs text-[#666]">
-            <span>Showing <strong>{visibleProducts.length}</strong> of {total} products
+            <span aria-live="polite">
+              {total === 0 ? "No products" : <>Showing <strong>{products.length}</strong> of {total} product{total === 1 ? "" : "s"}</>}
               {someSelected && <span className="ml-2 text-brand-600">· {selectedIds.size} selected</span>}
             </span>
             <div className="flex items-center gap-3">
@@ -483,7 +649,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
               action={<Button size="sm" variant="secondary" onClick={() => void load()}>Retry</Button>}
             />
           </div>
-        ) : visibleProducts.length === 0 ? (
+        ) : products.length === 0 ? (
           <div className="px-4 py-10">
             <EmptyState
               title={hasFilters ? "No products match these filters" : "No products yet"}
@@ -503,19 +669,19 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                     <th className="px-4 py-3">
                       <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} aria-label="Select all products" className="h-4 w-4 rounded border-slate-300" />
                     </th>
-                    <SortTh col="name"        label="Name"          cur={sortCol} dir={sortDir} onSort={handleSort} />
+                    <SortTh col="name"        label="Name"          cur={effectiveSort} dir={sortDir} onSort={handleSort} />
                     <th className="px-4 py-3">Type</th>
-                    <SortTh col="brand"       label="Brand"         cur={sortCol} dir={sortDir} onSort={handleSort} />
+                    <SortTh col="brand"       label="Brand"         cur={effectiveSort} dir={sortDir} onSort={handleSort} />
                     <th className="px-4 py-3">Supplier</th>
                     <th className="px-4 py-3">Available</th>
-                    <SortTh col="price_cents" label="Retail price"  cur={sortCol} dir={sortDir} onSort={handleSort} right />
+                    <SortTh col="price_cents" label="Retail price"  cur={effectiveSort} dir={sortDir} onSort={handleSort} right />
                     <th className="px-4 py-3">Channels</th>
-                    <SortTh col="created_at"  label="Created"       cur={sortCol} dir={sortDir} onSort={handleSort} />
+                    <SortTh col="created_at"  label="Created"       cur={effectiveSort} dir={sortDir} onSort={handleSort} />
                     <th className="w-10 px-4 py-3" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F5F5F5]">
-                  {visibleProducts.map(p => {
+                  {products.map(p => {
                     const isSelected = selectedIds.has(p.id);
                     const isAvailable = p.status === "active";
                     const productType = getProductType(p);
@@ -627,7 +793,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
               </table>
             </div>
             <div className="divide-y divide-slate-100 md:hidden">
-              {visibleProducts.map(p => (
+              {products.map(p => (
                 <ProductListCard key={p.id} product={p}
                   productType={getProductType(p)}
                   onEdit={() => router.push(`/catalog/${p.id}`)}
@@ -637,7 +803,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
           </>
         )}
         {!loading && !error && total > 0 && (
-          <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} onPageSizeChange={setPageSize} />
+          <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(0); }} />
         )}
       </Card>
 
