@@ -48,6 +48,12 @@ export interface AccessLogLine {
    * as an exception rather than a field every line carries.
    */
   aborted?: true;
+  /**
+   * Present on a long-lived stream (SSE). Its `durationMs` is a session length,
+   * not a latency — without this marker a two-hour dashboard tab looks like the
+   * slowest request the service has ever served.
+   */
+  stream?: true;
 }
 
 /**
@@ -60,19 +66,29 @@ export interface AccessLogLine {
  */
 export function buildAccessLogLine(
   req: Pick<Request, "method" | "path">,
-  res: Pick<Response, "statusCode" | "locals" | "writableFinished">,
+  res: Pick<Response, "statusCode" | "locals" | "writableFinished" | "getHeader">,
   durationMs: number,
 ): { line: AccessLogLine; level: AccessLogLevel } {
   // req.path excludes the query string by construction — keep it that way.
   const path = req.path;
   const auth = res.locals["auth"] as AuthPayload | undefined;
 
+  // A long-lived stream never "finishes" — `/api/v1/stream` (SseBroker) holds
+  // the response open until the client goes away, so by the abort test below
+  // every normal tab-close would be an abort. Detected by content-type rather
+  // than by a path list on purpose: a hardcoded list silently misses the next
+  // streaming endpoint someone adds, which is the drift this audit keeps
+  // finding. `getHeader` is optional-chained so the pure function stays
+  // callable from tests with a minimal fake.
+  const contentType = String(res.getHeader?.("content-type") ?? "");
+  const stream = contentType.includes("text/event-stream");
+
   // The hook fires on `close`, which covers both a completed response and a
   // connection that died first. `writableFinished` is what separates them, and
   // the distinction matters: on an abort the status code is whatever was set
   // before the client left (often the default 200), so logging it unqualified
   // would report a success that never reached anyone.
-  const aborted = res.writableFinished === false;
+  const aborted = !stream && res.writableFinished === false;
 
   const line: AccessLogLine = {
     requestId: res.locals["requestId"] as string | undefined,
@@ -86,12 +102,16 @@ export function buildAccessLogLine(
     tenantId: auth?.tenantId,
     userId: auth?.userId,
     ...(aborted ? { aborted: true as const } : {}),
+    ...(stream ? { stream: true as const } : {}),
   };
 
   // Severity tracks the response, so `level>=warn` is a usable filter for
   // "something the caller was told was wrong". An abort is warn regardless of
   // the recorded status — a client that gave up waiting is the signal an
-  // operator is looking for, and it is invisible in the status alone.
+  // operator is looking for, and it is invisible in the status alone. A closed
+  // stream is not an abort and must never reach warn: it is the single most
+  // frequent normal event on this server, and marking it would drown the real
+  // ones — the same flooding argument that puts probes at debug.
   let level: AccessLogLevel;
   if (PROBE_PATHS.has(path)) level = "debug";
   else if (res.statusCode >= 500) level = "error";

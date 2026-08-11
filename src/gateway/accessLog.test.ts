@@ -18,11 +18,17 @@ import { sendRequest } from "../shared/test-request.js";
  * that the id the middleware logs is the same one the caller is handed.
  */
 
-function fakeRes(status: number, locals: Record<string, unknown> = {}, writableFinished = true) {
+function fakeRes(
+  status: number,
+  locals: Record<string, unknown> = {},
+  writableFinished = true,
+  contentType?: string,
+) {
   return {
     statusCode: status,
     locals,
     writableFinished,
+    getHeader: (name: string) => (name === "content-type" ? contentType : undefined),
   } as unknown as Parameters<typeof buildAccessLogLine>[1];
 }
 
@@ -119,6 +125,47 @@ test("the abort marker is absent, not false, on the normal path", () => {
   // and almost always `false` is noise in an aggregator and in a grep.
   const { line } = buildAccessLogLine({ method: "GET", path: "/orders" }, fakeRes(200), 1);
   assert.ok(!("aborted" in line), "normal responses must not carry an `aborted` key at all");
+});
+
+test("a closed SSE stream is not an abort — the most common normal event must not be a warning", () => {
+  // `/api/v1/stream` (SseBroker) holds the response open for the life of the
+  // dashboard tab, so it NEVER sets writableFinished. Without this carve-out
+  // every normal tab-close would log `aborted: true` at warn — a steady stream
+  // of false alarms from day one, which is worse than the silence it replaced
+  // and would bury the genuine aborts the previous test pins.
+  const { line, level } = buildAccessLogLine(
+    { method: "GET", path: "/api/v1/stream" },
+    fakeRes(200, { requestId: "req-sse" }, false, "text/event-stream"),
+    7_200_000, // a two-hour session
+  );
+
+  assert.ok(!("aborted" in line), "a closed stream is not an abandoned request");
+  assert.equal(line.stream, true, "…but it must be marked, so the duration reads as a session");
+  assert.equal(level, "info", "a normal disconnect must not reach warn");
+});
+
+test("stream detection is by content-type, not by a path list", () => {
+  // A path list would silently miss the next streaming endpoint added — the
+  // exact drift class this audit keeps finding. A future /api/v1/notifications
+  // stream must be classified correctly with no change to this file.
+  const { line, level } = buildAccessLogLine(
+    { method: "GET", path: "/api/v1/some/future/stream" },
+    fakeRes(200, {}, false, "text/event-stream; charset=utf-8"),
+    5_000,
+  );
+  assert.equal(line.stream, true);
+  assert.ok(!("aborted" in line));
+  assert.equal(level, "info");
+
+  // And a normal JSON response that died mid-write is still an abort.
+  const { line: json, level: jsonLevel } = buildAccessLogLine(
+    { method: "GET", path: "/api/v1/orders" },
+    fakeRes(200, {}, false, "application/json"),
+    5_000,
+  );
+  assert.equal(json.aborted, true);
+  assert.ok(!("stream" in json));
+  assert.equal(jsonLevel, "warn");
 });
 
 test("the middleware hooks `close`, not `finish`, and fires once", () => {

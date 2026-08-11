@@ -577,14 +577,27 @@ the client left — commonly the default `200`, i.e. a "success" that reached no
 **absent rather than `false`** on the normal path, so it stays greppable instead of becoming a field
 every line carries. `finish` remains correct for `metricsMiddleware`, which counts served responses;
 it is wrong here, where the unserved ones are the point.
-*Verified:* 8 tests in `src/gateway/accessLog.test.ts`, all passing — severity mapping including
+
+*Third defect, created by that fix and caught before it shipped:* `/api/v1/stream` (`SseBroker`) holds
+a response open for the life of a dashboard tab, so it **never** sets `writableFinished` — under the
+new rule every normal tab-close would have logged `aborted: true` at `warn`. That is worse than the
+silence it replaced: a steady stream of false alarms from day one, burying the genuine aborts the fix
+exists to surface, and it is the same flooding argument that already puts probe paths at `debug`.
+Streams are now detected by `content-type: text/event-stream` and marked `stream: true` at `info`,
+never `aborted`. **Detected by content-type, not by a path list**, deliberately — a hardcoded list
+silently misclassifies the next streaming endpoint someone adds, which is the drift mechanism this
+audit keeps finding rather than a hypothetical.
+
+*Verified:* 10 tests in `src/gateway/accessLog.test.ts`, all passing — severity mapping including
 `429 → warn` and probes → `debug`; correlation ids and auth context present; no credential-carrying
 field emitted; the abort path marked and *not* reported as a success; the marker absent on the normal
-path; a structural assertion that the middleware hooks `close` and not `finish` (without it, a revert
-would silently stop logging aborts while every other test still passed); and end-to-end through a real
-server that the logged `requestId` equals the `x-request-id` response header, which is the property
-that makes the log joinable to a customer report. `pino-http` was deliberately not added (see §17
-row 8).
+path; a closed SSE stream classified as `info`/`stream` and not as an abort, while a JSON response
+that died mid-write still is one; stream detection proven to work on a path the code has never seen;
+a structural assertion that the middleware hooks `close` and not `finish` (without it, a revert would
+silently stop logging aborts while every other test still passed, since they drive the pure function
+directly); and end-to-end through a real server that the logged `requestId` equals the `x-request-id`
+response header, which is the property that makes the log joinable to a customer report. `pino-http`
+was deliberately not added (see §17 row 8).
 
 **D. `ADR-014-master-is-the-operations-runtime.md`** — writes down §0's central finding as a standing
 rule, since it is the one thing in this audit that no existing document stated and that silently
