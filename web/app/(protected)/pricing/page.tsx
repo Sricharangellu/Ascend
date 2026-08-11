@@ -522,11 +522,8 @@ function ContractPricesTab() {
         canReset={search.trim() !== "" || contractField !== "all"}
         resultCount={filtered.length}
         totalCount={contracts.length}
-        trailing={
-          <Can permission="pricing.manage">
-            <Button variant="primary" size="sm">+ New Contract</Button>
-          </Can>
-        }
+        /* "+ New Contract" used to sit here with no onClick — dead on arrival.
+           Removed rather than restyled, same reasoning as the warehouse list. */
       />
 
       <TableShell
