@@ -1,8 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
+  applyScanToEntries,
   buildReceiveLines,
   computeTotal,
+  type POLine,
   type ReceiveEntry,
+  type ResolvedScan,
 } from "@/app/(protected)/inventory/receive-stock/_components/receiveStockTypes";
 
 function entry(over: Partial<ReceiveEntry>): ReceiveEntry {
@@ -47,5 +50,128 @@ describe("computeTotal", () => {
   it("returns 0 for non-positive or invalid input", () => {
     expect(computeTotal("0", "12")).toBe(0);
     expect(computeTotal("x", "12")).toBe(0);
+  });
+});
+
+// ── applyScanToEntries ──────────────────────────────────────────────────────
+// The receiving desk's scan path. These guard the two rules that decide whether
+// a delivery is counted correctly: pack size comes from the scanned barcode,
+// and a scan counts rather than merely highlighting.
+
+function poLine(over: Partial<POLine> = {}): POLine {
+  return {
+    id: "l1",
+    product_id: "p1",
+    product_name: "Cola 330ml",
+    product_sku: "COLA-330",
+    quantity: 24,
+    unit_cost_cents: 100,
+    received_qty: 0,
+    remaining_qty: 24,
+    expiry_date: null,
+    lot_code: null,
+    ...over,
+  };
+}
+
+function scan(over: Partial<ResolvedScan> = {}): ResolvedScan {
+  return { id: "p1", sku: "COLA-330", name: "Cola 330ml", ...over };
+}
+
+const CASE_12 = { unit: "case", displayName: "Case", packSize: 12 };
+
+describe("applyScanToEntries", () => {
+  it("counts a case scan as pack_size base units, not one", () => {
+    const lines = [poLine()];
+    const before = [entry({ lineId: "l1", totalQty: 24 })];
+    const { entries, outcome } = applyScanToEntries(scan({ packaging: CASE_12 }), lines, before);
+
+    expect(outcome.kind).toBe("applied");
+    expect(entries[0]!.totalQty).toBe(12);
+    expect(entries[0]!.unitsPerCase).toBe("12");
+    expect(entries[0]!.cases).toBe("1");
+  });
+
+  it("takes the line over on the first scan instead of adding to the pre-fill", () => {
+    // Lines arrive pre-filled with the whole outstanding quantity. If the first
+    // scan added to it, one scanned case of a 24-unit line would read as 36.
+    const lines = [poLine()];
+    const before = [entry({ lineId: "l1", totalQty: 24, cases: "2", unitsPerCase: "12" })];
+    const { entries } = applyScanToEntries(scan({ packaging: CASE_12 }), lines, before);
+    expect(entries[0]!.totalQty).toBe(12);
+    expect(entries[0]!.scannedUnits).toBe(1);
+  });
+
+  it("accumulates across repeated scans of the same case", () => {
+    const lines = [poLine()];
+    let state = [entry({ lineId: "l1", totalQty: 24 })];
+    state = applyScanToEntries(scan({ packaging: CASE_12 }), lines, state).entries;
+    state = applyScanToEntries(scan({ packaging: CASE_12 }), lines, state).entries;
+    expect(state[0]!.totalQty).toBe(24);
+    expect(state[0]!.cases).toBe("2");
+  });
+
+  it("counts an each scan as one unit", () => {
+    const lines = [poLine({ remaining_qty: 5 })];
+    const before = [entry({ lineId: "l1", totalQty: 5 })];
+    const { entries } = applyScanToEntries(scan(), lines, before);
+    expect(entries[0]!.totalQty).toBe(1);
+    expect(entries[0]!.unitsPerCase).toBe("1");
+  });
+
+  it("caps at the remaining quantity rather than over-receiving", () => {
+    // Half a case outstanding: scanning a full case must not book 12 against a
+    // line expecting 6, which the backend would reject at close anyway.
+    const lines = [poLine({ remaining_qty: 6 })];
+    const before = [entry({ lineId: "l1", totalQty: 6 })];
+    const { entries, outcome } = applyScanToEntries(scan({ packaging: CASE_12 }), lines, before);
+    expect(entries[0]!.totalQty).toBe(6);
+    expect(outcome.kind === "applied" && outcome.capped).toBe(true);
+  });
+
+  it("refuses further scans once the line is fully counted", () => {
+    const lines = [poLine({ remaining_qty: 12 })];
+    let state = [entry({ lineId: "l1", totalQty: 12 })];
+    state = applyScanToEntries(scan({ packaging: CASE_12 }), lines, state).entries;
+    const second = applyScanToEntries(scan({ packaging: CASE_12 }), lines, state);
+    expect(second.outcome.kind).toBe("line_complete");
+    expect(second.entries[0]!.totalQty).toBe(12);
+  });
+
+  it("matches lines on product id, never on the barcode string", () => {
+    // The regression this replaces: a case UPC resolved to the right product
+    // but did not equal the ONE barcode denormalised onto the PO line, so the
+    // desk reported it as not on the PO.
+    const lines = [poLine({ product_id: "p1", product_barcode: "EACH-UPC" })];
+    const before = [entry({ lineId: "l1", totalQty: 24 })];
+    const { outcome } = applyScanToEntries(
+      scan({ id: "p1", packaging: CASE_12 }),
+      lines,
+      before,
+    );
+    expect(outcome.kind).toBe("applied");
+  });
+
+  it("reports a product that is genuinely not on the PO", () => {
+    const lines = [poLine({ product_id: "p1" })];
+    const before = [entry({ lineId: "l1", totalQty: 24 })];
+    const { entries, outcome } = applyScanToEntries(
+      scan({ id: "p-other", name: "Lemonade", sku: "LEM-1" }),
+      lines,
+      before,
+    );
+    expect(outcome).toMatchObject({ kind: "not_on_po", productName: "Lemonade", sku: "LEM-1" });
+    expect(entries[0]!.totalQty).toBe(24); // untouched
+  });
+
+  it("highlights only the scanned line", () => {
+    const lines = [poLine({ id: "l1", product_id: "p1" }), poLine({ id: "l2", product_id: "p2" })];
+    const before = [
+      entry({ lineId: "l1", totalQty: 24, highlighted: true }),
+      entry({ lineId: "l2", totalQty: 24 }),
+    ];
+    const { entries } = applyScanToEntries(scan({ id: "p2" }), lines, before);
+    expect(entries.find((e) => e.lineId === "l1")!.highlighted).toBe(false);
+    expect(entries.find((e) => e.lineId === "l2")!.highlighted).toBe(true);
   });
 });
