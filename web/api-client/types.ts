@@ -458,7 +458,14 @@ export interface PurchaseOrderLine {
 export interface PurchaseOrder {
   id: string;
   supplier_id: string;
+  /**
+   * Human-facing sequential number. The backend has always returned this on
+   * both the list and the detail; the client type omitted it, so list views
+   * fell back to printing raw UUIDs at operators.
+   */
+  po_number?: number | null;
   status: "ordered" | "received" | string;
+  receive_status?: string;
   total_cost_cents: number;
   created_at: number;
   received_at: number | null;
@@ -2020,4 +2027,127 @@ export interface RecordDecisionInput {
   decision: "validated" | "invalidated";
   reason?: string | null;
   nextAction?: string | null;
+}
+
+// ─── Receiving sessions (scan & receive) ──────────────────────────────────────
+// Mirrors src/modules/purchasing/receiving-sessions.ts. The backend for this
+// has been complete for some time — scan, per-line patch, cost intelligence,
+// close/cancel — with no client surface beyond the session list.
+
+export type ReceivingSessionStatus =
+  | "open" | "docked" | "receiving" | "quality_hold" | "completed" | "cancelled";
+
+export type ReceivingSessionMode = "standard" | "blind" | "asn";
+
+export type ReceivingLineStatus =
+  | "pending" | "scanning" | "accepted" | "held" | "rejected" | "posted";
+
+export interface ReceivingSessionLine {
+  id: string;
+  session_id: string;
+  po_line_id: string;
+  product_id: string;
+  expected_qty: number;
+  scanned_qty: number;
+  accepted_qty: number;
+  held_qty: number;
+  rejected_qty: number;
+  unit_cost_cents: number | null;
+  cost_override_reason: string | null;
+  lot_code: string | null;
+  expiry_date: number | null;
+  manufacture_date: number | null;
+  location_id: string | null;
+  barcode_scanned: string | null;
+  status: ReceivingLineStatus;
+  created_at: number;
+  updated_at: number;
+  product_name?: string | null;
+  sku?: string | null;
+  barcode?: string | null;
+  po_unit_cost_cents?: number | null;
+}
+
+export interface ReceivingSession {
+  id: string;
+  po_id: string;
+  session_number: string;
+  status: ReceivingSessionStatus;
+  mode: ReceivingSessionMode;
+  receiver_id: string | null;
+  receiver_name: string | null;
+  dock_code: string | null;
+  notes: string | null;
+  started_at: number;
+  completed_at: number | null;
+  created_at: number;
+  updated_at: number;
+  lines: ReceivingSessionLine[];
+  po_number?: number | null;
+  supplier_id?: string | null;
+  supplier_name?: string | null;
+}
+
+/** Everything Ascend already knows about what this product should cost. */
+export interface ReceiveLineIntelligence {
+  product_id: string;
+  last_purchase_cost_cents: number | null;
+  prev_vendor_cost_cents: number | null;
+  avg_purchase_cost_cents: number | null;
+  lowest_historical_cost_cents: number | null;
+  highest_historical_cost_cents: number | null;
+  cost_trend: "up" | "down" | "flat" | "unknown";
+  variance_vs_po_pct: number | null;
+  variance_band: "green" | "yellow" | "red" | "neutral";
+  preferred_supplier_id: string | null;
+  preferred_supplier_name: string | null;
+  lead_time_days: number | null;
+  moq: number | null;
+  fill_rate_pct: number | null;
+  stock_on_hand: number;
+  previous_lot_code: string | null;
+  previous_lot_expiry: number | null;
+  previous_lot_qty: number | null;
+  rotation_warning: string | null;
+}
+
+export type ScanOutcome =
+  | "matched" | "unknown" | "over_qty" | "expired"
+  | "near_expiry" | "cost_variance" | "already_complete";
+
+export interface ScanResult {
+  session: ReceivingSession;
+  matched_line_id: string | null;
+  result: ScanOutcome;
+  detail: string;
+  intelligence?: ReceiveLineIntelligence | null;
+}
+
+export interface ScanRequest {
+  barcode: string;
+  qty?: number;
+  lotCode?: string | null;
+  expiryDate?: number | null;
+  manufactureDate?: number | null;
+  unitCostCents?: number | null;
+  costOverrideReason?: string | null;
+  locationId?: string | null;
+  hold?: boolean;
+  reject?: boolean;
+}
+
+export interface UpdateReceivingLineRequest {
+  acceptedQty?: number;
+  heldQty?: number;
+  rejectedQty?: number;
+  lotCode?: string | null;
+  expiryDate?: number | null;
+  manufactureDate?: number | null;
+  unitCostCents?: number | null;
+  costOverrideReason?: string | null;
+  locationId?: string | null;
+}
+
+export interface ReceivingSessionsResponse {
+  items: ReceivingSession[];
 }

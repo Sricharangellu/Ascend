@@ -66,9 +66,26 @@
   --color-info-bg:         #E6F7FF;
   --color-info-border:     #91D5FF;
 
-  /* Domain */
+  /* Domain — procure-to-pay lifecycle.
+     Ordered → Received → Billed → Paid is the spine of the supplier workflow,
+     so each stage owns one colour and keeps it on every surface (badge, table
+     cell, progress rail, KPI). Exception is the one attention colour. */
   --color-billed:          #1890FF;
   --color-not-billed:      #FA8C16;
+
+  --color-stage-ordered:   #096DD9; /* placed, nothing physical yet */
+  --color-stage-received:  #237804; /* goods are in the building  */
+  --color-stage-billed:    #0050B3; /* supplier has invoiced      */
+  --color-stage-paid:      #135200; /* money has moved            */
+  --color-stage-partial:   #AD6800; /* in flight, incomplete      */
+  --color-stage-exception: #CF1322; /* needs a human              */
+
+  /* Elevation. Referenced by Card as var(--shadow-sm) since it was written,
+     but never declared — so every Card rendered flat. Deliberately shallow:
+     this is a dense operational tool, not a marketing page. */
+  --shadow-sm: 0 1px 2px 0 rgba(16, 24, 40, 0.05);
+  --shadow-md: 0 2px 4px -1px rgba(16, 24, 40, 0.06), 0 4px 8px -2px rgba(16, 24, 40, 0.05);
+  --shadow-lg: 0 4px 6px -2px rgba(16, 24, 40, 0.05), 0 12px 16px -4px rgba(16, 24, 40, 0.08);
 }
 
 /* ── Dark mode (html.dark from web/lib/theme.ts) ─────────────────────────── */
@@ -130,6 +147,19 @@
 
   --color-billed:          #60A5FA;
   --color-not-billed:      #FBBF24;
+
+  /* Lifecycle — lightened so each stage stays legible on the dark surfaces */
+  --color-stage-ordered:   #60A5FA;
+  --color-stage-received:  #6EE7A8;
+  --color-stage-billed:    #93C5FD;
+  --color-stage-paid:      #34D399;
+  --color-stage-partial:   #FBBF24;
+  --color-stage-exception: #FC8181;
+
+  /* Elevation — on dark surfaces depth reads as a darker, tighter shadow */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.30);
+  --shadow-md: 0 2px 4px -1px rgba(0, 0, 0, 0.36), 0 4px 8px -2px rgba(0, 0, 0, 0.30);
+  --shadow-lg: 0 4px 6px -2px rgba(0, 0, 0, 0.36), 0 12px 16px -4px rgba(0, 0, 0, 0.44);
 }
 
 /* ── Print receipt ────────────────────────────────────────────────────────── */
@@ -198,11 +228,18 @@
     min-width: 44px;
   }
 
-  .hide-scrollbar {
+  /* Two names for one behaviour: the utility was declared as `hide-scrollbar`
+     but call sites (the sidebar, the terminal category strip) spell it
+     `scrollbar-hide`, so neither of those actually hid a scrollbar. Both
+     spellings are now real rather than renaming call sites out from under
+     anyone. */
+  .hide-scrollbar,
+  .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-  .hide-scrollbar::-webkit-scrollbar {
+  .hide-scrollbar::-webkit-scrollbar,
+  .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
 
