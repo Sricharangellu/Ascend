@@ -5,6 +5,7 @@ import { apiGet, apiPatch, ApiResponseError } from "@/api-client/client";
 import { Badge, BadgeVariant } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { fmtDateTime } from "@/lib/date";
+import { ListControls, FilterField, filterControlClass } from "@/components/ListControls";
 
 type ErrCategory =
   | "sku_mapping" | "supplier_mapping" | "price_mismatch" | "qty_mismatch"
@@ -255,49 +256,52 @@ export function ErrorsListTab({ category = "all", showResolved = false }: Props)
         </div>
       )}
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          type="search"
-          placeholder="Search errors…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          className="h-8 w-52 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-        />
-        <select
-          value={filterCat}
-          onChange={(e) => setFilterCat(e.target.value)}
-          className="h-8 rounded-lg border border-slate-200 px-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-        >
-          <option value="all">All categories</option>
-          {(Object.keys(CATEGORY_LABELS) as ErrCategory[]).map((c) => (
-            <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
-          ))}
-        </select>
-        <select
-          value={filterSev}
-          onChange={(e) => setFilterSev(e.target.value)}
-          className="h-8 rounded-lg border border-slate-200 px-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-        >
-          <option value="all">All severities</option>
-          <option value="critical">Critical</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-        </select>
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="h-8 rounded-lg border border-slate-200 px-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-        >
-          <option value="open">Open</option>
-          <option value="in_review">In Review</option>
-          <option value="all">All statuses</option>
-          <option value="resolved">Resolved</option>
-          <option value="ignored">Ignored</option>
-          <option value="escalated">Escalated</option>
-        </select>
-      </div>
+      {/* Toolbar — no column selector: /api/v1/inventory/errors implements `q`
+          as one free-text parameter with no per-column scoping. */}
+      <ListControls
+        search={q}
+        onSearchChange={setQ}
+        searchPlaceholder="Search errors…"
+        searchLabel="Search inventory errors"
+        activeFilterCount={
+          (filterCat !== "all" ? 1 : 0) + (filterSev !== "all" ? 1 : 0) + (filterStatus !== "open" ? 1 : 0)
+        }
+        onReset={() => { setQ(""); setFilterCat("all"); setFilterSev("all"); setFilterStatus("open"); }}
+        canReset={q.trim() !== "" || filterCat !== "all" || filterSev !== "all" || filterStatus !== "open"}
+        resultCount={errors.length}
+        loading={loading}
+        filters={
+          <>
+            <FilterField label="Category" htmlFor="err-cat">
+              <select id="err-cat" value={filterCat}
+                onChange={(e) => setFilterCat(e.target.value)} className={filterControlClass}>
+                <option value="all">All categories</option>
+                {(Object.keys(CATEGORY_LABELS) as ErrCategory[]).map((c) => (
+                  <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
+                ))}
+              </select>
+            </FilterField>
+            <FilterField label="Severity" htmlFor="err-sev">
+              <select id="err-sev" value={filterSev}
+                onChange={(e) => setFilterSev(e.target.value)} className={filterControlClass}>
+                <option value="all">All severities</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </FilterField>
+            <FilterField label="Status" htmlFor="err-status">
+              <select id="err-status" value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)} className={filterControlClass}>
+                <option value="open">Open</option>
+                <option value="resolved">Resolved</option>
+                <option value="all">All</option>
+              </select>
+            </FilterField>
+          </>
+        }
+      />
 
       {err && <p role="alert" className="text-sm text-red-700">{err}</p>}
 

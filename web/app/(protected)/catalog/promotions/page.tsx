@@ -6,6 +6,8 @@ import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-cl
 import { formatMoney } from "@/lib/money";
 import { fmtDate, fmtDateTime } from "@/lib/date";
 import { Can } from "@/components/rbac";
+import { Button } from "@/components/Button";
+import { ListControls, FilterField, filterControlClass } from "@/components/ListControls";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -435,24 +437,35 @@ function CampaignsTab() {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 px-5 py-3.5">
-          <input type="search" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search campaigns…"
-            className="h-9 w-56 rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20" />
-          <select value={status} onChange={e => setStatus(e.target.value)}
-            className="h-9 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 focus:border-brand-600 focus:outline-none">
-            <option value="">All statuses</option>
-            <option value="active">Active</option>
-            <option value="scheduled">Scheduled</option>
-            <option value="expired">Expired</option>
-            <option value="draft">Draft</option>
-          </select>
-          <Can permission="promotions.manage">
-            <button type="button" onClick={() => setShowCreate(true)}
-              className="ml-auto rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
-              + New Campaign
-            </button>
-          </Can>
+        <div className="border-b border-line px-5 py-3.5">
+          <ListControls
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search campaigns by name…"
+            searchLabel="Search campaigns"
+            activeFilterCount={status ? 1 : 0}
+            onReset={() => { setSearch(""); setStatus(""); }}
+            canReset={search.trim() !== "" || status !== ""}
+            resultCount={promos.length}
+            loading={loading}
+            filters={
+              <FilterField label="Campaign status" htmlFor="promo-status">
+                <select id="promo-status" value={status}
+                  onChange={e => setStatus(e.target.value)} className={filterControlClass}>
+                  <option value="">All statuses</option>
+                  <option value="active">Active</option>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="expired">Expired</option>
+                  <option value="draft">Draft</option>
+                </select>
+              </FilterField>
+            }
+            trailing={
+              <Can permission="promotions.manage">
+                <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>+ New Campaign</Button>
+              </Can>
+            }
+          />
         </div>
 
         {loading ? <Skeleton /> : error ? (
