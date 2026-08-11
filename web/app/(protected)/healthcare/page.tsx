@@ -12,6 +12,7 @@ import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { Badge } from "@/components/Badge";
 import { apiGet, apiPost, safeLoad } from "@/api-client/client";
+import { ListControls } from "@/components/ListControls";
 
 interface Patient {
   id: string;
@@ -69,9 +70,18 @@ export default function HealthcarePage() {
     );
   };
 
-  useEffect(() => { load(); }, []);
-
-  const handleSearch = (v: string) => { setQ(v); load(v); };
+  // `handleSearch` used to call `load(v)` directly, i.e. one server request per
+  // character typed. Debounced so the list still feels live without putting a
+  // request on the wire for every keystroke.
+  //
+  // This also covers the initial load (it runs on mount with an empty term), so
+  // the separate mount-only `load()` that used to sit above it is gone — keeping
+  // both would have fetched the list twice on every page open.
+  useEffect(() => {
+    const t = setTimeout(() => { void load(q); }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q]);
 
   const handleCreate = async () => {
     setSaving(true);
@@ -98,12 +108,14 @@ export default function HealthcarePage() {
         {/* Patient list (3 cols) */}
         <div className="lg:col-span-2 space-y-3">
           <div className="flex gap-2">
-            <input
-              type="search"
-              value={q}
-              onChange={e => handleSearch(e.target.value)}
-              placeholder="Search patients…"
-              className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
+            <ListControls
+              search={q}
+              onSearchChange={setQ}
+              searchPlaceholder="Search patients…"
+              searchLabel="Search patients"
+              onReset={() => setQ("")}
+              canReset={q.trim() !== ""}
+              className="flex-1"
             />
             <Button variant="primary" size="sm" onClick={() => setModal(true)}>+ New</Button>
           </div>

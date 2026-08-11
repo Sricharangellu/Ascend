@@ -7,6 +7,15 @@ import { Button } from "@/components/Button";
 import { apiGet, apiPost, apiPatch, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type { GolfBooking, BookingStatus, GolfMember } from "@/api-client/types";
+import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
+
+/** Columns a booking search can be scoped to. Filters the fully-loaded booking list. */
+const BOOKING_SEARCH_FIELDS: ListSearchField[] = [
+  { value: "all", label: "All columns" },
+  { value: "member", label: "Member name" },
+  { value: "guest", label: "Guest name" },
+  { value: "tee", label: "Tee time" },
+];
 
 type BadgeVariant = "green" | "yellow" | "red" | "gray" | "blue" | "purple";
 
@@ -161,6 +170,7 @@ export default function GolfBookingsPage() {
   const [filterDate, setFilterDate] = useState(todayISO());
   const [filterStatus, setFilterStatus] = useState("all");
   const [q, setQ] = useState("");
+  const [searchField, setSearchField] = useState("all");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -184,14 +194,16 @@ export default function GolfBookingsPage() {
     if (filterStatus !== "all") list = list.filter(b => b.status === filterStatus);
     if (q.trim()) {
       const lq = q.toLowerCase();
-      list = list.filter(b =>
-        (b.member_name ?? "").toLowerCase().includes(lq) ||
-        (b.guest_name ?? "").toLowerCase().includes(lq) ||
-        b.tee_time.includes(lq),
-      );
+      list = list.filter(b => {
+        const fields: Record<string, string> = {
+          member: b.member_name ?? "", guest: b.guest_name ?? "", tee: b.tee_time,
+        };
+        const haystack = searchField === "all" ? Object.values(fields) : [fields[searchField] ?? ""];
+        return haystack.some(v => v.toLowerCase().includes(lq));
+      });
     }
     return list;
-  }, [bookings, filterStatus, q]);
+  }, [bookings, filterStatus, q, searchField]);
 
   async function updateStatus(id: string, status: BookingStatus) {
     setUpdatingId(id);
@@ -243,12 +255,24 @@ export default function GolfBookingsPage() {
             <option value="no_show">No Show</option>
             <option value="completed">Completed</option>
           </select>
-          <input type="search" placeholder="Search name…" value={q} onChange={e => setQ(e.target.value)}
-                 className="w-44 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
           <div className="ml-auto">
             <Button variant="primary" size="sm" onClick={() => setShowModal(true)}>+ New Booking</Button>
           </div>
         </div>
+        <ListControls
+          search={q}
+          onSearchChange={setQ}
+          searchPlaceholder="Search member, guest, tee time…"
+          searchLabel="Search bookings"
+          searchFields={BOOKING_SEARCH_FIELDS}
+          searchField={searchField}
+          onSearchFieldChange={setSearchField}
+          activeFilterCount={filterStatus !== "all" ? 1 : 0}
+          onReset={() => { setQ(""); setSearchField("all"); setFilterStatus("all"); }}
+          canReset={q.trim() !== "" || searchField !== "all" || filterStatus !== "all"}
+          resultCount={visible.length}
+          totalCount={bookings.length}
+        />
 
         {error && <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 

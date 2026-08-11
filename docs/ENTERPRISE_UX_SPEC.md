@@ -88,6 +88,19 @@ searching. It renders:
   filters in the browser, scoping the compared fields is equally honest, but the page must
   say so in a comment and move it server-side the moment that endpoint paginates. An
   option the data source ignores is the fake control this component exists to remove.
+- **Omitting the selector is a valid — and often correct — answer.** Most Ascend list
+  endpoints implement `q` as one free-text parameter with no per-column scoping
+  (`/service-orders`, `/loyalty/members`, `/documents`, `/inventory/errors`,
+  `/serial-numbers`, `/catalog/categories/:id/products`). Those pages pass no
+  `searchFields` at all, and say why in a comment. Do NOT add a selector "for
+  consistency" and filter the loaded page behind it: that is a control which appears to
+  narrow the whole list and actually narrows one page, which is strictly worse than not
+  offering it. Add the `searchField` to the endpoint first — the catalog's is the
+  worked example — then add the selector.
+- **The bar is for lists, not for pickers.** A typeahead inside a modal (add-product-to-
+  category, add-variant) is not a list toolbar: it has no filters, no reset and no result
+  set to count, and replacing its autofocused input with this bar trades a working
+  typeahead for chrome. Those stay as they are, deliberately.
 - **Filters are contextual.** Pass only filters that apply to the current dataset, wrapped
   in `FilterField` with `filterControlClass` so every page's popover matches. The popover
   is a labelled `role="dialog"`: Escape closes it and focus returns to the trigger.

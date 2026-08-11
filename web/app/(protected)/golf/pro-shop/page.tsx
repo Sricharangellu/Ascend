@@ -6,6 +6,15 @@ import { Button } from "@/components/Button";
 import { apiGet, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type { ProShopItem } from "@/api-client/types";
+import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
+
+/** Columns a pro-shop search can be scoped to. Filters the fully-loaded item list. */
+const PROSHOP_SEARCH_FIELDS: ListSearchField[] = [
+  { value: "all", label: "All columns" },
+  { value: "name", label: "Product name" },
+  { value: "sku", label: "SKU" },
+  { value: "brand", label: "Brand" },
+];
 
 type ProShopCategory = ProShopItem["category"];
 type BadgeVariant = "green" | "yellow" | "red" | "gray" | "blue" | "purple";
@@ -38,6 +47,7 @@ export default function GolfProShopPage() {
   const [error, setError] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<"all" | ProShopCategory>("all");
   const [q, setQ] = useState("");
+  const [searchField, setSearchField] = useState("all");
   const [lowStockCount, setLowStockCount] = useState(0);
 
   const load = useCallback(async () => {
@@ -58,14 +68,14 @@ export default function GolfProShopPage() {
     if (filterCategory !== "all") list = list.filter(p => p.category === filterCategory);
     if (q.trim()) {
       const lq = q.toLowerCase();
-      list = list.filter(p =>
-        p.name.toLowerCase().includes(lq) ||
-        p.sku.toLowerCase().includes(lq) ||
-        (p.brand ?? "").toLowerCase().includes(lq),
-      );
+      list = list.filter(p => {
+        const fields: Record<string, string> = { name: p.name, sku: p.sku, brand: p.brand ?? "" };
+        const haystack = searchField === "all" ? Object.values(fields) : [fields[searchField] ?? ""];
+        return haystack.some(v => v.toLowerCase().includes(lq));
+      });
     }
     return list;
-  }, [items, filterCategory, q]);
+  }, [items, filterCategory, q, searchField]);
 
   const totalValue = useMemo(() =>
     items.reduce((s, i) => s + i.price_cents * i.stock_qty, 0), [items]);
@@ -133,10 +143,22 @@ export default function GolfProShopPage() {
         </div>
 
         {/* Toolbar */}
+        <ListControls
+          search={q}
+          onSearchChange={setQ}
+          searchPlaceholder="Search name, SKU, brand…"
+          searchLabel="Search pro-shop items"
+          searchFields={PROSHOP_SEARCH_FIELDS}
+          searchField={searchField}
+          onSearchFieldChange={setSearchField}
+          activeFilterCount={filterCategory !== "all" ? 1 : 0}
+          onReset={() => { setQ(""); setSearchField("all"); setFilterCategory("all"); }}
+          canReset={q.trim() !== "" || searchField !== "all" || filterCategory !== "all"}
+          resultCount={visible.length}
+          totalCount={items.length}
+          trailing={<Button variant="secondary" size="sm" onClick={load}>Refresh</Button>}
+        />
         <div className="flex items-center gap-2">
-          <input type="search" placeholder="Search name, SKU, brand…" value={q} onChange={e => setQ(e.target.value)}
-                 className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
-          <Button variant="secondary" size="sm" onClick={load}>Refresh</Button>
           <a href="/catalog/new?category=golf" className="rounded-lg bg-brand-600 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700">
             + Add Item
           </a>
