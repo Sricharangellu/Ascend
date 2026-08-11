@@ -12,6 +12,8 @@ import {
 } from "./_components/teamTypes";
 import { AddEmployeeModal } from "./_components/AddEmployeeModal";
 import { EmployeeModal } from "./_components/EmployeeModal";
+import { Button } from "@/components/Button";
+import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
 
 // ── Badges ────────────────────────────────────────────────────────────────────
 
@@ -47,6 +49,13 @@ function initials(name: string): string {
 
 type Filter = "all" | "in" | "out" | "suspended";
 
+/** Columns a team search can be scoped to. Filters the fully-loaded employee list. */
+const TEAM_SEARCH_FIELDS: ListSearchField[] = [
+  { value: "all", label: "All columns" },
+  { value: "name", label: "Name" },
+  { value: "email", label: "Email" },
+];
+
 export default function TeamPage() {
   const router = useRouter();
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -54,6 +63,7 @@ export default function TeamPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
+  const [searchField, setSearchField] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
   const [editTarget, setEditTarget] = useState<Employee | null>(null);
   const [clockingId, setClockingId] = useState<string | null>(null);
@@ -88,7 +98,11 @@ export default function TeamPage() {
     if (filter === "suspended" && e.status === "active") return false;
     if (search) {
       const q = search.toLowerCase();
-      if (!e.name.toLowerCase().includes(q) && !e.email.toLowerCase().includes(q)) return false;
+      // Scoped search narrows which column is compared. The full employee list
+      // is loaded here, so the scope covers the whole team.
+      const fields: Record<string, string> = { name: e.name, email: e.email };
+      const haystack = searchField === "all" ? Object.values(fields) : [fields[searchField] ?? ""];
+      if (!haystack.some((v) => v.toLowerCase().includes(q))) return false;
     }
     return true;
   });
@@ -133,34 +147,38 @@ export default function TeamPage() {
           ))}
         </div>
 
-        {/* Filter + search + add */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1">
-            {FILTERS.map(({ key, label }) => (
-              <button key={key} type="button" onClick={() => setFilter(key)}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${filter === key ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}>
-                {label}
-              </button>
-            ))}
+        {/* Search + filter + add — the shared list bar */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-[280px] flex-1">
+            <ListControls
+              search={search}
+              onSearchChange={setSearch}
+              searchPlaceholder="Search team by name or email…"
+              searchLabel="Search team"
+              searchFields={TEAM_SEARCH_FIELDS}
+              searchField={searchField}
+              onSearchFieldChange={setSearchField}
+              activeFilterCount={filter !== "all" ? 1 : 0}
+              onReset={() => { setSearch(""); setSearchField("all"); setFilter("all"); }}
+              canReset={search.trim() !== "" || searchField !== "all" || filter !== "all"}
+              resultCount={filtered.length}
+              totalCount={employees.length}
+              loading={loading}
+              filters={
+                <FilterField label="Availability" htmlFor="team-filter">
+                  <select id="team-filter" value={filter}
+                    onChange={(e) => setFilter(e.target.value as Filter)} className={filterControlClass}>
+                    {FILTERS.map(({ key, label }) => <option key={key} value={key}>{label}</option>)}
+                  </select>
+                </FilterField>
+              }
+            />
           </div>
           <div className="flex items-center gap-2">
-            <input
-              type="search"
-              placeholder="Search name or email…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-brand-600 focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={() => setShowAdd(true)}
-              className="rounded-lg bg-brand-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#4849d0]"
-            >
-              + Add Employee
-            </button>
+            <Button variant="primary" size="sm" onClick={() => setShowAdd(true)}>+ Add Employee</Button>
             <Link
               href="/team/custom-roles"
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              className="focus-ring min-h-touch inline-flex items-center rounded-control border border-line px-3 text-xs font-medium text-content-secondary hover:bg-surface-2"
             >
               Custom roles
             </Link>

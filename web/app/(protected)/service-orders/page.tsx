@@ -9,6 +9,7 @@ import { apiGet, apiPost, apiPatch, ApiResponseError } from "@/api-client/client
 import { formatMoney } from "@/lib/money";
 import type { ServiceOrder, ServiceOrderStatus, ServiceOrderResponse } from "@/api-client/types";
 import { fmtDate, fmtDateTime } from "@/lib/date";
+import { ListControls, FilterField, filterControlClass } from "@/components/ListControls";
 
 type BadgeVariant = "gray" | "blue" | "yellow" | "green" | "red" | "purple";
 
@@ -144,36 +145,30 @@ export default function ServiceOrdersPage() {
           <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
         )}
 
-        {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-3">
-          <input
-            type="search"
-            placeholder="Search tickets or customers…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-64 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1">
-            {(["all", ...ALL_STATUSES] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                  statusFilter === s
-                    ? "bg-blue-600 text-white"
-                    : "text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                {s === "all" ? "All" : STATUS_LABEL[s]}
-              </button>
-            ))}
-          </div>
-          <div className="ml-auto">
-            <Button variant="primary" onClick={() => { setShowCreate(true); setForm(EMPTY_FORM); }}>
-              + New Ticket
-            </Button>
-          </div>
-        </div>
+        {/* Toolbar — the shared list bar. No column selector: this list is
+            served by /api/v1/service-orders, which implements `q` but has no
+            per-column scoping, and a selector the API ignores is a fake control. */}
+        <ListControls
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search tickets or customers…"
+          searchLabel="Search service orders"
+          activeFilterCount={statusFilter !== "all" ? 1 : 0}
+          onReset={() => { setSearch(""); setStatusFilter("all"); }}
+          canReset={search.trim() !== "" || statusFilter !== "all"}
+          resultCount={items.length}
+          loading={loading}
+          filters={
+            <FilterField label="Status" htmlFor="so-status">
+              <select id="so-status" value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as ServiceOrderStatus | "all")}
+                className={filterControlClass}>
+                <option value="all">All statuses</option>
+                {ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+              </select>
+            </FilterField>
+          }
+        />
 
         {/* Stats */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">

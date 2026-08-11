@@ -7,6 +7,7 @@ import { TableSkeleton } from "@/components/TableSkeleton";
 import { formatMoney } from "@/lib/money";
 import { AdjustModal } from "./AdjustModal";
 import { MovementsDrawer } from "./MovementsDrawer";
+import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
 import { ClockIcon, Detail, LedgerStatus } from "./ui";
 import {
   formatCost,
@@ -15,6 +16,13 @@ import {
   type InventoryRow,
   type StockStatusFilter,
 } from "./shared";
+
+/** Columns a ledger search can be scoped to. Filters rows already loaded in full. */
+const LEDGER_SEARCH_FIELDS: ListSearchField[] = [
+  { value: "all", label: "All columns" },
+  { value: "name", label: "Product name" },
+  { value: "sku", label: "SKU" },
+];
 
 export function LedgerTab({
   rows,
@@ -28,6 +36,7 @@ export function LedgerTab({
   invalidateLedger: () => void;
 }) {
   const [ledgerQuery, setLedgerQuery] = useState("");
+  const [searchField, setSearchField] = useState("all");
   const [ledgerCategory, setLedgerCategory] = useState("All");
   const [ledgerStatus, setLedgerStatus] = useState<StockStatusFilter>("All");
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
@@ -42,15 +51,17 @@ export function LedgerTab({
   const filteredRows = useMemo(() => {
     const normalizedQuery = ledgerQuery.trim().toLowerCase();
     return rows.filter((row) => {
+      // Scoped search narrows which column is compared. These rows are already
+      // loaded in full by the parent, so the scope covers the whole ledger.
+      const fields: Record<string, string> = { name: row.name, sku: row.sku };
+      const haystack = searchField === "all" ? Object.values(fields) : [fields[searchField] ?? ""];
       const matchesQuery =
-        normalizedQuery.length === 0 ||
-        row.name.toLowerCase().includes(normalizedQuery) ||
-        row.sku.toLowerCase().includes(normalizedQuery);
+        normalizedQuery.length === 0 || haystack.some((v) => v.toLowerCase().includes(normalizedQuery));
       const matchesCategory = ledgerCategory === "All" || row.category === ledgerCategory;
       const matchesStatus = ledgerStatus === "All" || row.stockStatus === ledgerStatus;
       return matchesQuery && matchesCategory && matchesStatus;
     });
-  }, [rows, ledgerQuery, ledgerCategory, ledgerStatus]);
+  }, [rows, ledgerQuery, searchField, ledgerCategory, ledgerStatus]);
 
   const selectedRow = useMemo(
     () => rows.find((row) => row.sku === selectedSku) ?? filteredRows[0] ?? null,
@@ -72,40 +83,46 @@ export function LedgerTab({
             </div>
           </div>
 
-          <div className="grid gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 lg:grid-cols-[minmax(16rem,1fr)_12rem_10rem]">
-            <label className="block">
-              <span className="sr-only">Search inventory</span>
-              <input
-                type="search"
-                value={ledgerQuery}
-                onChange={(e) => setLedgerQuery(e.target.value)}
-                placeholder="Search SKU or product"
-                className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
-              />
-            </label>
-            <label className="block">
-              <span className="sr-only">Filter by category</span>
-              <select
-                value={ledgerCategory}
-                onChange={(e) => setLedgerCategory(e.target.value)}
-                className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
-              >
-                {ledgerCategories.map((item) => <option key={item} value={item}>{item}</option>)}
-              </select>
-            </label>
-            <label className="block">
-              <span className="sr-only">Filter by stock status</span>
-              <select
-                value={ledgerStatus}
-                onChange={(e) => setLedgerStatus(e.target.value as StockStatusFilter)}
-                className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
-              >
-                <option value="All">All statuses</option>
-                <option value="Healthy">Healthy</option>
-                <option value="Watch">Watch</option>
-                <option value="Reorder">Reorder</option>
-              </select>
-            </label>
+          <div className="border-b border-line bg-surface-2 px-4 py-3">
+            <ListControls
+              search={ledgerQuery}
+              onSearchChange={setLedgerQuery}
+              searchPlaceholder="Search inventory by product or SKU…"
+              searchLabel="Search inventory"
+              searchFields={LEDGER_SEARCH_FIELDS}
+              searchField={searchField}
+              onSearchFieldChange={setSearchField}
+              activeFilterCount={(ledgerCategory !== "All" ? 1 : 0) + (ledgerStatus !== "All" ? 1 : 0)}
+              onReset={() => {
+                setLedgerQuery("");
+                setSearchField("all");
+                setLedgerCategory("All");
+                setLedgerStatus("All");
+              }}
+              canReset={ledgerQuery.trim() !== "" || searchField !== "all" || ledgerCategory !== "All" || ledgerStatus !== "All"}
+              resultCount={filteredRows.length}
+              totalCount={rows.length}
+              loading={loading}
+              filters={
+                <>
+                  <FilterField label="Category" htmlFor="ledger-category">
+                    <select id="ledger-category" value={ledgerCategory}
+                      onChange={(e) => setLedgerCategory(e.target.value)} className={filterControlClass}>
+                      {ledgerCategories.map((item) => <option key={item} value={item}>{item}</option>)}
+                    </select>
+                  </FilterField>
+                  <FilterField label="Stock status" htmlFor="ledger-status">
+                    <select id="ledger-status" value={ledgerStatus}
+                      onChange={(e) => setLedgerStatus(e.target.value as StockStatusFilter)} className={filterControlClass}>
+                      <option value="All">All statuses</option>
+                      <option value="Healthy">Healthy</option>
+                      <option value="Watch">Watch</option>
+                      <option value="Reorder">Reorder</option>
+                    </select>
+                  </FilterField>
+                </>
+              }
+            />
           </div>
 
           {loading ? (

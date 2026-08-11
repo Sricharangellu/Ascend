@@ -13,12 +13,28 @@ import type {
   ProductsResponse,
   CatalogCategoriesResponse,
 } from "@/api-client/types";
+import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
 import { StatusBadge, DropdownItem, buildCategoryName } from "./ui";
 import type { CatalogStatusFilter, LocalProductStatus } from "./shared";
+
+/**
+ * Columns an inventory catalog search can be scoped to.
+ *
+ * This tab loads one page of the catalog (`limit=200`) and filters it here, so
+ * the scope narrows which field is compared across those rows. It is NOT a
+ * server parameter — past 200 products the list itself is already truncated,
+ * which is a pre-existing limit of this tab, not something the scope introduces.
+ */
+const SEARCH_FIELDS: ListSearchField[] = [
+  { value: "all", label: "All columns" },
+  { value: "name", label: "Product name" },
+  { value: "sku", label: "SKU" },
+];
 
 export function CatalogTab() {
   const router = useRouter();
   const [catalogQuery, setCatalogQuery] = useState("");
+  const [searchField, setSearchField] = useState("all");
   const [catalogCategory, setCatalogCategory] = useState("All");
   const [catalogStatus, setCatalogStatus] = useState<CatalogStatusFilter>("All");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -64,7 +80,9 @@ export function CatalogTab() {
   const filteredProducts = useMemo(() => {
     const q = catalogQuery.trim().toLowerCase();
     return products.filter((p) => {
-      const matchesQuery = q.length === 0 || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q);
+      const fields: Record<string, string> = { name: p.name, sku: p.sku };
+      const haystack = searchField === "all" ? Object.values(fields) : [fields[searchField] ?? ""];
+      const matchesQuery = q.length === 0 || haystack.some((v) => v.toLowerCase().includes(q));
       let matchesCategory = true;
       if (catalogCategory !== "All") {
         const cat = categories.find((c) => buildCategoryName(c, categories) === catalogCategory);
@@ -73,7 +91,7 @@ export function CatalogTab() {
       const matchesStatus = catalogStatus === "All" || p.status === catalogStatus;
       return matchesQuery && matchesCategory && matchesStatus;
     });
-  }, [products, categories, catalogQuery, catalogCategory, catalogStatus]);
+  }, [products, categories, catalogQuery, searchField, catalogCategory, catalogStatus]);
 
   function toggleSelectAll() {
     if (selectedIds.size === filteredProducts.length) {
@@ -167,40 +185,54 @@ export function CatalogTab() {
         </div>
       </div>
 
-      <div className="grid gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 lg:grid-cols-[minmax(16rem,1fr)_14rem_10rem]">
-        <label className="block">
-          <span className="sr-only">Search catalog</span>
-          <input
-            type="search"
-            value={catalogQuery}
-            onChange={(e) => setCatalogQuery(e.target.value)}
-            placeholder="Search SKU or product name"
-            className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
-          />
-        </label>
-        <label className="block">
-          <span className="sr-only">Filter by category</span>
-          <select
-            value={catalogCategory}
-            onChange={(e) => setCatalogCategory(e.target.value)}
-            className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
-          >
-            {catalogCategoryOptions.map((name) => <option key={name} value={name}>{name}</option>)}
-          </select>
-        </label>
-        <label className="block">
-          <span className="sr-only">Filter by status</span>
-          <select
-            value={catalogStatus}
-            onChange={(e) => setCatalogStatus(e.target.value as CatalogStatusFilter)}
-            className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950"
-          >
-            <option value="All">All statuses</option>
-            <option value="active">Active</option>
-            <option value="draft">Draft</option>
-            <option value="archived">Archived</option>
-          </select>
-        </label>
+      <div className="border-b border-line bg-surface-2 px-4 py-3">
+        <ListControls
+          search={catalogQuery}
+          onSearchChange={setCatalogQuery}
+          searchPlaceholder="Search catalog by product name or SKU…"
+          searchLabel="Search catalog"
+          searchFields={SEARCH_FIELDS}
+          searchField={searchField}
+          onSearchFieldChange={setSearchField}
+          activeFilterCount={(catalogCategory !== "All" ? 1 : 0) + (catalogStatus !== "All" ? 1 : 0)}
+          onReset={() => {
+            setCatalogQuery("");
+            setSearchField("all");
+            setCatalogCategory("All");
+            setCatalogStatus("All");
+          }}
+          canReset={catalogQuery.trim() !== "" || searchField !== "all" || catalogCategory !== "All" || catalogStatus !== "All"}
+          resultCount={filteredProducts.length}
+          totalCount={products.length}
+          loading={catalogLoading}
+          filters={
+            <>
+              <FilterField label="Category" htmlFor="inv-catalog-category">
+                <select
+                  id="inv-catalog-category"
+                  value={catalogCategory}
+                  onChange={(e) => setCatalogCategory(e.target.value)}
+                  className={filterControlClass}
+                >
+                  {catalogCategoryOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+                </select>
+              </FilterField>
+              <FilterField label="Status" htmlFor="inv-catalog-status">
+                <select
+                  id="inv-catalog-status"
+                  value={catalogStatus}
+                  onChange={(e) => setCatalogStatus(e.target.value as CatalogStatusFilter)}
+                  className={filterControlClass}
+                >
+                  <option value="All">All statuses</option>
+                  <option value="active">Active</option>
+                  <option value="draft">Draft</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </FilterField>
+            </>
+          }
+        />
       </div>
 
       {catalogLoading ? (
