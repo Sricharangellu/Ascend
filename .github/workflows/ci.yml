@@ -155,8 +155,8 @@ jobs:
       # (orval reads a different, one-path lib/api-spec/openapi.yaml; web/api-client
       # is hand-maintained per F-21), so no compiler or type error will ever catch
       # drift here — this step is the only thing that does. The opposite direction
-      # (a real route nobody documented) is merely incomplete and is ratcheted
-      # report-only against tools/openapi-contract-baseline.json.
+      # (a real route nobody documented) is merely incomplete: 478 of them today,
+      # reported against tools/openapi-contract-baseline.json but never fatal.
       - name: OpenAPI contract scan — every documented operation is really served
         run: npm run contract:scan
 
