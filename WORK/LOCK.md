@@ -1,3 +1,15 @@
+## Active Claim (Claude Code web — migration advisory-lock statement_timeout)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/supabase-connection-setup-v86psj` |
+| Queue item | `WORK/LOOP_STATE.md` backlog, **NEW 2026-08-07**, explicitly "Not fixed in PR #196": the backend suite's 30 s `statement_timeout` covers an unbounded migration-lock WAIT. `buildApp()` runs migrations inside `db.tx()`, and `db.tx()` issues `SET LOCAL statement_timeout` on BEGIN (`src/shared/db.ts:124`); the transaction's **first** statement is the *blocking* `SELECT pg_advisory_xact_lock(7381920)` (`src/app.ts:292`), so time spent **queuing** for the lock is charged against the same budget as real work. 123 call sites across 86 test files each build a fresh schema and serialize on that one global lock, so on a slow runner this surfaces as a bogus `57014` in a test that did nothing wrong (observed live: CI run 31138020800 attempt 1, 893/894, `settings.test.ts` at exactly 30014 ms). Fix: suspend the timeout for the lock statement only, restore it for the migrations so runaway DDL stays bounded. |
+| Files/areas expected | `src/shared/db.ts` (export `txTimeoutMs()` so `app.ts` reuses it rather than re-deriving it; add `migrationLockTimeoutMs()`), `src/app.ts` (bracket the advisory lock), `src/shared/db-tx-timeout.test.ts` (NEW — two-connection barrier regression test), `.env.example` (document the new dial next to `PG_TX_TIMEOUT_MS`), `WORK/LOOP_STATE.md`, `WORK/LOCK.md`. NOT `web/**`, NOT `.github/**`, NOT `scripts/deploy.sh`, NOT `artifacts/**` (carries its own copy of `app.ts` — another environment's tree, left untouched per the convention on every claim in this file). |
+| Started | 2026-08-10T192000Z |
+| Status | ACTIVE — implementing |
+| Scope note (honest) | The backlog offered two fixes; both are flawed and neither shipped as written. "Lock outside the transaction" requires session-level `pg_advisory_lock`, which does not auto-release on ROLLBACK and leaks a global lock when a boot crashes mid-migration. Bare `statement_timeout = 0` bounds nothing — it converts a spurious failure into an unbounded hang, which is a regression the original note did not account for. Shipped instead: keep the transaction-scoped lock, move the wait onto `lock_timeout`. That is a slightly wider change than "a few characters" but it is the difference between fixing the flake and relocating it. |
+| Blockers | none |
+
 ## Active Claim (Claude Code web — release staging → master)
 
 | Field | Value |

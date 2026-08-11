@@ -84,6 +84,53 @@ export function compile(sql: string, params: Params): { text: string; values: un
   return { text, values };
 }
 
+/**
+ * Resolve the per-transaction `statement_timeout`, in milliseconds.
+ *
+ * Every `tx()` sets this on BEGIN so a runaway transaction cannot hold locks
+ * indefinitely. Exported — rather than inlined — because a caller that has to
+ * *suspend* the timeout for one statement still needs to restore this exact
+ * value afterwards. `src/app.ts` does that around the migration advisory lock:
+ * re-deriving the env parse there would be a second source of truth that drifts
+ * silently the first time the default or the env var name changes.
+ *
+ * Non-numeric, zero, and negative values fall back to 30 s; `PG_TX_TIMEOUT_MS`
+ * is an operator dial, not a way to disable the guard.
+ */
+export function txTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = Number(env["PG_TX_TIMEOUT_MS"] ?? 30_000);
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 30_000;
+}
+
+/**
+ * How long a booting instance may wait for the migration advisory lock, in
+ * milliseconds. `0` means wait indefinitely.
+ *
+ * This is `lock_timeout`, not `statement_timeout` — a distinction that matters
+ * for more than tidiness. Waiting your turn behind another instance's
+ * migrations is correct behaviour, so it must not be charged against the
+ * budget meant to bound your own DDL; but waiting *forever* would turn one
+ * wedged instance into a silently hung deploy. `lock_timeout` bounds exactly
+ * the wait and nothing else, and when it fires it raises `55P03`
+ * ("canceling statement due to lock timeout") — which says the lock could not
+ * be acquired, instead of `57014` falsely blaming a query for running long.
+ *
+ * Verified empirically against PostgreSQL 16: `lock_timeout` does apply to
+ * `pg_advisory_xact_lock`, which is not obvious from the documentation's
+ * "table, index, row, or other database object" wording.
+ *
+ * The default is deliberately generous. Real migrations finish in seconds, and
+ * the test suite legitimately queues many instances on this one lock; five
+ * minutes is far past any healthy queue but still fails a wedged deploy with a
+ * clear error rather than hanging.
+ */
+export function migrationLockTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = Number(env["PG_MIGRATION_LOCK_TIMEOUT_MS"] ?? 300_000);
+  // 0 is meaningful here (wait forever) — unlike PG_TX_TIMEOUT_MS, where it
+  // would disable the runaway guard and is therefore rejected.
+  return Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 300_000;
+}
+
 function makeDb(q: Queryable, opts: { isTx: boolean; pool?: pg.Pool }): DB {
   const db: DB = {
     async query<T = any>(sql: string, params?: Params): Promise<T[]> {
@@ -119,9 +166,7 @@ function makeDb(q: Queryable, opts: { isTx: boolean; pool?: pg.Pool }): DB {
         // 30 s is generous for any single business transaction; tune via PG_TX_TIMEOUT_MS.
         // SET LOCAL must run inside the transaction, so BEGIN and the timeout
         // travel in one combined statement (also saves a round trip).
-        const rawTimeout = Number(process.env["PG_TX_TIMEOUT_MS"] ?? 30_000);
-        const txTimeoutMs = Number.isFinite(rawTimeout) && rawTimeout > 0 ? Math.floor(rawTimeout) : 30_000;
-        await client.query(`BEGIN; SET LOCAL statement_timeout = ${txTimeoutMs}`);
+        await client.query(`BEGIN; SET LOCAL statement_timeout = ${txTimeoutMs()}`);
         // Tenant context (if any) applies to the whole transaction. Explicit
         // withTenant() views set their own value afterwards and take precedence.
         const ctxTenant = currentTenantId();

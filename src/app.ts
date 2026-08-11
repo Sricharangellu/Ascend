@@ -1,7 +1,7 @@
 import express, { Router, type Express } from "express";
 import { createHash, timingSafeEqual } from "node:crypto";
 import helmet from "helmet";
-import { openDb, type DB } from "./shared/db.js";
+import { openDb, migrationLockTimeoutMs, txTimeoutMs, type DB } from "./shared/db.js";
 import { openRedis } from "./shared/redis.js";
 import { EventBus } from "./shared/events.js";
 import { Outbox } from "./shared/outbox.js";
@@ -289,7 +289,37 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   // duration of the transaction. Concurrent instances wait here and then skip
   // all migrations (hash-checked above). Prevents simultaneous ALTER TABLE races.
   await db.tx(async (tdb) => {
+    // The lock WAIT is a statement like any other, so Postgres charges the time
+    // spent queuing for it against the transaction's statement_timeout — which
+    // shared/db.ts has already set on BEGIN. That makes the guard measure the
+    // wrong thing: the budget is meant to bound *this* instance's DDL, but the
+    // first statement to spend it is time blocked on *other* instances.
+    //
+    // It bites hardest in the test suite, where 123 call sites across 86 files
+    // each build a fresh schema and therefore serialize on this one global
+    // lock. On a loaded runner the queue alone exhausts the budget and the lock
+    // statement dies with 57014 — surfacing as a bogus "statement timeout" in
+    // whichever test happened to be last in line, not in anything it did.
+    // Observed live: CI run 31138020800 attempt 1, 893/894, settings.test.ts at
+    // exactly 30014 ms while Postgres was checkpointing; attempt 2 on a healthy
+    // runner passed 894/894.
+    //
+    // So take the wait off statement_timeout and put it on lock_timeout, which
+    // bounds lock acquisition and nothing else. Simply disabling the timeout
+    // would trade a spurious failure for a silent hang: one wedged instance
+    // would stall every subsequent boot forever. lock_timeout keeps the wait
+    // bounded AND reports it honestly — 55P03 "could not acquire the lock"
+    // rather than 57014 blaming a query that never ran long.
+    //
+    // Restored afterwards: statement_timeout back to its configured value so
+    // the migrations below stay bounded, and lock_timeout back to 0 so the DDL
+    // that follows keeps its original lock-waiting behaviour. The lock itself
+    // is transaction-scoped and releases on COMMIT/ROLLBACK — nothing leaks.
+    await tdb.exec("SET LOCAL statement_timeout = 0");
+    await tdb.exec(`SET LOCAL lock_timeout = ${migrationLockTimeoutMs()}`);
     await tdb.exec("SELECT pg_advisory_xact_lock(7381920)"); // stable magic int for finder migrations
+    await tdb.exec("SET LOCAL lock_timeout = 0");
+    await tdb.exec(`SET LOCAL statement_timeout = ${txTimeoutMs()}`);
     logger.info("migration lock acquired");
 
     for (const sql of identityModule.migrations) await runIfNew(sql, `identity`, tdb);
