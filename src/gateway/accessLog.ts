@@ -42,6 +42,12 @@ export interface AccessLogLine {
   durationMs: number;
   tenantId?: string;
   userId?: string;
+  /**
+   * Present only when the response never finished writing — the client gave up
+   * or the connection dropped. Omitted entirely on the normal path so it reads
+   * as an exception rather than a field every line carries.
+   */
+  aborted?: true;
 }
 
 /**
@@ -54,12 +60,19 @@ export interface AccessLogLine {
  */
 export function buildAccessLogLine(
   req: Pick<Request, "method" | "path">,
-  res: Pick<Response, "statusCode" | "locals">,
+  res: Pick<Response, "statusCode" | "locals" | "writableFinished">,
   durationMs: number,
 ): { line: AccessLogLine; level: AccessLogLevel } {
   // req.path excludes the query string by construction — keep it that way.
   const path = req.path;
   const auth = res.locals["auth"] as AuthPayload | undefined;
+
+  // The hook fires on `close`, which covers both a completed response and a
+  // connection that died first. `writableFinished` is what separates them, and
+  // the distinction matters: on an abort the status code is whatever was set
+  // before the client left (often the default 200), so logging it unqualified
+  // would report a success that never reached anyone.
+  const aborted = res.writableFinished === false;
 
   const line: AccessLogLine = {
     requestId: res.locals["requestId"] as string | undefined,
@@ -68,18 +81,21 @@ export function buildAccessLogLine(
     path,
     status: res.statusCode,
     durationMs: Math.round(durationMs * 10) / 10,
-    // Populated by the time `finish` fires even though auth runs later than
+    // Populated by the time the hook fires even though auth runs later than
     // this middleware — that ordering is why the work happens in the hook.
     tenantId: auth?.tenantId,
     userId: auth?.userId,
+    ...(aborted ? { aborted: true as const } : {}),
   };
 
   // Severity tracks the response, so `level>=warn` is a usable filter for
-  // "something the caller was told was wrong".
+  // "something the caller was told was wrong". An abort is warn regardless of
+  // the recorded status — a client that gave up waiting is the signal an
+  // operator is looking for, and it is invisible in the status alone.
   let level: AccessLogLevel;
   if (PROBE_PATHS.has(path)) level = "debug";
   else if (res.statusCode >= 500) level = "error";
-  else if (res.statusCode >= 400) level = "warn";
+  else if (aborted || res.statusCode >= 400) level = "warn";
   else level = "info";
 
   return { line, level };
@@ -88,7 +104,16 @@ export function buildAccessLogLine(
 export function accessLogMiddleware(req: Request, res: Response, next: NextFunction): void {
   const start = process.hrtime.bigint();
 
-  res.on("finish", () => {
+  // `close`, not `finish`. `finish` fires only once a response has been fully
+  // written, so a client that gives up and disconnects mid-request produces NO
+  // line at all — and a request that hung long enough for the caller to abandon
+  // it is precisely what an operator goes looking for. `close` fires on both
+  // outcomes and `writableFinished` tells them apart. (`metricsMiddleware` uses
+  // `finish`; that is right for RED metrics, which count served responses, and
+  // wrong here, where the unserved ones are the interesting ones.)
+  //
+  // `close` fires exactly once per response, so this cannot double-log.
+  res.on("close", () => {
     const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
     const { line, level } = buildAccessLogLine(req, res, durationMs);
     logger[level](line, "request");

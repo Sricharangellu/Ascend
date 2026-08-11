@@ -565,11 +565,26 @@ middleware a four-line wrapper. That was not a stylistic preference — the firs
 middleware by capturing `process.stdout.write`, and captured **zero lines**, because in development
 `pino` writes through a worker-thread transport straight to fd 1 and never touches the patched
 function. Extracting the decision made it testable against no sink at all.
-*Verified:* 5 tests in `src/gateway/accessLog.test.ts`, all passing — severity mapping including
+*Second defect, found reviewing this PR's own code rather than the repo's:* the hook first listened on
+`res.on("finish")`, matching `metricsMiddleware`. `finish` fires only when a response has been fully
+written — so a client that **gives up and disconnects produces no line at all**, and a request that
+hung long enough for the caller to abandon it is exactly what an operator goes hunting for. An access
+log whose blind spot is the slowest requests in the system is a milder version of the failure this
+whole audit reports. It now listens on `close`, which fires on both outcomes, and uses
+`res.writableFinished` to tell them apart: an abandoned request is marked `aborted: true` and logged
+at `warn` regardless of its recorded status, because on an abort the status is whatever was set before
+the client left — commonly the default `200`, i.e. a "success" that reached nobody. The marker is
+**absent rather than `false`** on the normal path, so it stays greppable instead of becoming a field
+every line carries. `finish` remains correct for `metricsMiddleware`, which counts served responses;
+it is wrong here, where the unserved ones are the point.
+*Verified:* 8 tests in `src/gateway/accessLog.test.ts`, all passing — severity mapping including
 `429 → warn` and probes → `debug`; correlation ids and auth context present; no credential-carrying
-field emitted; and end-to-end through a real server that the logged `requestId` equals the
-`x-request-id` response header, which is the property that makes the log joinable to a customer
-report. `pino-http` was deliberately not added (see §17 row 8).
+field emitted; the abort path marked and *not* reported as a success; the marker absent on the normal
+path; a structural assertion that the middleware hooks `close` and not `finish` (without it, a revert
+would silently stop logging aborts while every other test still passed); and end-to-end through a real
+server that the logged `requestId` equals the `x-request-id` response header, which is the property
+that makes the log joinable to a customer report. `pino-http` was deliberately not added (see §17
+row 8).
 
 **D. `ADR-014-master-is-the-operations-runtime.md`** — writes down §0's central finding as a standing
 rule, since it is the one thing in this audit that no existing document stated and that silently
@@ -603,6 +618,11 @@ Vercel/Render/Supabase/GitHub-settings credential.
 - **`master` is 245 commits behind and cannot currently be merged into**, so production is running
   ~3 weeks of superseded code including the pre-audit security posture — and will keep doing so until
   the required-check name is repaired. That repair is Sri-only.
+  **Re-measured 2026-08-11: now 294 commits behind** (`git rev-list --count origin/master..origin/develop`).
+  The gap is not static, it is **widening at roughly 16 commits/day** — every session that merges to
+  `develop` adds to the inert pile, because none of it reaches the branch the scheduled workflows and
+  the production backend actually run. This is the single number that best expresses §0.4: the ops
+  work is not merely undelivered, it is accumulating undelivered.
 - **The same failure mode can recur silently.** Renaming a required CI job raises no error anywhere
   until someone attempts a merge, which on a release branch may be weeks later. Nothing in the repo
   cross-checks job names against branch protection, and nothing can — the protection API is not

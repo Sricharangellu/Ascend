@@ -18,8 +18,12 @@ import { sendRequest } from "../shared/test-request.js";
  * that the id the middleware logs is the same one the caller is handed.
  */
 
-function fakeRes(status: number, locals: Record<string, unknown> = {}) {
-  return { statusCode: status, locals } as unknown as Parameters<typeof buildAccessLogLine>[1];
+function fakeRes(status: number, locals: Record<string, unknown> = {}, writableFinished = true) {
+  return {
+    statusCode: status,
+    locals,
+    writableFinished,
+  } as unknown as Parameters<typeof buildAccessLogLine>[1];
 }
 
 test("severity tracks the response so level>=warn means 'the caller was told no'", () => {
@@ -89,6 +93,61 @@ test("nothing that can carry a credential is ever put in the line", () => {
       `the access log must never carry ${forbidden}`,
     );
   }
+});
+
+test("a request the client abandoned is logged, and is not reported as a success", () => {
+  // The reason the hook listens on `close` rather than `finish`. A client that
+  // gives up mid-request never triggers `finish`, so under the original version
+  // the slowest and most diagnostically interesting requests in the system were
+  // the exact ones that produced no log line at all. On an abort the status is
+  // whatever was set before the client left — commonly the default 200 — so
+  // logging it unqualified would record a success that reached nobody.
+  const { line, level } = buildAccessLogLine(
+    { method: "GET", path: "/api/v1/reports/heavy" },
+    fakeRes(200, { requestId: "req-abort" }, false),
+    30_000,
+  );
+
+  assert.equal(line.aborted, true, "an unfinished response must be marked");
+  assert.equal(line.status, 200, "the recorded status is preserved as-is…");
+  assert.equal(level, "warn", "…but severity must not read it as a success");
+  assert.equal(line.durationMs, 30_000);
+});
+
+test("the abort marker is absent, not false, on the normal path", () => {
+  // Every completed request carries this line; a field that is always present
+  // and almost always `false` is noise in an aggregator and in a grep.
+  const { line } = buildAccessLogLine({ method: "GET", path: "/orders" }, fakeRes(200), 1);
+  assert.ok(!("aborted" in line), "normal responses must not carry an `aborted` key at all");
+});
+
+test("the middleware hooks `close`, not `finish`, and fires once", () => {
+  // Pins the wiring the two tests above depend on. Asserted structurally
+  // because the log sink is not observable here (see the header): if this ever
+  // reverts to `finish`, the abort case silently stops being logged and the
+  // `aborted` tests above would still pass, since they call the pure function
+  // directly. This is the test that would go red.
+  const events: string[] = [];
+  const res = {
+    statusCode: 200,
+    locals: {},
+    writableFinished: true,
+    on(event: string, _fn: () => void) {
+      events.push(event);
+    },
+  } as unknown as Parameters<typeof accessLogMiddleware>[1];
+
+  let nextCalled = 0;
+  accessLogMiddleware(
+    { method: "GET", path: "/orders" } as unknown as Parameters<typeof accessLogMiddleware>[0],
+    res,
+    () => {
+      nextCalled++;
+    },
+  );
+
+  assert.deepEqual(events, ["close"], "must listen on `close` only — `finish` misses aborts");
+  assert.equal(nextCalled, 1, "the middleware must always continue the chain exactly once");
 });
 
 test("end-to-end: the logged requestId is the one the caller is handed", async () => {
