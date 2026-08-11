@@ -2920,8 +2920,50 @@ paths:
       summary: List purchase orders
       operationId: listPurchaseOrders
       tags: [Purchasing]
+      description: >
+        Keyset-paginated, newest first. Every filter is applied server-side; an
+        unrecognised value is a 400 rather than a silently-dropped predicate.
+        Each row carries the roll-ups the list view needs (supplier name,
+        ordered/received/remaining quantities, bill state, is_overdue), derived
+        in the same query as the page.
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: status
+          in: query
+          schema: { type: string, enum: [ordered, partially_received, received, cancelled] }
+        - name: receiveStatus
+          in: query
+          schema: { type: string, enum: [pending, partial, complete] }
+        - name: approvalStatus
+          in: query
+          schema: { type: string, enum: [approved, pending, rejected] }
+        - name: supplierId
+          in: query
+          schema: { type: string }
+        - name: search
+          in: query
+          description: Exact PO number when all digits, otherwise a substring of the notes.
+          schema: { type: string, maxLength: 120 }
+        - name: createdFrom
+          in: query
+          schema: { type: integer, description: epoch ms }
+        - name: createdTo
+          in: query
+          schema: { type: integer, description: epoch ms }
+        - name: overdue
+          in: query
+          description: >
+            Open POs whose expected_date has passed. A PO with no expected_date
+            is unknown, not late, and is never returned by this filter.
+          schema: { type: string, enum: ["true", "false"] }
       responses:
         "200": { description: Purchase orders }
+        "400": { description: Unrecognised filter value }
     post:
       summary: Create purchase order
       operationId: createPurchaseOrder
@@ -2936,6 +2978,14 @@ paths:
               required: [supplierId, lines]
               properties:
                 supplierId: { type: string }
+                expectedDate:
+                  type: integer
+                  nullable: true
+                  description: >
+                    Expected delivery date, epoch ms. Optional; absent means no
+                    ETA was recorded, which the list reports as unknown rather
+                    than treating as on-time.
+                notes: { type: string, nullable: true, maxLength: 2000 }
                 lines:
                   type: array
                   items:
