@@ -265,6 +265,49 @@ expensive in ways that surface as unrelated-looking failures.
 - **The 480 undocumented backend routes.** Deliberate, per the one-way design.
 - **`src/**`** — untouched. In all 9 findings the code was right.
 
+## Appended 2026-08-11T040500Z — re-verification after merging `develop`
+
+`develop` moved **82 commits** between cutting this branch and opening the PR
+(PRs #210 and #211 merged: staging back-merge, design-system foundation, three
+migrated UI routes, the restore-drill automation, the requestId envelope).
+`develop` was merged in rather than the branch rebased, and everything re-run.
+
+Two conflicts, both in `WORK/` and both purely additive — my new `LOCK.md`
+claim against two new claims from `claude/status-master-staging-develop-en9r8k`,
+and my new `LOOP_STATE.md` row against four of theirs. Resolved as a **union**,
+mine first; no other session's content was rewritten or dropped, which is the
+rule `WORK/README.md` sets for this file.
+
+The re-run that mattered: **a new backend route on `develop` would have made one
+of the six allowlist entries stale and failed my own scan.** It did not — the
+route count is unchanged at 626, so #210's "migrated routes" were frontend
+pages, not new API surface.
+
+| Gate, post-merge | Result |
+|---|---|
+| `contract:scan` | ✅ 146 documented vs 626 routes, 6 allowlisted — unchanged |
+| `gap:scan` | ✅ 474 / 382, 17 allowlisted — unchanged |
+| `authz:scan` / `table:scan` | ✅ unchanged |
+| `hygiene` | ✅ 2221 files (was 2206 — develop's additions) |
+| backend `typecheck` | ✅ clean |
+| web `typecheck` / `lint` | ✅ clean / 0 errors, 0 warnings |
+| web `vitest` | ✅ **234/234 across 31 files** (was 206/29 — develop added 28) |
+| web `build` | ✅ production build succeeds |
+| `ci.yml` parses | ✅ 10 jobs; the new step auto-merged intact at position 10 of `guard` |
+| diff vs `develop` | ✅ exactly the 12 intended files, nothing unrelated swept in |
+
+**CI on merge commit `3adb901`** confirms the guard is live rather than merely
+present — GitHub reports step 10 of the `guard` job, *"OpenAPI contract scan —
+every documented operation has a route"*, as `completed / success`, alongside
+`Frontend — typecheck + lint + test + build`, `Docker build`, CodeQL, gitleaks,
+SBOM and `actionlint` (which lints the workflow edit itself). The step carries
+no `continue-on-error`, no `|| true`, and no `|| echo` — precisely the three
+spellings that made F-1 and F-2 inert for their entire lives.
+
+This section is the only change after `3adb901`; it is documentation, so the
+authoritative gate is the CI run on the final commit, which must be green
+before merge.
+
 ## Next unblocked item
 
 F-11, F-3, F-14 remain blocked. With F-5, F-9 and F-18 closed, the remaining
