@@ -4,7 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CommandPalette } from "@/components/CommandPalette";
+import { MobileTabBar } from "@/components/MobileTabBar";
 import { NotificationBell } from "@/components/NotificationBell";
+import { ScanSheet } from "@/components/ScanSheet";
 import { useAuth } from "@/lib/useAuth";
 import { useOffline } from "@/lib/useOffline";
 import { useFinderContext } from "@/lib/useFinderContext";
@@ -248,6 +250,7 @@ export function EnterpriseShell({
   contentClassName,
 }: EnterpriseShellProps) {
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
   const [compactViewport, setCompactViewport] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(() =>
     typeof window === "undefined" ? true : window.innerWidth >= 768
@@ -301,12 +304,22 @@ export function EnterpriseShell({
           expanded={sidebarExpanded}
           compact={compactViewport}
           onCollapseToggle={() => setSidebarExpanded((e) => !e)}
+          // Following a link used to leave the drawer open on top of the page
+          // it had just navigated to, so every mobile navigation needed a
+          // second tap on the scrim to see the result.
+          onNavigate={() => {
+            if (compactViewport) setSidebarExpanded(false);
+          }}
         />
 
         <main
           id="main-content"
           className={[
             "flex flex-1 flex-col min-w-0 transition-[margin-left] duration-200 ease-in-out md:ml-[var(--sidebar-w)]",
+            // Reserve the tab bar's height (plus the home-indicator inset) so a
+            // page's last row and any sticky footer clear it instead of sitting
+            // underneath. Collapses to 0 at `md`, where the bar is not rendered.
+            "pb-mobile-nav",
             contentClassName ?? "overflow-y-auto",
           ].join(" ")}
           style={{ "--sidebar-w": `${sidebarW}px` } as React.CSSProperties}
@@ -319,7 +332,14 @@ export function EnterpriseShell({
         </main>
       </div>
 
+      <MobileTabBar
+        moreOpen={compactViewport && sidebarExpanded}
+        onMoreClick={() => setSidebarExpanded((e) => !e)}
+        onScanClick={() => setScanOpen(true)}
+      />
+
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <ScanSheet open={scanOpen} onClose={() => setScanOpen(false)} />
     </div>
   );
 }
@@ -442,11 +462,14 @@ function LeftRail({
   expanded,
   compact,
   onCollapseToggle,
+  onNavigate,
 }: {
   active: NavKey;
   expanded: boolean;
   compact: boolean;
   onCollapseToggle: () => void;
+  /** Called after any nav link is followed — closes the mobile drawer. */
+  onNavigate: () => void;
 }) {
   const pathname = usePathname();
   const { enabled: enabledModules } = useModuleFlags();
@@ -496,7 +519,7 @@ function LeftRail({
   return (
     <nav
       aria-label="Primary navigation"
-      className="fixed left-0 top-12 bottom-0 z-40 flex flex-col overflow-hidden transition-[width] duration-200 ease-in-out"
+      className="fixed left-0 top-12 bottom-[var(--mobile-nav-total)] z-40 flex flex-col overflow-hidden transition-[width] duration-200 ease-in-out md:bottom-0"
       style={{
         width: compact && !expanded ? 0 : expanded ? 220 : 52,
         backgroundColor: "var(--color-sidebar-bg)",
@@ -575,6 +598,7 @@ function LeftRail({
               ) : (
                 <Link
                   href={item.href}
+                  onClick={onNavigate}
                   title={expanded ? undefined : item.label}
                   aria-label={item.label}
                   aria-current={isActive ? "page" : undefined}
@@ -625,6 +649,7 @@ function LeftRail({
                       <Link
                         key={child.href}
                         href={child.href}
+                        onClick={onNavigate}
                         className={`flex items-center gap-2 py-1.5 pl-[46px] pr-3 text-xs transition-colors ${
                           isCurrent
                             ? "font-semibold text-white"
