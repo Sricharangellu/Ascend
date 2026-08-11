@@ -229,15 +229,76 @@ in the bulk-update test fails against the previous implementation by constructio
 
 ---
 
-## 5. Known limitations
+## 5. Performance, measured
 
-- **No load test at 100k products.** The design is index-backed and paginated,
-  and nothing loads the catalog into the browser any more, but the largest set
-  actually exercised here is in the tens. `EXPLAIN`-level validation against a
-  synthetic large catalog is not done and is not claimed.
-- **Playwright e2e not run** — no built-and-served real-stack pair in this
-  container. CI runs the golden paths on the PR.
-- **Node 22 here, 24 in CI.** The web suite passed 215/215 anyway; the three
-  documented jsdom `FileReader` failures did not occur.
-- The trigram indexes are created but their *use* was not verified with
-  `EXPLAIN ANALYZE`; on a host without `pg_trgm` they are skipped by design.
+Run by booting the real app (real migrations, real indexes) and timing the
+actual service methods, not hand-written SQL. Numbers below are from a quiet
+box; an earlier set taken while the test suite was running was discarded as
+too noisy to reason from — in it the *cheapest* variant read slower than a more
+expensive one.
+
+At **10,000 products**, everything except search is comfortably fast:
+
+| Operation | Latency |
+|---|---|
+| filter, category + brand | 5.5 ms |
+| filter, price range | 5.8 ms |
+| sort, price desc (page 1) | 20.2 ms |
+| sort, name asc, deep page (offset 9,000) | 57.3 ms |
+| `productType=master` (derived in SQL) | 10.9 ms |
+| facets, unfiltered | 43.6 ms |
+| facets, scoped to a search | 108.9 ms |
+| **search, single token** | **120.7 ms** |
+| **search, two tokens** | **160.3 ms** |
+
+**Search is the slow path — ~120 ms at 10k, ~200 ms at 50k.** "Designed for
+large catalogs" was too generous a claim: the result is correct and paginated,
+but the search path is not sublinear.
+
+Two candidate explanations were ruled out rather than assumed:
+
+- The trigram indexes **are** created correctly — all seven present in
+  `pg_indexes` for the test schema, `pg_trgm` installed.
+- The raw predicate is fast (1.2 ms). `LIMIT 50` lets a sequential scan
+  short-circuit once it has enough rows.
+
+The cost is in the parts that *cannot* short-circuit: the `COUNT(*)` that
+produces `total`, and the `ORDER BY` across every match.
+
+### One fix this justified
+
+The alternate-barcode clause was a correlated `EXISTS`. Inside an `OR`, Postgres
+cannot flatten that into a semi-join, so it runs as a per-row SubPlan and
+re-queries `product_barcodes` for every row the column predicates did not
+already match. Rewritten as `products.id IN (SELECT …)`, which evaluates the
+inner scan once and hashes the result:
+
+| Query | `EXISTS` (before) | `IN` (after) |
+|---|---|---|
+| rows, 50k catalog | 201.9 ms | **122.1 ms** |
+| `COUNT(*)`, 50k catalog | 182.0 ms | **162.6 ms** |
+
+~26% off a search request end to end. Equivalence was checked in both
+directions before adopting it, including the case that would break if the
+rewrite were wrong: a term matching **only** an alternate barcode returns 10
+rows under both forms (6,250 = 6,250 on a common term). The barcode tests in
+`catalog.test.ts` cover the same behaviour.
+
+## 6. Known limitations
+
+- **Not measured at 100k.** Tested at 10k and 50k. Search cost grows roughly
+  linearly, so ~100k is expected around 400 ms for the search path — projected,
+  not measured, and stated as such. If the catalog gets there, the fix is a
+  materialized `search_text tsvector` column with a GIN index, which turns the
+  OR-chain into one indexed lookup. Not done here: it is a schema change with
+  its own maintenance story, and it should be driven by a real catalog rather
+  than a synthetic one.
+- **One measurement is not attributable.** The "variant_count subquery on 50
+  rows — 75.6 ms" reading had no control for the `ORDER BY name` over 50k rows
+  in the same query, so it cannot be blamed on `variant_count`. Recorded, not
+  acted on.
+- **Playwright e2e not run.** Correcting an earlier claim in this audit: the
+  e2e job is gated `if: github.event_name == 'push'`, so it does **not** run on
+  a pull request. The golden paths run after the merge to `develop`, not before.
+- **Node 22 here, 24 in CI.** The web suite passed anyway; the three documented
+  jsdom `FileReader` failures did not occur.
