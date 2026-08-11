@@ -84,6 +84,23 @@ export function compile(sql: string, params: Params): { text: string; values: un
   return { text, values };
 }
 
+/**
+ * Resolved per-STATEMENT timeout applied as `SET LOCAL statement_timeout` at
+ * every BEGIN. Note the scope: Postgres applies `statement_timeout` to each
+ * statement separately, so this is not a budget for the transaction as a whole
+ * (verified against PG 16 — two 1.5s sleeps both survive a 2s setting).
+ *
+ * Exported so callers that must legitimately widen it for one statement can
+ * restore *this* value afterwards rather than re-deriving it from the env and
+ * drifting. `src/app.ts` does exactly that around the migration advisory lock,
+ * where the wait is queuing time, not work, and must not be killed as if it
+ * were a hung query.
+ */
+export function txTimeoutMs(): number {
+  const raw = Number(process.env["PG_TX_TIMEOUT_MS"] ?? 30_000);
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 30_000;
+}
+
 function makeDb(q: Queryable, opts: { isTx: boolean; pool?: pg.Pool }): DB {
   const db: DB = {
     async query<T = any>(sql: string, params?: Params): Promise<T[]> {
@@ -115,13 +132,10 @@ function makeDb(q: Queryable, opts: { isTx: boolean; pool?: pg.Pool }): DB {
       const client = await pool.connect();
       const tdb = makeDb(client, { isTx: true });
       try {
-        // Prevent runaway transactions from holding locks indefinitely.
-        // 30 s is generous for any single business transaction; tune via PG_TX_TIMEOUT_MS.
+        // Prevent runaway statements from holding locks indefinitely.
         // SET LOCAL must run inside the transaction, so BEGIN and the timeout
         // travel in one combined statement (also saves a round trip).
-        const rawTimeout = Number(process.env["PG_TX_TIMEOUT_MS"] ?? 30_000);
-        const txTimeoutMs = Number.isFinite(rawTimeout) && rawTimeout > 0 ? Math.floor(rawTimeout) : 30_000;
-        await client.query(`BEGIN; SET LOCAL statement_timeout = ${txTimeoutMs}`);
+        await client.query(`BEGIN; SET LOCAL statement_timeout = ${txTimeoutMs()}`);
         // Tenant context (if any) applies to the whole transaction. Explicit
         // withTenant() views set their own value afterwards and take precedence.
         const ctxTenant = currentTenantId();

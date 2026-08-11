@@ -7,12 +7,31 @@ Supabase) and gated by CI. The Vercel projects are **not** git-connected — Git
 
 ## Environments
 
+**Design (what this pipeline is built to do):**
+
 | Tier | Git branch | Vercel env | Database | Frontend URL |
 |---|---|---|---|---|
-| **PROD** | `master` (default) | Production (`vercel --prod`) | Supabase **A** (prod) | finder-pos-frontend.vercel.app |
+| **PROD** | `master` (default) | Production (`vercel --prod`) | Supabase **A** (prod) | ascendhqweb.vercel.app |
 | **TESTING** | `staging` | Preview (stable alias) | Supabase **B** (testing) | `STAGING_FRONTEND_ALIAS` |
 | **DEV** | `develop` | Preview (unique per deploy) | Supabase **B** (shared) | per-deploy preview URL |
 | feature work | `feature/*` | — (CI tests only) | ephemeral CI Postgres | — |
+
+**Reality (verified against live runs 2026-08-08 — read this before trusting the table above):**
+
+| Tier | What actually happens on a push | Evidence |
+|---|---|---|
+| **PROD** | Last release is `e55e743`; `master` is **245 commits behind `staging`** — and the Render backend deploys from `master`, so the production *backend code* is stale by the same margin. `PROD_BACKEND_URL` is still **unset**; PR #206 repointed the fallback from the dead `ascendhq-api.vercel.app` (HTTP 404) to the Sri-confirmed `ascend-prod.onrender.com`, which runs on Render's **free plan** (~15 min idle → spin-down, ~50 s cold start). | run `31272326653`; PR #206 |
+| **TESTING** | Frontend deploys and aliases correctly; **backend deploy fails** (`Project not found` — the Vercel backend project is deleted). Net: a live staging frontend proxying `/api/*` at a host that does not exist. | run `31271109836` |
+| **DEV** | `Deploy → Dev` is **skipped every push** (`DEV_BACKEND_URL` unset). Green CI on `develop` means "tests passed", not "dev is updated". | run `31270468757`, job `93137531666` |
+| feature work | Works as designed — CI on the PR, no deploy. | run `31270468757` |
+
+> **Scheduled workflows run the DEFAULT BRANCH's copy.** `uptime.yml`, `backup.yml` and
+> `security.yml`'s weekly arm execute whatever is on `master`, not on `develop`. With `master` 245
+> commits behind, every ops fix merged to `develop` since 2026-07-20 is inert for those runs —
+> including the repo-variable indirection of ADR-011 and the backup job's honesty fix, and
+> `security.yml` does not exist on `master` at all. See `DEPLOYMENTS.md`'s 2026-08-08
+> re-verification section and
+> `WORK/audits/AUDIT_2026-08-08T184339Z-infrastructure-environment-integration-audit.md`.
 
 `develop` and `staging` both deploy as Vercel **Preview** builds, so they share the Preview
 environment variables → the same **testing** database (Supabase B). Production is fully isolated on
@@ -179,7 +198,8 @@ for the full investigation this depends on.
 |---|---|---|---|---|---|
 | `DATABASE_URL` | Postgres connection string | `src/shared/db.ts`, every module | Render/Vercel env (backend host — see `DEPLOYMENTS.md` for which), or `DEV_DATABASE_URL` GH secret override for dev tier | Regenerate via Supabase dashboard; update wherever the real backend host stores env vars | VERIFIED present + actively used; **which host actually holds the live value is UNVERIFIED — see `DEPLOYMENTS.md`** |
 | `PG_POOL_MAX` | Postgres connection pool size cap | `src/shared/db.ts` | Same as `DATABASE_URL`'s host | No rotation — a tuning value, not a credential | VERIFIED (code reference) |
-| `PG_TX_TIMEOUT_MS` | Per-transaction statement timeout | `src/shared/db.ts` | Same | No rotation — tuning value | VERIFIED — actively tuned per-environment (CI got its own headroom, PR #118) |
+| `PG_TX_TIMEOUT_MS` | Per-**statement** timeout, applied as `SET LOCAL statement_timeout` at BEGIN. Each statement in a transaction gets its own budget — verified against PG 16; the previous "per-transaction" wording here was wrong, and that misreading is what let the migration-lock flake hide | `src/shared/db.ts` | Same | No rotation — tuning value | VERIFIED — actively tuned per-environment (CI got its own headroom, PR #118) |
+| `PG_MIGRATION_LOCK_WAIT_MS` | Bound on how long boot waits for the migration advisory lock (default 300000). Concurrent instances queue here; exceeding it raises an explicit "migration lock not acquired" error instead of a misleading statement timeout | `src/app.ts` | Same | No rotation — tuning value | VERIFIED (code reference + regression tests in `src/app.migration-lock.test.ts`) |
 | `PG_SSL` | Enable/disable TLS to Postgres | `src/shared/db.ts` | Same | No rotation — config flag | VERIFIED (code reference) |
 | `PG_CA_CERT` / `PG_CA_CERT_B64` | Custom CA certificate for DB TLS verification (raw PEM / base64) — **two distinct formats, not a duplicate** | `src/shared/db.ts` (C-3 hardening) | Same | Regenerate alongside the Supabase project's cert chain if it rotates | VERIFIED — real fix, `WORK/LOCK.md` "session D — C-3: verified DB TLS" |
 | `PG_SSL_NO_VERIFY` | Explicit escape hatch to skip cert verification (logs a loud warning) | `src/shared/db.ts` | Same | Should not be set in production outside a documented exception | VERIFIED (C-3 fix) |
