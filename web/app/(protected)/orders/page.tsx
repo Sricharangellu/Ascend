@@ -22,6 +22,7 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { PageShell } from "@/components/PageShell";
 import { DataTable, type DataColumn } from "@/components/DataTable";
 import { Badge } from "@/components/Badge";
+import { Button } from "@/components/Button";
 import { formatMoney } from "@/lib/money";
 import { fmtDateTime } from "@/lib/date";
 import { apiGet, ApiResponseError } from "@/api-client/client";
@@ -230,6 +231,19 @@ export default function OrdersPage() {
             status === "all"
               ? "Orders appear here as soon as you ring up a sale on the Register."
               : "Try a different status filter — other orders may exist."
+          }
+          // Every empty state offers a way forward. Browser QA caught this one
+          // naming the Register without giving the user any way to reach it —
+          // a first-run tenant sees only this screen, so the dead end is the
+          // whole experience.
+          emptyAction={
+            status === "all" ? (
+              <Button onClick={() => router.push("/terminal")}>Open the Register</Button>
+            ) : (
+              <Button variant="secondary" onClick={() => changeStatus("all")}>
+                Show all orders
+              </Button>
+            )
           }
           // Search and column sorting are intentionally omitted: paging is
           // server-side, so both would silently act on the loaded 25 rows only
