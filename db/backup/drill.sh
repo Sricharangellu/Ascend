@@ -84,15 +84,39 @@ mkdir -p "$BACKUP_DIR"
 # Helpers
 # ---------------------------------------------------------------------------
 
-# Same python3-based URL parsing restore.sh uses — kept identical on purpose so
-# the two scripts cannot disagree about what a DATABASE_URL means.
+# Same python3-based URL parsing restore.sh uses, so the two scripts cannot
+# disagree about what a DATABASE_URL means — but passing the values through the
+# ENVIRONMENT rather than interpolating them into the python source.
+#
+# restore.sh interpolates directly (`urlparse('$1')`). A connection string whose
+# password contains a single quote would break out of that string literal: at
+# best a baffling SyntaxError mid-drill, at worst arbitrary python execution
+# from a value someone pasted out of a password manager. Not attacker-controlled
+# in any realistic threat model — you supply your own DATABASE_URL — but there is
+# no reason to keep the sharp edge when os.environ costs nothing.
+# (restore.sh carries the same pattern; fixing it there is a separate change to
+# a script this one deliberately does not rewrite.)
 url_part() {
-    python3 -c "
+    _URL="$1" _PART="$2" python3 -c "
+import os
 from urllib.parse import urlparse
-u = urlparse('$1')
-print(getattr(u, '$2') or '')
+u = urlparse(os.environ['_URL'])
+print(getattr(u, os.environ['_PART']) or '')
 "
 }
+
+require_cmd() {
+    if ! command -v "$1" &>/dev/null; then
+        echo "${LOG_PREFIX} ERROR: '$1' not found on PATH." >&2
+        echo "${LOG_PREFIX} The drill needs the PostgreSQL client tools (psql, pg_dump, pg_restore)." >&2
+        exit 1
+    fi
+}
+# Checked up front rather than letting step 1 die on a bare "command not found".
+# backup.sh and restore.sh each check their own tools, but the fingerprint below
+# runs before either of them is invoked.
+require_cmd psql
+require_cmd python3
 
 # Fingerprint = every public table, its exact row count, AND an md5 of its
 # entire contents. Sorted, so it diffs cleanly.
@@ -272,7 +296,7 @@ echo ""
 echo "${LOG_PREFIX} ━━━ DR DRILL PASSED ━━━"
 echo "${LOG_PREFIX}   backup      : ${BACKUP_SECONDS}s → ${DUMP_BYTES} bytes"
 echo "${LOG_PREFIX}   tables/rows : ${SOURCE_TABLES} / ${SOURCE_ROWS} — identical after restore"
-echo "${LOG_PREFIX}   RTO         : ${RTO_SECONDS}s (restore start → application authenticating)"
+echo "${LOG_PREFIX}   RTO         : ${RTO_SECONDS}s (restore start → application booted, migrated and ready)"
 echo "${LOG_PREFIX}   RTO budget  : ${RTO_BUDGET}s"
 
 if [[ "$RTO_SECONDS" -gt "$RTO_BUDGET" ]]; then
