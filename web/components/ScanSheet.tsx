@@ -90,13 +90,17 @@ export function ScanSheet({ open, onClose }: ScanSheetProps) {
   const [state, setState] = useState<ScanState>({ kind: "idle" });
   const [recent, setRecent] = useState<Array<{ code: string; name: string; id: string }>>([]);
   const [cameraOn, setCameraOn] = useState(false);
-  const cameraSupported = useRef<boolean>(false);
+  // State, not a ref: this is detected in an effect (it cannot run during SSR),
+  // and a ref write does not re-render — so the "Use camera" button would never
+  // appear on mount, only if some later keystroke happened to re-render.
+  const [cameraSupported, setCameraSupported] = useState(false);
 
   useEffect(() => {
-    cameraSupported.current =
+    setCameraSupported(
       getBarcodeDetector() !== null &&
-      typeof navigator !== "undefined" &&
-      Boolean(navigator.mediaDevices?.getUserMedia);
+        typeof navigator !== "undefined" &&
+        Boolean(navigator.mediaDevices?.getUserMedia),
+    );
   }, []);
 
   const resolve = useCallback(async (raw: string) => {
@@ -232,7 +236,7 @@ export function ScanSheet({ open, onClose }: ScanSheetProps) {
             </Button>
           </form>
 
-          {cameraSupported.current && (
+          {cameraSupported && (
             <button
               type="button"
               onClick={() => setCameraOn((c) => !c)}
@@ -422,10 +426,20 @@ function CameraScanner({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // The parent passes fresh inline closures on every render, and this effect
+  // starts a camera. Depending on their identity would tear the stream down and
+  // call getUserMedia again on every keystroke in the field above — a visible
+  // flicker, a permissions churn, and a battery cost. Hold them in refs so the
+  // effect runs exactly once per mount.
+  const onDetectRef = useRef(onDetect);
+  const onErrorRef = useRef(onError);
+  onDetectRef.current = onDetect;
+  onErrorRef.current = onError;
+
   useEffect(() => {
     const Ctor = getBarcodeDetector();
     if (!Ctor) {
-      onError("This browser cannot scan with the camera. Use the field above.");
+      onErrorRef.current("This browser cannot scan with the camera. Use the field above.");
       return;
     }
 
@@ -445,7 +459,7 @@ function CameraScanner({
         const hit = results.find((r) => r.rawValue);
         if (hit) {
           stopped = true;
-          onDetect(hit.rawValue);
+          onDetectRef.current(hit.rawValue);
           return;
         }
       } catch {
@@ -471,7 +485,7 @@ function CameraScanner({
         raf = requestAnimationFrame(() => void tick());
       } catch (e) {
         const name = e instanceof Error ? e.name : "";
-        onError(
+        onErrorRef.current(
           name === "NotAllowedError"
             ? "Camera access was blocked. Allow it in your browser settings, or type the code above."
             : "The camera could not be started. Type the code above instead.",
@@ -484,7 +498,7 @@ function CameraScanner({
       cancelAnimationFrame(raf);
       stream?.getTracks().forEach((t) => t.stop());
     };
-  }, [onDetect, onError]);
+  }, []);
 
   return (
     <div className="mt-3 overflow-hidden rounded-container border border-line bg-black">

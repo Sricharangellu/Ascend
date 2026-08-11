@@ -18,6 +18,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { MobileTabBar } from "@/components/MobileTabBar";
 import { DataTable, type DataColumn } from "@/components/DataTable";
+import { ScanSheet } from "@/components/ScanSheet";
 import { MOBILE_QUERY } from "@/lib/useMediaQuery";
 
 // ── Test doubles for the two gating layers ──────────────────────────────────
@@ -220,5 +221,56 @@ describe("DataTable — mobile layout", () => {
       />,
     );
     expect(screen.getByText("No products")).toBeInTheDocument();
+  });
+});
+
+// ── ScanSheet camera affordance ─────────────────────────────────────────────
+// Guards a bug this file was written after: camera support is detected in an
+// effect, and the flag was held in a ref. A ref write does not re-render, so
+// the button never appeared on mount — the camera path was unreachable on every
+// device that supported it, and nothing failed.
+
+describe("ScanSheet — camera affordance", () => {
+  const originalDetector = (globalThis as Record<string, unknown>)["BarcodeDetector"];
+
+  function setBarcodeApi(present: boolean) {
+    if (present) {
+      (globalThis as Record<string, unknown>)["BarcodeDetector"] = class {
+        detect() {
+          return Promise.resolve([]);
+        }
+      };
+      Object.defineProperty(navigator, "mediaDevices", {
+        value: { getUserMedia: () => Promise.resolve({ getTracks: () => [] }) },
+        configurable: true,
+      });
+    } else {
+      delete (globalThis as Record<string, unknown>)["BarcodeDetector"];
+    }
+  }
+
+  afterEach(() => {
+    if (originalDetector === undefined) delete (globalThis as Record<string, unknown>)["BarcodeDetector"];
+    else (globalThis as Record<string, unknown>)["BarcodeDetector"] = originalDetector;
+  });
+
+  it("offers the camera when the browser supports BarcodeDetector", async () => {
+    setBarcodeApi(true);
+    render(<ScanSheet open onClose={() => {}} />);
+    expect(await screen.findByRole("button", { name: /use camera/i })).toBeInTheDocument();
+  });
+
+  it("hides the camera on a browser without it, keeping the field as the path", () => {
+    setBarcodeApi(false);
+    render(<ScanSheet open onClose={() => {}} />);
+    expect(screen.queryByRole("button", { name: /use camera/i })).not.toBeInTheDocument();
+    // The typed/wedge path must always exist — it is the guaranteed one.
+    expect(screen.getByLabelText(/barcode, upc or sku/i)).toBeInTheDocument();
+  });
+
+  it("renders nothing when closed", () => {
+    setBarcodeApi(true);
+    render(<ScanSheet open={false} onClose={() => {}} />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
