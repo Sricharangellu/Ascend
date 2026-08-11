@@ -6,7 +6,8 @@
 | Queue item | `WORK/LOOP_STATE.md` NEW 2026-08-11: RefundWorkflow `validate_refund_eligibility` SELECTs nonexistent `orders.refunded_cents`. Proven against real PG; HTTP refund still 200 (errors swallowed). Also confirmed residual: `refunds` table missing + OrdersService payload uses `totalCents` not `refundCents`. |
 | Files/areas expected | `src/orchestration/workflows/refund.workflow.ts`; `src/orchestration/migrations.ts` (add `refunds` table only); `src/orchestration/tests/refund.workflow.test.ts`; NEW `src/orchestration/tests/refund.workflow.realdb.test.ts`; `WORK/{LOCK,LOOP_STATE}.md`; NEW audit. NOT `web/**`, NOT `src/modules/orders/**` (HTTP path is correct), NOT `artifacts/**`. |
 | Started | 2026-08-11T203000Z |
-| Status | ACTIVE — implementing |
+| Status | RELEASED — pushed to `cursor/fix-refund-workflow-refunded-cents-6459` (PR #232). |
+| Gates | Backend `typecheck` PASS · `npm test` **940/940, 0 fail** (~8.7 min, embedded PG) · `npm run smoke` **20/20** incl. step 14 "orchestration recorded no failed workflow instances" after a live refund · `table:scan` PASS · `hygiene` PASS. No `web/**` changes. |
 | Overlap check | No ACTIVE claim scopes `src/orchestration/**`. Migration-lock claim (ACTIVE) scopes `src/app.ts` / `src/shared/db.ts` only. |
 | Blockers | none |
 
