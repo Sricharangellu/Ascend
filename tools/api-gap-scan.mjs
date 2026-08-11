@@ -11,7 +11,7 @@
  *   1. Extracts every registered backend route: module register() routes with
  *      mountPath resolution, app.ts direct routes, and identity routes.
  *   2. Extracts every /api/v1|/api/identity path literal in the web client.
- *   3. Normalizes params (`:id`, `${expr}` → `:p`) and diffs FE → BE.
+ *   3. Normalizes params (`:id`, `{id}`, `${expr}` → `:p`) and diffs FE → BE.
  *   4. Fails (exit 1) on any FE path with no backend route, unless the path is
  *      in tools/api-gap-allowlist.json (known Preview surfaces / tracked gaps).
  *   5. Warns on stale allowlist entries (backend route now exists) so the
@@ -26,6 +26,7 @@
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { execFileSync } from "node:child_process";
+import { collectBackendRoutes, normalizePath as norm } from "./lib/backend-routes.mjs";
 
 const ROOT = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
 
@@ -41,61 +42,11 @@ function* walk(dir, skip = /node_modules|\.next|test-results/) {
   }
 }
 
-/** Normalize a route/call path: params and template holes become `:p`. */
-function norm(p) {
-  return (
-    p
-      .replace(/:[A-Za-z_]+/g, ":p")
-      .replace(/\$\{[^}]*\}/g, ":p")
-      .replace(/\$\{.*$/, "") // dangling template hole (multiline literal) — trim
-      .replace(/\?.*$/, "")
-      .trim()
-      .replace(/\/+$/, "") || "/"
-  );
-}
-
 // ─── 1. backend routes ────────────────────────────────────────────────────────
-
-const MODULES_DIR = join(ROOT, "src/modules");
-const ROUTE_RE = /\brouter\.(get|post|put|patch|delete)\(\s*[`"']([^`"']*)[`"']/g;
-
-const backend = new Set(); // normalized full paths
-
-for (const mod of readdirSync(MODULES_DIR)) {
-  const modDir = join(MODULES_DIR, mod);
-  if (!statSync(modDir).isDirectory()) continue;
-  const idx = join(modDir, "index.ts");
-  if (!existsSync(idx)) continue;
-  const idxSrc = readFileSync(idx, "utf8");
-  const name = idxSrc.match(/name:\s*"([^"]+)"/)?.[1] ?? mod;
-  const mountPath = idxSrc.match(/mountPath:\s*"([^"]+)"/)?.[1] ?? `/api/v1/${name}`;
-  for (const file of readdirSync(modDir)) {
-    if (!file.endsWith(".ts") || file.includes(".test.")) continue;
-    const src = readFileSync(join(modDir, file), "utf8");
-    for (const m of src.matchAll(ROUTE_RE)) {
-      const sub = m[2] === "/" ? "" : m[2];
-      backend.add(norm(mountPath.replace(/\/$/, "") + sub));
-    }
-  }
-}
-
-// app.ts direct routes (flags, capabilities, stream, jobs, …)
-const appSrc = readFileSync(join(ROOT, "src/app.ts"), "utf8");
-for (const m of appSrc.matchAll(/\bapp\.(get|post|put|patch|delete)\(\s*[`"']([^`"']+)[`"']/g)) {
-  backend.add(norm(m[2]));
-}
-// SSO public routes are registered via registerPublicRoutes on /api/v1/sso —
-// already collected from the sso module's routes.ts above.
-
-// identity routes
-const IDENTITY_DIR = join(ROOT, "src/identity");
-for (const file of readdirSync(IDENTITY_DIR)) {
-  if (!file.endsWith(".ts") || file.includes(".test.")) continue;
-  const src = readFileSync(join(IDENTITY_DIR, file), "utf8");
-  for (const m of src.matchAll(ROUTE_RE)) {
-    backend.add(norm("/api/identity" + m[2]));
-  }
-}
+// Extraction lives in tools/lib/backend-routes.mjs — openapi-contract-scan.mjs
+// needs the same enumeration with methods attached, and copying it to add one
+// field is exactly how 41 identical test-request.ts files happened (F-5).
+const { paths: backend } = collectBackendRoutes(ROOT);
 
 // ─── 2. frontend path literals ────────────────────────────────────────────────
 

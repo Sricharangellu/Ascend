@@ -1,0 +1,28 @@
+{
+  "_readme": [
+    "Operations documented in contracts/openapi.yaml that no backend route serves,",
+    "reviewed and tolerated by tools/openapi-contract-scan.mjs.",
+    "",
+    "Every entry must say WHY, and name the route that actually serves the",
+    "capability where one exists — an entry that only says 'known' turns this file",
+    "into the place findings go to die. All six below are tracked as F-28 in",
+    "WORK/FORWARD_PLAN.md; adding an entry with no board item is forbidden, the",
+    "same rule api-gap-allowlist.json carries for the same reason.",
+    "",
+    "The scan FAILS on a stale entry — one whose mismatch no longer exists because",
+    "the route was implemented or the contract corrected. Delete it then.",
+    "",
+    "Scope note: this scan compares paths and methods only. Request and response",
+    "bodies drift too (POST .../rooms/:id/charge takes camelCase amountCents and an",
+    "orderId, while the contract says snake_case amount_cents and a category that",
+    "does not exist) — that is F-19's territory, not this file's."
+  ],
+  "operations": {
+    "PATCH /api/v1/appointments/{id}/status": "Served at a different address. src/modules/appointments/index.ts:105 registers PATCH /api/v1/appointments/:id, whose patchSchema accepts status alongside notes/startsAt/endsAt. The contract models status as a sub-resource; the code made it one optional field of a generic patch. Capability exists; addressing disagrees.",
+    "POST /api/v1/healthcare/prescriptions": "Served nested. src/modules/healthcare/index.ts:125 registers POST /api/v1/healthcare/patients/:id/prescriptions (manager+). The contract carries patient_id in the request body; the code takes it from the path. Note the sibling POST /prescriptions/{id}/dispense matches exactly — it is creation, not the whole resource, that diverged.",
+    "PATCH /api/v1/automotive/work-orders/{id}/status": "Not built as specified. The contract describes a bodyless auto-advance (open→in_progress→completed); src/modules/automotive/index.ts:166 serves PATCH /api/v1/automotive/work-orders/:id, which requires the caller to supply the target status and also accepts mileageOut/labourCents. Address and semantics both differ, so this one needs a decision, not a rename.",
+    "PATCH /api/v1/entertainment/events/{id}/status": "Not built. src/modules/entertainment/index.ts registers no PATCH on events at any address — status is set at creation and only read (the sell path 409s unless it is 'on_sale'). Genuinely absent, not relocated.",
+    "POST /api/v1/entertainment/tickets": "Served at a different address. src/modules/entertainment/index.ts:114 registers POST /api/v1/entertainment/events/:id/sell with the same atomic capacity check the contract describes. Body differs as well: the code takes an optional customerId, the contract customer_name/customer_email. The sibling POST /tickets/redeem matches exactly.",
+    "POST /api/v1/education/fees": "Served nested. src/modules/education/index.ts:144 registers POST /api/v1/education/students/:id/fees (manager+). The contract carries student_id in the request body; the code takes it from the path. Same shape of divergence as healthcare prescriptions, and the sibling POST /fees/{id}/collect matches exactly."
+  }
+}

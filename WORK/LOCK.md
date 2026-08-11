@@ -1,3 +1,17 @@
+## Active Claim (Claude Code web — Phase 9 F-18: OpenAPI contract validation)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-f18-openapi-contract-scan` |
+| Queue item | **Phase 9 backlog F-18** (`WORK/FORWARD_PLAN.md` §9.6). Walking §9.3's execution order: S-1 and F-3 are Sri-only, F-11 is ⛔ blocked on "which tax authority wins", F-14 depends on F-3, and F-5/F-9 closed on `claude/ascend-f5-test-request-factory` (PR #215). F-18 is the next item with no blocker. `contracts/openapi.yaml` is written *from* the code and nothing checks it still describes it — while frontend work is written against it and `web/package.json` still wires `generate:client` at it. |
+| Files/areas expected | NEW `tools/openapi-contract-scan.mjs`, NEW `tools/openapi-contract-allowlist.json`, NEW `tools/lib/backend-routes.mjs`; `tools/api-gap-scan.mjs` (refactored onto the shared extractor, output byte-identical); `contracts/openapi.yaml` (**three path corrections only** — no body or response-schema edits); `package.json` (`contract:scan` + `verify`); `.github/workflows/ci.yml` (one `guard` step); `tools/README.md`; `WORK/FORWARD_PLAN.md` (F-18 status + new F-28); `WORK/LOOP_STATE.md`; `WORK/LOCK.md`; new `WORK/audits/` file. **NOT** `src/**` — the code is the source of truth here and nothing in it is wrong. NOT `web/**`. NOT `artifacts/**`. NOT the 41 `test-request.ts` files (PR #215's scope, deliberately left on that branch). |
+| Started | 2026-08-11T032000Z |
+| Status | **RELEASED** — pushed to `claude/ascend-f18-openapi-contract-scan`. F-18 done; the 6 findings it cannot fix without an API decision are recorded as F-28 rather than buried. |
+| Gates (all run in this container against real PostgreSQL 16) | see the audit — backend `typecheck` · `npm test` · `smoke` · `hygiene` · `gap:scan` · **new `contract:scan`** · `authz:scan` · `table:scan` · `dupe:scan` · web `typecheck`/`lint`/`vitest`/`build` |
+| Proof the new guard works | Negative-tested three ways before it was wired in, because a guard that cannot fail is this repo's recurring defect (F-1, F-2 — both inert for their entire lives). (1) A planted contract-only operation → exit 1, named. (2) A planted stale allowlist entry for an operation that *is* served → exit 1, named. (3) The document's indent shape shifted by one space → exit 1 on the parser floor, rather than "0 operations, all good" forever. It also arrived red on the real tree: 9 findings, of which 3 were fixed and 6 allowlisted with reasons. |
+| Scope line held (stated because it was tempting to cross) | The scan compares **paths and methods only**. Bodies drift too — `POST /rooms/{id}/charge` takes camelCase `amountCents` + `orderId` while the contract says snake_case `amount_cents` + a `category` that does not exist — and every one of those fixes would be unverifiable by any test in this PR. That is F-19's pass (DB↔API↔FE type consistency), recorded as a finding, not silently fixed here. Three path renames were in scope because each is provable from a route that already exists and a frontend call that already uses the corrected spelling. |
+| Overlap check (per AGENTS.md, run before editing) | The two `ACTIVE` Cursor Cloud claims scope `web/**` and `src/modules/payments/**`; this change touches neither. PR #215 (F-5) is open on a sibling branch — its only shared files are `WORK/FORWARD_PLAN.md` and `WORK/LOOP_STATE.md`, where it edits the F-5/F-9 rows and this edits the F-18 row, so the two do not overlap in content. This branch was cut from `origin/develop`, not from the F-5 branch, so the 41 `test-request.ts` files stay in exactly one PR. The seven `Claude session D` claims dated 2026-07-16 still read `ACTIVE` and are provably finished; flagged in the F-5 claim and left for review rather than closed here. |
+| Blockers | none |
 ## Active Claim (Claude Code web — migration-lock wait must not masquerade as a statement timeout)
 
 | Field | Value |
@@ -14,7 +28,6 @@
 | Regression test is proven, not just written | `src/app.migration-lock.test.ts` was run **against the old blocking implementation**: both tests fail with `the app must finish booting once the lock is released, but it failed with: canceling statement due to statement timeout`. Restored the fix → both pass. Re-confirmed after the final timing values were chosen. Two flaws in the test's own drafts were found this way and fixed: a floating `buildApp()` promise turned the old code's early rejection into an unhandled rejection that wedged the runner instead of failing it; and the helper's try-once lock acquire failed inside the parallel suite, where the lock is contended almost continuously — it now waits for the lock like any real instance would. |
 | Live evidence the bug was real | An instrumented full-suite run logged **485 lock acquisitions, 45 waits over 10s, and one at 30619ms** — past the 30s statement timeout. Under the old code that single boot would have been killed with 57014 and failed an unrelated test. |
 | Blockers | none |
-
 ## Active Claim (Claude Code web — C-1: automate the restore drill so it stops rotting)
 
 | Field | Value |
