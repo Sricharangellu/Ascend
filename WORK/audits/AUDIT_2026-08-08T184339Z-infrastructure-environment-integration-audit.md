@@ -487,17 +487,36 @@ row 8, which records the collision rather than quietly absorbing it.
 `31272326653` died at step 1 in 90 ms; the frontend probe never executed. Every red run since
 ~2026-07-22 has the same shape, so `ascendhqweb.vercel.app` — the one confirmed-live production
 surface — has never been checked.
-*Fix:* the three backend probes carry `continue-on-error: true` (the job still fails, via a new
+*Fix:* the four probes carry `continue-on-error: true` (the job still fails, via a new
 `Verdict` step) so the frontend probe always runs. `Verdict` writes a job summary naming which
 surface is down, and distinguishes **"`PROD_BACKEND_URL` not configured — not an outage signal"**
-from **"backend configured and down"**, which the run status alone cannot express. The dead fallback
-hostname is deliberately **not** changed — ADR-011's evidence bar forbids merging an unverified URL.
+from **"backend configured and down"**, which the run status alone cannot express. The fallback
+hostnames are deliberately **not** changed — ADR-011's evidence bar forbids merging an unverified URL.
 A header comment records the default-branch rule so the next editor knows the file is inert until it
 reaches `master`.
+
+*Reconciled with PR #219 (2026-08-11), which fixed a different half of the same file.* #219 solved the
+**retry-budget-vs-timeout arithmetic**: `--retry 5` on `/healthz` is 6 × 90 s + 5 × 10 s = 590 s, which
+against the then-current `timeout-minutes: 5` meant the job was *cancelled* for exceeding its runtime
+rather than failing with a message naming the endpoint — trading a useless timeout for a useless
+cancellation. That reasoning is correct and is kept. It does **not** fix the abort-at-first-failure
+defect above, and its shape cannot: with no `continue-on-error`, a backend failure still ends the job
+before the frontend is probed. So this branch's structure was kept and the **numbers were re-derived**,
+because they are only correct together — once four probes always run, the budget is the *sum* of four,
+not the max of one: `/healthz` 390 s (4 × 90 + 3 × 10) plus three × ~100 s ≈ **690 s ≈ 11.5 min**, under
+`timeout-minutes: 13`. 13 also has to fit inside the 15-minute `cron` interval, because
+`concurrency.cancel-in-progress: true` means the *next* scheduled run cancels this one — the same
+report-nothing failure by a different route. Dropping `/healthz` from 5 retries to 3 costs no wake-up
+tolerance: `--max-time 90` on the **first attempt alone** already outlasts a ~50 s Render cold start,
+so the extra attempts only ever bought transient-failure tolerance.
+*Also corrected:* develop's comment claiming "BACKEND fallback is still a dead hostname" contradicted
+its own `env:` line two lines below — PR #206 had repointed it at `ascend-prod.onrender.com`. A comment
+that disagrees with the code it sits on is precisely the failure mode this audit exists to catch.
+
 *Verified:* `actionlint` 1.7.12 clean on all workflows; the `Verdict` script extracted and
 `shellcheck`-clean; exercised under `bash -e` across all 8 permutations of
-(configured × backend × frontend) — exit 0 only when both surfaces pass; job-summary output rendered
-and inspected.
+(configured × backend × frontend) — exit 0 only when both surfaces pass, **0 mismatches**; job-summary
+output rendered and inspected.
 
 **B. `scripts/deploy.sh` — SUPERSEDED mid-audit by PR #206; replaced with a regression guard.**
 *What I originally did:* prod was the only tier whose `BACKEND_URL` fell back to a literal, and that
