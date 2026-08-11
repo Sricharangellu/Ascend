@@ -177,18 +177,45 @@ export interface MarginByCategoryItem {
   units: number;
 }
 
-const emptyBuckets = (): AgingBuckets => ({ current: 0, d1_30: 0, d31_60: 0, d61_90: 0, d90_plus: 0, total: 0 });
-
-/** Place an outstanding balance into an aging bucket by days overdue. */
-function addToBucket(b: AgingBuckets, balance: number, dueDate: number | null, now: number): void {
-  const daysOverdue = dueDate ? Math.floor((now - dueDate) / 86_400_000) : 0;
-  if (daysOverdue <= 0) b.current += balance;
-  else if (daysOverdue <= 30) b.d1_30 += balance;
-  else if (daysOverdue <= 60) b.d31_60 += balance;
-  else if (daysOverdue <= 90) b.d61_90 += balance;
-  else b.d90_plus += balance;
-  b.total += balance;
+/** One row of the SQL bucket aggregation. `SUM()` comes back as a numeric →
+ *  string under node-postgres, so every field is coerced with `Number()`. */
+interface AgingBucketRow {
+  current: number | string;
+  d1_30: number | string;
+  d31_60: number | string;
+  d61_90: number | string;
+  d90_plus: number | string;
+  total: number | string;
 }
+
+/** Coerce one SQL bucket row into the numeric `AgingBuckets` response shape.
+ *  The queries `COALESCE(...,0)` every column, so a present row is never NULL;
+ *  the `?? 0` only defends the (impossible-in-practice) absent-row case. */
+const bucketsFromRow = (r: AgingBucketRow | undefined): AgingBuckets => ({
+  current: Number(r?.current ?? 0),
+  d1_30: Number(r?.d1_30 ?? 0),
+  d31_60: Number(r?.d31_60 ?? 0),
+  d61_90: Number(r?.d61_90 ?? 0),
+  d90_plus: Number(r?.d90_plus ?? 0),
+  total: Number(r?.total ?? 0),
+});
+
+/** The five aging buckets as conditional-aggregate columns over a CTE that
+ *  exposes `balance` (integer cents) and `days_overdue` (whole days) per open
+ *  document. Placement mirrors the previous JS `addToBucket` exactly: `<= 0`
+ *  (incl. a NULL/0 due date) is current, then floor((now - due)/DAY) buckets
+ *  the rest at the 30/60/90-day edges. Shared verbatim by the totals query
+ *  (ungrouped) and the parties query (GROUP BY party) so both agree by
+ *  construction. Composed into a SQL string that is then passed to the DB
+ *  helpers as a prebuilt variable — never as a tagged template at the call
+ *  site — and the fragment is a fixed constant, never user input. */
+const AGING_BUCKET_COLUMNS = `
+        COALESCE(SUM(balance) FILTER (WHERE days_overdue <= 0), 0)              AS current,
+        COALESCE(SUM(balance) FILTER (WHERE days_overdue BETWEEN 1 AND 30), 0)  AS d1_30,
+        COALESCE(SUM(balance) FILTER (WHERE days_overdue BETWEEN 31 AND 60), 0) AS d31_60,
+        COALESCE(SUM(balance) FILTER (WHERE days_overdue BETWEEN 61 AND 90), 0) AS d61_90,
+        COALESCE(SUM(balance) FILTER (WHERE days_overdue > 90), 0)              AS d90_plus,
+        COALESCE(SUM(balance), 0)                                              AS total`;
 
 export interface RetailProofSignal {
   code: string;
@@ -483,34 +510,29 @@ export class ReportsService {
     });
   }
 
-  /** Accounts Receivable aging — open invoice balances bucketed by days overdue. */
-  async arAging(tenantId: string, now = Date.now()): Promise<AgingReport> {
-    const rows = await this.db.query<{
-      customer_id: string;
-      party_name: string;
-      balance: number;
-      due_date: number | null;
-    }>(
-      `SELECT i.customer_id,
-              COALESCE(NULLIF(TRIM(c.name), ''), i.customer_id) AS party_name,
-              (i.total_cents - i.paid_cents) AS balance,
-              i.due_date
-         FROM invoices i
-         LEFT JOIN customers c
-           ON c.id = i.customer_id AND c.tenant_id = i.tenant_id
-        WHERE i.tenant_id = @t
-          AND i.status <> 'void'
-          AND (i.total_cents - i.paid_cents) > 0`,
-      { t: tenantId },
-    );
-    return this.buildAging(
-      rows.map((r) => ({
-        partyId: r.customer_id,
-        partyName: r.party_name,
-        balance: Number(r.balance),
-        dueDate: r.due_date,
-      })),
+  /** Accounts Receivable aging — open customer invoice balances bucketed by
+   *  days overdue. Bucketing and the grand totals are computed in SQL (see
+   *  {@link aggregateAging}); `limit` caps the returned per-party list
+   *  (default 500) so a tenant with thousands of debtors never streams its
+   *  whole open-AR ledger into app memory — `totals` stay exact regardless of
+   *  the cap (REPORTS_MODULE_REVIEW.md finding #4). */
+  async arAging(tenantId: string, now = Date.now(), limit = 500): Promise<AgingReport> {
+    return this.aggregateAging(
+      `WITH open_rows AS (
+         SELECT i.customer_id AS party_id,
+                COALESCE(NULLIF(TRIM(c.name), ''), i.customer_id) AS party_name,
+                (i.total_cents - i.paid_cents) AS balance,
+                CASE WHEN i.due_date IS NULL OR i.due_date = 0 THEN 0
+                     ELSE floor((@now - i.due_date) / 86400000.0) END AS days_overdue
+           FROM invoices i
+           LEFT JOIN customers c ON c.id = i.customer_id AND c.tenant_id = i.tenant_id
+          WHERE i.tenant_id = @t
+            AND i.status <> 'void'
+            AND (i.total_cents - i.paid_cents) > 0
+       )`,
+      tenantId,
       now,
+      limit,
     );
   }
 
@@ -541,57 +563,67 @@ export class ReportsService {
     return { updated };
   }
 
-  /** Accounts Payable aging — open supplier bill balances bucketed by days overdue. */
-  async apAging(tenantId: string, now = Date.now()): Promise<AgingReport> {
-    const rows = await this.db.query<{
-      supplier_id: string;
-      party_name: string;
-      balance: number;
-      due_date: number | null;
-    }>(
-      `SELECT b.supplier_id,
-              COALESCE(NULLIF(TRIM(s.name), ''), b.supplier_id) AS party_name,
-              (b.total_cents - b.paid_cents) AS balance,
-              b.due_date
-         FROM bills b
-         LEFT JOIN suppliers s
-           ON s.id = b.supplier_id AND s.tenant_id = b.tenant_id
-        WHERE b.tenant_id = @t
-          AND b.status <> 'void'
-          AND (b.total_cents - b.paid_cents) > 0`,
-      { t: tenantId },
-    );
-    return this.buildAging(
-      rows.map((r) => ({
-        partyId: r.supplier_id,
-        partyName: r.party_name,
-        balance: Number(r.balance),
-        dueDate: r.due_date,
-      })),
+  /** Accounts Payable aging — open supplier bill balances bucketed by days
+   *  overdue. Same SQL-side aggregation and bounded `limit` as {@link arAging};
+   *  see it and {@link aggregateAging} for the shape and the totals guarantee. */
+  async apAging(tenantId: string, now = Date.now(), limit = 500): Promise<AgingReport> {
+    return this.aggregateAging(
+      `WITH open_rows AS (
+         SELECT b.supplier_id AS party_id,
+                COALESCE(NULLIF(TRIM(s.name), ''), b.supplier_id) AS party_name,
+                (b.total_cents - b.paid_cents) AS balance,
+                CASE WHEN b.due_date IS NULL OR b.due_date = 0 THEN 0
+                     ELSE floor((@now - b.due_date) / 86400000.0) END AS days_overdue
+           FROM bills b
+           LEFT JOIN suppliers s ON s.id = b.supplier_id AND s.tenant_id = b.tenant_id
+          WHERE b.tenant_id = @t
+            AND b.status <> 'void'
+            AND (b.total_cents - b.paid_cents) > 0
+       )`,
+      tenantId,
       now,
+      limit,
     );
   }
 
-  private buildAging(
-    rows: Array<{ partyId: string; partyName: string; balance: number; dueDate: number | null }>,
+  /** Run the shared two-query aging aggregation over a caller-supplied
+   *  `open_rows` CTE (which must expose `party_id`, `party_name`, `balance`
+   *  in integer cents, and whole-day `days_overdue`). One query returns the
+   *  grand totals over *every* open row — bounded output: a single row, so the
+   *  full ledger is aggregated in the DB, never pulled into app memory — and
+   *  the other returns the top-`limit` parties by outstanding total. Both share
+   *  {@link AGING_BUCKET_COLUMNS}, so capping the parties can never make them
+   *  disagree with the totals (REPORTS_MODULE_REVIEW.md finding #4: naively
+   *  slicing the parties in JS would have understated neither, but still pulled
+   *  every row in to compute the totals — this doesn't).
+   *
+   *  `cte` is a fixed internal constant chosen by arAging/apAging, never user
+   *  input; the SQL strings are assembled here and handed to the DB helpers as
+   *  prebuilt variables, so the CI "no raw SQL interpolation" guard is clean. */
+  private async aggregateAging(
+    cte: string,
+    tenantId: string,
     now: number,
-  ): AgingReport {
-    const totals = emptyBuckets();
-    const byParty = new Map<string, { name: string; buckets: AgingBuckets }>();
-    for (const r of rows) {
-      if (!byParty.has(r.partyId)) {
-        byParty.set(r.partyId, { name: r.partyName, buckets: emptyBuckets() });
-      }
-      addToBucket(byParty.get(r.partyId)!.buckets, r.balance, r.dueDate, now);
-      addToBucket(totals, r.balance, r.dueDate, now);
-    }
+    limit: number,
+  ): Promise<AgingReport> {
+    const totalsSql = `${cte} SELECT ${AGING_BUCKET_COLUMNS} FROM open_rows`;
+    const partiesSql =
+      `${cte} SELECT party_id, MAX(party_name) AS party_name, ${AGING_BUCKET_COLUMNS} ` +
+      `FROM open_rows GROUP BY party_id ORDER BY total DESC, party_id ASC LIMIT @limit`;
+
+    const totalsRow = await this.db.one<AgingBucketRow>(totalsSql, { t: tenantId, now });
+    const partyRows = await this.db.query<AgingBucketRow & { party_id: string; party_name: string }>(
+      partiesSql,
+      { t: tenantId, now, limit },
+    );
+
     return {
-      totals,
-      parties: Array.from(byParty, ([partyId, { name, buckets }]) => ({
-        partyId,
-        partyName: name,
-        buckets,
-      })).sort((a, b) => b.buckets.total - a.buckets.total),
+      totals: bucketsFromRow(totalsRow),
+      parties: partyRows.map((r) => ({
+        partyId: r.party_id,
+        partyName: r.party_name,
+        buckets: bucketsFromRow(r),
+      })),
     };
   }
 
