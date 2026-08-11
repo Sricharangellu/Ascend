@@ -314,7 +314,12 @@ export function EnterpriseShell({
 
         <main
           id="main-content"
+          // Focusable so the skip link actually moves KEYBOARD focus here, not
+          // just the scroll position — without it the next Tab returns to the
+          // top of the nav and the link achieves nothing.
+          tabIndex={-1}
           className={[
+            "outline-none",
             "flex flex-1 flex-col min-w-0 transition-[margin-left] duration-200 ease-in-out md:ml-[var(--sidebar-w)]",
             // Reserve the tab bar's height (plus the home-indicator inset) so a
             // page's last row and any sticky footer clear it instead of sitting

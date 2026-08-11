@@ -54,24 +54,31 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {/* Skip to main content for keyboard/screen-reader users */}
-        <a href="#main-content" className="skip-link">
-          Skip to main content
-        </a>
-
         {/* Register production service worker for offline shell */}
         <ServiceWorkerInit />
         {/* Install global JS error handlers for monitoring */}
         <ErrorMonitor />
 
+        {/*
+          No <main> or skip link here.
+
+          This used to render `<main id="main-content">` around everything, and
+          EnterpriseShell renders its own `<main id="main-content">` inside it.
+          That produced a duplicate id and a nested <main> on every protected
+          page — and because `#main-content` resolves to the FIRST match, the
+          skip link jumped to a wrapper that starts ABOVE the top bar and the
+          navigation rail. "Skip to content" therefore skipped nothing, on
+          every signed-in page, which is the one keyboard affordance whose
+          entire job is bypassing that navigation.
+
+          Each shell now owns its own landmark and skip link, positioned so the
+          target is genuinely past the chrome: EnterpriseShell, MarketingShell
+          and AuthShell.
+        */}
         <MockWorkerInit>
           <GlobalErrorBoundary>
             <FlagProvider>
-              <ToastProvider>
-                <main id="main-content" tabIndex={-1} className="outline-none">
-                  {children}
-                </main>
-              </ToastProvider>
+              <ToastProvider>{children}</ToastProvider>
             </FlagProvider>
           </GlobalErrorBoundary>
         </MockWorkerInit>

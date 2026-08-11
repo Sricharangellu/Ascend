@@ -18,22 +18,19 @@ export default function manifest(): MetadataRoute.Manifest {
     // here but had never been committed, so every home-screen install fell back
     // to a browser-default icon.
     //
-    // Declared "any maskable": a maskable-only icon is padded and shrunk by
-    // browsers that do not apply a mask, which is why an icon that only claims
-    // "maskable" often appears too small in a menu or tab.
+    // Each file is declared twice, once per purpose. The manifest spec allows
+    // a space-separated `"any maskable"`, but Next's `MetadataRoute.Manifest`
+    // types `purpose` as a single enum member and rejects it. Separate entries
+    // are equivalent to the browser and keep the file type-checked.
+    //
+    // Both purposes matter: a maskable-only icon is padded and shrunk by
+    // browsers that apply no mask, which is why such icons often look too
+    // small in a tab or menu.
     icons: [
-      {
-        src: "/icons/icon-192.png",
-        sizes: "192x192",
-        type: "image/png",
-        purpose: "any maskable",
-      },
-      {
-        src: "/icons/icon-512.png",
-        sizes: "512x512",
-        type: "image/png",
-        purpose: "any maskable",
-      },
+      { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
+      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
     screenshots: [],
     categories: ["business", "finance", "productivity"],

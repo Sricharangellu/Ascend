@@ -42,6 +42,8 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-950 lg:flex-row">
+      {/* Owned by the shell, not the root layout — see app/layout.tsx. */}
+      <a href="#main-content" className="skip-link">Skip to content</a>
       {/* Left — brand / marketing panel (60%) */}
       <div className="relative hidden overflow-hidden bg-gradient-to-br from-brand-700 via-brand-800 to-indigo-950 lg:flex lg:w-[60%] lg:flex-col lg:justify-between lg:p-12 xl:p-16">
         <DashboardPreview />
@@ -121,9 +123,13 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
 
-        <div className="flex flex-1 items-center justify-center px-4 py-6 sm:px-8">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="flex flex-1 items-center justify-center px-4 py-6 outline-none sm:px-8"
+        >
           <div className="w-full max-w-md">{children}</div>
-        </div>
+        </main>
 
         <AuthFooter />
       </div>
