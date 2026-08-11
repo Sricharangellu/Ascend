@@ -1,6 +1,7 @@
 "use client";
 
 import { Card } from "@/components/Card";
+import { DataTable, type DataColumn } from "@/components/DataTable";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { formatMoney } from "@/lib/money";
@@ -20,6 +21,22 @@ export function PendingPOsTable({
   onCreatePO: () => void;
 }) {
   const supplierName = (id: string) => suppliers.find((s) => s.id === id)?.name ?? id;
+
+  const columns: DataColumn<PendingPO>[] = [
+    { key: "po", header: "PO #", hideable: false, sticky: true,
+      sortValue: (po) => po.po_number ?? po.id,
+      render: (po) => <span className="font-semibold text-accent-700">#{po.po_number ?? po.id}</span> },
+    { key: "supplier", header: "Supplier", sortValue: (po) => supplierName(po.supplier_id),
+      render: (po) => <span className="font-medium text-content-primary">{supplierName(po.supplier_id)}</span> },
+    { key: "status", header: "Status", sortValue: (po) => po.receive_status ?? "pending",
+      render: (po) => (
+        <Badge variant={receiveStatusBadge(po.receive_status)}>{po.receive_status ?? "pending"}</Badge>
+      ) },
+    { key: "total", header: "Total", numeric: true, sortValue: (po) => po.total_cost_cents,
+      render: (po) => <span className="font-semibold">{formatMoney(po.total_cost_cents)}</span> },
+    { key: "created", header: "Created", sortValue: (po) => po.created_at,
+      render: (po) => <span className="text-xs text-content-muted">{fmtDate(po.created_at)}</span> },
+  ];
 
   if (pendingPOs.length === 0) {
     return (
@@ -42,30 +59,15 @@ export function PendingPOsTable({
         <h2 className="text-sm font-semibold text-slate-900">Pending shipments</h2>
         <p className="text-xs text-slate-400">Click a row or use the selector above to start receiving</p>
       </div>
-      <table className="min-w-full divide-y divide-slate-100 text-sm">
-        <thead className="bg-slate-50 text-xs text-left text-slate-500 uppercase tracking-wide">
-          <tr>
-            <th className="px-4 py-2.5">PO #</th>
-            <th className="px-4 py-2.5">Supplier</th>
-            <th className="px-4 py-2.5">Status</th>
-            <th className="px-4 py-2.5 text-right">Total</th>
-            <th className="px-4 py-2.5">Created</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-50 bg-white">
-          {pendingPOs.map((po) => (
-            <tr key={po.id} className="cursor-pointer hover:bg-blue-50 transition-colors" onClick={() => onSelect(po.id)}>
-              <td className="px-4 py-3 font-semibold text-blue-700">#{po.po_number ?? po.id}</td>
-              <td className="px-4 py-3 font-medium text-slate-900">{supplierName(po.supplier_id)}</td>
-              <td className="px-4 py-3">
-                <Badge variant={receiveStatusBadge(po.receive_status)}>{po.receive_status ?? "pending"}</Badge>
-              </td>
-              <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatMoney(po.total_cost_cents)}</td>
-              <td className="px-4 py-3 text-slate-400 text-xs">{fmtDate(po.created_at)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <DataTable<PendingPO>
+        caption="Purchase orders awaiting receipt, with supplier, status and total"
+        columns={columns}
+        rows={pendingPOs}
+        rowKey={(po) => po.id}
+        onRowClick={(po) => onSelect(po.id)}
+        storageKey="receive-pending-pos"
+        className="px-0"
+      />
     </Card>
   );
 }
