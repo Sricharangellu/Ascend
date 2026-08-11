@@ -6,7 +6,7 @@
 | Queue item | Phase 9.9 **F-18**: build the CI check that validates `contracts/openapi.yaml` against real backend routes, and correct the drift it finds. Picked as the next unblocked item in Phase 9's stated execution order — F-11/F-3/F-13/S-1/S-2 are all Sri-gated, and F-5/F-9 turned out to have already shipped in PR #185 with the plan table left stale. |
 | Files/areas expected | `tools/openapi-contract-scan.mjs` (new), `tools/openapi-contract-baseline.json` (new), `contracts/openapi.yaml`, `package.json`, `.github/workflows/ci.yml`, `WORK/**`. NO `src/**` changes — the backend is the source of truth here; the contract was what was wrong. NO `artifacts/**`. |
 | Started | 2026-08-06T17:10Z |
-| Status | RELEASED — pushed to `claude/status-staging-vs-develop-0vv2gg` |
+| Status | RELEASED — PR #217 → `develop`. Full report: `WORK/audits/AUDIT_2026-08-06T171000Z-f18-openapi-contract-validation.md` |
 | Blockers | none. F-28 (the underlying request-field naming split) is recorded as NEEDS-SRI rather than resolved unilaterally — renaming accepted request fields is a breaking API change. |
 ## Active Claim (Claude Code web — C-1: automate the restore drill so it stops rotting)
 
