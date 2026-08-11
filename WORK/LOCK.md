@@ -1,3 +1,15 @@
+## Active Claim (Claude Code web — P2P: purchase-order operational spine)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-p2p-design-audit-grl7ez` |
+| Queue item | Sri directive 2026-08-11: audit the Procure-to-Pay / Purchasing / Receiving implementation against a Claude Design reference and integrate the improvements that are actually justified. **The design URL (`claude.ai/design/p/424883f3-…`) is NOT reachable** — WebFetch returns 403 and it is not in the account's artifact list (shared or owned), so it could not be read. Reported as not done rather than invented. The audit therefore runs against code + the operational questions in the brief, cross-checked against the owner's own 2026-07-23 artifact "Product, Purchasing & Receiving — Enterprise Audit" (readable), with every claim in it re-verified against the current tree — several had already been closed by later work. |
+| Files/areas expected | `src/modules/purchasing/{index,service,routes,purchasing.test}.ts`; `web/api-client/types.ts` (purchasing section only); `web/components/DataTable.tsx` (additive `serverCursor` prop only); `web/app/(protected)/purchasing/_components/{OrdersTab,shared}.tsx`; NEW `web/app/(protected)/purchasing/_components/{OrderFilters,ApprovalActions}.tsx`; NEW `web/app/(protected)/purchasing/_lib/orders.ts` (+test); `web/app/(protected)/vendors/[id]/page.tsx` + `web/app/(protected)/catalog/[id]/_components/SupplierPriceComparisonTab.tsx` (dead `/purchasing/new` links only); `web/mocks/handlers.ts` (purchasing orders only); NEW `web/tests/purchasingOrders.test.tsx`; `docs/architecture/GAPS.md`; NEW `WORK/audits/AUDIT_2026-08-11T*-p2p-design-audit.md`; `WORK/{LOCK,LOOP_STATE}.md`. **NOT** `src/modules/purchasing/receiving-sessions.ts`, NOT `web/app/(protected)/inventory/**`, NOT `web/app/(protected)/dashboard/**`, NOT `src/modules/payments/**`, NOT `artifacts/**`. |
+| Started | 2026-08-11T04:20:00Z |
+| Status | ACTIVE — implementing |
+| Duplicate-work check | Ran per AGENTS.md. Two Cursor Cloud claims below are still marked `ACTIVE` (2026-08-03, 8 days stale): "Wave A/B trust leftovers + palette" scopes `web/app/(protected)/{gift-cards,dashboard,inventory,purchase}/**` and "POS customer + gift card" scopes `src/modules/payments/**` + `web/components/terminal/**`. **Neither overlaps this claim** — `purchase/**` (the singular Cost Entry page) is excluded here, `purchasing/**` is a different directory, and `inventory/**` is excluded. Not marking them STALE?; that is board maintenance, not this remit. |
+| Blockers | The design reference itself (403). Everything else in the brief is code-addressable and proceeds. |
+
 ## Active Claim (Claude Code web — C-1: automate the restore drill so it stops rotting)
 
 | Field | Value |
