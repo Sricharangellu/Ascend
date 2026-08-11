@@ -81,7 +81,12 @@ function PurchasingHub() {
           showVendorQuotes={vendorQuotationsEnabled}
         />
 
-        {activeTab === "orders" && <OrdersTab />}
+        {activeTab === "orders" && (
+          <OrdersTab
+            initialSupplierId={searchParams.get("supplier") ?? ""}
+            initialProductId={searchParams.get("product") ?? ""}
+          />
+        )}
         {activeTab === "suppliers" && <SuppliersTab />}
         {activeTab === "reorder" && (
           <ReorderTab onNavigateToOrders={() => onChangeTab("orders")} />

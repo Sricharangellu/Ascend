@@ -202,7 +202,7 @@ export function SupplierPriceComparisonTab({ productId }: { productId: string })
                     <td className="px-5 py-3.5">
                       <button
                         type="button"
-                        onClick={() => router.push(`/purchasing/new?supplier=${s.supplier_id}&product=${productId}`)}
+                        onClick={() => router.push(`/purchasing?tab=orders&supplier=${s.supplier_id}&product=${productId}`)}
                         className="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-600 whitespace-nowrap"
                       >
                         Create PO

@@ -331,21 +331,48 @@ export const mockHandlers = [
     const b = (await request.json()) as { productId?: string; costCents?: number };
     return HttpResponse.json({ product_id: b.productId, cost_cents: b.costCents ?? 0 });
   }),
-  http.get(`${V1}/purchasing/orders`, async () => {
+  // Mirrors the real contract: server-side filters, keyset page, per-row
+  // roll-ups. The filters are applied here too — a mock that ignores them would
+  // make every saved view look like it works while proving nothing.
+  http.get(`${V1}/purchasing/orders`, async ({ request }) => {
     await lat();
     const D = 86400000, now = Date.now();
-    return HttpResponse.json({ items: [
-      { id: "po_1", tenant_id: "tnt_demo", po_number: 4001, supplier_id: "sup_acme", status: "received",  receive_status: "received", total_cost_cents: 24000, created_at: now - 2*D, received_at: now - D },
-      { id: "po_2", tenant_id: "tnt_demo", po_number: 4002, supplier_id: "sup_tea",  status: "ordered",   receive_status: "pending",  total_cost_cents: 11250, created_at: now - 3600000, received_at: null },
-      { id: "po_3", tenant_id: "tnt_demo", po_number: 4003, supplier_id: "sup_acme", status: "ordered",   receive_status: "partial",  total_cost_cents: 43500, created_at: now - 5*D, received_at: null },
-    ] });
+    const all = [
+      { id: "po_1", tenant_id: "tnt_demo", po_number: 4001, supplier_id: "sup_acme", supplier_name: "Acme Coffee Co", status: "received", receive_status: "complete", approval_status: "approved", approved_at: now - 2*D, total_cost_cents: 24000, notes: null, expected_date: now - D, created_at: now - 2*D, received_at: now - D, line_count: 3, ordered_qty: 60, received_qty: 60, remaining_qty: 0, bill_count: 0, invoice_status: "none", is_overdue: false },
+      { id: "po_2", tenant_id: "tnt_demo", po_number: 4002, supplier_id: "sup_tea", supplier_name: "Tea Traders", status: "ordered", receive_status: "pending", approval_status: "pending", approved_at: null, total_cost_cents: 11250, notes: null, expected_date: now + 2*D, created_at: now - 3600000, received_at: null, line_count: 2, ordered_qty: 25, received_qty: 0, remaining_qty: 25, bill_count: 0, invoice_status: "none", is_overdue: false },
+      { id: "po_3", tenant_id: "tnt_demo", po_number: 4003, supplier_id: "sup_acme", supplier_name: "Acme Coffee Co", status: "ordered", receive_status: "partial", approval_status: "approved", approved_at: now - 5*D, total_cost_cents: 43500, notes: null, expected_date: now - 2*D, created_at: now - 5*D, received_at: null, line_count: 4, ordered_qty: 100, received_qty: 40, remaining_qty: 60, bill_count: 1, invoice_status: "open", is_overdue: true },
+    ];
+    const u = new URL(request.url);
+    const status = u.searchParams.get("status");
+    const approvalStatus = u.searchParams.get("approvalStatus");
+    const supplierId = u.searchParams.get("supplierId");
+    const search = u.searchParams.get("search");
+    const overdue = u.searchParams.get("overdue") === "true";
+    const items = all.filter((o) =>
+      (!status || o.status === status) &&
+      (!approvalStatus || o.approval_status === approvalStatus) &&
+      (!supplierId || o.supplier_id === supplierId) &&
+      (!overdue || o.is_overdue) &&
+      (!search || String(o.po_number).includes(search)),
+    );
+    return HttpResponse.json({ items, nextCursor: null, limit: 25 });
   }),
   http.post(`${V1}/purchasing/orders`, async ({ request }) => {
     await lat();
-    const b = (await request.json()) as { supplierId: string; lines: Array<{ productId: string; quantity: number; unitCostCents: number }> };
+    const b = (await request.json()) as { supplierId: string; expectedDate?: number; notes?: string; lines: Array<{ productId: string; quantity: number; unitCostCents: number }> };
     const lines = b.lines.map((l, i) => ({ id: `pol_${i}`, tenant_id: "tnt_demo", po_id: "po_new", product_id: l.productId, quantity: l.quantity, unit_cost_cents: l.unitCostCents, line_cost_cents: l.quantity * l.unitCostCents }));
     const total = lines.reduce((s, l) => s + l.line_cost_cents, 0);
-    return HttpResponse.json({ id: "po_new", tenant_id: "tnt_demo", supplier_id: b.supplierId, status: "ordered", total_cost_cents: total, created_at: Date.now(), received_at: null, lines }, { status: 201 });
+    return HttpResponse.json({ id: "po_new", tenant_id: "tnt_demo", po_number: 4004, supplier_id: b.supplierId, status: "ordered", receive_status: "pending", approval_status: "approved", approved_at: Date.now(), total_cost_cents: total, notes: b.notes ?? null, expected_date: b.expectedDate ?? null, created_at: Date.now(), received_at: null, lines }, { status: 201 });
+  }),
+  // PO approval — the gate that blocks receiving. Mocked so the action is
+  // exercisable in demo/preview mode rather than 404-ing against MSW.
+  http.post(`${V1}/purchasing/orders/:id/approve`, async ({ params }) => {
+    await lat();
+    return HttpResponse.json({ id: String(params.id), tenant_id: "tnt_demo", supplier_id: "sup_tea", po_number: 4002, status: "ordered", receive_status: "pending", approval_status: "approved", approved_at: Date.now(), total_cost_cents: 11250, notes: null, expected_date: null, created_at: Date.now(), received_at: null, lines: [] });
+  }),
+  http.post(`${V1}/purchasing/orders/:id/reject`, async ({ params }) => {
+    await lat();
+    return HttpResponse.json({ id: String(params.id), tenant_id: "tnt_demo", supplier_id: "sup_tea", po_number: 4002, status: "ordered", receive_status: "pending", approval_status: "rejected", approved_at: null, total_cost_cents: 11250, notes: null, expected_date: null, created_at: Date.now(), received_at: null, lines: [] });
   }),
   http.post(`${V1}/purchasing/orders/:id/receive`, async ({ params, request }) => {
     await lat();
