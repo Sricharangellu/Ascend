@@ -28,11 +28,31 @@ export interface PoolStats {
   waiting: number;
 }
 
+/** Per-transaction overrides for `DB.tx()`. */
+export interface TxOptions {
+  /**
+   * Override the `SET LOCAL statement_timeout` for this transaction only.
+   *
+   * The default (`PG_TX_TIMEOUT_MS`, 30 s) is sized for a *business*
+   * transaction — it exists so a runaway request cannot sit on row locks and
+   * exhaust the pool. Boot-time schema migrations are the opposite case: they
+   * are *supposed* to be long and to hold their lock, so charging them the
+   * business budget turns slow-but-healthy DDL into a spurious failure.
+   * Pass a larger value for those; leave unset for everything else.
+   *
+   * Ignored on a NESTED `tx()` call: the outermost transaction issues the one
+   * `SET LOCAL` that governs the whole thing, and silently re-setting it
+   * partway through would change the budget for the outer caller's remaining
+   * work too. Set it where the transaction actually begins.
+   */
+  statementTimeoutMs?: number;
+}
+
 export interface DB {
   query<T = any>(sql: string, params?: Params): Promise<T[]>;
   one<T = any>(sql: string, params?: Params): Promise<T | undefined>;
   exec(sql: string): Promise<void>;
-  tx<T>(fn: (db: DB) => Promise<T>): Promise<T>;
+  tx<T>(fn: (db: DB) => Promise<T>, options?: TxOptions): Promise<T>;
   /**
    * Returns a DB view where every query runs inside an explicit transaction
    * with `set_config('app.tenant_id', tenantId, true)` so Postgres RLS
@@ -109,7 +129,7 @@ function makeDb(q: Queryable, opts: { isTx: boolean; pool?: pg.Pool }): DB {
       }
       await q.query(sql);
     },
-    async tx<T>(fn: (tdb: DB) => Promise<T>): Promise<T> {
+    async tx<T>(fn: (tdb: DB) => Promise<T>, options?: TxOptions): Promise<T> {
       if (opts.isTx) return fn(db); // nested: outer BEGIN holds
       const pool = opts.pool!;
       const client = await pool.connect();
@@ -119,7 +139,11 @@ function makeDb(q: Queryable, opts: { isTx: boolean; pool?: pg.Pool }): DB {
         // 30 s is generous for any single business transaction; tune via PG_TX_TIMEOUT_MS.
         // SET LOCAL must run inside the transaction, so BEGIN and the timeout
         // travel in one combined statement (also saves a round trip).
-        const rawTimeout = Number(process.env["PG_TX_TIMEOUT_MS"] ?? 30_000);
+        //
+        // A caller may override it for this transaction only (see TxOptions) —
+        // migrations are the one legitimate case, since they are meant to be
+        // long and to hold their lock.
+        const rawTimeout = Number(options?.statementTimeoutMs ?? process.env["PG_TX_TIMEOUT_MS"] ?? 30_000);
         const txTimeoutMs = Number.isFinite(rawTimeout) && rawTimeout > 0 ? Math.floor(rawTimeout) : 30_000;
         await client.query(`BEGIN; SET LOCAL statement_timeout = ${txTimeoutMs}`);
         // Tenant context (if any) applies to the whole transaction. Explicit
@@ -161,11 +185,11 @@ function makeDb(q: Queryable, opts: { isTx: boolean; pool?: pg.Pool }): DB {
             await tdb.exec(sql);
           });
         },
-        async tx<T>(fn: (tdb: DB) => Promise<T>): Promise<T> {
+        async tx<T>(fn: (tdb: DB) => Promise<T>, options?: TxOptions): Promise<T> {
           return parent.tx(async (tdb) => {
             await tdb.query(`SELECT set_config('app.tenant_id', ?, true)`, [tenantId]);
             return fn(tdb);
-          });
+          }, options);
         },
         withTenant(newTenantId: string): DB {
           return parent.withTenant(newTenantId);
@@ -201,11 +225,11 @@ function makeDb(q: Queryable, opts: { isTx: boolean; pool?: pg.Pool }): DB {
             await tdb.exec(sql);
           });
         },
-        async tx<T>(fn: (tdb: DB) => Promise<T>): Promise<T> {
+        async tx<T>(fn: (tdb: DB) => Promise<T>, options?: TxOptions): Promise<T> {
           return parent.tx(async (tdb) => {
             await tdb.query(`SELECT set_config('app.request_id', ?, true)`, [requestId]);
             return fn(tdb);
-          });
+          }, options);
         },
         withTenant(tenantId: string): DB { return parent.withTenant(tenantId).withRequestId(requestId); },
         withRequestId(newId: string): DB { return parent.withRequestId(newId); },

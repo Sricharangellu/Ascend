@@ -13,6 +13,19 @@
 | Duplicate-work check | Ran per AGENTS.md before re-cutting this branch, and it caught a real collision. This claim originally also made `smoke-test`'s probes repointable; `develop` moved to `dcf6033` mid-session and PR #197's `d294041` had already landed exactly that. The duplicate commit was **dropped, not merged** — develop's version stands, including its deliberate asymmetric fallback. Only the `deploy-production` half, which #197 left behind, remains here. |
 | Blockers | `PROD_BACKEND_URL`, `PROD_DATABASE_URL` and the Render/Vercel/Supabase dashboards are Sri-only. The no-restorable-backup blocker and the `DEPLOYMENTS.md` P0 on where the prod backend runs stay OPEN and are not worked around here. |
 
+## Active Claim (Claude Code web — migration-lock statement-timeout flake)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `fix/migration-lock-statement-timeout` |
+| Queue item | `WORK/LOOP_STATE.md` backlog row "NEW 2026-08-07 — the backend suite's 30s statement timeout covers an unbounded migration-lock WAIT (flake source)". Highest-priority code-addressable item on the board: it makes CI lie, and it affects every one of the 86 backend test files rather than any one feature. |
+| Files/areas expected | `src/app.ts` (migration lock block + new helpers only), `src/shared/db.ts` (`TxOptions` + threading it through `tx`), `src/app.migration-lock.test.ts` (new), `.env.example`, `WORK/LOOP_STATE.md`, `WORK/LOCK.md`. **NOT** `web/**` or `src/modules/payments/**` — the two `ACTIVE` Cursor Cloud claims below scope exactly those. NOT `artifacts/**`. |
+| Started | 2026-08-10T190000Z |
+| Status | RELEASED — pushed to `fix/migration-lock-statement-timeout`. Overlap check performed before starting: the only two `ACTIVE` claims below cover `web/**` and `src/modules/payments/**`; this touches neither. |
+| Blockers | none |
+| Proof it fixes the reported symptom | `src/app.migration-lock.test.ts` passes **5/5** with the fix and fails **3/5** against the restored pre-fix lock, reading `canceling statement due to statement timeout` / pg `57014` — the exact symptom from CI run 31138020800, reproduced at 1x instead of the 86x concurrency that produced it. Each test was also run against the specific defect it guards, not just against the whole pre-fix block. |
+| Two defects found in the fix itself, before pushing | (1) A first draft of the concurrency test **passed against the pre-fix code**: Postgres keeps one-key and two-key advisory locks in separate spaces, so a two-key hold never blocked the old one-key call. The helper now holds both forms. (2) The new budgets were module-level `const`s, so `buildApp()`'s many in-process calls froze whatever the environment held at import — a test that set a 300 ms wait actually sat on the 120 s default and the file took >180 s while appearing to pass. Both budgets are now read at call time; the same file finishes in 3.6 s. |
+
 ## Active Claim (Claude Code web — enterprise infrastructure/platform audit)
 
 | Field | Value |
