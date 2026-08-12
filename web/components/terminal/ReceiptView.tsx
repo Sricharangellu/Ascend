@@ -16,6 +16,8 @@ import { clsx } from "clsx";
 import { apiPost } from "@/api-client/client";
 import { useToast } from "@/components/Toast";
 import type { Order, Payment } from "@/api-client/types";
+
+const RECEIPT_UNIT_LABEL: Record<string, string> = { box: "Box", case: "Case", pallet: "Pallet", alt: "Alternate" };
 import { formatMoney } from "@/lib/money";
 import { Button } from "@/components/Button";
 import type { Role } from "@/api-client/types";
@@ -183,9 +185,11 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
               <li key={line.id} className="flex justify-between gap-3 py-2.5 text-sm">
                 <div className="min-w-0">
                   <span className="font-medium text-gray-900">{line.name}</span>
-                  {line.quantity > 1 && (
+                  {line.unitKind && line.unitQty ? (
+                    <span className="ml-2 text-gray-400">{line.unitQty} {RECEIPT_UNIT_LABEL[line.unitKind] ?? line.unitKind}</span>
+                  ) : line.quantity > 1 ? (
                     <span className="ml-2 text-gray-400">× {line.quantity}</span>
-                  )}
+                  ) : null}
                 </div>
                 <span className="text-gray-900">{formatMoney(line.lineCents)}</span>
               </li>
@@ -254,6 +258,9 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
                 quantity: l.quantity,
                 price_cents: l.unitCents,
                 total_cents: l.lineCents,
+                ...(l.unitKind && l.unitQty
+                  ? { displayQty: `${l.unitQty} ${RECEIPT_UNIT_LABEL[l.unitKind] ?? l.unitKind}` }
+                  : {}),
               }))}
               subtotal_cents={currentOrder.subtotalCents}
               tax_cents={currentOrder.taxCents}

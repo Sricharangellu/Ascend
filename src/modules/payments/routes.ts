@@ -8,7 +8,7 @@ import { HttpError } from "../../shared/http.js";
 
 const captureSchema = z.object({
   orderId: z.string().min(1),
-  method: z.enum(["cash", "card", "split", "store_credit"]),
+  method: z.enum(["cash", "card", "split", "store_credit", "gift_card"]),
   cashCents: z.number().int().nonnegative().optional(),
   cardCents: z.number().int().nonnegative().optional(),
   tenderedCents: z.number().int().nonnegative().optional(),
@@ -16,6 +16,8 @@ const captureSchema = z.object({
   stripePaymentIntentId: z.string().min(1).optional(),
   // Required for store_credit payments.
   customerId: z.string().min(1).optional(),
+  // Required for gift_card payments.
+  giftCardCode: z.string().min(1).optional(),
 });
 
 function tenantId(res: Response): string {

@@ -109,10 +109,12 @@ export function rateLimitMiddleware(options: RateLimitOptions = {}) {
       const now = Date.now();
       const key = `rl:${keyFn(req)}`;
       const member = `${now}:${Math.random().toString(36).slice(2)}`;
+      res.setHeader("X-RateLimit-Limit", String(capacity));
       redis
         .eval(SLIDING_WINDOW_SCRIPT, 1, key, String(now), String(windowMs), String(capacity), member)
         .then((allowed) => {
           if (!allowedFromRedis(allowed)) {
+            res.setHeader("X-RateLimit-Remaining", "0");
             res.setHeader("Retry-After", String(Math.ceil(windowMs / 1000)));
             next(new HttpError(429, "rate_limit_exceeded", "Too many requests — slow down."));
           } else {
@@ -152,14 +154,20 @@ export function rateLimitMiddleware(options: RateLimitOptions = {}) {
     bucket.tokens = Math.min(capacity, bucket.tokens + elapsedSec * refillRate);
     bucket.lastRefillMs = now;
 
+    res.setHeader("X-RateLimit-Limit", String(capacity));
+
     if (bucket.tokens < 1) {
-      const retryAfterSec = Math.ceil((1 - bucket.tokens) / refillRate);
+      // refillRate 0 (used in tests) → avoid Infinity; ask clients to wait 1s.
+      const retryAfterSec =
+        refillRate > 0 ? Math.ceil((1 - bucket.tokens) / refillRate) : 1;
+      res.setHeader("X-RateLimit-Remaining", "0");
       res.setHeader("Retry-After", String(retryAfterSec));
       next(new HttpError(429, "rate_limit_exceeded", "Too many requests — slow down."));
       return;
     }
 
     bucket.tokens -= 1;
+    res.setHeader("X-RateLimit-Remaining", String(Math.floor(bucket.tokens)));
     next();
   };
 }
@@ -269,7 +277,10 @@ export function tenantRateLimitMiddleware(options: TenantRateLimitOptions = {}) 
     res.setHeader("X-RateLimit-Limit", String(cfg.capacity));
 
     if (bucket.tokens < 1) {
-      res.setHeader("Retry-After", String(Math.ceil((1 - bucket.tokens) / cfg.refillRate)));
+      const retryAfterSec =
+        cfg.refillRate > 0 ? Math.ceil((1 - bucket.tokens) / cfg.refillRate) : 1;
+      res.setHeader("X-RateLimit-Remaining", "0");
+      res.setHeader("Retry-After", String(retryAfterSec));
       next(new HttpError(429, "rate_limit_exceeded", "Tenant rate limit exceeded — slow down."));
       return;
     }

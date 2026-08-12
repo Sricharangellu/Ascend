@@ -4,6 +4,7 @@ import { handler, parseBody, notFound } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import { requireRole } from "../../gateway/auth.js";
 import type { PurchasingService, ReceiveLineInput } from "./service.js";
+import { recordUomConversion } from "../../gateway/metrics.js";
 
 function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
@@ -56,10 +57,50 @@ const poSchema = z.object({
         vendorUpc: z.string().nullable().optional(),
         rawCostPriceCents: z.number().int().nonnegative().nullable().optional(),
         unitPriceCents: z.number().int().nonnegative().nullable().optional(),
+        // Purchasing unit this line was entered in ("case", "box", etc.) — when
+        // present and not "each", quantity/unitCostCents below are converted to
+        // base (each) units via the product's matching product_barcodes pack
+        // size before the PO line is created. purchase_order_lines always
+        // stores base-unit quantity/cost, unchanged from today.
+        unitKind: z.string().min(1).optional(),
       }),
     )
     .min(1),
 });
+
+interface UnitConversionNote {
+  productId: string;
+  unitKind: string;
+  enteredQty: number;
+  packSize: number;
+  baseQty: number;
+}
+
+/** Converts a line entered in a purchasing/receiving unit ("case", "box") into
+ *  base (each) units, using the pack size from the product's matching
+ *  product_barcodes row. Returns the line unchanged when no unitKind is given
+ *  or it's "each" — the common case, zero behavior change. Reads catalog's
+ *  product_barcodes directly: an accepted cross-domain SQL read (ADR-002),
+ *  not a service import. */
+async function convertUnitLine<T extends { quantity?: number; qty?: number; unitCostCents?: number; unitKind?: string; productId?: string }>(
+  service: PurchasingService,
+  tenantId: string,
+  line: T,
+  productId: string,
+  notes: UnitConversionNote[],
+): Promise<T> {
+  if (!line.unitKind || line.unitKind === "each") return line;
+  const packSize = await service.resolveUnitPackSize(productId, line.unitKind, tenantId);
+  const enteredQty = line.quantity ?? line.qty ?? 0;
+  notes.push({ productId, unitKind: line.unitKind, enteredQty, packSize, baseQty: enteredQty * packSize });
+  recordUomConversion(line.unitKind, line.quantity !== undefined ? "po_create" : "receive");
+  return {
+    ...line,
+    ...(line.quantity !== undefined ? { quantity: line.quantity * packSize } : {}),
+    ...(line.qty !== undefined ? { qty: line.qty * packSize } : {}),
+    ...(line.unitCostCents !== undefined ? { unitCostCents: Math.round(line.unitCostCents / packSize) } : {}),
+  };
+}
 
 const returnSchema = z.object({
   supplierId: z.string().min(1).optional(),
@@ -255,7 +296,13 @@ export function registerRoutes(router: Router, service: PurchasingService): void
 
   router.post("/orders", mgr, handler(async (req, res) => {
     const b = parseBody(poSchema, req.body);
-    res.status(201).json(await service.createOrder(b.supplierId, b.lines, tenantId(res), actor(res)));
+    const tid = tenantId(res);
+    const unitConversions: UnitConversionNote[] = [];
+    const lines = await Promise.all(
+      b.lines.map((l) => convertUnitLine(service, tid, l, l.productId, unitConversions)),
+    );
+    const po = await service.createOrder(b.supplierId, lines, tid, actor(res));
+    res.status(201).json(unitConversions.length ? { ...po, unitConversions } : po);
   }));
 
   // ── PO approval workflow ─────────────────────────────────────────────────────
@@ -314,6 +361,10 @@ export function registerRoutes(router: Router, service: PurchasingService): void
       lotCode: z.string().min(1).max(120).optional(),
       unitCostCents: z.number().int().nonnegative().optional(),
       locationId: z.string().min(1).optional(),
+      // Same purchasing-unit conversion as PO creation — "case"/"box" etc.
+      // convert qty/unitCostCents to base (each) units via product_barcodes
+      // before reaching the existing receive() logic, which is untouched.
+      unitKind: z.string().min(1).optional(),
     })).optional(),
   });
 
@@ -321,17 +372,30 @@ export function registerRoutes(router: Router, service: PurchasingService): void
     const id = String(req.params.id);
     const tid = tenantId(res);
     const b = parseBody(receiveSchema, req.body ?? {});
+    const unitConversions: UnitConversionNote[] = [];
     let lines: ReceiveLineInput[];
     if (b.lines && b.lines.length > 0) {
       // Explicit lines provided — support both `qty` and `quantity` field names,
       // and carry the receive-time actuals through to the service.
-      lines = b.lines.map((l) => ({
-        lineId: l.lineId,
-        qty: l.qty ?? l.quantity ?? 1,
-        ...(l.expiryDate !== undefined ? { expiryDate: l.expiryDate } : {}),
-        ...(l.lotCode !== undefined ? { lotCode: l.lotCode } : {}),
-        ...(l.unitCostCents !== undefined ? { unitCostCents: l.unitCostCents } : {}),
-        ...(l.locationId !== undefined ? { locationId: l.locationId } : {}),
+      const needsProductLookup = b.lines.some((l) => l.unitKind && l.unitKind !== "each");
+      const productByLineId = needsProductLookup
+        ? new Map((await service.getOrder(id, tid)).lines.map((l) => [l.id, l.product_id]))
+        : new Map<string, string>();
+      lines = await Promise.all(b.lines.map(async (l) => {
+        const raw = {
+          lineId: l.lineId,
+          qty: l.qty ?? l.quantity ?? 1,
+          ...(l.expiryDate !== undefined ? { expiryDate: l.expiryDate } : {}),
+          ...(l.lotCode !== undefined ? { lotCode: l.lotCode } : {}),
+          ...(l.unitCostCents !== undefined ? { unitCostCents: l.unitCostCents } : {}),
+          ...(l.locationId !== undefined ? { locationId: l.locationId } : {}),
+          ...(l.unitKind !== undefined ? { unitKind: l.unitKind } : {}),
+        };
+        if (!l.unitKind || l.unitKind === "each") return raw;
+        const productId = productByLineId.get(l.lineId);
+        if (!productId) throw notFound(`line '${l.lineId}' not found on this PO`);
+        const { unitKind: _unitKind, ...converted } = await convertUnitLine(service, tid, raw, productId, unitConversions);
+        return converted;
       }));
     } else {
       // No lines specified: receive all open lines at full remaining quantity ("receive all" button).
@@ -344,7 +408,8 @@ export function registerRoutes(router: Router, service: PurchasingService): void
         return;
       }
     }
-    res.json(await service.receive(id, tid, lines));
+    const received = await service.receive(id, tid, lines);
+    res.json(unitConversions.length ? { ...received, unitConversions } : received);
   }));
 
   // Landed costs: freight and other charges distributed proportionally across PO lines.
@@ -443,8 +508,19 @@ export function registerRoutes(router: Router, service: PurchasingService): void
   }));
 
   router.post("/bills/:billId/status", mgr, handler(async (req, res) => {
-    const b = parseBody(z.object({ status: z.enum(["approved", "held"]) }), req.body);
-    res.json(await service.setBillStatus(String(req.params.billId), tenantId(res), b.status));
+    const b = parseBody(
+      z.object({
+        status: z.enum(["approved", "held"]),
+        varianceOverrideReason: z.string().min(1).max(500).optional(),
+      }),
+      req.body,
+    );
+    res.json(
+      await service.setBillStatus(String(req.params.billId), tenantId(res), b.status, {
+        varianceOverrideReason: b.varianceOverrideReason,
+        actorId: actor(res).id,
+      }),
+    );
   }));
 
   router.post("/bills/:billId/post", mgr, handler(async (req, res) => {

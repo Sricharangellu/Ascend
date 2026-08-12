@@ -5,6 +5,31 @@ import { CatalogDetailViewsService } from "./detail-views.js";
 import { registerDetailRoutes } from "./detail-routes.js";
 import { dropLegacyNoTenant } from "../../shared/migrate.js";
 
+// Trigram GIN indexes for the catalog list's `?q=` search, which matches with
+// `col ILIKE '%term%'` across product identity, brand and barcode. Without them
+// every keystroke is a sequential scan once a catalog reaches real size.
+//
+// `products.name` and `products.sku` are already indexed this way by
+// src/modules/search (the ⌘K palette) — deliberately not duplicated here; this
+// block adds only the columns catalog search introduced. Same guarded DO-block
+// shape as that module: on a host without pg_trgm the indexes are skipped and
+// boot continues, because search stays correct unindexed, just slower.
+const CATALOG_SEARCH_INDEXES = `
+DO $$
+BEGIN
+  CREATE EXTENSION IF NOT EXISTS pg_trgm SCHEMA public;
+  CREATE INDEX IF NOT EXISTS products_barcode_trgm_idx  ON products USING gin (barcode public.gin_trgm_ops);
+  CREATE INDEX IF NOT EXISTS products_brand_trgm_idx    ON products USING gin (brand public.gin_trgm_ops);
+  CREATE INDEX IF NOT EXISTS products_mfr_trgm_idx      ON products USING gin (manufacturer public.gin_trgm_ops);
+  CREATE INDEX IF NOT EXISTS products_altname_trgm_idx  ON products USING gin (alternative_name public.gin_trgm_ops);
+  CREATE INDEX IF NOT EXISTS products_tags_trgm_idx     ON products USING gin (tags public.gin_trgm_ops);
+  CREATE INDEX IF NOT EXISTS products_vendorupc_trgm_idx ON products USING gin (vendor_upc public.gin_trgm_ops);
+  CREATE INDEX IF NOT EXISTS pbarcodes_barcode_trgm_idx ON product_barcodes USING gin (barcode public.gin_trgm_ops);
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'catalog trigram indexes skipped: %', SQLERRM;
+END;
+$$;`;
+
 // Mirrors db/migrations/0002_commerce.sql — db/ is the canonical DDL owner.
 // tenant_id TEXT NOT NULL: every commerce row is scoped to a tenant (tnt_* prefix).
 // The UNIQUE constraint moves from (sku) to (tenant_id, sku) so tenants can share SKUs.
@@ -329,6 +354,7 @@ CREATE TABLE IF NOT EXISTS product_units (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS product_units_code_idx ON product_units (tenant_id, unit_code);
 `,
+    CATALOG_SEARCH_INDEXES,
   ],
   async register({ db, events, router }) {
     const service = new CatalogService(db, events);

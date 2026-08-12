@@ -31,6 +31,15 @@
 
 - [ ] tenant-scoped queries / RBAC checked / integer cents / immutable inventory movements / no production mock dependency (strike out non-applicable)
 
+## Delivery standard (ORCHESTRATION.md — every category required; write "none" explicitly if it doesn't apply, don't omit)
+
+- **Architecture impact:**
+- **Database impact** (both migration paths — up and down):
+- **Testing evidence** (actual results, not claims):
+- **Security impact:**
+- **Rollback note:**
+- **Monitoring/alerting needs:**
+
 ## Honest notes
 
-<!-- What is NOT covered by this change; known gaps; follow-ups filed in WORK/WORK_STATE.md -->
+<!-- What is NOT covered by this change; known gaps; follow-ups filed in WORK/LOOP_STATE.md -->

@@ -63,11 +63,11 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
 
   // ── B2B / Wholesale ────────────────────────────────────────────────────
 
-  { key: "sales_orders",   name: "Sales Orders",          description: "B2B orders, credit terms, fulfilment workflows",              group: "b2b",     route: "/sales" },
+  { key: "sales_orders",   name: "Sales Orders",          description: "B2B orders, credit terms, fulfilment workflows",              group: "b2b",     route: "/orders" },
   { key: "purchasing",     name: "Purchasing",            description: "Purchase orders, receiving, vendor management, returns",      group: "b2b",     route: "/purchasing" },
   { key: "billing",        name: "Billing — AP/AR",       description: "Supplier bills, customer invoices, aging reports",            group: "b2b",     route: "/finance" },
   { key: "accounting",     name: "Accounting",            description: "Chart of accounts, journal entries, batch deposits, P&L",     group: "b2b",     route: "/accounting" },
-  { key: "price_book",     name: "Price Book",            description: "Customer-specific prices, outlet-specific overrides",          group: "b2b",     route: "/catalog/price-book" },
+  { key: "price_book",     name: "Price Book",            description: "Customer-specific prices, outlet-specific overrides",          group: "b2b",     route: "/pricing" },
   { key: "quotes",         name: "Quotes / Quotations",   description: "Create, send, and convert sales quotes to orders",            group: "b2b",     route: "/quotes" },
 
   // ── Restaurant & Food Service ──────────────────────────────────────────
@@ -111,7 +111,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
   { key: "online_store",   name: "Online Store",          description: "Product visibility, SEO fields, meta title/description",   group: "ecommerce",  route: "/ecommerce/products" },
   { key: "order_fulfillment", name: "Order Fulfillment",  description: "Pick-pack-ship for online orders, tracking integration",   group: "ecommerce",  route: "/inventory/receive-stock" },
   { key: "marketplace",    name: "Marketplace Sync",      description: "Sync inventory/orders with Amazon, eBay, Shopify, etc.",   group: "ecommerce" },
-  { key: "shipping_mgmt",  name: "Shipping Management",   description: "Carrier integrations, label printing, tracking numbers",   group: "ecommerce",  route: "/shipping" },
+  { key: "shipping_mgmt",  name: "Shipping Management",   description: "Carrier integrations, label printing, tracking numbers",   group: "ecommerce",  route: "/delivery" },
 
   // ── Automotive ────────────────────────────────────────────────────────
 
@@ -151,11 +151,12 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
   // ── Enterprise Add-ons ────────────────────────────────────────────────
 
   { key: "workforce",      name: "Workforce & Payroll",   description: "Scheduling, time-off requests, commission, payroll prep",  group: "enterprise", route: "/workforce" },
-  { key: "wms",            name: "Warehouse Management",  description: "Multi-location stock, bin locations, pick-pack routing",  group: "enterprise", route: "/operations" },
+  { key: "wms",            name: "Warehouse Management",  description: "Multi-location stock, bin locations, pick-pack routing",  group: "enterprise", route: "/setup/outlets" },
   { key: "webhooks",       name: "Webhooks & Public API", description: "Outbound webhooks, API keys for third-party integrations", group: "enterprise" },
   { key: "sso",            name: "Single Sign-On",        description: "OIDC/SAML SSO for enterprise identity providers",         group: "enterprise" },
   { key: "multi_currency", name: "Multi-Currency",        description: "Accept and report in multiple currencies with FX rates",  group: "enterprise" },
   { key: "advanced_analytics", name: "Advanced Analytics", description: "BI dashboards, custom reports, data export, forecasting", group: "enterprise" },
+  { key: "ai_assistant", name: "AI Assistant", description: "Conversational menu & inventory recommendations grounded in your real data — reorder alerts, low stock, expiring inventory, best/slow sellers", group: "enterprise", route: "/ai-assistant" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

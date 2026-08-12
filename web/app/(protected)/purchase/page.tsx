@@ -105,7 +105,7 @@ export default function PurchasePage() {
   return (
     <EnterpriseShell
       active="inventory"
-      title="Purchase"
+      title="Cost Entry"
       subtitle="Confirm the cost of received goods before they hit inventory valuation"
       contentClassName="overflow-y-auto"
     >

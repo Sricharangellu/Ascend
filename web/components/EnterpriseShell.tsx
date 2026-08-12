@@ -18,7 +18,7 @@ export type NavKey =
   | "dashboard" | "register" | "inventory" | "purchasing" | "customers"
   | "orders" | "sales" | "accounting" | "shipping" | "discounts" | "ecommerce"
   | "reports" | "settings" | "operations" | "team" | "insights" | "finance"
-  | "catalog" | "gift-cards" | "vendors" | "payments" | "returns"
+  | "catalog" | "gift-cards" | "vendors" | "returns"
   | "tax-compliance" | "integrations" | "imports-exports" | "workflows"
   | "quotes" | "loyalty" | "notifications" | "audit-log" | "service-orders"
   | "inventory-locations" | "inventory-expiry" | "invoicing" | "inventory-serials"
@@ -29,28 +29,31 @@ export type NavKey =
   | "restaurant-dashboard" | "restaurant-floor-plan" | "restaurant-tabs"
   | "permissions" | "modes" | "kiosk-settings" | "b2b-settings"
   | "warehouse" | "pricing" | "edi-imports" | "promotions" | "documents"
-  | "inventory-errors" | "bills" | "delivery";
+  | "inventory-errors" | "bills" | "delivery" | "ai-assistant" | "progress";
 
 // ── Section / nav tree ────────────────────────────────────────────────────────
 
 type RailSection =
   | "home" | "sell" | "online" | "reporting" | "catalog"
-  | "inventory" | "customers" | "finance" | "setup";
+  | "inventory" | "shipping" | "customers" | "finance" | "setup";
 
 const SECTION_MAP: Record<NavKey, RailSection> = {
   dashboard: "home",
   register: "sell", sales: "sell", orders: "sell", quotes: "sell",
-  returns: "sell", payments: "sell", "service-orders": "sell",
+  returns: "sell", "service-orders": "sell",
   ecommerce: "online",
-  reports: "reporting", insights: "reporting", "tax-compliance": "reporting",
+  reports: "reporting", insights: "reporting", "ai-assistant": "reporting", "tax-compliance": "reporting",
+  progress: "reporting",
   catalog: "catalog", discounts: "catalog", "gift-cards": "catalog",
   loyalty: "catalog", promotions: "catalog", pricing: "catalog",
   inventory: "inventory", operations: "inventory", purchasing: "inventory",
   "edi-imports": "inventory",
-  vendors: "inventory", shipping: "inventory", "inventory-locations": "inventory",
+  vendors: "inventory", shipping: "sell", "inventory-locations": "inventory",
   "inventory-expiry": "inventory", "inventory-serials": "inventory",
   "inventory-reorder": "inventory", "inventory-counts": "inventory", "inventory-pipeline": "inventory", "inventory-errors": "inventory", workforce: "inventory",
-  warehouse: "inventory", delivery: "inventory",
+  warehouse: "inventory",
+  // Delivery lives under Sell (Wave 1) — still uses fulfillment/shipping APIs
+  delivery: "sell",
   customers: "customers", appointments: "customers", healthcare: "customers",
   finance: "finance", accounting: "finance", invoicing: "finance", bills: "finance",
   settings: "setup", team: "setup", workflows: "setup", integrations: "setup",
@@ -115,11 +118,13 @@ const NAV_TREE: NavSection[] = [
     icon: <SellIcon />,
     children: [
       { label: "Register",       href: "/terminal",       featureGate: "register" },
-      { label: "Sales",          href: "/sales",          featureGate: "sales" },
+      // Sales history is /orders (real /api/v1/orders). Legacy /sales called
+      // MSW-only /api/v1/sales/history — removed from nav; /sales redirects.
       { label: "Orders",         href: "/orders",         featureGate: "orders" },
       { label: "Quotes",         href: "/quotes",         featureGate: "quotes" },
       { label: "Returns",        href: "/returns",        featureGate: "returns" },
-      { label: "Payments",       href: "/payments",       featureGate: "payments" },
+      // Payments folded into /orders/[id] Payments tab (Wave 2b); /payments redirects.
+      { label: "Delivery",       href: "/delivery",       featureGate: "shipping" },
       { label: "Service Orders", href: "/service-orders", featureGate: "service-orders" },
     ],
   },
@@ -138,7 +143,9 @@ const NAV_TREE: NavSection[] = [
     children: [
       { label: "Reports",        href: "/reports",        featureGate: "reports" },
       { label: "Insights",       href: "/insights",       featureGate: "insights" },
+      { label: "AI Assistant",   href: "/ai-assistant",   featureGate: "ai-assistant" },
       { label: "Tax Compliance", href: "/tax-compliance", featureGate: "tax-compliance" },
+      { label: "Progress",       href: "/progress",       featureGate: "progress" },
     ],
   },
   {
@@ -159,22 +166,21 @@ const NAV_TREE: NavSection[] = [
     label: "Inventory",
     icon: <InventoryIcon />,
     children: [
-      { label: "Overview",      href: "/inventory",               featureGate: "inventory" },
-      { label: "Pipeline",      href: "/inventory/pipeline",      featureGate: "inventory" },
-      { label: "Receive Stock", href: "/inventory/receive-stock", featureGate: "inventory" },
-      { label: "Purchase",      href: "/purchase",                featureGate: "purchasing" },
-      { label: "Expiry",        href: "/inventory/expiry-pool",   featureGate: "inventory" },
-      { label: "Warehouse",     href: "/warehouse",               featureGate: "inventory", partial: true },
-      { label: "Delivery",      href: "/delivery",                featureGate: "shipping" },
+      // Ponytail Wave 1 — trimmed IA. Pipeline / Cost Entry / EDI / Reorder nest
+      // under Purchasing hub links; Delivery moved to Sell; Operations reachable
+      // via setup checklist aliases but not a peer Inventory item.
+      { label: "Movements",     href: "/inventory",               featureGate: "inventory" },
       { label: "Purchasing",    href: "/purchasing",              featureGate: "purchasing" },
-      { label: "EDI Imports",   href: "/purchasing/edi-imports",  featureGate: "purchasing" },
-      { label: "Error Center",  href: "/inventory/errors",        featureGate: "inventory" },
+      { label: "Receive Stock", href: "/inventory/receive-stock", featureGate: "inventory" },
+      { label: "Receiving Hub", href: "/purchasing/receiving",    featureGate: "purchasing" },
+      { label: "Expiry",        href: "/inventory/expiry-pool",   featureGate: "inventory" },
       { label: "Cycle Counts",  href: "/inventory/counts",        featureGate: "inventory" },
-      { label: "Reorder",       href: "/inventory/reorder",       featureGate: "inventory" },
-      { label: "Serial Numbers", href: "/inventory/serials",      featureGate: "inventory" },
       { label: "Locations",     href: "/inventory/locations",     featureGate: "inventory" },
       { label: "Vendors",       href: "/vendors",                 featureGate: "vendors" },
-      { label: "Operations",    href: "/operations",              featureGate: "operations" },
+      { label: "Serial Numbers", href: "/inventory/serials",      featureGate: "inventory" },
+      { label: "Warehouse",     href: "/warehouse",               featureGate: "inventory", partial: true },
+      // Mock/missing detection engine — hidden unless SHOW_PARTIAL_PAGES
+      { label: "Error Center",  href: "/inventory/errors",        featureGate: "inventory", partial: true },
     ],
   },
   {
@@ -199,13 +205,16 @@ const NAV_TREE: NavSection[] = [
   },
   {
     section: "setup",
-    label: "Setup",
+    label: "Settings",
     icon: <SetupIcon />,
     children: [
-      { label: "Settings",        href: "/settings",             featureGate: "settings" },
+      { label: "General",         href: "/settings",             featureGate: "settings" },
       { label: "Permissions",     href: "/settings/permissions", featureGate: "settings" },
       { label: "Business Modes",  href: "/settings/modes",       featureGate: "settings" },
-      { label: "Kiosk Mode",      href: "/settings/kiosk",       featureGate: "settings" },
+      // Outlets/registers (Wave 2 dissolved Operations mega-page)
+      { label: "Outlets",         href: "/setup/outlets",        featureGate: "settings" },
+      // Kiosk settings UI has no persistence API yet (Preview) — hide by default
+      { label: "Kiosk Mode",      href: "/settings/kiosk",       featureGate: "settings", partial: true },
       { label: "B2B Portal",      href: "/settings/b2b",         featureGate: "settings" },
       { label: "Team",            href: "/team",                 featureGate: "team" },
       { label: "Workflows",       href: "/workflows",            featureGate: "workflows" },
@@ -213,6 +222,7 @@ const NAV_TREE: NavSection[] = [
       { label: "Imports/Exports", href: "/imports-exports",      featureGate: "imports-exports" },
       { label: "Document Center", href: "/documents",            featureGate: "documents", partial: true },
       { label: "Audit Log",       href: "/audit-log",            featureGate: "audit-log" },
+      { label: "Notifications",   href: "/notifications",        featureGate: "notifications" },
     ],
   },
 ];
@@ -374,12 +384,14 @@ function TopBar({
             Offline
           </span>
         )}
-        <a
+        <Link
           href="/help"
-          className="hidden sm:block text-sm text-white/60 hover:text-white transition-colors"
+          className="flex h-8 w-8 items-center justify-center rounded-md text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+          aria-label="Help Center"
+          title="Help Center"
         >
-          Help
-        </a>
+          <HelpIcon />
+        </Link>
         <NotificationBell />
         <div className="relative" ref={menuRef}>
           <button
@@ -403,10 +415,10 @@ function TopBar({
                 <p className="text-xs text-slate-500 truncate">{user?.email}</p>
               </div>
               <Link
-                href="/setup"
+                href="/settings"
                 className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
               >
-                Account settings
+                Settings
               </Link>
               <button
                 type="button"
@@ -597,19 +609,11 @@ function LeftRail({
                 <div className="pb-1">
                   {/* Register context header for Sell section */}
                   {item.section === "sell" && (
-                    <div className="mx-3 mb-1.5 mt-0.5 flex items-center justify-between rounded-md bg-white/5 px-2.5 py-1.5">
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-widest text-white/35">
-                          {registerId ?? "Main Register"}
-                        </p>
-                        <p className="text-xs font-medium text-white/70">Main Outlet</p>
-                      </div>
-                      <button
-                        type="button"
-                        className="text-[10px] font-medium text-white/40 hover:text-white/70 transition-colors"
-                      >
-                        Switch
-                      </button>
+                    <div className="mx-3 mb-1.5 mt-0.5 rounded-md bg-white/5 px-2.5 py-1.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-white/35">
+                        {registerId ?? "Main Register"}
+                      </p>
+                      <p className="text-xs font-medium text-white/70">Active register</p>
                     </div>
                   )}
 
@@ -720,6 +724,17 @@ function InventoryIcon() {
   );
 }
 
+function ShippingIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="1" y="3" width="15" height="13" />
+      <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+      <circle cx="5.5" cy="18.5" r="2.5" />
+      <circle cx="18.5" cy="18.5" r="2.5" />
+    </svg>
+  );
+}
+
 function CustomersIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -764,6 +779,16 @@ function SearchIcon() {
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="11" cy="11" r="8" />
       <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+function HelpIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
     </svg>
   );
 }

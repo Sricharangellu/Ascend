@@ -55,6 +55,50 @@ test("sales summary aggregates orders, revenue, and captured payments for the te
   assert.equal(r.json.payments.byMethod.cash, 2165);
 });
 
+test("summary sparklines come from live orders (not the never-written daily_sales_summary)", async () => {
+  const app = await freshApp();
+
+  // Empty tenant: dense 8-day zero series so the FE sparkline (≥2 points) can render.
+  let r = await call(app, "GET", "/api/reports/summary");
+  assert.equal(r.status, 200);
+  assert.equal(r.json.sparklines.revenue.length, 8);
+  assert.equal(r.json.sparklines.saleCount.length, 8);
+  assert.ok(r.json.sparklines.revenue.every((v: number) => v === 0));
+  assert.ok(r.json.sparklines.saleCount.every((v: number) => v === 0));
+
+  const p = await call(app, "POST", "/api/catalog/", {
+    sku: "SPARK-001", name: "Spark Widget", price_cents: 1000, category: "general",
+  });
+  assert.equal(p.status, 201);
+  await call(app, "POST", `/api/inventory/${p.json.id}/receive`, { quantity: 5 });
+  const o = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: p.json.id, quantity: 1 }],
+  });
+  assert.equal(o.status, 201);
+  await call(app, "POST", "/api/payments/", {
+    orderId: o.json.id, method: "cash", tenderedCents: o.json.total_cents,
+  });
+
+  r = await call(app, "GET", "/api/reports/summary");
+  assert.equal(r.status, 200);
+  assert.equal(r.json.sparklines.revenue.length, 8, "dense 8-day revenue series");
+  assert.equal(r.json.sparklines.saleCount.length, 8, "dense 8-day sale-count series");
+  // Today's bucket carries the completed sale; prior days stay 0.
+  assert.equal(r.json.sparklines.revenue[7], o.json.total_cents, "today's revenue matches the sale");
+  assert.equal(r.json.sparklines.saleCount[7], 1, "today's sale count is 1");
+  assert.equal(
+    r.json.sparklines.revenue.reduce((a: number, b: number) => a + b, 0),
+    o.json.total_cents,
+    "window sum equals the single completed order",
+  );
+  // Prove we are NOT reading the empty CQRS table: nothing wrote to it.
+  const anyRows = await app.db.query<{ n: number }>(
+    "SELECT COUNT(*)::int AS n FROM daily_sales_summary",
+  );
+  assert.equal(Number(anyRows[0]?.n ?? 0), 0, "daily_sales_summary still empty — sparkline used live orders");
+});
+
 test("summary kpi: gross profit is real COGS-based, or null when sold units have no known cost", async () => {
   const app = await freshApp();
 
@@ -412,6 +456,42 @@ test("cashier cannot trigger the AR-aging dunning sweep (403); manager can", asy
   assert.equal((await callAsRep(app, "manager", "POST", "/api/reports/ar-aging/sweep")).status, 200);
 });
 
+test("AR aging joins customer names; AP aging joins supplier names", async () => {
+  const app = await freshApp();
+
+  const customer = await call(app, "POST", "/api/customers/", { name: "Acme Retail LLC" });
+  assert.equal(customer.status, 201);
+  const inv = await call(app, "POST", "/api/billing/invoices", {
+    customerId: customer.json.id,
+    totalCents: 12_500,
+  });
+  assert.equal(inv.status, 201);
+
+  const ar = await call(app, "GET", "/api/reports/ar-aging");
+  assert.equal(ar.status, 200);
+  assert.ok(Array.isArray(ar.json.parties));
+  const arParty = ar.json.parties.find((p: { partyId: string }) => p.partyId === customer.json.id);
+  assert.ok(arParty, "customer appears in AR aging");
+  assert.equal(arParty.partyName, "Acme Retail LLC");
+  assert.equal(arParty.buckets.total, 12_500);
+
+  const supplier = await call(app, "POST", "/api/purchasing/suppliers", { name: "Northwind Supply" });
+  assert.equal(supplier.status, 201);
+  const bill = await call(app, "POST", "/api/billing/bills", {
+    supplierId: supplier.json.id,
+    totalCents: 8_000,
+  });
+  assert.equal(bill.status, 201);
+
+  const ap = await call(app, "GET", "/api/reports/ap-aging");
+  assert.equal(ap.status, 200);
+  assert.ok(Array.isArray(ap.json.parties));
+  const apParty = ap.json.parties.find((p: { partyId: string }) => p.partyId === supplier.json.id);
+  assert.ok(apParty, "supplier appears in AP aging");
+  assert.equal(apParty.partyName, "Northwind Supply");
+  assert.equal(apParty.buckets.total, 8_000);
+});
+
 test("top-products: a non-numeric limit falls back to the default instead of producing NaN, and a huge limit is capped", async () => {
   const app = await freshApp();
 
@@ -503,4 +583,137 @@ test("sales-by-customer: limit caps the number of distinct customers returned (r
   const limited = await call(app, "GET", "/api/reports/sales-by-customer?range=all&limit=1");
   assert.equal(limited.status, 200);
   assert.equal(limited.json.items.length, 1, "only 1 customer returned when limit=1");
+});
+
+// ── P&L correctness ─────────────────────────────────────────────────────────
+
+test("p-l excludes sales tax from revenue — tax collected is a liability, not income", async () => {
+  const app = await freshApp();
+
+  const p = await call(app, "POST", "/api/catalog/", {
+    sku: "PNL-001", name: "PnL Widget", price_cents: 1000, category: "general",
+  });
+  assert.equal(p.status, 201);
+  await call(app, "POST", `/api/inventory/${p.json.id}/receive`, { quantity: 10 });
+
+  // 2 units @ $10 = $20 subtotal, CA tax 8.25% = $1.65, total $21.65.
+  const o = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: p.json.id, quantity: 2 }],
+  });
+  assert.equal(o.status, 201);
+  assert.equal(o.json.total_cents, 2165);
+
+  const pay = await call(app, "POST", "/api/payments/", {
+    orderId: o.json.id, method: "cash", tenderedCents: 2165,
+  });
+  assert.equal(pay.status, 201);
+
+  const r = await call(app, "GET", "/api/reports/p-l?range=all");
+  assert.equal(r.status, 200);
+
+  // Revenue is net of tax: 2165 gross − 165 tax = 2000.
+  assert.equal(r.json.grossSalesCents, 2165, "gross sales include tax");
+  assert.equal(r.json.taxCents, 165, "tax is reported separately");
+  assert.equal(r.json.revenueCents, 2000, "revenue excludes the tax collected");
+
+  // Gross profit derives from the tax-exclusive revenue.
+  assert.equal(
+    r.json.grossProfitCents,
+    r.json.revenueCents - r.json.cogsCents,
+    "gross profit = net revenue − COGS",
+  );
+});
+
+test("p-l operating expenses come from recorded expenses, not from bills", async () => {
+  const app = await freshApp();
+
+  const p = await call(app, "POST", "/api/catalog/", {
+    sku: "PNL-002", name: "Opex Widget", price_cents: 5000, category: "general",
+  });
+  assert.equal(p.status, 201);
+  await call(app, "POST", `/api/inventory/${p.json.id}/receive`, { quantity: 5 });
+
+  const o = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: p.json.id, quantity: 1 }],
+  });
+  assert.equal(o.status, 201);
+  await call(app, "POST", "/api/payments/", {
+    orderId: o.json.id, method: "cash", tenderedCents: o.json.total_cents,
+  });
+
+  const before = await call(app, "GET", "/api/reports/p-l?range=all");
+  assert.equal(before.status, 200);
+  assert.equal(before.json.operatingExpensesCents, 0, "no recorded expenses yet");
+
+  // Record real operating spend (rent) — this is what opex must reflect.
+  const e = await call(app, "POST", "/api/expenses/", {
+    amountCents: 75_000, category: "rent", note: "Storefront rent",
+  });
+  assert.equal(e.status, 201, `expense create failed: ${JSON.stringify(e.json)}`);
+
+  const after = await call(app, "GET", "/api/reports/p-l?range=all");
+  assert.equal(after.status, 200);
+  assert.equal(after.json.operatingExpensesCents, 75_000, "opex reflects the recorded expense");
+  assert.equal(
+    after.json.netIncomeCents,
+    after.json.grossProfitCents - 75_000,
+    "net income = gross profit − operating expenses",
+  );
+});
+
+// ── Authorization on executive/financial reports ────────────────────────────
+
+test("cashiers cannot read executive financial reports; managers can", async () => {
+  const app = await freshApp();
+
+  async function as(role: "cashier" | "manager", path: string) {
+    const { default: request } = await import("./test-request.js");
+    return request(app.express, "GET", path, undefined, role);
+  }
+
+  // Business financials, counterparty balances, and cost/margin data are
+  // manager+ only. The frontend already assumed this bar (reports/p-l gates on
+  // owner||manager); the server did not enforce it, so any cashier token could
+  // read the whole company's P&L, receivables, and payables.
+  const gated = [
+    "/api/reports/p-l?range=all",
+    "/api/reports/ar-aging",
+    "/api/reports/ap-aging",
+    "/api/reports/sales-by-customer?range=all",
+    "/api/reports/sales-by-vendor?range=all",
+    "/api/reports/inventory-valuation",
+    "/api/reports/revenue-trend?range=7d",
+    "/api/reports/margin-by-category?range=all",
+  ];
+
+  for (const path of gated) {
+    const denied = await as("cashier", path);
+    assert.equal(denied.status, 403, `cashier must be denied ${path}`);
+
+    const allowed = await as("manager", path);
+    assert.equal(allowed.status, 200, `manager must be allowed ${path}`);
+  }
+});
+
+test("cashiers keep access to the operational reports they need at the till", async () => {
+  const app = await freshApp();
+
+  async function asCashier(path: string) {
+    const { default: request } = await import("./test-request.js");
+    return request(app.express, "GET", path, undefined, "cashier");
+  }
+
+  // Guarding the executive surface must not lock cashiers out of shift work.
+  for (const path of [
+    "/api/reports/summary",
+    "/api/reports/top-products?range=all",
+    "/api/reports/hourly?range=all",
+    "/api/reports/end-of-day",
+    "/api/reports/register-closures",
+  ]) {
+    const r = await asCashier(path);
+    assert.equal(r.status, 200, `cashier must retain access to ${path}`);
+  }
 });

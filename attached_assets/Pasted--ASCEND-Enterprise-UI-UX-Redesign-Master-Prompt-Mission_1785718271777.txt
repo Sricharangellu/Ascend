@@ -1,0 +1,778 @@
+# ASCEND Enterprise UI/UX Redesign Master Prompt
+
+## Mission
+
+You are the Lead Enterprise Product Designer, Senior UX Architect, and Senior Frontend Engineer for ASCEND.
+
+Your task is to redesign the entire ASCEND application into a modern enterprise platform while preserving existing functionality and business logic.
+
+Do NOT perform a cosmetic redesign only.
+
+Think like the design teams behind:
+
+* Shopify Admin
+* Stripe Dashboard
+* Notion
+* Linear
+* Figma
+* Oracle Fusion
+* Microsoft Dynamics 365
+* SAP Fiori
+* Apple Human Interface Guidelines
+* Material Design 3
+
+The goal is to create an ERP that looks modern, clean, intelligent, premium, and is extremely easy to navigate.
+
+---
+
+# Primary Objectives
+
+## Redesign the entire frontend
+
+Audit every screen.
+
+Redesign every page.
+
+Redesign every workflow.
+
+Improve usability.
+
+Reduce clicks.
+
+Improve discoverability.
+
+Increase consistency.
+
+Modernize every component.
+
+Nothing should remain inconsistent.
+
+---
+
+# Important Rule
+
+Do NOT change business logic unless necessary.
+
+Do NOT break APIs.
+
+Do NOT break existing workflows.
+
+Frontend improvements should preserve backend compatibility.
+
+If an API needs improvement, create an abstraction layer instead of breaking existing contracts.
+
+---
+
+# Enterprise Design Principles
+
+The UI should feel like a premium enterprise application.
+
+Use:
+
+• generous whitespace
+
+• clean typography
+
+• clear visual hierarchy
+
+• modern cards
+
+• intelligent spacing
+
+• consistent shadows
+
+• subtle animations
+
+• smooth transitions
+
+• responsive layouts
+
+• polished micro interactions
+
+Avoid:
+
+• clutter
+
+• unnecessary borders
+
+• duplicated actions
+
+• excessive colors
+
+• inconsistent spacing
+
+• outdated tables
+
+• confusing menus
+
+---
+
+# Design System
+
+Create a reusable design system.
+
+Every component must be standardized.
+
+Examples:
+
+Buttons
+
+Inputs
+
+Dropdowns
+
+Tables
+
+Dialogs
+
+Drawers
+
+Cards
+
+Tabs
+
+Badges
+
+Status Pills
+
+Progress Indicators
+
+Timeline Components
+
+Charts
+
+Widgets
+
+Filters
+
+Date Pickers
+
+Search Bars
+
+Navigation
+
+Icons
+
+Notifications
+
+Everything should reuse the same component library.
+
+---
+
+# Typography
+
+Implement a complete typography hierarchy.
+
+Heading
+
+Subheading
+
+Section Title
+
+Card Title
+
+Body
+
+Caption
+
+Metadata
+
+Status Labels
+
+Maintain consistent font sizes across the application.
+
+---
+
+# Color System
+
+Create a professional enterprise color palette.
+
+Primary
+
+Secondary
+
+Success
+
+Warning
+
+Danger
+
+Information
+
+Background
+
+Surface
+
+Border
+
+Text
+
+Muted Text
+
+Dark Mode support.
+
+High Contrast support.
+
+Accessibility compliant.
+
+---
+
+# Navigation Redesign
+
+Redesign navigation completely.
+
+Current navigation should be audited.
+
+Merge duplicate menu items.
+
+Group related modules together.
+
+Example:
+
+Dashboard
+
+Sales
+
+Customers
+
+Products
+
+Inventory
+
+Purchasing
+
+Suppliers
+
+Warehouse
+
+Receiving
+
+Transfers
+
+Accounting
+
+Finance
+
+Reports
+
+Analytics
+
+AI Assistant
+
+Administration
+
+Settings
+
+Avoid multiple navigation paths leading to the same destination.
+
+---
+
+# Merge Similar Screens
+
+Audit every page.
+
+If multiple pages perform similar tasks:
+
+Merge them.
+
+Examples:
+
+Receiving
+
+Invoice Receiving
+
+Scan Receiving
+
+Manual Receiving
+
+These should become one intelligent receiving workspace with multiple modes.
+
+Same for:
+
+Inventory Adjustments
+
+Transfers
+
+Stock Corrections
+
+Returns
+
+Purchase Requests
+
+Purchase Orders
+
+Supplier Orders
+
+Product Maintenance
+
+Variant Management
+
+Barcode Management
+
+Everything should feel unified.
+
+---
+
+# Dashboard Redesign
+
+Create an executive dashboard.
+
+Should include:
+
+Today's Sales
+
+Revenue
+
+Profit
+
+Inventory Value
+
+Low Stock
+
+Out of Stock
+
+Expiring Soon
+
+Purchase Orders Awaiting Approval
+
+Receiving Today
+
+Pending Shipments
+
+Supplier Performance
+
+AI Insights
+
+Recent Activity
+
+Quick Actions
+
+Role-based widgets.
+
+---
+
+# Product Pages
+
+Completely redesign.
+
+Large searchable catalog.
+
+Fast filtering.
+
+Bulk editing.
+
+Image gallery.
+
+Variants.
+
+Supplier history.
+
+Price history.
+
+Inventory history.
+
+Barcode history.
+
+Purchase history.
+
+Sales analytics.
+
+Expiry.
+
+Locations.
+
+Margins.
+
+Related products.
+
+Everything visible without excessive navigation.
+
+---
+
+# Purchasing Workspace
+
+Create a modern procurement workspace.
+
+Include:
+
+Purchase Requests
+
+Purchase Orders
+
+Supplier Quotes
+
+Approvals
+
+Receiving
+
+Invoices
+
+Shipment Tracking
+
+Lead Time
+
+Supplier Performance
+
+Last Purchase Price
+
+Previous Vendor Price
+
+MOQ
+
+Pack Size
+
+Suggested Orders
+
+AI Recommendations
+
+Everything in one workspace.
+
+---
+
+# Receiving Workspace
+
+One intelligent page.
+
+Modes:
+
+Manual Receiving
+
+Barcode Scan
+
+Invoice Matching
+
+PO Receiving
+
+Blind Receiving
+
+Returns
+
+Over Receiving
+
+Partial Receiving
+
+Expiry Entry
+
+Lot Tracking
+
+Serial Numbers
+
+Photo Attachments
+
+Quality Checks
+
+Damage Reporting
+
+Variance Approval
+
+---
+
+# Inventory Workspace
+
+Modern warehouse dashboard.
+
+Include:
+
+Stock Levels
+
+Movement History
+
+Transfers
+
+Cycle Counts
+
+Adjustments
+
+Reservations
+
+Locations
+
+Bins
+
+Lots
+
+Expiry
+
+Serial Numbers
+
+Forecast
+
+Velocity
+
+Reorder Suggestions
+
+Supplier Lead Time
+
+---
+
+# Search
+
+Implement global search.
+
+Search:
+
+Products
+
+Orders
+
+Customers
+
+Invoices
+
+Purchase Orders
+
+Suppliers
+
+Locations
+
+Employees
+
+Reports
+
+Everything searchable instantly.
+
+---
+
+# AI Assistant Integration
+
+Every module should include contextual AI assistance.
+
+Examples:
+
+Explain this report.
+
+Why is inventory low?
+
+Recommend purchase quantities.
+
+Find pricing anomalies.
+
+Predict stockouts.
+
+Suggest supplier.
+
+Explain margin changes.
+
+---
+
+# Tables
+
+Redesign all tables.
+
+Features:
+
+Sticky headers
+
+Resizable columns
+
+Saved layouts
+
+Column chooser
+
+Bulk actions
+
+Inline editing
+
+Sorting
+
+Grouping
+
+Filtering
+
+Export
+
+Import
+
+Pagination
+
+Infinite scrolling where appropriate.
+
+---
+
+# Forms
+
+Modern multi-step forms.
+
+Autosave drafts.
+
+Validation.
+
+Keyboard navigation.
+
+Progress indicators.
+
+Recent selections.
+
+Smart defaults.
+
+Undo capability.
+
+---
+
+# Mobile & Tablet
+
+Every screen should be responsive.
+
+Support:
+
+Desktop
+
+Laptop
+
+Tablet
+
+Mobile
+
+Touch-friendly controls where appropriate.
+
+---
+
+# Accessibility
+
+Meet WCAG AA standards.
+
+Keyboard navigation.
+
+Screen reader support.
+
+Focus indicators.
+
+Color contrast.
+
+ARIA attributes.
+
+---
+
+# Performance
+
+Reduce rendering time.
+
+Lazy loading.
+
+Virtualized tables.
+
+Optimized images.
+
+Skeleton loading.
+
+Optimistic updates.
+
+Caching.
+
+Code splitting.
+
+---
+
+# Audit Process
+
+For EVERY page:
+
+1. Analyze current UI.
+2. Identify UX problems.
+3. Identify duplicated functionality.
+4. Merge similar screens when appropriate.
+5. Improve navigation.
+6. Improve layouts.
+7. Improve workflows.
+8. Modernize components.
+9. Preserve business functionality.
+10. Refactor frontend architecture if needed.
+
+Do NOT skip any page.
+
+---
+
+# Deliverables
+
+Produce:
+
+1. Complete UI audit.
+2. UX audit.
+3. Navigation audit.
+4. Information architecture redesign.
+5. Design system.
+6. Component library.
+7. Updated page layouts.
+8. Responsive redesign.
+9. Accessibility improvements.
+10. Performance improvements.
+11. Frontend refactoring plan.
+12. Incremental implementation roadmap.
+
+---
+
+# Implementation Strategy
+
+Do NOT rewrite everything at once.
+
+Work in phases:
+
+Phase 1
+Design System
+
+Phase 2
+Navigation
+
+Phase 3
+Shared Components
+
+Phase 4
+Dashboard
+
+Phase 5
+Products
+
+Phase 6
+Inventory
+
+Phase 7
+Purchasing
+
+Phase 8
+Receiving
+
+Phase 9
+Sales
+
+Phase 10
+Customers
+
+Phase 11
+Accounting
+
+Phase 12
+Reports & Analytics
+
+Phase 13
+Administration
+
+Phase 14
+AI Workspace
+
+Phase 15
+Global QA and UI consistency review
+
+Each phase must finish with:
+
+* visual consistency checks
+* accessibility validation
+* responsive testing
+* performance testing
+* regression testing
+
+---
+
+# Success Criteria
+
+The finished ASCEND application should:
+
+* Look like a modern enterprise SaaS platform.
+* Feel intuitive for first-time users.
+* Minimize clicks and cognitive load.
+* Use one consistent design language.
+* Eliminate duplicate screens and workflows.
+* Preserve all existing business functionality.
+* Be scalable for future modules.
+* Be visually comparable to Shopify Admin, Stripe Dashboard, Linear, and SAP Fiori while maintaining ASCEND's own identity.
+
+Think beyond redesigning screens—redesign the entire user experience and information architecture so ASCEND becomes a world-class enterprise ERP platform.

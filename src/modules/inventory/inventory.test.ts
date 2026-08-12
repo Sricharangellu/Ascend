@@ -78,6 +78,40 @@ test("reorder-suggestions: lists a product below its reorder point with preferre
   assert.equal(row.preferred_vendor_name, "Reorder Vendor");
 });
 
+// Phase 6 item 1 (WORK/FORWARD_PLAN.md): this is the third of three
+// reorder-suggestion surfaces (the other two are catalog/detail-views.ts's
+// reorderSuggestions and inventory/pipeline-views.ts's reorderAlerts) found to
+// suggest a raw reorder_pt without regard for whether the preferred supplier
+// can actually fulfil that quantity. suggested_qty must round up to a valid
+// case-pack multiple that also clears the supplier's MOQ.
+test("reorder-suggestions: suggested_qty rounds up to the preferred supplier's MOQ/case_pack", async () => {
+  const app = await freshApp();
+  const product = await call(app, "POST", "/api/catalog/", {
+    sku: "REORDER-MOQ-1", name: "Reorder MOQ Product", price_cents: 1000, raw_cost_price_cents: 500,
+  });
+  assert.equal(product.status, 201);
+  const productId = product.json.id;
+
+  // case_pack=6, moq=20 — raw reorder_pt of 10 must round up to a multiple of
+  // 6 that also clears 20: ceil(20/6)*6 = 24.
+  const supplier = await call(app, "POST", "/api/catalog/" + productId + "/suppliers", {
+    vendor_name: "MOQ Reorder Vendor", is_preferred: true, moq: 20, case_pack: 6,
+  });
+  assert.equal(supplier.status, 201, JSON.stringify(supplier.json));
+
+  await call(app, "PUT", `/api/inventory/${productId}/reorder-point`, { reorderPt: 10 });
+
+  const { status, json } = await call(app, "GET", "/api/inventory/reorder-suggestions");
+  assert.equal(status, 200, JSON.stringify(json));
+  const row = json.items.find((i: { product_id: string }) => i.product_id === productId);
+  assert.ok(row, "expected product below reorder point in suggestions");
+  assert.equal(row.reorder_pt, 10, "raw reorder point is unchanged");
+  assert.equal(row.suggested_qty, 24, "suggested_qty rounds up to a valid order quantity");
+  assert.equal(row.suggested_qty % 6, 0, "must be a whole number of cases");
+  assert.equal(row.preferred_supplier_moq, 20);
+  assert.equal(row.preferred_supplier_case_pack, 6);
+});
+
 // Regression: web/app/(protected)/purchasing/_components/shared.ts's
 // ReorderSuggestion type (used by ReorderTab.tsx) expects last_unit_cost_cents/
 // last_ordered_at/last_ordered_qty, but getReorderSuggestions() never returned
@@ -386,6 +420,115 @@ test("movements history records receive and adjust", async () => {
   assert.ok(json.some((m: any) => m.reason === "receiving" && m.delta === 4));
   assert.ok(json.some((m: any) => m.reason === "adjustment" && m.delta === -1));
   assert.ok(json.every((m: any) => m.id.startsWith("mov_")));
+});
+
+// Phase 6 item 2 (WORK/FORWARD_PLAN.md): safety stock is a dedicated buffer,
+// distinct from reorder point — mirrors the reorder-point tests exactly.
+test("safety-stock can be set independently of reorder point", async () => {
+  const app = await freshApp();
+  const { status, json } = await call(app, "PUT", "/api/inventory/prod_ss/safety-stock", {
+    safetyStock: 12,
+  });
+  assert.equal(status, 200);
+  assert.equal(json.safetyStock, 12);
+  assert.equal(json.reorderPt, 0, "setting safety stock must not touch reorder point");
+  assert.equal(json.stockQty, 0);
+});
+
+test("reorder point and safety stock are independently settable and both persist", async () => {
+  const app = await freshApp();
+  await call(app, "PUT", "/api/inventory/prod_both/reorder-point", { reorderPt: 15 });
+  const r = await call(app, "PUT", "/api/inventory/prod_both/safety-stock", { safetyStock: 5 });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.reorderPt, 15, "setting safety stock must preserve the existing reorder point");
+  assert.equal(r.json.safetyStock, 5);
+});
+
+test("manager can set safety stock; cashier cannot (403)", async () => {
+  const app = await freshApp();
+  const ok = await call(app, "PUT", "/api/inventory/prod_ss_role/safety-stock", { safetyStock: 3 }, "manager");
+  assert.equal(ok.status, 200);
+  const denied = await call(app, "PUT", "/api/inventory/prod_ss_role2/safety-stock", { safetyStock: 3 }, "cashier");
+  assert.equal(denied.status, 403);
+});
+
+test("reorder-suggestions: safety_stock is additive to suggested_qty and rounds with MOQ/case_pack", async () => {
+  const app = await freshApp();
+  const product = await call(app, "POST", "/api/catalog/", {
+    sku: "REORDER-SAFETY-1", name: "Reorder Safety Product", price_cents: 1000, raw_cost_price_cents: 500,
+  });
+  assert.equal(product.status, 201);
+  const productId = product.json.id;
+
+  // No MOQ/case_pack this time — isolates the safety-stock addition itself:
+  // reorder_pt=10 + safety_stock=8 = 18, unrounded (no supplier constraint).
+  const supplier = await call(app, "POST", "/api/catalog/" + productId + "/suppliers", {
+    vendor_name: "Safety Stock Vendor", is_preferred: true,
+  });
+  assert.equal(supplier.status, 201);
+
+  await call(app, "PUT", `/api/inventory/${productId}/reorder-point`, { reorderPt: 10 });
+  const setSafety = await call(app, "PUT", `/api/inventory/${productId}/safety-stock`, { safetyStock: 8 });
+  assert.equal(setSafety.status, 200);
+
+  const { status, json } = await call(app, "GET", "/api/inventory/reorder-suggestions");
+  assert.equal(status, 200, JSON.stringify(json));
+  const row = json.items.find((i: { product_id: string }) => i.product_id === productId);
+  assert.ok(row, "expected product below reorder point in suggestions");
+  assert.equal(row.reorder_pt, 10);
+  assert.equal(row.safety_stock, 8);
+  assert.equal(row.suggested_qty, 18, "suggested_qty = reorder_pt + safety_stock when no MOQ/case_pack applies");
+});
+
+test("reorder-suggestions: safety_stock defaults to 0 and does not change suggested_qty when unconfigured (regression)", async () => {
+  const app = await freshApp();
+  const product = await call(app, "POST", "/api/catalog/", {
+    sku: "REORDER-NOSAFETY-1", name: "No Safety Stock Product", price_cents: 1000, raw_cost_price_cents: 500,
+  });
+  assert.equal(product.status, 201);
+  const productId = product.json.id;
+  await call(app, "PUT", `/api/inventory/${productId}/reorder-point`, { reorderPt: 7 });
+
+  const { status, json } = await call(app, "GET", "/api/inventory/reorder-suggestions");
+  assert.equal(status, 200);
+  const row = json.items.find((i: { product_id: string }) => i.product_id === productId);
+  assert.ok(row);
+  assert.equal(row.safety_stock, 0);
+  assert.equal(row.suggested_qty, 7, "unconfigured safety_stock must not change suggested_qty (prior behavior)");
+});
+
+// Phase 6 item 3 (WORK/FORWARD_PLAN.md): a lead-time-derived promised
+// delivery date on this, the third of three reorder-suggestion surfaces.
+// Null with no preferred supplier to promise against; now + lead_time_days
+// once one is linked.
+test("reorder-suggestions: expected_delivery_date is now + the preferred supplier's lead time, null with no preferred supplier", async () => {
+  const app = await freshApp();
+  const product = await call(app, "POST", "/api/catalog/", {
+    sku: "REORDER-ETA-1", name: "Reorder ETA Product", price_cents: 1000, raw_cost_price_cents: 500,
+  });
+  assert.equal(product.status, 201);
+  const productId = product.json.id;
+  await call(app, "PUT", `/api/inventory/${productId}/reorder-point`, { reorderPt: 5 });
+
+  const noSupplier = await call(app, "GET", "/api/inventory/reorder-suggestions");
+  assert.equal(noSupplier.status, 200);
+  const rowNoSupplier = noSupplier.json.items.find((i: { product_id: string }) => i.product_id === productId);
+  assert.ok(rowNoSupplier);
+  assert.equal(rowNoSupplier.expected_delivery_date, null, "no preferred supplier to promise against");
+
+  const before = Date.now();
+  const supplier = await call(app, "POST", "/api/catalog/" + productId + "/suppliers", {
+    vendor_name: "ETA Reorder Vendor", is_preferred: true, lead_time_days: 6,
+  });
+  assert.equal(supplier.status, 201);
+
+  const { status, json } = await call(app, "GET", "/api/inventory/reorder-suggestions");
+  assert.equal(status, 200, JSON.stringify(json));
+  const row = json.items.find((i: { product_id: string }) => i.product_id === productId);
+  assert.ok(row);
+  const sixDaysMs = 6 * 24 * 60 * 60 * 1000;
+  assert.ok(row.expected_delivery_date >= before + sixDaysMs, "must be roughly now + 6 days");
+  assert.ok(row.expected_delivery_date <= Date.now() + sixDaysMs + 5000, "must not be far in excess of now + 6 days");
 });
 
 test("reorder-point can be set before any stock exists", async () => {
