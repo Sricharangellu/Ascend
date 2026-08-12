@@ -127,7 +127,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/dependency-review-action@v4
+      - uses: actions/dependency-review-action@v5
         with:
           # Matches ci.yml's root `npm audit --audit-level=high` gate, so a
           # dependency cannot enter through the PR path at a severity the
