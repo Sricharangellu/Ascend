@@ -74,18 +74,47 @@ function flatten(err: ZodError): string {
     .join("; ");
 }
 
-/** Express error-handling middleware. Mount last. */
+/**
+ * Express error-handling middleware. Mount last — this is the ONLY error
+ * handler; see the note in `src/app.ts` about the envelope middleware that used
+ * to sit behind it and could never run.
+ *
+ * Delivers the documented envelope `{ error: { code, message, requestId } }`,
+ * plus `details` on validation errors. `requestId` is what lets a customer
+ * reporting an error be correlated to the server log line — it is also echoed
+ * as the `x-request-id` response header by `requestIdMiddleware`, so the two
+ * always agree.
+ */
 export function errorMiddleware(
   err: unknown,
   req: Request,
   res: Response,
   _next: NextFunction,
 ) {
+  // requestIdMiddleware writes these to res.locals for exactly this purpose
+  // ("so subsequent middleware (auth, error-envelope) can reference it").
+  const requestId = (res.locals["requestId"] as string | undefined) ?? "unknown";
+  const traceId = (res.locals["traceId"] as string | undefined) ?? requestId;
+  const spanId = (res.locals["spanId"] as string | undefined) ?? "";
+
   if (err instanceof HttpError) {
+    // 5xx raised as an HttpError is still a server fault and still needs a log
+    // line — previously nothing logged it, because the handler that did was
+    // unreachable. Client-side 4xx stay unlogged, as before.
+    if (err.status >= 500) {
+      logError(err, {
+        ...contextFromRequest(req),
+        requestId,
+        traceId,
+        spanId,
+        statusCode: err.status,
+      });
+    }
     res.status(err.status).json({
       error: {
         code: err.code,
         message: err.message,
+        requestId,
         ...(err.details !== undefined ? { details: err.details } : {}),
       },
     });
@@ -93,6 +122,16 @@ export function errorMiddleware(
   }
   // Security: never echo raw error text (it can leak SQL/stack internals). Log
   // structured detail server-side; return a generic message to the client.
-  logError(err, { ...contextFromRequest(req), statusCode: 500 });
-  res.status(500).json({ error: { code: "internal", message: "internal error" } });
+  //
+  // The correlation fields are passed explicitly rather than left to
+  // contextFromRequest. That helper reads `req.id` and the `x-trace-id` /
+  // `x-span-id` REQUEST headers — none of which this application ever sets.
+  // requestIdMiddleware writes to `res.locals` and emits `traceparent` /
+  // `x-request-id` RESPONSE headers instead, so contextFromRequest has been
+  // returning `requestId: undefined` and empty trace/span ids on every 500 ever
+  // logged. errorMiddleware is its only call site, so overriding here fixes it
+  // completely; the helper's own signature is left alone rather than changed
+  // for a single caller.
+  logError(err, { ...contextFromRequest(req), requestId, traceId, spanId, statusCode: 500 });
+  res.status(500).json({ error: { code: "internal", message: "internal error", requestId } });
 }
