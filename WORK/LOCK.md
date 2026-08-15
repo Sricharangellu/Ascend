@@ -11,6 +11,16 @@
 | Gates | `hygiene` PASS (2202 files) · backend `typecheck` PASS · `gap:scan` PASS (474 backend / 382 frontend, 17 allowlisted) · `authz:scan` PASS (49 route files, 6 allowlisted) · `table:scan` PASS (166 names). Docs-only diff, run to confirm the baseline is clean. |
 | Not run | `npm test` (894 backend tests) and `smoke` — need a Postgres instance not started in this container, and no `src/` file changed. Web typecheck/lint/vitest/build — no `web/` file changed, `web/node_modules` absent. Playwright e2e — no real-stack pair here. **Mobile typecheck/test/build — impossible, which is finding F-2 itself.** Node here is v22, repo pins 24. |
 | Blockers | **No fix was attempted, deliberately.** Every remedy lands in `artifacts/`, whose disposition is `NEEDS-SRI` (`WORK/LOOP_STATE.md:137`) and which `AGENTS.md` forbids an agent to resolve. Recommendation on record stays harvest-then-extract, never delete. The referenced Claude Design file could not be opened (DesignSync needs an interactive auth; WebFetch 403), so this claim makes **no** design-conformance claim. |
+## Active Claim (Claude Code web — F-18 OpenAPI contract validation)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/status-staging-vs-develop-0vv2gg` |
+| Queue item | Phase 9.9 **F-18**: build the CI check that validates `contracts/openapi.yaml` against real backend routes, and correct the drift it finds. Picked as the next unblocked item in Phase 9's stated execution order — F-11/F-3/F-13/S-1/S-2 are all Sri-gated, and F-5/F-9 turned out to have already shipped in PR #185 with the plan table left stale. |
+| Files/areas expected | Ended as `WORK/**` only. The scanner, allowlist, CI step, `package.json` script and `contracts/openapi.yaml` edits were all stood down in favour of PR #222, which shipped the same gate first. NO `src/**` changes at any point. NO `artifacts/**`. |
+| Started | 2026-08-06T17:10Z |
+| Status | RELEASED — **stood down as a duplicate.** PR #222 shipped F-18 first; this branch defers to it and keeps only the non-overlapping work (F-5/F-9 board corrections, F-29, F-30). PR #217. Full report: `WORK/audits/AUDIT_2026-08-06T171000Z-f18-openapi-contract-validation.md` |
+| Blockers | none. F-28 (the underlying request-field naming split) is recorded as NEEDS-SRI rather than resolved unilaterally — renaming accepted request fields is a breaking API change. |
 ## Active Claim (Claude Code web — product search/filter/sort: server-side catalog query)
 
 | Field | Value |
