@@ -148,16 +148,21 @@ jobs:
         # entry. No deps; plain ESM on the runner's Node.
         run: npm run gap:scan
 
-      # Backlog F-18. GATING, unlike the three report-only scans below, and it can
-      # be because it is green on arrival: the 9 phantom operations this check
-      # found on its first run were corrected in the same PR, so the count it
-      # gates on is already zero. Nothing generates code from contracts/openapi.yaml
-      # (orval reads a different, one-path lib/api-spec/openapi.yaml; web/api-client
-      # is hand-maintained per F-21), so no compiler or type error will ever catch
-      # drift here — this step is the only thing that does. The opposite direction
-      # (a real route nobody documented) is merely incomplete: 478 of them today,
-      # reported against tools/openapi-contract-baseline.json but never fatal.
-      - name: OpenAPI contract scan — every documented operation is really served
+      # Backlog F-18, and the other direction of the step above: gap:scan asks
+      # "does the route the frontend calls exist?", this asks "does the
+      # operation the contract promises exist?". Frontend work is written
+      # against contracts/openapi.yaml — "if it's not in the spec, you don't
+      # call it" — so a documented path with no route is an instruction to
+      # build a 404. GATING, not report-only: the first run found 9 mismatches,
+      # 3 of them plain typos fixed in this change, and 6 needing an API
+      # decision, allowlisted with the route that actually serves each. That is
+      # a small enough arrival cost to gate on, unlike F-15/F-16.
+      #
+      # One-way by design. The backend serves 626 operations and the contract
+      # documents 146; requiring every route to be documented would fail on
+      # arrival with ~480 findings and be deleted within a week. Undocumented
+      # routes are a documentation gap; documented-but-absent routes are a lie.
+      - name: OpenAPI contract scan — every documented operation has a route
         run: npm run contract:scan
 
       # Backlog F-15. REPORT-ONLY on purpose — the script exits 0 regardless.

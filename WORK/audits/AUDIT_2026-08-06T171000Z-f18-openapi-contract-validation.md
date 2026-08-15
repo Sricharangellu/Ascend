@@ -291,3 +291,70 @@ F-14, F-19, F-22, F-23 and F-27), **F-13** (pricing owner), and now **F-28**.
 
 The honest read: Phase 9's remaining surface is decision-bound, not
 effort-bound.
+
+---
+
+## 7. STAND-DOWN — PR #222 shipped F-18 first (recorded 2026-08-11)
+
+Everything above describes an implementation that **was not merged**. While this
+branch was in flight, another session built the same gate and landed it via
+**PR #222** (`7b5b079`, merged at `32f8796`). `develop`'s Phase 9.9 row already
+reads F-18 ✅ DONE. Two sessions produced `tools/openapi-contract-scan.mjs`
+independently — an **add/add conflict on the same filename**, the third
+concurrent duplicate this week after PR #212/#214 and #219.
+
+**PR #222 is the surviving implementation.** This is not deference for its own
+sake — it is better on three counts:
+
+1. **Better engineered.** Route extraction lives in a shared
+   `tools/lib/backend-routes.mjs`; the parser asserts a plausible operation
+   floor rather than trusting itself; the allowlist demands a written reason per
+   entry and *fails* on a stale one.
+2. **It corrected a claim this audit got wrong.** §3a asserted nothing generates
+   from `contracts/openapi.yaml`. False: `web/package.json` wires
+   `generate:client: openapi-typescript ../contracts/openapi.yaml -o
+   api-client/types.ts`. It is a footgun nobody runs rather than a build step,
+   but it exists, and PR #222 found it while this audit asserted its absence.
+3. **It made the better product call.** On `PATCH /automotive/work-orders/{id}/status`
+   the contract describes a *bodyless auto-advance*; the code requires a
+   caller-supplied status. PR #222: *"Address and semantics both differ, so this
+   one needs a decision, not a rename."* This branch renamed it, silently
+   discarding documented intent — a unilateral product decision.
+
+**Merging this branch would have broken `develop`, proven rather than assumed.**
+Swapping this branch's corrected contract under develop's scanner and allowlist:
+
+```
+openapi-contract-scan: STALE ALLOWLIST
+  PATCH /api/v1/appointments/{id}/status
+  POST  /api/v1/healthcare/prescriptions
+  PATCH /api/v1/automotive/work-orders/{id}/status
+  PATCH /api/v1/entertainment/events/{id}/status
+  POST  /api/v1/entertainment/tickets
+  POST  /api/v1/education/fees
+exit=1
+```
+
+Correcting the contract resolves the six mismatches the allowlist describes, and
+that scanner treats a stale entry as fatal. Two valid designs, mutually
+incompatible; the merged one wins.
+
+### What survived, and why
+
+| Item | Kept? | Reason |
+|---|---|---|
+| Scanner, allowlist/baseline, CI step, `package.json` script | ❌ | Duplicates PR #222 |
+| The 9 contract path corrections | ❌ | Would strand develop's 6 allowlist entries |
+| F-18 plan row, F-28 (ID taken by develop) | ❌ | Superseded / renumbered to **F-30** |
+| **F-5 and F-9 board corrections** | ✅ | **Still `⬜ READY` on develop despite both shipping in PR #185.** Verified against the tree; nobody else caught this |
+| **F-29** — two files named `openapi.yaml` | ✅ | Not filed by PR #222 |
+| **F-30** — two request-field naming conventions | ✅ | Renumbered; distinct from develop's F-28 |
+| The 11 request-body corrections | ❌ *(evidence kept)* | PR #222 scopes bodies to F-19 because unverified schema rewrites can make the contract *more* wrong. Mine were mechanically verified (11 → 0 against each zod schema) and the per-operation list is in §4 — a down-payment for F-19, not a merge for this PR |
+
+### The real finding
+
+Three concurrent duplicates in one week (#212/#214, #219, #222) is a coordination
+failure, not bad luck. `WORK/LOCK.md` is claim-on-start, but nothing makes an
+agent *read* it against a board item before building — this branch claimed F-18
+in LOCK.md and still collided. Worth a board item of its own; the cost here was
+a full implementation, its verification, and two develop merges.
