@@ -10,6 +10,16 @@
 | Status | RELEASED — pushed to `claude/replit-import-ascend-sv4ykb`. |
 | Blockers | The primary source named in the directive (`Desktop/Prj/ascend-wt-v3`) was never readable here. Everything below is an audit of in-repo Replit content, not of that directory — if the Desktop worktree has diverged from what `64758a5` merged, this import does not cover the difference. |
 
+## Active Claim (Claude Code web — F-18 OpenAPI contract validation)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/status-staging-vs-develop-0vv2gg` |
+| Queue item | Phase 9.9 **F-18**: build the CI check that validates `contracts/openapi.yaml` against real backend routes, and correct the drift it finds. Picked as the next unblocked item in Phase 9's stated execution order — F-11/F-3/F-13/S-1/S-2 are all Sri-gated, and F-5/F-9 turned out to have already shipped in PR #185 with the plan table left stale. |
+| Files/areas expected | Ended as `WORK/**` only. The scanner, allowlist, CI step, `package.json` script and `contracts/openapi.yaml` edits were all stood down in favour of PR #222, which shipped the same gate first. NO `src/**` changes at any point. NO `artifacts/**`. |
+| Started | 2026-08-06T17:10Z |
+| Status | RELEASED — **stood down as a duplicate.** PR #222 shipped F-18 first; this branch defers to it and keeps only the non-overlapping work (F-5/F-9 board corrections, F-29, F-30). PR #217. Full report: `WORK/audits/AUDIT_2026-08-06T171000Z-f18-openapi-contract-validation.md` |
+| Blockers | none. F-28 (the underlying request-field naming split) is recorded as NEEDS-SRI rather than resolved unilaterally — renaming accepted request fields is a breaking API change. |
 ## Active Claim (Claude Code web — product search/filter/sort: server-side catalog query)
 
 | Field | Value |
