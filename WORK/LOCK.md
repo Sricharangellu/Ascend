@@ -1,3 +1,15 @@
+## Active Claim (Claude Code web — Replit worktree import: harvest `push_tokens` out of `artifacts/`)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/replit-import-ascend-sv4ykb` |
+| Queue item | Sri directive 2026-08-15: audit the Replit worktree (`Desktop/Prj/ascend-wt-v3`) and integrate whatever ASCEND is missing. **The named directory is not reachable from this container** (isolated remote clone; no shared filesystem — verified by full-filesystem scan, all mount points, `git worktree list`, `git stash`, and all 91 remote branches). Audited the Replit worktree content that *is* in-repo instead: the `@workspace/*` tree merged by `64758a5` and parked under `artifacts/`. That audit reproduces, independently, the finding `WORK/LOOP_STATE.md` already carries twice as **NEEDS-SRI**: `artifacts/api-server/` is a bidirectionally-diverged copy of the backend, and a finished, tested `push_tokens` module lives only there and ships to nobody. LOOP_STATE's own recommendation is **harvest-then-extract, never delete**. This claim does the harvest half. |
+| Files/areas expected | NEW `src/modules/push_tokens/{index,service,routes,batcher,batcher.test,quiet_hours.test}.ts`; `src/modules/index.ts` (two lines — import + registry entry); NEW `WORK/audits/AUDIT_2026-08-15T174500Z-replit-worktree-import.md`; `WORK/LOOP_STATE.md`; `WORK/LOCK.md`. **NOT** `artifacts/**` — nothing there is deleted or moved; the harvest is a copy, so the extract decision stays entirely Sri's. NOT `web/**` (no frontend consumer exists in `web/`; the mobile client lives in `artifacts/ascend-mobile`). NOT `lib/**`. NOT the S3/backup work (see the exclusion list in the audit). |
+| Started | 2026-08-15T174500Z |
+| Overlap check | Ran per AGENTS.md. No `ACTIVE` claim below names `src/modules/push_tokens/**` (the path did not exist in `src/`) or `src/modules/index.ts`. The nearest neighbours are the catalog claim (`src/modules/catalog/**`, RELEASED) and F-18 (`tools/**` + `contracts/openapi.yaml`, RELEASED); neither overlaps. Branch cut from `origin/develop` at `04eea87`, level with it. |
+| Status | RELEASED — pushed to `claude/replit-import-ascend-sv4ykb`. |
+| Blockers | The primary source named in the directive (`Desktop/Prj/ascend-wt-v3`) was never readable here. Everything below is an audit of in-repo Replit content, not of that directory — if the Desktop worktree has diverged from what `64758a5` merged, this import does not cover the difference. |
+
 ## Active Claim (Claude Code web — product search/filter/sort: server-side catalog query)
 
 | Field | Value |
