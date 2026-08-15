@@ -41,11 +41,37 @@ What it is, having now read it:
   device. So it is a manager/monitoring companion, not a floor-operator app.
 - Dark-first tokens with `primary: '#5D5FEF'` (`constants/colors.ts`).
 
-**Consequence for §2.** The web `MobileTabBar` this wave added (Home / Sell / **Scan** / Stock /
-Orders + More) **diverges from that IA** and was designed without reference to it. The divergence
-is defensible — the web app owns the register and the scanner and the native app owns neither, so
-the two have genuinely different primary tasks — but it was arrived at by omission, not by a
-decision. **Flagged for Sri: align, keep both, or hybridise.** Not resolved here.
+**Consequence for §2 — RESOLVED 2026-08-15.** The web `MobileTabBar` originally shipped as
+Home / Sell / **Scan** / Stock / Orders + More, designed without reference to the native app.
+**Sri's call: align the web bar to the native IA.** The bar is now
+**Dashboard / Inventory / Orders / Search** + More, matching
+`artifacts/ascend-mobile/app/(tabs)/_layout.tsx` in both labels and order.
+
+Two places where a literal port is impossible, and what was done:
+
+- **More is kept.** The native app has four screens total, so four tabs reach all of it. The web
+  app has ~100 routes; without More, the register, purchasing, receiving, customers, settings and
+  reports are unreachable on a phone. It is a structural necessity, not a fifth tab.
+- **Search opens the command palette.** The native Search is a screen; the web app has no
+  `/search` route. The palette already resolves products/orders/customers/vendors/POs and
+  deep-links to their detail pages.
+
+**What the alignment cost, stated plainly.** Sell and Scan leave the bar. The register goes back
+from one tap to More → Sell → Register. Scan moved into the palette Search opens, so a barcode
+lookup is one tap further than before rather than deleted — the scan affordance sits beside the
+search field, since scanning a code and typing a SKU are the same task. The native app has neither
+a register nor a scanner, so there was nothing to align these to; this is a consistency-over-speed
+trade Sri chose with the cost stated.
+
+**Two things the alignment surfaced, both fixed here:** the new bar's `aria-label="Primary"`
+collided with the rail's `"Primary navigation"` (two nav landmarks a screen reader cannot tell
+apart) — renamed to `"Quick navigation"`. And adding a Search tab duplicated the top bar's search
+field, which on a 375px header is ~60% of the width spent on a second door to the same palette —
+that field is now `hidden md:flex`. Desktop is unchanged in both cases.
+
+**Note on gating:** `/orders` belongs to the `sales_orders` **B2B** capability module, so on a
+retail-only tenant (including the demo) the bar renders three tabs, not four. The native app shows
+Orders unconditionally. That is the capability gate working as designed, not a porting error.
 
 **Consequence for finding #8.** That row calls `#5D5FEF` "the purple retired before" the blue, which
 reads as though it is gone. It is not: it is still hard-coded in at least five live `web/` spots —

@@ -340,10 +340,20 @@ export function EnterpriseShell({
       <MobileTabBar
         moreOpen={compactViewport && sidebarExpanded}
         onMoreClick={() => setSidebarExpanded((e) => !e)}
-        onScanClick={() => setScanOpen(true)}
+        onSearchClick={() => setPaletteOpen(true)}
       />
 
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      {/* Scan is reached from the palette rather than from the tab bar — the
+          bar mirrors the native app's IA, which has no scan tab. Opening the
+          scanner closes the palette so the two sheets never stack. */}
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        onScanClick={() => {
+          setPaletteOpen(false);
+          setScanOpen(true);
+        }}
+      />
       <ScanSheet open={scanOpen} onClose={() => setScanOpen(false)} />
     </div>
   );
@@ -392,7 +402,11 @@ function TopBar({
       <button
         type="button"
         onClick={onSearchClick}
-        className="flex flex-1 max-w-2xl items-center gap-2 rounded border border-white/20 bg-white/10 px-3 h-8 text-[13px] text-white/50 hover:bg-white/15 hover:text-white/70 transition-colors mx-auto"
+        // Hidden below `md`: the tab bar now owns Search, and two entry points
+        // to the same palette is not extra reach — it is ~60% of a 375px header
+        // spent on a duplicate. The keyboard shortcut is unaffected, and the
+        // desktop header is unchanged.
+        className="hidden md:flex flex-1 max-w-2xl items-center gap-2 rounded border border-white/20 bg-white/10 px-3 h-8 text-[13px] text-white/50 hover:bg-white/15 hover:text-white/70 transition-colors mx-auto"
         aria-label="Open search (⌘/)"
       >
         <SearchIcon />

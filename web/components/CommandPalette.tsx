@@ -112,9 +112,21 @@ function HitIcon({ type }: { type: SearchHit["type"] }) {
 interface CommandPaletteProps {
   open: boolean;
   onClose: () => void;
+  /**
+   * Opens the barcode scanner. When provided, the palette offers scanning
+   * alongside typing.
+   *
+   * This is where Scan lives now. It used to be a dedicated tab on the mobile
+   * bar, but that bar was aligned to the native app's IA (Dashboard /
+   * Inventory / Orders / Search), which has no scan tab. Search is the right
+   * home for it rather than a deletion: scanning a barcode and typing a SKU are
+   * the same task — find this product — and both resolve to the same detail
+   * pages. Omit the prop on surfaces with no scanner and nothing renders.
+   */
+  onScanClick?: () => void;
 }
 
-export function CommandPalette({ open, onClose }: CommandPaletteProps) {
+export function CommandPalette({ open, onClose, onScanClick }: CommandPaletteProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -261,6 +273,23 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
           />
           {loading && (
             <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-slate-200 border-t-slate-600" />
+          )}
+          {onScanClick && (
+            <button
+              type="button"
+              onClick={onScanClick}
+              aria-label="Scan a barcode"
+              title="Scan a barcode"
+              className="focus-ring flex h-11 w-11 shrink-0 items-center justify-center rounded-control text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 7V5a2 2 0 0 1 2-2h2" />
+                <path d="M17 3h2a2 2 0 0 1 2 2v2" />
+                <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
+                <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+                <line x1="7" y1="12" x2="17" y2="12" />
+              </svg>
+            </button>
           )}
           <kbd className="hidden shrink-0 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-xs text-slate-400 sm:block">
             Esc

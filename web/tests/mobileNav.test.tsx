@@ -14,6 +14,7 @@
  * about rather than inheriting an ambient default.
  */
 
+import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { MobileTabBar } from "@/components/MobileTabBar";
@@ -60,60 +61,78 @@ afterEach(() => {
 
 describe("MobileTabBar", () => {
   const noop = () => {};
+  const bar = (over: Partial<React.ComponentProps<typeof MobileTabBar>> = {}) => (
+    <MobileTabBar onMoreClick={noop} onSearchClick={noop} moreOpen={false} {...over} />
+  );
 
-  it("puts the primary retail tasks one tap from anywhere", () => {
-    render(<MobileTabBar onMoreClick={noop} onScanClick={noop} moreOpen={false} />);
-    const nav = screen.getByRole("navigation", { name: "Primary" });
-    expect(within(nav).getByRole("link", { name: "Home" })).toHaveAttribute("href", "/dashboard");
-    expect(within(nav).getByRole("link", { name: "Sell" })).toHaveAttribute("href", "/terminal");
-    expect(within(nav).getByRole("link", { name: "Stock" })).toHaveAttribute("href", "/inventory");
-    expect(within(nav).getByRole("button", { name: "Scan a barcode" })).toBeInTheDocument();
+  // The tab set mirrors artifacts/ascend-mobile's expo-router tabs
+  // (Dashboard / Inventory / Orders / Search) on Sri's call, so the assertion
+  // is against that IA rather than against a web-only invention.
+  it("mirrors the native app's tab set", () => {
+    render(bar());
+    const nav = screen.getByRole("navigation", { name: "Quick navigation" });
+    expect(within(nav).getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/dashboard");
+    expect(within(nav).getByRole("link", { name: "Inventory" })).toHaveAttribute("href", "/inventory");
+    expect(within(nav).getByRole("link", { name: "Orders" })).toHaveAttribute("href", "/orders");
+    expect(within(nav).getByRole("button", { name: "Search" })).toBeInTheDocument();
+  });
+
+  it("no longer carries Sell or a Scan tab", () => {
+    // Both were on the previous iteration of this bar and were removed when it
+    // was aligned to the native IA. Sell moved under More; Scan moved into the
+    // palette that Search opens.
+    render(bar());
+    expect(screen.queryByRole("link", { name: "Sell" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /scan/i })).not.toBeInTheDocument();
   });
 
   it("marks the current tab with aria-current, not colour alone", () => {
-    render(<MobileTabBar onMoreClick={noop} onScanClick={noop} moreOpen={false} />);
-    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: "Sell" })).not.toHaveAttribute("aria-current");
+    render(bar());
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Inventory" })).not.toHaveAttribute("aria-current");
   });
 
   it("hides a tab the user's role cannot use", () => {
-    permissions.hasFeature = (f) => f !== "register";
-    render(<MobileTabBar onMoreClick={noop} onScanClick={noop} moreOpen={false} />);
-    expect(screen.queryByRole("link", { name: "Sell" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Stock" })).toBeInTheDocument();
+    permissions.hasFeature = (f) => f !== "orders";
+    render(bar());
+    expect(screen.queryByRole("link", { name: "Orders" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Inventory" })).toBeInTheDocument();
   });
 
   it("hides a tab whose route the tenant has disabled", () => {
     capabilities.routeEnabled = (h) => h !== "/inventory";
-    render(<MobileTabBar onMoreClick={noop} onScanClick={noop} moreOpen={false} />);
-    expect(screen.queryByRole("link", { name: "Stock" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Sell" })).toBeInTheDocument();
+    render(bar());
+    expect(screen.queryByRole("link", { name: "Inventory" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Orders" })).toBeInTheDocument();
   });
 
-  it("keeps Scan and More when every gated tab is removed", () => {
-    // The failure this guards against is a user with a narrow role landing on
-    // a nav bar with nothing on it and no way to open the rest of the app.
+  it("keeps Search and More when every gated tab is removed", () => {
+    // The failure this guards against is a narrow role landing on a bar with
+    // nothing on it and no way to reach the ~100 routes that are not tabs.
     permissions.hasFeature = () => false;
     capabilities.routeEnabled = () => false;
-    render(<MobileTabBar onMoreClick={noop} onScanClick={noop} moreOpen={false} />);
+    render(bar());
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Scan a barcode" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Search" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "More navigation" })).toBeInTheDocument();
   });
 
+  it("Search opens the palette rather than navigating", () => {
+    // The web app has no /search route — the native app's Search is a screen,
+    // the web's is the command palette. A link here would 404.
+    const onSearchClick = vi.fn();
+    render(bar({ onSearchClick }));
+    const search = screen.getByRole("button", { name: "Search" });
+    expect(search).not.toHaveAttribute("href");
+    search.click();
+    expect(onSearchClick).toHaveBeenCalledOnce();
+  });
+
   it("reports the drawer's open state on the More control", () => {
-    const { rerender } = render(
-      <MobileTabBar onMoreClick={noop} onScanClick={noop} moreOpen={false} />,
-    );
-    expect(screen.getByRole("button", { name: "More navigation" })).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
-    rerender(<MobileTabBar onMoreClick={noop} onScanClick={noop} moreOpen />);
-    expect(screen.getByRole("button", { name: "More navigation" })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
+    const { rerender } = render(bar());
+    expect(screen.getByRole("button", { name: "More navigation" })).toHaveAttribute("aria-expanded", "false");
+    rerender(bar({ moreOpen: true }));
+    expect(screen.getByRole("button", { name: "More navigation" })).toHaveAttribute("aria-expanded", "true");
   });
 });
 

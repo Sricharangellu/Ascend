@@ -6,30 +6,45 @@
  * WHY THIS EXISTS
  * On a phone the only way into any part of Ascend was the top-bar hamburger,
  * which opens the desktop rail as a 220px overlay: ten collapsed sections, the
- * relevant one expanded, the target link somewhere inside it. Reaching the
- * register — the single most frequent retail task — cost a menu open, a section
- * expand and a link tap, with the tap targets at the rail's desktop density
- * (36px rows) and the whole tree competing for a 375px-wide screen.
+ * relevant one expanded, the target link somewhere inside it. Reaching anything
+ * cost a menu open, a section expand and a link tap, at the rail's desktop row
+ * density, on a 375px screen.
  *
- * So the four highest-frequency destinations are lifted out of the tree and put
- * one thumb-tap away, and the tree stays behind "More" for everything else.
- * This is deliberately NOT a compression of the desktop IA: the tabs are chosen
- * by task frequency for a retail operator on the floor, not by mirroring the
- * rail's top level (which would give Home / Sell / Online / Reporting / …).
+ * THE TAB SET IS NOT A FRESH DESIGN — IT MIRRORS THE NATIVE APP
+ * `artifacts/ascend-mobile` is an Expo app titled "Ascend Mobile" whose tabs are
+ * Dashboard / Inventory / Orders / Search. This bar deliberately matches it, on
+ * Sri's call (2026-08-15), so a user moving between the native app and the web
+ * app on a phone meets the same four destinations in the same order.
  *
- * Scan is the centre tab and is an ACTION, not a destination. Scanning is the
- * one interaction that removes typing entirely, and on a phone typing is the
- * expensive part — a 12-digit UPC is ~12 taps and a misread. It opens the
- * global scan sheet over whatever page you are on, so it never costs you your
- * place. It resolves through the same canonical backend endpoint the terminal
- * uses (`/catalog/barcode/:code/pos`); there is no second mobile resolver.
+ * Two places where a literal port is impossible, and what was done instead:
+ *
+ *  - **More has no native counterpart and cannot be dropped.** The native app
+ *    has four screens in total, so four tabs reach all of it. The web app has
+ *    ~100 routes; without More, every route outside the four tabs — the
+ *    register, purchasing, receiving, customers, settings, reports — becomes
+ *    unreachable on a phone. More is a web-only structural necessity, not an
+ *    extra tab.
+ *  - **Search has no route.** The native Search tab is a screen; the web app has
+ *    no `/search` page, it has a command palette. So Search opens that palette,
+ *    which already resolves products, orders, customers, vendors and POs and
+ *    deep-links to their detail pages.
+ *
+ * WHAT THIS COST, RECORDED HONESTLY
+ * The previous iteration of this bar carried Sell (`/terminal`) and a centre
+ * Scan action, which took the register from three taps to one and a barcode
+ * lookup from ~12 taps of typing to one. Aligning to the native IA removes both
+ * from the bar: Sell now lives under More, and Scan moved into the palette that
+ * Search opens — one tap further than before, rather than deleted. The native
+ * app has neither a register nor a scanner, so there was nothing to align them
+ * to.
  *
  * GATING
- * Same layers as the rail, in the same order (capabilities → permissions), so
- * a tab can never offer a route the tenant has disabled or the user cannot use.
- * Home and More are never gated: Home is the fallback destination and More is
- * the only way to reach anything not on the bar. Hiding a tab is presentation
- * only — the route itself is still enforced server-side.
+ * Same layers as the rail, in the same order (capabilities → permissions), so a
+ * tab can never offer a route the tenant has disabled or the user cannot use.
+ * Dashboard, Search and More are never gated: Dashboard is the fallback
+ * destination and the other two are the only ways to reach anything not on the
+ * bar. Hiding a tab is presentation only — the route is still enforced
+ * server-side.
  */
 
 import Link from "next/link";
@@ -40,8 +55,8 @@ import { usePermissions } from "@/contexts/PermissionsContext";
 export interface MobileTabBarProps {
   /** Opens the full navigation drawer (the rail) — the "More" tab. */
   onMoreClick: () => void;
-  /** Opens the global scan sheet — the centre tab. */
-  onScanClick: () => void;
+  /** Opens the command palette — the "Search" tab. */
+  onSearchClick: () => void;
   /** True while the drawer is open, so "More" reports its state. */
   moreOpen: boolean;
 }
@@ -55,14 +70,14 @@ type Tab = {
   featureGate?: string;
 };
 
+/** Order and labels mirror `artifacts/ascend-mobile/app/(tabs)/_layout.tsx`. */
 const TABS: Tab[] = [
-  { key: "home", label: "Home", href: "/dashboard", icon: <HomeIcon /> },
-  { key: "sell", label: "Sell", href: "/terminal", icon: <SellIcon />, featureGate: "register" },
-  { key: "stock", label: "Stock", href: "/inventory", icon: <StockIcon />, featureGate: "inventory" },
-  { key: "orders", label: "Orders", href: "/orders", icon: <OrdersIcon />, featureGate: "orders" },
+  { key: "dashboard", label: "Dashboard", href: "/dashboard", icon: <HomeIcon /> },
+  { key: "inventory", label: "Inventory", href: "/inventory", icon: <BoxIcon />, featureGate: "inventory" },
+  { key: "orders", label: "Orders", href: "/orders", icon: <ClipboardIcon />, featureGate: "orders" },
 ];
 
-export function MobileTabBar({ onMoreClick, onScanClick, moreOpen }: MobileTabBarProps) {
+export function MobileTabBar({ onMoreClick, onSearchClick, moreOpen }: MobileTabBarProps) {
   const pathname = usePathname();
   const { hasFeature } = usePermissions();
   const { routeEnabled } = useCapabilities();
@@ -71,56 +86,34 @@ export function MobileTabBar({ onMoreClick, onScanClick, moreOpen }: MobileTabBa
     (t) => routeEnabled(t.href) && (!t.featureGate || hasFeature(t.featureGate)),
   );
 
-  // Split around the centre action so Scan always sits in the middle, even
-  // when a gate removes a tab. With everything gated away the bar is still
-  // Scan + More, which is the minimum useful mobile surface.
-  const half = Math.ceil(visible.length / 2);
-  const left = visible.slice(0, half);
-  const right = visible.slice(half);
-
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
 
   return (
     <nav
-      aria-label="Primary"
+      // NOT "Primary" — the rail already exposes a landmark named "Primary
+      // navigation", and two nav landmarks whose names differ by one word are
+      // indistinguishable when a screen reader lists them.
+      aria-label="Quick navigation"
       // `pb-safe` clears the iOS home indicator; without it the bottom row of
       // labels sits under the gesture bar on every notched device.
       className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-line bg-surface-1 pb-safe md:hidden"
       style={{ height: "calc(var(--mobile-nav-h) + var(--safe-bottom))" }}
     >
-      {left.map((t) => (
+      {visible.map((t) => (
         <TabLink key={t.key} tab={t} active={isActive(t.href)} />
       ))}
 
-      <div className="flex flex-1 items-center justify-center">
-        <button
-          type="button"
-          onClick={onScanClick}
-          aria-label="Scan a barcode"
-          className="focus-ring -mt-4 flex h-14 w-14 flex-col items-center justify-center rounded-full bg-brand-600 text-white shadow-popover transition-colors hover:bg-brand-700 active:bg-brand-800"
-        >
-          <ScanIcon />
-          <span className="mt-0.5 text-[9px] font-semibold uppercase tracking-wide">Scan</span>
-        </button>
-      </div>
+      <TabButton label="Search" onClick={onSearchClick} icon={<SearchIcon />} />
 
-      {right.map((t) => (
-        <TabLink key={t.key} tab={t} active={isActive(t.href)} />
-      ))}
-
-      <button
-        type="button"
+      <TabButton
+        label="More"
         onClick={onMoreClick}
-        aria-expanded={moreOpen}
-        aria-label="More navigation"
-        className={`focus-ring flex flex-1 flex-col items-center justify-center gap-0.5 px-1 transition-colors ${
-          moreOpen ? "text-brand-600" : "text-content-secondary hover:text-content-primary"
-        }`}
-      >
-        <MoreIcon />
-        <span className="text-[10px] font-medium leading-none">More</span>
-      </button>
+        icon={<MoreIcon />}
+        ariaLabel="More navigation"
+        expanded={moreOpen}
+        active={moreOpen}
+      />
     </nav>
   );
 }
@@ -136,7 +129,7 @@ function TabLink({ tab, active }: { tab: Tab; active: boolean }) {
     >
       <span className="relative">
         {tab.icon}
-        {/* Active state is carried by colour AND this bar, so it does not rely
+        {/* Active state is carried by colour AND this bar, so it never relies
             on colour alone (design-system accessibility rule). */}
         {active && (
           <span
@@ -150,7 +143,40 @@ function TabLink({ tab, active }: { tab: Tab; active: boolean }) {
   );
 }
 
-// ── Icons — 22px, matching the rail's stroke weight ─────────────────────────
+/** A tab that performs an action rather than navigating — Search and More. */
+function TabButton({
+  label,
+  onClick,
+  icon,
+  ariaLabel,
+  expanded,
+  active = false,
+}: {
+  label: string;
+  onClick: () => void;
+  icon: React.ReactNode;
+  ariaLabel?: string;
+  expanded?: boolean;
+  active?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel ?? label}
+      aria-expanded={expanded}
+      className={`focus-ring flex flex-1 flex-col items-center justify-center gap-0.5 px-1 transition-colors ${
+        active ? "text-brand-600" : "text-content-secondary hover:text-content-primary"
+      }`}
+    >
+      {icon}
+      <span className="text-[10px] font-medium leading-none">{label}</span>
+    </button>
+  );
+}
+
+// ── Icons — 22px, matching the rail's stroke weight. Shapes chosen to echo the
+//    native app's SF Symbols (house / shippingbox / list.clipboard / magnifyingglass).
 
 function HomeIcon() {
   return (
@@ -161,16 +187,7 @@ function HomeIcon() {
   );
 }
 
-function SellIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
-      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-    </svg>
-  );
-}
-
-function StockIcon() {
+function BoxIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
@@ -180,25 +197,22 @@ function StockIcon() {
   );
 }
 
-function OrdersIcon() {
+function ClipboardIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="8" y1="13" x2="16" y2="13" />
-      <line x1="8" y1="17" x2="13" y2="17" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <rect x="8" y="2" width="8" height="4" rx="1" />
+      <line x1="8" y1="12" x2="16" y2="12" />
+      <line x1="8" y1="16" x2="13" y2="16" />
     </svg>
   );
 }
 
-function ScanIcon() {
+function SearchIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 7V5a2 2 0 0 1 2-2h2" />
-      <path d="M17 3h2a2 2 0 0 1 2 2v2" />
-      <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
-      <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
-      <line x1="7" y1="12" x2="17" y2="12" />
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
     </svg>
   );
 }
