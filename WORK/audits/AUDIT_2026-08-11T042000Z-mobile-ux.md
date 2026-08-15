@@ -25,6 +25,39 @@ To unblock: use Claude Design's *Send to Claude Code Web*, or paste the `.dc.htm
 
 ---
 
+## 0b. CORRECTION (2026-08-15) — an existing "Ascend Mobile" app was missed
+
+`artifacts/ascend-mobile/` is a **tracked, committed Expo / React Native app whose
+`artifact.toml` title is literally "Ascend Mobile"** (last touched 2026-08-03). **This audit did
+not look at it.** `artifacts/` is excluded from lock claims as "another environment's tree", and
+that was taken as a reason not to read it — wrong, since the brief was to inspect the existing
+mobile experience and this *is* one.
+
+What it is, having now read it:
+
+- Four tabs: **Dashboard / Inventory / Orders / Search** (`app/(tabs)/_layout.tsx`), native
+  `NativeTabs` on iOS 26 with a classic `Tabs` fallback.
+- **No POS/register and no barcode scanning.** `orders.tsx` refers to "POS terminal" as a separate
+  device. So it is a manager/monitoring companion, not a floor-operator app.
+- Dark-first tokens with `primary: '#5D5FEF'` (`constants/colors.ts`).
+
+**Consequence for §2.** The web `MobileTabBar` this wave added (Home / Sell / **Scan** / Stock /
+Orders + More) **diverges from that IA** and was designed without reference to it. The divergence
+is defensible — the web app owns the register and the scanner and the native app owns neither, so
+the two have genuinely different primary tasks — but it was arrived at by omission, not by a
+decision. **Flagged for Sri: align, keep both, or hybridise.** Not resolved here.
+
+**Consequence for finding #8.** That row calls `#5D5FEF` "the purple retired before" the blue, which
+reads as though it is gone. It is not: it is still hard-coded in at least five live `web/` spots —
+`components/terminal/ProductGrid.tsx`, `components/terminal/RegisterSessionGuard.tsx`,
+`components/KpiCard.tsx` (x2) and `app/(protected)/catalog/[id]/_components/InventoryTab.tsx` — and
+it is the *current* primary of the native app. The manifest fix in this wave was still right (the
+manifest disagreed with the web token layer), but "three brand colours shipping at once"
+**understated** the drift rather than overstating it, and the remaining hard-coded usages were not
+filed. Filed now in `WORK/LOOP_STATE.md`.
+
+---
+
 ## 1. Current mobile audit (before this change)
 
 ### Structural
