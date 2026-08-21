@@ -1,3 +1,25 @@
+## Active Claim (Claude Code web — Phase 9 F-5: one test-request factory)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-f5-test-request-factory` |
+| Queue item | **Phase 9 backlog F-5** (`WORK/FORWARD_PLAN.md` §9.2/§9.3), the next unblocked item in the stated execution order. S-1 and F-3 are Sri-only, F-11 is ⛔ BLOCKED on Sri's "which tax authority wins", and F-14 depends on F-3 — F-5 is the first item with no blocker. `test-request.ts` is copied into 46 modules across 8 variants; 41 of those are byte-identical in 3 groups (31 + 5 + 5) and `dupe:scan` reports them on every PR. Collapse the identical ones onto one shared factory, each module re-exporting with its own pinned default role. |
+| Files/areas expected | `src/shared/test-request.ts` (add factory); the 41 identical `src/modules/*/test-request.ts` files (→ re-exports); `WORK/FORWARD_PLAN.md` (F-5 status), `WORK/LOOP_STATE.md`, `WORK/LOCK.md`. **NOT** the 5 genuinely-distinct helpers (`business`, `custom_roles`, `progress`, `reports`, `identity`) — they have real signature differences and are not duplication. NOT any `*.test.ts`, NOT `src/modules/*/service.ts` or `routes.ts`, NOT `web/**`, NOT `artifacts/**`. |
+| Started | 2026-08-10T190308Z |
+| Status | **RELEASED** — pushed to `claude/ascend-f5-test-request-factory`. F-5 done and F-9 found already done (its ⬜ READY status was stale, not the work). |
+| Gates (all run in this container against real PostgreSQL 16) | backend `typecheck` PASS · backend `npm test` **899/899, 0 fail** · `npm run smoke` **20/20** full POS lifecycle · `dupe:scan` **3 identical-file groups → 0** (was 41 files) · `hygiene` PASS (2202 files) · `authz:scan` PASS · `gap:scan` PASS (474/382, 17 allowlisted) · `table:scan` PASS (166 names) · web `typecheck` PASS · web `lint` 0 errors/0 warnings · web `vitest` **206/206 across 29 files** · web production `build` PASS |
+| Proof the roles were preserved | The `manager` set after the change — {discounts, insights, purchasing, sso, workflows} — was diffed against the same set computed from git before the change. Byte-identical. `workflows` stays `manager`, which is F-5's named acceptance criterion. Separately, every `request(` call site in the 31 fixed-`owner` modules was parsed (paren-balanced, string-aware) to confirm **none passes a 5th argument**, so adding a defaulted `role` parameter cannot change an existing call's meaning. |
+| Overlap check (per AGENTS.md, run before editing) | Two Cursor Cloud claims are `ACTIVE`: "Wave A/B trust leftovers" scopes `web/**` only, and "POS customer + gift card" scopes `src/modules/payments/{service,routes,payments.test}.ts` — **`test-request.ts` is not in either file list**, and this change does not touch any file they name. Seven `Claude session D` claims dated 2026-07-16 still read `ACTIVE — implementing`; their work demonstrably shipped as loop iterations 10–13 (`WORK/LOOP_STATE.md`), so they are stale rather than live. Flagged below rather than edited — per AGENTS.md a stale-looking lock is marked and left for review, not silently cleared. |
+| Blockers | none |
+
+### Stale-claim flag (raised 2026-08-10, not actioned)
+
+The seven `Claude session D` claims below dated `2026-07-16` and the two Cursor
+Cloud claims dated `2026-08-03` all still read `ACTIVE`. The session-D ones are
+provably finished — `WORK/LOOP_STATE.md` iterations 10–13 record the transfer
+atomicity, over-transfer, cycle-count double-close and stock-adjust race fixes
+as shipped and tested. Marking them `STALE?` per the protocol rather than
+closing them, because closing another session's claim is a lead/human call.
 ## Active Claim (Claude Code web — mobile full-stack integration check)
 
 | Field | Value |
