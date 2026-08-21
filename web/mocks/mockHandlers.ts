@@ -1845,6 +1845,47 @@ export const mockHandlers = [
         return HttpResponse.json(products[idx]);
       }),
 
+      // POS/receiving scan resolution. Registered BEFORE the plain
+      // /barcode/:code route so the extra segment is not swallowed by it.
+      //
+      // This handler was missing entirely: the terminal and (now) the receiving
+      // desk both call this path, and MSW is configured `onUnhandledRequest:
+      // "warn"`, so in demo/dev mode every scan fell through to the network as
+      // a console warning and a failed lookup rather than an obvious error.
+      //
+      // Mirrors the backend's shape (catalog/service.ts `resolvePosBarcode`):
+      // the flat product plus packaging/pricing/inventory. A `-CASE` suffix on
+      // a product's barcode stands in for a case UPC so the case path is
+      // exercisable in demo mode — the real thing reads `product_barcodes`.
+      http.get(`${V1}/catalog/barcode/:code/pos`, async ({ params }) => {
+        await lat();
+        const code = String(params["code"]);
+        const caseMatch = code.endsWith("-CASE");
+        const baseCode = caseMatch ? code.slice(0, -"-CASE".length) : code;
+        const p = products.find((x) => x.barcode === baseCode || x.sku === baseCode);
+        if (!p) {
+          return HttpResponse.json(
+            { error: { code: "not_found", message: `No active product with barcode '${code}'` } },
+            { status: 404 },
+          );
+        }
+        const packSize = caseMatch ? 12 : 1;
+        return HttpResponse.json({
+          ...p,
+          packaging: {
+            unit: caseMatch ? "case" : "each",
+            displayName: caseMatch ? "Case" : "Each",
+            packSize,
+          },
+          pricing: { unitPriceCents: p.priceCents * packSize },
+          inventory: {
+            baseQuantityPerUnit: packSize,
+            stockOnHandEach: 100,
+            availableForSale: true,
+          },
+        });
+      }),
+
       http.get(`${V1}/catalog/barcode/:code`, async ({ params }) => {
         await lat();
         const code = String(params["code"]);

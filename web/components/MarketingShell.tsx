@@ -25,6 +25,8 @@ const FOOTER_LINKS = [
 export function MarketingShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-[var(--color-page-bg)]">
+      {/* Owned by the shell, not the root layout — see app/layout.tsx. */}
+      <a href="#main-content" className="skip-link">Skip to content</a>
       <header className="border-b border-[var(--color-table-border)] bg-[var(--color-surface)]">
         <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link href="/" className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">
@@ -55,7 +57,9 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
         </nav>
       </header>
 
-      <main className="flex-1">{children}</main>
+      <main id="main-content" tabIndex={-1} className="flex-1 outline-none">
+        {children}
+      </main>
 
       <footer className="border-t border-[var(--color-table-border)] bg-[var(--color-surface)]">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-8 sm:flex-row sm:items-center sm:justify-between">

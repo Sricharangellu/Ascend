@@ -99,6 +99,31 @@ export interface ScanResult {
     | "already_complete";
   detail: string;
   intelligence?: ReceiveLineIntelligence | null;
+  /**
+   * Set only when the scanned code was a multi-unit pack (case/box). The
+   * operator scanned `scanned_units` of `kind`; every quantity elsewhere in
+   * this result — including `session.lines[].accepted_qty` — is in base (each)
+   * units, so a client that shows "1 case" must read it from here rather than
+   * inferring it from the accepted quantity.
+   */
+  unit?: ScanUnitConversion | null;
+}
+
+export interface ScanUnitConversion {
+  kind: string;
+  pack_size: number;
+  scanned_units: number;
+  base_qty: number;
+}
+
+interface ResolvedBarcode {
+  id: string;
+  sku: string | null;
+  barcode: string | null;
+  /** `product_barcodes.kind` — "each" for a plain product/SKU/vendor-UPC hit. */
+  unitKind: string;
+  /** Base units per scanned unit. Always ≥ 1. */
+  packSize: number;
 }
 
 export interface ReceiveLineIntelligence {
@@ -320,33 +345,54 @@ export class ReceivingSessionService {
       };
     }
 
+    // ── Unit conversion ──────────────────────────────────────────────────
+    // `qty` is in the unit the operator scanned. Everything below — expected,
+    // accepted, held, rejected, and the inventory movement close() posts — is
+    // in base (each) units, so convert once here and use `baseQty` throughout.
+    // Cost arrives per scanned unit for the same reason and is divided down,
+    // matching `convertUnitLine()` on the PO-create/receive path.
+    const packSize = product.packSize;
+    const baseQty = qty * packSize;
+    const unitConversion: ScanUnitConversion | null =
+      packSize > 1
+        ? { kind: product.unitKind, pack_size: packSize, scanned_units: qty, base_qty: baseQty }
+        : null;
+    const scannedUnitLabel = unitConversion
+      ? `${qty} ${product.unitKind}${qty === 1 ? "" : "s"} (${baseQty} each)`
+      : `${qty}`;
+
     const detail = await this.get(sessionId, tenantId);
     const line = detail.lines.find((l) => l.product_id === product.id && l.status !== "posted");
     if (!line) {
-      await this.recordScan(tenantId, sessionId, null, input.barcode, qty, "unknown", "Product not on this PO session");
+      await this.recordScan(tenantId, sessionId, null, input.barcode, baseQty, "unknown", "Product not on this PO session");
       return {
         session: detail,
         matched_line_id: null,
         result: "unknown",
         detail: `Product '${product.sku ?? product.id}' is not on this receiving session`,
         intelligence: null,
+        // Reported even though nothing was received: "a case of X is not on
+        // this PO" is a different problem from "an each of X is not on this
+        // PO", and only the client can tell the operator which they scanned.
+        unit: unitConversion,
       };
     }
 
     const remaining = line.expected_qty - line.accepted_qty - line.held_qty - line.rejected_qty;
-    if (qty > remaining) {
-      await this.recordScan(tenantId, sessionId, line.id, input.barcode, qty, "over_qty", `qty ${qty} exceeds remaining ${remaining}`);
+    if (baseQty > remaining) {
+      await this.recordScan(tenantId, sessionId, line.id, input.barcode, baseQty, "over_qty", `qty ${baseQty} exceeds remaining ${remaining}`);
       return {
         session: detail,
         matched_line_id: line.id,
         result: "over_qty",
-        detail: `Quantity ${qty} exceeds remaining ${remaining} on this line`,
+        detail: `Quantity ${scannedUnitLabel} exceeds remaining ${remaining} on this line`,
         intelligence: await this.lineIntelligence(line.product_id, session.po_id, tenantId, line.unit_cost_cents),
+        unit: unitConversion,
       };
     }
 
     if (input.expiryDate != null && input.expiryDate < Date.now()) {
-      await this.recordScan(tenantId, sessionId, line.id, input.barcode, qty, "expired", "Expiry date is in the past");
+      await this.recordScan(tenantId, sessionId, line.id, input.barcode, baseQty, "expired", "Expiry date is in the past");
       throw new HttpError(400, "expired_inventory", "Cannot receive inventory with an expiry date in the past");
     }
     if (
@@ -357,7 +403,14 @@ export class ReceivingSessionService {
       throw new HttpError(400, "invalid_dates", "Expiry date cannot be before manufacture date");
     }
 
-    const unitCost = input.unitCostCents ?? line.unit_cost_cents;
+    // A cost supplied with a case scan is the case price; the line stores an
+    // each price. Without this the variance band below compares a case cost to
+    // an each cost and demands an override for a correctly-priced delivery.
+    const scannedUnitCost =
+      input.unitCostCents != null && packSize > 1
+        ? Math.round(input.unitCostCents / packSize)
+        : input.unitCostCents;
+    const unitCost = scannedUnitCost ?? line.unit_cost_cents;
     const poCost = line.po_unit_cost_cents ?? line.unit_cost_cents ?? 0;
     let costBand: "green" | "yellow" | "red" | "neutral" = "neutral";
     if (unitCost != null && poCost > 0) {
@@ -377,9 +430,9 @@ export class ReceivingSessionService {
     const now = Date.now();
     const hold = Boolean(input.hold);
     const reject = Boolean(input.reject);
-    const acceptedInc = hold || reject ? 0 : qty;
-    const heldInc = hold ? qty : 0;
-    const rejectedInc = reject ? qty : 0;
+    const acceptedInc = hold || reject ? 0 : baseQty;
+    const heldInc = hold ? baseQty : 0;
+    const rejectedInc = reject ? baseQty : 0;
     const nextStatus: SessionLineStatus = reject
       ? "rejected"
       : hold
@@ -403,7 +456,7 @@ export class ReceivingSessionService {
           updated_at = @now
         WHERE id = @id AND tenant_id = @t`,
       {
-        qty,
+        qty: baseQty,
         accepted: acceptedInc,
         held: heldInc,
         rejected: rejectedInc,
@@ -433,10 +486,10 @@ export class ReceivingSessionService {
     );
 
     let scanResult: ScanResult["result"] = "matched";
-    let detailMsg = `Scanned ${qty} onto line`;
+    let detailMsg = `Scanned ${scannedUnitLabel} onto line`;
     if (hold) {
       scanResult = "matched";
-      detailMsg = `Held ${qty} for quality review`;
+      detailMsg = `Held ${scannedUnitLabel} for quality review`;
       await this.db.query(
         `UPDATE receiving_sessions SET status = 'quality_hold', updated_at = @now WHERE id = @id AND tenant_id = @t`,
         { now, id: sessionId, t: tenantId },
@@ -451,7 +504,7 @@ export class ReceivingSessionService {
       detailMsg = `Accepted with ${costBand} cost variance (reason recorded)`;
     }
 
-    await this.recordScan(tenantId, sessionId, line.id, input.barcode, qty, scanResult, detailMsg);
+    await this.recordScan(tenantId, sessionId, line.id, input.barcode, baseQty, scanResult, detailMsg);
 
     const intelligence = await this.lineIntelligence(
       line.product_id,
@@ -466,6 +519,7 @@ export class ReceivingSessionService {
       result: scanResult,
       detail: detailMsg,
       intelligence,
+      unit: unitConversion,
     };
   }
 
@@ -847,19 +901,46 @@ export class ReceivingSessionService {
     return this.requireOpen(sessionId, tenantId);
   }
 
+  /**
+   * Resolve a scanned code to a product AND the unit that code represents.
+   *
+   * `product_barcodes` is where units live (ADR-006) — a case UPC is a row with
+   * `kind='case'` and `pack_size=12`. This used to SELECT only the product
+   * columns and drop the pack size, so a case scan was received as one each.
+   * Callers must treat `pack_size` as authoritative: it is the multiplier
+   * between the unit the operator scanned and the base (each) units every
+   * quantity in this module is denominated in.
+   */
   private async resolveBarcode(
     code: string,
     tenantId: string,
-  ): Promise<{ id: string; sku: string | null; barcode: string | null } | null> {
-    const fromTable = await this.db.one<{ id: string; sku: string | null; barcode: string | null }>(
-      `SELECT p.id, p.sku, p.barcode
+  ): Promise<ResolvedBarcode | null> {
+    const fromTable = await this.db.one<{
+      id: string;
+      sku: string | null;
+      barcode: string | null;
+      kind: string | null;
+      pack_size: number | null;
+    }>(
+      `SELECT p.id, p.sku, p.barcode, pb.kind, pb.pack_size
          FROM product_barcodes pb
          JOIN products p ON p.tenant_id = pb.tenant_id AND p.id = pb.product_id
         WHERE pb.tenant_id = @t AND pb.barcode = @code
         LIMIT 1`,
       { t: tenantId, code },
     );
-    if (fromTable) return fromTable;
+    if (fromTable) {
+      // pack_size is NOT NULL DEFAULT 1, but COALESCE anyway: a 0/NULL here
+      // would silently zero out every received quantity.
+      const packSize = Number(fromTable.pack_size ?? 1);
+      return {
+        id: fromTable.id,
+        sku: fromTable.sku,
+        barcode: fromTable.barcode,
+        unitKind: fromTable.kind ?? "each",
+        packSize: Number.isFinite(packSize) && packSize > 0 ? packSize : 1,
+      };
+    }
     const product = await this.db.one<{ id: string; sku: string | null; barcode: string | null }>(
       `SELECT id, sku, barcode FROM products
         WHERE tenant_id = @t AND (barcode = @code OR sku = @code OR vendor_upc = @code)
@@ -867,7 +948,8 @@ export class ReceivingSessionService {
         LIMIT 1`,
       { t: tenantId, code },
     );
-    return product ?? null;
+    if (!product) return null;
+    return { ...product, unitKind: "each", packSize: 1 };
   }
 
   private async recordScan(

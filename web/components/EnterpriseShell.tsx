@@ -4,7 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CommandPalette } from "@/components/CommandPalette";
+import { MobileTabBar } from "@/components/MobileTabBar";
 import { NotificationBell } from "@/components/NotificationBell";
+import { ScanSheet } from "@/components/ScanSheet";
 import { useAuth } from "@/lib/useAuth";
 import { useOffline } from "@/lib/useOffline";
 import { useFinderContext } from "@/lib/useFinderContext";
@@ -288,6 +290,7 @@ export function EnterpriseShell({
 }: EnterpriseShellProps) {
   const pathname = usePathname();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
   const [compactViewport, setCompactViewport] = useState(false);
   const focused = focus ?? isFocusedRoute(pathname);
 
@@ -362,13 +365,31 @@ export function EnterpriseShell({
           expanded={sidebarExpanded}
           compact={compactViewport}
           focused={focused}
+          // develop's `toggleSidebar` supersedes this branch's inline toggle:
+          // it does the same flip and additionally sets `userSetSidebar`, so an
+          // explicit user toggle is not undone by the focus-route auto-collapse.
           onCollapseToggle={toggleSidebar}
+          // Following a link used to leave the drawer open on top of the page
+          // it had just navigated to, so every mobile navigation needed a
+          // second tap on the scrim to see the result.
+          onNavigate={() => {
+            if (compactViewport) setSidebarExpanded(false);
+          }}
         />
 
         <main
           id="main-content"
+          // Focusable so the skip link actually moves KEYBOARD focus here, not
+          // just the scroll position — without it the next Tab returns to the
+          // top of the nav and the link achieves nothing.
+          tabIndex={-1}
           className={[
+            "outline-none",
             "flex flex-1 flex-col min-w-0 transition-[margin-left] duration-200 ease-in-out md:ml-[var(--sidebar-w)]",
+            // Reserve the tab bar's height (plus the home-indicator inset) so a
+            // page's last row and any sticky footer clear it instead of sitting
+            // underneath. Collapses to 0 at `md`, where the bar is not rendered.
+            "pb-mobile-nav",
             contentClassName ?? "overflow-y-auto",
           ].join(" ")}
           style={{ "--sidebar-w": `${sidebarW}px` } as React.CSSProperties}
@@ -381,7 +402,24 @@ export function EnterpriseShell({
         </main>
       </div>
 
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <MobileTabBar
+        moreOpen={compactViewport && sidebarExpanded}
+        onMoreClick={() => setSidebarExpanded((e) => !e)}
+        onSearchClick={() => setPaletteOpen(true)}
+      />
+
+      {/* Scan is reached from the palette rather than from the tab bar — the
+          bar mirrors the native app's IA, which has no scan tab. Opening the
+          scanner closes the palette so the two sheets never stack. */}
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        onScanClick={() => {
+          setPaletteOpen(false);
+          setScanOpen(true);
+        }}
+      />
+      <ScanSheet open={scanOpen} onClose={() => setScanOpen(false)} />
     </div>
   );
 }
@@ -429,7 +467,11 @@ function TopBar({
       <button
         type="button"
         onClick={onSearchClick}
-        className="flex flex-1 max-w-2xl items-center gap-2 rounded border border-white/20 bg-white/10 px-3 h-8 text-[13px] text-white/50 hover:bg-white/15 hover:text-white/70 transition-colors mx-auto"
+        // Hidden below `md`: the tab bar now owns Search, and two entry points
+        // to the same palette is not extra reach — it is ~60% of a 375px header
+        // spent on a duplicate. The keyboard shortcut is unaffected, and the
+        // desktop header is unchanged.
+        className="hidden md:flex flex-1 max-w-2xl items-center gap-2 rounded border border-white/20 bg-white/10 px-3 h-8 text-[13px] text-white/50 hover:bg-white/15 hover:text-white/70 transition-colors mx-auto"
         aria-label="Open search (⌘/)"
       >
         <SearchIcon />
@@ -508,12 +550,15 @@ function LeftRail({
   compact,
   focused,
   onCollapseToggle,
+  onNavigate,
 }: {
   active: NavKey;
   expanded: boolean;
   compact: boolean;
   focused: boolean;
   onCollapseToggle: () => void;
+  /** Called after any nav link is followed — closes the mobile drawer. */
+  onNavigate: () => void;
 }) {
   const pathname = usePathname();
   const { enabled: enabledModules } = useModuleFlags();
@@ -563,7 +608,7 @@ function LeftRail({
   return (
     <nav
       aria-label="Primary navigation"
-      className="fixed left-0 top-12 bottom-0 z-40 flex flex-col overflow-hidden transition-[width] duration-200 ease-in-out"
+      className="fixed left-0 top-12 bottom-[var(--mobile-nav-total)] z-40 flex flex-col overflow-hidden transition-[width] duration-200 ease-in-out md:bottom-0"
       style={{
         width: compact && !expanded ? 0 : expanded ? 220 : 52,
         backgroundColor: "var(--color-sidebar-bg)",
@@ -642,6 +687,7 @@ function LeftRail({
               ) : (
                 <Link
                   href={item.href}
+                  onClick={onNavigate}
                   title={expanded ? undefined : item.label}
                   aria-label={item.label}
                   aria-current={isActive ? "page" : undefined}
@@ -692,6 +738,7 @@ function LeftRail({
                       <Link
                         key={child.href}
                         href={child.href}
+                        onClick={onNavigate}
                         className={`flex items-center gap-2 py-1.5 pl-[46px] pr-3 text-xs transition-colors ${
                           isCurrent
                             ? "font-semibold text-white"

@@ -131,6 +131,23 @@
   --control-h:             32px;
   --cell-px:               12px;
   --cell-py:               8px;
+
+  /* ── Mobile chrome ──────────────────────────────────────────────────────
+     Height of the bottom tab bar (MobileTabBar), excluding the home-indicator
+     inset. Any mobile view with a sticky bottom action reads
+     `--mobile-nav-total` so its own bar stacks above the tab bar instead of
+     underneath it. Zero on desktop, where the tab bar does not render. ──── */
+  --mobile-nav-h:          0px;
+  --safe-bottom:           env(safe-area-inset-bottom, 0px);
+  --safe-top:              env(safe-area-inset-top, 0px);
+  --mobile-nav-total:      calc(var(--mobile-nav-h) + var(--safe-bottom));
+}
+
+/* The tab bar only exists below `md`, so only claim the space below `md`.
+   Declared here rather than on the component so sticky footers on any page
+   can budget for it without importing anything. */
+@media (max-width: 767px) {
+  :root { --mobile-nav-h: 56px; }
 }
 
 :root[data-density="comfortable"] { --row-h: 48px; --control-h: 36px; --cell-px: 16px; --cell-py: 12px; }
@@ -281,12 +298,60 @@
   }
 }
 
+/* ── Touch input ───────────────────────────────────────────────────────────
+   Keyed on `pointer: coarse` rather than a width breakpoint: a 1024px tablet
+   is touch-operated and a 700px desktop window is not, and it is the input
+   device — not the viewport — that decides whether a 32px control is reachable
+   and whether iOS zooms on focus.
+
+   1. 16px form text. iOS Safari zooms the viewport whenever a focused control
+      is under 16px; the app's `text-sm` (13px) tripped it on every input. This
+      is what makes it correct to leave pinch-zoom enabled (see app/layout.tsx)
+      instead of disabling zoom to hide the symptom.
+   2. 44px minimum control height (WCAG 2.5.5 / AGENTS.md design-system rule).
+      Desktop keeps the 32px enterprise density — this only lifts the floor
+      where a finger is the pointer. ─────────────────────────────────────── */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  :root {
+    --control-h: 44px;
+    --row-h: 48px;
+  }
+}
+
 /* ── Utility classes ─────────────────────────────────────────────────────── */
 @layer utilities {
   .touch-target {
     min-height: 44px;
     min-width: 44px;
   }
+
+  /* Opt-in touch floor for controls that are dense by design on desktop.
+     The control keeps its designed height on a mouse and grows to a
+     thumb-sized target on touch. Callers set their designed height with
+     `--tap-min` (e.g. `[--tap-min:40px]`); this is the ONLY min-height on the
+     element, so there is no precedence race with a `min-h-*` utility. */
+  .tap-target {
+    min-height: var(--tap-min, 32px);
+  }
+  @media (pointer: coarse) {
+    .tap-target {
+      min-height: max(var(--tap-min, 32px), 44px);
+      min-width: 44px;
+    }
+  }
+
+  /* Clears the home indicator / gesture bar. */
+  .pb-safe { padding-bottom: var(--safe-bottom); }
+  .pt-safe { padding-top: var(--safe-top); }
+  /* Bottom padding for scroll containers that sit behind the mobile tab bar,
+     so the last row is not permanently hidden under it. */
+  .pb-mobile-nav { padding-bottom: var(--mobile-nav-total); }
 
   /* ── Tabular numerals ───────────────────────────────────────────────────
      Any number a user compares down a column — money, quantity, SKU, count,

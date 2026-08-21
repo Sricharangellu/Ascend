@@ -8,8 +8,8 @@ import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { formatMoney } from "@/lib/money";
 import { apiGet, apiPost, apiPatch, ApiResponseError } from "@/api-client/client";
-import { computeTotal, receiveStatusBadge, docTypeLabel, fmtBytes, buildReceiveLines, findScannedLine } from "./_components/receiveStockTypes";
-import type { PendingPO, ReceiveEntry, PODocument, SortMode, LocationOption } from "./_components/receiveStockTypes";
+import { computeTotal, receiveStatusBadge, docTypeLabel, fmtBytes, buildReceiveLines, applyScanToEntries, findScannedLine } from "./_components/receiveStockTypes";
+import type { PendingPO, ReceiveEntry, PODocument, SortMode, LocationOption, ResolvedScan } from "./_components/receiveStockTypes";
 import { ReceiveLinesCard } from "./_components/ReceiveLinesCard";
 import { PendingPOsTable } from "./_components/PendingPOsTable";
 
@@ -27,6 +27,8 @@ export default function ReceiveStockPage() {
   const [sortMode, setSortMode]   = useState<SortMode>("insertion");
   const [scanInput, setScanInput] = useState("");
   const [scanError, setScanError] = useState<string | null>(null);
+  const [scanNotice, setScanNotice] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
 
   const [documents, setDocuments] = useState<PODocument[]>([]);
   const [docName, setDocName]     = useState("");
@@ -99,33 +101,94 @@ export default function ReceiveStockPage() {
 
   useEffect(() => { void loadPO(selectedPOId); }, [selectedPOId, loadPO]);
 
+  /**
+   * Resolve a scanned code through the canonical backend resolver and count it
+   * onto the matching line.
+   *
+   * Two things changed here and both were defects, not preferences:
+   *
+   * 1. Resolution moved to `GET /catalog/barcode/:code/pos` — the same endpoint
+   *    the register uses. The desk previously compared the code against
+   *    `product_barcode`/`product_sku` on the PO line, which sees only the one
+   *    barcode denormalised onto that line. A case UPC, a vendor UPC or any
+   *    second each-code lives in `product_barcodes` and was therefore reported
+   *    as "not found on this PO" while sitting on the pallet in front of you.
+   *
+   * 2. A scan now COUNTS. It used to flash the row yellow for two seconds and
+   *    change no quantity, so scanner-first receiving still required typing
+   *    every case count by hand — which is the whole cost the scanner exists to
+   *    remove, and is worst on a phone.
+   *
+   * MERGE NOTE — develop's PR #228 fixed the same defect independently, and the
+   * two are not equivalent. #228 resolved through the plain
+   * `/catalog/barcode/:code` and only HIGHLIGHTED the matched row; this path
+   * resolves through `/pos` (the only variant returning `pack_size`) and COUNTS.
+   * Both are kept where each is stronger: #228's `findScannedLine` now does the
+   * line matching — it matches the line's denormalised barcode, the SKU, *or*
+   * the resolved product id, where this branch matched product id alone — and
+   * this branch's `applyScanToEntries` does the counting.
+   *
+   * One piece of #228 is deliberately NOT carried: its `catch {}` fall-through
+   * to exact matching when resolution fails. That is safe when a scan only
+   * highlights, and unsafe now that a scan counts — a case UPC that failed to
+   * resolve would match the line by its each-barcode and book 1 instead of
+   * pack_size, which is the exact defect this branch exists to fix. A failed
+   * lookup therefore counts nothing and says so.
+   */
   const handleScan = async () => {
     const code = scanInput.trim();
-    setScanInput(""); setScanError(null);
+    setScanInput(""); setScanError(null); setScanNotice(null);
     if (!code) return;
 
-    // Ask the canonical resolver what this code is. It is the only thing that
-    // knows about `product_barcodes` — the multi-UPC table holding each/box/
-    // case/vendor codes — so without it a case barcode (the normal thing to
-    // scan at a receiving desk) resolved to nothing while the same scan worked
-    // at the till. Best-effort: an unknown code or a failed request just leaves
-    // the exact-match legs to answer, exactly as before.
-    let resolvedProductId: string | null = null;
+    setScanning(true);
+    let resolved: ResolvedScan;
     try {
-      const resolved = await apiGet<{ id?: string }>(`/api/v1/catalog/barcode/${encodeURIComponent(code)}`);
-      resolvedProductId = resolved?.id ?? null;
-    } catch { /* not a known barcode, or offline — fall through */ }
+      resolved = await apiGet<ResolvedScan>(
+        `/api/v1/catalog/barcode/${encodeURIComponent(code)}/pos`,
+      );
+    } catch (e) {
+      // Distinguish "this code is not a product" from "the lookup did not
+      // happen". Telling an operator a real case is unknown because the
+      // network dropped sends them to re-key a quantity that is already right.
+      if (e instanceof ApiResponseError && e.status === 404) {
+        setScanError(`No product carries the code "${code}". Check it is in the catalog, or add it as a barcode on the product.`);
+      } else if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        setScanError(`Offline — "${code}" was not looked up. Nothing was counted. Reconnect and scan it again.`);
+      } else {
+        setScanError(
+          e instanceof ApiResponseError ? e.message : `Could not look up "${code}". Nothing was counted.`,
+        );
+      }
+      return;
+    } finally {
+      setScanning(false);
+    }
 
+    // No PO chosen yet — jump to the one that actually contains this product.
     if (!selectedPO?.lines) {
-      const matchingPO = pendingPOs.find((po) => findScannedLine(po.lines, code, resolvedProductId));
-      if (matchingPO) { setSelectedPOId(matchingPO.id); }
-      else { setScanError(`No pending PO contains barcode "${code}"`); }
+      // #228's matcher: line barcode, then SKU, then resolved product id.
+      const matchingPO = pendingPOs.find((po) => findScannedLine(po.lines, code, resolved.id));
+      if (matchingPO) setSelectedPOId(matchingPO.id);
+      else setScanError(`${resolved.name} (${resolved.sku}) is not on any pending purchase order.`);
       return;
     }
-    const line = findScannedLine(selectedPO.lines, code, resolvedProductId);
-    if (!line) { setScanError(`Barcode "${code}" not found on this PO`); return; }
-    setEntries((prev) => prev.map((e) => ({ ...e, highlighted: e.lineId === line.id })));
-    setTimeout(() => setEntries((prev) => prev.map((e) => ({ ...e, highlighted: false }))), 2000);
+
+    const { entries: next, outcome } = applyScanToEntries(resolved, selectedPO.lines, entries);
+    setEntries(next);
+
+    if (outcome.kind === "not_on_po") {
+      setScanError(`${outcome.productName} (${outcome.sku}) is not on this purchase order.`);
+      return;
+    }
+    if (outcome.kind === "line_complete") {
+      setScanError(`${outcome.productName} is already fully counted (${outcome.remaining} expected). Adjust the quantity by hand to receive more.`);
+      return;
+    }
+    setScanNotice(
+      outcome.capped
+        ? `${outcome.productName} — capped at the ${selectedPO.lines.find((l) => l.id === outcome.lineId)?.remaining_qty ?? 0} still expected.`
+        : `+${outcome.addedQty} ${outcome.productName}${outcome.unitLabel !== "each" ? ` (1 ${outcome.unitLabel})` : ""}`,
+    );
   };
 
   const updateEntry = (lineId: string, patch: Partial<ReceiveEntry>) => {
@@ -224,7 +287,7 @@ export default function ReceiveStockPage() {
         <Card>
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex-1 min-w-[200px]">
-              <label className="block text-xs font-medium uppercase text-slate-500 mb-1">Scan barcode / SKU</label>
+              <label className="mb-1 block text-xs font-medium uppercase text-content-secondary">Scan barcode / SKU</label>
               <div className="flex gap-2">
                 <input
                   ref={scanRef}
@@ -233,19 +296,35 @@ export default function ReceiveStockPage() {
                   onChange={(e) => setScanInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") void handleScan(); }}
                   placeholder="Scan or type barcode…"
-                  className="flex-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none font-mono"
+                  aria-label="Scan barcode or SKU"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  enterKeyHint="done"
+                  className="focus-ring min-h-touch flex-1 rounded-control border border-line bg-surface-1 px-3 font-mono text-base text-content-primary placeholder:text-content-muted"
                   autoFocus
                 />
-                <Button variant="secondary" size="sm" onClick={() => void handleScan()}>Scan</Button>
+                <Button variant="secondary" size="lg" disabled={scanning} onClick={() => void handleScan()}>
+                  {scanning ? "…" : "Scan"}
+                </Button>
               </div>
-              {scanError && <p className="mt-1 text-xs text-red-600">{scanError}</p>}
+              {/* aria-live: a scan is a hands-busy, eyes-on-the-pallet action —
+                  the result has to be announced, not just rendered. */}
+              <div aria-live="polite">
+                {scanError && <p role="alert" className="mt-1 text-xs text-danger-700">{scanError}</p>}
+                {!scanError && scanNotice && (
+                  <p className="mt-1 text-xs font-medium text-success-700">{scanNotice}</p>
+                )}
+              </div>
             </div>
             <div className="flex-1 min-w-[260px]">
-              <label className="block text-xs font-medium uppercase text-slate-500 mb-1">Select pending PO</label>
+              <label className="mb-1 block text-xs font-medium uppercase text-content-secondary">Select pending PO</label>
               <select
                 value={selectedPOId}
                 onChange={(e) => setSelectedPOId(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
+                aria-label="Select pending purchase order"
+                className="focus-ring min-h-touch w-full rounded-control border border-line bg-surface-1 px-3 text-base text-content-primary"
               >
                 <option value="">— Choose a PO to receive —</option>
                 {pendingPOs.map((po) => (
