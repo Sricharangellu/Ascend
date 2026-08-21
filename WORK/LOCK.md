@@ -1,3 +1,19 @@
+## Active Claim (Claude Code web — desktop UI/UX + Scan & Receive workspace)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-desktop-ui-ux-fx9qif` |
+| Queue item | Sri directive 2026-08-11: improve the **existing** ASCEND desktop UI/UX (not a redesign) and cut clicks on supplier → purchase → receive → bill. Phases 1–4 of the directive's order: audit, design-system repair, sidebar/focused-workspace behaviour, and the Scan & Receive → review leg. |
+| Files/areas expected | `web/tailwind.config.ts`, `web/app/globals.css`, `web/components/{Badge,EnterpriseShell,index}.tsx`, NEW `web/components/{LifecycleTrail,WorkspaceHeader}.tsx`, NEW `web/app/(protected)/purchasing/receiving/[id]/**`, `web/app/(protected)/purchasing/{[id]/page.tsx,_components/OrdersTab.tsx,receiving/page.tsx}`, NEW `web/lib/receiving.ts`, `web/api-client/types.ts`, `web/mocks/mockHandlers.ts`, NEW `web/tests/receivingWorkspace.test.tsx`, NEW `WORK/audits/AUDIT_2026-08-11T035500Z-*.md`, `WORK/LOCK.md`, `WORK/LOOP_STATE.md`. **NOT `src/**`** (zero backend files changed — the receiving-session backend already existed and is consumed as-is), NOT `artifacts/**`, NOT `WORK/FORWARD_PLAN.md`. |
+| Started | 2026-08-11T035500Z |
+| Status | RELEASED — pushed to `claude/ascend-desktop-ui-ux-fx9qif`, PR into `develop`. Full report: `WORK/audits/AUDIT_2026-08-11T035500Z-desktop-ux-receiving-workspace.md`. |
+| Gates | Web `typecheck` PASS · `lint` PASS (0 warnings/0 errors) · `vitest` **239/239 across 30 files** (33 new) · `NEXT_PUBLIC_MOCK=false build` PASS (`/purchasing/receiving/[id]` emitted, 11.4 kB; shared JS unchanged at 87.4 kB) · `hygiene-check` PASS (2212 files). |
+| Headline finding | The Scan & Receive **backend was already complete** (scan, per-line patch, cost intelligence, close/cancel) with **zero client** — the only UI was a list that could close sessions it had no way to open. This claim builds that client rather than adding backend. Separately: 12 semantic Tailwind stops (all of `info-*`, plus `-200/-300/-400/-800` on success/warning/danger) were referenced across ~20 call sites but never declared, so `Badge variant="blue"` rendered with no colour at all and alert borders had no border colour; `--shadow-sm` was referenced by `Card` and never declared. |
+| Verified, not asserted | The Escape-to-cancel bug in inline editing was found **by a test that failed against the first implementation** (`setDraft` is async, so blur committed the abandoned edit), then fixed and re-verified. Badge contrast ratios were computed per variant, not eyeballed: green 3.37:1, orange 2.76:1, red 3.71:1 and purple 4.19:1 all failed AA for 10–11px text before this change. |
+| Blockers | none |
+| Not run | **Playwright e2e** (no built-and-served real-stack pair in this container; CI runs it on the PR) and **real-browser visual QA at 1280/1366/1440/1536/1920 (§35)** — the largest open item, reported rather than softened. Backend suite not run: zero `src/**` files changed. |
+| Scope, honestly | Phases 5–9 of the directive are **not** delivered: unpaid-bill correction, paid-bill controlled adjustments, returns/credits reconciliation, three-way-match UI + tolerances, exception centre, supplier-workspace action bar. |
+
 ## Active Claim (Claude Code web — Phase 9 F-5: one test-request factory)
 
 | Field | Value |
@@ -90,8 +106,7 @@ closing them, because closing another session's claim is a lead/human call.
 | Proof the new guard works | Negative-tested three ways before it was wired in, because a guard that cannot fail is this repo's recurring defect (F-1, F-2 — both inert for their entire lives). (1) A planted contract-only operation → exit 1, named. (2) A planted stale allowlist entry for an operation that *is* served → exit 1, named. (3) The document's indent shape shifted by one space → exit 1 on the parser floor, rather than "0 operations, all good" forever. It also arrived red on the real tree: 9 findings, of which 3 were fixed and 6 allowlisted with reasons. |
 | Scope line held (stated because it was tempting to cross) | The scan compares **paths and methods only**. Bodies drift too — `POST /rooms/{id}/charge` takes camelCase `amountCents` + `orderId` while the contract says snake_case `amount_cents` + a `category` that does not exist — and every one of those fixes would be unverifiable by any test in this PR. That is F-19's pass (DB↔API↔FE type consistency), recorded as a finding, not silently fixed here. Three path renames were in scope because each is provable from a route that already exists and a frontend call that already uses the corrected spelling. |
 | Overlap check (per AGENTS.md, run before editing) | The two `ACTIVE` Cursor Cloud claims scope `web/**` and `src/modules/payments/**`; this change touches neither. PR #215 (F-5) is open on a sibling branch — its only shared files are `WORK/FORWARD_PLAN.md` and `WORK/LOOP_STATE.md`, where it edits the F-5/F-9 rows and this edits the F-18 row, so the two do not overlap in content. This branch was cut from `origin/develop`, not from the F-5 branch, so the 41 `test-request.ts` files stay in exactly one PR. The seven `Claude session D` claims dated 2026-07-16 still read `ACTIVE` and are provably finished; flagged in the F-5 claim and left for review rather than closed here. |
-| Blockers | none |
-## Active Claim (Claude Code web — migration-lock wait must not masquerade as a statement timeout)
+| Blockers | none |## Active Claim (Claude Code web — migration-lock wait must not masquerade as a statement timeout)
 
 | Field | Value |
 |---|---|
