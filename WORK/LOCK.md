@@ -15,7 +15,16 @@
 | Scope held (stated because it was tempting to cross) | `useListQuery` is built, exported and tested (15 tests) but **no page uses it yet** — the three migrated pages kept their existing local state so the migration stayed reviewable. Rewiring `ProductsTab`'s 14 `useState`s onto it in the same PR would have mixed a mechanical UI swap with a state-model rewrite of the repo's most recently-fixed page. Recorded as the next step, not silently half-done. |
 | Not done (directive scope explicitly NOT met) | 21 of 24 pages with a search box are untouched; 109 files still hand-roll `<table>`; `PageShell` adoption still 3 pages; dashboards, forms, POS/terminal, reports and settings untouched; no app-wide responsive/iPad or accessibility sweep (the new component is covered, the app is not); **Playwright e2e not run** — no built-and-served real-stack pair in this container, CI runs the golden paths on the PR. The directive's definition of done is **not** met and this claim does not pretend otherwise. |
 | Blockers | none — the remainder is volume, not difficulty. |
+## Active Claim (Claude Code web — F-18 OpenAPI contract validation)
 
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/status-staging-vs-develop-0vv2gg` |
+| Queue item | Phase 9.9 **F-18**: build the CI check that validates `contracts/openapi.yaml` against real backend routes, and correct the drift it finds. Picked as the next unblocked item in Phase 9's stated execution order — F-11/F-3/F-13/S-1/S-2 are all Sri-gated, and F-5/F-9 turned out to have already shipped in PR #185 with the plan table left stale. |
+| Files/areas expected | Ended as `WORK/**` only. The scanner, allowlist, CI step, `package.json` script and `contracts/openapi.yaml` edits were all stood down in favour of PR #222, which shipped the same gate first. NO `src/**` changes at any point. NO `artifacts/**`. |
+| Started | 2026-08-06T17:10Z |
+| Status | RELEASED — **stood down as a duplicate.** PR #222 shipped F-18 first; this branch defers to it and keeps only the non-overlapping work (F-5/F-9 board corrections, F-29, F-30). PR #217. Full report: `WORK/audits/AUDIT_2026-08-06T171000Z-f18-openapi-contract-validation.md` |
+| Blockers | none. F-28 (the underlying request-field naming split) is recorded as NEEDS-SRI rather than resolved unilaterally — renaming accepted request fields is a breaking API change. |
 ## Active Claim (Claude Code web — product search/filter/sort: server-side catalog query)
 
 | Field | Value |
