@@ -16,12 +16,14 @@ import {
   requestIdMiddleware,
   rateLimitMiddleware,
   tenantRateLimitMiddleware,
+  makeTenantTierResolver,
   makeAuthMiddleware,
   tenantResolver,
   metricsMiddleware,
   accessLogMiddleware,
   renderMetrics,
   requireRole,
+  readinessVerdict,
 } from "./gateway/index.js";
 import type { RuntimeGauges } from "./gateway/metrics.js";
 import { handler, errorMiddleware } from "./shared/http.js";
@@ -373,7 +375,18 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   // gateway/accessLog.ts). Logging happens in a `finish` hook, so a request
   // rejected downstream is still logged, with the auth context resolved by then.
   app.use(accessLogMiddleware);
-  app.use(rateLimitMiddleware({ capacity: 120, refillRate: 40, redis }));
+  // Per-IP limiter in front of everything. Env-overridable because the right
+  // value depends on deployment topology, not on this code: behind a NAT, a
+  // corporate proxy or a misconfigured TRUST_PROXY_DEPTH, an entire customer
+  // site arrives as one IP and the default would throttle the whole site to
+  // 40 req/s. Defaults below are the previous hard-coded values.
+  app.use(
+    rateLimitMiddleware({
+      capacity: Number(process.env["GLOBAL_RATE_LIMIT_CAPACITY"] ?? 120),
+      refillRate: Number(process.env["GLOBAL_RATE_LIMIT_REFILL"] ?? 40),
+      redis,
+    }),
+  );
 
   // ── Liveness + readiness probes (no auth — infrastructure-level)
   app.get("/healthz", (_req, res) => {
@@ -408,19 +421,42 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   });
 
   app.get("/readyz", handler(async (_req, res) => {
-    await db.one("SELECT 1");
+    // The pool verdict is decided BEFORE touching the database on purpose: the
+    // probe must be able to answer when connections are scarce, which is
+    // exactly when it is asked. See gateway/readiness.ts for why a queue is no
+    // longer treated as unreadiness.
     const pool = db.poolStats();
     const poolMax = Number(process.env["PG_POOL_MAX"] ?? 10);
-    // Return 503 when all connections are in use — load balancer will stop routing.
-    if (pool && pool.waiting > 0) {
+    const verdict = readinessVerdict(pool, poolMax);
+    if (!verdict.ready) {
       res.status(503).json({
         status: "degraded",
-        reason: "connection pool exhausted",
+        reason: verdict.reason,
         pool,
+        waitingLimit: verdict.waitingLimit,
         ts: Date.now(),
       });
       return;
     }
+
+    // Reaching the database is still what "ready" means, so it is checked — but
+    // a failure here is 503 "not ready", not the 500 it used to be. A 500 reads
+    // as "this endpoint is broken" to a load balancer and to an on-call
+    // engineer; the truth is "this instance cannot serve traffic right now",
+    // which is what a readiness probe exists to say.
+    try {
+      await db.one("SELECT 1");
+    } catch (err) {
+      res.status(503).json({
+        status: "degraded",
+        reason: "database unreachable",
+        error: (err as Error).message,
+        pool: pool ?? undefined,
+        ts: Date.now(),
+      });
+      return;
+    }
+
     res.json({
       status: "ok",
       db: "connected",
@@ -499,7 +535,16 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
 
   // ── Auth + per-tenant tiered rate limit applied to all /api/v1/* routes.
   // makeAuthMiddleware handles both JWT sessions and API key tokens (fpk_ prefix).
-  app.use("/api/v1", makeAuthMiddleware(db), tenantResolver, tenantRateLimitMiddleware({ redis }));
+  // Per-tenant tiered limiter, sized by the tenant's subscription plan. Without
+  // the resolver every tenant fell through to `standard` (10 req/s sustained),
+  // which no multi-store enterprise customer can run a shift on.
+  const tierResolver = makeTenantTierResolver(db);
+  app.use(
+    "/api/v1",
+    makeAuthMiddleware(db),
+    tenantResolver,
+    tenantRateLimitMiddleware({ redis, tierOf: tierResolver.tierOf }),
+  );
 
   // ── Feature flags (tenant-scoped, requires auth)
   app.get(

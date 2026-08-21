@@ -1,3 +1,16 @@
+## Active Claim (Claude Code web — 20k-user scalability audit: DB layer, POS query plans, load testing)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-erp-scale-20k-vmu1ha` |
+| Queue item | Sri directive 2026-08-15: end-to-end scalability/performance/reliability audit and implementation for 20,000 registered users (2,000–5,000 concurrent). Measured, not inspected: a production-shaped dataset (2.1M order lines, 300k orders, 40k products, 2.0M inventory movements) was generated and every claim below comes from `EXPLAIN (ANALYZE)` or a timed benchmark against real PostgreSQL 16. Three bottlenecks confirmed so far: (1) **every authenticated query was wrapped in its own transaction** — 4 round trips and 4× the connection hold time for one statement Postgres already runs atomically; (2) the **POS stock check sequentially scanned all 2.1M order lines once per basket line** (1,086 ms for a 3-line basket, growing forever with order history); (3) the **inventory levels page aggregated every order line in the tenant per page** (312 ms). This claim also closes the previous claim's own "Not run" item: load testing. |
+| Files/areas expected | `src/shared/db.ts`; NEW `src/shared/db-session-context.test.ts`; `src/modules/orders/service.ts`; `src/modules/inventory/service.ts`; NEW `scripts/perf/**`; NEW `docs/architecture/SCALABILITY.md`; NEW `WORK/audits/AUDIT_<UTC>-scale-20k.md`; `WORK/LOOP_STATE.md`; `WORK/LOCK.md`; `.env.example` (new PG_* tuning vars only). **NOT** `web/**` beyond measurement, NOT `src/modules/catalog/**` (the claim below owns the catalog query surface and is RELEASED but recent), NOT `artifacts/**`. |
+| Started | 2026-08-15T172000Z |
+| Overlap check | Ran per AGENTS.md. Every claim in this file is `RELEASED` except three from 2026-07 (Cursor Cloud Wave A/B `web/**`, POS customer + gift card `src/modules/payments/**`, outlet-filter `web/**`); none scopes `src/shared/db.ts`, `src/modules/orders/**`, `src/modules/inventory/**` or `scripts/**`. The catalog claim directly below is RELEASED and its files are excluded here. Stale 2026-07 `ACTIVE` claims left untouched for human review rather than silently closed, per this file's rules. |
+| Status | RELEASED — pushed to `claude/ascend-erp-scale-20k-vmu1ha`. |
+| Gates | Run against **real PostgreSQL 16** (not embedded): backend `typecheck` PASS · backend `npm test` **957/957, 0 fail** (22 new) · `hygiene` PASS (2,233 files) · `scripts/perf/explain.ts` PASS (6/6 critical queries within budget, no sequential scans) · load test baseline/target/stress run on an idle host. **Not run:** web gates (no `web/**` file changed), Playwright e2e, the `extreme` load profile (would only have measured queue depth behind a saturated core), failure-injection, frontend performance, and the security surface beyond rate limiting and tenant isolation — all listed explicitly in the audit rather than softened. |
+| Blockers | none |
+
 ## Active Claim (Claude Code web — Replit worktree import: harvest `push_tokens` out of `artifacts/`)
 
 | Field | Value |

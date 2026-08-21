@@ -20,9 +20,10 @@
  */
 export { requestIdMiddleware } from "./requestId.js";
 export type { RedisClient } from "../shared/redis.js";
-export { rateLimitMiddleware, tenantRateLimitMiddleware, RATE_TIERS } from "./rateLimit.js";
+export { rateLimitMiddleware, tenantRateLimitMiddleware, makeTenantTierResolver, RATE_TIERS, PLAN_TIERS } from "./rateLimit.js";
 export type { TierLimit, TenantRateLimitOptions } from "./rateLimit.js";
 export { authMiddleware, makeAuthMiddleware, tenantResolver, requireRole, requireScope, requirePlan, requireCapability, requireModule } from "./auth.js";
 export { accessLogMiddleware } from "./accessLog.js";
 export { metricsMiddleware, renderMetrics, recordRequest, normalizePath, resetMetrics } from "./metrics.js";
 export type { AuthPayload } from "./auth.js";
+export { readinessVerdict } from "./readiness.js";
