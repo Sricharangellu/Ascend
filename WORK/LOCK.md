@@ -1,3 +1,12 @@
+## Active Claim (Replit — PR-A2 gap-scan allowlist cleanup)
+
+| Field | Value |
+|---|---|
+| Agent/session | Replit Agent session (Sri-directed), branch `chore/gapscan-allowlist-cleanup` |
+| Queue item | PR-A2: gap:scan stale-allowlist warning — /api/v1/inventory/pipeline/receiving, .../receiving/:p/update, .../pipeline/summary now backed by real routes in src/modules/inventory/pipeline-routes.ts; remove from tools/api-gap-allowlist.json. Branch also restores the npm root (package.json, package-lock.json, tsconfig.json from 2c916be; removes pnpm-lock.yaml/pnpm-workspace.yaml/.npmrc) per the pre-push gates, reverting the earlier Replit workspace-merge contamination at root. |
+| Files/areas expected | `tools/api-gap-allowlist.json`; root `package.json`/`package-lock.json`/`tsconfig.json` (restore only); `WORK/LOCK.md` |
+| Started | 2026-08-03T191010Z |
+| Status | ACTIVE |
 ## Active Claim (Claude Code web — 20k-user scalability audit: DB layer, POS query plans, load testing)
 
 | Field | Value |
