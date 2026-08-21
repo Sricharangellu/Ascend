@@ -1,0 +1,66 @@
+# Gitleaks configuration for Ascend.
+#
+# `AGENTS.md`'s first hard rule is "never write secrets into any file", and
+# until 2026-08-06 nothing checked it. A first full scan of the working tree
+# found 4 hits, all false positives, listed and justified below — which is why
+# this check ships able to FAIL rather than report-only like the newer scanners
+# in ci.yml. There is no backlog of real leaks to work through first, so there
+# is no reason to accept a check that cannot say no.
+#
+# If a scan fails on something that is genuinely not a secret, add it here WITH
+# the reason. If it fails on something that is: rotate the credential first
+# (the secret is already in git history and removing the line does not unpublish
+# it), then allowlist nothing.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Reviewed non-secrets, 2026-08-06"
+
+paths = [
+  # Vendored/lock content: matches here are upstream package metadata, not our
+  # credentials, and the files are machine-generated.
+  '''package-lock\.json$''',
+  '''(^|/)node_modules/''',
+
+  # Build and test output. All of these are in .gitignore, so nothing here can
+  # ever be committed — but `gitleaks dir` walks the filesystem, not the index,
+  # so whether they exist depends on whether anyone has run a build. Without
+  # these entries the scan passes on a fresh checkout (CI) and fails on a
+  # developer's machine after `npm run build`, which is the kind of
+  # inconsistency that gets a check disabled.
+  #
+  # Confirmed 2026-08-06: a post-build scan reported 12 findings, every one in
+  # web/.next/{prerender,middleware,server-reference}-manifest.json — Next.js's
+  # own generated deployment/preview ids, none of them tracked by git.
+  '''(^|/)\.next/''',
+  '''(^|/)dist/''',
+  '''(^|/)coverage/''',
+  '''(^|/)playwright-report/''',
+  '''(^|/)test-results/''',
+]
+
+regexes = [
+  # localStorage/sessionStorage cache-key constants. The default generic-api-key
+  # rule fires on `CACHE_KEY = "..."` purely because of the variable name.
+  # Present in web/contexts/CapabilitiesContext.tsx and its diverged twin under
+  # artifacts/ascend/ (see WORK/LOOP_STATE.md's artifacts/ NEEDS-SRI item).
+  '''ascend[._-]?capabilities[._-]?(cache|v\d+)''',
+  '''finder[._-]?capabilities[._-]?(cache|v\d+)''',
+]
+
+# Documentation examples and prose. These are illustrative values in docs, not
+# live credentials — but the paths are narrow on purpose so a real key committed
+# elsewhere in docs/ still fails.
+[[rules]]
+id = "generic-api-key"
+[rules.allowlist]
+paths = [
+  # docs/api/authentication.md ships a sample login response containing an
+  # example JWT so the shape is copy-pasteable. Not issued by any real signer.
+  '''^docs/api/authentication\.md$''',
+  # WORK/audits/ are append-only point-in-time records; this one discusses the
+  # OIDC *token endpoint* and the rule matches the English phrase, not a value.
+  '''^WORK/audits/AUDIT_2026-07-15T161500Z-sso-oidc-hardening\.md$''',
+]

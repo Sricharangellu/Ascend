@@ -160,7 +160,7 @@ const recReport: RecommendationReport = {
     {
       id: "rec_low_stock", signalCode: "low_stock", category: "inventory", severity: "warning",
       title: "Restock low inventory", detail: "Some products are at or below reorder point.",
-      action: "Review reorder list", href: "/inventory/reorder", count: 4, rank: 1,
+      action: "Review reorder list", href: "/purchasing?tab=reorder", count: 4, rank: 1,
     },
   ],
 };

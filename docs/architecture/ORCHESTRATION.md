@@ -111,10 +111,13 @@ LOCK claim or the committed work owns the area; later arrivals adapt.
 - Never `git add -A` — stage only files you authored.
 - Build anything you'll commit in an isolated `git worktree` off the target
   base branch; cherry-pick/PR from there.
-- Claim durable task ownership on the GitHub Issue (`tools/AGENT_PROMPT.md`), then take a
-  short-lived `WORK/LOCK.md` entry the moment you start editing (session + exact files +
-  explicit NOT-list); release with gates evidence as soon as those edits land — don't let it
-  sit ACTIVE past the session that opened it.
+- Take the task from `WORK/FORWARD_PLAN.md` (the authoritative queue) or the `LOOP_STATE.md`
+  backlog, then take a short-lived `WORK/LOCK.md` entry the moment you start editing (session
+  + exact files + explicit NOT-list); release with gates evidence as soon as those edits land
+  — don't let it sit ACTIVE past the session that opened it. GitHub Issues with `lane:*`
+  labels are the intended durable-ownership layer above the lock, but the board has **zero
+  open issues as of 2026-08-05** — claim the lock and proceed; don't read an empty
+  `lane:ready` query as an empty backlog. Session prompt: `tools/AGENT_PROMPT.md`.
 - Treat files another session is touching as owned — coordinate, don't
   collide. If a file you need enters another session's claim mid-flight,
   back off and pick a different task.

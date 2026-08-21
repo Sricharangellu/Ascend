@@ -191,7 +191,7 @@ const _BP_CATALOG: _BPMod[] = [
   { key: "compliance",       name: "Compliance",               description: "Age verification, MSA/PACT reporting, state flavor bans",      group: "retail" },
   { key: "ecommerce",        name: "Ecommerce",                description: "Online store sync, product visibility, online orders",          group: "retail",  route: "/ecommerce" },
   { key: "customer_display", name: "Customer Display",          description: "Second-screen cart mirror for customer-facing display",        group: "retail",  route: "/display" },
-  { key: "sales_orders",  name: "Sales Orders",        description: "B2B orders, credit terms, fulfilment workflows",              group: "b2b",  route: "/sales" },
+  { key: "sales_orders",  name: "Sales Orders",        description: "B2B orders, credit terms, fulfilment workflows",              group: "b2b",  route: "/orders" },
   { key: "purchasing",    name: "Purchasing",           description: "Purchase orders, receiving, vendor management, returns",     group: "b2b",  route: "/purchasing" },
   { key: "billing",       name: "Billing — AP/AR",      description: "Supplier bills, customer invoices, aging reports",           group: "b2b",  route: "/finance" },
   { key: "accounting",    name: "Accounting",           description: "Chart of accounts, journal entries, batch deposits, P&L",   group: "b2b",  route: "/accounting" },
@@ -221,7 +221,7 @@ const _BP_CATALOG: _BPMod[] = [
   { key: "online_store",      name: "Online Store",        description: "Product visibility, SEO fields, meta title/description",    group: "ecommerce" },
   { key: "order_fulfillment", name: "Order Fulfillment",   description: "Pick-pack-ship for online orders, tracking integration",    group: "ecommerce" },
   { key: "marketplace",       name: "Marketplace Sync",    description: "Sync inventory/orders with external marketplaces",          group: "ecommerce" },
-  { key: "shipping_mgmt",     name: "Shipping Management", description: "Carrier integrations, label printing, tracking numbers",    group: "ecommerce", route: "/shipping" },
+  { key: "shipping_mgmt",     name: "Shipping Management", description: "Carrier integrations, label printing, tracking numbers",    group: "ecommerce", route: "/delivery" },
   { key: "vehicle_history", name: "Vehicle History",    description: "VIN/license lookup, service history per vehicle, notes",    group: "automotive", route: "/automotive/vehicles" },
   { key: "parts_inventory", name: "Parts Inventory",    description: "Auto parts with OEM/aftermarket codes, supplier ordering",  group: "automotive" },
   { key: "work_orders",     name: "Work Orders",        description: "Job cards, technician assignment, time tracking, parts",    group: "automotive", route: "/automotive/work-orders" },
@@ -659,8 +659,8 @@ export const mockHandlers = [
     return HttpResponse.json({
       totals: { current: 120000, d1_30: 45000, d31_60: 18000, d61_90: 9000, d90_plus: 5000, total: 197000 },
       parties: [
-        { partyId: "cus_demo_1", buckets: { current: 80000, d1_30: 20000, d31_60: 0, d61_90: 0, d90_plus: 5000, total: 105000 } },
-        { partyId: "cus_demo_2", buckets: { current: 40000, d1_30: 25000, d31_60: 18000, d61_90: 9000, d90_plus: 0, total: 92000 } },
+        { partyId: "cus_demo_1", partyName: "Demo Customer One", buckets: { current: 80000, d1_30: 20000, d31_60: 0, d61_90: 0, d90_plus: 5000, total: 105000 } },
+        { partyId: "cus_demo_2", partyName: "Demo Customer Two", buckets: { current: 40000, d1_30: 25000, d31_60: 18000, d61_90: 9000, d90_plus: 0, total: 92000 } },
       ],
     });
   }),
@@ -687,7 +687,7 @@ export const mockHandlers = [
     await lat();
     return HttpResponse.json({
       totals: { current: 60000, d1_30: 22000, d31_60: 0, d61_90: 0, d90_plus: 0, total: 82000 },
-      parties: [{ partyId: "sup_demo_1", buckets: { current: 60000, d1_30: 22000, d31_60: 0, d61_90: 0, d90_plus: 0, total: 82000 } }],
+      parties: [{ partyId: "sup_demo_1", partyName: "Demo Supplier", buckets: { current: 60000, d1_30: 22000, d31_60: 0, d61_90: 0, d90_plus: 0, total: 82000 } }],
     });
   }),
   http.get(`${V1}/reports/sales-by-category`, async () => {
@@ -705,6 +705,24 @@ export const mockHandlers = [
       { key: "cus_demo_2", name: "Grace Hopper", units: 12, revenueCents: 286000 },
     ] });
   }),
+  // Cash movement had NO handler at all. MSW is configured onUnhandledRequest:
+  // "warn", so the request fell through to a backend that isn't deployed in mock
+  // mode; useQuery's error branch clears loading, leaving the dashboard Cash Flow
+  // KPI showing a confident $0.00. Shape mirrors ReportsService.cashMovement.
+  http.get(`${V1}/reports/cash-movement`, async () => {
+    await lat();
+    const now = Date.now();
+    const items = [
+      { movement_type: "sale",       amount: 12_450, reason: null,              created_by: "usr_demo_cashier", created_at: now - 3_600_000 },
+      { movement_type: "float_in",   amount: 10_000, reason: "Opening float",   created_by: "usr_demo_owner",   created_at: now - 28_800_000 },
+      { movement_type: "sale",       amount:  8_320, reason: null,              created_by: "usr_demo_cashier", created_at: now - 7_200_000 },
+      { movement_type: "cash_out",   amount:  4_500, reason: "Supplier payout", created_by: "usr_demo_owner",   created_at: now - 10_800_000 },
+      { movement_type: "cash_out",   amount:  2_000, reason: "Petty cash",      created_by: "usr_demo_owner",   created_at: now - 14_400_000 },
+    ];
+    const totalInCents = items.filter((r) => r.movement_type !== "cash_out").reduce((s, r) => s + r.amount, 0);
+    const totalOutCents = items.filter((r) => r.movement_type === "cash_out").reduce((s, r) => s + r.amount, 0);
+    return HttpResponse.json({ items, totalInCents, totalOutCents, netCents: totalInCents - totalOutCents });
+  }),
   http.get(`${V1}/reports/inventory-valuation`, async () => {
     await lat();
     const rows = [
@@ -716,7 +734,9 @@ export const mockHandlers = [
     ];
     const totalCostCents = rows.reduce((s, r) => s + r.costValueCents, 0);
     const totalRetailCents = rows.reduce((s, r) => s + r.retailValueCents, 0);
-    return HttpResponse.json({ rows, totalCostCents, totalRetailCents });
+    // `total` (SKU count) is part of the backend's Valuation shape; omitting it
+    // made the dashboard Ops Hub render "SKUs: 0" next to a real inventory value.
+    return HttpResponse.json({ rows, totalCostCents, totalRetailCents, total: rows.length });
   }),
 
 
@@ -1318,25 +1338,133 @@ export const mockHandlers = [
       ),
     ];
 
-    function applyFilters(
-      list: typeof products,
-      category?: string,
-      status?: string,
-      q?: string,
-    ) {
+    /**
+     * Mirror of the real catalog list query (src/modules/catalog/service.ts).
+     *
+     * Keeping these two in step matters more than it looks: this mock used to
+     * implement `?q=` while the backend silently ignored it, so search worked
+     * in `npm run dev` and did nothing in production for as long as the feature
+     * existed. Anything added to the real query belongs here too.
+     */
+    interface CatalogQuery {
+      category?: string; status?: string; q?: string; brand?: string;
+      supplier?: string; taxClass?: string; ageRestricted?: boolean;
+      productType?: string; minPrice?: number; maxPrice?: number;
+      topLevel?: boolean;
+    }
+
+    const variantCountOf = (id: string) => products.filter((p) => p.parent_product_id === id).length;
+
+    const productTypeOf = (p: (typeof products)[number]) =>
+      p.parent_product_id ? "variant" : variantCountOf(p.id) > 0 ? "master" : "standalone";
+
+    /** Same precedence as the server: exact barcode, exact SKU, prefixes, then contains. */
+    function relevanceRank(p: (typeof products)[number], q: string): number {
+      const lq = q.trim().toLowerCase();
+      const digits = lq.replace(/\D/g, "");
+      const barcode = String(p.barcode ?? "").toLowerCase();
+      const sku = String(p.sku).toLowerCase();
+      const name = String(p.name).toLowerCase();
+      const brand = String(p.brand ?? "").toLowerCase();
+      if (barcode && (barcode === lq || (digits.length >= 6 && barcode === digits))) return 0;
+      if (sku === lq) return 1;
+      if (sku.startsWith(lq)) return 3;
+      if (name.startsWith(lq)) return 4;
+      if (brand.startsWith(lq)) return 5;
+      if (name.includes(lq)) return 6;
+      return 7;
+    }
+
+    function applyFilters(list: typeof products, f: CatalogQuery) {
       return list.filter((p) => {
-        if (category && p.category !== category) return false;
-        if (status && p.status !== status) return false;
-        if (q) {
-          const lq = q.toLowerCase();
-          if (
-            !String(p.name).toLowerCase().includes(lq) &&
-            !String(p.sku).toLowerCase().includes(lq) &&
-            !String(p.barcode ?? "").includes(lq)
-          ) return false;
+        if (f.topLevel && p.parent_product_id) return false;
+        if (f.category && p.category !== f.category) return false;
+        if (f.status && p.status !== f.status) return false;
+        if (f.brand && !String(p.brand ?? "").toLowerCase().includes(f.brand.toLowerCase())) return false;
+        if (f.taxClass && p.tax_class !== f.taxClass) return false;
+        if (f.ageRestricted && p.age_restricted !== 1) return false;
+        if (f.productType && productTypeOf(p) !== f.productType) return false;
+        if (f.minPrice !== undefined && p.price_cents < f.minPrice) return false;
+        if (f.maxPrice !== undefined && p.price_cents > f.maxPrice) return false;
+        if (f.supplier) {
+          const s = f.supplier.toLowerCase();
+          if (!String((p as { preferred_vendor_name?: string | null }).preferred_vendor_name ?? "").toLowerCase().includes(s)) return false;
+        }
+        if (f.q) {
+          // AND across tokens, OR across the searchable columns.
+          const tokens = f.q.trim().toLowerCase().split(/\s+/).filter(Boolean).slice(0, 5);
+          const haystack = [p.name, p.sku, p.barcode, p.brand, p.category,
+            (p as { manufacturer?: string | null }).manufacturer,
+            (p as { vendor_upc?: string | null }).vendor_upc,
+          ].map((v) => String(v ?? "").toLowerCase());
+          if (!tokens.every((t) => haystack.some((h) => h.includes(t)))) return false;
         }
         return true;
       });
+    }
+
+    function sortProducts(list: typeof products, sort: string, dir: string, q?: string) {
+      const sign = dir === "desc" ? -1 : 1;
+      const cmp = (a: unknown, b: unknown) => {
+        // NULLS LAST in both directions, matching the server.
+        const an = a === null || a === undefined || a === "";
+        const bn = b === null || b === undefined || b === "";
+        if (an && bn) return 0;
+        if (an) return 1;
+        if (bn) return -1;
+        if (typeof a === "number" && typeof b === "number") return (a - b) * sign;
+        return String(a).localeCompare(String(b)) * sign;
+      };
+      const key = (p: (typeof products)[number]) => {
+        switch (sort) {
+          case "sku":         return p.sku;
+          case "price_cents": return p.price_cents;
+          case "category":    return p.category;
+          case "brand":       return p.brand;
+          case "status":      return p.status;
+          case "created_at":  return p.createdAt;
+          case "updated_at":  return p.updatedAt;
+          case "cost":        return p.raw_cost_price_cents;
+          default:            return p.name;
+        }
+      };
+      if (sort === "relevance" && q) {
+        return [...list].sort((a, b) =>
+          relevanceRank(a, q) - relevanceRank(b, q)
+          || (a.status === "active" ? 0 : 1) - (b.status === "active" ? 0 : 1)
+          || String(a.name).localeCompare(String(b.name)));
+      }
+      return [...list].sort((a, b) => cmp(key(a), key(b)) || String(a.id).localeCompare(String(b.id)));
+    }
+
+    function readCatalogQuery(url: URL): CatalogQuery {
+      const str = (k: string) => url.searchParams.get(k) || undefined;
+      const money = (k: string) => {
+        const raw = url.searchParams.get(k);
+        return raw && raw.trim() !== "" && Number.isFinite(Number(raw)) ? Math.round(Number(raw) * 100) : undefined;
+      };
+      const type = str("productType");
+      return {
+        category: str("category"), status: str("status"), q: str("q"),
+        brand: str("brand"), supplier: str("supplier"), taxClass: str("taxClass"),
+        ageRestricted: url.searchParams.get("ageRestricted") === "true",
+        topLevel: url.searchParams.get("topLevel") === "true",
+        productType: type === "all" ? undefined : type,
+        minPrice: money("minPrice"), maxPrice: money("maxPrice"),
+      };
+    }
+
+    /** Buckets over a list, biggest first — the mock's version of the facets query. */
+    function bucketize(list: typeof products, pick: (p: (typeof products)[number]) => string | null | undefined) {
+      const counts = new Map<string, number>();
+      for (const p of list) {
+        const v = pick(p);
+        if (v == null || v === "") continue;
+        counts.set(v, (counts.get(v) ?? 0) + 1);
+      }
+      return [...counts.entries()]
+        .map(([value, count]) => ({ value, count }))
+        .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
     }
 
     return [
@@ -1344,17 +1472,44 @@ export const mockHandlers = [
       http.get(`${V1}/catalog`, async ({ request }) => {
         await lat();
         const url = new URL(request.url);
-        const category = url.searchParams.get("category") ?? undefined;
-        const status   = url.searchParams.get("status")   ?? undefined;
-        const q        = url.searchParams.get("q")        ?? undefined;
+        const query = readCatalogQuery(url);
         const limit    = Number(url.searchParams.get("limit") ?? 50);
         const offset   = Number(url.searchParams.get("offset") ?? 0);
-        const filtered = applyFilters(products, category, status, q);
+        const sort     = url.searchParams.get("sort") ?? (query.q ? "relevance" : "created_at");
+        const dir      = url.searchParams.get("dir") ?? "asc";
+        const filtered = sortProducts(applyFilters(products, query), sort, dir, query.q);
         return HttpResponse.json({
-          items: filtered.slice(offset, offset + limit),
+          items: filtered.slice(offset, offset + limit).map((p) => ({ ...p, variant_count: variantCountOf(p.id) })),
           total: filtered.length,
           limit,
           offset,
+        });
+      }),
+
+      // Facet counts for the current query. Each dimension drops its own filter
+      // so the UI can still offer the alternatives to switch to — same rule the
+      // server's buildListWhere(omit) applies.
+      http.get(`${V1}/catalog/facets`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const query = readCatalogQuery(url);
+        const scoped = (omit: keyof CatalogQuery) => applyFilters(products, { ...query, [omit]: undefined });
+        const matching = applyFilters(products, query);
+        const prices = matching.map((p) => p.price_cents);
+        return HttpResponse.json({
+          total: matching.length,
+          status: bucketize(scoped("status"), (p) => p.status),
+          productType: ["standalone", "master", "variant"].map((value) => ({
+            value,
+            count: scoped("productType").filter((p) => productTypeOf(p) === value).length,
+          })),
+          category: bucketize(scoped("category"), (p) => p.category),
+          brand: bucketize(scoped("brand"), (p) => p.brand),
+          supplier: bucketize(scoped("supplier"), (p) => (p as { preferred_vendor_name?: string | null }).preferred_vendor_name),
+          taxClass: bucketize(scoped("taxClass"), (p) => p.tax_class),
+          ageRestricted: matching.filter((p) => p.age_restricted === 1).length,
+          ecommerce: matching.filter((p) => (p as { ecommerce?: number }).ecommerce === 1).length,
+          priceRange: prices.length ? { min: Math.min(...prices), max: Math.max(...prices) } : null,
         });
       }),
 
@@ -3159,15 +3314,25 @@ mockHandlers.push(
   }),
 
   // ── P&L report ────────────────────────────────────────────────────────────
+  // Shape mirrors PnlReport in src/modules/reports/service.ts. It used to return
+  // a nested {revenue:{...},cogs:{...},...} object no backend ever produced, so
+  // every consumer read undefined and rendered a confident $0.00 P&L.
   http.get(`${V1}/reports/p-l`, async () => {
     await lat();
+    const grossSalesCents = 284_600;
+    const taxCents = 22_768;
+    const revenueCents = grossSalesCents - taxCents; // 261,832 — revenue is net of tax
+    const cogsCents = 142_300;
+    const grossProfitCents = revenueCents - cogsCents; // 119,532
+    const operatingExpensesCents = 38_400;
     return HttpResponse.json({
-      revenue: { grossCents: 284600, taxCents: 22768, netCents: 261832 },
-      cogs: { costCents: 142300 },
-      grossProfit: { cents: 119532, pct: 45.6 },
-      opex: { cents: 38400 },
-      netProfit: { cents: 81132, pct: 31.0 },
-      period: "Last 30 days",
+      revenueCents,
+      grossSalesCents,
+      taxCents,
+      cogsCents,
+      grossProfitCents,
+      operatingExpensesCents,
+      netIncomeCents: grossProfitCents - operatingExpensesCents, // 81,132
     });
   }),
 
@@ -3182,12 +3347,13 @@ mockHandlers.push(
   }),
 
   // ── Sales-by-vendor report ─────────────────────────────────────────────────
+  // Shape mirrors SalesByVendorRow (totalCents/qty, not revenueCents/unitsSold).
   http.get(`${V1}/reports/sales-by-vendor`, async () => {
     await lat();
     return HttpResponse.json({ items: [
-      { vendorId: "sup_acme", vendorName: "Acme Coffee Co", orderCount: 54, revenueCents: 168400, unitsSold: 312 },
-      { vendorId: "sup_tea", vendorName: "Tea Traders", orderCount: 29, revenueCents: 84200, unitsSold: 198 },
-      { vendorId: "sup_other", vendorName: "General Goods", orderCount: 15, revenueCents: 32000, unitsSold: 87 },
+      { vendorId: "sup_acme", vendorName: "Acme Coffee Co", orderCount: 54, totalCents: 168400, qty: 312 },
+      { vendorId: "sup_tea", vendorName: "Tea Traders", orderCount: 29, totalCents: 84200, qty: 198 },
+      { vendorId: "sup_other", vendorName: "General Goods", orderCount: 15, totalCents: 32000, qty: 87 },
     ]});
   }),
 

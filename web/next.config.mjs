@@ -39,6 +39,43 @@ const nextConfig = {
       { source: "/readyz", destination: `${backendUrl}/readyz` },
     ];
   },
+
+  // Ponytail Waves 1–3 — permanent redirects for legacy / alias IA.
+  // Wave 3 deleted the thin page.tsx twins; these redirects are the sole SoT.
+  async redirects() {
+    return [
+      // Reports: /reporting was a full re-export twin of /reports
+      { source: "/reporting", destination: "/reports", permanent: true },
+      { source: "/reporting/closing", destination: "/reports/end-of-day", permanent: true },
+      { source: "/reporting/:path*", destination: "/reports/:path*", permanent: true },
+      // Sell aliases
+      { source: "/sell", destination: "/terminal", permanent: true },
+      { source: "/sales", destination: "/orders", permanent: true },
+      // Payments tender audit lives on order detail; list entry was redundant
+      { source: "/payments", destination: "/orders", permanent: true },
+      // Finance aliases
+      { source: "/finance/bills", destination: "/bills", permanent: true },
+      { source: "/finance/settings", destination: "/settings", permanent: true },
+      { source: "/finance/payment-made", destination: "/bills", permanent: true },
+      // Setup duplicates of capabilities-driven Business Modes
+      { source: "/setup/business-profile", destination: "/settings/modes", permanent: true },
+      { source: "/setup/modules", destination: "/settings/modes", permanent: true },
+      // Purchasing hub — standalone reorder page folds into Purchasing Reorder tab
+      { source: "/inventory/reorder", destination: "/purchasing?tab=reorder", permanent: true },
+      // Inventory legacy pages retired to their real-data equivalents
+      { source: "/inventory/expiry", destination: "/inventory/expiry-pool", permanent: true },
+      { source: "/inventory/transfers", destination: "/inventory?tab=transfers", permanent: true },
+      // Ecommerce aliases that re-exported other trees
+      { source: "/ecommerce/customers", destination: "/customers", permanent: true },
+      { source: "/ecommerce/promotions", destination: "/catalog/promotions", permanent: true },
+      // Pricing: old price-book surface → Customer Overrides
+      { source: "/catalog/price-book", destination: "/pricing?tab=customer-overrides", permanent: true },
+      // Ponytail Wave 2 — shipping registry folds into Delivery Shipments tab
+      { source: "/shipping", destination: "/delivery?tab=shipments", permanent: true },
+      // Operations mega-page dissolved to Outlets (+ deep links on that page)
+      { source: "/operations", destination: "/setup/outlets", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

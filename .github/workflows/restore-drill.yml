@@ -1,0 +1,152 @@
+# Disaster-recovery drill — proves the backup→restore path still works.
+#
+# WHY THIS EXISTS
+#   `db/backup/restore.sh` has carried a "DR DRILL CHECKLIST (run quarterly,
+#   record in RTO log)" since it was written, and nothing ever ran it. The
+#   mechanism was drilled by hand exactly once — 2026-08-05, recorded in
+#   GAPS.md — and has had nothing re-proving it since. That is GAPS.md's
+#   "Restore validation in CI … nothing re-proves it, so the path can rot
+#   silently."
+#
+#   An untested backup is indistinguishable from a broken one until the day you
+#   need it. This repo has shipped that exact failure twice already: backup.yml
+#   reporting success in ~5s having backed up nothing, and uptime.yml probing a
+#   dead hostname for over a week. Both were green the whole time.
+#
+# WHAT A GREEN RUN HERE MEANS — and what it does not
+#   MEANS:     the backup→restore MECHANISM works against a real PostgreSQL 16.
+#   DOES NOT:  mean production can be recovered. That needs a drill against real
+#              production infrastructure and is blocked on PROD_DATABASE_URL
+#              (WORK/LOOP_STATE.md, NEEDS-SRI). C-1's production half stays OPEN
+#              and this workflow says so in its own summary.
+name: DR drill (backup → restore → verify)
+
+on:
+  schedule:
+    # Weekly. The drill takes minutes and the thing it guards against is silent
+    # rot over weeks, so a daily run would buy little for the cost.
+    - cron: "0 7 * * 1" # Mondays 07:00 UTC
+  workflow_dispatch: {}
+  # Also on any change to the backup/restore path itself — the highest-risk
+  # moment for this machinery is the commit that edits it, not the following
+  # Monday.
+  push:
+    branches: [develop, staging, master]
+    paths:
+      - "db/backup/**"
+      - "scripts/verify-restored-db.ts"
+      - ".github/workflows/restore-drill.yml"
+  pull_request:
+    branches: [develop, staging, master]
+    paths:
+      - "db/backup/**"
+      - "scripts/verify-restored-db.ts"
+      - ".github/workflows/restore-drill.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: restore-drill-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  drill:
+    name: Backup → restore → verify on real PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: finder
+          POSTGRES_PASSWORD: finder
+          POSTGRES_DB: drill_source
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # No TLS on the service container, and the verifier runs NODE_ENV=production
+      # which otherwise flips sslConfig()'s default to "TLS required".
+      PG_SSL: disable
+      JWT_SECRET: drill-secret-at-least-32-characters-long-xxxx
+      PGPASSWORD: finder
+      DRILL_SOURCE_URL: postgresql://finder:finder@localhost:5432/drill_source
+      DRILL_TARGET_URL: postgresql://finder:finder@localhost:5432/drill_restore
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      # pg_dump refuses to dump from a server NEWER than itself. ubuntu-latest
+      # ships postgresql-client 16, which matches the service image today — but
+      # backup.yml already learned this lesson the hard way, so pin the same
+      # expectation here rather than inherit whatever the runner image drifts to.
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client
+          pg_dump --version
+
+      # The drill needs a source with REAL data in it. drill.sh refuses to run
+      # against an empty source precisely because that would pass trivially, so
+      # this step is load-bearing, not setup noise.
+      #
+      # Booting the server is what provisions the schema — buildApp runs every
+      # module's migrations on boot. seed-e2e then plants a tenant, users,
+      # products and a purchase order.
+      - name: Provision and seed the source database
+        run: |
+          set -euo pipefail
+          DATABASE_URL="$DRILL_SOURCE_URL" PORT=3055 npx tsx src/server.ts > /tmp/drill-server.log 2>&1 &
+          for _ in $(seq 1 60); do
+            curl -sf http://127.0.0.1:3055/readyz >/dev/null 2>&1 && break
+            sleep 2
+          done
+          if ! curl -sf http://127.0.0.1:3055/readyz >/dev/null 2>&1; then
+            echo "::error title=Source provisioning failed::server never became ready"
+            tail -50 /tmp/drill-server.log
+            exit 1
+          fi
+          ALLOW_E2E_SEED=1 DATABASE_URL="$DRILL_SOURCE_URL" npx tsx scripts/seed-e2e.ts
+          pkill -f "tsx src/server.ts" || true
+
+      - name: Create the restore target database
+        run: createdb -h localhost -U finder drill_restore
+
+      - name: Run the DR drill
+        id: drill
+        run: ./db/backup/drill.sh | tee /tmp/drill-output.txt
+
+      - name: Summarise
+        if: always()
+        run: |
+          {
+            echo "## DR drill — ${{ steps.drill.outcome == 'success' && '✅ passed' || '❌ FAILED' }}"
+            echo
+            echo '```'
+            grep -E '^\[drill\.sh\] +(backup|tables/rows|RTO)' /tmp/drill-output.txt 2>/dev/null || tail -20 /tmp/drill-output.txt 2>/dev/null || echo '(no output captured)'
+            echo '```'
+            echo
+            echo "**Scope.** This proves the backup→restore *mechanism* against a real"
+            echo "PostgreSQL 16. It does **not** prove production can be recovered — that"
+            echo "needs a drill against real production infrastructure and is blocked on"
+            echo "\`PROD_DATABASE_URL\`. C-1's production half remains OPEN."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload drill log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dr-drill-log
+          path: |
+            /tmp/drill-output.txt
+            /tmp/drill-server.log
+          retention-days: 14
+          if-no-files-found: warn

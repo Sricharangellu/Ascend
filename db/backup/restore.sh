@@ -25,13 +25,26 @@
 #   Operator must confirm with 'yes' unless --force is passed.
 #   NEVER run in production without a confirmed incident window.
 #
-# DR DRILL CHECKLIST (run quarterly, record in RTO log)
-#   1. Run this script against a restore-test database.
-#   2. Run migrations (db/migrations/run.sh up).
-#   3. Run smoke tests (DATABASE_URL=<restore-test-db> npm run smoke — scripts/
-#      smoke.ts takes no CLI flags; it only reads DATABASE_URL from the env).
-#   4. Record: start time, backup timestamp, end time → RTO.
-#   5. RTO must be ≤ 30 minutes.
+# DR DRILL — NOW AUTOMATED. Use db/backup/drill.sh, not this checklist by hand.
+#
+#   DRILL_SOURCE_URL=… DRILL_TARGET_URL=… ./db/backup/drill.sh
+#
+#   It runs the whole sequence (fingerprint → backup → verify → restore →
+#   compare → prove the app boots against the result → report RTO) and fails on
+#   any step. .github/workflows/restore-drill.yml runs it weekly and on every
+#   change to db/backup/**, which is what this checklist never achieved: it said
+#   "run quarterly" and was run exactly once, by hand, on 2026-08-05.
+#
+# CORRECTION to the manual checklist this replaces — its step 3 was wrong, and
+# following it would have produced a false pass:
+#   ✗ "Run smoke tests (DATABASE_URL=<restore-test-db> npm run smoke)"
+#     scripts/smoke.ts provisions its OWN throwaway `smoke_<ts>` schema and drops
+#     it afterwards. Pointed at a restored database it exercises a brand-new
+#     schema sitting beside the restored data and never reads a single restored
+#     row — so it goes green regardless of whether the restore worked at all.
+#   ✓ scripts/verify-restored-db.ts reads the restored rows instead, and drill.sh
+#     additionally compares a per-table content checksum (which covers
+#     users.password_hash byte for byte) between source and restored database.
 # =============================================================================
 
 set -euo pipefail
@@ -267,10 +280,14 @@ run_restore() {
     fi
 
     echo "${LOG_PREFIX} NEXT STEPS:"
-    echo "  1. Run migrations: ./db/migrations/run.sh up"
-    echo "  2. Verify application health: GET /healthz"
-    echo "  3. Run smoke tests: npm run smoke"
-    echo "  4. Record RTO in DR log: ${rto_m}m ${rto_s}s"
+    echo "  1. Verify the restore is USABLE, not merely present:"
+    echo "       NODE_ENV=production DATABASE_URL=<this-db> npx tsx scripts/verify-restored-db.ts"
+    echo "     (boots the app, which applies migrations, then reads the restored rows)"
+    echo "  2. Record RTO in DR log: ${rto_m}m ${rto_s}s"
+    echo ""
+    echo "  NOTE: do NOT verify with 'npm run smoke'. It provisions its own throwaway"
+    echo "  schema and drops it, so it never reads a restored row and goes green even"
+    echo "  if this restore did nothing. That advice was wrong and has been corrected."
 }
 
 # ---------------------------------------------------------------------------

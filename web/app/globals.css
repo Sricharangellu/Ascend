@@ -2,29 +2,200 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Design System Tokens ────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   ASCEND DESIGN SYSTEM — "Structure & Signal"
+   ───────────────────────────────────────────────────────────────────────────
+   THE single source of colour truth. `tailwind.config.ts` reads these via
+   var() for the `erp.*`/semantic namespaces, so a Tailwind utility and a
+   raw var() reference can no longer resolve to different colours — that
+   disagreement was the root cause of cross-module visual drift
+   (see WORK/audits/AUDIT_2026-08-10T174500Z-ui-ux-platform-audit.md §1).
+
+   Identity: Graphite chrome + Signal Teal accent.
+   To switch identity, change ONLY the Accent and Chrome blocks below.
+
+   Contrast ratios are measured against the surface each token is used on and
+   annotated inline. Every text/status token meets WCAG 2.1 AA (≥4.5:1).
+   ═══════════════════════════════════════════════════════════════════════════ */
 :root {
-  /* Primary brand — reference spec #5D5FEF */
-  --color-primary:        #5D5FEF;
-  /* Shell — always dark per reference spec */
-  --color-topbar-bg:      #1a1a1a;
-  --color-sidebar-bg:     #1a1a1a;
-  --color-sidebar-flyout: #2a2a2a;
-  --color-sidebar-active: rgba(255,255,255,0.15);
-  --color-sidebar-hover:  rgba(255,255,255,0.08);
-  /* Content area */
-  --color-header-bg:      #ffffff;
-  --color-header-border:  #E8E8E8;
-  --color-page-bg:        #F5F5F5;
-  --color-table-header:   #FAFAFA;
-  --color-table-border:   #F0F0F0;
-  --color-text-primary:   #111111;
-  --color-text-secondary: #666666;
-  --color-link:           #5D5FEF;
-  --color-billed:         #1890FF;
-  --color-not-billed:     #FA8C16;
-  --color-danger:         #FF4D4F;
-  --color-success:        #52C41A;
+  /* ── Accent — Signal Teal. The ONLY accent. Spent on exactly five things:
+     primary action, active nav, focus ring, selected row, links. ─────────── */
+  --accent-50:   #F0FAF8;
+  --accent-100:  #D6F2EE;
+  --accent-200:  #A9E5DC;
+  --accent-300:  #74D2C5;
+  --accent-400:  #3CB5A5;
+  --accent-500:  #17998A;
+  --accent-600:  #0B7A6E; /* primary — white text on this = 5.22:1 AA */
+  --accent-700:  #086358; /* hover  — white text on this = 7.05:1 AAA */
+  --accent-800:  #064E45;
+  --accent-900:  #053E37;
+  --accent-950:  #032622;
+
+  --color-primary:         var(--accent-600);
+  --color-primary-hover:   var(--accent-700);
+  --color-primary-active:  var(--accent-800);
+  --color-primary-subtle:  var(--accent-50);
+  --color-primary-border:  var(--accent-200);
+
+  /* ── Chrome — graphite. Recedes so the accent can mean something. ─────── */
+  --color-topbar-bg:       #14181F;
+  --color-sidebar-bg:      #14181F;
+  --color-sidebar-flyout:  #1E242E;
+  --color-sidebar-active:  rgba(255,255,255,0.12);
+  --color-sidebar-hover:   rgba(255,255,255,0.06);
+  --color-sidebar-border:  rgba(255,255,255,0.08);
+
+  /* ── Surfaces — 3 levels, separated by luminance + border, never shadow.
+     Shadow is reserved for genuinely floating things (modal/popover/toast). */
+  --color-canvas:          #F6F7F8; /* level 0 — page behind everything */
+  --color-page-bg:         var(--color-canvas);
+  --color-surface:         #FFFFFF; /* level 1 — cards, tables, panels */
+  --color-surface-1:       #FFFFFF;
+  --color-surface-2:       #FBFCFC; /* level 2 — nested/inset regions */
+  --color-surface-3:       #F2F4F5; /* level 3 — toolbars, table headers */
+  --color-surface-raised:  #FFFFFF;
+  --color-surface-subtle:  var(--color-surface-2);
+  --color-surface-overlay: rgba(12,16,20,0.45);
+
+  /* ── Borders ──────────────────────────────────────────────────────────── */
+  --color-border-subtle:   #EDEFF1;
+  --color-border:          #DFE3E6;
+  --color-border-strong:   #C3CACF;
+
+  /* ── Header / tables ──────────────────────────────────────────────────── */
+  --color-header-bg:       #FFFFFF;
+  --color-header-border:   var(--color-border);
+  --color-table-header:    var(--color-surface-3);
+  --color-table-border:    var(--color-border-subtle);
+  --color-table-row-hover: #F4F8F7;
+  --color-table-row-selected: var(--accent-50);
+
+  /* ── Typography ───────────────────────────────────────────────────────── */
+  --color-text-primary:    #12161C; /* 16.9:1 on white — AAA */
+  --color-text-secondary:  #5A646E; /* 5.96:1 on white, 5.55:1 on canvas — AA
+                                       (replaces rgba(0,0,0,0.45) @ 3.9:1, which FAILED) */
+  --color-text-muted:      #6B7581; /* 4.75:1 on white — AA (was #9BA8B8 @ 2.6:1, FAILED) */
+  --color-text-inverse:    #FFFFFF;
+  --color-link:            var(--accent-600);
+
+  /* ── Status — every value AA on white. Never used as the only signal;
+     StatusBadge pairs each with an icon shape AND a text label. ─────────── */
+  --color-success:         #197A3D; /* 5.39:1 */
+  --color-success-text:    #12602F;
+  --color-success-bg:      #EFF8F2;
+  --color-success-border:  #B7DEC5;
+
+  --color-warning:         #9A6200; /* 5.05:1 */
+  --color-warning-text:    #7A4E00;
+  --color-warning-bg:      #FDF6EA;
+  --color-warning-border:  #EBD3A6;
+
+  --color-danger:          #B3261E; /* 6.55:1 */
+  --color-danger-text:     #8E1E17;
+  --color-danger-bg:       #FDF1F0;
+  --color-danger-border:   #EDBDB9;
+
+  --color-info:            #1F6FB2; /* 5.30:1 */
+  --color-info-text:       #185890;
+  --color-info-bg:         #EFF5FA;
+  --color-info-border:     #B8D3E8;
+
+  --color-neutral:         var(--color-text-secondary);
+  --color-neutral-bg:      var(--color-surface-3);
+  --color-neutral-border:  var(--color-border);
+
+  /* ── Domain ───────────────────────────────────────────────────────────── */
+  --color-billed:          var(--color-info);
+  --color-not-billed:      var(--color-warning);
+
+  /* ── Focus — derived from the accent so the ring can never drift from the
+     brand again (the old token was rgba(1,55,252,.3) = the RETIRED brand). */
+  --focus-ring:            0 0 0 3px rgba(11,122,110,0.32);
+
+  /* ── Density. Set data-density on <html>; every row/control height reads
+     these, so one attribute retunes the whole app. ──────────────────────── */
+  --row-h:                 40px; /* standard */
+  --control-h:             32px;
+  --cell-px:               12px;
+  --cell-py:               8px;
+}
+
+:root[data-density="comfortable"] { --row-h: 48px; --control-h: 36px; --cell-px: 16px; --cell-py: 12px; }
+:root[data-density="compact"]     { --row-h: 32px; --control-h: 28px; --cell-px: 8px;  --cell-py: 4px;  }
+
+/* ── Dark mode (html.dark from web/lib/theme.ts) ──────────────────────────
+   Same graphite/teal identity, inverted. Accent lifts to accent-400 so it
+   keeps ≥7:1 against the dark canvas; status colours lift for the same reason. */
+.dark {
+  --color-primary:         var(--accent-400); /* 7.19:1 on dark canvas */
+  --color-primary-hover:   var(--accent-300);
+  --color-primary-active:  var(--accent-200);
+  --color-primary-subtle:  rgba(23,153,138,0.16);
+  --color-primary-border:  rgba(60,181,165,0.32);
+
+  --color-topbar-bg:       #0C0F14;
+  --color-sidebar-bg:      #0C0F14;
+  --color-sidebar-hover:   rgba(255,255,255,0.06);
+  --color-sidebar-active:  rgba(255,255,255,0.12);
+  --color-sidebar-border:  rgba(255,255,255,0.07);
+  --color-sidebar-flyout:  #161B22;
+
+  --color-canvas:          #0E1116;
+  --color-page-bg:         var(--color-canvas);
+  --color-surface:         #161B22;
+  --color-surface-1:       #161B22;
+  --color-surface-2:       #1B212A;
+  --color-surface-3:       #212832;
+  --color-surface-raised:  #1B212A;
+  --color-surface-subtle:  var(--color-surface-2);
+  --color-surface-overlay: rgba(0,0,0,0.65);
+
+  --color-border-subtle:   #232A34;
+  --color-border:          #2C3540;
+  --color-border-strong:   #3E4855;
+
+  --color-header-bg:       #161B22;
+  --color-header-border:   var(--color-border);
+  --color-table-header:    var(--color-surface-3);
+  --color-table-border:    var(--color-border-subtle);
+  --color-table-row-hover: #1C2530;
+  --color-table-row-selected: rgba(23,153,138,0.14);
+
+  --color-text-primary:    #E6EAEF;
+  --color-text-secondary:  #A3ADB8;
+  --color-text-muted:      #7D8894;
+  --color-text-inverse:    #0E1116;
+  --color-link:            var(--accent-300);
+
+  --color-success:         #4FB477;
+  --color-success-text:    #A7DFBC;
+  --color-success-bg:      rgba(79,180,119,0.12);
+  --color-success-border:  rgba(79,180,119,0.28);
+
+  --color-warning:         #D9A038;
+  --color-warning-text:    #EFD3A0;
+  --color-warning-bg:      rgba(217,160,56,0.12);
+  --color-warning-border:  rgba(217,160,56,0.28);
+
+  --color-danger:          #E4796F;
+  --color-danger-text:     #F2B6B0;
+  --color-danger-bg:       rgba(228,121,111,0.12);
+  --color-danger-border:   rgba(228,121,111,0.28);
+
+  --color-info:            #6BA6DA;
+  --color-info-text:       #B7D4EC;
+  --color-info-bg:         rgba(107,166,218,0.12);
+  --color-info-border:     rgba(107,166,218,0.28);
+
+  --color-neutral:         var(--color-text-secondary);
+  --color-neutral-bg:      var(--color-surface-3);
+  --color-neutral-border:  var(--color-border);
+
+  --color-billed:          var(--color-info);
+  --color-not-billed:      var(--color-warning);
+
+  --focus-ring:            0 0 0 3px rgba(60,181,165,0.40);
 }
 
 /* ── Print receipt ────────────────────────────────────────────────────────── */
@@ -75,7 +246,6 @@
     outline-offset: 2px;
   }
 
-  /* Links */
   a {
     color: var(--color-link);
   }
@@ -94,7 +264,44 @@
     min-width: 44px;
   }
 
-  /* ERP table styles */
+  /* ── Tabular numerals ───────────────────────────────────────────────────
+     Any number a user compares down a column — money, quantity, SKU, count,
+     percentage — must use this so digits share a fixed advance width and
+     figures align on the decimal. For a POS/inventory product this is the
+     single highest signal-to-effort quality cue in the system. ──────────── */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Money/quantity cells: tabular + right-aligned, the enterprise convention. */
+  .num-cell {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  /* Density-aware row + control sizing. Reads the --row-h/--control-h tokens
+     so `data-density` on <html> retunes every table and control at once. */
+  .row-h     { height: var(--row-h); }
+  .control-h { height: var(--control-h); }
+  .cell-pad  { padding: var(--cell-py) var(--cell-px); }
+
+  /* The one focus treatment. Derived from the accent — cannot drift. */
+  .focus-ring:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   .erp-table thead {
     background-color: var(--color-table-header);
     font-size: 13px;
@@ -114,7 +321,6 @@
     color: var(--color-text-primary);
   }
 
-  /* ERP link style */
   .erp-link {
     color: var(--color-link);
     cursor: pointer;
@@ -143,5 +349,49 @@
   @keyframes fadeIn {
     from { opacity: 0; }
     to   { opacity: 1; }
+  }
+
+  .animate-skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--color-border-subtle) 25%,
+      var(--color-border) 50%,
+      var(--color-border-subtle) 75%
+    );
+    background-size: 200% 100%;
+    animation: skeleton 1.5s ease-in-out infinite;
+  }
+  @keyframes skeleton {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+}
+
+/* ── Help article (MDX) — minimal prose styling for rendered .mdx content.
+   Scoped to one class rather than pulling in @tailwindcss/typography for a
+   handful of static help pages. ─────────────────────────────────────────── */
+@layer components {
+  .help-article h2 {
+    margin-top: 2rem;
+    margin-bottom: 0.5rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+  .help-article p {
+    margin-top: 0.75rem;
+    line-height: 1.7;
+  }
+  .help-article ul {
+    margin-top: 0.75rem;
+    padding-left: 1.25rem;
+    list-style: disc;
+  }
+  .help-article li {
+    margin-top: 0.25rem;
+  }
+  .help-article a {
+    color: var(--color-link, #5D5FEF);
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 }

@@ -1,0 +1,41 @@
+Ascend — updated git-safety rule for this workspace (2026-07-30, supersedes nothing,
+adds one hard rule on top of everything already agreed)
+
+Context for why this matters: your local `origin` remote points at the real
+Sricharangellu/Ascend GitHub repo, and you work directly on a local branch named
+`master` (per your own report — no feature branches for your edits, Replit checkpoints
+as the undo mechanism instead). `master` on the real repo is the production-deploying
+branch. Checking its branch protection just now: required status checks + admin
+enforcement + no force-push are in place, but there is NO required-PR-review rule,
+which is a thinner backstop than I'd want between your sandbox and production for
+the one branch that matters most.
+
+New hard rule, effective now:
+
+1. NEVER push this workspace's local `master` (or any branch here) to the `origin`
+   remote (Sricharangellu/Ascend) without Sri explicitly asking for that specific
+   push, in that moment. Not "I think this is ready" — an explicit, direct ask.
+   This applies to you, to any task agent whose work you approve and merge locally,
+   and to any automation Replit runs on your behalf.
+2. This is not new in spirit — REPLIT.md already scopes you to sandbox/prototyping
+   only, not a deploy target. This rule is the git-specific consequence of that: your
+   local commits accumulating on a branch named `master` is fine and expected: your
+   Build-mode edits, your task-agent merge workflow via the subrepl-* remotes, your
+   checkpoints — none of that needs to change. The only new constraint is the origin
+   push itself.
+3. If you or a task agent ever produce something you think is genuinely ready for
+   the real repo: don't push it. Tell Sri what it is and let a human decide whether
+   and how it gets ported over (it would need real rework anyway — your directory
+   layout, artifacts/ascend + artifacts/api-server, doesn't match the real repo's
+   web/ + src/ structure, and anything built against your own mocked stack needs
+   re-verifying against real gates before it could land there regardless).
+4. One thing to check on your end, not a directive: would renaming your local
+   `master` to something unambiguous (e.g. `replit-sandbox`) break your own
+   task-agent auto-merge automation, if that automation is hardcoded to target a
+   branch literally named `master`? If renaming is safe for your own tooling, do it
+   — it removes the "push master" muscle-memory risk entirely. If you're not sure,
+   leave it as `master` locally and just hold rule #1 as the actual boundary; don't
+   guess on this one.
+5. Nothing else about your current work changes — continue whatever you're doing
+   independently. This is purely a git-hygiene addition, not a new scope restriction
+   beyond what REPLIT.md already says.

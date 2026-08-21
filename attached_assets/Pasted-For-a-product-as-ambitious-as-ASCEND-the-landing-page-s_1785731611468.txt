@@ -1,0 +1,387 @@
+For a product as ambitious as ASCEND, the landing page should **feel like the operating system for an enterprise**, not like a POS, inventory app, or ERP from the 2000s.
+
+When a CEO, COO, CFO, warehouse manager, buyer, or store manager logs in, they should immediately feel:
+
+> **"This is the command center of my business."**
+
+---
+
+# ASCEND Home Dashboard
+
+## Hero Section
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ASCEND
+
+The Intelligent Enterprise Operations Platform
+
+One platform to manage every aspect of your business—
+Purchasing • Inventory • Sales • Finance • Warehousing •
+Distribution • Manufacturing • CRM • Analytics • AI
+
+[ Executive Dashboard ]    [ Get Started ]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+Instead of a static hero image, use an animated enterprise visualization showing:
+
+* Inventory moving between warehouses
+* Purchase orders being approved
+* Sales updating in real time
+* AI generating recommendations
+* Financial KPIs updating
+* Distribution routes
+* Executive analytics
+
+This instantly communicates that everything is connected.
+
+---
+
+# Live Business Overview
+
+Think of it as the "Business Health" section.
+
+```
+Today's Revenue
+
+Gross Profit
+
+Cash Flow
+
+Inventory Value
+
+Open Purchase Orders
+
+Open Sales Orders
+
+Warehouse Capacity
+
+Customer Satisfaction
+
+Active Users
+
+AI Insights
+```
+
+Each KPI should be clickable.
+
+---
+
+# Business Operations Hub
+
+Instead of a sidebar-first experience, present the core modules as large, modern cards.
+
+```
+📦 Inventory
+
+🛒 Purchasing
+
+💳 Sales
+
+🏪 POS
+
+🚚 Distribution
+
+🏭 Manufacturing
+
+💰 Finance
+
+👥 CRM
+
+📊 Analytics
+
+🤖 AI Workspace
+
+⚙ Administration
+
+```
+
+Hovering over a card should show live metrics:
+
+```
+Inventory
+
+3 Warehouses
+
+14,832 SKUs
+
+18 Low Stock
+
+4 Overstock
+
+12 Expiring Soon
+
+```
+
+---
+
+# AI Command Center
+
+This should become ASCEND's signature feature.
+
+```
+Good Morning.
+
+Here are today's priorities.
+
+• 12 products need reordering.
+
+• Vendor ABC delayed two shipments.
+
+• Warehouse Dallas operating at 96%.
+
+• Sales increased 18%.
+
+• Cash flow healthy.
+
+• 5 invoices require approval.
+
+• Predicted shortage in 7 days.
+
+[ View Recommendations ]
+```
+
+This is what differentiates ASCEND from traditional ERPs.
+
+---
+
+# Enterprise Workflow
+
+A visual operational pipeline:
+
+```
+Supplier
+
+↓
+
+Purchase Request
+
+↓
+
+Approval
+
+↓
+
+Purchase Order
+
+↓
+
+Receiving
+
+↓
+
+Warehouse
+
+↓
+
+Inventory
+
+↓
+
+Sales
+
+↓
+
+Customer
+
+↓
+
+Accounting
+
+↓
+
+Analytics
+
+```
+
+Clicking any step drills into that process.
+
+---
+
+# Executive Workspace
+
+A dedicated area for leadership.
+
+```
+Revenue
+
+Expenses
+
+Net Profit
+
+Forecast
+
+Cash Position
+
+Growth
+
+Top Customers
+
+Top Vendors
+
+Regional Performance
+
+```
+
+---
+
+# Smart Search
+
+Place a prominent search bar at the top.
+
+```
+Search anything...
+
+Customer
+
+Invoice
+
+Purchase Order
+
+Product
+
+Supplier
+
+Employee
+
+Shipment
+
+Warehouse
+
+SKU
+
+```
+
+Results should appear instantly, similar to Spotlight or Raycast.
+
+---
+
+# Quick Actions
+
+```
++ Create Purchase Order
+
++ Receive Inventory
+
++ New Sale
+
++ Add Customer
+
++ Add Product
+
++ Transfer Inventory
+
++ Create Invoice
+
++ Create Vendor
+
+```
+
+One click to common tasks.
+
+---
+
+# Activity Timeline
+
+```
+10:34 AM
+
+Purchase Order #219 Approved
+
+10:12 AM
+
+Receiving Completed
+
+9:54 AM
+
+Payment Posted
+
+9:32 AM
+
+Inventory Transfer Completed
+
+9:15 AM
+
+Low Stock Alert
+
+```
+
+---
+
+# Performance Analytics
+
+Interactive charts for:
+
+* Revenue
+* Inventory
+* Purchasing
+* Sales
+* Customer Growth
+* Profitability
+* Warehouse Efficiency
+
+---
+
+# Industry Selector (Optional)
+
+Without changing the platform, tailor dashboards for:
+
+* Retail
+* Wholesale
+* Distribution
+* Manufacturing
+* Healthcare
+* Hospitality
+* E-commerce
+* Enterprise Services
+
+The underlying modules remain the same, but the homepage emphasizes the metrics most relevant to that industry.
+
+---
+
+# Navigation
+
+A clean left navigation with icons and labels:
+
+```
+🏠 Dashboard
+🤖 AI Assistant
+📦 Inventory
+🛒 Procurement
+🚚 Warehousing
+🏭 Manufacturing
+💰 Finance
+💳 Sales
+🏪 POS
+👥 Customers
+🏢 Suppliers
+📊 Reports
+⚙ Administration
+```
+
+---
+
+# Design Language
+
+Aim for the feel of:
+
+* Apple — clean and intuitive
+* Linear — minimal and fast
+* Notion — organized and flexible
+* Stripe Dashboard — professional and data-rich
+* Vercel Dashboard — modern and developer-friendly
+
+Avoid the cluttered, dense interfaces common in legacy ERP systems like SAP ECC, Oracle E-Business Suite, or Microsoft Dynamics NAV.
+
+## Core UX Principles
+
+* **Role-based dashboards:** Executives, buyers, warehouse staff, finance teams, and store associates each see a homepage tailored to their responsibilities.
+* **Progressive disclosure:** Show the most important information first, with deeper details one click away.
+* **Action-oriented design:** Every insight should offer a direct next step.
+* **Consistent visual hierarchy:** Use cards, whitespace, typography, and color to make scanning effortless.
+* **AI-first experience:** Make the AI workspace a primary entry point, not an afterthought.
+
+The goal is for users to open ASCEND and immediately understand the state of their business, identify what needs attention, and take action within seconds. That creates the feeling of an intelligent enterprise command center rather than just another ERP screen.

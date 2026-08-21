@@ -120,7 +120,22 @@ export function BillsSection({
     if (!selected) return;
     setBusy(true); setError(null);
     try {
-      setSelected(await apiPost<BillDetail>(`/api/v1/purchasing/bills/${selected.id}/status`, { status }));
+      const payload: { status: "approved" | "held"; varianceOverrideReason?: string } = { status };
+      if (
+        status === "approved" &&
+        selected.match?.match_status === "variance"
+      ) {
+        const reason = window.prompt(
+          "This bill has match variances. Enter an override reason to approve:",
+        );
+        if (!reason?.trim()) {
+          setError("Variance override reason is required to approve mismatched bills.");
+          setBusy(false);
+          return;
+        }
+        payload.varianceOverrideReason = reason.trim();
+      }
+      setSelected(await apiPost<BillDetail>(`/api/v1/purchasing/bills/${selected.id}/status`, payload));
       await loadBills();
     } catch (e) { setError(e instanceof Error ? e.message : "Could not update bill."); }
     finally { setBusy(false); }

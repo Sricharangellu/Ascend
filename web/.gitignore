@@ -21,4 +21,7 @@ public/mockServiceWorker.js
 .idea/
 .vscode/settings.json
 .vercel
+# See the root .gitignore: the bare `.env*` must keep a negation for the
+# committed templates, or deleting `web/.env.example` becomes irreversible.
 .env*
+!.env*.example
