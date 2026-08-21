@@ -55,14 +55,19 @@ export const RefundWorkflow: WorkflowDefinition<RefundContext> = {
   triggers: [EventTypes.ORDER_REFUNDED],
 
   buildContext(payload: Record<string, unknown>, tenantId: string): RefundContext {
-    const p = payload as unknown as OrderRefundedPayload;
+    const p = payload as unknown as OrderRefundedPayload & { totalCents?: Cents };
+    // OrdersService.refund publishes { totalCents } (full-order refund), while
+    // the typed orchestration payload uses refundCents/originalTotalCents.
+    // Accept both so the live POS event does not drive a 0¢ workflow.
+    const totalCents = p.totalCents ?? p.originalTotalCents ?? 0;
+    const refundCents = p.refundCents ?? totalCents;
     return {
       workflowId: "",
       tenantId,
       correlationId: `refund_${p.id}`,
       orderId: p.id,
-      refundCents: p.refundCents ?? 0,
-      originalTotalCents: p.originalTotalCents ?? 0,
+      refundCents,
+      originalTotalCents: p.originalTotalCents ?? totalCents,
       customerId: p.customerId ?? null,
       lines: p.lines ?? [],
       refundId: null,
@@ -76,25 +81,31 @@ export const RefundWorkflow: WorkflowDefinition<RefundContext> = {
     };
   },
 
+
   steps: [
     {
       name: "validate_refund_eligibility",
       async execute(ctx, db) {
+        // orders has no refunded_cents column — live POS refunds are a full-order
+        // status flip (OrdersService.refund). This step runs *after* that flip, so
+        // status is already 'refunded'; prior amounts are not on the order row.
+        // Treat already-refunded as 0 for the in-flight event and rely on
+        // OrdersService's status conflict + check_double_refund_guard for
+        // idempotency against a second attempt.
         const order = await db.one<{
           id: string;
           status: string;
           total_cents: number;
           tax_cents: number;
-          refunded_cents: number;
         }>(
-          "SELECT id, status, total_cents, tax_cents, refunded_cents FROM orders WHERE id = @id AND tenant_id = @tenantId",
+          "SELECT id, status, total_cents, tax_cents FROM orders WHERE id = @id AND tenant_id = @tenantId",
           { id: ctx.orderId, tenantId: ctx.tenantId },
         );
         if (!order) throw new Error(`order '${ctx.orderId}' not found`);
-        if (["void", "cancelled"].includes(order.status)) {
+        if (["void", "voided", "cancelled"].includes(order.status)) {
           throw new Error(`order '${ctx.orderId}' in status '${order.status}' cannot be refunded`);
         }
-        const alreadyRefunded = order.refunded_cents ?? 0;
+        const alreadyRefunded = 0;
         const maxRefundable = order.total_cents - alreadyRefunded;
         if (ctx.refundCents > maxRefundable) {
           throw new Error(

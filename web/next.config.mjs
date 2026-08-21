@@ -40,8 +40,8 @@ const nextConfig = {
     ];
   },
 
-  // Ponytail Wave 1 — permanent redirects for legacy / alias IA.
-  // Keep thin page.tsx redirects too where Next needs them for typed routes.
+  // Ponytail Waves 1–3 — permanent redirects for legacy / alias IA.
+  // Wave 3 deleted the thin page.tsx twins; these redirects are the sole SoT.
   async redirects() {
     return [
       // Reports: /reporting was a full re-export twin of /reports
@@ -62,8 +62,14 @@ const nextConfig = {
       { source: "/setup/modules", destination: "/settings/modes", permanent: true },
       // Purchasing hub — standalone reorder page folds into Purchasing Reorder tab
       { source: "/inventory/reorder", destination: "/purchasing?tab=reorder", permanent: true },
-      // Ecommerce: customers child was a misleading re-export of /customers
+      // Inventory legacy pages retired to their real-data equivalents
+      { source: "/inventory/expiry", destination: "/inventory/expiry-pool", permanent: true },
+      { source: "/inventory/transfers", destination: "/inventory?tab=transfers", permanent: true },
+      // Ecommerce aliases that re-exported other trees
       { source: "/ecommerce/customers", destination: "/customers", permanent: true },
+      { source: "/ecommerce/promotions", destination: "/catalog/promotions", permanent: true },
+      // Pricing: old price-book surface → Customer Overrides
+      { source: "/catalog/price-book", destination: "/pricing?tab=customer-overrides", permanent: true },
       // Ponytail Wave 2 — shipping registry folds into Delivery Shipments tab
       { source: "/shipping", destination: "/delivery?tab=shipments", permanent: true },
       // Operations mega-page dissolved to Outlets (+ deep links on that page)

@@ -21,10 +21,12 @@ which are written for store operators, not developers.
 
 ## 1. Environment variables
 
-**The backend does NOT auto-load a `.env` file** (there is no dotenv dependency).
-Copying `.env.example` to `.env` is not enough on its own — you must load those
-variables into your shell, or pass them inline. This is the most common reason a
-first run fails with `DATABASE_URL is not set`.
+**`npm run dev`, `npm start` and `npm run db:check` auto-load `.env`.** There is
+no dotenv dependency — the scripts pass Node's built-in
+`--env-file-if-exists=.env` (see `package.json`), so copying `.env.example` to
+`.env` and filling it in is enough for those three commands. Nothing else is:
+`npm test`, `npm run smoke`, the seed scripts and `db/migrations/run.sh` all read
+the ambient environment, so export the variables in your shell when you use them.
 
 Two variables matter for a working local backend:
 
@@ -33,29 +35,77 @@ Two variables matter for a working local backend:
 | `DATABASE_URL` | **Yes** | e.g. `postgresql://finder:finder@localhost:5432/finder_dev`. `openDb()` throws immediately if it is unset. For managed pooled providers, use the **pooled** connection string (see `.env.example`). |
 | `JWT_SECRET` | **Yes** | ≥ 32 random chars. There is **no development fallback** — the server boots without it, but every authenticated request then returns `500 misconfigured` (see `src/gateway/auth.ts`). |
 | `PORT` | No | Defaults to `3000`. `.env.example` and Docker use `3001`. |
-| `PG_SSL` | Only for SSL DBs | In development SSL is **off** by default. For a managed Postgres that requires TLS, set `PG_SSL=true`. Set `PG_SSL=false` for a local/CI Postgres that has no SSL. Logic: `src/shared/db.ts` → `sslConfig()`. |
+| `PG_SSL` | Only for SSL DBs | In development SSL is **off** by default. For a managed Postgres that requires TLS (Supabase does), set `PG_SSL=true`. Set `PG_SSL=false` for a local/CI Postgres that has no SSL. Logic: `src/shared/db.ts` → `sslConfig()`. |
 | `PG_POOL_MAX` | No | Max pool connections per process (default 10). Lower it for free-tier managed plans. |
 
 Everything else in `.env.example` (Redis, Stripe, SendGrid, metrics, …) is
 optional for local development and degrades gracefully when unset.
 
-The reliable way — export the two required variables directly:
+The normal path — copy the template and fill in the two required values:
+
+```bash
+cp .env.example .env
+# edit .env: set DATABASE_URL and a real JWT_SECRET (>=32 chars)
+npm run db:check                   # confirms .env reaches a usable Postgres
+```
+
+For the commands that do **not** read `.env` (tests, smoke, seeds, `run.sh`),
+export the variables into the shell instead:
 
 ```bash
 export DATABASE_URL='postgresql://finder:finder@localhost:5432/finder_dev'
 export JWT_SECRET='dev-only-secret-at-least-32-characters-long'
 ```
 
-If you prefer to keep them in the shipped `.env` file, you can load it into the
-shell — but note `.env.example` has at least one value with a space
-(`STORE_NAME=Ascend Demo`), so quote any such values first, or `source` will print
-a harmless "command not found" on that line:
+If you `source .env` rather than exporting by hand, quote any value containing a
+space first (`.env.example` ships `STORE_NAME=Ascend Demo`) or `source` prints a
+harmless "command not found" on that line:
 
 ```bash
-cp .env.example .env
-# edit .env: set DATABASE_URL and a real JWT_SECRET (>=32 chars)
-set -a; source .env; set +a        # loads the file; the two vars above are what matter
+set -a; source .env; set +a
 ```
+
+`.env` is gitignored (`.gitignore` → `.env*`) and `npm run hygiene` fails the
+build if one is ever staged, so real credentials stay out of the repo. Only
+`.env.example` is tracked — never put a live password in it.
+
+### Connecting to Supabase
+
+Take the connection string from **Project Settings → Database → Connection
+string → Shared Pooler** and use **session mode (port 5432)**:
+
+```dotenv
+DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres
+PG_SSL=true
+PG_POOL_MAX=5
+```
+
+Four things bite people here, and `npm run db:check` reports all four before it
+opens a socket:
+
+- **`PG_SSL=true` is required**, even locally. TLS is off by default outside
+  production, and Supabase refuses plaintext connections. The pooler's
+  certificate is publicly signed, so Node's bundled CAs verify it — you do not
+  need `PG_CA_CERT`, and you should not reach for `PG_SSL_NO_VERIFY=1`.
+- **Use session mode (5432), not transaction mode (6543).** `openDb()` pins the
+  schema with the `options=-c search_path=…` startup parameter, which the
+  transaction-mode pooler does not carry (it also disallows prepared
+  statements). Session mode supports every Postgres feature this backend uses.
+- **The pooler user is `postgres.<project-ref>`**, not `postgres`. Supavisor
+  routes on that suffix and rejects the login without it.
+- **Percent-encode reserved characters in the password** — `@` → `%40`,
+  `/` → `%2F`, `?` → `%3F`, `#` → `%23`, `[` → `%5B`, `]` → `%5D`. Node's URL
+  parser splits on the *last* `@` while libpq splits on the *first*, so a raw
+  `@` can work in `npm run dev` and still send `psql` and
+  `db/migrations/run.sh` to the wrong host.
+
+Prefer the pooler host over the direct `db.<project-ref>.supabase.co` connection:
+direct connections consume the project's `max_connections` budget and are
+IPv6-only on projects without the IPv4 add-on.
+
+`PG_POOL_MAX` is per process, but Supabase's client limit is per project and
+shared with every other process and tool — `psql`, the seed scripts and
+`db:check` all draw on the same budget. Keep it at 5 on free/small plans.
 
 ## 2. Install dependencies
 
@@ -73,6 +123,12 @@ records each by content hash in a `schema_migrations` table, so a **fresh, empty
 database is fully provisioned the first time you start the backend**
 (`src/app.ts`). Subsequent starts skip already-applied migrations.
 
+Waiting for that lock gets its own, much larger statement timeout
+(`PG_MIGRATION_LOCK_WAIT_MS`, default 300 s), and the normal `PG_TX_TIMEOUT_MS`
+budget is restored the moment the lock is held — so the widened timeout covers
+only queuing behind another instance, never the migrations themselves. Exhausting
+it reports the lock by name rather than surfacing as an unrelated slow query.
+
 There is also a **separate, optional** canonical SQL path — `db/migrations/*.sql`
 applied via `db/migrations/run.sh` (tracked in its own `migrations_applied`
 table, requires `psql`). That path is the human-readable DDL of record and the
@@ -80,20 +136,39 @@ only way to run `down` rollbacks; it is **not required** to run the app locally.
 See [`db/README.md`](../../db/README.md) for it, plus the RLS policies, seeds, and
 backup/restore scripts.
 
-## 4. Start the backend
-
-With `DATABASE_URL` and `JWT_SECRET` exported (step 1):
+## 4. Check the connection before you start the backend
 
 ```bash
-npm run dev        # tsx watch src/server.ts — reloads on change
+npm run db:check                        # uses .env
+npm run db:check -- "postgresql://…"    # or check a specific URL
+```
+
+`db:check` runs in two phases. First it validates `DATABASE_URL` and the
+TLS/pool environment as pure string checks — un-encoded password characters, TLS
+off against a remote host, the wrong Supabase pooler port, a pooler user missing
+its project ref — and stops before dialling if any of them would fail. Then it
+opens a pool through the **same `openDb()` the server uses**, so the
+`search_path` startup option and `sslConfig()` are exercised for real, and
+reports the server version, database, user, negotiated TLS, and how much of the
+schema exists. It is read-only, exits non-zero on failure, and only ever prints
+the connection string with the password redacted.
+
+"Schema not provisioned yet" is the expected result on a brand-new database —
+step 5 fixes that.
+
+## 5. Start the backend
+
+```bash
+npm run dev        # tsx watch src/server.ts — reloads on change (loads .env)
 # or, non-watch:
 npm start
 ```
 
 You should see logs like `migration lock acquired` → `migrations complete` →
-`Ascend started` with the port.
+`Ascend started` with the port. Re-running `npm run db:check` afterwards reports
+the table and migration counts instead of "not provisioned".
 
-## 5. Verify it is connected to Postgres
+## 6. Verify it is connected to Postgres
 
 ```bash
 curl -s http://localhost:3001/healthz    # liveness + build version
@@ -142,14 +217,21 @@ persistent Postgres via `DATABASE_URL`** — just don't let an exported
 
 ## Troubleshooting
 
+Run `npm run db:check` first for anything connection-related — it names the cause
+and the fix directly instead of leaving you to decode a driver error.
+
 | Symptom | Likely cause / fix |
 |---|---|
-| `DATABASE_URL is not set` on start | `.env` is not auto-loaded — `export DATABASE_URL=…` (and `JWT_SECRET`) in the shell first (step 1). |
-| Requests return `500 misconfigured` / "JWT_SECRET … not set" | `JWT_SECRET` not exported. It has no dev fallback. |
+| `DATABASE_URL is not set` on start | No `.env` in the repo root and nothing exported. `npm run dev`/`start`/`db:check` load `.env`; other commands need `export DATABASE_URL=…`. |
+| Requests return `500 misconfigured` / "JWT_SECRET … not set" | `JWT_SECRET` missing. It has no dev fallback. |
 | `ECONNREFUSED` / connection refused | Postgres not running, or wrong host/port in `DATABASE_URL`. Start it (`docker-compose up postgres` brings up Postgres 16 on 5432). |
-| SSL / `self-signed certificate` errors on a managed DB | Set `PG_SSL=true`. For a local no-SSL DB, leave it unset (dev default is off). |
-| `too many connections` | Lower `PG_POOL_MAX`; use the provider's **pooled** connection string. |
+| `Connection terminated due to connection timeout` on a managed DB | The host resolved but the port never answered — usually a firewall or egress policy blocking 5432/6543. Confirm from an unrestricted network. |
+| SSL / `self-signed certificate` errors on a managed DB | Set `PG_SSL=true`. For a local no-SSL DB, leave it unset (dev default is off). A verification failure against Supabase normally means a TLS-intercepting proxy — pass its CA via `PG_CA_CERT`, don't set `PG_SSL_NO_VERIFY=1`. |
+| `password authentication failed` against Supabase | Wrong password, or a reserved character in it left un-encoded. Re-copy from the dashboard and percent-encode (`@` → `%40`, …). |
+| `Tenant or user not found` from Supabase | The pooler user must be `postgres.<project-ref>`; plain `postgres` only works on a direct connection. |
+| `too many connections` | Lower `PG_POOL_MAX`; use the provider's **pooled** connection string. On Supabase the limit is per project and shared across every process and tool. |
 | Tables missing after start | Check the logs for `migrations complete`. If migrations errored, the advisory lock/hash record prevents partial re-runs — inspect `schema_migrations`. |
+| `migration lock 7381920 not acquired after …ms` | Another instance is mid-migration and did not finish. That is the message doing its job: it names the lock instead of surfacing later as an unrelated query timeout. Find the holder (`SELECT * FROM pg_locks WHERE locktype = 'advisory'`) before raising `PG_MIGRATION_LOCK_WAIT_MS` — a stuck holder needs killing, not a longer wait. |
 | `/readyz` not `ok` | The pool can't reach Postgres — recheck `DATABASE_URL`, that the DB exists, and network/SSL. |
 
 ## Notes for changing auth, e2e, or tenant behavior

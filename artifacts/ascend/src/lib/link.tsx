@@ -15,8 +15,13 @@ interface NextLinkProps extends Omit<WouterLinkProps, "to" | "href"> {
 }
 
 export default function Link({ href, children, ...props }: NextLinkProps) {
+  // wouter's LinkProps is a discriminated union on `asChild` (true | false),
+  // which a plain `boolean` from our pass-through props can't satisfy
+  // statically. Runtime behavior is identical, so cast the rest props.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rest = props as any;
   return (
-    <WouterLink href={href} {...props}>
+    <WouterLink href={href} {...rest}>
       {children}
     </WouterLink>
   );

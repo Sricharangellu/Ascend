@@ -5,5 +5,5 @@ import { redirect } from "@/lib/router";
 // anyone reaching this URL. Real transfer data lives on /inventory's own
 // Transfers tab.
 export default function LegacyTransfersRedirect() {
-  redirect("/inventory?tab=transfers");
+  return redirect("/inventory?tab=transfers");
 }

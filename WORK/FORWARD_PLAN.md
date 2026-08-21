@@ -1611,6 +1611,289 @@ Use evidence from files and commands. Run at least:
 Do not overwrite existing work-state docs. Write the audit as a new dated file at WORK/AUDIT_YYYY-MM-DD.md and follow the rules in WORK/README.md. Be brutally honest but practical. Separate "built", "verified", "mocked", "partial", and "planned". End with a prioritized phase plan and release gate checklist.
 ```
 
+### Phase 9: AI-slop remediation program (approved scope, 2026-08-04)
+
+Source: `WORK/audits/AUDIT_2026-08-04T040621Z-ai-slop-consistency-audit.md`.
+
+**The governing rule for this phase: findings are not fixed in one pass.** An
+agent turned loose to "fix everything the audit found" trades a known set of
+defects for an unknown set of regressions, and this repo has already paid that
+price — three of the four table-collision bugs fixed in July were introduced by
+work that looked locally correct. Each bucket below is a separate PR series with
+its own gates. Do not open a PR that spans two buckets.
+
+Buckets P0 and the CI-blocker half of P1 are already **DONE** (PR #185). What
+remains is sequenced, not scheduled — pick the next unchecked item in order.
+
+#### Phase 9.0 — Frozen baseline
+
+Every Phase 9 change is measured against, and rolls back to:
+
+| | |
+|---|---|
+| **Commit** | `8b6218d010a238dea6276c5fe30de6d7848cdcef` (PR #185 head) |
+| **Local tag** | `baseline/ai-slop-audit-2026-08-04` — created, **not on origin**: this environment's git proxy accepts branch pushes but rejects tag pushes (4 retries, `remote end hung up`). Recreate with `git tag -a baseline/ai-slop-audit-2026-08-04 8b6218d && git push origin --tags`. The SHA above is the authoritative reference either way. |
+| **Report** | `WORK/audits/AUDIT_2026-08-04T040621Z-ai-slop-consistency-audit.md` |
+| **Metrics** | Phase 9.10 below |
+
+**Deliberately not `develop@a4dbf2c`, where the audit was taken.** That commit
+does not build and its CI is red across five consecutive runs, so it cannot be
+a rollback point. `8b6218d` is the first commit on that line where the freeze
+conditions actually hold: backend `npm test` 851/851, backend typecheck exit 0,
+web tsc/lint/build clean, hygiene + gap:scan + table:scan + prevent:drift pass,
+and CI run 700 green on every job including the real-Postgres smoke.
+
+#### Phase 9.1 — Classification
+
+| Priority | Definition | Findings |
+|---|---|---|
+| **P0** | Security, data corruption, broken transactions, pipeline down | C-1 root-manifest hijack ✅ DONE · C-2 missing guardrail ✅ DONE |
+| **P1** | Duplicate business logic, inconsistent APIs, architecture violations | F-11 tax has three authorities · F-3 `artifacts/` duplicate app tree (NEEDS-SRI) · F-4 duplicate `apiFetch` ✅ DONE |
+| **P2** | Dead code, inconsistent naming, mechanical refactoring | F-5 48× `test-request.ts` ✅ DONE · F-14 `expenses` module layout differs from all 52 others · F-6/F-7/F-8 ✅ DONE |
+| **P3** | Style, comments, formatting | F-20 31 `eslint-disable` + 3 `: any` in `src/` · F-9 Node-24 test assertion ✅ DONE |
+
+Nothing in the audit was classified P0 on the *application* — the P0s were both
+pipeline/infrastructure. That is worth stating plainly: the retail core did not
+produce a security or data-corruption finding this pass.
+
+#### Phase 9.2 — Canonical ownership
+
+Done: `docs/architecture/ARCHITECTURE.md` now carries a **Domain → owning
+implementation** table naming the single file that decides each business rule,
+alongside the existing team→module table. Two domains are recorded as having no
+single owner (tax, pricing) rather than being assigned a plausible one.
+
+Every duplicate below migrates *toward* an owner in that table. If a duplicate
+has no owner, naming the owner is the first task, not the refactor.
+
+**Work is grouped by domain, not by file.** A PR touches one domain; a domain is
+finished before the next starts. Domains with no open findings are listed anyway
+so the sweep is provably complete rather than silently partial.
+
+| Domain | Owning module(s) | Open items | Cleanup plan |
+|---|---|---|---|
+| **Tax** | ⚠️ none — 3 authorities | **F-11** | Pick the authority, migrate the other two, backfill-check invoices written at 0%. Highest risk in the program; do it first because #3 (types) and #6 (tests) both touch invoice shapes. |
+| **Pricing** | ⚠️ none — module absent | **F-13** | Name an owner before any pricing work. Currently UI-only Preview. |
+| Repo structure | — | **F-3**, **F-10** | The `artifacts/` decision. Gates almost everything else — do not refactor a module that may be deleted. |
+| Test harness | all backend modules | ~~**F-5**~~ ✅ | Single `test-request.ts` factory — done 2026-08-10; 41 duplicates collapsed, `dupe:scan` identical-file groups 3 → 0. |
+| Expenses | `expenses` | **F-14** | Align layout with the other 52 modules, or promote its layout to the standard. |
+| Tooling / CI | `tools/`, `.github/` | **F-15**…**F-18** | Guardrails, non-blocking first. |
+| Types (DB↔API↔UI) | cross-cutting | **F-19** | **Never audited** — see 9.4. |
+| Inventory · Purchasing · Receiving · Orders · Catalog · Accounting · Identity | per ownership table | none | Verified clean this pass: no module orphans, no table collisions, no route drift, tenant-scoping swept clean 2026-07-16. Re-check at 9.10, don't pre-emptively refactor. |
+
+#### Phase 9.2b — Definition of "done" for a module
+
+Agreed *before* a module's cleanup PR opens. A module is clean when all of:
+
+- [ ] No duplicate business logic — every rule it implements traces to an owner in the `ARCHITECTURE.md` domain table, and it imports rather than reimplements.
+- [ ] No dead code — no unreferenced exports, routes, or columns (needs **F-17**; until that lands, say "not checked" rather than ticking this).
+- [ ] Consistent naming and file layout — `index.ts` / `routes.ts` / `service.ts`, matching the other modules.
+- [ ] Standard API responses — the shared `{ error: { code, message, requestId } }` envelope; keyset pagination via `shared/pagination.ts`; no bespoke error shapes.
+- [ ] Domain rules hold — tenant-scoped queries, RBAC on mutations, integer cents, immutable inventory movements, append-only financial records.
+- [ ] Tests pass, and cover the business rules the module owns — not just its routes.
+- [ ] No lint or type errors; no new suppressions (`@ts-ignore`, `eslint-disable`) without a one-line justification.
+- [ ] Docs updated — `ARCHITECTURE.md` ownership table if ownership moved; an ADR if a seam changed.
+
+"Not checked" is an acceptable answer for any line. A tick that was never
+verified is worse than an honest gap — that is the failure mode this whole
+program exists to correct.
+
+#### Phase 9.2c — PR discipline
+
+- One logical concern per PR. Never two domains, never two buckets.
+- Behaviour-preserving unless the PR says otherwise in its title.
+- Tests updated in the same PR as the change they cover.
+- Full backend suite green before the next PR in the series opens (~19 min; run it detached).
+- A refactor PR that also fixes a bug is two PRs.
+
+#### Phase 9.3 — Duplication elimination, in dependency order
+
+Bottom-up so each layer is stable before the one above it moves. One domain per
+PR; full backend suite green before the next.
+
+1. **Shared utilities** — F-5 (`test-request.ts` ×48).
+2. **Validation** — audit zod schemas for the F-11 class (optional fields that
+   silently default to a money value). `tax_rate_pct` is the known instance.
+3. **DTOs** — F-14; align `expenses.dto.ts`/`expenses.repository.ts` with the
+   `service.ts`/`routes.ts`/`index.ts` shape the other 52 modules use, or
+   document why expenses is the exception and make it the new standard.
+4. **Repositories / services / business logic** — F-11 tax consolidation.
+5. **API controllers** — deferred; `gap:scan` reports no route-level drift today.
+6. **UI components** — deferred; only 4 files bypass the shared API client and
+   each has a stated reason.
+
+#### Phase 9.4 — Hallucination sweep (not yet run)
+
+The audit checked module registration (clean), table collisions (clean), and
+route alignment (clean). It did **not** run a systematic unreferenced-symbol
+sweep — no tooling exists for it here. Blocked on Phase 9.6's dead-code
+detector; running it by hand across 977 `.ts` + 836 `.tsx` files is exactly the
+kind of task that should be automated once rather than eyeballed once.
+
+#### Phase 9.5 — Standards
+
+Already enforced and holding: integer cents, tenant-scoped tables, idempotent
+hash-tracked migrations, one error envelope, keyset pagination, append-only
+financial records, `strict: true` on both trees.
+
+Gaps to close: module file layout (F-14), and a written rule that an optional
+request field may never default to a money or tax value (F-11's root cause, tracked as F-12).
+
+#### Phase 9.6 — Automated guardrails: have vs. missing
+
+Measured 2026-08-04, not assumed.
+
+| Check | Status |
+|---|---|
+| TS strict, no ignored errors | ✅ `strict: true` both trees; **0** `@ts-ignore`, **0** `@ts-expect-error` in `src/` |
+| Backend typecheck / test / smoke | ✅ CI |
+| Frontend typecheck / lint / build | ✅ CI (lint currently allows warnings) |
+| Root-manifest integrity | ✅ CI, first step (added PR #185) |
+| Route/contract drift | ✅ `gap:scan` (+ orphan detection, PR #185) |
+| Table collisions | ✅ `table:scan` |
+| Repo hygiene, secrets, tracked env | ✅ `hygiene` |
+| Unguarded mutations, SQL interpolation, `console.*` | ✅ CI greps |
+| e2e golden paths | ✅ CI (non-gating: known auth flake) |
+| **Duplicate-code detection** | ❌ **none** — would have found F-5 and F-4 automatically |
+| Dead-code detection | ✅ **added 2026-08-04** — report-only (F-17); unblocks 9.4 |
+| **Dependency-cycle detection** | ❌ none |
+| Dependency vulnerability scanning | ✅ **added 2026-08-04** — `dependabot.yml` + report-only `npm audit` in CI (F-16) |
+| **Test coverage thresholds** | ❌ none (`node --test`, no coverage gate) |
+| OpenAPI contract validation | ✅ **added 2026-08-06** — `contract:scan` (F-18), **gating** on phantom operations; undocumented-route count report-only |
+| OpenAPI contract validation | ✅ **added 2026-08-11** — gating `contract:scan` (F-18); first run found 9 mismatches, 3 fixed, 6 → F-28 |
+| Bundle size / perf regression | ❌ none |
+
+Highest value first: **duplicate-code detection** (it would have caught two of
+this audit's findings with no human), then **dependency vulnerability
+scanning** (conspicuous by absence — `pnpm-workspace.yaml` already carries a
+`minimumReleaseAge` supply-chain defence, so the intent exists without the
+check), then **dead-code detection** to unblock 9.4.
+
+Add each as **non-blocking first**, exactly as `docker-build` and `e2e` were
+introduced. A brand-new detector on a 2,195-file repo will report hundreds of
+findings; gating merges on it before the backlog is burned down blocks all work
+and the check gets deleted. Prove it green, then gate it.
+
+#### Phase 9.7 — Incremental refactor loop
+
+Per module: audit → refactor → full backend suite → staging → verify → merge →
+next. Never two modules in one PR.
+
+#### Phase 9.8 — Agent workflow
+
+`AGENTS.md` already mandates the discovery half (read order, "before building
+any feature/module/endpoint, check it does not already exist", lock protocol).
+The gap is that it says nothing about *which owner* a change belongs to. Add
+one step: after the duplicate check, identify the owning implementation in
+`ARCHITECTURE.md`'s domain table and extend it, rather than adding a local
+helper. H-2 was a private `apiFetch` written beside a canonical one — the rule
+that would have prevented it is exactly that.
+
+#### Phase 9.9 — Master remediation backlog
+
+**Every audit finding appears here.** Nothing from
+`AUDIT_2026-08-04T040621Z` remains as an untracked note — the *Audit ref*
+column is the traceability link, and the four findings that had drifted out of
+an earlier draft of this table (L-1, L-2, the hallucination sweep, and the
+never-run type-consistency check) are now F-11, F-9, F-17 and F-19.
+
+IDs are stable. Do not renumber; add.
+
+| ID | Audit ref | Title | Domain / module | Severity | Root cause | Proposed fix | Depends on | Effort | Risk | Acceptance criteria | Status |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| **F-1** | C-1 | npm root replaced by foreign workspace stub | repo root | **Critical** | A separately-scaffolded pnpm workspace shares this `origin` and merges into it; nothing structural stopped it | Restore root manifests from last-known-good `ca7ec4b` | — | 0.5 d | Low | `npm ci` resolves; all root scripts CI calls exist; CI green | ✅ **DONE** PR #185 |
+| **F-2** | C-2 | No guard against the hijack class | tooling / CI | **Critical** | Failure only surfaces *after* checkout+install, so it reads as an infra flake; prior audit recommended a guard and did not build it | `hygiene-check.mjs` check 8, run as CI's first step via bare `node` | F-1 | 0.5 d | Low | Green on restored tree; 6 violations + exit 1 against the real broken commit | ✅ **DONE** PR #185 |
+| **F-3** | H-1 | `artifacts/` is a 1,004-file duplicate app tree | repo structure | **High** | Another environment's full copy merged in and then diverged in both directions | ADR names canonical tree → harvest `push_tokens` → remove duplicates in a separate PR | **NEEDS-SRI** | 1–2 d | Medium — 857 files, reversible via git | ADR merged; `push_tokens` in `src/` with tests; duplicates removed in a follow-up PR | ⛔ **BLOCKED** |
+| **F-4** | H-2 | Duplicate `apiFetch` in `StoreAuthContext` | web / storefront auth | **High** | Local helper written beside a canonical one; passes every gate because nothing is missing or colliding | Route through shared `@/api-client` with `anonymous: true` | — | 0.5 d | Low | Envelope message surfaces (not `[object Object]`); customer token never mixed with staff token; regression test fails against old code | ✅ **DONE** PR #185 |
+| **F-5** | H-3 | `test-request.ts` copied into 48 modules, 8 variants | test harness | **Medium** | Per-module helper creation instead of one shared import; drifted silently | One `src/shared/test-request.ts` factory; each module re-exports pinning its own default role | — | 0.5 d | Low — test-only | 851/851 still green; per-module default roles preserved *exactly* (`workflows` stays `manager`) | ✅ **DONE** 2026-08-10 — `makeRequest(defaultRole)` added to `src/shared/test-request.ts`; **41 of the 46 module helpers** (31 fixed-`owner` + 5 selectable-`owner` + 5 `manager`) collapsed to one-line factory calls. `dupe:scan` **3 identical-file groups → 0**. Default roles preserved exactly — the `manager` set is byte-for-byte the original {discounts, insights, purchasing, sso, workflows}, diffed against git. The 31 fixed-`owner` helpers gained a defaulted 5th `role` param; verified beforehand by parsing every `request(` call in those 31 modules that **none passes a 5th argument**, so no existing call changed meaning. Five helpers deliberately left hand-written (`identity`, `progress`, `business`, `custom_roles`, `reports`) — real signature differences, not duplication; folding them in would need a five-flag options bag. |
+| **F-6** | M-1 | `.gitignore` `.env*` made template deletion irreversible | repo root | **Medium** | Bare ignore rule added while templates were already tracked, so it looked harmless | Add `!.env*.example` to both `.gitignore`s | — | mins | Low | `git add .env.example` works | ✅ **DONE** PR #185 |
+| **F-7** | M-2 | 4 dead entries in `api-gap-allowlist.json` | tooling | **Medium** | Allowlist grew without a mechanism to notice entries going stale | Remove; verified against real routes first | — | mins | Low | 21 → 17 entries, scan green | ✅ **DONE** PR #185 |
+| **F-8** | M-3, M-4 | `gap:scan` counted doc-comment paths; no orphan detection | tooling | **Medium** | Regex over raw source; only checked one direction of staleness | Strip block comments; add `orphaned` warning | — | 0.5 d | Low | Doc examples no longer need allowlisting; orphan check found `/api/v1/things` on first run | ✅ **DONE** PR #185 |
+| **F-9** | L-2 | 3 web tests require Node 24; local default is 22 | web / tests | **Low** | jsdom `Blob`/`FileReader` behaviour differs by Node major; nothing asserts the version | Assert the Node major in the web test setup so the failure names its own cause | — | 0.5 h | Low | Running on Node 22 produces a clear message, not 3 opaque `FileReader` failures | ✅ **DONE** — status was stale, not the work. `web/tests/setup.ts` already reads `.nvmrc`, compares `process.versions.node`, and warns without failing the run. Verified 2026-08-10 on Node 22.22.2: it prints the version gap, the 3 test names, the real cause (jsdom's `FileReader` rejects undici's `Blob` before Node 24) and `nvm use`. Marked DONE rather than left open — an unticked item that is actually finished invites exactly the duplicate work this phase exists to prevent. |
+| **F-5** | H-3 | `test-request.ts` copied into 48 modules, 8 variants | test harness | **Medium** | Per-module helper creation instead of one shared import; drifted silently | One `src/shared/test-request.ts` factory; each module re-exports pinning its own default role | — | 0.5 d | Low — test-only | 851/851 still green; per-module default roles preserved *exactly* (`workflows` stays `manager`) | ✅ **DONE** PR #185 (`409f617`) — status corrected 2026-08-06; the table had it as READY after it had already shipped. Verified on `develop@41f6eda`: `src/shared/test-request.ts` exists and all 46 module copies are thin re-exports of `sendRequest`/`resolveApiPath`/`bearer`, each pinning its own default role (`workflows` = `manager`, `catalog` = `owner`, `identity` signs no token at all) |
+| **F-6** | M-1 | `.gitignore` `.env*` made template deletion irreversible | repo root | **Medium** | Bare ignore rule added while templates were already tracked, so it looked harmless | Add `!.env*.example` to both `.gitignore`s | — | mins | Low | `git add .env.example` works | ✅ **DONE** PR #185 |
+| **F-7** | M-2 | 4 dead entries in `api-gap-allowlist.json` | tooling | **Medium** | Allowlist grew without a mechanism to notice entries going stale | Remove; verified against real routes first | — | mins | Low | 21 → 17 entries, scan green | ✅ **DONE** PR #185 |
+| **F-8** | M-3, M-4 | `gap:scan` counted doc-comment paths; no orphan detection | tooling | **Medium** | Regex over raw source; only checked one direction of staleness | Strip block comments; add `orphaned` warning | — | 0.5 d | Low | Doc examples no longer need allowlisting; orphan check found `/api/v1/things` on first run | ✅ **DONE** PR #185 |
+| **F-9** | L-2 | 3 web tests require Node 24; local default is 22 | web / tests | **Low** | jsdom `Blob`/`FileReader` behaviour differs by Node major; nothing asserts the version | Assert the Node major in the web test setup so the failure names its own cause | — | 0.5 h | Low | Running on Node 22 produces a clear message, not 3 opaque `FileReader` failures | ✅ **DONE** PR #185 (`df1a45f`) — status corrected 2026-08-06, same stale-row class as F-5. Verified on `develop@41f6eda`: `web/tests/setup.ts` reads `process.versions.node`, compares against `.nvmrc`, and prints a named warning |
+| **F-10** | L-1 | `scripts/` has two owners | repo structure | **Low** | Workspace merge added `@workspace/scripts` (`package.json` + `src/hello.ts`) beside Ascend's operational scripts | Resolve with F-3 — same root cause | F-3 | mins | Low | One definition of what `scripts/` is | ⛔ **BLOCKED** |
+| **F-11** | — *(new, found while building the ownership table)* | **Tax has three independent authorities** | tax | **High** | No owner: `orders/tax.ts` claims it but is imported only within `orders/`; `customer_invoices` does inline math on an `.optional()` `tax_rate_pct` defaulting to `0`; `settings.tax_rates` is a third source | Pick the authority; migrate the other two to import it; make a missing tax rate an error, not a silent `0` | **Sri: which wins** | 2–3 d | **High — changes what customers are charged** | One calculator imported by every writer; POS and invoice agree on identical input, test-proven; no silent `0` default; invoices already written at 0% identified and reported | ⛔ **BLOCKED** |
+| **F-12** | — *(new)* | Optional request fields may silently default to money values | validation | **Medium** | No rule forbids it; `tax_rate_pct` is the known instance, others unaudited | Sweep zod schemas for `.optional()` on money/rate fields; write the rule into `AGENTS.md` | F-11 | 1 d | Medium | No money-affecting field defaults silently; rule documented | ⬜ **READY** after F-11 |
+| **F-13** | — *(new)* | Pricing has no owning module | pricing | **Medium** | Never built; `/api/v1/pricing` is a UI-only Preview prefix | Decide whether pricing becomes a real domain; if so create the module and add it to the ownership table | **NEEDS-SRI** | — | — | Ownership table has a real owner, or Preview status is explicitly reaffirmed | ⛔ **BLOCKED** — re-verified after develop's Wave 3 (`55a4d41`): the mock-backed tabs are now gated behind `NEXT_PUBLIC_SHOW_PARTIAL_PAGES`, so the *exposure* is contained, but `src/modules/pricing` still does not exist and `/api/v1/pricing/` is still allowlisted. Quarantine ≠ ownership; the decision is unchanged. |
+| **F-14** | — *(new)* | `expenses` layout differs from all 52 other modules | expenses | **Low** | Uses `expenses.dto.ts` / `expenses.repository.ts` instead of the `service.ts`/`routes.ts`/`index.ts` convention | Align it, or promote its layout to the standard and migrate the rest | F-3 | 0.5 d | Low | One documented module layout, applied consistently | ⬜ **READY** |
+| **F-15** | 9.6 | Duplicate-code detection in CI | tooling | **Medium** | No detector exists; this audit found duplicates by hand | `tools/duplicate-code-scan.mjs`, dependency-free, report-only, wired into the guard job | — | 0.5 d | Low | Reports on PRs; baseline recorded (9.10); reproduced F-5 unaided **and surfaced F-21/F-22/F-23** | ✅ **DONE** |
+| **F-16** | 9.6 | Dependency vulnerability scanning | tooling | **Medium** | Absent, despite `pnpm-workspace.yaml` already carrying a `minimumReleaseAge` supply-chain defence — the intent exists without the check | `.github/dependabot.yml` (grouped, low PR limit, majors ignored — this repo's failure mode is merge chaos, not stale deps) + a report-only `npm audit` CI step | — | 0.5 d | Low | Advisories visible on every PR; **first run found 14 in `web` + 2 at root** → F-24/F-25/F-26 | ✅ **DONE** |
+| **F-17** | 9.4 | Dead-code detection | tooling | **Medium** | No tooling; sweeping 977 `.ts` + 836 `.tsx` by hand is not repeatable | `tools/dead-code-scan.mjs`, dependency-free, report-only, split value vs type | — | 1 d | Low | Report exists and is wired into CI. **Baseline: 371 unreferenced exports — 95 value, 276 type-only** | ✅ **DONE** |
+| **F-27** | 9.4 | Run the hallucination sweep F-17 enables | repo-wide | **Medium** | Deferred until detection was repeatable | Triage the 95 value hits: most are **over-exported, not dead** (verified: `CREATE_USERS_TABLE` is used at line 493 of its own file; `withStripeBreaker` only inside `stripe.ts`). Drop the `export` keyword where the symbol is file-local; delete only what is genuinely unreachable | F-17, F-3 | 1–2 d | **Medium — this is the one item that deletes code**; removals must be their own PR, never bundled | Each of the 95 classified as over-exported / dead / false-positive; deletions in a separate reviewed PR; 852 tests green | ⬜ **READY** |
+| **F-18** | 9.6 | OpenAPI contract validation | tooling / contracts | **Medium** | `contracts/openapi.yaml` is written *from* the code, never checked *against* it | `tools/openapi-contract-scan.mjs`, dependency-free, **gating**; route extraction shared with `api-gap-scan` via `tools/lib/backend-routes.mjs` | — | 1 d | Medium — may reveal real drift | CI fails on divergence. **It did: 9 mismatches on first run.** 3 were plain typos, fixed here (`/api/v1/audit_log` → `audit-log`; `POST .../rooms/{id}/charges` → `/charge`; `GET .../rooms/{id}/folio` → `/charges`) — the frontend was already calling the corrected paths. The other 6 need an API decision → **F-28**. Negative-tested three ways: planted contract-only op fails, stale allowlist entry fails, parser-shape change fails instead of silently scanning nothing | ✅ **DONE** |
+| **F-19** | — *(gap in the audit itself)* | **DB ↔ API ↔ frontend type consistency never audited** | cross-cutting | **High** | The audit verified route *existence* (`gap:scan`) and table collisions, but never the Schema→ORM→Service→API→FE-types→UI chain the master prompt asked for. Recorded as *not done*, not as *clean*. | Run that audit as its own pass; feed findings back here as F-20+ | F-3 (don't audit a tree that may be deleted) | 1–2 d | Medium | Every FE type traces to a real column; no field referenced that does not exist | ⬜ **READY** |
+| **F-20** | P3 | 31 `eslint-disable` + 3 `: any` in `src`/`web` | cross-cutting | **Low** | Accumulated without justification requirements | Burn down; require a one-line reason for survivors | F-15..F-17 | 1 d | Low | Every suppression justified; lint gates on zero *new* warnings | ⬜ **READY** last |
+| **F-21** | — *(found by F-15)* | `ProgressTask`/`ProgressEvidence` interfaces hand-duplicated backend↔frontend | progress, web/api-client | **Medium** | `web/api-client/types.ts` is **manually maintained** (its own header documents that the "auto-generated" claim was false) and 218 files import from it, so backend interfaces are re-typed by hand with no generation link | Generate from one source, or make the frontend type alias the backend's | F-19 | 0.5 d | Medium — 218 importers | One definition per interface; drift impossible by construction | ⬜ **READY** |
+| **F-22** | — *(found by F-15)* | Duplicated block: `OrdersTab.tsx` ↔ `ReturnsTab.tsx` | web / inventory | **Low** | Tab components copy-pasted | Extract the shared block | F-3 | 0.5 d | Low | One implementation, both tabs render unchanged | ⬜ **READY** |
+| **F-23** | — *(found by F-15)* | Duplicated block: `reports/sales-by-rep` ↔ `sales-by-vendor` pages | web / reports | **Low** | Report pages copy-pasted | Extract a shared report-page component | F-3 | 0.5 d | Low | One implementation, both reports render unchanged | ⬜ **READY** |
+| **F-24** | — *(found by F-16)* | `next` 14.2.29 → 16.x (9 high advisories incl. `postcss` chain) | web | **High** | Framework majors deferred; `next`, `postcss`, `eslint-config-next` and `glob` all resolve through this one bump | Plan a Next 14→16 migration; **not** `npm audit fix --force` | — | 2–3 d | **High — framework major, touches every page** | `npm audit` clean of the `next` chain; build, lint, e2e green | ⬜ **READY** |
+| **F-25** | — *(found by F-16)* | `vitest` 2.x → 4.x (the 1 **critical**, + `vite`/`esbuild`/`@vitest/mocker`) | web / tests | **High** *(dev-only exposure)* | Test-runner major deferred | Upgrade vitest and its vite chain | — | 1 d | Medium — test-only blast radius, but 177 tests must stay green | `npm audit` clean of the vitest chain; 177 pass / 3 known Node-24 fails unchanged | ⬜ **READY** |
+| **F-26** | — *(found by F-16)* | 4 advisories with **non-breaking** fixes | web, root | **Medium** | Nothing was watching, so trivially-fixable transitive advisories accumulated | `npm audit fix` (never `--force`); lockfiles only, `package.json` untouched | — | 0.5 d | Low — no major bumps | **root 2 → 0, web 14 → 10; 6 cleared.** `brace-expansion`, `form-data`, `js-yaml`, `@redocly/openapi-core`, `body-parser`, `esbuild` all gone. Verified: web tsc 0, lint clean, 177 pass/3 known, **prod build succeeds**; backend tsc 0 | ✅ **DONE** |
+| **F-30** | — *(found by F-18)* | **Two request-field naming conventions across modules** | cross-cutting / API design | **Medium** | No rule picks one. `catalog` and `service_orders` take **snake_case** request bodies (`price_cents`, `tax_class`, `estimate_cents`); the eight vertical modules take **camelCase** (`labourCents`, `roomNumber`, `startsAt`, `qtyConsumed`). Responses are raw DB rows, so they are snake_case everywhere — meaning a caller of the camelCase modules sends one convention and reads back another | Pick one convention and migrate the other side, or document the split as deliberate and make it a written rule in `AGENTS.md`. **Renaming accepted request fields is a breaking API change**, which is why this is a decision and not a cleanup | F-19 | 1–2 d | **High — changes what payloads are accepted** | One documented convention; `AGENTS.md` carries the rule; no module silently accepts the other spelling | ⛔ **NEEDS-SRI** — the contract half is already fixed (11 operations documented fields the handler rejects, all corrected 2026-08-06, measured 11 → 0); what remains is the underlying inconsistency, which only Sri should resolve |
+| **F-29** | — *(found by F-18)* | **Two files named `openapi.yaml`, unrelated** | repo structure / contracts | **Medium** | `contracts/openapi.yaml` (3,170 lines, 111 paths) is the contract of record and is consumed by **nothing programmatic**; `lib/api-spec/openapi.yaml` (36 lines, one path — `/healthz`) is what orval actually generates `lib/api-client-react`/`lib/api-zod` from. Nothing relates them, and archived docs still describe `web/api-client/` as generated from the first one (it is hand-maintained — F-21) | Decide which spec is authoritative: either point orval at `contracts/openapi.yaml` and generate for real, or rename the stub so it stops reading as a second contract. Fold into the F-21 generation decision rather than solving twice | F-21 | 0.5–1 d | Medium — wiring codegen to the real spec regenerates 218 importers' types | One spec is authoritative and named as such; no second file called `openapi.yaml` implying otherwise | ⬜ **READY** after F-21 |
+| **F-28** | — *(found by F-18)* | 6 documented operations addressed differently from the routes that serve them | contracts / verticals | **Medium** | The contract was written alongside the vertical modules, not generated from them, so creation endpoints diverged: it puts the parent id in the request body (`POST /healthcare/prescriptions` with `patient_id`, `POST /education/fees` with `student_id`, `POST /entertainment/tickets` with `event_id`) where the code nests it in the path, and models status as a sub-resource (`PATCH /appointments/{id}/status`) where the code takes it as one field of a generic patch. Two are absent outright: `PATCH /entertainment/events/{id}/status` (no PATCH on events at any address) and `PATCH /automotive/work-orders/{id}/status` (contract describes a bodyless auto-advance; code requires the caller to supply the target status). Sibling action endpoints — `/prescriptions/{id}/dispense`, `/fees/{id}/collect`, `/tickets/redeem` — all match exactly, so this is specifically creation and status that drifted | Per operation, decide: correct the contract to the served address, or build the documented one. Then delete the allowlist entry — `contract:scan` fails on a stale one, so the cleanup is enforced | F-18 | 0.5–1 d | Low — contract only, unless a route is added | `tools/openapi-contract-allowlist.json` is empty and `npm run contract:scan` passes with zero mismatches | ⬜ **READY** |
+| **S-1** | C-1/C-2 rec. | Branch protection on `develop` requiring green CI | — | **Critical** | Nothing enforces that a red branch cannot merge | Repo setting | **Sri-only** | mins | None | `develop` requires green CI. Every hijack was red on arrival | ⛔ **SRI-ONLY** |
+| **S-2** | C-1 rec. | Repoint the other workspace's `origin` | — | **High** | Two projects share one remote | Fork, or disconnect | **Sri-only** | mins | None | A foreign root can no longer reach this repo | ⛔ **SRI-ONLY** |
+
+**Execution order** (architecture settles before cleanup, per the sequence
+agreed 2026-08-04): **S-1** → **F-11** (tax owner) → **F-3** decision →
+**F-15/F-16/F-17** guardrails → **F-5**, **F-14**, **F-9** cleanups →
+**F-19** type-consistency audit → **F-12**, **F-18** → **F-20**.
+
+S-1 first because it is minutes of Sri's time and prevents a fourth
+occurrence of the thing that started all of this. F-11 before any type or
+test work because it changes invoice shapes. F-3 before module-level
+refactors because there is no point cleaning a tree that may be deleted.
+
+**Progress against that order (refreshed 2026-08-06).** Done: F-15, F-16,
+F-17, F-5, F-9, F-26, and now F-18. Blocked on a Sri decision, in order:
+**S-1** and **S-2** (repo settings), **F-11** (which tax authority wins),
+**F-3** (the `artifacts/` tree), **F-13** (pricing owner), and the new
+**F-28** (which request-field naming convention wins). Everything still
+marked READY is gated behind one of those: F-14, F-19, F-22, F-23 and F-27
+all declare a dependency on F-3; F-12 waits on F-11; F-21 waits on F-19.
+
+That leaves exactly three items an agent can pick up without a decision:
+**F-24** (Next 14→16, a framework major), **F-25** (vitest 2→4), and
+**F-20** (suppression burndown, explicitly sequenced last). F-18 was the
+last unblocked, non-major item in the order — which is why it was taken
+this pass. Do not "unblock" F-3-dependent work by assuming the answer.
+
+
+#### Phase 9.10 — Re-audit baseline
+
+Re-run the audit after 9.3 and after 9.6. Compare against 2026-08-04:
+
+| Metric | 2026-08-04 baseline |
+|---|---|
+| Duplicate business-rule domains | 2 (tax; `artifacts/` tree) |
+| Duplicated helper files | 48 (`test-request.ts`), 8 variants |
+| Identical-file groups (`dupe:scan`) | 3 groups / 44 files |
+| Duplicated blocks ≥25 lines (`dupe:scan`) | 9 |
+| Duplicate app trees | 1 (1,004 files, 46% of repo) |
+| Dead config entries | 0 (4 removed) |
+| Backend tests | 851, 851 pass |
+| Backend modules / tables / routes | 53 / 166 / 473 |
+| Type suppressions in `src/` | 0 |
+| `eslint-disable` (src+web) | 31 |
+| CI guardrail coverage | ~~12~~ **13** of 16 categories (duplicate-code, dependency advisories, dead-code added 2026-08-04; OpenAPI contract validation added 2026-08-11 via PR #222) |
+| Request bodies documenting fields the handler rejects | **11**, measured against each module's zod schema. Not fixed — the contract half of F-18 shipped via PR #222, which scopes bodies to F-19 on the grounds that unverified schema rewrites can make the contract more wrong. Evidence and the per-operation list are in `AUDIT_2026-08-06T171000Z`; root-cause naming split is F-30 |
+| Backend routes absent from the contract | ~480 — a documentation gap, deliberately not gated (see `tools/openapi-contract-scan.mjs`'s DIRECTION note) |
+| Unreferenced exports (`dead:scan`) | 371 — 95 value, 276 type-only |
+| Dependency advisories — `web` | ~~14~~ **10** (1 critical, 6 high, 3 moderate) — remainder needs F-24/F-25 majors |
+| Dependency advisories — root | ~~2 low~~ **0** |
+| Overall health score | 58/100 |
+
+Phase 9 is complete when: no P0 or P1 open, the duplicate-app-tree decision is
+made and executed, duplicate/dead-code detection runs in CI, and a re-audit
+scores every category it can measure without inventing one — Performance stays
+unscored until real profiling evidence exists.
+
+
 ## Release gate checklist
 
 Ascend should not be considered production-ready until all of these are true:

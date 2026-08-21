@@ -24,7 +24,8 @@ describe("hrefForHit — entity detail URLs", () => {
 
   it("falls back to owning hubs when no detail route exists", () => {
     expect(hrefForHit(hit("invoice"))).toBe("/finance");
-    expect(hrefForHit(hit("sales_order"))).toBe("/sales");
+    // /sales was deleted in Ponytail Wave 3 — link the real hub, not a redirect.
+    expect(hrefForHit(hit("sales_order"))).toBe("/orders");
     expect(hrefForHit(hit("quotation"))).toBe("/quotes");
   });
 });

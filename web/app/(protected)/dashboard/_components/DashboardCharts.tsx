@@ -1,106 +1,94 @@
 "use client";
 
-import { Card } from "@/components/Card";
+import { useQuery } from "@/lib/useQuery";
+import { apiGet } from "@/api-client/client";
 import { LineChart } from "@/components/charts/LineChart";
 import { BarChart } from "@/components/charts/BarChart";
 import { formatMoney } from "@/lib/money";
 
+const CHART_COLOR = "#5D5FEF";
+
 function SkeletonBox({ className = "" }: { className?: string }) {
-  return <div aria-hidden="true" className={`animate-pulse rounded bg-slate-200 ${className}`} />;
+  return <div aria-hidden="true" className={`animate-skeleton rounded border border-[var(--color-border)] ${className}`} />;
 }
 
-interface ChartPoint { label: string; value: number; }
-
-interface Props {
-  trendPoints: ChartPoint[];
-  hourlyPoints: ChartPoint[];
-  paymentsByMethod: Record<string, number> | undefined;
-  loadingTrend: boolean;
-  loadingHourly: boolean;
-  loadingPayments: boolean;
-  trendRange: string;
+interface TrendDay {
+  date: string;
+  label: string;
+  revenueCents: number;
+  orderCount: number;
+}
+interface TrendResponse {
+  items: TrendDay[];
 }
 
-export function DashboardCharts({
-  trendPoints,
-  hourlyPoints,
-  paymentsByMethod,
-  loadingTrend,
-  loadingHourly,
-  loadingPayments,
-  trendRange,
-}: Props) {
-  const paymentEntries = Object.entries(paymentsByMethod ?? {});
-  const paymentTotal = paymentEntries.reduce((s, [, v]) => s + v, 0);
+interface HourlyBucket {
+  hour: number;
+  label: string;
+  orderCount: number;
+  revenueCents: number;
+  value: number;
+}
+interface HourlyResponse {
+  items: HourlyBucket[];
+}
+
+export function DashboardCharts({ range, scope }: { range: string; scope: string }) {
+  const trendRange = range === "today" ? "7d" : range;
+
+  const { data: trendData, loading: loadingTrend } = useQuery(`dashboard:trend:${trendRange}:${scope}`, () =>
+    apiGet<TrendResponse>(`/api/v1/reports/revenue-trend?range=${trendRange}&${scope}`),
+  );
+
+  const { data: hourlyData, loading: loadingHourly } = useQuery(`dashboard:hourly:${range}:${scope}`, () =>
+    apiGet<HourlyResponse>(`/api/v1/reports/hourly?range=${range}&${scope}`),
+  );
+
+  const trendPoints = (trendData?.items ?? []).map((d) => ({ label: d.label, value: d.revenueCents }));
+  const hourlyPoints = (hourlyData?.items ?? []).map((d) => ({ label: d.label, value: d.revenueCents }));
 
   return (
-    <>
-      {/* Revenue Trend */}
-      <section aria-label="Revenue trend">
-        <Card
-          title={`Revenue Trend — Last ${trendRange === "7d" ? "7 Days" : "30 Days"}`}
-          noPadding
-        >
-          <div className="px-5 pb-4 pt-2">
-            <LineChart
-              data={trendPoints}
-              height={200}
-              color="#10b981"
-              loading={loadingTrend}
-              formatValue={(v) => formatMoney(v)}
-            />
+    <section>
+      <h2 className="mb-4 text-lg font-bold tracking-tight text-[var(--color-text-primary)]">Performance Analytics</h2>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-sm">
+          <div className="mb-4">
+            <h3 className="text-[13px] font-semibold text-[var(--color-text-primary)]">Revenue Trend</h3>
+            <p className="mt-0.5 text-[12px] text-[var(--color-text-secondary)]">
+              Trailing {trendRange === "7d" ? "7" : "30"} days
+            </p>
           </div>
-        </Card>
-      </section>
-
-      {/* Sales by Hour + Payment Mix */}
-      <section aria-label="Sales patterns" className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <Card title="Sales by Hour" noPadding>
-          <div className="px-5 pb-4 pt-2">
-            <BarChart
-              data={hourlyPoints}
-              height={160}
-              color="#6366f1"
-              loading={loadingHourly}
-              showEveryNthLabel={4}
-              formatValue={(v) => formatMoney(v)}
-            />
-          </div>
-        </Card>
-
-        <Card title="Revenue Mix by Payment Method" noPadding>
-          {loadingPayments ? (
-            <div className="space-y-3 px-5 py-4">
-              {[0, 1, 2].map((i) => <SkeletonBox key={i} className="h-6 w-full" />)}
+          {loadingTrend ? (
+            <SkeletonBox className="h-[250px] w-full" />
+          ) : trendPoints.length === 0 ? (
+            <div className="flex h-[250px] items-center justify-center rounded border border-dashed border-[var(--color-border)] text-[13px] text-[var(--color-text-muted)]">
+              No trend data available.
             </div>
-          ) : paymentEntries.length === 0 ? (
-            <p className="px-5 py-4 text-sm text-slate-400">No payments in this period.</p>
           ) : (
-            <div className="space-y-3 px-5 py-4">
-              {paymentEntries.map(([method, cents]) => {
-                const pct = paymentTotal > 0 ? Math.round((cents / paymentTotal) * 100) : 0;
-                return (
-                  <div key={method}>
-                    <div className="mb-1 flex items-center justify-between text-sm">
-                      <span className="font-medium capitalize text-slate-700">{method}</span>
-                      <span className="tabular-nums text-slate-600">
-                        {formatMoney(cents)}{" "}
-                        <span className="text-xs text-slate-400">({pct}%)</span>
-                      </span>
-                    </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className="h-2 rounded-full bg-brand-500 transition-all"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="h-[250px] w-full">
+              <LineChart data={trendPoints} height={250} color={CHART_COLOR} formatValue={(val) => formatMoney(val)} />
             </div>
           )}
-        </Card>
-      </section>
-    </>
+        </div>
+
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-sm">
+          <div className="mb-4">
+            <h3 className="text-[13px] font-semibold text-[var(--color-text-primary)]">Hourly Performance</h3>
+            <p className="mt-0.5 text-[12px] text-[var(--color-text-secondary)]">Revenue by hour of day</p>
+          </div>
+          {loadingHourly ? (
+            <SkeletonBox className="h-[250px] w-full" />
+          ) : hourlyPoints.length === 0 ? (
+            <div className="flex h-[250px] items-center justify-center rounded border border-dashed border-[var(--color-border)] text-[13px] text-[var(--color-text-muted)]">
+              No hourly data available.
+            </div>
+          ) : (
+            <div className="h-[250px] w-full">
+              <BarChart data={hourlyPoints} height={250} color={CHART_COLOR} formatValue={(val) => formatMoney(val)} />
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }

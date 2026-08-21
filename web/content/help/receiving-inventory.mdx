@@ -1,0 +1,34 @@
+---
+title: Receiving inventory
+category: Inventory
+summary: Record incoming stock so on-hand quantities and reorder alerts stay accurate.
+---
+
+## Why receiving matters
+
+Every stock change in Ascend is recorded as an immutable inventory movement —
+receiving, sales, transfers, and adjustments all leave a permanent trail.
+This is what makes reports, reorder alerts, and stock levels trustworthy: a
+quantity on screen is always backed by a real history of how it got there.
+
+## Recording a receipt
+
+From **Inventory → Receive**, select the product and enter the quantity and
+cost. If your business tracks lots or expiry dates, you'll be asked for that
+at the same time — it's recorded against this specific receipt, not the
+product in general, so mixed-expiry stock stays traceable.
+
+## Reorder alerts
+
+Once a product's on-hand quantity drops to or below its reorder point,
+it surfaces as a reorder alert on the dashboard and in **Purchasing**. If a
+supplier has a minimum order quantity or case pack size on file, the
+suggested reorder quantity automatically rounds up to a valid order size —
+you won't see a suggestion to order a fraction of a case.
+
+## Transfers between locations
+
+If you operate multiple outlets, **Inventory → Transfers** moves stock
+between them as a single atomic operation — both legs succeed together or
+neither does, so a failed transfer can never leave stock "in transit" and
+unaccounted for.

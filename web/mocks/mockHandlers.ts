@@ -191,7 +191,7 @@ const _BP_CATALOG: _BPMod[] = [
   { key: "compliance",       name: "Compliance",               description: "Age verification, MSA/PACT reporting, state flavor bans",      group: "retail" },
   { key: "ecommerce",        name: "Ecommerce",                description: "Online store sync, product visibility, online orders",          group: "retail",  route: "/ecommerce" },
   { key: "customer_display", name: "Customer Display",          description: "Second-screen cart mirror for customer-facing display",        group: "retail",  route: "/display" },
-  { key: "sales_orders",  name: "Sales Orders",        description: "B2B orders, credit terms, fulfilment workflows",              group: "b2b",  route: "/sales" },
+  { key: "sales_orders",  name: "Sales Orders",        description: "B2B orders, credit terms, fulfilment workflows",              group: "b2b",  route: "/orders" },
   { key: "purchasing",    name: "Purchasing",           description: "Purchase orders, receiving, vendor management, returns",     group: "b2b",  route: "/purchasing" },
   { key: "billing",       name: "Billing — AP/AR",      description: "Supplier bills, customer invoices, aging reports",           group: "b2b",  route: "/finance" },
   { key: "accounting",    name: "Accounting",           description: "Chart of accounts, journal entries, batch deposits, P&L",   group: "b2b",  route: "/accounting" },
@@ -221,7 +221,7 @@ const _BP_CATALOG: _BPMod[] = [
   { key: "online_store",      name: "Online Store",        description: "Product visibility, SEO fields, meta title/description",    group: "ecommerce" },
   { key: "order_fulfillment", name: "Order Fulfillment",   description: "Pick-pack-ship for online orders, tracking integration",    group: "ecommerce" },
   { key: "marketplace",       name: "Marketplace Sync",    description: "Sync inventory/orders with external marketplaces",          group: "ecommerce" },
-  { key: "shipping_mgmt",     name: "Shipping Management", description: "Carrier integrations, label printing, tracking numbers",    group: "ecommerce", route: "/delivery?tab=shipments" },
+  { key: "shipping_mgmt",     name: "Shipping Management", description: "Carrier integrations, label printing, tracking numbers",    group: "ecommerce", route: "/delivery" },
   { key: "vehicle_history", name: "Vehicle History",    description: "VIN/license lookup, service history per vehicle, notes",    group: "automotive", route: "/automotive/vehicles" },
   { key: "parts_inventory", name: "Parts Inventory",    description: "Auto parts with OEM/aftermarket codes, supplier ordering",  group: "automotive" },
   { key: "work_orders",     name: "Work Orders",        description: "Job cards, technician assignment, time tracking, parts",    group: "automotive", route: "/automotive/work-orders" },
@@ -276,6 +276,117 @@ function seed() {
   }
 }
 seed();
+
+// ── Receiving sessions (scan & receive) ──────────────────────────────────────
+// Stateful on purpose: scanning the same barcode twice has to increment, an
+// over-scan has to report itself, and edits have to stick — a stub that always
+// returns the same payload would make the workspace look like it works while
+// hiding exactly the behaviour worth exercising.
+
+interface MockReceivingLine {
+  id: string; session_id: string; po_line_id: string; product_id: string;
+  expected_qty: number; scanned_qty: number; accepted_qty: number;
+  held_qty: number; rejected_qty: number;
+  unit_cost_cents: number | null; cost_override_reason: string | null;
+  lot_code: string | null; expiry_date: number | null; manufacture_date: number | null;
+  location_id: string | null; barcode_scanned: string | null; status: string;
+  created_at: number; updated_at: number;
+  product_name: string; sku: string; barcode: string; po_unit_cost_cents: number;
+}
+
+interface MockReceivingSession {
+  id: string; po_id: string; session_number: string; status: string; mode: string;
+  receiver_id: string | null; receiver_name: string | null;
+  dock_code: string | null; notes: string | null;
+  started_at: number; completed_at: number | null;
+  created_at: number; updated_at: number;
+  lines: MockReceivingLine[];
+  po_number: number; supplier_id: string; supplier_name: string;
+}
+
+const recvNow = Date.now();
+
+function mockRecvLine(
+  n: number,
+  productId: string,
+  name: string,
+  sku: string,
+  barcode: string,
+  expected: number,
+  poCostCents: number,
+): MockReceivingLine {
+  return {
+    id: `rsl_${n}`, session_id: "rcv_1", po_line_id: `pol_${n}`, product_id: productId,
+    expected_qty: expected, scanned_qty: 0, accepted_qty: 0, held_qty: 0, rejected_qty: 0,
+    unit_cost_cents: null, cost_override_reason: null,
+    lot_code: null, expiry_date: null, manufacture_date: null,
+    location_id: null, barcode_scanned: null, status: "pending",
+    created_at: recvNow, updated_at: recvNow,
+    product_name: name, sku, barcode, po_unit_cost_cents: poCostCents,
+  };
+}
+
+const receivingSessions = new Map<string, MockReceivingSession>([
+  ["rcv_1", {
+    id: "rcv_1", po_id: "po_1", session_number: "RCV-1042", status: "receiving",
+    mode: "standard", receiver_id: "usr_demo", receiver_name: "Demo Operator",
+    dock_code: "D2", notes: null,
+    started_at: recvNow - 1_200_000, completed_at: null,
+    created_at: recvNow - 1_200_000, updated_at: recvNow,
+    po_number: 118, supplier_id: "sup_acme", supplier_name: "Acme Wholesale",
+    lines: [
+      mockRecvLine(1, "prod_1", "Organic Dark Roast Beans", "COF-001", "0700000000011", 48, 850),
+      mockRecvLine(2, "prod_2", "Wildflower Honey", "HON-002", "0700000000028", 24, 320),
+      mockRecvLine(3, "prod_4", "Ceramic Coffee Mug", "MUG-004", "0700000000042", 12, 640),
+    ],
+  }],
+]);
+
+/** Cost history is per product, so the intelligence panel has something real to show. */
+const recvIntelligence: Record<string, Record<string, unknown>> = {
+  prod_1: {
+    product_id: "prod_1", last_purchase_cost_cents: 825, prev_vendor_cost_cents: 810,
+    avg_purchase_cost_cents: 831, lowest_historical_cost_cents: 780,
+    highest_historical_cost_cents: 899, cost_trend: "up",
+    variance_vs_po_pct: 0, variance_band: "green",
+    preferred_supplier_id: "sup_acme", preferred_supplier_name: "Acme Wholesale",
+    lead_time_days: 5, moq: 24, fill_rate_pct: 96.4, stock_on_hand: 62,
+    previous_lot_code: "L-2402", previous_lot_expiry: recvNow + 12 * 86_400_000,
+    previous_lot_qty: 18, rotation_warning: null,
+  },
+  prod_2: {
+    product_id: "prod_2", last_purchase_cost_cents: 300, prev_vendor_cost_cents: 295,
+    avg_purchase_cost_cents: 304, lowest_historical_cost_cents: 280,
+    highest_historical_cost_cents: 330, cost_trend: "up",
+    variance_vs_po_pct: 6.67, variance_band: "yellow",
+    preferred_supplier_id: "sup_acme", preferred_supplier_name: "Acme Wholesale",
+    lead_time_days: 9, moq: 12, fill_rate_pct: 88.1, stock_on_hand: 14,
+    previous_lot_code: "L-2310", previous_lot_expiry: recvNow - 3 * 86_400_000,
+    previous_lot_qty: 4, rotation_warning: "Older lot L-2310 is already past expiry — pull it before shelving this delivery.",
+  },
+  prod_4: {
+    product_id: "prod_4", last_purchase_cost_cents: 640, prev_vendor_cost_cents: null,
+    avg_purchase_cost_cents: 640, lowest_historical_cost_cents: 640,
+    highest_historical_cost_cents: 640, cost_trend: "flat",
+    variance_vs_po_pct: 0, variance_band: "green",
+    preferred_supplier_id: null, preferred_supplier_name: null,
+    lead_time_days: null, moq: null, fill_rate_pct: null, stock_on_hand: 31,
+    previous_lot_code: null, previous_lot_expiry: null, previous_lot_qty: null,
+    rotation_warning: null,
+  },
+};
+
+function recvTouch(session: MockReceivingSession): MockReceivingSession {
+  session.updated_at = Date.now();
+  return session;
+}
+
+function recvLineStatus(line: MockReceivingLine): string {
+  if (line.rejected_qty > 0) return "rejected";
+  if (line.held_qty > 0) return "held";
+  if (line.accepted_qty === 0) return "pending";
+  return line.accepted_qty >= line.expected_qty ? "accepted" : "scanning";
+}
 
 
 export const mockHandlers = [
@@ -359,6 +470,168 @@ export const mockHandlers = [
       expiry_date: l.expiryDate ?? null, lot_code: l.lotCode ?? null,
     }));
     return HttpResponse.json({ id: String(params.id), tenant_id: "tnt_demo", supplier_id: "sup_acme", status: "received", receive_status: "received", total_cost_cents: 24000, created_at: Date.now() - 3600000, received_at: Date.now(), lines });
+  }),
+
+  // ── Receiving sessions ────────────────────────────────────────────────────
+  http.get(`${V1}/purchasing/receiving/dashboard`, async () => {
+    await lat();
+    const active = [...receivingSessions.values()].filter((s) => !["completed", "cancelled"].includes(s.status));
+    return HttpResponse.json({
+      generated_at: Date.now(),
+      todays_receipts: 3, todays_units_received: 214,
+      pending_receipts: 2, late_pos: 1,
+      active_sessions: active.length, quality_holds: 0, quality_hold_units: 0,
+      invoices_pending: 2, bills_open: 4,
+      near_expiry_lots: 3, expired_lots: 1,
+      receiving_errors_today: 0, avg_receiving_time_ms: 512_000,
+      receiving_accuracy_pct: 97.8,
+      receiving_trend: [
+        { day: "Mon", receipts: 4 }, { day: "Tue", receipts: 2 }, { day: "Wed", receipts: 5 },
+        { day: "Thu", receipts: 3 }, { day: "Fri", receipts: 6 },
+      ],
+      ai_suggestions: { status: "idle" },
+    });
+  }),
+
+  http.get(`${V1}/purchasing/receiving/sessions`, async () => {
+    await lat();
+    return HttpResponse.json({
+      items: [...receivingSessions.values()].filter(
+        (s) => !["completed", "cancelled"].includes(s.status),
+      ),
+    });
+  }),
+
+  http.post(`${V1}/purchasing/receiving/sessions`, async ({ request }) => {
+    await lat();
+    const b = (await request.json().catch(() => ({}))) as { poId?: string; mode?: string; dockCode?: string | null };
+    // One open session per PO — hand back the existing one rather than forking
+    // a second set of counts against the same delivery.
+    const existing = [...receivingSessions.values()].find(
+      (s) => s.po_id === b.poId && !["completed", "cancelled"].includes(s.status),
+    );
+    if (existing) return HttpResponse.json(existing, { status: 201 });
+
+    const n = receivingSessions.size + 1;
+    const created: MockReceivingSession = {
+      ...structuredClone(receivingSessions.get("rcv_1")!),
+      id: `rcv_${n}`, po_id: b.poId ?? "po_1",
+      session_number: `RCV-10${41 + n}`, status: "open",
+      mode: b.mode ?? "standard", dock_code: b.dockCode ?? null,
+      started_at: Date.now(), created_at: Date.now(), updated_at: Date.now(),
+      completed_at: null,
+    };
+    created.lines = created.lines.map((l) => ({
+      ...l, session_id: created.id,
+      scanned_qty: 0, accepted_qty: 0, held_qty: 0, rejected_qty: 0,
+      unit_cost_cents: null, lot_code: null, expiry_date: null, status: "pending",
+    }));
+    receivingSessions.set(created.id, created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
+
+  http.get(`${V1}/purchasing/receiving/sessions/:id`, async ({ params }) => {
+    await lat();
+    const s = receivingSessions.get(String(params["id"]));
+    if (!s) return HttpResponse.json({ error: "not_found", message: "No such receiving session." }, { status: 404 });
+    return HttpResponse.json(s);
+  }),
+
+  http.post(`${V1}/purchasing/receiving/sessions/:id/scan`, async ({ params, request }) => {
+    await lat();
+    const s = receivingSessions.get(String(params["id"]));
+    if (!s) return HttpResponse.json({ error: "not_found", message: "No such receiving session." }, { status: 404 });
+
+    const b = (await request.json().catch(() => ({}))) as { barcode?: string; qty?: number };
+    const code = (b.barcode ?? "").trim();
+    const qty = b.qty && b.qty > 0 ? Math.trunc(b.qty) : 1;
+
+    const line = s.lines.find((l) => l.barcode === code || l.sku.toLowerCase() === code.toLowerCase());
+    if (!line) {
+      return HttpResponse.json({
+        session: s, matched_line_id: null, result: "unknown",
+        detail: `${code} is not on this purchase order. Check the item, or add it as an unexpected receipt.`,
+        intelligence: null,
+      });
+    }
+
+    line.scanned_qty += qty;
+    line.accepted_qty += qty;
+    line.barcode_scanned = code;
+    line.status = recvLineStatus(line);
+    s.status = "receiving";
+    recvTouch(s);
+
+    const over = line.accepted_qty > line.expected_qty;
+    return HttpResponse.json({
+      session: s,
+      matched_line_id: line.id,
+      result: over ? "over_qty" : "matched",
+      detail: over
+        ? `${line.product_name}: ${line.accepted_qty} counted against ${line.expected_qty} ordered — ${line.accepted_qty - line.expected_qty} over.`
+        : `${line.product_name} — ${line.accepted_qty} of ${line.expected_qty}.`,
+      intelligence: recvIntelligence[line.product_id] ?? null,
+    });
+  }),
+
+  http.patch(`${V1}/purchasing/receiving/sessions/:id/lines/:lineId`, async ({ params, request }) => {
+    await lat();
+    const s = receivingSessions.get(String(params["id"]));
+    if (!s) return HttpResponse.json({ error: "not_found", message: "No such receiving session." }, { status: 404 });
+    const line = s.lines.find((l) => l.id === String(params["lineId"]));
+    if (!line) return HttpResponse.json({ error: "not_found", message: "No such line." }, { status: 404 });
+
+    const b = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    if (typeof b["acceptedQty"] === "number") line.accepted_qty = Math.max(0, Math.trunc(b["acceptedQty"]));
+    if (typeof b["heldQty"] === "number") line.held_qty = Math.max(0, Math.trunc(b["heldQty"]));
+    if (typeof b["rejectedQty"] === "number") line.rejected_qty = Math.max(0, Math.trunc(b["rejectedQty"]));
+    if (typeof b["unitCostCents"] === "number") line.unit_cost_cents = Math.max(0, Math.trunc(b["unitCostCents"]));
+    if ("lotCode" in b) line.lot_code = (b["lotCode"] as string | null) ?? null;
+    if ("expiryDate" in b) line.expiry_date = (b["expiryDate"] as number | null) ?? null;
+    if ("costOverrideReason" in b) line.cost_override_reason = (b["costOverrideReason"] as string | null) ?? null;
+    line.status = recvLineStatus(line);
+    line.updated_at = Date.now();
+    recvTouch(s);
+    return HttpResponse.json(s);
+  }),
+
+  http.get(`${V1}/purchasing/receiving/sessions/:id/intelligence/:productId`, async ({ params }) => {
+    await lat();
+    const intel = recvIntelligence[String(params["productId"])];
+    if (!intel) {
+      return HttpResponse.json({
+        product_id: String(params["productId"]),
+        last_purchase_cost_cents: null, prev_vendor_cost_cents: null,
+        avg_purchase_cost_cents: null, lowest_historical_cost_cents: null,
+        highest_historical_cost_cents: null, cost_trend: "unknown",
+        variance_vs_po_pct: null, variance_band: "neutral",
+        preferred_supplier_id: null, preferred_supplier_name: null,
+        lead_time_days: null, moq: null, fill_rate_pct: null, stock_on_hand: 0,
+        previous_lot_code: null, previous_lot_expiry: null, previous_lot_qty: null,
+        rotation_warning: null,
+      });
+    }
+    return HttpResponse.json(intel);
+  }),
+
+  http.post(`${V1}/purchasing/receiving/sessions/:id/close`, async ({ params }) => {
+    await lat();
+    const s = receivingSessions.get(String(params["id"]));
+    if (!s) return HttpResponse.json({ error: "not_found", message: "No such receiving session." }, { status: 404 });
+    s.status = "completed";
+    s.completed_at = Date.now();
+    s.lines.forEach((l) => { l.status = "posted"; });
+    recvTouch(s);
+    return HttpResponse.json(s);
+  }),
+
+  http.post(`${V1}/purchasing/receiving/sessions/:id/cancel`, async ({ params }) => {
+    await lat();
+    const s = receivingSessions.get(String(params["id"]));
+    if (!s) return HttpResponse.json({ error: "not_found", message: "No such receiving session." }, { status: 404 });
+    s.status = "cancelled";
+    recvTouch(s);
+    return HttpResponse.json(s);
   }),
 
   // ── Inventory: near-expiry report ─────────────────────────────────────────
@@ -705,6 +978,24 @@ export const mockHandlers = [
       { key: "cus_demo_2", name: "Grace Hopper", units: 12, revenueCents: 286000 },
     ] });
   }),
+  // Cash movement had NO handler at all. MSW is configured onUnhandledRequest:
+  // "warn", so the request fell through to a backend that isn't deployed in mock
+  // mode; useQuery's error branch clears loading, leaving the dashboard Cash Flow
+  // KPI showing a confident $0.00. Shape mirrors ReportsService.cashMovement.
+  http.get(`${V1}/reports/cash-movement`, async () => {
+    await lat();
+    const now = Date.now();
+    const items = [
+      { movement_type: "sale",       amount: 12_450, reason: null,              created_by: "usr_demo_cashier", created_at: now - 3_600_000 },
+      { movement_type: "float_in",   amount: 10_000, reason: "Opening float",   created_by: "usr_demo_owner",   created_at: now - 28_800_000 },
+      { movement_type: "sale",       amount:  8_320, reason: null,              created_by: "usr_demo_cashier", created_at: now - 7_200_000 },
+      { movement_type: "cash_out",   amount:  4_500, reason: "Supplier payout", created_by: "usr_demo_owner",   created_at: now - 10_800_000 },
+      { movement_type: "cash_out",   amount:  2_000, reason: "Petty cash",      created_by: "usr_demo_owner",   created_at: now - 14_400_000 },
+    ];
+    const totalInCents = items.filter((r) => r.movement_type !== "cash_out").reduce((s, r) => s + r.amount, 0);
+    const totalOutCents = items.filter((r) => r.movement_type === "cash_out").reduce((s, r) => s + r.amount, 0);
+    return HttpResponse.json({ items, totalInCents, totalOutCents, netCents: totalInCents - totalOutCents });
+  }),
   http.get(`${V1}/reports/inventory-valuation`, async () => {
     await lat();
     const rows = [
@@ -716,7 +1007,9 @@ export const mockHandlers = [
     ];
     const totalCostCents = rows.reduce((s, r) => s + r.costValueCents, 0);
     const totalRetailCents = rows.reduce((s, r) => s + r.retailValueCents, 0);
-    return HttpResponse.json({ rows, totalCostCents, totalRetailCents });
+    // `total` (SKU count) is part of the backend's Valuation shape; omitting it
+    // made the dashboard Ops Hub render "SKUs: 0" next to a real inventory value.
+    return HttpResponse.json({ rows, totalCostCents, totalRetailCents, total: rows.length });
   }),
 
 
@@ -1318,25 +1611,133 @@ export const mockHandlers = [
       ),
     ];
 
-    function applyFilters(
-      list: typeof products,
-      category?: string,
-      status?: string,
-      q?: string,
-    ) {
+    /**
+     * Mirror of the real catalog list query (src/modules/catalog/service.ts).
+     *
+     * Keeping these two in step matters more than it looks: this mock used to
+     * implement `?q=` while the backend silently ignored it, so search worked
+     * in `npm run dev` and did nothing in production for as long as the feature
+     * existed. Anything added to the real query belongs here too.
+     */
+    interface CatalogQuery {
+      category?: string; status?: string; q?: string; brand?: string;
+      supplier?: string; taxClass?: string; ageRestricted?: boolean;
+      productType?: string; minPrice?: number; maxPrice?: number;
+      topLevel?: boolean;
+    }
+
+    const variantCountOf = (id: string) => products.filter((p) => p.parent_product_id === id).length;
+
+    const productTypeOf = (p: (typeof products)[number]) =>
+      p.parent_product_id ? "variant" : variantCountOf(p.id) > 0 ? "master" : "standalone";
+
+    /** Same precedence as the server: exact barcode, exact SKU, prefixes, then contains. */
+    function relevanceRank(p: (typeof products)[number], q: string): number {
+      const lq = q.trim().toLowerCase();
+      const digits = lq.replace(/\D/g, "");
+      const barcode = String(p.barcode ?? "").toLowerCase();
+      const sku = String(p.sku).toLowerCase();
+      const name = String(p.name).toLowerCase();
+      const brand = String(p.brand ?? "").toLowerCase();
+      if (barcode && (barcode === lq || (digits.length >= 6 && barcode === digits))) return 0;
+      if (sku === lq) return 1;
+      if (sku.startsWith(lq)) return 3;
+      if (name.startsWith(lq)) return 4;
+      if (brand.startsWith(lq)) return 5;
+      if (name.includes(lq)) return 6;
+      return 7;
+    }
+
+    function applyFilters(list: typeof products, f: CatalogQuery) {
       return list.filter((p) => {
-        if (category && p.category !== category) return false;
-        if (status && p.status !== status) return false;
-        if (q) {
-          const lq = q.toLowerCase();
-          if (
-            !String(p.name).toLowerCase().includes(lq) &&
-            !String(p.sku).toLowerCase().includes(lq) &&
-            !String(p.barcode ?? "").includes(lq)
-          ) return false;
+        if (f.topLevel && p.parent_product_id) return false;
+        if (f.category && p.category !== f.category) return false;
+        if (f.status && p.status !== f.status) return false;
+        if (f.brand && !String(p.brand ?? "").toLowerCase().includes(f.brand.toLowerCase())) return false;
+        if (f.taxClass && p.tax_class !== f.taxClass) return false;
+        if (f.ageRestricted && p.age_restricted !== 1) return false;
+        if (f.productType && productTypeOf(p) !== f.productType) return false;
+        if (f.minPrice !== undefined && p.price_cents < f.minPrice) return false;
+        if (f.maxPrice !== undefined && p.price_cents > f.maxPrice) return false;
+        if (f.supplier) {
+          const s = f.supplier.toLowerCase();
+          if (!String((p as { preferred_vendor_name?: string | null }).preferred_vendor_name ?? "").toLowerCase().includes(s)) return false;
+        }
+        if (f.q) {
+          // AND across tokens, OR across the searchable columns.
+          const tokens = f.q.trim().toLowerCase().split(/\s+/).filter(Boolean).slice(0, 5);
+          const haystack = [p.name, p.sku, p.barcode, p.brand, p.category,
+            (p as { manufacturer?: string | null }).manufacturer,
+            (p as { vendor_upc?: string | null }).vendor_upc,
+          ].map((v) => String(v ?? "").toLowerCase());
+          if (!tokens.every((t) => haystack.some((h) => h.includes(t)))) return false;
         }
         return true;
       });
+    }
+
+    function sortProducts(list: typeof products, sort: string, dir: string, q?: string) {
+      const sign = dir === "desc" ? -1 : 1;
+      const cmp = (a: unknown, b: unknown) => {
+        // NULLS LAST in both directions, matching the server.
+        const an = a === null || a === undefined || a === "";
+        const bn = b === null || b === undefined || b === "";
+        if (an && bn) return 0;
+        if (an) return 1;
+        if (bn) return -1;
+        if (typeof a === "number" && typeof b === "number") return (a - b) * sign;
+        return String(a).localeCompare(String(b)) * sign;
+      };
+      const key = (p: (typeof products)[number]) => {
+        switch (sort) {
+          case "sku":         return p.sku;
+          case "price_cents": return p.price_cents;
+          case "category":    return p.category;
+          case "brand":       return p.brand;
+          case "status":      return p.status;
+          case "created_at":  return p.createdAt;
+          case "updated_at":  return p.updatedAt;
+          case "cost":        return p.raw_cost_price_cents;
+          default:            return p.name;
+        }
+      };
+      if (sort === "relevance" && q) {
+        return [...list].sort((a, b) =>
+          relevanceRank(a, q) - relevanceRank(b, q)
+          || (a.status === "active" ? 0 : 1) - (b.status === "active" ? 0 : 1)
+          || String(a.name).localeCompare(String(b.name)));
+      }
+      return [...list].sort((a, b) => cmp(key(a), key(b)) || String(a.id).localeCompare(String(b.id)));
+    }
+
+    function readCatalogQuery(url: URL): CatalogQuery {
+      const str = (k: string) => url.searchParams.get(k) || undefined;
+      const money = (k: string) => {
+        const raw = url.searchParams.get(k);
+        return raw && raw.trim() !== "" && Number.isFinite(Number(raw)) ? Math.round(Number(raw) * 100) : undefined;
+      };
+      const type = str("productType");
+      return {
+        category: str("category"), status: str("status"), q: str("q"),
+        brand: str("brand"), supplier: str("supplier"), taxClass: str("taxClass"),
+        ageRestricted: url.searchParams.get("ageRestricted") === "true",
+        topLevel: url.searchParams.get("topLevel") === "true",
+        productType: type === "all" ? undefined : type,
+        minPrice: money("minPrice"), maxPrice: money("maxPrice"),
+      };
+    }
+
+    /** Buckets over a list, biggest first — the mock's version of the facets query. */
+    function bucketize(list: typeof products, pick: (p: (typeof products)[number]) => string | null | undefined) {
+      const counts = new Map<string, number>();
+      for (const p of list) {
+        const v = pick(p);
+        if (v == null || v === "") continue;
+        counts.set(v, (counts.get(v) ?? 0) + 1);
+      }
+      return [...counts.entries()]
+        .map(([value, count]) => ({ value, count }))
+        .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
     }
 
     return [
@@ -1344,17 +1745,44 @@ export const mockHandlers = [
       http.get(`${V1}/catalog`, async ({ request }) => {
         await lat();
         const url = new URL(request.url);
-        const category = url.searchParams.get("category") ?? undefined;
-        const status   = url.searchParams.get("status")   ?? undefined;
-        const q        = url.searchParams.get("q")        ?? undefined;
+        const query = readCatalogQuery(url);
         const limit    = Number(url.searchParams.get("limit") ?? 50);
         const offset   = Number(url.searchParams.get("offset") ?? 0);
-        const filtered = applyFilters(products, category, status, q);
+        const sort     = url.searchParams.get("sort") ?? (query.q ? "relevance" : "created_at");
+        const dir      = url.searchParams.get("dir") ?? "asc";
+        const filtered = sortProducts(applyFilters(products, query), sort, dir, query.q);
         return HttpResponse.json({
-          items: filtered.slice(offset, offset + limit),
+          items: filtered.slice(offset, offset + limit).map((p) => ({ ...p, variant_count: variantCountOf(p.id) })),
           total: filtered.length,
           limit,
           offset,
+        });
+      }),
+
+      // Facet counts for the current query. Each dimension drops its own filter
+      // so the UI can still offer the alternatives to switch to — same rule the
+      // server's buildListWhere(omit) applies.
+      http.get(`${V1}/catalog/facets`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const query = readCatalogQuery(url);
+        const scoped = (omit: keyof CatalogQuery) => applyFilters(products, { ...query, [omit]: undefined });
+        const matching = applyFilters(products, query);
+        const prices = matching.map((p) => p.price_cents);
+        return HttpResponse.json({
+          total: matching.length,
+          status: bucketize(scoped("status"), (p) => p.status),
+          productType: ["standalone", "master", "variant"].map((value) => ({
+            value,
+            count: scoped("productType").filter((p) => productTypeOf(p) === value).length,
+          })),
+          category: bucketize(scoped("category"), (p) => p.category),
+          brand: bucketize(scoped("brand"), (p) => p.brand),
+          supplier: bucketize(scoped("supplier"), (p) => (p as { preferred_vendor_name?: string | null }).preferred_vendor_name),
+          taxClass: bucketize(scoped("taxClass"), (p) => p.tax_class),
+          ageRestricted: matching.filter((p) => p.age_restricted === 1).length,
+          ecommerce: matching.filter((p) => (p as { ecommerce?: number }).ecommerce === 1).length,
+          priceRange: prices.length ? { min: Math.min(...prices), max: Math.max(...prices) } : null,
         });
       }),
 
@@ -3159,15 +3587,25 @@ mockHandlers.push(
   }),
 
   // ── P&L report ────────────────────────────────────────────────────────────
+  // Shape mirrors PnlReport in src/modules/reports/service.ts. It used to return
+  // a nested {revenue:{...},cogs:{...},...} object no backend ever produced, so
+  // every consumer read undefined and rendered a confident $0.00 P&L.
   http.get(`${V1}/reports/p-l`, async () => {
     await lat();
+    const grossSalesCents = 284_600;
+    const taxCents = 22_768;
+    const revenueCents = grossSalesCents - taxCents; // 261,832 — revenue is net of tax
+    const cogsCents = 142_300;
+    const grossProfitCents = revenueCents - cogsCents; // 119,532
+    const operatingExpensesCents = 38_400;
     return HttpResponse.json({
-      revenue: { grossCents: 284600, taxCents: 22768, netCents: 261832 },
-      cogs: { costCents: 142300 },
-      grossProfit: { cents: 119532, pct: 45.6 },
-      opex: { cents: 38400 },
-      netProfit: { cents: 81132, pct: 31.0 },
-      period: "Last 30 days",
+      revenueCents,
+      grossSalesCents,
+      taxCents,
+      cogsCents,
+      grossProfitCents,
+      operatingExpensesCents,
+      netIncomeCents: grossProfitCents - operatingExpensesCents, // 81,132
     });
   }),
 
@@ -3182,12 +3620,13 @@ mockHandlers.push(
   }),
 
   // ── Sales-by-vendor report ─────────────────────────────────────────────────
+  // Shape mirrors SalesByVendorRow (totalCents/qty, not revenueCents/unitsSold).
   http.get(`${V1}/reports/sales-by-vendor`, async () => {
     await lat();
     return HttpResponse.json({ items: [
-      { vendorId: "sup_acme", vendorName: "Acme Coffee Co", orderCount: 54, revenueCents: 168400, unitsSold: 312 },
-      { vendorId: "sup_tea", vendorName: "Tea Traders", orderCount: 29, revenueCents: 84200, unitsSold: 198 },
-      { vendorId: "sup_other", vendorName: "General Goods", orderCount: 15, revenueCents: 32000, unitsSold: 87 },
+      { vendorId: "sup_acme", vendorName: "Acme Coffee Co", orderCount: 54, totalCents: 168400, qty: 312 },
+      { vendorId: "sup_tea", vendorName: "Tea Traders", orderCount: 29, totalCents: 84200, qty: 198 },
+      { vendorId: "sup_other", vendorName: "General Goods", orderCount: 15, totalCents: 32000, qty: 87 },
     ]});
   }),
 

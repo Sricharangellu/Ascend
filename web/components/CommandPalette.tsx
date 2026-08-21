@@ -40,7 +40,7 @@ export function hrefForHit(hit: SearchHit): string {
     case "order":          return `/orders/${hit.id}`;
     // No dedicated detail routes yet — land on the owning list hub.
     case "invoice":        return `/finance`;
-    case "sales_order":    return `/sales`;
+    case "sales_order":    return `/orders`;
     case "quotation":      return `/quotes`;
     default:               return `/dashboard`;
   }

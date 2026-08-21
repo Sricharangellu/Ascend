@@ -110,6 +110,82 @@ for (const f of files) {
   }
 }
 
+// 8. Root-manifest integrity — the npm surface CI actually invokes.
+//
+//    FIVE times over ~2 days (PR #145, #171 tsconfig, #174 full root, the
+//    2026-08-03T110000Z incident, and the a4dbf2c/#182 pair) a merge from a
+//    separately-scaffolded workspace replaced
+//    this repo's root with a foreign one: `package.json` became a `name: workspace`
+//    pnpm stub whose `preinstall` hook deletes `package-lock.json` and hard-fails
+//    every npm invocation, `package-lock.json` was deleted, and `tsconfig.json`
+//    became a project-references stub with no `compilerOptions`. CI runs `npm ci`
+//    in seven places and builds `dist/src/server.js` from that tsconfig, so all of
+//    it goes red — but only *after* checkout+install, which reads as an
+//    infrastructure flake rather than a swapped manifest.
+//
+//    The first two incidents were each hand-diagnosed after the fact; the second
+//    audit recommended exactly this guard and did not build it. Asserting the
+//    behaviour CI depends on (rather than the absence of specific foreign files,
+//    which would also forbid a legitimately coexisting pnpm workspace) catches the
+//    whole class in seconds, locally and in CI, before anything installs.
+//
+//    This check must stay reachable WITHOUT npm — CI invokes it as a bare
+//    `node tools/hygiene-check.mjs`, since `npm run hygiene` is itself unusable
+//    once the root manifest is the thing that broke.
+const ROOT_PKG_NAME = "ascend";
+// Every root script CI or the deploy path calls by name. Sources:
+// .github/workflows/ci.yml (prevent:drift, gap:scan, typecheck, test, smoke),
+// Dockerfile (build), AGENTS.md Command Gates (hygiene, table:scan, verify).
+const REQUIRED_ROOT_SCRIPTS = [
+  "build", "typecheck", "test", "smoke",
+  "hygiene", "prevent:drift", "gap:scan", "table:scan", "verify",
+];
+try {
+  const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+  if (pkg.name !== ROOT_PKG_NAME) {
+    violations.push(
+      `root package.json name is "${pkg.name}", expected "${ROOT_PKG_NAME}" — ` +
+        "the root manifest has been replaced by a foreign one (see check 8 above)",
+    );
+  }
+  const scripts = pkg.scripts ?? {};
+  const missing = REQUIRED_ROOT_SCRIPTS.filter((s) => !scripts[s]);
+  if (missing.length) {
+    violations.push(`root package.json is missing scripts CI invokes: ${missing.join(", ")}`);
+  }
+  // A `preinstall` that rejects npm (the pnpm stub's `case "$npm_config_user_agent"`
+  // guard) blocks all seven of CI's `npm ci` steps AND deletes the lockfile.
+  if (typeof scripts.preinstall === "string" && /npm_config_user_agent|Use pnpm/.test(scripts.preinstall)) {
+    violations.push("root package.json has a preinstall hook that rejects npm — CI installs with npm ci");
+  }
+} catch (err) {
+  violations.push(`root package.json unreadable or not valid JSON: ${err.message}`);
+}
+
+// `npm ci` (7 CI steps) fails outright without a lockfile; `web` has its own job.
+for (const lock of ["package-lock.json", "web/package-lock.json"]) {
+  if (!existsSync(lock)) violations.push(`missing ${lock} — every \`npm ci\` step fails without it`);
+}
+
+// The root tsconfig must be the one that compiles the backend: the Dockerfile and
+// CI's e2e job both run `tsc -p tsconfig.json` and then execute `dist/src/server.js`.
+// A `files: []` + `references: []` project-references stub typechecks nothing and
+// emits nothing, so the build "succeeds" and the server file is simply absent.
+try {
+  const tsconfig = JSON.parse(readFileSync("tsconfig.json", "utf8").replace(/^\s*\/\/.*$/gm, ""));
+  if (!tsconfig.compilerOptions) {
+    violations.push("root tsconfig.json has no compilerOptions — it is a project-references stub, not the backend build config");
+  } else if (!tsconfig.compilerOptions.outDir) {
+    violations.push("root tsconfig.json has no compilerOptions.outDir — the Dockerfile and CI e2e run `node dist/src/server.js`");
+  }
+  const include = tsconfig.include ?? [];
+  if (!include.some((p) => p.startsWith("src/"))) {
+    violations.push(`root tsconfig.json does not include src/ (include: ${JSON.stringify(include)}) — the backend would not be compiled`);
+  }
+} catch (err) {
+  violations.push(`root tsconfig.json unreadable or not valid JSON: ${err.message}`);
+}
+
 if (violations.length) {
   console.error("✗ repo-hygiene check FAILED:\n" + violations.map((v) => "  - " + v).join("\n"));
   console.error(
