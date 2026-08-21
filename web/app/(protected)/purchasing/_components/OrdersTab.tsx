@@ -1,10 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/Button";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { formatMoney, parseToCents } from "@/lib/money";
 import { hasRole } from "@/lib/auth";
+import { startReceivingSession, receivingSessionHref } from "@/lib/receiving";
 import type {
   CreatePurchaseOrderLineRequest,
   InventoryLevelsResponse,
@@ -15,15 +19,23 @@ import type {
 } from "@/api-client/types";
 import { STATUS_STYLE, emptyLine, type DraftLine } from "./shared";
 
+interface ProductBarcode { barcode: string; kind: string; pack_size: number }
+
+const UNIT_LABEL: Record<string, string> = { each: "Each", box: "Box", case: "Case", pallet: "Pallet", alt: "Alternate" };
+
 export function OrdersTab() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [orders, setOrders]       = useState<PurchaseOrder[]>([]);
   const [products, setProducts]   = useState<Array<{ id: string; sku: string; name: string }>>([]);
   const [error, setError]         = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<string[] | null>(null);
   const [busy, setBusy]           = useState(false);
   const [poSupplierId, setPoSupplierId] = useState("");
   const [lines, setLines]         = useState<DraftLine[]>([emptyLine()]);
+  const [unitsByProduct, setUnitsByProduct] = useState<Record<string, ProductBarcode[]>>({});
+  const [confirmReceiveAll, setConfirmReceiveAll] = useState<PurchaseOrder | null>(null);
   const canManage                 = hasRole("manager");
+  const router                    = useRouter();
 
   const load = useCallback(async () => {
     setError(null);
@@ -49,10 +61,54 @@ export function OrdersTab() {
   const updateLine = (index: number, patch: Partial<DraftLine>) =>
     setLines((cur) => cur.map((line, i) => (i === index ? { ...line, ...patch } : line)));
 
+  const onProductChange = async (index: number, productId: string) => {
+    updateLine(index, { productId, unitKind: "each" });
+    if (!productId || unitsByProduct[productId]) return;
+    try {
+      const d = await apiGet<{ items: ProductBarcode[] }>(`/api/v1/catalog/${productId}/barcodes`);
+      setUnitsByProduct((cur) => ({ ...cur, [productId]: d.items ?? [] }));
+    } catch { /* units are optional — line still works as "each" */ }
+  };
+
+  /** The configured pack size for a line's selected unit, or null for "each"
+   *  (no conversion) or when that unit isn't configured for this product. */
+  const packSizeFor = (line: DraftLine): number | null => {
+    if (line.unitKind === "each") return null;
+    const match = unitsByProduct[line.productId]?.find((u) => u.kind === line.unitKind);
+    return match?.pack_size ?? null;
+  };
+
   const addLine    = () => setLines((cur) => [...cur, emptyLine()]);
   const removeLine = (index: number) => setLines((cur) => cur.filter((_, i) => i !== index));
 
-  const receiveOrder = async (id: string) => {
+  /**
+   * Open the scan workspace for this PO — the normal way to receive a delivery.
+   * Starting the session from the row is what removes the old
+   * list → detail → tab → modal walk before the first box gets counted.
+   */
+  const openReceiving = async (id: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const session = await startReceivingSession(id);
+      router.push(receivingSessionHref(session.id));
+    } catch (err) {
+      setError(err instanceof ApiResponseError ? err.message : "Could not open receiving for this order.");
+      setBusy(false);
+    }
+  };
+
+  /**
+   * "Receive all expected" — post every open line at its full remaining
+   * quantity in one shot.
+   *
+   * This is what the old `Receive` button did, unlabelled and unguarded: a
+   * single click posted a complete receipt into inventory with no counts, no
+   * costs, no lots and no way back. It is a genuinely useful mode when the
+   * delivery is known-good, so it stays — but it now says what it does and
+   * asks first.
+   */
+  const receiveAll = async (id: string) => {
     setBusy(true);
     setError(null);
     try {
@@ -60,7 +116,7 @@ export function OrdersTab() {
       await load();
     } catch (err) {
       setError(err instanceof ApiResponseError ? err.message : "Could not receive purchase order.");
-    } finally { setBusy(false); }
+    } finally { setBusy(false); setConfirmReceiveAll(null); }
   };
 
   const createOrder = async () => {
@@ -73,6 +129,7 @@ export function OrdersTab() {
         quantity: Number(line.quantity),
         unitCostCents: parseToCents(line.unitCost),
       };
+      if (line.unitKind !== "each") entry.unitKind = line.unitKind;
       if (line.expiryDate) entry.expiryDate = new Date(line.expiryDate).getTime();
       if (line.lotCode.trim()) entry.lotCode = line.lotCode.trim();
       requestLines.push(entry);
@@ -83,9 +140,17 @@ export function OrdersTab() {
     }
     setBusy(true);
     setError(null);
+    setConfirmation(null);
     try {
-      await apiPost("/api/v1/purchasing/orders", { supplierId: poSupplierId, lines: requestLines });
+      const po = await apiPost<PurchaseOrder>("/api/v1/purchasing/orders", { supplierId: poSupplierId, lines: requestLines });
       setLines([emptyLine()]);
+      setConfirmation(
+        po.unitConversions?.length
+          ? po.unitConversions.map((c) =>
+              `${c.enteredQty} ${UNIT_LABEL[c.unitKind] ?? c.unitKind} → ${c.baseQty} Each (pack size ${c.packSize})`,
+            )
+          : null,
+      );
       await load();
     } catch (err) {
       setError(err instanceof ApiResponseError ? err.message : "Could not create purchase order.");
@@ -96,7 +161,26 @@ export function OrdersTab() {
 
   return (
     <div className="flex flex-col gap-5 p-4">
+      <ConfirmDialog
+        open={confirmReceiveAll !== null}
+        title="Receive everything on this order?"
+        message={
+          confirmReceiveAll
+            ? `Every open line on ${confirmReceiveAll.po_number != null ? `PO-${confirmReceiveAll.po_number}` : "this order"} will be posted at its full remaining quantity, at the ordered cost. Stock moves immediately. Use Scan & Receive instead if you need to count, price, or record lots and expiry dates.`
+            : ""
+        }
+        confirmLabel="Receive all"
+        onConfirm={() => { if (confirmReceiveAll) void receiveAll(confirmReceiveAll.id); }}
+        onCancel={() => setConfirmReceiveAll(null)}
+      />
+
       {error && <p role="alert" className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
+      {confirmation && (
+        <div className="rounded-md bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
+          <p className="font-medium">Purchase order created — unit conversion applied:</p>
+          {confirmation.map((line, i) => <p key={i}>{line}</p>)}
+        </div>
+      )}
 
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -117,7 +201,16 @@ export function OrdersTab() {
             ) : (
               orders.map((order) => (
                 <tr key={order.id} className="transition-colors hover:bg-slate-50">
-                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{order.id}</td>
+                  <td className="whitespace-nowrap px-4 py-3">
+                    {/* The PO number is what people say out loud and search for;
+                        the UUID was never useful here. */}
+                    <Link
+                      href={`/purchasing/${order.id}`}
+                      className="font-medium text-brand-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+                    >
+                      {order.po_number != null ? `PO-${order.po_number}` : order.id.slice(0, 8)}
+                    </Link>
+                  </td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-950">{supplierName(order.supplier_id)}</td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <span className={`inline-flex rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${STATUS_STYLE[order.status] ?? "bg-slate-100 text-slate-700 ring-slate-200"}`}>
@@ -127,9 +220,25 @@ export function OrdersTab() {
                   <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-950">{formatMoney(order.total_cost_cents)}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
                     {order.status === "ordered" && canManage && (
-                      <Button size="sm" variant="primary" disabled={busy} onClick={() => void receiveOrder(order.id)}>
-                        Receive
-                      </Button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          disabled={busy}
+                          onClick={() => void openReceiving(order.id)}
+                        >
+                          Scan &amp; Receive
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={busy}
+                          onClick={() => setConfirmReceiveAll(order)}
+                          title="Post every open line at its full remaining quantity"
+                        >
+                          Receive all
+                        </Button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -149,38 +258,70 @@ export function OrdersTab() {
             </select>
           </label>
           <div className="flex flex-col gap-3">
-            {lines.map((line, index) => (
-              <div key={index} className="grid grid-cols-1 gap-2 rounded-md border border-slate-200 p-3 sm:grid-cols-5">
-                <label className="block sm:col-span-2">
-                  <span className="text-xs font-medium uppercase text-slate-500">Product</span>
-                  <select value={line.productId} onChange={(e) => updateLine(index, { productId: e.target.value })} className={INPUT}>
-                    <option value="">Select product</option>
-                    {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
-                  </select>
-                </label>
-                <label className="block">
-                  <span className="text-xs font-medium uppercase text-slate-500">Quantity</span>
-                  <input type="number" min="1" value={line.quantity} onChange={(e) => updateLine(index, { quantity: e.target.value })} className={INPUT} />
-                </label>
-                <label className="block">
-                  <span className="text-xs font-medium uppercase text-slate-500">Unit cost</span>
-                  <input type="text" inputMode="decimal" value={line.unitCost} onChange={(e) => updateLine(index, { unitCost: e.target.value })} placeholder="0.00" className={INPUT} />
-                </label>
-                <label className="block">
-                  <span className="text-xs font-medium uppercase text-slate-500">Expiry date</span>
-                  <input type="date" value={line.expiryDate} onChange={(e) => updateLine(index, { expiryDate: e.target.value })} className={INPUT} />
-                </label>
-                <label className="block">
-                  <span className="text-xs font-medium uppercase text-slate-500">Lot code</span>
-                  <input type="text" value={line.lotCode} onChange={(e) => updateLine(index, { lotCode: e.target.value })} placeholder="Optional" className={INPUT} />
-                </label>
+            {lines.map((line, index) => {
+              const availableUnits = unitsByProduct[line.productId] ?? [];
+              const packSize = packSizeFor(line);
+              const qty = Number(line.quantity) || 0;
+              const costCents = line.unitCost ? parseToCents(line.unitCost) : 0;
+              return (
+              <div key={index} className="rounded-md border border-slate-200 p-3">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-6">
+                  <label className="block sm:col-span-2">
+                    <span className="text-xs font-medium uppercase text-slate-500">Product</span>
+                    <select value={line.productId} onChange={(e) => void onProductChange(index, e.target.value)} className={INPUT}>
+                      <option value="">Select product</option>
+                      {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-medium uppercase text-slate-500">Unit</span>
+                    <select value={line.unitKind} onChange={(e) => updateLine(index, { unitKind: e.target.value })} className={INPUT}>
+                      <option value="each">Each</option>
+                      {availableUnits.filter((u) => u.kind !== "each").map((u) => (
+                        <option key={u.kind} value={u.kind}>{UNIT_LABEL[u.kind] ?? u.kind}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-medium uppercase text-slate-500">Quantity {line.unitKind !== "each" && `(${UNIT_LABEL[line.unitKind] ?? line.unitKind})`}</span>
+                    <input type="number" min="1" value={line.quantity} onChange={(e) => updateLine(index, { quantity: e.target.value })} className={INPUT} />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-medium uppercase text-slate-500">Unit cost {line.unitKind !== "each" && `(per ${UNIT_LABEL[line.unitKind] ?? line.unitKind})`}</span>
+                    <input type="text" inputMode="decimal" value={line.unitCost} onChange={(e) => updateLine(index, { unitCost: e.target.value })} placeholder="0.00" className={INPUT} />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-medium uppercase text-slate-500">Expiry date</span>
+                    <input type="date" value={line.expiryDate} onChange={(e) => updateLine(index, { expiryDate: e.target.value })} className={INPUT} />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-medium uppercase text-slate-500">Lot code</span>
+                    <input type="text" value={line.lotCode} onChange={(e) => updateLine(index, { lotCode: e.target.value })} placeholder="Optional" className={INPUT} />
+                  </label>
+                </div>
+
+                {line.unitKind !== "each" && (
+                  packSize ? (
+                    <p className="mt-2 rounded bg-blue-50 px-3 py-1.5 text-xs text-blue-800">
+                      1 {UNIT_LABEL[line.unitKind] ?? line.unitKind} = {packSize} Each — entered {qty || "?"} {UNIT_LABEL[line.unitKind] ?? line.unitKind}
+                      {qty > 0 && ` → ${qty * packSize} Each`}
+                      {costCents > 0 && ` @ ${formatMoney(Math.round(costCents / packSize))}/each (normalized from ${formatMoney(costCents)}/${UNIT_LABEL[line.unitKind] ?? line.unitKind})`}
+                    </p>
+                  ) : (
+                    <p className="mt-2 rounded bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
+                      No &quot;{UNIT_LABEL[line.unitKind] ?? line.unitKind}&quot; unit is configured for this product yet — add one under Units &amp; Packaging on the product page first.
+                    </p>
+                  )
+                )}
+
                 {lines.length > 1 && (
-                  <div className="sm:col-span-5">
+                  <div className="mt-2">
                     <Button variant="ghost" size="sm" onClick={() => removeLine(index)}>Remove line</Button>
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
           <div className="mt-3 flex gap-2">
             <Button variant="secondary" size="sm" onClick={addLine}>Add line</Button>

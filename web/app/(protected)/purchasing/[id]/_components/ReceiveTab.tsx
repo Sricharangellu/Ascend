@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { Modal } from "@/components/Modal";
@@ -50,6 +50,11 @@ export function ReceiveTab({
   const [docName, setDocName] = useState("");
   const [docType, setDocType] = useState("invoice");
   const [docBusy, setDocBusy] = useState(false);
+  // Which lines' "units/case" prefill came from the product's real configured
+  // case pack size (vs. the generic "1 case = all remaining" fallback) — shown
+  // as a hint so the operator knows it's a real number, not a guess.
+  const [configuredPackSize, setConfiguredPackSize] = useState<Record<string, number>>({});
+  const packSizesApplied = useRef(false);
 
   const loadDocs = useCallback(async () => {
     try {
@@ -59,6 +64,39 @@ export function ReceiveTab({
   }, [orderId]);
 
   useEffect(() => { void loadDocs(); }, [loadDocs]);
+
+  // Prefill each line's "units/case" from the product's actual configured
+  // case pack size (product_barcodes), once, before the operator edits it —
+  // replaces the generic "1 case = all remaining" guess with a real number.
+  useEffect(() => {
+    if (packSizesApplied.current) return;
+    packSizesApplied.current = true;
+    (async () => {
+      const uniqueProductIds = Array.from(new Set(order.lines.map((l) => l.product_id)));
+      const results = await Promise.all(uniqueProductIds.map(async (pid) => {
+        try {
+          const d = await apiGet<{ items: Array<{ kind: string; pack_size: number }> }>(`/api/v1/catalog/${pid}/barcodes`);
+          const caseUnit = d.items?.find((u) => u.kind === "case");
+          return [pid, caseUnit?.pack_size] as const;
+        } catch {
+          return [pid, undefined] as const;
+        }
+      }));
+      const byProduct = new Map(results.filter(([, size]) => size != null));
+      if (byProduct.size === 0) return;
+      const byLineId: Record<string, number> = {};
+      for (const l of order.lines) {
+        const size = byProduct.get(l.product_id);
+        if (size != null) byLineId[l.id] = size;
+      }
+      setConfiguredPackSize(byLineId);
+      setReceiveEntries((prev) => prev.map((e) => {
+        const size = byLineId[e.lineId];
+        if (size == null) return e;
+        return { ...e, unitsPerCase: String(size), totalQty: computeTotal(e.cases, String(size)) };
+      }));
+    })();
+  }, [order.lines]);
 
   const updateEntry = (lineId: string, patch: Partial<ReceiveEntry>) => {
     setReceiveEntries((prev) => prev.map((e) => {
@@ -75,7 +113,16 @@ export function ReceiveTab({
   };
 
   const submitReceive = async () => {
-    const lines = receiveEntries.filter((e) => e.totalQty > 0).map((e) => ({ lineId: e.lineId, qty: e.totalQty }));
+    const lines = receiveEntries
+      .filter((e) => e.totalQty > 0)
+      .map((e) => ({
+        lineId: e.lineId,
+        qty: e.totalQty,
+        ...(e.expiryDate
+          ? { expiryDate: new Date(`${e.expiryDate}T00:00:00.000Z`).getTime() }
+          : {}),
+        ...(e.lotCode.trim() ? { lotCode: e.lotCode.trim() } : {}),
+      }));
     if (lines.length === 0) { setReceiveError("Enter quantities to receive."); return; }
     setReceiveBusy(true); setReceiveError(null);
     try {
@@ -221,7 +268,9 @@ export function ReceiveTab({
                       className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-center text-sm focus:border-blue-500 focus:outline-none" />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500">Units/case</label>
+                    <label className="mb-1 block text-xs font-medium text-slate-500">
+                      Units/case{configuredPackSize[line.id] != null && <span className="ml-1 text-emerald-600">✓ configured</span>}
+                    </label>
                     <input type="number" min={1} value={entry.unitsPerCase} onChange={(e) => updateEntry(line.id, { unitsPerCase: e.target.value })}
                       className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-center text-sm focus:border-blue-500 focus:outline-none" />
                   </div>

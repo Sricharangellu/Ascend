@@ -11,6 +11,7 @@ import { Badge, statusBadge } from "@/components/Badge";
 import { formatMoney } from "@/lib/money";
 import { apiGet, ApiResponseError } from "@/api-client/client";
 import { hasRole } from "@/lib/auth";
+import { startReceivingSession, receivingSessionHref } from "@/lib/receiving";
 import type { Supplier, SuppliersResponse } from "@/api-client/types";
 import {
   type PurchaseOrderDetail,
@@ -42,8 +43,24 @@ export default function PurchaseOrderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<DetailTab>("lines");
+  const [startingSession, setStartingSession] = useState(false);
 
   const canManage = hasRole("manager");
+
+  /** Straight from the purchase order into the scan workspace. */
+  const openScanReceive = async () => {
+    setStartingSession(true);
+    setError(null);
+    try {
+      const session = await startReceivingSession(id);
+      router.push(receivingSessionHref(session.id));
+    } catch (e) {
+      setError(
+        e instanceof ApiResponseError ? e.message : "Could not start receiving for this order.",
+      );
+      setStartingSession(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setError(null);
@@ -161,9 +178,20 @@ export default function PurchaseOrderDetailPage() {
                   {order.notes && <p className="max-w-prose text-xs italic text-slate-500">{order.notes}</p>}
                 </div>
                 {canManage && order.status !== "received" && (
-                  <div className="flex gap-2">
+                  // The receiving modes belong here, on the purchase order, not
+                  // two clicks deep inside a tab — this is the screen the
+                  // operator is looking at when the pallet turns up.
+                  <div className="flex flex-wrap gap-2">
                     <Button variant="secondary" size="sm" onClick={() => setActiveTab("billing")}>Landed costs</Button>
-                    <Button variant="primary" size="sm" onClick={() => setActiveTab("receive")}>Receive stock</Button>
+                    <Button variant="secondary" size="sm" onClick={() => setActiveTab("receive")}>Manual receive</Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      loading={startingSession}
+                      onClick={() => void openScanReceive()}
+                    >
+                      Scan &amp; Receive
+                    </Button>
                   </div>
                 )}
               </div>

@@ -1,6 +1,8 @@
 import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import { notFound, badRequest } from "../../shared/http.js";
+import { roundToOrderQuantity } from "../../shared/reorder-quantity.js";
+import { computeSalesVelocityForProduct } from "../../shared/sales-velocity.js";
 import type { CatalogService } from "./service.js";
 
 /**
@@ -633,8 +635,22 @@ export class CatalogDetailViewsService {
   /**
    * avg_daily_sales/days_until_stockout use a trailing-30-day sales velocity
    * (no dedicated forecasting model exists yet — see WORK/FORWARD_PLAN.md's
-   * "inventory forecasting" future item). suggested_qty rounds up to the
-   * location's reorder_quantity when set, otherwise to 14 days of cover.
+   * "inventory forecasting" future item). The raw target quantity is the
+   * location's reorder_quantity when set, otherwise 14 days of cover;
+   * suggested_qty then rounds that up to a quantity the preferred supplier
+   * can actually fulfil — MOQ and case/pack size, via
+   * `shared/reorder-quantity.ts` (Phase 6 item 1, see WORK/FORWARD_PLAN.md
+   * and AUDIT_2026-07-28T184729Z-erp-procurement-demand-planning-gap.md) —
+   * falling back to no rounding when the supplier has no MOQ/case_pack
+   * configured, which preserves prior behavior exactly. safety_stock (Phase 6
+   * item 2) is read from the product-level `inventory.safety_stock` — the
+   * single settable source of truth (via `PUT /inventory/:productId/safety-
+   * stock`), since `inventory_stock`'s own reorder_level/reorder_quantity
+   * columns are never written by any route today (confirmed by the gap
+   * analysis) and adding a second, never-settable copy there would just be
+   * more dead schema. Defaults to 0 (no buffer configured), additive to the
+   * raw target before rounding — a no-op for any product that hasn't
+   * configured one, preserving prior behavior exactly.
    */
   async reorderSuggestions(productId: string, tenantId: string) {
     await this.catalog.getOrThrow(productId, tenantId);
@@ -645,6 +661,10 @@ export class CatalogDetailViewsService {
               COALESCE(SUM(quantity_available), 0) AS available,
               COALESCE(MAX(reorder_level), 0) AS reorder_level, COALESCE(MAX(reorder_quantity), 0) AS reorder_qty
        FROM inventory_stock WHERE tenant_id = @t AND product_id = @p`,
+      { t: tenantId, p: productId },
+    );
+    const safetyStockRow = await this.db.one<{ safety_stock: number }>(
+      `SELECT COALESCE(safety_stock, 0) AS safety_stock FROM inventory WHERE tenant_id = @t AND product_id = @p`,
       { t: tenantId, p: productId },
     );
     // "Incoming" = still on order and not yet physically arrived. Must use
@@ -659,13 +679,12 @@ export class CatalogDetailViewsService {
        WHERE pol.tenant_id = @t AND pol.product_id = @p AND po.status IN ('ordered', 'partially_received')`,
       { t: tenantId, p: productId },
     );
-    const velocity = await this.db.one<{ units: number }>(
-      `SELECT COALESCE(SUM(ol.quantity), 0) AS units
-       FROM order_lines ol JOIN orders o ON o.tenant_id = ol.tenant_id AND o.id = ol.order_id
-       WHERE ol.tenant_id = @t AND ol.product_id = @p AND o.status = 'completed'
-         AND o.created_at >= @cutoff`,
-      { t: tenantId, p: productId, cutoff: Date.now() - 30 * DAY_MS },
-    );
+    // Phase 7 item 1 (WORK/FORWARD_PLAN.md): velocity now comes from the
+    // shared, single-source-of-truth sales-velocity service instead of a
+    // locally-duplicated query — see src/shared/sales-velocity.ts for why
+    // this consolidation exists (five independently-drifted velocity
+    // formulas across the codebase, two with real correctness bugs).
+    const velocity = await computeSalesVelocityForProduct(this.db, { tenantId, productId, lookbackDays: 30 });
     const lastPo = await this.db.one<{ date: number }>(
       `SELECT MAX(po.created_at) AS date FROM purchase_order_lines pol
        JOIN purchase_orders po ON po.tenant_id = pol.tenant_id AND po.id = pol.po_id
@@ -677,8 +696,9 @@ export class CatalogDetailViewsService {
     const available = Number(stock?.available ?? 0);
     const reorderLevel = Number(stock?.reorder_level ?? 0);
     const reorderQty = Number(stock?.reorder_qty ?? 0);
+    const safetyStock = Number(safetyStockRow?.safety_stock ?? 0);
     const incomingQty = Number(incoming?.qty ?? 0);
-    const avgDaily = Number(velocity?.units ?? 0) / 30;
+    const avgDaily = velocity.velocityPerDay;
     const daysUntilStockout = avgDaily > 0 ? Math.floor(available / avgDaily) : Infinity;
 
     const suppliers = (await this.listSuppliers(productId, tenantId)).items;
@@ -692,7 +712,15 @@ export class CatalogDetailViewsService {
     if (available <= 0) status = "critical";
     else if (reorderLevel > 0 && available <= reorderLevel) status = "suggested";
 
-    const suggestedQty = status === "ok" ? 0 : (reorderQty > 0 ? reorderQty : Math.max(1, Math.ceil(avgDaily * 14)));
+    const baseTargetQty = reorderQty > 0 ? reorderQty : Math.max(1, Math.ceil(avgDaily * 14));
+    const suggestedQty = status === "ok"
+      ? 0
+      : roundToOrderQuantity(baseTargetQty + safetyStock, { moq: preferred?.moq, casePack: preferred?.case_pack });
+    // Phase 6 item 3 (WORK/FORWARD_PLAN.md): "if I ordered today, when would
+    // this arrive" — the preferred supplier's lead time from now. Null when
+    // there's no linked supplier to promise against; defaults to 7 days when
+    // a supplier is linked but has no lead_time_days configured.
+    const expectedDeliveryDate = preferred ? Date.now() + (preferred.lead_time_days ?? 7) * DAY_MS : null;
 
     return {
       current_stock: onHand,
@@ -700,13 +728,16 @@ export class CatalogDetailViewsService {
       available_stock: available,
       incoming_stock: incomingQty,
       reorder_point: reorderLevel,
-      safety_stock: reorderLevel,
+      safety_stock: safetyStock,
       avg_daily_sales: Math.round(avgDaily * 100) / 100,
       days_until_stockout: Number.isFinite(daysUntilStockout) ? daysUntilStockout : -1,
       suggested_qty: suggestedQty,
+      preferred_supplier_moq: preferred?.moq ?? null,
+      preferred_supplier_case_pack: preferred?.case_pack ?? null,
       preferred_supplier_id: preferred?.vendor_id ?? "",
       preferred_supplier_name: preferred?.vendor_name ?? "",
       preferred_supplier_lead_days: preferred?.lead_time_days ?? 0,
+      expected_delivery_date: expectedDeliveryDate,
       preferred_supplier_cost_cents: preferred?.cost_cents ?? 0,
       best_price_supplier_id: bestPrice?.vendor_id ?? "",
       best_price_supplier_name: bestPrice?.vendor_name ?? "",

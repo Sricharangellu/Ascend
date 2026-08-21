@@ -70,8 +70,13 @@ if (untrackedModules.size) {
   );
 }
 
+// CLAUDE.md was deliberately removed from this list 2026-07-30: Claude Code auto-loads
+// CLAUDE.md as project context, and AGENTS.md's own text ("CLAUDE.md is only a short pointer
+// to it") depends on the file existing. A *pointer* CLAUDE.md is the sanctioned bootstrap, not
+// the duplicated-content file this list guards against — if CLAUDE.md ever regrows real
+// instruction content instead of a pointer to AGENTS.md, that's a review-time catch, not a
+// filename-existence check.
 const obsoleteDocs = [
-  "CLAUDE.md",
   "WORK/RULES.md",
   "WORK/WORK_STATE.md",
   "orchestration/ROADMAP.md",

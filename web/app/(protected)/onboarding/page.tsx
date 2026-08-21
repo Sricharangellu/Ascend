@@ -82,7 +82,7 @@ export default function OnboardingPage() {
 
       {/* Branding */}
       <div className="mb-8 flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-600 text-2xl font-bold text-white shadow-lg">F</div>
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-600 text-2xl font-bold text-white shadow-lg" aria-hidden="true">A</div>
         <div>
           <p className="text-xl font-bold text-white leading-none">Ascend</p>
           <p className="text-xs text-white/40">Enterprise Platform</p>

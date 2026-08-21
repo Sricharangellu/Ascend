@@ -7,6 +7,9 @@ interface ReceiptLineItem {
   quantity: number;
   price_cents: number;
   total_cents: number;
+  /** Overrides the printed "{quantity} ×" for a case/box sale — e.g. "1 Case"
+   *  instead of "12 ×". quantity/price_cents still drive the math shown. */
+  displayQty?: string;
 }
 
 interface ThermalReceiptProps {
@@ -74,7 +77,7 @@ export function ThermalReceipt({
             <div key={i}>
               <div className="text-xs truncate">{item.name}</div>
               <div className="flex justify-between text-xs pl-2">
-                <span>{item.quantity} × {formatMoney(item.price_cents)}</span>
+                <span>{item.displayQty ?? `${item.quantity} ×`} {formatMoney(item.price_cents)}</span>
                 <span>{formatMoney(item.total_cents)}</span>
               </div>
             </div>

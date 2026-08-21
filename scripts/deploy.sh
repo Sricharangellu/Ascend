@@ -51,8 +51,26 @@ case "$DEPLOY_ENV" in
   *) echo "DEPLOY_ENV must be prod|testing|dev"; exit 1 ;;
 esac
 TEAM="team_WNp8vBq1RmWTEH8WSnenP7jM"             # gellusricharan-4715s-projects
-BACKEND_PID="prj_krZ34CIFjzQrMvZ08PWqqbxzBf7d"    # ascend-backend (rebrand Phase 3; formerly finder-pos-backend — project ID is immutable, never changed)
-FRONTEND_PID="prj_TiPX9UYctGKJbQr4Lb1WFwSsKiN1"   # ascend-frontend (formerly finder-pos-frontend — project ID unchanged)
+# Vercel project IDs. Overridable via env so a deleted/renamed/replaced project
+# can be repointed from repo variables WITHOUT editing this script — set
+# VERCEL_BACKEND_PROJECT_ID / VERCEL_FRONTEND_PROJECT_ID under
+# Settings → Secrets and variables → Actions → Variables (ci.yml passes them).
+#
+# FRONTEND: the historical default `prj_TiPX9UY…` (ascend-frontend) no longer
+# exists — every deploy since 2026-08-05 died with
+# `Error: Project not found ({"VERCEL_PROJECT_ID":"prj_TiPX9UY…"})`, which is
+# what kept the testing tier from ever producing a deployment. Sri confirmed on
+# 2026-08-07 that the live production frontend is https://ascendhqweb.vercel.app,
+# i.e. Vercel project `ascend_hq_web` (root dir `web`), so the default now points
+# there and every tier deploys from that one project (preview for dev/testing,
+# --prod for master), differentiated by the *_ALIAS vars rather than by project.
+#
+# BACKEND: default left unchanged and still NOT verified — `prj_krZ34CI…` is
+# recorded in docs/architecture/DEPLOYMENTS.md as serving a bare, unrelated
+# Express app, and the prod backend host `ascendhq-api.vercel.app` returns
+# DEPLOYMENT_NOT_FOUND. That half of the P0 is still open.
+BACKEND_PID="${VERCEL_BACKEND_PROJECT_ID:-prj_krZ34CIFjzQrMvZ08PWqqbxzBf7d}"    # ascend-backend (rebrand Phase 3; formerly finder-pos-backend — project ID is immutable, never changed) — UNVERIFIED, see above
+FRONTEND_PID="${VERCEL_FRONTEND_PROJECT_ID:-prj_MvvmpNkRQbKUAEOmh9ZvmRJa7ETN}"  # ascend_hq_web → https://ascendhqweb.vercel.app (confirmed by Sri 2026-08-07; replaces the deleted ascend-frontend prj_TiPX9UY…)
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 : "${VERCEL_TOKEN:?Set VERCEL_TOKEN (a Vercel token with access to the team scope)}"
 
@@ -60,8 +78,22 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 #   prod           → the stable production backend domain (default).
 #   testing / dev  → MUST be supplied (fail closed): a non-prod frontend pointing
 #                    at the prod backend would write to the prod database.
+#
+# This value is compiled into the frontend bundle: web/next.config.mjs reads it
+# inside rewrites(), which Next evaluates at build time and freezes into
+# routes-manifest.json. It is the origin the shipped app proxies every /api/*
+# call to, so a wrong value here means users cannot log in.
+#
+# The prod default was https://ascendhq-api.vercel.app, which has returned
+# DEPLOYMENT_NOT_FOUND (HTTP 404, observed on heartbeat run 31266012547) since
+# the 2026-07-20 Render cutover — every production build since has baked in a
+# dead origin. Sri confirmed the real production backend on 2026-08-08:
+# https://ascend-prod.onrender.com. Render deploys it from its own git
+# integration on push to master; scripts/deploy.sh does not and never did
+# deploy the backend to Render (deploy_backend targets Vercel), which is the
+# reconciliation docs/architecture/PIPELINE.md already flagged as outstanding.
 if [[ "$DEPLOY_ENV" == "prod" ]]; then
-  BACKEND_URL="${BACKEND_URL:-https://ascendhq-api.vercel.app}"
+  BACKEND_URL="${BACKEND_URL:-https://ascend-prod.onrender.com}"
 else
   if [[ -z "${BACKEND_URL:-}" ]]; then
     echo "✗ DEPLOY_ENV=$DEPLOY_ENV requires BACKEND_URL (the TESTING backend origin)."
@@ -103,6 +135,13 @@ deploy_backend() {
   url=$( cd "$S" && VERCEL_ORG_ID="$TEAM" VERCEL_PROJECT_ID="$BACKEND_PID" \
       npx --yes vercel deploy $PROD_FLAG --archive=tgz --yes --token "$VERCEL_TOKEN" "${DB_ENV_ARGS[@]}" \
       | grep -oE 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1 )
+  # An empty url means `vercel deploy` failed (e.g. "Project not found") — its
+  # non-zero status cannot propagate here, because `set -e` is suspended inside
+  # the `deploy_backend || backend_status=$?` call below. Fail explicitly.
+  if [[ -z "$url" ]]; then
+    echo "✗ backend deploy failed ($DEPLOY_ENV): vercel produced no deployment URL" >&2
+    return 1
+  fi
   echo "→ Backend deployed: $url"
   # Non-prod: pin the unique preview URL to a stable alias so the frontend can be
   # built against a durable backend origin (prod uses --prod's own alias).
@@ -124,20 +163,53 @@ deploy_frontend() {
     exit 1
   fi
 
-  ( cd "$REPO/web" && tar --exclude=node_modules --exclude=.next --exclude=.vercel -cf - . ) | ( cd "$S" && tar -xf - )
+  # Stage the app under `web/`, NOT at the root of the upload.
+  #
+  # The Vercel project `ascend_hq_web` has its Root Directory set to `web` —
+  # it has to, because the same project is git-connected to this repo and its
+  # PR previews build from the repo root, where the app genuinely lives at
+  # `web/`. This script used to unpack the CONTENTS of `web/` at the top of the
+  # temp dir and upload that, so Vercel resolved its root directory against the
+  # upload and looked for `<tmp>/web`, which did not exist:
+  #
+  #   Error: The provided path “/tmp/tmp.upl5y1upwa/web” does not exist.
+  #
+  # That is the failure the testing tier hit on 2026-08-08 once the deleted
+  # project ID was corrected (staging run 31268669760) — a second, independent
+  # break sitting behind the first. deploy_frontend is shared, so DEPLOY_ENV=prod
+  # fails identically; the release deploy could not have worked either.
+  #
+  # Mirroring the repo layout inside the upload satisfies the project setting
+  # without touching the dashboard, which would break the git-connected
+  # previews that currently work.
+  local APP="$S/web"
+  mkdir -p "$APP"
+  ( cd "$REPO/web" && tar --exclude=node_modules --exclude=.next --exclude=.vercel -cf - . ) | ( cd "$APP" && tar -xf - )
+  # .vercelignore sits at the upload root; bare patterns match at any depth.
   printf 'node_modules\n.next\n' > "$S/.vercelignore"
   # Build locally first to catch errors before uploading (the mounted FS can segfault next build;
   # mktemp is on the local FS so this is safe).
   echo "→ Frontend: NEXT_PUBLIC_MOCK=$FRONTEND_MOCK_MODE BACKEND_URL=$BACKEND_URL"
-  ( cd "$S" && npm install --no-audit --no-fund --loglevel=error && BACKEND_URL="$BACKEND_URL" NEXT_PUBLIC_MOCK="$FRONTEND_MOCK_MODE" npm run build )
+  ( cd "$APP" && npm install --no-audit --no-fund --loglevel=error && BACKEND_URL="$BACKEND_URL" NEXT_PUBLIC_MOCK="$FRONTEND_MOCK_MODE" npm run build )
   echo "→ Frontend: deploying…"
   local url
   # See the matching comment in deploy_backend: extract the URL by pattern,
   # not by assuming a fixed "last line" shape (newer Vercel CLI versions
   # print a JSON summary to stdout instead of a plain URL line).
+  # Upload from $S (the repo-shaped root), not $APP — Vercel appends the
+  # project's Root Directory to whatever is uploaded.
   url=$( cd "$S" && VERCEL_ORG_ID="$TEAM" VERCEL_PROJECT_ID="$FRONTEND_PID" \
       npx --yes vercel deploy $PROD_FLAG --archive=tgz --yes --token "$VERCEL_TOKEN" \
       | grep -oE 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1 )
+  # Same failure mode as deploy_backend: without this guard a failed deploy
+  # ("Project not found") fell through to the alias step, which errored with
+  # `argument "" is not a valid ID or URL`, and the function still returned 0
+  # because its last command was the unconditional "✓ frontend deployed" echo.
+  # That reported a green deploy while shipping nothing — including for prod.
+  if [[ -z "$url" ]]; then
+    echo "✗ frontend deploy failed ($DEPLOY_ENV): vercel produced no deployment URL" >&2
+    return 1
+  fi
   echo "→ Frontend deployed: $url"
   if [[ "$DEPLOY_ENV" != "prod" && -n "${FRONTEND_ALIAS:-}" ]]; then
     echo "→ Frontend: aliasing $url → $FRONTEND_ALIAS"

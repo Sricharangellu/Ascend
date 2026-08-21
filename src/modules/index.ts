@@ -28,12 +28,15 @@ import { ssoModule } from "./sso/index.js";
 import { monitoringModule } from "./monitoring/index.js";
 import { quotesModule } from "./quotes/index.js";
 import { notificationsModule } from "./notifications/index.js";
+import { pushTokensModule } from "./push_tokens/index.js";
 import { auditLogModule } from "./audit_log/index.js";
 import { loyaltyModule } from "./loyalty/index.js";
 import { rlsModule } from "./rls/index.js";
 import { storeLocationsModule } from "./store_locations/index.js";
 import { permissionRequestsModule } from "./permission_requests/index.js";
 import { productBatchesModule } from "./product_batches/index.js";
+import { aiAssistantModule } from "./ai_assistant/index.js";
+import { demandPlanningModule } from "./demand_planning/index.js";
 import { customerInvoicesModule } from "./customer_invoices/index.js";
 import { serviceOrdersModule } from "./service_orders/index.js";
 import { serialNumbersModule } from "./serial_numbers/index.js";
@@ -96,11 +99,14 @@ export const modules: PosModule[] = [
   monitoringModule,
   quotesModule,
   notificationsModule,
+  pushTokensModule,
   auditLogModule,
   loyaltyModule,
   storeLocationsModule,
   permissionRequestsModule,
   productBatchesModule,
+  aiAssistantModule,
+  demandPlanningModule,
   customerInvoicesModule,
   serviceOrdersModule,
   workforceModule,

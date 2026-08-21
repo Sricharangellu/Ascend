@@ -1,14 +1,6 @@
 import { clsx } from "clsx";
 
 // ─── Variant types ────────────────────────────────────────────────────────────
-// Spec:
-//   Billed / active  → #1890FF solid (blue)
-//   Not Billed / pending → #FA8C16 solid (orange)
-//   Completed / paid  → green outlined
-//   Draft / voided    → gray outlined
-//   Danger / error    → #FF4D4F solid (red)
-//   Purple            → purple solid
-
 export type BadgeVariant =
   | "gray"
   | "blue"
@@ -22,31 +14,29 @@ interface BadgeProps {
   children: React.ReactNode;
   variant?: BadgeVariant;
   size?: "sm" | "md";
-  /** Use outlined style instead of solid fill */
   outlined?: boolean;
 }
 
-// Solid fills (default — matches Ascend ERP status tags)
+// Tinted fills. Badge text is 10–11px semibold — small text, so every pair
+// here has to clear WCAG AA at 4.5:1, not the 3:1 large-text allowance.
+//
+// The `-600` text stops these used to carry did not: green was 3.37:1, orange
+// 2.76:1, red 3.71:1 and purple 4.19:1 against their own backgrounds. Each is
+// now one or two stops darker — which also lands them on the `--color-*-text`
+// values globals.css had already nominated for exactly this job. Backgrounds
+// and borders are untouched, so the badges look like themselves, just legible.
 const solidClass: Record<BadgeVariant, string> = {
-  blue:   "bg-[#1890FF] text-white",          // Billed
-  orange: "bg-[#FA8C16] text-white",          // Not Billed / Pending
-  yellow: "bg-[#FA8C16] text-white",          // alias for orange
-  green:  "bg-[#52C41A] text-white",          // Completed / Paid
-  gray:   "bg-gray-400 text-white",           // Draft / Voided
-  red:    "bg-[#FF4D4F] text-white",          // Error / Overdue
-  purple: "bg-purple-500 text-white",
+  blue:   "bg-info-50 text-info-600 border border-info-200",          // 4.60:1
+  orange: "bg-warning-50 text-warning-800 border border-warning-200", // 6.53:1
+  yellow: "bg-warning-50 text-warning-800 border border-warning-200", // 6.53:1
+  green:  "bg-success-50 text-success-700 border border-success-200", // 5.51:1
+  gray:   "bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] border border-[var(--color-border)]",
+  red:    "bg-danger-50 text-danger-700 border border-danger-200",    // 5.07:1
+  purple: "bg-[var(--color-primary-subtle)] text-brand-700 border border-[var(--color-primary-border)]", // 5.36:1
 };
 
-// Outlined style (spec uses for "Completed", "Pending Shipment")
-const outlinedClass: Record<BadgeVariant, string> = {
-  blue:   "bg-transparent border border-[#1890FF] text-[#1890FF]",
-  orange: "bg-transparent border border-[#FA8C16] text-[#FA8C16]",
-  yellow: "bg-transparent border border-[#FA8C16] text-[#FA8C16]",
-  green:  "bg-transparent border border-[#52C41A] text-[#52C41A]",
-  gray:   "bg-transparent border border-gray-400 text-gray-500",
-  red:    "bg-transparent border border-[#FF4D4F] text-[#FF4D4F]",
-  purple: "bg-transparent border border-purple-500 text-purple-600",
-};
+// Outlined — same as solid in new system (already uses light bg + colored text)
+const outlinedClass: Record<BadgeVariant, string> = solidClass;
 
 export function Badge({
   children,
@@ -57,10 +47,8 @@ export function Badge({
   return (
     <span
       className={clsx(
-        "inline-flex items-center font-medium whitespace-nowrap",
-        // Spec: border-radius 4px, padding 0 7px, font-size 12px
-        "rounded-[4px] text-[12px] leading-[20px]",
-        size === "sm" ? "px-1.5" : "px-[7px]",
+        "inline-flex items-center font-semibold whitespace-nowrap rounded-md leading-none tracking-[0.02em]",
+        size === "sm" ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-1 text-[11px]",
         outlined ? outlinedClass[variant] : solidClass[variant]
       )}
     >
@@ -70,23 +58,51 @@ export function Badge({
 }
 
 // ─── Status → variant mapping ─────────────────────────────────────────────────
-
+//
+// One rule decides the colour, so a status the operator has never seen before
+// still reads correctly at a glance:
+//
+//   gray   — nothing has happened yet, or it never will (draft, void, closed)
+//   blue   — committed and in flight, waiting on someone else (ordered, billed)
+//   orange — underway but incomplete, and that is expected (partial, pending)
+//   green  — finished cleanly (received, paid, matched)
+//   red    — finished badly, or blocked on a human (variance, rejected, overdue)
+//   purple — a financial correction against something already settled
+//
+// Where a stage needs to be distinguished from another stage of the same colour
+// — Received vs Paid are both "finished cleanly" — the label and the
+// LifecycleTrail carry the difference, rather than minting another hue.
 export function statusBadge(status: string): BadgeVariant {
   const map: Record<string, BadgeVariant> = {
     open:               "blue",
     billed:             "blue",
+    ordered:            "blue",
+    submitted:          "blue",
+    awaiting_approval:  "blue",
+    in_transit:         "blue",
+    docked:             "blue",
     active:             "green",
     completed:          "green",
     paid:               "green",
     received:           "green",
     approved:           "green",
     ready:              "green",
+    matched:            "green",
+    reconciled:         "green",
+    posted:             "green",
+    accepted:           "green",
     partial:            "orange",
     partially_received: "orange",
+    partially_billed:   "orange",
+    partially_paid:     "orange",
     pending:            "orange",
     not_billed:         "orange",
     "not-billed":       "orange",
+    unbilled:           "orange",
     in_progress:        "orange",
+    receiving:          "orange",
+    scanning:           "orange",
+    backordered:        "orange",
     draft:              "gray",
     voided:             "gray",
     void:               "gray",
@@ -94,8 +110,27 @@ export function statusBadge(status: string): BadgeVariant {
     archived:           "gray",
     closed:             "gray",
     refunded:           "purple",
+    credited:           "purple",
+    credit:             "purple",
+    adjusted:           "purple",
     overdue:            "red",
     failed:             "red",
+    // Receiving / three-way-match exceptions — every one of these means a
+    // human has to decide something, so they all read as red.
+    exception:          "red",
+    variance:           "red",
+    cost_variance:      "red",
+    qty_variance:       "red",
+    over_received:      "red",
+    short:              "red",
+    shortage:           "red",
+    damaged:            "red",
+    expired:            "red",
+    rejected:           "red",
+    quality_hold:       "red",
+    held:               "red",
+    unmatched:          "red",
+    duplicate:          "red",
     dunning_1:          "orange",
     dunning_2:          "orange",
     dunning_3:          "red",
@@ -103,7 +138,26 @@ export function statusBadge(status: string): BadgeVariant {
   return map[status.toLowerCase()] ?? "gray";
 }
 
-// ─── Outlined status badge (for Completed, Pending Shipment per spec) ─────────
+/** Human label for a snake_case status, e.g. `partially_received` → "Partially received". */
+export function statusLabel(status: string): string {
+  const s = status.replace(/[_-]+/g, " ").trim();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Badge that renders a raw backend status with the right colour and a readable label. */
+export function StatusBadge({
+  status,
+  size,
+}: {
+  status: string;
+  size?: "sm" | "md";
+}) {
+  return (
+    <Badge variant={statusBadge(status)} size={size}>
+      {statusLabel(status)}
+    </Badge>
+  );
+}
 
 export function OutlinedStatusBadge({
   status,
@@ -113,11 +167,8 @@ export function OutlinedStatusBadge({
   label?: string;
 }) {
   const variant = statusBadge(status);
-  const outlineVariants: BadgeVariant[] = ["green", "orange", "blue"];
-  const useOutline = outlineVariants.includes(variant);
-
   return (
-    <Badge variant={variant} outlined={useOutline}>
+    <Badge variant={variant} outlined>
       {label ?? status}
     </Badge>
   );

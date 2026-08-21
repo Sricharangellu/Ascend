@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { NextFunction, Request, Response } from "express";
-import { rateLimitMiddleware, tenantRateLimitMiddleware, RATE_TIERS } from "./rateLimit.js";
+import { rateLimitMiddleware, tenantRateLimitMiddleware, makeTenantTierResolver, RATE_TIERS } from "./rateLimit.js";
 import type { RedisClient } from "../shared/redis.js";
 
 // Minimal fake req/res to drive the middleware without HTTP.
@@ -152,4 +152,96 @@ test("a malformed numeric override (NaN) falls back to the safe default instead 
     if (!err) allowed++;
   }
   assert.equal(allowed, 60, "NaN capacity enforces the documented default (60), not unlimited");
+});
+
+test("IP limiter sets X-RateLimit-Limit/Remaining and a finite Retry-After on 429", async () => {
+  const mw = rateLimitMiddleware({ capacity: 2, refillRate: 0 });
+  const res = fakeRes();
+  assert.equal(await invoke(mw, fakeReq(), res), null);
+  assert.equal(res.getHeader("X-RateLimit-Limit"), "2");
+  assert.equal(res.getHeader("X-RateLimit-Remaining"), "1");
+  assert.equal(await invoke(mw, fakeReq(), res), null);
+  const err = await invoke(mw, fakeReq(), res);
+  assert.ok(err instanceof Error);
+  assert.equal(res.getHeader("X-RateLimit-Remaining"), "0");
+  // refillRate 0 must not emit "Infinity" — clients parse Retry-After as an int.
+  assert.equal(res.getHeader("Retry-After"), "1");
+});
+
+// ── Tenant tier resolution ───────────────────────────────────────────────────
+// RATE_TIERS has always defined premium and enterprise rows, but nothing ever
+// resolved a tenant to them: src/app.ts mounted the tenant limiter without a
+// tierOf, so every tenant — on every plan — was limited as `standard`
+// (10 req/s sustained). These tests pin the mapping and the caching behaviour.
+
+/** Minimal stub of the one query makeTenantTierResolver issues. */
+function stubDb(plans: Record<string, string>, opts: { fail?: boolean } = {}) {
+  let calls = 0;
+  return {
+    calls: () => calls,
+    one: async (_sql: string, params?: Record<string, unknown>) => {
+      calls++;
+      if (opts.fail) throw new Error("db down");
+      const plan = plans[String(params?.["t"])];
+      return plan === undefined ? undefined : { plan };
+    },
+  };
+}
+
+/** Let the resolver's background refresh settle. */
+const settle = () => new Promise((r) => setTimeout(r, 5));
+
+test("tenant tier is resolved from the subscription plan", async () => {
+  const db = stubDb({ t_ent: "enterprise", t_pro: "professional", t_small: "starter" });
+  const r = makeTenantTierResolver(db);
+
+  // First read is a cache miss: answers conservatively and refreshes behind it.
+  assert.equal(r.tierOf("t_ent"), "standard");
+  await settle();
+  assert.equal(r.tierOf("t_ent"), "enterprise");
+
+  r.tierOf("t_pro"); await settle();
+  assert.equal(r.tierOf("t_pro"), "premium");
+
+  r.tierOf("t_small"); await settle();
+  assert.equal(r.tierOf("t_small"), "standard");
+
+  // A tenant with no subscription row is a starter tenant, not an error.
+  r.tierOf("t_none"); await settle();
+  assert.equal(r.tierOf("t_none"), "standard");
+});
+
+test("tenant tier is cached and not re-queried on every request", async () => {
+  const db = stubDb({ t_ent: "enterprise" });
+  const r = makeTenantTierResolver(db, { ttlMs: 10_000 });
+  r.tierOf("t_ent");
+  await settle();
+  const afterFirst = db.calls();
+  for (let i = 0; i < 500; i++) assert.equal(r.tierOf("t_ent"), "enterprise");
+  assert.equal(db.calls(), afterFirst, "cached tier must not issue a query per request");
+});
+
+test("a failing plan lookup degrades to standard rather than throwing or failing open", async () => {
+  const db = stubDb({}, { fail: true });
+  const r = makeTenantTierResolver(db, { errorTtlMs: 10_000 });
+  assert.equal(r.tierOf("t_x"), "standard");
+  await settle();
+  assert.equal(r.tierOf("t_x"), "standard");
+});
+
+test("the tenant limiter actually applies the resolved tier's capacity", async () => {
+  const db = stubDb({ t_ent: "enterprise" });
+  const r = makeTenantTierResolver(db);
+  r.tierOf("t_ent");
+  await settle();
+
+  const mw = tenantRateLimitMiddleware({ tierOf: r.tierOf });
+  const res = fakeRes("t_ent");
+  // The standard tier would have run out at 60; the enterprise tier is 600.
+  let allowed = 0;
+  for (let i = 0; i < 200; i++) {
+    if (!(await invoke(mw, fakeReq(), res))) allowed++;
+  }
+  assert.equal(allowed, 200, "an enterprise tenant must not be limited at the standard capacity");
+  assert.equal(res.getHeader("X-RateLimit-Tier"), "enterprise");
 });

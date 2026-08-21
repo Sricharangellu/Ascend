@@ -1,0 +1,68 @@
+import type { Router, Response } from "express";
+import { z } from "zod";
+import { handler, parseBody } from "../../shared/http.js";
+import type { AuthPayload } from "../../gateway/auth.js";
+import { requireRole } from "../../gateway/auth.js";
+import type { FulfillmentService } from "./service.js";
+
+function tenantId(res: Response): string {
+  return (res.locals["auth"] as AuthPayload).tenantId;
+}
+
+const locationKindSchema = z.enum(["zone", "aisle", "shelf", "bin"]).optional();
+const locationSchema = z.object({
+  code: z.string().min(1),
+  name: z.string().min(1).optional(),
+  kind: locationKindSchema,  // API convention
+  type: locationKindSchema,  // frontend sends `type` — treated as alias for `kind`
+  description: z.string().optional(), // frontend field, stored in name if name is absent
+});
+const assignSchema = z.object({ productId: z.string().min(1), locationId: z.string().min(1) });
+const pickListSchema = z.object({ orderId: z.string().min(1) });
+const soPickListSchema = z.object({ salesOrderId: z.string().min(1) });
+const pickSchema = z.object({ quantity: z.number().int().positive().optional() });
+
+export function registerRoutes(router: Router, service: FulfillmentService): void {
+  // Warehouse setup and pick/pack are manager-level operations. GET routes stay
+  // open to any authenticated tenant user; mutations require manager+ so the
+  // client-side gating in the delivery UI is actually enforced server-side.
+  const mgr = requireRole("manager");
+
+  router.post("/locations", mgr, handler(async (req, res) => {
+    const b = parseBody(locationSchema, req.body);
+    const kind = b.kind ?? b.type ?? "bin";
+    const name = b.name ?? b.description ?? undefined;
+    res.status(201).json(await service.createLocation(b.code, name, kind, tenantId(res)));
+  }));
+  router.get("/locations", handler(async (_req, res) => {
+    res.json({ items: await service.listLocations(tenantId(res)) });
+  }));
+  router.post("/assign", mgr, handler(async (req, res) => {
+    const b = parseBody(assignSchema, req.body);
+    await service.assign(b.productId, b.locationId, tenantId(res));
+    res.status(200).json({ ok: true });
+  }));
+
+  router.post("/pick-lists", mgr, handler(async (req, res) => {
+    const b = parseBody(pickListSchema, req.body);
+    res.status(201).json(await service.createPickList(b.orderId, tenantId(res)));
+  }));
+  router.post("/pick-lists/from-sales-order", mgr, handler(async (req, res) => {
+    const b = parseBody(soPickListSchema, req.body);
+    res.status(201).json(await service.createPickListForSalesOrder(b.salesOrderId, tenantId(res)));
+  }));
+  router.get("/pick-lists", handler(async (req, res) => {
+    const orderId = typeof req.query.orderId === "string" ? req.query.orderId : undefined;
+    res.json({ items: await service.listPickLists(tenantId(res), orderId) });
+  }));
+  router.get("/pick-lists/:id", handler(async (req, res) => {
+    res.json(await service.getPickList(String(req.params.id), tenantId(res)));
+  }));
+  router.post("/pick-lists/:id/lines/:lineId/pick", mgr, handler(async (req, res) => {
+    const b = parseBody(pickSchema, req.body ?? {});
+    res.json(await service.pickLine(String(req.params.id), String(req.params.lineId), b.quantity, tenantId(res)));
+  }));
+  router.post("/pick-lists/:id/pack", mgr, handler(async (req, res) => {
+    res.json(await service.pack(String(req.params.id), tenantId(res)));
+  }));
+}

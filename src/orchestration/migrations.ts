@@ -82,4 +82,23 @@ CREATE INDEX IF NOT EXISTS job_queue_ready_idx
   ON job_queue (status, run_at ASC, attempts, max_attempts);
 CREATE INDEX IF NOT EXISTS job_queue_tenant_type_idx
   ON job_queue (tenant_id, type, status);
+`, `
+-- Refund ledger used by RefundWorkflow + PROCESS_REFUND command handler.
+-- Live POS refunds flip orders.status to 'refunded'; this table records each
+-- workflow attempt for idempotency (check_double_refund_guard) and exception
+-- tracking. Owned here because no commerce module creates it today, and the
+-- workflow has been failing on "relation does not exist" since it was registered.
+CREATE TABLE IF NOT EXISTS refunds (
+  id            TEXT PRIMARY KEY,
+  tenant_id     TEXT NOT NULL,
+  order_id      TEXT NOT NULL,
+  amount_cents  BIGINT NOT NULL,
+  status        TEXT NOT NULL,
+  created_at    BIGINT NOT NULL,
+  updated_at    BIGINT
+);
+CREATE INDEX IF NOT EXISTS refunds_tenant_order_idx
+  ON refunds (tenant_id, order_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS refunds_tenant_status_idx
+  ON refunds (tenant_id, status, created_at DESC);
 `];

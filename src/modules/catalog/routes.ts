@@ -1,8 +1,11 @@
 import type { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { handler, parseBody, notFound, badRequest } from "../../shared/http.js";
-import type { CatalogService, ProductStatus, TaxClass, VariantChannel, VariantSortMode, PriceTarget, PriceOp } from "./service.js";
-import { VARIANT_SORT_MODES, PRICE_OPS } from "./service.js";
+import type {
+  CatalogService, ProductStatus, TaxClass, VariantChannel, VariantSortMode,
+  PriceTarget, PriceOp, ProductTypeFilter, ProductSort, ListProductsQuery,
+} from "./service.js";
+import { VARIANT_SORT_MODES, PRICE_OPS, PRODUCT_TYPE_FILTERS, PRODUCT_SORTS } from "./service.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import { requireRole } from "../../gateway/auth.js";
 import { parseCsv, toCsv } from "../../shared/csv.js";
@@ -225,15 +228,68 @@ function parseInt0(value: unknown): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-function readQuery(req: Request) {
-  const category = typeof req.query.category === "string" ? req.query.category : undefined;
-  const status = readStatusFilter(req.query.status);
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
+}
+
+/** Dollars in the query string → integer cents. Money is never a float here. */
+function readPriceCents(value: unknown): number | undefined {
+  const n = parseInt0(value);
+  if (n === undefined || n < 0) return undefined;
+  return Math.round(n * 100);
+}
+
+function readTaxClassFilter(value: unknown): TaxClass | undefined {
+  if (typeof value !== "string" || value === "") return undefined;
+  if (value !== "standard" && value !== "exempt") {
+    throw badRequest(`invalid taxClass '${value}'; expected one of standard, exempt`);
+  }
+  return value;
+}
+
+function readProductTypeFilter(value: unknown): ProductTypeFilter | undefined {
+  if (typeof value !== "string" || value === "" || value === "all") return undefined;
+  if (!PRODUCT_TYPE_FILTERS.includes(value as ProductTypeFilter)) {
+    throw badRequest(`invalid productType '${value}'; expected one of ${PRODUCT_TYPE_FILTERS.join(", ")}`);
+  }
+  return value as ProductTypeFilter;
+}
+
+function readSort(value: unknown): ProductSort | undefined {
+  if (typeof value !== "string" || value === "") return undefined;
+  if (!PRODUCT_SORTS.includes(value as ProductSort)) {
+    throw badRequest(`invalid sort '${value}'; expected one of ${PRODUCT_SORTS.join(", ")}`);
+  }
+  return value as ProductSort;
+}
+
+/**
+ * Read every product-list filter off the query string.
+ *
+ * Until 2026-08-11 this read only category/status/limit/offset — `q` and every
+ * other filter the catalog UI sent were dropped on the floor, so the search box
+ * did nothing in production while the MSW mock made it look fine in dev. An
+ * unknown enum value now 400s instead of being silently ignored.
+ */
+function readQuery(req: Request): ListProductsQuery {
   return {
-    category,
-    status,
+    q: readString(req.query.q),
+    category: readString(req.query.category),
+    status: readStatusFilter(req.query.status),
+    brand: readString(req.query.brand),
+    taxClass: readTaxClassFilter(req.query.taxClass),
+    ageRestricted: req.query.ageRestricted === "true",
+    ecommerce: req.query.ecommerce === "true",
+    minPriceCents: readPriceCents(req.query.minPrice),
+    maxPriceCents: readPriceCents(req.query.maxPrice),
+    productType: readProductTypeFilter(req.query.productType),
+    supplier: readString(req.query.supplier),
+    sort: readSort(req.query.sort),
+    dir: req.query.dir === "desc" ? "desc" : req.query.dir === "asc" ? "asc" : undefined,
     limit: parseInt0(req.query.limit),
     offset: parseInt0(req.query.offset),
     excludeMasters: req.query.excludeMasters === "true",
+    topLevel: req.query.topLevel === "true",
   };
 }
 
@@ -449,6 +505,20 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     }),
   );
 
+  // POS scan resolution (POS-v1): fully resolved payload (product + packaging
+  // + price + stock) so the terminal does zero conversion/pricing math itself.
+  // A separate route from /barcode/:code above — that one's flat Product
+  // shape stays untouched for any other caller; this is POS-specific.
+  router.get(
+    "/barcode/:code/pos",
+    handler(async (req, res) => {
+      const code = String(req.params.code);
+      const info = await service.resolvePosBarcode(code, tenantId(res));
+      if (!info) throw notFound(`no active product with barcode '${code}'`);
+      res.json(info);
+    }),
+  );
+
   router.get(
     "/:id/barcodes",
     handler(async (req, res) => {
@@ -465,6 +535,16 @@ export function registerRoutes(router: Router, service: CatalogService): void {
       );
       await service.addBarcode(String(req.params.id), b.barcode, b.kind ?? "alt", b.packSize ?? 1, tenantId(res));
       res.status(201).json({ ok: true });
+    }),
+  );
+
+  // Data-driven filter options for the current query — the values this catalog
+  // actually contains, counted over the whole matching set rather than the
+  // loaded page. Static segment, so it must precede "/:id".
+  router.get(
+    "/facets",
+    handler(async (req, res) => {
+      res.json(await service.listFacets(readQuery(req), tenantId(res)));
     }),
   );
 

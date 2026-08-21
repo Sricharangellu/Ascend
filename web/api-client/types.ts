@@ -138,6 +138,13 @@ export interface TerminalProduct {
   lotTracked?: boolean;
   createdAt: number;
   updatedAt: number;
+  /** Purchasing/selling unit this scan resolved to ("each" by default, or a
+   *  configured unit like "case"/"box"). Set only when scanned via the POS
+   *  barcode-resolution endpoint; absent elsewhere (e.g. tapped from the grid). */
+  unitKind?: string;
+  unitDisplayName?: string;
+  /** How many base (each) units make up one of unitKind — 1 for "each". */
+  packSize?: number;
 }
 
 export interface RegisterSession {
@@ -171,6 +178,11 @@ export interface OrderLine {
   /** integer cents */
   lineCents: number;
   taxable: boolean;
+  /** Business unit this line was sold as ("case", "box"), or absent for a
+   *  plain each sale. Display-only — quantity above is always base units. */
+  unitKind?: string | null;
+  /** Human-entered count in unitKind (e.g. 1 for "1 Case"). */
+  unitQty?: number | null;
 }
 
 export interface Order {
@@ -193,7 +205,7 @@ export interface Order {
 }
 
 // ─── Payments (Wave 1, pre-typed for MSW mocks) ───────────────────────────────
-export type PaymentMethod = "cash" | "card" | "split" | "store_credit";
+export type PaymentMethod = "cash" | "card" | "split" | "store_credit" | "gift_card";
 export type PaymentStatus = "captured" | "declined";
 
 export interface Payment {
@@ -212,6 +224,17 @@ export interface Payment {
   authCode?: string;
   status: PaymentStatus;
   createdAt: number;
+}
+
+/** Gift card lookup response (backend returns snake_case). */
+export interface GiftCard {
+  id: string;
+  code: string;
+  initial_cents: number;
+  balance_cents: number;
+  status: "active" | "redeemed" | "void";
+  created_at: number;
+  updated_at: number;
 }
 
 // ─── Catalog (Wave 1) ─────────────────────────────────────────────────────────
@@ -256,6 +279,8 @@ export interface CapturePaymentRequest {
   stripePaymentIntentId?: string;
   /** Required for store_credit payments — the customer whose balance is deducted. */
   customerId?: string;
+  /** Required for gift_card payments — human-readable card code. */
+  giftCardCode?: string;
 }
 
 export interface StoreCreditBalance {
@@ -433,11 +458,19 @@ export interface PurchaseOrderLine {
 export interface PurchaseOrder {
   id: string;
   supplier_id: string;
+  /**
+   * Human-facing sequential number. The backend has always returned this on
+   * both the list and the detail; the client type omitted it, so list views
+   * fell back to printing raw UUIDs at operators.
+   */
+  po_number?: number | null;
   status: "ordered" | "received" | string;
+  receive_status?: string;
   total_cost_cents: number;
   created_at: number;
   received_at: number | null;
   lines?: PurchaseOrderLine[];
+  unitConversions?: UnitConversionNote[];
 }
 
 export interface PurchaseOrdersResponse {
@@ -450,6 +483,18 @@ export interface CreatePurchaseOrderLineRequest {
   unitCostCents: number;
   expiryDate?: number;
   lotCode?: string;
+  /** Purchasing unit this line was entered in ("case", "box", ...). When
+   *  present and not "each", the backend converts quantity/unitCostCents to
+   *  base (each) units via the product's matching barcode pack size. */
+  unitKind?: string;
+}
+
+export interface UnitConversionNote {
+  productId: string;
+  unitKind: string;
+  enteredQty: number;
+  packSize: number;
+  baseQty: number;
 }
 
 export interface CreatePurchaseOrderRequest {
@@ -578,6 +623,8 @@ export interface AgingBuckets {
 
 export interface AgingRow {
   partyId: string;
+  /** Customer or supplier display name from the aging join. */
+  partyName: string;
   buckets: AgingBuckets;
 }
 
@@ -676,6 +723,12 @@ export interface CatalogProduct {
   qty_increment?: number | null;
   parent_product_id?: string | null;
   variant_label?: string | null;
+  /**
+   * How many variants hang off this product. Returned by the list endpoint so a
+   * row can say whether it is a master without the client inspecting its
+   * siblings — which only worked while every sibling was on the same page.
+   */
+  variant_count?: number;
   // Pricing extras
   msrp_cents?: number | null;
   raw_cost_price_cents?: number | null;
@@ -1093,6 +1146,41 @@ export interface ProductsResponse {
   total: number;
   limit: number;
   offset: number;
+}
+
+/** How the product list is ordered. `relevance` only means something with a search term. */
+export type ProductSort =
+  | "relevance" | "name" | "sku" | "price_cents" | "category" | "brand"
+  | "status" | "created_at" | "updated_at" | "cost";
+
+/** Position in the master/variant tree, derived server-side across the whole catalog. */
+export type ProductTypeFilter = "standalone" | "master" | "variant";
+
+/** One value the catalog actually contains, with how many products carry it. */
+export interface FacetBucket {
+  value: string;
+  count: number;
+}
+
+/**
+ * Filter options for the current query — GET /api/v1/catalog/facets.
+ *
+ * Counted over the whole matching set, not the loaded page, and each dimension
+ * ignores its own filter so the UI can always offer the alternatives to switch
+ * to. Buckets only ever contain values the catalog really has, which is what
+ * makes the filter panel adapt to the data instead of being hard-coded.
+ */
+export interface ProductFacets {
+  total: number;
+  status: FacetBucket[];
+  productType: FacetBucket[];
+  category: FacetBucket[];
+  brand: FacetBucket[];
+  supplier: FacetBucket[];
+  taxClass: FacetBucket[];
+  ageRestricted: number;
+  ecommerce: number;
+  priceRange: { min: number; max: number } | null;
 }
 
 export interface Category {
@@ -1914,4 +2002,193 @@ export interface AttachEvidenceInput {
   url?: string | null;
   notes?: string | null;
   source?: string;
+}
+
+/** A belief about the business, stated so it can be proven or disproven. */
+export interface ProgressHypothesis {
+  id: string;
+  tenant_id: string;
+  statement: string;
+  category: string;
+  status: ProgressStatus;
+  confidence_score: number;
+  success_criteria: string | null;
+  created_by: string;
+  created_at: number;
+  updated_at: number;
+}
+
+/**
+ * The closing move on a hypothesis. Append-only: recording a decision never
+ * edits or replaces an earlier one, so the reasoning trail stays intact.
+ */
+export interface ProgressDecision {
+  id: string;
+  tenant_id: string;
+  hypothesis_id: string;
+  decision: "validated" | "invalidated";
+  reason: string | null;
+  next_action: string | null;
+  created_by: string;
+  created_at: number;
+}
+
+/** `GET /progress/hypotheses/:id` — the whole loop in one response. */
+export interface ProgressHypothesisDetail {
+  hypothesis: ProgressHypothesis;
+  tasks: ProgressTask[];
+  evidence: ProgressEvidence[];
+  decisions: ProgressDecision[];
+}
+
+/** List envelopes. `limit` is the bound the backend actually applied. */
+export interface ProgressHypothesesResponse {
+  items: ProgressHypothesis[];
+  limit: number;
+}
+
+export interface ProgressEvidenceResponse {
+  items: ProgressEvidence[];
+  limit: number;
+}
+
+export interface ProgressDecisionsResponse {
+  items: ProgressDecision[];
+  limit: number;
+}
+
+export interface CreateHypothesisInput {
+  statement: string;
+  category?: string;
+  confidenceScore?: number;
+  successCriteria?: string | null;
+}
+
+export interface RecordDecisionInput {
+  decision: "validated" | "invalidated";
+  reason?: string | null;
+  nextAction?: string | null;
+}
+
+// ─── Receiving sessions (scan & receive) ──────────────────────────────────────
+// Mirrors src/modules/purchasing/receiving-sessions.ts. The backend for this
+// has been complete for some time — scan, per-line patch, cost intelligence,
+// close/cancel — with no client surface beyond the session list.
+
+export type ReceivingSessionStatus =
+  | "open" | "docked" | "receiving" | "quality_hold" | "completed" | "cancelled";
+
+export type ReceivingSessionMode = "standard" | "blind" | "asn";
+
+export type ReceivingLineStatus =
+  | "pending" | "scanning" | "accepted" | "held" | "rejected" | "posted";
+
+export interface ReceivingSessionLine {
+  id: string;
+  session_id: string;
+  po_line_id: string;
+  product_id: string;
+  expected_qty: number;
+  scanned_qty: number;
+  accepted_qty: number;
+  held_qty: number;
+  rejected_qty: number;
+  unit_cost_cents: number | null;
+  cost_override_reason: string | null;
+  lot_code: string | null;
+  expiry_date: number | null;
+  manufacture_date: number | null;
+  location_id: string | null;
+  barcode_scanned: string | null;
+  status: ReceivingLineStatus;
+  created_at: number;
+  updated_at: number;
+  product_name?: string | null;
+  sku?: string | null;
+  barcode?: string | null;
+  po_unit_cost_cents?: number | null;
+}
+
+export interface ReceivingSession {
+  id: string;
+  po_id: string;
+  session_number: string;
+  status: ReceivingSessionStatus;
+  mode: ReceivingSessionMode;
+  receiver_id: string | null;
+  receiver_name: string | null;
+  dock_code: string | null;
+  notes: string | null;
+  started_at: number;
+  completed_at: number | null;
+  created_at: number;
+  updated_at: number;
+  lines: ReceivingSessionLine[];
+  po_number?: number | null;
+  supplier_id?: string | null;
+  supplier_name?: string | null;
+}
+
+/** Everything Ascend already knows about what this product should cost. */
+export interface ReceiveLineIntelligence {
+  product_id: string;
+  last_purchase_cost_cents: number | null;
+  prev_vendor_cost_cents: number | null;
+  avg_purchase_cost_cents: number | null;
+  lowest_historical_cost_cents: number | null;
+  highest_historical_cost_cents: number | null;
+  cost_trend: "up" | "down" | "flat" | "unknown";
+  variance_vs_po_pct: number | null;
+  variance_band: "green" | "yellow" | "red" | "neutral";
+  preferred_supplier_id: string | null;
+  preferred_supplier_name: string | null;
+  lead_time_days: number | null;
+  moq: number | null;
+  fill_rate_pct: number | null;
+  stock_on_hand: number;
+  previous_lot_code: string | null;
+  previous_lot_expiry: number | null;
+  previous_lot_qty: number | null;
+  rotation_warning: string | null;
+}
+
+export type ScanOutcome =
+  | "matched" | "unknown" | "over_qty" | "expired"
+  | "near_expiry" | "cost_variance" | "already_complete";
+
+export interface ScanResult {
+  session: ReceivingSession;
+  matched_line_id: string | null;
+  result: ScanOutcome;
+  detail: string;
+  intelligence?: ReceiveLineIntelligence | null;
+}
+
+export interface ScanRequest {
+  barcode: string;
+  qty?: number;
+  lotCode?: string | null;
+  expiryDate?: number | null;
+  manufactureDate?: number | null;
+  unitCostCents?: number | null;
+  costOverrideReason?: string | null;
+  locationId?: string | null;
+  hold?: boolean;
+  reject?: boolean;
+}
+
+export interface UpdateReceivingLineRequest {
+  acceptedQty?: number;
+  heldQty?: number;
+  rejectedQty?: number;
+  lotCode?: string | null;
+  expiryDate?: number | null;
+  manufactureDate?: number | null;
+  unitCostCents?: number | null;
+  costOverrideReason?: string | null;
+  locationId?: string | null;
+}
+
+export interface ReceivingSessionsResponse {
+  items: ReceivingSession[];
 }

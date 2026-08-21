@@ -10,6 +10,7 @@ web/.next/
 web/tsconfig.tsbuildinfo
 .vercel
 .claude/worktrees/
+.omc/
 desktop/release/
 *.dmg
 *.dmg.blockmap
@@ -46,4 +47,21 @@ version.json
 .next
 .next.stuck-*
 web/.next.stuck-*
+# Real env files never get committed — but the committed *templates* must stay
+# trackable. A bare `.env*` here (added 2026-08-03 by the workspace merge) is a
+# silent one-way door: `.env.example` / `.env.staging.example` were already
+# tracked, so the rule looked harmless, but the moment that merge deleted them
+# `git add` could no longer restore them. Keep the negation next to the rule.
 .env*
+!.env*.example
+
+# Local DB backup dumps
+artifacts/backups/
+
+# Full-tree backup copies break hygiene (duplicate AGENTS.md)
+.migration-backup/
+
+# DR drill output — db/backup/drill.sh writes .pgdump files here by default.
+# Never commit a database dump: it is large, and for any non-synthetic source it
+# contains real customer data and password hashes.
+.drill-backups/

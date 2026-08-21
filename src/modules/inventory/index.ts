@@ -255,6 +255,17 @@ CREATE TABLE IF NOT EXISTS inventory_transfers (
 );
 CREATE INDEX IF NOT EXISTS inventory_transfers_tenant_idx ON inventory_transfers (tenant_id, created_at DESC);
 `,
+    // Phase 6 item 2 (WORK/FORWARD_PLAN.md, AUDIT_2026-07-28T184729Z-erp-
+    // procurement-demand-planning-gap.md §13): a dedicated safety-stock
+    // buffer, distinct from `reorder_pt`. Before this, every reorder-
+    // suggestion surface's `safety_stock` JSON field was a fake mirror of
+    // `reorder_pt` (see the code comments this replaces in service.ts /
+    // pipeline-views.ts / catalog/detail-views.ts) — there was no real,
+    // independently configurable concept anywhere in the schema. Defaults to
+    // 0 (no buffer configured), which is additive to the existing reorder
+    // formulas — a product with no safety_stock set behaves exactly as
+    // before this migration.
+    `ALTER TABLE inventory ADD COLUMN IF NOT EXISTS safety_stock INTEGER NOT NULL DEFAULT 0;`,
   ],
   register({ db, events, router, outbox }) {
     const service = new InventoryService(db, events);
@@ -272,11 +283,10 @@ CREATE INDEX IF NOT EXISTS inventory_transfers_tenant_idx ON inventory_transfers
       const tenantId = payload.tenantId ?? "";
       if (!tenantId) return; // no tenant context — skip (should not happen in prod)
       const lines = payload.lines ?? [];
-      for (const line of lines) {
-        await service.adjust(line.productId, -line.quantity, "sale", tenantId, orderId);
-        // FEFO: draw the sold quantity from the earliest-expiring lots (no-op if untracked).
-        await service.depleteFefo(line.productId, line.quantity, tenantId);
-      }
+      // One transaction for the whole basket — stock decrement, movement ledger
+      // and FEFO lot depletion together. See applyOrderSale() for why this is
+      // not a per-line loop any more.
+      if (lines.length > 0 && orderId) await service.applyOrderSale(lines, tenantId, orderId);
     });
 
     // order.refunded -> restock by reversing the recorded 'sale' movements.

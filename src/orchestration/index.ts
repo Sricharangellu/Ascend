@@ -82,6 +82,7 @@ export { reconcilePaymentsJob } from "./jobs/reconcile-payments.job.js";
 export { closeRegisterJob } from "./jobs/close-register.job.js";
 export { syncEcommerceJob } from "./jobs/sync-ecommerce.job.js";
 export { trialExpiryJob, TRIAL_EXPIRY_INTERVAL_MS } from "./jobs/trial-expiry.job.js";
+export { inventoryReconciliationJob, findInventoryDrift, INVENTORY_RECONCILIATION_INTERVAL_MS } from "./jobs/inventory-reconciliation.job.js";
 
 // Compensations
 export { releaseInventoryCompensation } from "./compensations/release-inventory.compensation.js";
@@ -130,6 +131,9 @@ import { arDunningJob } from "./jobs/ar-dunning.job.js";
 import { idempotencyExpiryJob, IDEMPOTENCY_EXPIRY_INTERVAL_MS } from "./jobs/idempotency-expiry.job.js";
 import { outboxRetentionJob, OUTBOX_RETENTION_INTERVAL_MS } from "./jobs/outbox-retention.job.js";
 import { trialExpiryJob, TRIAL_EXPIRY_INTERVAL_MS } from "./jobs/trial-expiry.job.js";
+import { inventoryReconciliationJob, INVENTORY_RECONCILIATION_INTERVAL_MS } from "./jobs/inventory-reconciliation.job.js";
+import { aiAssistantAnswerJob } from "./jobs/ai-assistant-answer.job.js";
+import { demandSnapshotJob, DEMAND_SNAPSHOT_INTERVAL_MS } from "./jobs/demand-snapshot.job.js";
 
 export interface OrchestrationBootstrap {
   runner: WorkflowRunner;
@@ -212,6 +216,9 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
   jobConsumer.register(QueueNames.ECOMMERCE_SYNC, async (job) => {
     await syncEcommerceJob(job, db, events);
   });
+  jobConsumer.register(QueueNames.AI_ASSISTANT_ANSWER, async (job) => {
+    await aiAssistantAnswerJob(job, db, events);
+  });
 
   // INF-6: AR dunning — runs once per tenant per day. The handler re-enqueues
   // itself 24 h in the future so the sweep perpetuates without a cron daemon.
@@ -287,6 +294,53 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
   if (backgroundJobsEnabled) {
     void jobProducer.enqueueOnce({
       type: QueueNames.OUTBOX_RETENTION,
+      tenantId: "system",
+      payload: {},
+      runAt: Date.now(),
+      maxAttempts: 3,
+    }).catch(() => {});
+  }
+
+  // Reliability Phase 4a #2: daily inventory drift check — stock_qty cache
+  // vs SUM(inventory_movements.delta). Read-only detector, not a fixer; see
+  // inventory-reconciliation.job.ts for why it doesn't auto-correct.
+  jobConsumer.register(QueueNames.INVENTORY_RECONCILIATION, async (job) => {
+    await inventoryReconciliationJob(job, db);
+    await jobProducer.enqueueOnce({
+      type: QueueNames.INVENTORY_RECONCILIATION,
+      tenantId: "system",
+      payload: {},
+      runAt: Date.now() + INVENTORY_RECONCILIATION_INTERVAL_MS,
+      maxAttempts: 3,
+    });
+  });
+  if (backgroundJobsEnabled) {
+    void jobProducer.enqueueOnce({
+      type: QueueNames.INVENTORY_RECONCILIATION,
+      tenantId: "system",
+      payload: {},
+      runAt: Date.now(),
+      maxAttempts: 3,
+    }).catch(() => {});
+  }
+
+  // Phase 7 item 2: daily demand-snapshot sweep — persists yesterday's
+  // completed sales into demand_snapshots (see demand-snapshot.job.ts for
+  // why "yesterday" not "today", and why this is system-scoped like the
+  // inventory-reconciliation sweep above rather than per-tenant).
+  jobConsumer.register(QueueNames.DEMAND_SNAPSHOT, async (job) => {
+    await demandSnapshotJob(job, db);
+    await jobProducer.enqueueOnce({
+      type: QueueNames.DEMAND_SNAPSHOT,
+      tenantId: "system",
+      payload: {},
+      runAt: Date.now() + DEMAND_SNAPSHOT_INTERVAL_MS,
+      maxAttempts: 3,
+    });
+  });
+  if (backgroundJobsEnabled) {
+    void jobProducer.enqueueOnce({
+      type: QueueNames.DEMAND_SNAPSHOT,
       tenantId: "system",
       payload: {},
       runAt: Date.now(),

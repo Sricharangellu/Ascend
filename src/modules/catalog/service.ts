@@ -5,6 +5,7 @@ import type { Cents } from "../../shared/money.js";
 import type { Page } from "../../shared/types.js";
 import { notFound, conflict, badRequest } from "../../shared/http.js";
 import { writeAudit } from "../../shared/audit.js";
+import { recordUomBarcodeLookupFailed, recordPosBarcodeScan, recordPosBarcodeScanFailure, recordPosScanUnit } from "../../gateway/metrics.js";
 
 export type TaxClass = "standard" | "exempt";
 export type ProductStatus = "active" | "draft" | "archived";
@@ -58,6 +59,8 @@ function variantOrderBy(mode: VariantSortMode, orderCol: string): string {
     default: return "variant_label ASC, sku ASC";
   }
 }
+
+const UNIT_DISPLAY_NAME: Record<string, string> = { each: "Each", box: "Box", case: "Case", pallet: "Pallet", alt: "Alternate" };
 
 export interface Product {
   id: string;
@@ -258,6 +261,31 @@ export interface UpdateCategoryInput {
   parent_id?: string | null;
 }
 
+/**
+ * Where a product sits in the master/variant tree. `master` = has at least one
+ * child; `variant` = has a parent; `standalone` = neither. Derived, not stored —
+ * the list computes it in SQL so the filter is catalog-wide rather than
+ * page-wide (the frontend used to derive it from the loaded page, which made a
+ * master whose children happened to be on another page read as standalone).
+ */
+export type ProductTypeFilter = "standalone" | "master" | "variant";
+export const PRODUCT_TYPE_FILTERS: readonly ProductTypeFilter[] = ["standalone", "master", "variant"];
+
+/**
+ * Sort columns the product list exposes. `relevance` is only meaningful with a
+ * search term and falls back to `name` without one. Whitelisted rather than
+ * interpolated so a sort key can never reach SQL unchecked.
+ */
+export type ProductSort =
+  | "relevance" | "name" | "sku" | "price_cents" | "category" | "brand"
+  | "status" | "created_at" | "updated_at" | "cost";
+export const PRODUCT_SORTS: readonly ProductSort[] = [
+  "relevance", "name", "sku", "price_cents", "category", "brand",
+  "status", "created_at", "updated_at", "cost",
+];
+
+export type SortDir = "asc" | "desc";
+
 export interface ListProductsQuery {
   category?: string;
   status?: ProductStatus;
@@ -266,6 +294,66 @@ export interface ListProductsQuery {
   /** Exclude master/variant-parent rows (products referenced by another
    *  product's parent_product_id) — for sellable/browse lists (FE-7). */
   excludeMasters?: boolean;
+  /** Free-text search across identity, brand and every registered barcode. */
+  q?: string;
+  brand?: string;
+  taxClass?: TaxClass;
+  ageRestricted?: boolean;
+  minPriceCents?: number;
+  maxPriceCents?: number;
+  productType?: ProductTypeFilter;
+  /** Matches the preferred vendor id/name or any linked supplier id. */
+  supplier?: string;
+  /**
+   * Only products with no parent — masters and standalone products, never a
+   * child variant. The complement of `excludeMasters`, and what a browse grid
+   * wants: one card per product family. Without it, paginating a catalog can
+   * separate a variant from its master, and a card built by grouping children
+   * under their parent drops the orphan silently.
+   */
+  topLevel?: boolean;
+  /** Only products flagged for the online storefront. */
+  ecommerce?: boolean;
+  sort?: ProductSort;
+  dir?: SortDir;
+}
+
+/**
+ * A product row as the list returns it: the stored product plus how many
+ * variants hang off it.
+ *
+ * The count is here because "is this a master?" is not answerable from a single
+ * row, and the catalog UI previously guessed by looking at which other products
+ * shared the loaded page — so a master whose children sorted onto page 2
+ * displayed as a standalone product.
+ */
+export interface ProductListItem extends Product {
+  variant_count: number;
+}
+
+/** One facet bucket: a value the catalog actually contains, and how many rows have it. */
+export interface FacetBucket {
+  value: string;
+  count: number;
+}
+
+/**
+ * Data-driven filter options for the *current* query context. Every bucket is
+ * computed from the rows that match the other active filters, so the filter UI
+ * can only ever offer refinements that return something, and the counts are
+ * catalog-wide instead of page-wide.
+ */
+export interface ProductFacets {
+  total: number;
+  status: FacetBucket[];
+  productType: FacetBucket[];
+  category: FacetBucket[];
+  brand: FacetBucket[];
+  supplier: FacetBucket[];
+  taxClass: FacetBucket[];
+  ageRestricted: number;
+  ecommerce: number;
+  priceRange: { min: number; max: number } | null;
 }
 
 export interface VariantAttributeInput {
@@ -609,20 +697,78 @@ export class CatalogService {
   }
 
   /** Look up a sellable product by ANY of its UPCs (each/single/box/case/vendor),
-   *  falling back to the legacy products.barcode column. Active products only. */
-  async getByBarcode(barcode: string, tenantId: string): Promise<Product | undefined> {
-    const viaTable = await this.db.one<Product>(
-      `SELECT p.* FROM products p
+   *  falling back to the legacy products.barcode column. Active products only.
+   *  Includes which unit the scanned code was (`kind`) and its pack size, so a
+   *  caller (e.g. the POS terminal) can multiply the sale quantity by pack size
+   *  instead of always selling 1 each — a scan of a case barcode previously
+   *  resolved to the right product but discarded the fact it was a case. */
+  async getByBarcode(barcode: string, tenantId: string): Promise<(Product & { scanned_unit_kind: string; scanned_pack_size: number }) | undefined> {
+    const viaTable = await this.db.one<Product & { scanned_unit_kind: string; scanned_pack_size: number }>(
+      `SELECT p.*, pb.kind AS scanned_unit_kind, pb.pack_size AS scanned_pack_size
+         FROM products p
          JOIN product_barcodes pb ON pb.product_id = p.id AND pb.tenant_id = p.tenant_id
         WHERE pb.tenant_id = @tenantId AND pb.barcode = @barcode AND p.status = 'active'
         LIMIT 1`,
       { tenantId, barcode },
     );
     if (viaTable) return viaTable;
-    return this.db.one<Product>(
+    const viaLegacy = await this.db.one<Product>(
       "SELECT * FROM products WHERE tenant_id = @tenantId AND barcode = @barcode AND status = 'active' LIMIT 1",
       { tenantId, barcode },
     );
+    if (viaLegacy) return { ...viaLegacy, scanned_unit_kind: "each", scanned_pack_size: 1 };
+    recordUomBarcodeLookupFailed();
+    return undefined;
+  }
+
+  /**
+   * POS scan resolution (ADR-006/POS-v1): everything the terminal needs to
+   * add a cart line and price it, fully resolved server-side — the terminal
+   * does no conversion or pricing math itself. Wraps getByBarcode (product +
+   * scanned unit) with the unit's selling price (each price × pack size —
+   * no tiered/promotional pricing here, that's explicitly out of scope) and
+   * current stock (a cross-domain read of `inventory`, the accepted ADR-002
+   * pattern). When no packaging unit was scanned (legacy/each barcode), this
+   * reduces to today's implicit behavior: packaging.unit "each", packSize 1,
+   * pricing = the product's normal price — existing barcode workflows are
+   * unaffected.
+   */
+  async resolvePosBarcode(barcode: string, tenantId: string): Promise<(Product & {
+    packaging: { unit: string; displayName: string; packSize: number };
+    pricing: { unitPriceCents: number };
+    inventory: { baseQuantityPerUnit: number; stockOnHandEach: number; availableForSale: boolean };
+  }) | undefined> {
+    recordPosBarcodeScan();
+    const product = await this.getByBarcode(barcode, tenantId);
+    if (!product) {
+      recordPosBarcodeScanFailure();
+      return undefined;
+    }
+    recordPosScanUnit(product.scanned_unit_kind);
+    const stockRow = await this.db.one<{ stock_qty: number }>(
+      "SELECT stock_qty FROM inventory WHERE tenant_id = @tenantId AND product_id = @productId",
+      { tenantId, productId: product.id },
+    );
+    const stockOnHandEach = stockRow ? Number(stockRow.stock_qty) : 0;
+    // Full product fields (age/tax/status/etc.) stay flat, exactly like the
+    // plain /barcode/:code response the terminal already knows how to read —
+    // packaging/pricing/inventory are additive, POS-specific enrichment.
+    return {
+      ...product,
+      packaging: {
+        unit: product.scanned_unit_kind,
+        displayName: UNIT_DISPLAY_NAME[product.scanned_unit_kind] ?? product.scanned_unit_kind,
+        packSize: product.scanned_pack_size,
+      },
+      pricing: {
+        unitPriceCents: product.price_cents * product.scanned_pack_size,
+      },
+      inventory: {
+        baseQuantityPerUnit: product.scanned_pack_size,
+        stockOnHandEach,
+        availableForSale: stockOnHandEach >= product.scanned_pack_size,
+      },
+    };
   }
 
   private async assertBarcodeAvailable(barcode: string, tenantId: string, exceptProductId?: string): Promise<void> {
@@ -663,24 +809,93 @@ export class CatalogService {
     );
   }
 
-  async list(query: ListProductsQuery = {}, tenantId: string): Promise<Page<Product>> {
+  /**
+   * Compose the WHERE clause shared by `list()` and `listFacets()`.
+   *
+   * Both must read the same rows or the counts shown beside a result set would
+   * describe a different set than the one on screen. `omit` lets the facet pass
+   * drop one dimension so that dimension's own buckets stay visible — the
+   * standard faceted-search behaviour where picking "Beverages" still shows you
+   * how many Snacks there are to switch to.
+   */
+  private buildListWhere(
+    query: ListProductsQuery,
+    tenantId: string,
+    omit?: keyof ListProductsQuery,
+  ): { whereSql: string; params: Record<string, unknown>; rank: string | null } {
+    const where: string[] = ["products.tenant_id = @tenantId"];
+    const params: Record<string, unknown> = { tenantId };
+    const use = (field: keyof ListProductsQuery) => omit !== field;
+
+    let rank: string | null = null;
+    if (query.q && use("q")) {
+      const search = buildProductSearch(query.q, tenantId, params);
+      if (search) {
+        where.push(`(${search.predicate})`);
+        rank = search.rank;
+      }
+    }
+    if (query.category && use("category")) {
+      where.push("products.category = @category");
+      params.category = query.category;
+    }
+    if (query.status && use("status")) {
+      where.push("products.status = @status");
+      params.status = query.status;
+    }
+    if (query.brand && use("brand")) {
+      where.push("products.brand ILIKE @brand");
+      params.brand = `%${escapeLike(query.brand)}%`;
+    }
+    if (query.taxClass && use("taxClass")) {
+      where.push("products.tax_class = @taxClass");
+      params.taxClass = query.taxClass;
+    }
+    if (query.ageRestricted && use("ageRestricted")) {
+      where.push("products.age_restricted = 1");
+    }
+    if (query.ecommerce && use("ecommerce")) {
+      where.push("products.ecommerce = 1");
+    }
+    if (query.minPriceCents !== undefined && use("minPriceCents")) {
+      where.push("products.price_cents >= @minPriceCents");
+      params.minPriceCents = query.minPriceCents;
+    }
+    if (query.maxPriceCents !== undefined && use("maxPriceCents")) {
+      where.push("products.price_cents <= @maxPriceCents");
+      params.maxPriceCents = query.maxPriceCents;
+    }
+    if (query.productType && use("productType")) {
+      where.push(`(${productTypePredicate(query.productType)})`);
+    }
+    if (query.supplier && use("supplier")) {
+      where.push(
+        `(products.preferred_vendor_id = @supplierId
+          OR products.preferred_vendor_name ILIKE @supplierLike
+          OR products.primary_vendor ILIKE @supplierLike
+          OR EXISTS (SELECT 1 FROM product_suppliers psf
+                      WHERE psf.tenant_id = products.tenant_id
+                        AND psf.product_id = products.id
+                        AND psf.supplier_id = @supplierId))`,
+      );
+      params.supplierId = query.supplier;
+      params.supplierLike = `%${escapeLike(query.supplier)}%`;
+    }
+    if (query.topLevel && use("topLevel")) {
+      where.push("products.parent_product_id IS NULL");
+    }
+    if (query.excludeMasters && use("excludeMasters")) {
+      where.push("NOT EXISTS (SELECT 1 FROM products c WHERE c.tenant_id = products.tenant_id AND c.parent_product_id = products.id)");
+    }
+
+    return { whereSql: `WHERE ${where.join(" AND ")}`, params, rank };
+  }
+
+  async list(query: ListProductsQuery = {}, tenantId: string): Promise<Page<ProductListItem>> {
     const limit = clampLimit(query.limit);
     const offset = query.offset && query.offset > 0 ? Math.floor(query.offset) : 0;
 
-    const where: string[] = ["tenant_id = @tenantId"];
-    const params: Record<string, unknown> = { tenantId };
-    if (query.category) {
-      where.push("category = @category");
-      params.category = query.category;
-    }
-    if (query.status) {
-      where.push("status = @status");
-      params.status = query.status;
-    }
-    if (query.excludeMasters) {
-      where.push("NOT EXISTS (SELECT 1 FROM products c WHERE c.tenant_id = products.tenant_id AND c.parent_product_id = products.id)");
-    }
-    const whereSql = `WHERE ${where.join(" AND ")}`;
+    const { whereSql, params, rank } = this.buildListWhere(query, tenantId);
 
     const totalRow = await this.db.one<{ n: number }>(
       `SELECT COUNT(*) AS n FROM products ${whereSql}`,
@@ -688,14 +903,104 @@ export class CatalogService {
     );
     const total = totalRow?.n ?? 0;
 
-    const items = await this.db.query<Product>(
-      `SELECT * FROM products ${whereSql}
-       ORDER BY created_at DESC, id DESC
-       LIMIT @limit OFFSET @offset`,
+    // The rank expression is inlined into ORDER BY rather than selected, so the
+    // rows keep their table shape apart from the one column we mean to add — no
+    // internal scoring value leaks into the API response. The variant count is a
+    // correlated subquery over products_tenant_parent_idx, bounded by LIMIT.
+    const rows = await this.db.query<ProductListItem>(
+      `SELECT products.*,
+              (SELECT COUNT(*) FROM products kids
+                WHERE kids.tenant_id = products.tenant_id
+                  AND kids.parent_product_id = products.id) AS variant_count
+         FROM products ${whereSql}
+        ORDER BY ${productOrderBy(query.sort, query.dir, rank)}
+        LIMIT @limit OFFSET @offset`,
       { ...params, limit, offset },
     );
+    // COUNT() arrives as a string from node-postgres for BIGINT-typed results.
+    const items = rows.map((r) => ({ ...r, variant_count: Number(r.variant_count) }));
 
     return { items, total, limit, offset };
+  }
+
+  /**
+   * Filter options for the current query, counted over the whole matching set.
+   *
+   * This exists because the catalog header used to count statuses and product
+   * types from the rows React happened to be holding — correct only while the
+   * catalog fit on one page, and quietly wrong after that. Each dimension omits
+   * its own filter (see `buildListWhere`) so selecting a value doesn't collapse
+   * that facet to a single bucket.
+   */
+  async listFacets(query: ListProductsQuery, tenantId: string): Promise<ProductFacets> {
+    const base = this.buildListWhere(query, tenantId);
+
+    const bucketsFor = async (
+      column: string,
+      omit: keyof ListProductsQuery,
+      limit: number,
+    ): Promise<FacetBucket[]> => {
+      const scoped = this.buildListWhere(query, tenantId, omit);
+      const rows = await this.db.query<{ value: string | null; n: number }>(
+        `SELECT ${column} AS value, COUNT(*) AS n
+           FROM products ${scoped.whereSql}
+          GROUP BY ${column}
+          HAVING ${column} IS NOT NULL AND ${column} <> ''
+          ORDER BY COUNT(*) DESC, ${column} ASC
+          LIMIT ${limit}`,
+        scoped.params,
+      );
+      return rows.map((r) => ({ value: String(r.value), count: Number(r.n) }));
+    };
+
+    const typeScoped = this.buildListWhere(query, tenantId, "productType");
+    const [totalRow, status, category, brand, supplier, taxClass, flags, price, typeRow] = await Promise.all([
+      this.db.one<{ n: number }>(`SELECT COUNT(*) AS n FROM products ${base.whereSql}`, base.params),
+      bucketsFor("products.status", "status", 10),
+      bucketsFor("products.category", "category", 40),
+      bucketsFor("products.brand", "brand", 40),
+      bucketsFor("products.preferred_vendor_name", "supplier", 40),
+      bucketsFor("products.tax_class", "taxClass", 10),
+      this.db.one<{ restricted: number; online: number }>(
+        `SELECT COALESCE(SUM(CASE WHEN products.age_restricted = 1 THEN 1 ELSE 0 END), 0) AS restricted,
+                COALESCE(SUM(CASE WHEN products.ecommerce = 1 THEN 1 ELSE 0 END), 0) AS online
+           FROM products ${base.whereSql}`,
+        base.params,
+      ),
+      this.db.one<{ lo: number | null; hi: number | null }>(
+        `SELECT MIN(products.price_cents) AS lo, MAX(products.price_cents) AS hi FROM products ${base.whereSql}`,
+        base.params,
+      ),
+      this.db.one<{ standalone: number; master: number; variant: number }>(
+        `SELECT
+           COALESCE(SUM(CASE WHEN ${productTypePredicate("standalone")} THEN 1 ELSE 0 END), 0) AS standalone,
+           COALESCE(SUM(CASE WHEN ${productTypePredicate("master")}     THEN 1 ELSE 0 END), 0) AS master,
+           COALESCE(SUM(CASE WHEN ${productTypePredicate("variant")}    THEN 1 ELSE 0 END), 0) AS variant
+         FROM products ${typeScoped.whereSql}`,
+        typeScoped.params,
+      ),
+    ]);
+
+    const productType: FacetBucket[] = [
+      { value: "standalone", count: Number(typeRow?.standalone ?? 0) },
+      { value: "master", count: Number(typeRow?.master ?? 0) },
+      { value: "variant", count: Number(typeRow?.variant ?? 0) },
+    ];
+
+    return {
+      total: Number(totalRow?.n ?? 0),
+      status,
+      productType,
+      category,
+      brand,
+      supplier,
+      taxClass,
+      ageRestricted: Number(flags?.restricted ?? 0),
+      ecommerce: Number(flags?.online ?? 0),
+      priceRange: price?.lo != null && price?.hi != null
+        ? { min: Number(price.lo), max: Number(price.hi) }
+        : null,
+    };
   }
 
   async update(id: string, input: UpdateProductInput, tenantId: string, options: MutationOptions = {}): Promise<Product> {
@@ -1621,6 +1926,161 @@ function ean13CheckDigit(body12: string): string {
 function clampLimit(limit?: number): number {
   if (!limit || limit <= 0) return 50;
   return Math.min(Math.floor(limit), 200);
+}
+
+// ── Product search / filter / sort SQL ────────────────────────────────────────
+// All of this used to live in the browser, over whatever page happened to be
+// loaded. It is here now so a filter means the same thing on row 1 and row
+// 100,000. Two constraints shaped it:
+//   1. `compile()` in shared/db.ts binds `undefined` for an @name with no
+//      matching key — silently, as NULL. Every fragment below therefore writes
+//      its own params, and nothing references a placeholder it did not set.
+//   2. Contains-matching uses bare-column ILIKE (not `lower(col) LIKE`) so the
+//      gin_trgm_ops indexes stay eligible; `lower()` appears only in the rank
+//      expression, which is evaluated on already-filtered rows.
+
+/** Columns a free-text term is matched against, in the product row itself. */
+const SEARCH_COLUMNS: readonly string[] = [
+  "name", "sku", "barcode", "brand", "manufacturer",
+  "alternative_name", "model_name", "tags", "vendor_upc", "category",
+];
+
+/** More tokens than this stops adding signal and starts costing scans. */
+const MAX_SEARCH_TOKENS = 5;
+
+interface SearchSql {
+  /** Restricts to rows matching every token (AND across tokens, OR across columns). */
+  predicate: string;
+  /** Integer relevance, lower is better. See RANK_* ordering in the CASE below. */
+  rank: string;
+}
+
+/**
+ * Build the search predicate and relevance ranking for a raw query string.
+ *
+ * Token semantics are AND: "coke 12" means both "coke" and "12" appear
+ * somewhere on the product, which is what makes `12 pack coke` resolve to a
+ * 12-pack of Coca-Cola rather than to everything containing "coke".
+ *
+ * Ranking follows the documented precedence — exact barcode, then exact SKU,
+ * then exact supplier SKU, then prefix matches, then name contains, then
+ * anything else — so scanning `049000028904` resolves the product rather than
+ * burying it under name matches.
+ *
+ * Returns null for a blank query (caller then applies no search at all).
+ */
+function buildProductSearch(raw: string, tenantId: string, params: Record<string, unknown>): SearchSql | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  // The barcode sub-select below binds @tenantId. Set it here rather than
+  // relying on the caller having done so: `compile()` binds a missing @name as
+  // NULL without complaining, which would silently turn that clause into "no
+  // alternate barcode ever matches" — a wrong result, not an error.
+  params.tenantId = tenantId;
+
+  const tokens = trimmed.split(/\s+/).filter(Boolean).slice(0, MAX_SEARCH_TOKENS);
+  if (tokens.length === 0) return null;
+
+  const clauses: string[] = [];
+  tokens.forEach((token, i) => {
+    const key = `sq${i}`;
+    params[key] = `%${escapeLike(token)}%`;
+    const cols = SEARCH_COLUMNS.map((c) => `products.${c} ILIKE @${key}`);
+    // Alternate/case/vendor UPCs live in their own table; a scan of any of them
+    // has to find the product, not just a scan of products.barcode.
+    //
+    // `IN (subquery)` rather than a correlated `EXISTS`: inside an OR, Postgres
+    // cannot flatten EXISTS into a semi-join and runs it as a per-row SubPlan,
+    // so it re-queries product_barcodes for every row the column predicates
+    // did not already match. The IN form evaluates the inner scan once against
+    // pbarcodes_barcode_trgm_idx and hashes the (small) result. Measured on a
+    // 50k catalog: 202ms → 122ms for the row query, 182ms → 163ms for the
+    // count. Identical results, including for a term that matches only an
+    // alternate barcode — see the barcode tests in catalog.test.ts.
+    cols.push(
+      `products.id IN (SELECT pbs.product_id FROM product_barcodes pbs
+                        WHERE pbs.tenant_id = @tenantId
+                          AND pbs.barcode ILIKE @${key})`,
+    );
+    clauses.push(`(${cols.join(" OR ")})`);
+  });
+
+  const lower = trimmed.toLowerCase();
+  params.sxEq = lower;
+  params.sxPrefix = `${escapeLike(lower)}%`;
+  params.sxContains = `%${escapeLike(lower)}%`;
+  // Scanners and pasted UPCs arrive with spaces or dashes; compare a digits-only
+  // form too. NULL when the term has no digits — `col = NULL` is simply never true.
+  const digits = lower.replace(/\D/g, "");
+  params.sxDigits = digits.length >= 6 ? digits : null;
+
+  const rank = `CASE
+      WHEN lower(products.barcode) = @sxEq OR lower(products.barcode) = @sxDigits THEN 0
+      WHEN EXISTS (SELECT 1 FROM product_barcodes pbr
+                    WHERE pbr.tenant_id = products.tenant_id
+                      AND pbr.product_id = products.id
+                      AND (lower(pbr.barcode) = @sxEq OR lower(pbr.barcode) = @sxDigits)) THEN 0
+      WHEN lower(products.sku) = @sxEq THEN 1
+      WHEN lower(products.vendor_upc) = @sxEq OR lower(products.vendor_upc) = @sxDigits THEN 2
+      WHEN lower(products.sku) LIKE @sxPrefix THEN 3
+      WHEN lower(products.name) LIKE @sxPrefix THEN 4
+      WHEN lower(products.brand) LIKE @sxPrefix OR lower(products.manufacturer) LIKE @sxPrefix THEN 5
+      WHEN lower(products.name) LIKE @sxContains THEN 6
+      ELSE 7
+    END`;
+
+  return { predicate: clauses.join(" AND "), rank };
+}
+
+/** Neutralize LIKE wildcards in user input so `50%` is a literal, not a match-all. */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
+/** SQL for the derived master/variant/standalone position of a product. */
+function productTypePredicate(type: ProductTypeFilter): string {
+  const hasChild = `EXISTS (SELECT 1 FROM products kids
+                             WHERE kids.tenant_id = products.tenant_id
+                               AND kids.parent_product_id = products.id)`;
+  if (type === "variant") return "products.parent_product_id IS NOT NULL";
+  if (type === "master") return `products.parent_product_id IS NULL AND ${hasChild}`;
+  return `products.parent_product_id IS NULL AND NOT ${hasChild}`;
+}
+
+const SORT_COLUMNS: Record<Exclude<ProductSort, "relevance">, string> = {
+  name: "products.name",
+  sku: "products.sku",
+  price_cents: "products.price_cents",
+  category: "products.category",
+  brand: "products.brand",
+  status: "products.status",
+  created_at: "products.created_at",
+  updated_at: "products.updated_at",
+  cost: "products.raw_cost_price_cents",
+};
+
+/**
+ * ORDER BY for the product list. Whitelisted columns only — `sort` never
+ * reaches SQL as text. Every ordering ends in `products.id` so paging through a
+ * catalog with duplicate sort values can't repeat or skip a row.
+ */
+function productOrderBy(sort: ProductSort | undefined, dir: SortDir | undefined, rank: string | null): string {
+  const direction = dir === "desc" ? "DESC" : "ASC";
+  const effective: ProductSort = sort ?? (rank ? "relevance" : "created_at");
+
+  if (effective === "relevance") {
+    if (!rank) return "products.name ASC, products.id ASC";
+    // Within a relevance tier, prefer what the user can actually sell today.
+    return `${rank} ASC, (products.status = 'active') DESC, products.name ASC, products.id ASC`;
+  }
+
+  const column = SORT_COLUMNS[effective];
+  // NULLS LAST in both directions: an unset brand or cost is missing data, not
+  // the "smallest" value, and shouldn't fill the first page of an ascending sort.
+  const nulls = effective === "brand" || effective === "cost" ? " NULLS LAST" : "";
+  const fallback = effective === "created_at" ? "" : ", products.created_at DESC";
+  return `${column} ${direction}${nulls}${fallback}, products.id ASC`;
 }
 
 /** Postgres signals a unique-constraint breach with SQLSTATE 23505. */

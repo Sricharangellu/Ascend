@@ -8,9 +8,8 @@ import { moduleLogger } from "../shared/logger.js";
 import { HttpError } from "../shared/http.js";
 import type { Role, TokenClaims, UserRow, AuditLogRow } from "./types.js";
 import { hasRole } from "./types.js";
+import { issueTokenPair, resolveCustomRolePermissions, type TokenPair } from "./tokens.js";
 
-const ACCESS_TOKEN_TTL = "15m";
-const REFRESH_TOKEN_TTL = "7d";
 const MFA_PENDING_TOKEN_TTL_SECONDS = 5 * 60;
 const MFA_BACKUP_CODE_COUNT = 8;
 
@@ -35,11 +34,9 @@ export interface LoginInput {
   password: string;
 }
 
-export interface TokenPair {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number; // seconds
-}
+// Re-exported so existing importers of `TokenPair` from this module keep
+// working; the definition now lives beside the minter in ./tokens.ts.
+export type { TokenPair };
 
 export interface MfaRequiredLogin {
   mfaRequired: true;
@@ -931,37 +928,17 @@ export class IdentityService {
     customRoleId?: string,
     permissions?: string[],
   ): TokenPair {
-    const secret = this.getSecret();
-    const claims: Omit<TokenClaims, "sub" | "iat" | "exp"> = {
+    return issueTokenPair(this.getSecret(), {
+      userId,
       tenantId,
       role,
       ...(customRoleId ? { customRoleId } : {}),
-      ...(permissions && permissions.length > 0 ? { permissions } : {}),
-    };
-    const accessToken = jwt.sign(claims, secret, {
-      subject: userId,
-      expiresIn: ACCESS_TOKEN_TTL,
-      jwtid: `atk_${uuidv7()}`,
+      ...(permissions ? { permissions } : {}),
     });
-    const refreshToken = jwt.sign(claims, secret + ":refresh", {
-      subject: userId,
-      expiresIn: REFRESH_TOKEN_TTL,
-      jwtid: `rtk_${uuidv7()}`,
-    });
-    return { accessToken, refreshToken, expiresIn: 15 * 60 };
   }
 
   private async resolveCustomRolePermissions(customRoleId: string): Promise<string[]> {
-    const row = await this.db.one<{ permissions: string }>(
-      "SELECT permissions FROM custom_roles WHERE id = @id",
-      { id: customRoleId },
-    );
-    if (!row) return [];
-    try {
-      return JSON.parse(row.permissions) as string[];
-    } catch {
-      return [];
-    }
+    return resolveCustomRolePermissions(this.db, customRoleId);
   }
 
   private async verifyPassword(plain: string, stored: string): Promise<boolean> {

@@ -96,6 +96,8 @@ export interface AgingBuckets {
 
 export interface AgingRow {
   partyId: string; // customer_id (AR) or supplier_id (AP)
+  /** Display name from customers/suppliers join; falls back to partyId. */
+  partyName: string;
   buckets: AgingBuckets;
 }
 
@@ -123,13 +125,16 @@ export interface SalesByVendorRow {
   vendorName: string;
   totalCents: number;
   qty: number;
+  orderCount: number;
 }
 
 export interface PnlReport {
-  revenueCents: number;          // gross from completed orders
+  revenueCents: number;          // NET of sales tax — tax collected is a liability, not revenue
+  grossSalesCents: number;       // gross from completed orders, tax included (reconciliation aid)
+  taxCents: number;              // sales tax collected in the window (excluded from revenue)
   cogsCents: number;             // sum(cost_cents * qty) from order_lines via product_costs
   grossProfitCents: number;      // revenue − COGS
-  operatingExpensesCents: number; // sum of expense account line items (from accounts)
+  operatingExpensesCents: number; // sum(expenses.amount_cents) — recorded business spend
   netIncomeCents: number;        // grossProfit − operatingExpenses
 }
 
@@ -172,18 +177,45 @@ export interface MarginByCategoryItem {
   units: number;
 }
 
-const emptyBuckets = (): AgingBuckets => ({ current: 0, d1_30: 0, d31_60: 0, d61_90: 0, d90_plus: 0, total: 0 });
-
-/** Place an outstanding balance into an aging bucket by days overdue. */
-function addToBucket(b: AgingBuckets, balance: number, dueDate: number | null, now: number): void {
-  const daysOverdue = dueDate ? Math.floor((now - dueDate) / 86_400_000) : 0;
-  if (daysOverdue <= 0) b.current += balance;
-  else if (daysOverdue <= 30) b.d1_30 += balance;
-  else if (daysOverdue <= 60) b.d31_60 += balance;
-  else if (daysOverdue <= 90) b.d61_90 += balance;
-  else b.d90_plus += balance;
-  b.total += balance;
+/** One row of the SQL bucket aggregation. `SUM()` comes back as a numeric →
+ *  string under node-postgres, so every field is coerced with `Number()`. */
+interface AgingBucketRow {
+  current: number | string;
+  d1_30: number | string;
+  d31_60: number | string;
+  d61_90: number | string;
+  d90_plus: number | string;
+  total: number | string;
 }
+
+/** Coerce one SQL bucket row into the numeric `AgingBuckets` response shape.
+ *  The queries `COALESCE(...,0)` every column, so a present row is never NULL;
+ *  the `?? 0` only defends the (impossible-in-practice) absent-row case. */
+const bucketsFromRow = (r: AgingBucketRow | undefined): AgingBuckets => ({
+  current: Number(r?.current ?? 0),
+  d1_30: Number(r?.d1_30 ?? 0),
+  d31_60: Number(r?.d31_60 ?? 0),
+  d61_90: Number(r?.d61_90 ?? 0),
+  d90_plus: Number(r?.d90_plus ?? 0),
+  total: Number(r?.total ?? 0),
+});
+
+/** The five aging buckets as conditional-aggregate columns over a CTE that
+ *  exposes `balance` (integer cents) and `days_overdue` (whole days) per open
+ *  document. Placement mirrors the previous JS `addToBucket` exactly: `<= 0`
+ *  (incl. a NULL/0 due date) is current, then floor((now - due)/DAY) buckets
+ *  the rest at the 30/60/90-day edges. Shared verbatim by the totals query
+ *  (ungrouped) and the parties query (GROUP BY party) so both agree by
+ *  construction. Composed into a SQL string that is then passed to the DB
+ *  helpers as a prebuilt variable — never as a tagged template at the call
+ *  site — and the fragment is a fixed constant, never user input. */
+const AGING_BUCKET_COLUMNS = `
+        COALESCE(SUM(balance) FILTER (WHERE days_overdue <= 0), 0)              AS current,
+        COALESCE(SUM(balance) FILTER (WHERE days_overdue BETWEEN 1 AND 30), 0)  AS d1_30,
+        COALESCE(SUM(balance) FILTER (WHERE days_overdue BETWEEN 31 AND 60), 0) AS d31_60,
+        COALESCE(SUM(balance) FILTER (WHERE days_overdue BETWEEN 61 AND 90), 0) AS d61_90,
+        COALESCE(SUM(balance) FILTER (WHERE days_overdue > 90), 0)              AS d90_plus,
+        COALESCE(SUM(balance), 0)                                              AS total`;
 
 export interface RetailProofSignal {
   code: string;
@@ -251,7 +283,7 @@ const RECO_PLAYBOOK: Record<string, { category: RecommendationCategory; title: s
   out_of_stock:          { category: "inventory", title: "Restock out-of-stock items", action: "Receive stock for products that are out of stock.",                    href: "/inventory" },
   negative_net_profit:   { category: "profit",    title: "Fix negative net profit",    action: "Raise margins or cut expenses — spending is outpacing gross profit.",  href: "/reports" },
   thin_margin:           { category: "pricing",   title: "Improve thin margin",        action: "Review pricing or supplier costs to lift a low gross margin.",         href: "/reports" },
-  low_stock:             { category: "inventory", title: "Reorder low stock",          action: "Reorder products at or below their reorder point.",                    href: "/inventory" },
+  low_stock:             { category: "inventory", title: "Reorder low stock",          action: "Reorder products at or below their reorder point.",                    href: "/purchasing?tab=reorder" },
   no_sales_yet:          { category: "sales",     title: "Record your first sale",     action: "Ring up a sale at the register to start measuring performance.",       href: "/terminal" },
   products_never_sold:   { category: "sales",     title: "Review never-sold products", action: "Promote, reprice, or discontinue products that have never sold.",       href: "/catalog" },
   slow_movers:           { category: "sales",     title: "Clear slow movers",          action: "Discount or clear stock that has not sold recently.",                  href: "/catalog" },
@@ -365,23 +397,43 @@ export class ReportsService {
     const avgItemsPerSale = saleCount > 0 ? Math.round((totalItems / saleCount) * 10) / 10 : 0;
     const discountedPct = saleCount > 0 ? Math.round((discountedOrders / saleCount) * 1000) / 10 : 0;
 
-    // DB-9: CQRS sparklines — read from daily_sales_summary (pre-aggregated).
-    // Uses pre-computed ISO date string for comparison (avoids to_char/to_timestamp
-    // which behaves differently on embedded-postgres vs production Postgres 16).
-    const sparkStartDate = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
-    const sparkRows = await this.db.query<{ day: string; rev: number; cnt: number }>(
+    // Sparklines: last 8 UTC days from live completed orders.
+    // `daily_sales_summary` exists for a future CQRS read model (DB-9) but is
+    // never written today — reading it left every dashboard sparkline empty
+    // even when real sales existed. Same grain as aggregateDailySales(); day
+    // buckets use integer ms/86400000 (portable across embedded + PG16).
+    // Dense-fill missing days with zeros so the FE sparkline (≥2 points) can
+    // render after a single sale in the window.
+    const SPARK_DAYS = 8;
+    const dayMs = 86_400_000;
+    const now = Date.now();
+    const todayBucket = Math.floor(now / dayMs);
+    const firstBucket = todayBucket - (SPARK_DAYS - 1);
+    const sparkStartMs = firstBucket * dayMs;
+    const sparkRows = await this.db.query<{ day_bucket: number; rev: number; cnt: number }>(
       `SELECT
-         summary_date        AS day,
-         gross_sales_cents   AS rev,
-         transaction_count   AS cnt
-       FROM daily_sales_summary
+         (created_at / 86400000)::bigint AS day_bucket,
+         COALESCE(SUM(total_cents), 0)   AS rev,
+         COUNT(*)::int                   AS cnt
+       FROM orders
        WHERE tenant_id = @tenantId
-         AND summary_date >= @sparkStartDate
-       ORDER BY summary_date ASC LIMIT 8`,
-      { tenantId, sparkStartDate },
+         AND status = 'completed'
+         AND created_at >= @sparkStartMs
+       GROUP BY 1
+       ORDER BY 1 ASC`,
+      { tenantId, sparkStartMs },
     );
-    const sparkRevenue = sparkRows.map((r) => Number(r.rev));
-    const sparkSaleCount = sparkRows.map((r) => Number(r.cnt));
+    const byBucket = new Map<number, { rev: number; cnt: number }>();
+    for (const r of sparkRows) {
+      byBucket.set(Number(r.day_bucket), { rev: Number(r.rev), cnt: Number(r.cnt) });
+    }
+    const sparkRevenue: number[] = [];
+    const sparkSaleCount: number[] = [];
+    for (let b = firstBucket; b <= todayBucket; b++) {
+      const cell = byBucket.get(b);
+      sparkRevenue.push(cell?.rev ?? 0);
+      sparkSaleCount.push(cell?.cnt ?? 0);
+    }
 
     return {
       orders,
@@ -458,15 +510,30 @@ export class ReportsService {
     });
   }
 
-  /** Accounts Receivable aging — open invoice balances bucketed by days overdue. */
-  async arAging(tenantId: string, now = Date.now()): Promise<AgingReport> {
-    const rows = await this.db.query<{ customer_id: string; balance: number; due_date: number | null }>(
-      `SELECT customer_id, (total_cents - paid_cents) AS balance, due_date
-         FROM invoices
-        WHERE tenant_id = @t AND status <> 'void' AND (total_cents - paid_cents) > 0`,
-      { t: tenantId },
+  /** Accounts Receivable aging — open customer invoice balances bucketed by
+   *  days overdue. Bucketing and the grand totals are computed in SQL (see
+   *  {@link aggregateAging}); `limit` caps the returned per-party list
+   *  (default 500) so a tenant with thousands of debtors never streams its
+   *  whole open-AR ledger into app memory — `totals` stay exact regardless of
+   *  the cap (REPORTS_MODULE_REVIEW.md finding #4). */
+  async arAging(tenantId: string, now = Date.now(), limit = 500): Promise<AgingReport> {
+    return this.aggregateAging(
+      `WITH open_rows AS (
+         SELECT i.customer_id AS party_id,
+                COALESCE(NULLIF(TRIM(c.name), ''), i.customer_id) AS party_name,
+                (i.total_cents - i.paid_cents) AS balance,
+                CASE WHEN i.due_date IS NULL OR i.due_date = 0 THEN 0
+                     ELSE floor((@now - i.due_date) / 86400000.0) END AS days_overdue
+           FROM invoices i
+           LEFT JOIN customers c ON c.id = i.customer_id AND c.tenant_id = i.tenant_id
+          WHERE i.tenant_id = @t
+            AND i.status <> 'void'
+            AND (i.total_cents - i.paid_cents) > 0
+       )`,
+      tenantId,
+      now,
+      limit,
     );
-    return this.buildAging(rows.map((r) => ({ partyId: r.customer_id, balance: Number(r.balance), dueDate: r.due_date })), now);
   }
 
   /** Dunning sweep: set dunning_level (1/2/3) on overdue open/partial invoices.
@@ -496,26 +563,68 @@ export class ReportsService {
     return { updated };
   }
 
-  /** Accounts Payable aging — open supplier bill balances bucketed by days overdue. */
-  async apAging(tenantId: string, now = Date.now()): Promise<AgingReport> {
-    const rows = await this.db.query<{ supplier_id: string; balance: number; due_date: number | null }>(
-      `SELECT supplier_id, (total_cents - paid_cents) AS balance, due_date
-         FROM bills
-        WHERE tenant_id = @t AND status <> 'void' AND (total_cents - paid_cents) > 0`,
-      { t: tenantId },
+  /** Accounts Payable aging — open supplier bill balances bucketed by days
+   *  overdue. Same SQL-side aggregation and bounded `limit` as {@link arAging};
+   *  see it and {@link aggregateAging} for the shape and the totals guarantee. */
+  async apAging(tenantId: string, now = Date.now(), limit = 500): Promise<AgingReport> {
+    return this.aggregateAging(
+      `WITH open_rows AS (
+         SELECT b.supplier_id AS party_id,
+                COALESCE(NULLIF(TRIM(s.name), ''), b.supplier_id) AS party_name,
+                (b.total_cents - b.paid_cents) AS balance,
+                CASE WHEN b.due_date IS NULL OR b.due_date = 0 THEN 0
+                     ELSE floor((@now - b.due_date) / 86400000.0) END AS days_overdue
+           FROM bills b
+           LEFT JOIN suppliers s ON s.id = b.supplier_id AND s.tenant_id = b.tenant_id
+          WHERE b.tenant_id = @t
+            AND b.status <> 'void'
+            AND (b.total_cents - b.paid_cents) > 0
+       )`,
+      tenantId,
+      now,
+      limit,
     );
-    return this.buildAging(rows.map((r) => ({ partyId: r.supplier_id, balance: Number(r.balance), dueDate: r.due_date })), now);
   }
 
-  private buildAging(rows: Array<{ partyId: string; balance: number; dueDate: number | null }>, now: number): AgingReport {
-    const totals = emptyBuckets();
-    const byParty = new Map<string, AgingBuckets>();
-    for (const r of rows) {
-      if (!byParty.has(r.partyId)) byParty.set(r.partyId, emptyBuckets());
-      addToBucket(byParty.get(r.partyId)!, r.balance, r.dueDate, now);
-      addToBucket(totals, r.balance, r.dueDate, now);
-    }
-    return { totals, parties: Array.from(byParty, ([partyId, buckets]) => ({ partyId, buckets })).sort((a, b) => b.buckets.total - a.buckets.total) };
+  /** Run the shared two-query aging aggregation over a caller-supplied
+   *  `open_rows` CTE (which must expose `party_id`, `party_name`, `balance`
+   *  in integer cents, and whole-day `days_overdue`). One query returns the
+   *  grand totals over *every* open row — bounded output: a single row, so the
+   *  full ledger is aggregated in the DB, never pulled into app memory — and
+   *  the other returns the top-`limit` parties by outstanding total. Both share
+   *  {@link AGING_BUCKET_COLUMNS}, so capping the parties can never make them
+   *  disagree with the totals (REPORTS_MODULE_REVIEW.md finding #4: naively
+   *  slicing the parties in JS would have understated neither, but still pulled
+   *  every row in to compute the totals — this doesn't).
+   *
+   *  `cte` is a fixed internal constant chosen by arAging/apAging, never user
+   *  input; the SQL strings are assembled here and handed to the DB helpers as
+   *  prebuilt variables, so the CI "no raw SQL interpolation" guard is clean. */
+  private async aggregateAging(
+    cte: string,
+    tenantId: string,
+    now: number,
+    limit: number,
+  ): Promise<AgingReport> {
+    const totalsSql = `${cte} SELECT ${AGING_BUCKET_COLUMNS} FROM open_rows`;
+    const partiesSql =
+      `${cte} SELECT party_id, MAX(party_name) AS party_name, ${AGING_BUCKET_COLUMNS} ` +
+      `FROM open_rows GROUP BY party_id ORDER BY total DESC, party_id ASC LIMIT @limit`;
+
+    const totalsRow = await this.db.one<AgingBucketRow>(totalsSql, { t: tenantId, now });
+    const partyRows = await this.db.query<AgingBucketRow & { party_id: string; party_name: string }>(
+      partiesSql,
+      { t: tenantId, now, limit },
+    );
+
+    return {
+      totals: bucketsFromRow(totalsRow),
+      parties: partyRows.map((r) => ({
+        partyId: r.party_id,
+        partyName: r.party_name,
+        buckets: bucketsFromRow(r),
+      })),
+    };
   }
 
   /** Revenue + units grouped by product category (completed orders in window). */
@@ -581,11 +690,14 @@ export class ReportsService {
   /** Revenue + qty grouped by vendor/supplier (via products.preferred_vendor_id, completed orders). */
   async salesByVendor(tenantId: string, sinceMs?: number): Promise<SalesByVendorRow[]> {
     const since = sinceMs ?? 0;
-    const rows = await this.db.query<{ vendor_id: string; vendor_name: string; total: number; qty: number }>(
+    const rows = await this.db.query<{
+      vendor_id: string; vendor_name: string; total: number; qty: number; order_count: number;
+    }>(
       `SELECT p.preferred_vendor_id AS vendor_id,
               COALESCE(MAX(s.name), p.preferred_vendor_id) AS vendor_name,
               COALESCE(SUM(ol.line_cents), 0) AS total,
-              SUM(ol.quantity)::int AS qty
+              SUM(ol.quantity)::int AS qty,
+              COUNT(DISTINCT o.id)::int AS order_count
          FROM order_lines ol
          JOIN orders o ON o.id = ol.order_id AND o.tenant_id = ol.tenant_id
          LEFT JOIN products p ON p.id = ol.product_id AND p.tenant_id = ol.tenant_id
@@ -601,6 +713,7 @@ export class ReportsService {
       vendorName: r.vendor_name ?? r.vendor_id,
       totalCents: Number(r.total),
       qty: Number(r.qty),
+      orderCount: Number(r.order_count),
     }));
   }
 
@@ -609,15 +722,21 @@ export class ReportsService {
     const since = sinceMs ?? 0;
     const until = untilMs ?? Date.now();
 
-    // Revenue: gross from completed orders in the window.
-    const revRow = await this.db.one<{ revenue: number }>(
-      `SELECT COALESCE(SUM(total_cents), 0) AS revenue
+    // Revenue: completed orders in the window, NET of sales tax. `total_cents` is
+    // subtotal − discount + tax; tax collected is a liability owed to the tax
+    // authority, never revenue. This matches salesSummary(), which reports
+    // `netCents: grossCents - taxCents` from the same orders table.
+    const revRow = await this.db.one<{ gross: number; tax: number }>(
+      `SELECT COALESCE(SUM(total_cents), 0) AS gross,
+              COALESCE(SUM(tax_cents), 0)   AS tax
          FROM orders
         WHERE tenant_id = @tenantId AND status = 'completed'
           AND created_at >= @since AND created_at <= @until`,
       { tenantId, since, until },
     );
-    const revenueCents = Number(revRow?.revenue ?? 0);
+    const grossSalesCents = Number(revRow?.gross ?? 0);
+    const taxCents = Number(revRow?.tax ?? 0);
+    const revenueCents = grossSalesCents - taxCents;
 
     // COGS: sum(cost_cents * qty) joining order_lines to product_costs.
     const cogsRow = await this.db.one<{ cogs: number }>(
@@ -631,27 +750,36 @@ export class ReportsService {
     );
     const cogsCents = Number(cogsRow?.cogs ?? 0);
 
-    // Operating expenses: accounts of type 'expense' (chart of accounts).
-    // We use the sum of all expense account balances — approximated as bills
-    // issued in the window. If no bills table is available, defaults to 0.
-    let operatingExpensesCents = 0;
-    try {
-      const expRow = await this.db.one<{ expenses: number }>(
-        `SELECT COALESCE(SUM(total_cents), 0) AS expenses
-           FROM bills
-          WHERE tenant_id = @tenantId AND status <> 'void'
-            AND issued_at >= @since AND issued_at <= @until`,
-        { tenantId, since, until },
-      );
-      operatingExpensesCents = Number(expRow?.expenses ?? 0);
-    } catch {
-      // bills table may not exist in all deployments; default to 0.
-    }
+    // Operating expenses: recorded business spend from the `expenses` table.
+    //
+    // This deliberately does NOT sum `bills`. Bills are auto-drafted from fully
+    // received purchase orders (see billing/service.ts billFromPO), i.e. they are
+    // inventory purchases — already expensed through COGS above when the goods
+    // sell. Counting them here too double-counts inventory cost and, worse,
+    // omits real opex (rent, payroll) entirely, since those live in `expenses`.
+    // retailProof() already computes net profit off `expenses`; this aligns the
+    // P&L with it, so the two no longer contradict each other on the same screen.
+    const expRow = await this.db.one<{ expenses: number }>(
+      `SELECT COALESCE(SUM(amount_cents), 0) AS expenses
+         FROM expenses
+        WHERE tenant_id = @tenantId
+          AND spent_at >= @since AND spent_at <= @until`,
+      { tenantId, since, until },
+    );
+    const operatingExpensesCents = Number(expRow?.expenses ?? 0);
 
     const grossProfitCents = revenueCents - cogsCents;
     const netIncomeCents = grossProfitCents - operatingExpensesCents;
 
-    return { revenueCents, cogsCents, grossProfitCents, operatingExpensesCents, netIncomeCents };
+    return {
+      revenueCents,
+      grossSalesCents,
+      taxCents,
+      cogsCents,
+      grossProfitCents,
+      operatingExpensesCents,
+      netIncomeCents,
+    };
   }
 
   /** Inventory valuation at cost and retail (on-hand qty × cost / price).
@@ -746,13 +874,19 @@ export class ReportsService {
     const rows = await this.db.query<{
       category: string; revenue: number; cost: number; units: number;
     }>(
+      // This report used to 500 for every caller: order_lines has no
+      // `unit_price_cents` column (it is `unit_cents`), and `products` has no
+      // `cost_cents` (that column is on product_suppliers). Cost now comes from
+      // product_costs — the same source pnl() and salesByProduct() use — so
+      // margins agree across reports instead of diverging.
       `SELECT COALESCE(p.category, 'Uncategorized') AS category,
-              SUM(ol.unit_price_cents * ol.quantity)::bigint AS revenue,
-              SUM(COALESCE(p.cost_cents, 0) * ol.quantity)::bigint AS cost,
+              SUM(ol.unit_cents * ol.quantity)::bigint AS revenue,
+              SUM(COALESCE(pc.cost_cents, 0) * ol.quantity)::bigint AS cost,
               SUM(ol.quantity)::int AS units
          FROM order_lines ol
          JOIN orders o ON o.id = ol.order_id
          LEFT JOIN products p ON p.id = ol.product_id
+         LEFT JOIN product_costs pc ON pc.product_id = ol.product_id AND pc.tenant_id = o.tenant_id
         WHERE o.tenant_id = @tenantId AND o.status = 'completed' AND o.created_at >= @since
         GROUP BY COALESCE(p.category, 'Uncategorized')
         ORDER BY revenue DESC`,

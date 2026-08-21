@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import { useOffline } from "@/lib/useOffline";
 import { useCart } from "@/lib/useCart";
@@ -19,6 +20,10 @@ import { DiscountModal } from "@/components/terminal/DiscountModal";
 import { OfflineQueueBanner } from "@/components/terminal/OfflineQueueBanner";
 import { RegisterSessionGuard } from "@/components/terminal/RegisterSessionGuard";
 import { ShortcutsOverlay } from "@/components/terminal/ShortcutsOverlay";
+import {
+  CustomerAttachModal,
+  type AttachedCustomer,
+} from "@/components/terminal/CustomerAttachModal";
 import { useFlag } from "@/flags/useFlag";
 import { ScanToast } from "@/components/ScanToast";
 import { useFinderContext } from "@/lib/useFinderContext";
@@ -27,24 +32,28 @@ import { TerminalActionBar } from "./TerminalActionBar";
 
 export function TerminalInner() {
   const { user } = useAuth();
-  const { registerId, outletId } = useFinderContext();
+  const { registerId } = useFinderContext();
+  const searchParams = useSearchParams();
   const { isOffline } = useOffline();
   const cart = useCart();
   const { addToast } = useToast();
   const splitTenderEnabled = useFlag("checkout_split_tender");
+  const quickSellConsumed = useRef(false);
 
   const [screen, setScreen] = useState<"terminal" | "tender" | "receipt">("terminal");
   const [completedPayment, setCompletedPayment] = useState<Payment | null>(null);
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
   const [ageVerified, setAgeVerified] = useState(false);
-  const [returnMode, setReturnMode] = useState(false);
   const [discountCents, setDiscountCents] = useState(0);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [scannedName, setScannedName] = useState<string | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [attachedCustomer, setAttachedCustomer] = useState<AttachedCustomer | null>(null);
   const [activeOutletId, setActiveOutletId] = useState<string>("");
   const [outlets, setOutlets] = useState<{ id: string; name: string; state?: string }[]>([]);
   const [outletState, setOutletState] = useState<string>("");
+  const [outletLoadError, setOutletLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -65,13 +74,16 @@ export function TerminalInner() {
       .then((d) => {
         const locs = d.items ?? [];
         setOutlets(locs);
+        setOutletLoadError(null);
         const initial = locs[0];
         if (initial) {
           setActiveOutletId(initial.id);
           if (initial.state) setOutletState(initial.state);
         }
       })
-      .catch(() => {});
+      .catch((err: unknown) => {
+        setOutletLoadError(err instanceof Error ? err.message : "Could not load outlets");
+      });
   }, []);
 
   useEffect(() => {
@@ -90,19 +102,14 @@ export function TerminalInner() {
     }
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
     cart.dispatch({ type: "SET_SYNCING", value: true });
-    syncTimerRef.current = setTimeout(() => { void syncOrder(); }, 400);
+    // No existing order yet: debounce longer since a burst of line-item scans
+    // typically follows. Once an order exists, a shorter debounce keeps
+    // discount/quantity edits feeling responsive.
+    const delay = orderIdRef.current ? 200 : 400;
+    syncTimerRef.current = setTimeout(() => { void syncOrder(); }, delay);
     return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cart.state.lines]);
-
-  useEffect(() => {
-    if (cart.state.lines.length === 0 || !orderIdRef.current) return;
-    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
-    cart.dispatch({ type: "SET_SYNCING", value: true });
-    syncTimerRef.current = setTimeout(() => { void syncOrder(); }, 200);
-    return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [discountCents]);
+  }, [cart.state.lines, discountCents, attachedCustomer?.id]);
 
   const syncOrder = useCallback(async () => {
     const lines = cart.state.lines;
@@ -113,8 +120,14 @@ export function TerminalInner() {
         productId: l.product.id,
         quantity: l.quantity,
         ...(l.product.ageRestricted ? { ageVerified } : {}),
+        ...(l.product.unitKind ? { unitKind: l.product.unitKind } : {}),
       })),
       ...(discountCents > 0 ? { discountCents } : {}),
+      // Sales History real-data fix: orders.store_id is otherwise always NULL
+      // for POS-created orders, since the inventory/deduct call below carries
+      // the outlet separately and this create/update payload never did.
+      ...(activeOutletId ? { storeId: activeOutletId } : {}),
+      customerId: attachedCustomer?.id ?? null,
     };
 
     if (isOffline) {
@@ -139,7 +152,7 @@ export function TerminalInner() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cart.state.lines, isOffline, ageVerified, discountCents]);
+  }, [cart.state.lines, isOffline, ageVerified, discountCents, activeOutletId, attachedCustomer?.id]);
 
   const handleAddProduct = useCallback(
     (product: Product) => {
@@ -156,13 +169,39 @@ export function TerminalInner() {
     [cart, outletState, addToast]
   );
 
+  // Catalog "Quick Sell" deep-link: /terminal?product=<id> — add once on mount.
+  useEffect(() => {
+    const productId = searchParams.get("product");
+    if (!productId || quickSellConsumed.current) return;
+    quickSellConsumed.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = await apiGet<Product>(`/api/v1/catalog/${encodeURIComponent(productId)}`);
+        if (cancelled) return;
+        const product = normalizeTerminalProduct(raw);
+        handleAddProduct(product);
+        addToast({ title: `Added ${product.name}`, variant: "success" });
+      } catch {
+        if (!cancelled) {
+          addToast({ title: "Could not add product to cart", variant: "error" });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, handleAddProduct, addToast]);
+
   const handleBarcodeScan = useCallback(async (code: string) => {
     if (screen !== "terminal") return;
     try {
-      const raw = await apiGet<Product>(`/api/v1/catalog/barcode/${encodeURIComponent(code)}`);
+      // POS-v1: fully resolved (product + packaging + price + stock) — the
+      // terminal does no conversion/pricing math, it only renders this.
+      const raw = await apiGet<Product>(`/api/v1/catalog/barcode/${encodeURIComponent(code)}/pos`);
       const product = normalizeTerminalProduct(raw); // real backend returns snake_case
       cart.addProduct(product);
-      setScannedName(product.name);
+      setScannedName(product.unitKind ? `${product.name} (${product.unitDisplayName})` : product.name);
     } catch {
       addToast({ title: `Barcode not found: ${code}`, variant: "error" });
     }
@@ -175,23 +214,26 @@ export function TerminalInner() {
     setScreen("tender");
   }, [cart.state.order]);
 
-  const handleAction = useCallback((action: string) => {
-    if (action === "Discount") { setShowDiscountModal(true); return; }
-    addToast({ title: action, description: "Feature coming soon.", variant: "info" });
+  const handleSelectCustomer = useCallback((customer: AttachedCustomer) => {
+    setAttachedCustomer(customer);
+    addToast({ title: `Customer attached: ${customer.name}`, variant: "success" });
   }, [addToast]);
 
-  const handleReturnMode = useCallback(() => {
-    setReturnMode((current) => {
-      const next = !current;
-      addToast({ title: next ? "Return mode enabled" : "Return mode disabled", variant: next ? "warning" : "info" });
-      return next;
-    });
+  const handleClearCustomer = useCallback(() => {
+    setAttachedCustomer(null);
+    addToast({ title: "Customer cleared", variant: "info" });
   }, [addToast]);
 
   const handleTenderSuccess = useCallback(
     (payment: Payment) => {
       setCompletedPayment(payment);
-      setCompletedOrder(cart.state.order);
+      // A successful tender completes the order, but cart.state.order still
+      // carries the "open" status it was created with. Stamp it "completed" so
+      // the receipt renders correctly — otherwise ReceiptView's status fallback
+      // mistitles the success screen "Order Voided" and hides refund/void.
+      setCompletedOrder(
+        cart.state.order ? { ...cart.state.order, status: "completed" } : null,
+      );
       setScreen("receipt");
       const lines = cart.state.lines;
       if (lines.length > 0 && activeOutletId) {
@@ -199,10 +241,16 @@ export function TerminalInner() {
           location_id: activeOutletId,
           lines: lines.map((l) => ({ product_id: l.product.id, qty: l.quantity })),
           order_id: cart.state.order?.id ?? null,
-        }).catch(() => {});
+        }).catch((err: unknown) => {
+          addToast({
+            title: "Inventory deduct failed",
+            description: err instanceof Error ? err.message : "Stock was not deducted after payment.",
+            variant: "error",
+          });
+        });
       }
     },
-    [cart.state.order, cart.state.lines, activeOutletId]
+    [cart.state.order, cart.state.lines, activeOutletId, addToast]
   );
 
   const handleTenderCancel = useCallback(() => { setScreen("terminal"); }, []);
@@ -214,8 +262,8 @@ export function TerminalInner() {
     setCompletedOrder(null);
     setScreen("terminal");
     setAgeVerified(false);
-    setReturnMode(false);
     setDiscountCents(0);
+    setAttachedCustomer(null);
     addToast({ title: "New sale started", variant: "info" });
   }, [cart, addToast]);
 
@@ -223,9 +271,10 @@ export function TerminalInner() {
     cart.clearCart();
     orderIdRef.current = null;
     setAgeVerified(false);
-    setReturnMode(false);
     setDiscountCents(0);
   }, [cart]);
+
+  const activeOutletName = outlets.find((o) => o.id === activeOutletId)?.name ?? activeOutletId;
 
   const hasAgeRestricted = cart.state.lines.some((line) => line.product.ageRestricted);
   const canCharge =
@@ -235,31 +284,44 @@ export function TerminalInner() {
     (!hasAgeRestricted || ageVerified);
   const totalCents = cart.state.order?.totalCents ?? cart.localSubtotalCents;
 
+  // Prefer local attach state; fall back to order.customerId after sync.
+  const tenderOrder =
+    cart.state.order && attachedCustomer
+      ? { ...cart.state.order, customerId: attachedCustomer.id }
+      : cart.state.order;
+
   return (
     <EnterpriseShell
       active="register"
       title="Sell"
-      subtitle={`${outletId} · ${registerId}`}
+      subtitle={`${activeOutletName} · ${registerId}`}
       banner={<OfflineQueueBanner />}
       contentClassName="flex flex-1 flex-col overflow-hidden lg:flex-row"
     >
       <RegisterSessionGuard registerId={registerId}>
         <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+          {outletLoadError && (
+            <div role="alert" className="border-b border-danger-200 bg-danger-50 px-4 py-2 text-sm text-danger-700">
+              {outletLoadError}
+            </div>
+          )}
           <CheckoutStatusStrip
             cashier={user?.name ?? "Cashier"}
             isOffline={isOffline}
-            returnMode={returnMode}
             itemCount={cart.itemCount}
             onShortcuts={() => setShortcutsOpen(true)}
             activeOutletId={activeOutletId}
             outlets={outlets}
             onOutletChange={setActiveOutletId}
+            customerName={attachedCustomer?.name ?? null}
+            onAttachCustomer={() => setShowCustomerModal(true)}
+            onClearCustomer={handleClearCustomer}
           />
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
             <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
               <ProductGrid onAddProduct={handleAddProduct} />
             </div>
-            <div className="h-[42vh] shrink-0 overflow-hidden border-t border-slate-200 lg:h-auto lg:w-[45%] lg:border-l lg:border-t-0">
+            <div className="h-[42vh] shrink-0 overflow-hidden border-t border-erp-table-border lg:h-auto lg:w-[45%] lg:border-l lg:border-t-0">
               <CartPanel
                 cart={cart}
                 onCharge={handleCharge}
@@ -273,22 +335,19 @@ export function TerminalInner() {
           <TerminalActionBar
             canCharge={canCharge}
             totalCents={totalCents}
-            returnMode={returnMode}
             hasCart={cart.state.lines.length > 0}
             discountActive={discountCents > 0}
-            onHoldSale={() => handleAction("Hold sale")}
-            onDiscount={() => handleAction("Discount")}
-            onReturnMode={handleReturnMode}
-            onCashDrawer={() => handleAction("Cash drawer")}
-            onPrintReceipt={() => handleAction("Print receipt")}
+            customerAttached={Boolean(attachedCustomer)}
+            onDiscount={() => setShowDiscountModal(true)}
+            onAttachCustomer={() => setShowCustomerModal(true)}
             onCharge={handleCharge}
           />
         </div>
       </RegisterSessionGuard>
 
-      {screen === "tender" && cart.state.order && (
+      {screen === "tender" && tenderOrder && (
         <TenderScreen
-          order={cart.state.order}
+          order={tenderOrder}
           onSuccess={handleTenderSuccess}
           onCancel={handleTenderCancel}
           splitEnabled={splitTenderEnabled}
@@ -313,6 +372,13 @@ export function TerminalInner() {
           onClose={() => setShowDiscountModal(false)}
         />
       )}
+
+      <CustomerAttachModal
+        open={showCustomerModal}
+        onClose={() => setShowCustomerModal(false)}
+        onSelect={handleSelectCustomer}
+        currentCustomerId={attachedCustomer?.id}
+      />
 
       <ScanToast productName={scannedName} onDismiss={() => setScannedName(null)} />
       <ShortcutsOverlay open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
