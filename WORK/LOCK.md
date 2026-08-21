@@ -454,6 +454,31 @@ git push origin docs/forward-plan-phase9-session-continuity:docs/forward-plan-ph
 ```
 (The last one targets the existing remote branch, not `develop` directly,
 since Phase 8 itself is presumably headed to `develop` via its own PR first.)
+## Update 2026-08-03: Phase G recovered from orphaned commit; ready to push
+
+Phase E+F (nav-reachability + loyalty/finance shim cleanup) merged to `develop` as
+PR #144, then promoted to `staging` as PR #147 (develop/staging now in sync,
+1-commit cosmetic drift only — a docs commit on develop, PR #149). Confirmed via
+`git merge-base --is-ancestor` both ways.
+
+Phase G (delete 3 dead `setup/*` shims, commit `498092e`) was NOT part of that
+promotion — its branch (`pos-shared-metric-cleanup-rebased` → renamed
+`fix/ponytail-phase-ef-nav-loyalty-cleanup`) had been reset away locally after
+PR #144's squash-merge, leaving `498092e` reachable only via reflog (unreachable
+from any branch/tag, one `git gc` away from loss). Recovered by cherry-picking
+`498092e` onto a fresh branch off current `origin/develop`:
+
+- Branch: `fix/ponytail-phase-g-dead-setup-shims`, single commit `3e17389`
+  (cherry-pick of `498092e`), sitting directly on `origin/develop` tip
+  (`9fee56a`) — clean fast-forward candidate, no rebase/conflict needed.
+- Verified: hygiene / gap:scan / table:scan all pass on the branch.
+- Push command for Sri: `git push origin fix/ponytail-phase-g-dead-setup-shims:develop`
+  (or open as a normal PR against develop — either is a clean ff).
+- Lesson: after a squash-merged PR lands, always recreate any sibling
+  branch that shared the same pre-squash ancestry via cherry-pick of the
+  *specific commit* onto the new tip, not `git rebase` of the old branch —
+  rebase replays the whole pre-squash chain and conflicts against content
+  that's already present under different hashes.
 
 Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0 wave-dispatch coordination claim (started 2026-07-18) was closed 2026-07-30 as superseded — see its entry below; work since has shipped as independent claims rather than through that coordinator. Latest substantive work: Phase 7 items 1-2 (sales-velocity consolidation, demand-snapshot foundation) RELEASED; four-environment AI coordination workflow (Claude Code/Cursor/Replit) adopted 2026-07-30, see `docs/architecture/ORCHESTRATION.md` "Environment routing" + `tools/AGENT_PROMPT.md`. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B, RELEASED); Clean Architecture pilot (quotes + gateway auth) (session C, ABANDONED — see entry); SSO OIDC hardening (session D)
 
