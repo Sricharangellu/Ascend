@@ -1,20 +1,13 @@
-import type { Express } from "express";
-import { bearer, resolveApiPath, sendRequest } from "../../shared/test-request.js";
+import { makeRequest } from "../../shared/test-request.js";
 
 /**
- * Tiny test client: issues one request against the app on an ephemeral port.
- * Signs a demo-tenant (tnt_demo / owner) bearer token and upgrades brevity
- * paths (/api/<module>) to the real /api/v1 mount. Plumbing is shared — see
- * src/shared/test-request.ts.
+ * Tiny test client for this module: one request against the app on an
+ * ephemeral port, signing a demo-tenant (tnt_demo) bearer token and upgrading
+ * brevity paths (/api/<module>) to the real /api/v1 mount.
+ *
+ * Default role: `owner`. Pass a 5th argument to sign a different role, which
+ * is how a module exercises its route guards.
+ *
+ * Implementation is shared — see `makeRequest` in src/shared/test-request.ts.
  */
-export default function request(
-  app: Express,
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<{ status: number; json: any }> {
-  return sendRequest(app, method, resolveApiPath(path), {
-    body,
-    headers: bearer({ sub: "usr_demo_owner", tenantId: "tnt_demo", role: "owner" }),
-  });
-}
+export default makeRequest("owner");

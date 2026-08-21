@@ -26,7 +26,11 @@ export type { PageShellProps, PageWidth, Crumb } from "./PageShell";
 
 export { Modal } from "./Modal";
 
-export { Badge, statusBadge } from "./Badge";
+export { Badge, statusBadge, statusLabel, StatusBadge } from "./Badge";
+export type { BadgeVariant } from "./Badge";
+
+export { LifecycleTrail, buildLifecycle } from "./LifecycleTrail";
+export type { LifecycleStage, LifecycleStageKey, LifecycleStageState } from "./LifecycleTrail";
 
 export { Skeleton, SkeletonCard, SkeletonPage } from "./Skeleton";
 
