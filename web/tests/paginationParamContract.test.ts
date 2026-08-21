@@ -52,6 +52,11 @@ describe("page-size parameter contract", () => {
         // Only query-string usages — `pageSize={…}` as a React prop is a
         // different thing entirely and must not be flagged.
         if (!/[?&]pageSize=/.test(line)) return;
+        // ...and only real call sites. A comment that documents a `pageSize`
+        // defect — including one this repo has already fixed — is prose, not a
+        // request. Flagging it teaches people to ignore this check, and a
+        // commented-out call cannot send anything anyway.
+        if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;
         if (PAGE_SIZE_IS_HONOURED.test(line)) return;
         offenders.push(`${rel}:${i + 1} → ${line.trim()}`);
       });

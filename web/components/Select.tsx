@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { clsx } from "clsx";
 
 export interface SelectOption {
@@ -22,20 +23,29 @@ const sizeClasses: Record<string, string> = {
   lg: "h-10 px-3 text-[14px]",
 };
 
-export function Select({
-  options,
-  placeholder,
-  size = "md",
-  error = false,
-  label,
-  className,
-  id,
-  ...rest
-}: SelectProps) {
+/**
+ * Ref-forwarding so callers can move focus to the field a validation error is
+ * about — WCAG 2.1 AA expects the error to be reachable, not just displayed,
+ * and without a ref the only alternative is querying the DOM by selector.
+ */
+export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(function Select(
+  {
+    options,
+    placeholder,
+    size = "md",
+    error = false,
+    label,
+    className,
+    id,
+    ...rest
+  },
+  ref,
+) {
   const selectId = id ?? (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
 
   const select = (
     <select
+      ref={ref}
       id={selectId}
       className={clsx(
         "w-full rounded border bg-white pr-8 leading-tight",
@@ -74,4 +84,4 @@ export function Select({
       {select}
     </div>
   );
-}
+});

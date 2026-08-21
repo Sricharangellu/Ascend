@@ -265,7 +265,7 @@ function ProductsTab({ vendorId }: { vendorId: string }) {
               <td className="px-5 py-3.5 text-right text-xs text-slate-600">{p.lead_time_days != null ? `${p.lead_time_days}d` : "—"}</td>
               <td className="px-5 py-3.5 text-xs text-slate-500">{p.last_ordered_at ? fmtDate(p.last_ordered_at) : "—"}</td>
               <td className="px-5 py-3.5">
-                <button type="button" onClick={() => router.push(`/purchasing/new?supplier=${vendorId}&product=${p.product_id}`)}
+                <button type="button" onClick={() => router.push(`/purchasing?tab=orders&supplier=${vendorId}&product=${p.product_id}`)}
                   className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 opacity-0 group-hover:opacity-100 hover:bg-slate-50 transition-all whitespace-nowrap">
                   Create PO
                 </button>
@@ -287,7 +287,7 @@ function PurchaseOrdersTab({ vendorId }: { vendorId: string }) {
   if (pos.length === 0) return (
     <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400">
       No purchase orders for this vendor.
-      <button type="button" onClick={() => router.push(`/purchasing/new?supplier=${vendorId}`)}
+      <button type="button" onClick={() => router.push(`/purchasing?tab=orders&supplier=${vendorId}`)}
         className="mt-2 block mx-auto text-sm text-brand-600 hover:underline">Create PO</button>
     </div>
   );
@@ -343,7 +343,7 @@ function PurchaseOrdersTab({ vendorId }: { vendorId: string }) {
         </table>
       </div>
       <div className="flex justify-end">
-        <button type="button" onClick={() => router.push(`/purchasing/new?supplier=${vendorId}`)}
+        <button type="button" onClick={() => router.push(`/purchasing?tab=orders&supplier=${vendorId}`)}
           className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600">
           + New Purchase Order
         </button>
@@ -600,7 +600,7 @@ export default function VendorDetailPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <button type="button" onClick={() => router.push(`/purchasing/new?supplier=${vendor.id}`)}
+            <button type="button" onClick={() => router.push(`/purchasing?tab=orders&supplier=${vendor.id}`)}
               className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600">
               + New PO
             </button>

@@ -1,336 +1,544 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+/**
+ * Purchase-order list — the operational surface of the module.
+ *
+ * It exists to answer, without leaving the page: what needs my attention, what
+ * has been ordered, what has arrived, what is late, and what is still waiting
+ * for an invoice. Everything it filters or pages on is a server-side query;
+ * nothing here narrows a single fetched page and presents it as the whole list.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/Button";
+import { Badge } from "@/components/Badge";
+import { Input } from "@/components/Input";
+import { Select } from "@/components/Select";
+import { DataTable, type DataColumn } from "@/components/DataTable";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
-import { formatMoney, parseToCents } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
+import { fmtDateShort } from "@/lib/date";
 import { hasRole } from "@/lib/auth";
 import { startReceivingSession, receivingSessionHref } from "@/lib/receiving";
 import type {
-  CreatePurchaseOrderLineRequest,
-  InventoryLevelsResponse,
-  PurchaseOrder,
+  PurchaseOrderListRow,
   PurchaseOrdersResponse,
   Supplier,
   SuppliersResponse,
 } from "@/api-client/types";
-import { STATUS_STYLE, emptyLine, type DraftLine } from "./shared";
+import {
+  APPROVAL_BADGE,
+  APPROVAL_LABEL,
+  INVOICE_BADGE,
+  INVOICE_LABEL,
+  ORDER_VIEWS,
+  RECEIVE_BADGE,
+  attentionReason,
+  buildOrdersQuery,
+  explainReceiveError,
+  receiveAllSummary,
+  receivedPct,
+  type OrderView,
+} from "../_lib/orders";
+import { NewOrderPanel } from "./NewOrderPanel";
 
-interface ProductBarcode { barcode: string; kind: string; pack_size: number }
+const PAGE_LIMIT = 25;
 
-const UNIT_LABEL: Record<string, string> = { each: "Each", box: "Box", case: "Case", pallet: "Pallet", alt: "Alternate" };
+type PendingAction =
+  | { kind: "receive"; row: PurchaseOrderListRow }
+  | { kind: "approve"; row: PurchaseOrderListRow }
+  | { kind: "reject"; row: PurchaseOrderListRow };
 
-export function OrdersTab() {
+export function OrdersTab({
+  initialSupplierId = "",
+  initialProductId = "",
+}: { initialSupplierId?: string; initialProductId?: string } = {}) {
+  const [rows, setRows] = useState<PurchaseOrderListRow[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [orders, setOrders]       = useState<PurchaseOrder[]>([]);
-  const [products, setProducts]   = useState<Array<{ id: string; sku: string; name: string }>>([]);
-  const [error, setError]         = useState<string | null>(null);
-  const [confirmation, setConfirmation] = useState<string[] | null>(null);
-  const [busy, setBusy]           = useState(false);
-  const [poSupplierId, setPoSupplierId] = useState("");
-  const [lines, setLines]         = useState<DraftLine[]>([emptyLine()]);
-  const [unitsByProduct, setUnitsByProduct] = useState<Record<string, ProductBarcode[]>>({});
-  const [confirmReceiveAll, setConfirmReceiveAll] = useState<PurchaseOrder | null>(null);
-  const canManage                 = hasRole("manager");
-  const router                    = useRouter();
+  const [loading, setLoading] = useState(true);
+  // Load failures and action failures are separate on purpose: a load failure
+  // belongs in the table (where the retry is, and where the rows would have
+  // been), an action failure belongs beside the action. Routing both to both
+  // places announced the same problem twice to a screen reader.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // The whole query is ONE state object, deliberately. Its identity is what the
+  // fetch effect keys off, so a caller that needs a reload without changing any
+  // field (a PO was just created while already on the All view) simply writes a
+  // fresh object — no separate "refresh" counter that the fetch never reads.
+  //
+  // `cursorStack` lives here too: the endpoint returns a forward cursor and no
+  // total, so Previous is served by the cursors already used rather than by an
+  // offset the API cannot honour.
+  const [query, setQuery] = useState<{
+    view: OrderView;
+    searchTerm: string;
+    supplierId: string;
+    cursorStack: Array<string | null>;
+  }>({ view: "all", searchTerm: "", supplierId: initialSupplierId, cursorStack: [null] });
+  const [search, setSearch] = useState("");
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const { view, supplierId } = query;
+
+  const [pending, setPending] = useState<PendingAction | null>(null);
+  const canManage = hasRole("manager");
+  const noticeRef = useRef<HTMLParagraphElement>(null);
+  const router = useRouter();
 
   const load = useCallback(async () => {
-    setError(null);
+    setLoading(true);
+    setLoadError(null);
     try {
-      const [suppliersRes, ordersRes, inventoryRes] = await Promise.all([
-        apiGet<SuppliersResponse>("/api/v1/purchasing/suppliers"),
-        apiGet<PurchaseOrdersResponse>("/api/v1/purchasing/orders"),
-        apiGet<InventoryLevelsResponse>("/api/v1/inventory/levels?pageSize=200"),
-      ]);
-      setSuppliers(suppliersRes.items ?? []);
-      setOrders(ordersRes.items ?? []);
-      setProducts((inventoryRes.items ?? []).map((item) => ({ id: item.id, sku: item.sku, name: item.name })));
-      setPoSupplierId((cur) => cur || suppliersRes.items?.[0]?.id || "");
+      const qs = buildOrdersQuery({
+        view: query.view,
+        search: query.searchTerm,
+        supplierId: query.supplierId,
+        cursor: query.cursorStack[query.cursorStack.length - 1] ?? null,
+        limit: PAGE_LIMIT,
+      });
+      const res = await apiGet<PurchaseOrdersResponse>(`/api/v1/purchasing/orders${qs}`);
+      setRows(res.items ?? []);
+      setNextCursor(res.nextCursor ?? null);
     } catch (err) {
-      setError(err instanceof ApiResponseError ? err.message : "Could not load purchasing data.");
+      setRows([]);
+      setNextCursor(null);
+      setLoadError(
+        err instanceof ApiResponseError ? err.message : "Could not load purchase orders.",
+      );
+    } finally {
+      setLoading(false);
     }
+  }, [query]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Suppliers are only needed for the filter's labels; a failure here must not
+  // blank the orders list, so it is reported separately and never throws.
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const res = await apiGet<SuppliersResponse>("/api/v1/purchasing/suppliers");
+        if (live) setSuppliers(res.items ?? []);
+      } catch {
+        if (live) setSuppliers([]);
+      }
+    })();
+    return () => {
+      live = false;
+    };
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
-
-  const supplierName = (id: string) => suppliers.find((s) => s.id === id)?.name ?? id;
-
-  const updateLine = (index: number, patch: Partial<DraftLine>) =>
-    setLines((cur) => cur.map((line, i) => (i === index ? { ...line, ...patch } : line)));
-
-  const onProductChange = async (index: number, productId: string) => {
-    updateLine(index, { productId, unitKind: "each" });
-    if (!productId || unitsByProduct[productId]) return;
-    try {
-      const d = await apiGet<{ items: ProductBarcode[] }>(`/api/v1/catalog/${productId}/barcodes`);
-      setUnitsByProduct((cur) => ({ ...cur, [productId]: d.items ?? [] }));
-    } catch { /* units are optional — line still works as "each" */ }
-  };
-
-  /** The configured pack size for a line's selected unit, or null for "each"
-   *  (no conversion) or when that unit isn't configured for this product. */
-  const packSizeFor = (line: DraftLine): number | null => {
-    if (line.unitKind === "each") return null;
-    const match = unitsByProduct[line.productId]?.find((u) => u.kind === line.unitKind);
-    return match?.pack_size ?? null;
-  };
-
-  const addLine    = () => setLines((cur) => [...cur, emptyLine()]);
-  const removeLine = (index: number) => setLines((cur) => cur.filter((_, i) => i !== index));
+  /** Any filter change restarts paging — keeping a cursor from the previous
+   *  query would page through a list the user is no longer looking at. */
+  const changeQuery = useCallback(
+    (patch: Partial<{ view: OrderView; searchTerm: string; supplierId: string }>) =>
+      setQuery((q) => ({ ...q, ...patch, cursorStack: [null] })),
+    [],
+  );
 
   /**
-   * Open the scan workspace for this PO — the normal way to receive a delivery.
-   * Starting the session from the row is what removes the old
-   * list → detail → tab → modal walk before the first box gets counted.
+   * Open the scan workspace for this PO — the normal way to receive a delivery,
+   * and the one that can count, price, and record lots and expiry dates.
+   *
+   * Kept from PR #230 when this list was rewritten. Starting the session from
+   * the row is what removes the list → detail → tab → modal walk before the
+   * first box gets counted; the backend returns the existing open session
+   * rather than erroring, so two people at the same pallet land in one count.
    */
-  const openReceiving = async (id: string) => {
+  const openReceiving = async (row: PurchaseOrderListRow) => {
     setBusy(true);
-    setError(null);
+    setActionError(null);
+    setNotice(null);
     try {
-      const session = await startReceivingSession(id);
+      const session = await startReceivingSession(row.id);
       router.push(receivingSessionHref(session.id));
     } catch (err) {
-      setError(err instanceof ApiResponseError ? err.message : "Could not open receiving for this order.");
+      // Deliberately routed through the same translator as "Receive all": the
+      // approval gate rejects both with 409 approval_pending, and "Forbidden"
+      // is not an instruction anyone can act on.
+      setActionError(
+        err instanceof ApiResponseError
+          ? explainReceiveError(err.code, err.message)
+          : "Could not open receiving for this order.",
+      );
       setBusy(false);
     }
   };
 
-  /**
-   * "Receive all expected" — post every open line at its full remaining
-   * quantity in one shot.
-   *
-   * This is what the old `Receive` button did, unlabelled and unguarded: a
-   * single click posted a complete receipt into inventory with no counts, no
-   * costs, no lots and no way back. It is a genuinely useful mode when the
-   * delivery is known-good, so it stays — but it now says what it does and
-   * asks first.
-   */
-  const receiveAll = async (id: string) => {
+  const runAction = async (action: PendingAction) => {
     setBusy(true);
-    setError(null);
+    setActionError(null);
+    setNotice(null);
+    const { kind, row } = action;
+    const label = row.po_number != null ? `PO #${row.po_number}` : "Purchase order";
     try {
-      await apiPost(`/api/v1/purchasing/orders/${id}/receive`, {});
+      if (kind === "receive") {
+        await apiPost(`/api/v1/purchasing/orders/${row.id}/receive`, {});
+        setNotice(`${label} received in full.`);
+      } else if (kind === "approve") {
+        await apiPost(`/api/v1/purchasing/orders/${row.id}/approve`, {});
+        setNotice(`${label} approved — it can now be received.`);
+      } else {
+        await apiPost(`/api/v1/purchasing/orders/${row.id}/reject`, {});
+        setNotice(`${label} rejected.`);
+      }
       await load();
     } catch (err) {
-      setError(err instanceof ApiResponseError ? err.message : "Could not receive purchase order.");
-    } finally { setBusy(false); setConfirmReceiveAll(null); }
-  };
-
-  const createOrder = async () => {
-    if (!poSupplierId) return;
-    const requestLines: CreatePurchaseOrderLineRequest[] = [];
-    for (const line of lines) {
-      if (!line.productId || !line.quantity || !line.unitCost) continue;
-      const entry: CreatePurchaseOrderLineRequest = {
-        productId: line.productId,
-        quantity: Number(line.quantity),
-        unitCostCents: parseToCents(line.unitCost),
-      };
-      if (line.unitKind !== "each") entry.unitKind = line.unitKind;
-      if (line.expiryDate) entry.expiryDate = new Date(line.expiryDate).getTime();
-      if (line.lotCode.trim()) entry.lotCode = line.lotCode.trim();
-      requestLines.push(entry);
-    }
-    if (requestLines.length === 0) {
-      setError("Add at least one line with a product, quantity, and unit cost.");
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    setConfirmation(null);
-    try {
-      const po = await apiPost<PurchaseOrder>("/api/v1/purchasing/orders", { supplierId: poSupplierId, lines: requestLines });
-      setLines([emptyLine()]);
-      setConfirmation(
-        po.unitConversions?.length
-          ? po.unitConversions.map((c) =>
-              `${c.enteredQty} ${UNIT_LABEL[c.unitKind] ?? c.unitKind} → ${c.baseQty} Each (pack size ${c.packSize})`,
-            )
-          : null,
+      setActionError(
+        err instanceof ApiResponseError
+          ? explainReceiveError(err.code, err.message)
+          : `Could not ${kind} ${label.toLowerCase()}.`,
       );
-      await load();
-    } catch (err) {
-      setError(err instanceof ApiResponseError ? err.message : "Could not create purchase order.");
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+      setPending(null);
+    }
   };
 
-  const INPUT = "mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950";
+  // Errors and confirmations move focus so a keyboard or screen-reader user is
+  // told the outcome instead of discovering it by chance further down the page.
+  useEffect(() => {
+    if (notice) noticeRef.current?.focus();
+  }, [notice]);
+
+  const supplierOptions = useMemo(
+    () => [
+      { value: "", label: "All suppliers" },
+      ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+    ],
+    [suppliers],
+  );
+
+  const columns: DataColumn<PurchaseOrderListRow>[] = [
+    {
+      key: "po",
+      header: "PO",
+      sticky: true,
+      minWidth: "7rem",
+      render: (row) => (
+        <Link
+          href={`/purchasing/${row.id}`}
+          className="focus-ring rounded font-mono text-sm font-semibold text-accent-700 underline-offset-2 hover:underline"
+        >
+          {row.po_number != null ? `#${row.po_number}` : row.id.slice(0, 12)}
+        </Link>
+      ),
+    },
+    {
+      key: "supplier",
+      header: "Supplier",
+      minWidth: "10rem",
+      render: (row) => row.supplier_name ?? row.supplier_id,
+    },
+    {
+      key: "attention",
+      header: "Attention",
+      minWidth: "12rem",
+      render: (row) => {
+        const reason = attentionReason(row);
+        if (!reason) return <span className="text-content-tertiary">—</span>;
+        const variant =
+          row.approval_status === "pending"
+            ? "yellow"
+            : row.approval_status === "rejected"
+              ? "red"
+              : row.is_overdue
+                ? "orange"
+                : "blue";
+        return (
+          <Badge variant={variant} size="sm">
+            {reason}
+          </Badge>
+        );
+      },
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (row) => (
+        <Badge variant={RECEIVE_BADGE[row.status] ?? "gray"} size="sm">
+          {row.status.replace(/_/g, " ")}
+        </Badge>
+      ),
+    },
+    {
+      key: "approval",
+      header: "Approval",
+      defaultHidden: true,
+      render: (row) => (
+        <Badge variant={APPROVAL_BADGE[row.approval_status] ?? "gray"} size="sm">
+          {APPROVAL_LABEL[row.approval_status] ?? row.approval_status}
+        </Badge>
+      ),
+    },
+    {
+      key: "created",
+      header: "Created",
+      sortValue: (row) => row.created_at,
+      render: (row) => fmtDateShort(row.created_at),
+    },
+    {
+      key: "expected",
+      header: "Expected",
+      sortValue: (row) => row.expected_date,
+      render: (row) =>
+        row.expected_date == null ? (
+          // An unset ETA is unknown, not on time — saying "—" is the honest
+          // rendering, and it is also what makes the Overdue view trustworthy.
+          <span className="text-content-tertiary" title="No expected date recorded">
+            —
+          </span>
+        ) : (
+          <span className={row.is_overdue ? "font-semibold text-danger-700" : undefined}>
+            {fmtDateShort(row.expected_date)}
+          </span>
+        ),
+    },
+    {
+      key: "received",
+      header: "Received",
+      numeric: true,
+      minWidth: "8rem",
+      sortValue: (row) => receivedPct(row),
+      render: (row) => {
+        const pct = receivedPct(row);
+        return (
+          <span title={`${row.received_qty} of ${row.ordered_qty} units received`}>
+            {row.received_qty}/{row.ordered_qty}
+            {pct != null && (
+              <span className="ml-1 text-content-tertiary">({pct}%)</span>
+            )}
+          </span>
+        );
+      },
+    },
+    {
+      key: "remaining",
+      header: "Remaining",
+      numeric: true,
+      defaultHidden: true,
+      sortValue: (row) => row.remaining_qty,
+      render: (row) => row.remaining_qty,
+    },
+    {
+      key: "invoice",
+      header: "Invoice",
+      render: (row) => (
+        <Badge variant={INVOICE_BADGE[row.invoice_status]} size="sm">
+          {INVOICE_LABEL[row.invoice_status]}
+        </Badge>
+      ),
+    },
+    {
+      key: "total",
+      header: "Total",
+      numeric: true,
+      sortValue: (row) => row.total_cost_cents,
+      render: (row) => formatMoney(row.total_cost_cents),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      hideable: false,
+      minWidth: "11rem",
+      render: (row) => {
+        if (!canManage) return null;
+        if (row.approval_status === "pending") {
+          return (
+            <span className="flex justify-end gap-1">
+              <Button size="sm" variant="primary" disabled={busy} onClick={() => setPending({ kind: "approve", row })}>
+                Approve
+              </Button>
+              <Button size="sm" variant="ghost" disabled={busy} onClick={() => setPending({ kind: "reject", row })}>
+                Reject
+              </Button>
+            </span>
+          );
+        }
+        if (row.remaining_qty > 0 && row.approval_status === "approved" && row.status !== "cancelled") {
+          return (
+            <span className="flex justify-end gap-1">
+              <Button size="sm" variant="primary" disabled={busy} onClick={() => void openReceiving(row)}>
+                Scan &amp; Receive
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy}
+                title="Post every open line at its full remaining quantity"
+                onClick={() => setPending({ kind: "receive", row })}
+              >
+                {/* Named for what it does. The API treats an empty body as
+                    "receive every remaining line in full" — the old label just
+                    said "Receive", next to two other entry points that let you
+                    receive a partial quantity. */}
+                Receive all
+              </Button>
+            </span>
+          );
+        }
+        return null;
+      },
+    },
+  ];
+
+  const confirmCopy = (): { title: string; message: string; label: string; destructive: boolean } => {
+    if (!pending) return { title: "", message: "", label: "", destructive: false };
+    const { kind, row } = pending;
+    const po = row.po_number != null ? `PO #${row.po_number}` : "this purchase order";
+    if (kind === "receive") {
+      return {
+        title: `Receive all of ${po}?`,
+        message: receiveAllSummary(row),
+        label: "Receive all remaining",
+        destructive: false,
+      };
+    }
+    if (kind === "approve") {
+      return {
+        title: `Approve ${po}?`,
+        message: `Approving releases ${po} (${formatMoney(row.total_cost_cents)}) for receiving. The approval is recorded against your account.`,
+        label: "Approve",
+        destructive: false,
+      };
+    }
+    return {
+      title: `Reject ${po}?`,
+      message: `${po} will be permanently rejected and can never be received. A rejected purchase order cannot be re-approved — a new one has to be raised.`,
+      label: "Reject",
+      destructive: true,
+    };
+  };
+
+  const copy = confirmCopy();
 
   return (
-    <div className="flex flex-col gap-5 p-4">
-      <ConfirmDialog
-        open={confirmReceiveAll !== null}
-        title="Receive everything on this order?"
-        message={
-          confirmReceiveAll
-            ? `Every open line on ${confirmReceiveAll.po_number != null ? `PO-${confirmReceiveAll.po_number}` : "this order"} will be posted at its full remaining quantity, at the ordered cost. Stock moves immediately. Use Scan & Receive instead if you need to count, price, or record lots and expiry dates.`
-            : ""
-        }
-        confirmLabel="Receive all"
-        onConfirm={() => { if (confirmReceiveAll) void receiveAll(confirmReceiveAll.id); }}
-        onCancel={() => setConfirmReceiveAll(null)}
-      />
-
-      {error && <p role="alert" className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
-      {confirmation && (
-        <div className="rounded-md bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
-          <p className="font-medium">Purchase order created — unit conversion applied:</p>
-          {confirmation.map((line, i) => <p key={i}>{line}</p>)}
-        </div>
+    <div className="flex flex-col gap-4 p-4">
+      {actionError && (
+        <p role="alert" className="rounded-control bg-danger-50 px-4 py-2 text-sm text-danger-700">
+          {actionError}
+        </p>
+      )}
+      {notice && (
+        <p
+          ref={noticeRef}
+          tabIndex={-1}
+          role="status"
+          className="focus-ring rounded-control bg-success-50 px-4 py-2 text-sm text-success-700"
+        >
+          {notice}
+        </p>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200 text-sm">
-          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-            <tr>
-              <th className="px-4 py-3">PO</th>
-              <th className="px-4 py-3">Supplier</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3 text-right">Total</th>
-              <th className="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 bg-white">
-            {orders.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-slate-400">No purchase orders yet.</td>
-              </tr>
-            ) : (
-              orders.map((order) => (
-                <tr key={order.id} className="transition-colors hover:bg-slate-50">
-                  <td className="whitespace-nowrap px-4 py-3">
-                    {/* The PO number is what people say out loud and search for;
-                        the UUID was never useful here. */}
-                    <Link
-                      href={`/purchasing/${order.id}`}
-                      className="font-medium text-brand-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
-                    >
-                      {order.po_number != null ? `PO-${order.po_number}` : order.id.slice(0, 8)}
-                    </Link>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-950">{supplierName(order.supplier_id)}</td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <span className={`inline-flex rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${STATUS_STYLE[order.status] ?? "bg-slate-100 text-slate-700 ring-slate-200"}`}>
-                      {order.status}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-950">{formatMoney(order.total_cost_cents)}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right">
-                    {order.status === "ordered" && canManage && (
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          disabled={busy}
-                          onClick={() => void openReceiving(order.id)}
-                        >
-                          Scan &amp; Receive
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          disabled={busy}
-                          onClick={() => setConfirmReceiveAll(order)}
-                          title="Post every open line at its full remaining quantity"
-                        >
-                          Receive all
-                        </Button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      {/* Saved views — each is a server query, so the counts and the pager stay
+          truthful when the tenant has more orders than one page. */}
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Purchase order views">
+        {ORDER_VIEWS.map((v) => (
+          <button
+            key={v.id}
+            type="button"
+            title={v.hint}
+            aria-pressed={view === v.id}
+            onClick={() => changeQuery({ view: v.id })}
+            className={
+              view === v.id
+                ? "focus-ring min-h-touch rounded-control border border-accent-600 bg-accent-600 px-3 text-sm font-semibold text-white"
+                : "focus-ring min-h-touch rounded-control border border-line bg-surface-1 px-3 text-sm font-medium text-content-primary hover:bg-surface-2"
+            }
+          >
+            {v.label}
+          </button>
+        ))}
       </div>
 
+      <DataTable<PurchaseOrderListRow>
+        caption="Purchase orders"
+        columns={columns}
+        rows={rows}
+        rowKey={(row) => row.id}
+        loading={loading}
+        error={loadError}
+        onRetry={() => void load()}
+        storageKey="purchasing.orders.columns"
+        stickyHeader
+        emptyTitle={view === "all" ? "No purchase orders yet" : "Nothing in this view"}
+        emptyDescription={
+          view === "all"
+            ? "Create your first purchase order to start tracking what you have on order."
+            : "Try another view, or clear the search and supplier filters."
+        }
+        serverCursor={{
+          hasNext: nextCursor != null,
+          hasPrev: query.cursorStack.length > 1,
+          page: query.cursorStack.length,
+          onNext: () => setQuery((q) => ({ ...q, cursorStack: [...q.cursorStack, nextCursor] })),
+          onPrev: () =>
+            setQuery((q) =>
+              q.cursorStack.length > 1 ? { ...q, cursorStack: q.cursorStack.slice(0, -1) } : q,
+            ),
+        }}
+        toolbar={
+          <div className="flex flex-wrap items-end gap-2">
+            <form
+              className="flex items-end gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                changeQuery({ searchTerm: search });
+              }}
+            >
+              <Input
+                label="Search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="PO number or note"
+                fullWidth={false}
+                className="w-48"
+              />
+              <Button type="submit" size="sm" variant="secondary">
+                Search
+              </Button>
+            </form>
+            <Select
+              label="Supplier"
+              value={supplierId}
+              options={supplierOptions}
+              onChange={(e) => changeQuery({ supplierId: e.target.value })}
+              className="w-44"
+            />
+          </div>
+        }
+      />
+
       {canManage && (
-        <div className="border-t border-slate-200 pt-4">
-          <h3 className="mb-3 text-sm font-semibold text-slate-950">Create purchase order</h3>
-          <label className="mb-3 block max-w-sm">
-            <span className="text-xs font-medium uppercase text-slate-500">Supplier</span>
-            <select value={poSupplierId} onChange={(e) => setPoSupplierId(e.target.value)} className={INPUT}>
-              {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </label>
-          <div className="flex flex-col gap-3">
-            {lines.map((line, index) => {
-              const availableUnits = unitsByProduct[line.productId] ?? [];
-              const packSize = packSizeFor(line);
-              const qty = Number(line.quantity) || 0;
-              const costCents = line.unitCost ? parseToCents(line.unitCost) : 0;
-              return (
-              <div key={index} className="rounded-md border border-slate-200 p-3">
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-6">
-                  <label className="block sm:col-span-2">
-                    <span className="text-xs font-medium uppercase text-slate-500">Product</span>
-                    <select value={line.productId} onChange={(e) => void onProductChange(index, e.target.value)} className={INPUT}>
-                      <option value="">Select product</option>
-                      {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
-                    </select>
-                  </label>
-                  <label className="block">
-                    <span className="text-xs font-medium uppercase text-slate-500">Unit</span>
-                    <select value={line.unitKind} onChange={(e) => updateLine(index, { unitKind: e.target.value })} className={INPUT}>
-                      <option value="each">Each</option>
-                      {availableUnits.filter((u) => u.kind !== "each").map((u) => (
-                        <option key={u.kind} value={u.kind}>{UNIT_LABEL[u.kind] ?? u.kind}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="block">
-                    <span className="text-xs font-medium uppercase text-slate-500">Quantity {line.unitKind !== "each" && `(${UNIT_LABEL[line.unitKind] ?? line.unitKind})`}</span>
-                    <input type="number" min="1" value={line.quantity} onChange={(e) => updateLine(index, { quantity: e.target.value })} className={INPUT} />
-                  </label>
-                  <label className="block">
-                    <span className="text-xs font-medium uppercase text-slate-500">Unit cost {line.unitKind !== "each" && `(per ${UNIT_LABEL[line.unitKind] ?? line.unitKind})`}</span>
-                    <input type="text" inputMode="decimal" value={line.unitCost} onChange={(e) => updateLine(index, { unitCost: e.target.value })} placeholder="0.00" className={INPUT} />
-                  </label>
-                  <label className="block">
-                    <span className="text-xs font-medium uppercase text-slate-500">Expiry date</span>
-                    <input type="date" value={line.expiryDate} onChange={(e) => updateLine(index, { expiryDate: e.target.value })} className={INPUT} />
-                  </label>
-                  <label className="block">
-                    <span className="text-xs font-medium uppercase text-slate-500">Lot code</span>
-                    <input type="text" value={line.lotCode} onChange={(e) => updateLine(index, { lotCode: e.target.value })} placeholder="Optional" className={INPUT} />
-                  </label>
-                </div>
-
-                {line.unitKind !== "each" && (
-                  packSize ? (
-                    <p className="mt-2 rounded bg-blue-50 px-3 py-1.5 text-xs text-blue-800">
-                      1 {UNIT_LABEL[line.unitKind] ?? line.unitKind} = {packSize} Each — entered {qty || "?"} {UNIT_LABEL[line.unitKind] ?? line.unitKind}
-                      {qty > 0 && ` → ${qty * packSize} Each`}
-                      {costCents > 0 && ` @ ${formatMoney(Math.round(costCents / packSize))}/each (normalized from ${formatMoney(costCents)}/${UNIT_LABEL[line.unitKind] ?? line.unitKind})`}
-                    </p>
-                  ) : (
-                    <p className="mt-2 rounded bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
-                      No &quot;{UNIT_LABEL[line.unitKind] ?? line.unitKind}&quot; unit is configured for this product yet — add one under Units &amp; Packaging on the product page first.
-                    </p>
-                  )
-                )}
-
-                {lines.length > 1 && (
-                  <div className="mt-2">
-                    <Button variant="ghost" size="sm" onClick={() => removeLine(index)}>Remove line</Button>
-                  </div>
-                )}
-              </div>
-              );
-            })}
-          </div>
-          <div className="mt-3 flex gap-2">
-            <Button variant="secondary" size="sm" onClick={addLine}>Add line</Button>
-            <Button variant="primary" size="sm" disabled={busy || !poSupplierId} onClick={() => void createOrder()}>
-              Create purchase order
-            </Button>
-          </div>
-        </div>
+        <NewOrderPanel
+          suppliers={suppliers}
+          initialSupplierId={initialSupplierId}
+          initialProductId={initialProductId}
+          // A fresh object, so the effect refetches even when every field is
+          // already what it is being set to.
+          onCreated={() => changeQuery({ view: "all" })}
+        />
       )}
+
+      <ConfirmDialog
+        open={pending != null}
+        title={copy.title}
+        message={copy.message}
+        confirmLabel={copy.label}
+        destructive={copy.destructive}
+        onConfirm={() => pending && void runAction(pending)}
+        onCancel={() => setPending(null)}
+      />
     </div>
   );
 }

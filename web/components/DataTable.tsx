@@ -111,6 +111,26 @@ export interface DataTableProps<T> {
     limit: number;
     onOffsetChange: (offset: number) => void;
   };
+  /**
+   * Opt into CURSOR-driven paging, for the keyset endpoints that return
+   * `{items, nextCursor}` and deliberately do NOT count the table.
+   *
+   * Use this instead of `serverPagination` when there is no total: an offset
+   * pager needs one to know where the end is, and inventing it (or leaving the
+   * caller to fetch one page and call it the whole list) is how a list quietly
+   * shows page 1 as if it were everything. The same caveat as `serverPagination`
+   * applies to `searchable`/`sortValue` — they would act on the loaded page only.
+   */
+  serverCursor?: {
+    /** True when the API returned a next cursor. */
+    hasNext: boolean;
+    /** True when the caller is holding previous cursors it can pop. */
+    hasPrev: boolean;
+    onNext: () => void;
+    onPrev: () => void;
+    /** 1-indexed page the caller is on — cursor paging cannot know the last. */
+    page: number;
+  };
   onRowClick?: (row: T) => void;
   /** Filters / actions rendered on the toolbar's right. */
   toolbar?: React.ReactNode;
@@ -176,6 +196,7 @@ export function DataTable<T>({
   bulkActions,
   pageSize = 25,
   serverPagination,
+  serverCursor,
   onRowClick,
   toolbar,
   stickyHeader = true,
@@ -664,11 +685,40 @@ export function DataTable<T>({
                   serverPagination.offset + serverPagination.limit,
                   serverPagination.total
                 )} of ${serverPagination.total}`
-              : sorted.length === rows.length
-                ? `${sorted.length} ${sorted.length === 1 ? "row" : "rows"}`
-                : `${sorted.length} of ${rows.length} rows`}
+              : serverCursor
+                ? // No total by design — say what is on screen and that more
+                  // exists, rather than implying this page is the whole list.
+                  `${sorted.length} ${sorted.length === 1 ? "row" : "rows"} on page ${serverCursor.page}${
+                    serverCursor.hasNext ? " — more available" : ""
+                  }`
+                : sorted.length === rows.length
+                  ? `${sorted.length} ${sorted.length === 1 ? "row" : "rows"}`
+                  : `${sorted.length} of ${rows.length} rows`}
           </p>
-          {pageCount > 1 && (
+          {serverCursor && (serverCursor.hasNext || serverCursor.hasPrev) && (
+            <nav className="flex items-center gap-1" aria-label="Pagination">
+              <button
+                type="button"
+                onClick={serverCursor.onPrev}
+                disabled={!serverCursor.hasPrev}
+                className="focus-ring min-h-touch rounded-control border border-line px-3 text-sm font-medium text-content-primary disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-2"
+              >
+                Previous
+              </button>
+              <span className="px-2 tnum" aria-current="page">
+                Page {serverCursor.page}
+              </span>
+              <button
+                type="button"
+                onClick={serverCursor.onNext}
+                disabled={!serverCursor.hasNext}
+                className="focus-ring min-h-touch rounded-control border border-line px-3 text-sm font-medium text-content-primary disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-2"
+              >
+                Next
+              </button>
+            </nav>
+          )}
+          {!serverCursor && pageCount > 1 && (
             <nav className="flex items-center gap-1" aria-label="Pagination">
               <button
                 type="button"

@@ -44,6 +44,10 @@ const updateSupplierSchema = z.object({ name: z.string().min(1).optional(), ...s
 
 const poSchema = z.object({
   supplierId: z.string().min(1),
+  /** Expected delivery date (epoch ms). Optional — absent means "no ETA recorded",
+   *  which the list reports as unknown rather than treating as on-time. */
+  expectedDate: z.number().int().positive().nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
   lines: z
     .array(
       z.object({
@@ -301,7 +305,10 @@ export function registerRoutes(router: Router, service: PurchasingService): void
     const lines = await Promise.all(
       b.lines.map((l) => convertUnitLine(service, tid, l, l.productId, unitConversions)),
     );
-    const po = await service.createOrder(b.supplierId, lines, tid, actor(res));
+    const po = await service.createOrder(b.supplierId, lines, tid, actor(res), {
+      expectedDate: b.expectedDate ?? null,
+      notes: b.notes ?? null,
+    });
     res.status(201).json(unitConversions.length ? { ...po, unitConversions } : po);
   }));
 
@@ -338,10 +345,25 @@ export function registerRoutes(router: Router, service: PurchasingService): void
     res.json({ items: await service.listApprovals(String(req.params.id), tenantId(res)) });
   }));
 
+  // Filters are parsed here and applied in SQL. An unknown or malformed value is
+  // a 400, not a silently-ignored filter — a filter that quietly does nothing
+  // shows the user a full list they believe is a filtered one.
+  const orderListQuery = z.object({
+    cursor: z.string().min(1).optional(),
+    limit: z.coerce.number().int().positive().optional(),
+    status: z.enum(["ordered", "partially_received", "received", "cancelled"]).optional(),
+    receiveStatus: z.enum(["pending", "partial", "complete"]).optional(),
+    approvalStatus: z.enum(["approved", "pending", "rejected"]).optional(),
+    supplierId: z.string().min(1).optional(),
+    search: z.string().max(120).optional(),
+    createdFrom: z.coerce.number().int().nonnegative().optional(),
+    createdTo: z.coerce.number().int().nonnegative().optional(),
+    overdue: z.enum(["true", "false"]).optional(),
+  });
+
   router.get("/orders", handler(async (req, res) => {
-    const cursor = typeof req.query.cursor === "string" && req.query.cursor !== "" ? req.query.cursor : undefined;
-    const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
-    res.json(await service.listOrders(tenantId(res), { cursor, limit }));
+    const { overdue, ...q } = parseBody(orderListQuery, req.query ?? {});
+    res.json(await service.listOrders(tenantId(res), { ...q, overdue: overdue === "true" }));
   }));
 
   router.get("/orders/:id", handler(async (req, res) => {

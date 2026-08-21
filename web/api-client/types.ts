@@ -455,26 +455,62 @@ export interface PurchaseOrderLine {
   line_cost_cents: number;
 }
 
+export type POApprovalStatus = "approved" | "pending" | "rejected";
+
 export interface PurchaseOrder {
   id: string;
   supplier_id: string;
   /**
    * Human-facing sequential number. The backend has always returned this on
    * both the list and the detail; the client type omitted it, so list views
-   * fell back to printing raw UUIDs at operators.
+   * fell back to printing raw UUIDs at operators. Required, not optional — the
+   * API always sends it, and `?:` is what let the UUID fallback stay plausible.
    */
-  po_number?: number | null;
-  status: "ordered" | "received" | string;
-  receive_status?: string;
+  po_number: number | null;
+  status: "ordered" | "partially_received" | "received" | "cancelled" | string;
+  receive_status: string;
+  approval_status: POApprovalStatus;
+  approved_at: number | null;
   total_cost_cents: number;
+  notes: string | null;
+  /** Expected delivery date (epoch ms). null = no ETA recorded — unknown, not on-time. */
+  expected_date: number | null;
   created_at: number;
   received_at: number | null;
   lines?: PurchaseOrderLine[];
   unitConversions?: UnitConversionNote[];
 }
 
+/** A PO plus the roll-ups `GET /purchasing/orders` derives per row. */
+export interface PurchaseOrderListRow extends PurchaseOrder {
+  supplier_name: string | null;
+  line_count: number;
+  ordered_qty: number;
+  received_qty: number;
+  remaining_qty: number;
+  bill_count: number;
+  invoice_status: "none" | "open" | "posted";
+  is_overdue: boolean;
+}
+
+/** Keyset page. `nextCursor` is null on the last page — it is NOT optional
+ *  metadata: dropping it is what made the list render page 1 as the whole list. */
 export interface PurchaseOrdersResponse {
-  items: PurchaseOrder[];
+  items: PurchaseOrderListRow[];
+  nextCursor: string | null;
+  limit: number;
+}
+
+/** Query accepted by `GET /purchasing/orders`. Applied server-side. */
+export interface PurchaseOrderListQuery {
+  cursor?: string;
+  limit?: number;
+  status?: string;
+  receiveStatus?: string;
+  approvalStatus?: POApprovalStatus;
+  supplierId?: string;
+  search?: string;
+  overdue?: boolean;
 }
 
 export interface CreatePurchaseOrderLineRequest {

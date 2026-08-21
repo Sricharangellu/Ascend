@@ -515,6 +515,23 @@ CREATE INDEX IF NOT EXISTS receiving_scan_events_session_idx
 `;
 
 // 3-way match: never silently approve variances — require an override reason.
+// P2P-1: a purchase order had no expected delivery date, so nothing in the app
+// could answer "what is overdue?" truthfully — the receiving dashboard proxied it
+// as "ordered more than 7 days ago", which is a guess about age, not lateness.
+// Nullable and additive: legacy rows stay NULL and are reported as "no ETA"
+// rather than silently treated as on-time or late.
+//
+// The two indexes serve the list query's real shapes. `po_tenant_status_idx`
+// leads with `status`, so the unfiltered keyset scan (WHERE tenant_id AND
+// (created_at,id) < (…) ORDER BY created_at DESC, id DESC) could only use
+// tenant_id as an equality prefix and had to sort the rest.
+const ALTER_PO_EXPECTED_DATE = `
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS expected_date BIGINT;
+CREATE INDEX IF NOT EXISTS po_tenant_created_idx ON purchase_orders (tenant_id, created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS po_tenant_expected_idx ON purchase_orders (tenant_id, expected_date)
+  WHERE expected_date IS NOT NULL;
+`;
+
 const ALTER_PO_BILLS_OVERRIDE = `
 ALTER TABLE po_bills ADD COLUMN IF NOT EXISTS variance_override_reason TEXT;
 ALTER TABLE po_bills ADD COLUMN IF NOT EXISTS variance_override_at BIGINT;
@@ -525,7 +542,7 @@ ALTER TABLE po_bills ADD COLUMN IF NOT EXISTS variance_override_by TEXT;
  *  `purchase_order.received`; inventory listens and increments stock. */
 export const purchasingModule: PosModule = {
   name: "purchasing",
-  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_SUPPLIERS_VENDOR_360, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES, ADD_PO_LINE_FK, ADD_PURCHASING_UPDATED_AT_TRIGGERS, CREATE_PO_DOCUMENTS, CREATE_PO_APPROVALS, SEED_PO_COUNTER, CREATE_REQUISITIONS, CREATE_EDI_IMPORTS, CREATE_PO_BILLS, CREATE_RECEIVING_SESSIONS, ALTER_PO_BILLS_OVERRIDE],
+  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_SUPPLIERS_VENDOR_360, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES, ADD_PO_LINE_FK, ADD_PURCHASING_UPDATED_AT_TRIGGERS, CREATE_PO_DOCUMENTS, CREATE_PO_APPROVALS, SEED_PO_COUNTER, CREATE_REQUISITIONS, CREATE_EDI_IMPORTS, CREATE_PO_BILLS, CREATE_RECEIVING_SESSIONS, ALTER_PO_BILLS_OVERRIDE, ALTER_PO_EXPECTED_DATE],
   async register({ db, events, router }) {
     const service = new PurchasingService(db, events);
     const ediService = new EdiImportsService(db);
