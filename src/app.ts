@@ -1,13 +1,12 @@
 import express, { Router, type Express } from "express";
 import { createHash, timingSafeEqual } from "node:crypto";
 import helmet from "helmet";
-import { openDb, type DB } from "./shared/db.js";
+import { openDb, txTimeoutMs, type DB } from "./shared/db.js";
 import { openRedis } from "./shared/redis.js";
 import { EventBus } from "./shared/events.js";
 import { Outbox } from "./shared/outbox.js";
 import { logger } from "./shared/logger.js";
 import { buildInfo } from "./shared/version.js";
-import { errorMiddleware } from "./shared/http.js";
 import { modules } from "./modules/index.js";
 import { parseCapabilitiesImpactQuery, SettingsService } from "./modules/settings/service.js";
 import { identityModule } from "./identity/index.js";
@@ -19,13 +18,13 @@ import {
   tenantRateLimitMiddleware,
   makeAuthMiddleware,
   tenantResolver,
-  errorEnvelopeMiddleware,
   metricsMiddleware,
+  accessLogMiddleware,
   renderMetrics,
   requireRole,
 } from "./gateway/index.js";
 import type { RuntimeGauges } from "./gateway/metrics.js";
-import { handler } from "./shared/http.js";
+import { handler, errorMiddleware } from "./shared/http.js";
 import { bootstrapOrchestration, ORCHESTRATION_MIGRATIONS } from "./orchestration/index.js";
 import { SseBroker } from "./shared/sse.js";
 import type { AuthPayload } from "./gateway/auth.js";
@@ -285,12 +284,65 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   }
 
   // Acquire a transaction-level advisory lock before running any migrations.
-  // pg_advisory_xact_lock blocks until the lock is free, then holds it for the
-  // duration of the transaction. Concurrent instances wait here and then skip
-  // all migrations (hash-checked above). Prevents simultaneous ALTER TABLE races.
+  // The lock is held for the duration of the transaction, so concurrent
+  // instances wait here and then skip all migrations (hash-checked above).
+  // Prevents simultaneous ALTER TABLE races.
+  //
+  // The wait gets its own, much larger statement timeout. `db.tx()` opens every
+  // transaction with `SET LOCAL statement_timeout` (30s by default), and the
+  // lock wait is itself a single statement — so queuing behind another instance
+  // was abortable with SQLSTATE 57014, "canceling statement due to statement
+  // timeout". That surfaced as a query timeout in whichever test was unlucky,
+  // rather than as the contention it actually was. Widening the timeout for
+  // just this statement separates "waiting for a peer" from "this query hung",
+  // which are the same signal to Postgres but very different to an operator.
+  //
+  // It is not hypothetical: CI run 31138020800 attempt 1 failed 893/894, the
+  // loser being settings.test.ts "get and update feature flags" at exactly
+  // 30014ms with code 57014, while the Postgres service container was
+  // checkpointing heavily. Attempt 2 on a healthy runner passed 894/894. The
+  // backend suite builds a fresh schema at 123 call sites across 86 files, and
+  // every one of them serializes on this single global lock.
+  //
+  // Verified against PostgreSQL 16 rather than assumed:
+  //   - statement_timeout DOES abort a blocking pg_advisory_xact_lock wait
+  //     (2s timeout → "canceling statement due to statement timeout" at 2093ms,
+  //     SQLSTATE 57014);
+  //   - statement_timeout is per-STATEMENT, not per-transaction, so the
+  //     migrations themselves were never starved of budget — only the wait was;
+  //   - a later `SET LOCAL statement_timeout` overrides an earlier one, so the
+  //     normal budget can be restored for the migrations that follow.
+  //
+  // A bounded *blocking* wait is used rather than polling pg_try_advisory_xact_lock:
+  // Postgres wakes a blocked waiter the instant the lock frees (measured at 4ms),
+  // whereas a poll loop adds up to its own interval of latency to every one of
+  // the hundreds of acquisitions a full test run makes.
+  const MIGRATION_LOCK_KEY = 7381920; // stable magic int for finder migrations
+  const rawLockWait = Number(process.env["PG_MIGRATION_LOCK_WAIT_MS"] ?? 300_000);
+  const lockWaitMs = Number.isFinite(rawLockWait) && rawLockWait > 0 ? Math.floor(rawLockWait) : 300_000;
+
   await db.tx(async (tdb) => {
-    await tdb.exec("SELECT pg_advisory_xact_lock(7381920)"); // stable magic int for finder migrations
-    logger.info("migration lock acquired");
+    const startedAt = Date.now();
+    try {
+      await tdb.exec(`SET LOCAL statement_timeout = ${lockWaitMs}`);
+      await tdb.exec(`SELECT pg_advisory_xact_lock(${MIGRATION_LOCK_KEY})`);
+    } catch (err) {
+      // 57014 = query_canceled. Here it can only mean the wait hit lockWaitMs,
+      // so translate it into the cause rather than letting a boot blocked behind
+      // a peer report itself as an unrelated slow query.
+      if ((err as { code?: string }).code === "57014") {
+        throw new Error(
+          `migration lock ${MIGRATION_LOCK_KEY} not acquired after ${Date.now() - startedAt}ms — ` +
+          `another instance is holding it. Raise PG_MIGRATION_LOCK_WAIT_MS (currently ${lockWaitMs}) ` +
+          `if this is expected contention, or check for a stuck migration transaction.`,
+        );
+      }
+      throw err;
+    }
+    // Restore the normal per-statement budget for the migrations themselves, so
+    // the widened timeout covers only the queuing and never the DDL.
+    await tdb.exec(`SET LOCAL statement_timeout = ${txTimeoutMs()}`);
+    logger.info({ waitedMs: Date.now() - startedAt }, "migration lock acquired");
 
     for (const sql of identityModule.migrations) await runIfNew(sql, `identity`, tdb);
     for (const mod of modules) {
@@ -315,6 +367,12 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     next();
   });
   app.use(metricsMiddleware);
+  // One structured line per completed request. Mounted BEFORE the rate limiter
+  // on purpose: a 429 is exactly the response that needs to be visible, and it
+  // is the one an earlier incident investigation could not see at all (see
+  // gateway/accessLog.ts). Logging happens in a `finish` hook, so a request
+  // rejected downstream is still logged, with the auth context resolved by then.
+  app.use(accessLogMiddleware);
   app.use(rateLimitMiddleware({ capacity: 120, refillRate: 40, redis }));
 
   // ── Liveness + readiness probes (no auth — infrastructure-level)
@@ -635,9 +693,22 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     }),
   );
 
-  // ── Error handling (errorEnvelope must be last)
+  // ── Error handling — ONE handler, deliberately.
+  // This used to be two: `errorMiddleware` followed by `errorEnvelopeMiddleware`,
+  // with a comment claiming the envelope "must be last". It was last, and it was
+  // never reached: errorMiddleware always responds and never calls next(err), so
+  // the envelope was unreachable dead code from the day it was mounted. The
+  // visible consequence was that the documented `{error:{code,message,requestId}}`
+  // contract was never delivered — no error response carried a requestId, so a
+  // customer reporting an error gave you nothing to correlate against the logs.
+  // The frontend had been reading that field all along (web/contexts/StoreAuthContext.tsx).
+  //
+  // Fixed by folding the envelope's one genuine advantage (requestId, plus
+  // logging 5xx HttpErrors) into errorMiddleware rather than by reordering the
+  // two: swapping them would have been a breaking change, since the envelope
+  // renames 5xx `internal` → `internal_error` and drops the `details` array that
+  // validation errors carry.
   app.use(errorMiddleware);
-  app.use(errorEnvelopeMiddleware);
 
   return { express: app, db, events, outbox, cleanup: cleanupEventBridge };
 }

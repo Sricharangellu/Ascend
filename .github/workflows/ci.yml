@@ -148,6 +148,23 @@ jobs:
         # entry. No deps; plain ESM on the runner's Node.
         run: npm run gap:scan
 
+      # Backlog F-18, and the other direction of the step above: gap:scan asks
+      # "does the route the frontend calls exist?", this asks "does the
+      # operation the contract promises exist?". Frontend work is written
+      # against contracts/openapi.yaml — "if it's not in the spec, you don't
+      # call it" — so a documented path with no route is an instruction to
+      # build a 404. GATING, not report-only: the first run found 9 mismatches,
+      # 3 of them plain typos fixed in this change, and 6 needing an API
+      # decision, allowlisted with the route that actually serves each. That is
+      # a small enough arrival cost to gate on, unlike F-15/F-16.
+      #
+      # One-way by design. The backend serves 626 operations and the contract
+      # documents 146; requiring every route to be documented would fail on
+      # arrival with ~480 findings and be deleted within a week. Undocumented
+      # routes are a documentation gap; documented-but-absent routes are a lie.
+      - name: OpenAPI contract scan — every documented operation has a route
+        run: npm run contract:scan
+
       # Backlog F-15. REPORT-ONLY on purpose — the script exits 0 regardless.
       # The 2026-08-04 audit found two duplication defects by hand (48 copies of
       # test-request.ts; a private apiFetch beside the canonical one) that no
@@ -348,6 +365,48 @@ jobs:
       # the guard against linking to deleted pages. Gate them here.
       - run: npm test
       - run: npm run build
+
+  # ─── Required-check compatibility shim (DELETE once protection is corrected) ─
+  # `master`'s branch protection requires a check literally named
+  # "Frontend — typecheck + lint + build". Commit 1a4b989 (2026-08-05) renamed
+  # the job above to "… + test + build" without updating protection, and a
+  # required check that no job emits is never satisfied AND never fails — it
+  # sits permanently "expected". The merge button has therefore been dead for
+  # every PR into `master` since that date, which is why `master` has not moved
+  # since 2026-07-23. Verified by GitHub's own refusal on the PR #200 release
+  # attempt: `405 Required status check "…" is expected`.
+  #
+  # This job re-emits the required name. It deliberately does NOT rename the
+  # real job — that name is accurate (it does run the web tests), and renaming
+  # would risk breaking develop/staging protection, which may already require
+  # the new name. Adding a name is safe under every branch's config; removing
+  # one is not.
+  #
+  # `if: always()` is load-bearing. Without it a failed `frontend` SKIPS this
+  # job, and GitHub can treat a skipped required check as satisfied — which
+  # would recreate the original bug in reverse: a required check that cannot
+  # fail. The explicit result assertion is what makes this a real gate.
+  #
+  # EXIT CONDITION: delete this job when branch protection is updated to
+  # require "Frontend — typecheck + lint + test + build" (the preferred remedy,
+  # Sri-only — the protection API returns 403 to agents). Keep this file and
+  # PIPELINE.md's required-check list in sync when that happens.
+  frontend-required-name-shim:
+    name: Frontend — typecheck + lint + build
+    needs: [frontend]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mirror the frontend job's result
+        env:
+          FRONTEND_RESULT: ${{ needs.frontend.result }}
+        run: |
+          echo "frontend job result: $FRONTEND_RESULT"
+          if [ "$FRONTEND_RESULT" != "success" ]; then
+            echo "::error title=Frontend gate failed::The 'Frontend — typecheck + lint + test + build' job did not succeed (result: $FRONTEND_RESULT)."
+            exit 1
+          fi
+          echo "✓ frontend gate passed"
 
   # ─── Docker build sanity check ─────────────────────────────────────────────
   # Nothing previously exercised the Dockerfile at all — the node:20-alpine vs
@@ -606,13 +665,29 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      # Target is a repo variable (both | frontend | backend), default `both`.
-      # Set STAGING_DEPLOY_TARGET=frontend when the staging backend is hosted
-      # outside Vercel (e.g. Render git auto-deploy, as production already is) —
-      # otherwise deploy.sh tries to push the backend to a Vercel project that
-      # may not exist and fails the whole job.
+      # Target is a repo variable (both | frontend | backend), default `frontend`.
+      #
+      # The default was `both` and that guaranteed a red job. deploy.sh's
+      # deploy_backend pushes to Vercel, and DEPLOYMENTS.md records that this
+      # repo's Vercel backend project IDs are "either dead
+      # (DEPLOYMENT_NOT_FOUND) or serving an unrelated app", while the real
+      # backend runs on Render via git auto-deploy with "no representation in
+      # this repo's CI/CD at all — no workflow, no deploy hook, no render.yaml".
+      # So the backend half could not succeed on any tier, deploy.sh fails if
+      # either half fails, and the `Testing smoke test` step below is therefore
+      # SKIPPED. Net effect: the last three pushes to `staging` all went red
+      # after passing every quality gate (runs 31574160018, 31273743041,
+      # 31271109836), and staging has never once been smoke-verified.
+      #
+      # Defaulting to `frontend` deploys the half this repo can actually deploy
+      # and lets the smoke test run, so a red job now means "the staging backend
+      # is not answering" — a true, actionable signal — instead of "we tried to
+      # push a backend somewhere it does not live".
+      #
+      # Set STAGING_DEPLOY_TARGET=both if a Vercel-hosted staging backend is
+      # ever configured; the code path is unchanged and still supported.
       - name: Deploy testing → Vercel preview alias
-        run: ./scripts/deploy.sh "${{ vars.STAGING_DEPLOY_TARGET || 'both' }}"
+        run: ./scripts/deploy.sh "${{ vars.STAGING_DEPLOY_TARGET || 'frontend' }}"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           DEPLOY_ENV: testing
@@ -649,8 +724,30 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      # Default is `frontend`, NOT `both`, and that is deliberate.
+      #
+      # `both` invokes deploy.sh's deploy_backend, which uploads to Vercel
+      # project prj_krZ34CIFjzQrMvZ08PWqqbxzBf7d. DEPLOYMENTS.md records that
+      # project as CONFIRMED BROKEN: it resolves, but serves a bare, unrelated
+      # Express app — not this repo's backend. Deploying there on every release
+      # can only produce noise or a red release check.
+      #
+      # The real production backend is Render service "Ascend Prod"
+      # (srv-d9lo8jm7bikc739dnsn0, Docker runtime, deploying from this repo's
+      # `master` branch) — confirmed by Sri from the Render dashboard
+      # 2026-08-08. Render's own git integration deploys the backend on a push
+      # to `master`. A release therefore ships the backend through Render and
+      # the frontend through Vercel, by two entirely separate mechanisms, and
+      # only the second one belongs in this job.
+      #
+      # smoke-test below still probes BOTH halves — CI no longer deploys the
+      # backend, but it must keep verifying it.
+      #
+      # `vars.PROD_DEPLOY_TARGET` still overrides, so restoring the old
+      # behaviour is one repo variable away if the Render/Vercel decision in
+      # DEPLOYMENTS.md P1 ever resolves the other way.
       - name: Deploy production → Vercel --prod
-        run: ./scripts/deploy.sh "${{ vars.PROD_DEPLOY_TARGET || 'both' }}"
+        run: ./scripts/deploy.sh "${{ vars.PROD_DEPLOY_TARGET || 'frontend' }}"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN_PROD }}
           DEPLOY_ENV: prod
@@ -706,19 +803,40 @@ jobs:
           echo "frontend: $FRONTEND"
       - name: Wait for Vercel propagation
         run: sleep 15
+      # The BACKEND probes below carry uptime.yml's widened timeouts, not the
+      # 15-seconds-of-retries they used to. Two independent reasons, both of
+      # which make the old values able to fail a perfectly good release:
+      #
+      #   1. CI no longer deploys the backend (see deploy-production above) —
+      #      Render's git integration does, asynchronously, triggered by the
+      #      same push. So this job can easily start probing while Render is
+      #      still building. `--retry 3 --retry-delay 5` gave up ~15s in.
+      #   2. Production is a Render FREE instance that cold-starts in ~50s. A
+      #      timeout shorter than the cold start does not measure availability,
+      #      it measures the timeout — the mistake that had this repo believing
+      #      production was dead from three networks that were independent in
+      #      location and identical in timeout.
+      #
+      # `--retry-all-errors` matters specifically for reason 1: without it curl
+      # does not retry connection-level failures, which is exactly what a
+      # mid-deploy Render service returns.
+      #
+      # The FRONTEND probe keeps a tighter budget deliberately: Vercel is
+      # deployed synchronously by the previous job and does not cold-start, so a
+      # slow answer there is a real signal, not a scheduling artefact.
       - name: Health check — backend liveness
         run: |
-          curl -f --retry 3 --retry-delay 5 \
+          curl -fsS --max-time 90 --retry 5 --retry-delay 10 --retry-all-errors \
             "$BACKEND/healthz" \
             || (echo "❌ /healthz failed against $BACKEND" && exit 1)
       - name: Health check — backend readiness
         run: |
-          curl -f --retry 3 --retry-delay 5 \
+          curl -fsS --max-time 90 --retry 5 --retry-delay 10 --retry-all-errors \
             "$BACKEND/readyz" \
             || (echo "❌ /readyz failed against $BACKEND" && exit 1)
       - name: Health check — feature flags auth boundary
         run: |
-          http_status="$(curl -sS --retry 2 --retry-delay 5 \
+          http_status="$(curl -sS --max-time 90 --retry 5 --retry-delay 10 --retry-all-errors \
             -o /tmp/flags-response.json \
             -w '%{http_code}' \
             "$BACKEND/api/v1/flags")"

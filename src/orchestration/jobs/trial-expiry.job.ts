@@ -10,7 +10,7 @@
  *      password-reset uses). Each is sent at most once per tenant, tracked by
  *      `nurture_day7_sent_at` / `nurture_day13_sent_at` markers so re-running
  *      the job (it is re-enqueued every 24h, and can also be triggered via
- *      POST /api/jobs/tick) never double-sends.
+ *      GET /jobs/tick) never double-sends.
  *   2. Soft-expires trials whose trial_ends_at has passed and which never
  *      converted to a paid plan — flips status to 'expired'. This never
  *      touches tenant data; IdentityService.issueLoginSession() is what

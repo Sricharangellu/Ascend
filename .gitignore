@@ -60,3 +60,8 @@ artifacts/backups/
 
 # Full-tree backup copies break hygiene (duplicate AGENTS.md)
 .migration-backup/
+
+# DR drill output — db/backup/drill.sh writes .pgdump files here by default.
+# Never commit a database dump: it is large, and for any non-synthetic source it
+# contains real customer data and password hashes.
+.drill-backups/
