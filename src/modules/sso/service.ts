@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import type { DB } from "../../shared/db.js";
 import { HttpError } from "../../shared/http.js";
 import type { Role } from "../../identity/types.js";
+import { issueTokenPair, resolveCustomRolePermissions } from "../../identity/tokens.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -301,18 +302,22 @@ export class SsoService {
       throw new HttpError(502, "oidc_token_error", "id_token is missing email/sub claim.");
     }
 
-    // JIT-provision: upsert user.
-    const existingUser = await this.db.one<{ id: string; role: string }>(
-      "SELECT id, role FROM users WHERE tenant_id = @tenantId AND email = @email",
+    // JIT-provision: upsert user. `custom_role_id` is selected because the
+    // session token has to carry the user's fine-grained permissions — see the
+    // issueTokenPair call below.
+    const existingUser = await this.db.one<{ id: string; role: string; custom_role_id: string | null }>(
+      "SELECT id, role, custom_role_id FROM users WHERE tenant_id = @tenantId AND email = @email",
       { tenantId, email: email.toLowerCase() },
     );
 
     let userId: string;
     let role: Role;
+    let customRoleId: string | null;
 
     if (existingUser) {
       userId = existingUser.id;
       role = existingUser.role as Role;
+      customRoleId = existingUser.custom_role_id;
     } else {
       // Create new user with SSO placeholder password hash.
       userId = `usr_sso_${createHash("sha256").update(email + tenantId).digest("hex").slice(0, 16)}`;
@@ -332,27 +337,33 @@ export class SsoService {
         },
       );
       // Re-read in case ON CONFLICT hit.
-      const created = await this.db.one<{ id: string; role: string }>(
-        "SELECT id, role FROM users WHERE tenant_id = @tenantId AND email = @email",
+      const created = await this.db.one<{ id: string; role: string; custom_role_id: string | null }>(
+        "SELECT id, role, custom_role_id FROM users WHERE tenant_id = @tenantId AND email = @email",
         { tenantId, email: email.toLowerCase() },
       );
       userId = created!.id;
       role = created!.role as Role;
+      customRoleId = created!.custom_role_id;
     }
 
     const secret = process.env.JWT_SECRET;
     if (!secret) throw new HttpError(500, "misconfigured", "JWT_SECRET not set.");
 
-    const accessToken = jwt.sign(
-      { tenantId, role, ssoProvider: cfg.providerName },
-      secret,
-      { subject: userId, expiresIn: "15m" },
-    );
-    const refreshToken = jwt.sign(
-      { tenantId, role },
-      secret + ":refresh",
-      { subject: userId, expiresIn: "7d" },
-    );
+    // Mint through the shared minter rather than a local jwt.sign. SSO used to
+    // build its own claims here and silently omitted `customRoleId` and
+    // `permissions`, so an SSO session reported no fine-grained entitlements
+    // until its first refresh re-derived them from the user row.
+    const permissions = customRoleId
+      ? await resolveCustomRolePermissions(this.db, customRoleId)
+      : undefined;
+    const { accessToken, refreshToken, expiresIn } = issueTokenPair(secret, {
+      userId,
+      tenantId,
+      role,
+      ...(customRoleId ? { customRoleId } : {}),
+      ...(permissions ? { permissions } : {}),
+      extraClaims: { ssoProvider: cfg.providerName },
+    });
 
     // Persist the refresh token hash exactly as identity's login does —
     // identity.refresh() looks tokens up by sha256 hash in refresh_tokens,
@@ -370,6 +381,6 @@ export class SsoService {
       },
     );
 
-    return { accessToken, refreshToken, expiresIn: 900 };
+    return { accessToken, refreshToken, expiresIn };
   }
 }
