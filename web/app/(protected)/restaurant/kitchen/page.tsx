@@ -36,7 +36,7 @@ export default function KitchenDisplayPage() {
 
   const load = () => {
     safeLoad(
-      apiGet<{ items: KdsOrder[] }>("/api/v1/orders?status=open&pageSize=50")
+      apiGet<{ items: KdsOrder[] }>("/api/v1/orders?status=open&limit=50")
         .then((d) => setOrders(d.items ?? []))
         .then(() => setLastRefresh(Date.now())),
     );

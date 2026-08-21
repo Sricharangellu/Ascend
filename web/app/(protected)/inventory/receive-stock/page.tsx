@@ -8,7 +8,7 @@ import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { formatMoney } from "@/lib/money";
 import { apiGet, apiPost, apiPatch, ApiResponseError } from "@/api-client/client";
-import { computeTotal, receiveStatusBadge, docTypeLabel, fmtBytes, buildReceiveLines } from "./_components/receiveStockTypes";
+import { computeTotal, receiveStatusBadge, docTypeLabel, fmtBytes, buildReceiveLines, findScannedLine } from "./_components/receiveStockTypes";
 import type { PendingPO, ReceiveEntry, PODocument, SortMode, LocationOption } from "./_components/receiveStockTypes";
 import { ReceiveLinesCard } from "./_components/ReceiveLinesCard";
 import { PendingPOsTable } from "./_components/PendingPOsTable";
@@ -99,19 +99,30 @@ export default function ReceiveStockPage() {
 
   useEffect(() => { void loadPO(selectedPOId); }, [selectedPOId, loadPO]);
 
-  const handleScan = () => {
+  const handleScan = async () => {
     const code = scanInput.trim();
     setScanInput(""); setScanError(null);
     if (!code) return;
+
+    // Ask the canonical resolver what this code is. It is the only thing that
+    // knows about `product_barcodes` — the multi-UPC table holding each/box/
+    // case/vendor codes — so without it a case barcode (the normal thing to
+    // scan at a receiving desk) resolved to nothing while the same scan worked
+    // at the till. Best-effort: an unknown code or a failed request just leaves
+    // the exact-match legs to answer, exactly as before.
+    let resolvedProductId: string | null = null;
+    try {
+      const resolved = await apiGet<{ id?: string }>(`/api/v1/catalog/barcode/${encodeURIComponent(code)}`);
+      resolvedProductId = resolved?.id ?? null;
+    } catch { /* not a known barcode, or offline — fall through */ }
+
     if (!selectedPO?.lines) {
-      const matchingPO = pendingPOs.find((po) =>
-        po.lines?.some((l) => l.product_barcode === code || l.product_sku === code),
-      );
+      const matchingPO = pendingPOs.find((po) => findScannedLine(po.lines, code, resolvedProductId));
       if (matchingPO) { setSelectedPOId(matchingPO.id); }
       else { setScanError(`No pending PO contains barcode "${code}"`); }
       return;
     }
-    const line = selectedPO.lines.find((l) => l.product_barcode === code || l.product_sku === code);
+    const line = findScannedLine(selectedPO.lines, code, resolvedProductId);
     if (!line) { setScanError(`Barcode "${code}" not found on this PO`); return; }
     setEntries((prev) => prev.map((e) => ({ ...e, highlighted: e.lineId === line.id })));
     setTimeout(() => setEntries((prev) => prev.map((e) => ({ ...e, highlighted: false }))), 2000);
@@ -220,12 +231,12 @@ export default function ReceiveStockPage() {
                   type="text"
                   value={scanInput}
                   onChange={(e) => setScanInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleScan(); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") void handleScan(); }}
                   placeholder="Scan or type barcode…"
                   className="flex-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none font-mono"
                   autoFocus
                 />
-                <Button variant="secondary" size="sm" onClick={handleScan}>Scan</Button>
+                <Button variant="secondary" size="sm" onClick={() => void handleScan()}>Scan</Button>
               </div>
               {scanError && <p className="mt-1 text-xs text-red-600">{scanError}</p>}
             </div>

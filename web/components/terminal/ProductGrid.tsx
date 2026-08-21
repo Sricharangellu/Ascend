@@ -81,10 +81,15 @@ export function ProductGrid({ onAddProduct }: ProductGridProps) {
 
   // Initial load — the browse grid.
   //
-  // `limit`, not `pageSize`: the catalog endpoint reads `limit`, so the old
-  // `?pageSize=200` was dropped on the floor and the register silently browsed
-  // the default 50 products. On any catalog bigger than that, the grid showed
-  // a fraction of what the shop sells and nothing said so.
+  // `limit`, not the page-size spelling this used to send: the catalog endpoint
+  // reads `limit`, so the old parameter was dropped on the floor and the
+  // register silently browsed the default 50 products. On any catalog bigger
+  // than that, the grid showed a fraction of what the shop sells and nothing
+  // said so.
+  //
+  // The old spelling is deliberately not written out here: develop's
+  // paginationParamContract guard greps source text and cannot tell a comment
+  // from a call, so quoting it trips the very check that protects this line.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);

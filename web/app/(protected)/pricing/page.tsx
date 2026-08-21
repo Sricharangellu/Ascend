@@ -259,12 +259,12 @@ function CustomerOverridesTab() {
   useEffect(() => {
     setLoading(true);
     safeLoad(
-      apiGet<{ items: OverrideProduct[] }>("/api/v1/catalog?pageSize=200")
+      apiGet<{ items: OverrideProduct[] }>("/api/v1/catalog?limit=200")
         .then((r) => setProducts(r.items ?? []))
         .finally(() => setLoading(false)),
     );
     safeLoad(
-      apiGet<{ items: OverrideCustomer[] }>("/api/v1/customers?pageSize=200")
+      apiGet<{ items: OverrideCustomer[] }>("/api/v1/customers?limit=200")
         .then((r) => setCustomers(r.items ?? [])),
     );
   }, []);
