@@ -12,7 +12,7 @@ Built for the tobacco, vapor, hemp, and specialty retail distribution industry �
 
 | Service | URL |
 |---------|-----|
-| Frontend | https://ascendhq-app.vercel.app |
+| Frontend | https://ascendhqweb.vercel.app |
 | Backend API | https://ascendhq-api.vercel.app |
 
 **Demo credentials:**
@@ -130,15 +130,17 @@ Compose injects `DATABASE_URL`/`JWT_SECRET` for the backend container, so no
 
 ### Local development (manual, your own Postgres)
 
-The backend does **not** auto-load `.env`, so you must export the variables (a
-plain `cp .env.example .env` alone will fail with `DATABASE_URL is not set`).
-Migrations run automatically on startup — there is no separate migrate command.
+`npm run dev`, `npm start` and `npm run db:check` load `.env` automatically (via
+Node's `--env-file-if-exists`), so `cp .env.example .env` and filling it in is
+enough for those. Other commands — tests, smoke, seeds, `db/migrations/run.sh` —
+read the ambient environment, so export the variables when you use them.
+Migrations run automatically on startup; there is no separate migrate command.
 
 ```bash
-# Backend — the server does NOT auto-load .env, so export the two required vars:
-export DATABASE_URL='postgresql://finder:finder@localhost:5432/finder_dev'
-export JWT_SECRET='dev-only-secret-at-least-32-characters-long'
+# Backend
+cp .env.example .env                 # then set DATABASE_URL and a real JWT_SECRET (>=32 chars)
 npm install
+npm run db:check                     # verifies the connection string before you boot
 npm run dev                          # tsx watch src/server.ts — applies migrations, then serves
 curl -s localhost:3001/readyz        # expect "status":"ok","db":"connected"
 
@@ -146,6 +148,13 @@ curl -s localhost:3001/readyz        # expect "status":"ok","db":"connected"
 cd web && npm install
 NEXT_PUBLIC_API_BASE_URL=http://localhost:3001 npm run dev   # Next.js on :3000
 ```
+
+Pointing at a managed Postgres (Supabase, Neon, Railway)? Use the provider's
+**pooled** connection string and set `PG_SSL=true` — TLS is off by default
+outside production. `npm run db:check` reports that and the other common
+misconfigurations before it opens a socket. Supabase specifics (session-mode
+port, the `postgres.<project-ref>` user, password encoding) are in the
+[local development guide](docs/getting-started/local-development.md#connecting-to-supabase).
 
 Full walkthrough (env vars, verification, embedded-postgres test harness vs. your
 DB, troubleshooting): **[docs/getting-started/local-development.md](docs/getting-started/local-development.md)**.

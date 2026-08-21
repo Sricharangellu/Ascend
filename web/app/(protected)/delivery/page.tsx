@@ -33,11 +33,11 @@ const STAGE_LABEL: Record<string, string> = {
   delivered: "Delivered",
 };
 const STAGE_STYLE: Record<string, string> = {
-  unfulfilled: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300",
-  picking: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-  packed: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  shipped: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300",
-  delivered: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+  unfulfilled: "bg-erp-table-header text-erp-text-secondary",
+  picking: "bg-warning-100 text-warning-700",
+  packed: "bg-brand-100 text-brand-700",
+  shipped: "bg-brand-50 text-brand-800",
+  delivered: "bg-success-100 text-success-700",
 };
 
 function StageBadge({ status }: { status: string }) {
@@ -57,12 +57,20 @@ function StageStepper({ status }: { status: string }) {
         <div key={s} className="flex items-center gap-1.5">
           <div className="flex flex-col items-center gap-1">
             <div
-              className={`h-2.5 w-2.5 rounded-full ${i <= idx ? "bg-blue-500" : "bg-neutral-300 dark:bg-neutral-700"}`}
+              className={`h-2.5 w-2.5 rounded-full ${i <= idx ? "bg-brand-600" : "bg-erp-table-border"}`}
               aria-current={i === idx ? "step" : undefined}
             />
-            <span className={`text-[10px] ${i <= idx ? "text-neutral-700 dark:text-neutral-200" : "text-neutral-400"}`}>{STAGE_LABEL[s]}</span>
+            <span
+              className={`text-[10px] ${
+                i <= idx ? "text-erp-text-primary" : "text-erp-text-secondary"
+              }`}
+            >
+              {STAGE_LABEL[s]}
+            </span>
           </div>
-          {i < STAGES.length - 1 && <div className={`h-px w-6 ${i < idx ? "bg-blue-500" : "bg-neutral-300 dark:bg-neutral-700"}`} />}
+          {i < STAGES.length - 1 && (
+            <div className={`h-px w-6 ${i < idx ? "bg-brand-600" : "bg-erp-table-border"}`} />
+          )}
         </div>
       ))}
     </div>

@@ -110,7 +110,7 @@ function MergeModal({
                 <p className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>No customers found matching &ldquo;{debouncedQ}&rdquo;.</p>
               )}
               {results.length > 0 && (
-                <ul className="divide-y rounded-lg border overflow-hidden" style={{ borderColor: "var(--color-border)", divideColor: "var(--color-table-border)" }}>
+                <ul className="divide-y rounded-lg border overflow-hidden" style={{ borderColor: "var(--color-border)" }}>
                   {results.map((r) => (
                     <li key={r.id} className="flex items-center justify-between gap-3 px-4 py-3" style={{ borderColor: "var(--color-table-border)" }}>
                       <div className="min-w-0">

@@ -6,6 +6,7 @@ import MockWorkerInit from "@/mocks/MockWorkerInit";
 import { ErrorMonitor } from "@/components/ErrorMonitor";
 import { ServiceWorkerInit } from "@/components/ServiceWorkerInit";
 
+export const metadata = {
   title: {
     default: "Ascend",
     template: "%s | Ascend",
@@ -21,6 +22,7 @@ import { ServiceWorkerInit } from "@/components/ServiceWorkerInit";
   },
 };
 
+export const viewport = {
   width: "device-width",
   initialScale: 1,
   // Prevent auto-zoom on iOS when focusing inputs (UX)

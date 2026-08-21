@@ -45,19 +45,23 @@ test.describe("Preview business-pack routes", () => {
   }
 });
 
-test.describe("Module Marketplace", () => {
-  test("module marketplace page loads with vertical sidebar", async ({ page }) => {
-    await expectAuthenticatedRouteHealthy(page, "/setup/modules");
+// Ponytail Wave 3 deleted /setup/modules — the capabilities-driven Business
+// Modes page at /settings/modes is the one canonical module surface.
+const MODULES_URL = "/settings/modes";
+
+test.describe("Business Modes (modules)", () => {
+  test("business modes page loads with its module list", async ({ page }) => {
+    await expectAuthenticatedRouteHealthy(page, MODULES_URL);
     await expect(
       page
-        .getByRole("heading", { name: /module marketplace/i })
-        .or(page.getByText(/verticals/i))
+        .getByRole("heading", { name: /business profile/i })
+        .or(page.getByRole("heading", { name: /modules/i }))
         .first(),
     ).toBeVisible({ timeout: 15_000 });
   });
 
-  test("vertical sidebar navigation works", async ({ page }) => {
-    await expectAuthenticatedRouteHealthy(page, "/setup/modules");
+  test("business-type selection works", async ({ page }) => {
+    await expectAuthenticatedRouteHealthy(page, MODULES_URL);
 
     const sidebarItem = page.getByRole("button", { name: /retail|restaurant|automotive/i }).first();
     if (await sidebarItem.isVisible({ timeout: 5_000 }).catch(() => false)) {
@@ -68,7 +72,7 @@ test.describe("Module Marketplace", () => {
   });
 
   test("module toggle switches render with honest enabled state", async ({ page }) => {
-    await expectAuthenticatedRouteHealthy(page, "/setup/modules");
+    await expectAuthenticatedRouteHealthy(page, MODULES_URL);
 
     const toggles = page.getByRole("switch");
     const firstToggle = toggles.first();
@@ -105,7 +109,7 @@ test.describe("Module Marketplace", () => {
   });
 
   test("search filters modules", async ({ page }) => {
-    await expectAuthenticatedRouteHealthy(page, "/setup/modules");
+    await expectAuthenticatedRouteHealthy(page, MODULES_URL);
 
     const search = page.getByPlaceholder(/search module/i).first();
     if (await search.isVisible({ timeout: 5_000 }).catch(() => false)) {

@@ -102,8 +102,7 @@ function AddProductsModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
         className="flex w-full max-w-lg flex-col rounded-2xl shadow-2xl"
-        style={{ backgroundColor: "var(--color-surface)" }}
-        style={{ maxHeight: "80vh" }}
+        style={{ backgroundColor: "var(--color-surface)", maxHeight: "80vh" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

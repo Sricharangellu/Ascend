@@ -31,6 +31,15 @@ test("refund: builds context from order.refunded payload", () => {
   assert.equal(ctx.customerId, "cust_1");
 });
 
+test("refund: buildContext accepts OrdersService totalCents alias", () => {
+  // Live POS publishes { id, tenantId, orderNumber, totalCents } — not refundCents.
+  const ctx = RefundWorkflow.buildContext({
+    id: "ord_2", tenantId: "t1", orderNumber: "ON-1", totalCents: 4500,
+  }, "t1");
+  assert.equal(ctx.refundCents, 4500);
+  assert.equal(ctx.originalTotalCents, 4500);
+});
+
 test("refund: validate_eligibility throws when order not found", async () => {
   const { events } = makeEvents();
   const db = makeDb({ one: undefined });
@@ -43,9 +52,10 @@ test("refund: validate_eligibility throws when order not found", async () => {
 
 test("refund: validate_eligibility throws when amount exceeds refundable balance", async () => {
   const { events } = makeEvents();
-  const db = makeDb({ one: { id: "ord_1", status: "open", total_cents: 5000, tax_cents: 400, refunded_cents: 3000 } });
+  // Full-order model: no orders.refunded_cents — refundable balance is total_cents.
+  const db = makeDb({ one: { id: "ord_1", status: "open", total_cents: 5000, tax_cents: 400 } });
   const ctx = RefundWorkflow.buildContext(
-    { id: "ord_1", tenantId: "t1", refundCents: 3000, originalTotalCents: 5000, lines: [] }, "t1",
+    { id: "ord_1", tenantId: "t1", refundCents: 6000, originalTotalCents: 5000, lines: [] }, "t1",
   );
   const step = RefundWorkflow.steps.find((s) => s.name === "validate_refund_eligibility")!;
   await assert.rejects(() => step.execute(ctx, db, events), /exceeds refundable balance/);
@@ -53,12 +63,24 @@ test("refund: validate_eligibility throws when amount exceeds refundable balance
 
 test("refund: validate_eligibility throws for voided orders", async () => {
   const { events } = makeEvents();
-  const db = makeDb({ one: { id: "ord_1", status: "void", total_cents: 5000, tax_cents: 0, refunded_cents: 0 } });
+  const db = makeDb({ one: { id: "ord_1", status: "voided", total_cents: 5000, tax_cents: 0 } });
   const ctx = RefundWorkflow.buildContext(
     { id: "ord_1", tenantId: "t1", refundCents: 1000, originalTotalCents: 5000, lines: [] }, "t1",
   );
   const step = RefundWorkflow.steps.find((s) => s.name === "validate_refund_eligibility")!;
   await assert.rejects(() => step.execute(ctx, db, events), /cannot be refunded/);
+});
+
+test("refund: validate_eligibility succeeds against real order columns (no refunded_cents)", async () => {
+  const { events } = makeEvents();
+  const db = makeDb({ one: { id: "ord_1", status: "open", total_cents: 5000, tax_cents: 400 } });
+  const ctx = RefundWorkflow.buildContext(
+    { id: "ord_1", tenantId: "t1", refundCents: 5000, originalTotalCents: 5000, lines: [] }, "t1",
+  );
+  const step = RefundWorkflow.steps.find((s) => s.name === "validate_refund_eligibility")!;
+  const updated = await step.execute(ctx, db, events);
+  assert.equal(updated.taxCents, 400);
+  assert.equal(updated.subtotalCents, 4600);
 });
 
 test("refund: double_refund_guard throws on duplicate", async () => {

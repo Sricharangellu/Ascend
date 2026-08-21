@@ -101,7 +101,7 @@ export function MovementsDrawer({
                         {isReturn ? (
                           <span
                             className="inline-flex rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset"
-                            style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)", ringColor: "var(--color-border)" }}
+                            style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}
                           >
                             {badge.label}
                           </span>

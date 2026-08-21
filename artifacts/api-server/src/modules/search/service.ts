@@ -52,6 +52,7 @@ interface QuotationRow {
 
 interface PurchaseOrderRow {
   id: string;
+  display_number: string;
 }
 
 export class SearchService {
@@ -107,10 +108,20 @@ export class SearchService {
     }
     if (want("purchase_order")) {
       const rows = await this.db.query<PurchaseOrderRow>(
-        `SELECT id FROM purchase_orders WHERE tenant_id = @t AND id ILIKE @q ORDER BY created_at DESC LIMIT @l`,
+        // Match the human-facing PO number (same "PO-<n>" display format used
+        // elsewhere; legacy rows without po_number fall back to PO-<id tail>).
+        `SELECT id,
+                CASE WHEN po_number IS NOT NULL THEN 'PO-' || po_number
+                     ELSE 'PO-' || UPPER(RIGHT(id, 4)) END AS display_number
+           FROM purchase_orders
+          WHERE tenant_id = @t
+            AND (COALESCE(po_number::text, '') ILIKE @q
+                 OR (CASE WHEN po_number IS NOT NULL THEN 'PO-' || po_number
+                          ELSE 'PO-' || UPPER(RIGHT(id, 4)) END) ILIKE @q)
+          ORDER BY created_at DESC LIMIT @l`,
         { t: tenantId, q: term, l: lim },
       ).catch((): PurchaseOrderRow[] => []);
-      out.purchaseOrders = rows.map((r): SearchHit => ({ type: "purchase_order", id: r.id, label: r.id }));
+      out.purchaseOrders = rows.map((r): SearchHit => ({ type: "purchase_order", id: r.id, label: r.display_number }));
     }
     return out;
   }

@@ -28,6 +28,7 @@ import { ssoModule } from "./sso/index.js";
 import { monitoringModule } from "./monitoring/index.js";
 import { quotesModule } from "./quotes/index.js";
 import { notificationsModule } from "./notifications/index.js";
+import { pushTokensModule } from "./push_tokens/index.js";
 import { auditLogModule } from "./audit_log/index.js";
 import { loyaltyModule } from "./loyalty/index.js";
 import { rlsModule } from "./rls/index.js";
@@ -98,6 +99,7 @@ export const modules: PosModule[] = [
   monitoringModule,
   quotesModule,
   notificationsModule,
+  pushTokensModule,
   auditLogModule,
   loyaltyModule,
   storeLocationsModule,

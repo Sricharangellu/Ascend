@@ -2,6 +2,7 @@ import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import { badRequest, notFound } from "../../shared/http.js";
 import { writeAudit } from "../../shared/audit.js";
+import { clampLimit } from "../../shared/pagination.js";
 
 export type ProgressStatus =
   | "not_started"
@@ -78,6 +79,33 @@ export interface ProgressDecision {
   created_at: number;
 }
 
+/**
+ * One hypothesis with the whole loop hanging off it — the tasks planned against
+ * it, the evidence that counts toward it, and the decisions already recorded.
+ * Served as a single read so the UI never has to stitch four requests together
+ * (and never renders a half-loaded loop).
+ */
+export interface ProgressHypothesisDetail {
+  hypothesis: ProgressHypothesis;
+  tasks: ProgressTask[];
+  evidence: ProgressEvidence[];
+  decisions: ProgressDecision[];
+}
+
+/**
+ * Evidence "counts toward" a hypothesis two ways: attached to it directly, or
+ * attached to a task that belongs to it. `createDecision`'s gate uses exactly
+ * this union, so every read that shows a user their evidence uses the same
+ * predicate — otherwise the UI could show "no evidence" on a hypothesis the
+ * backend will happily let them validate, or the reverse.
+ */
+const EVIDENCE_FOR_HYPOTHESIS = `
+  FROM progress_evidence e
+  LEFT JOIN progress_tasks t
+    ON t.tenant_id = e.tenant_id AND t.id = e.task_id
+ WHERE e.tenant_id = @tenantId
+   AND (e.hypothesis_id = @hypothesisId OR t.hypothesis_id = @hypothesisId)`;
+
 export class ProgressService {
   constructor(private readonly db: DB) {}
 
@@ -114,12 +142,72 @@ export class ProgressService {
     return row;
   }
 
-  async listHypotheses(tenantId: string): Promise<{ items: ProgressHypothesis[] }> {
+  async listHypotheses(tenantId: string, limit?: number): Promise<{ items: ProgressHypothesis[]; limit: number }> {
+    const take = clampLimit(limit);
     const items = await this.db.query<ProgressHypothesis>(
-      "SELECT * FROM progress_hypotheses WHERE tenant_id = @tenantId ORDER BY created_at DESC",
-      { tenantId },
+      "SELECT * FROM progress_hypotheses WHERE tenant_id = @tenantId ORDER BY created_at DESC, id DESC LIMIT @take",
+      { tenantId, take },
     );
-    return { items };
+    return { items, limit: take };
+  }
+
+  /** The whole loop for one hypothesis, in one tenant-scoped read. */
+  async getHypothesisDetail(id: string, tenantId: string): Promise<ProgressHypothesisDetail> {
+    const hypothesis = await this.getHypothesis(id, tenantId);
+    const [tasks, evidence, decisions] = await Promise.all([
+      this.db.query<ProgressTask>(
+        `SELECT * FROM progress_tasks
+          WHERE tenant_id = @tenantId AND hypothesis_id = @id
+          ORDER BY created_at DESC, id DESC LIMIT @take`,
+        { tenantId, id, take: clampLimit(undefined) },
+      ),
+      this.listEvidence(tenantId, { hypothesisId: id }).then((r) => r.items),
+      this.listDecisions(tenantId, id).then((r) => r.items),
+    ]);
+    return { hypothesis, tasks, evidence, decisions };
+  }
+
+  /**
+   * Evidence for a task or a hypothesis. Exactly one filter is required — an
+   * unfiltered evidence list is not a surface any screen needs, and refusing it
+   * keeps this endpoint from becoming an accidental tenant-wide export.
+   */
+  async listEvidence(
+    tenantId: string,
+    filter: { taskId?: string | null; hypothesisId?: string | null },
+    limit?: number,
+  ): Promise<{ items: ProgressEvidence[]; limit: number }> {
+    const take = clampLimit(limit);
+    if (filter.taskId) {
+      const items = await this.db.query<ProgressEvidence>(
+        `SELECT * FROM progress_evidence
+          WHERE tenant_id = @tenantId AND task_id = @taskId
+          ORDER BY created_at DESC, id DESC LIMIT @take`,
+        { tenantId, taskId: filter.taskId, take },
+      );
+      return { items, limit: take };
+    }
+    if (filter.hypothesisId) {
+      const items = await this.db.query<ProgressEvidence>(
+        `SELECT e.* ${EVIDENCE_FOR_HYPOTHESIS}
+          ORDER BY e.created_at DESC, e.id DESC LIMIT @take`,
+        { tenantId, hypothesisId: filter.hypothesisId, take },
+      );
+      return { items, limit: take };
+    }
+    throw badRequest("taskId or hypothesisId is required");
+  }
+
+  /** Decision history for a hypothesis — append-only, newest first. */
+  async listDecisions(tenantId: string, hypothesisId: string, limit?: number): Promise<{ items: ProgressDecision[]; limit: number }> {
+    const take = clampLimit(limit);
+    const items = await this.db.query<ProgressDecision>(
+      `SELECT * FROM progress_decisions
+        WHERE tenant_id = @tenantId AND hypothesis_id = @hypothesisId
+        ORDER BY created_at DESC, id DESC LIMIT @take`,
+      { tenantId, hypothesisId, take },
+    );
+    return { items, limit: take };
   }
 
   async createTask(input: {
@@ -161,18 +249,28 @@ export class ProgressService {
     return row;
   }
 
-  async listTasks(tenantId: string, status?: ProgressStatus): Promise<{ items: ProgressTask[] }> {
-    const params: Record<string, unknown> = { tenantId };
+  async listTasks(
+    tenantId: string,
+    status?: ProgressStatus,
+    filter?: { hypothesisId?: string | null },
+    limit?: number,
+  ): Promise<{ items: ProgressTask[]; limit: number }> {
+    const take = clampLimit(limit);
+    const params: Record<string, unknown> = { tenantId, take };
     const where = ["tenant_id = @tenantId"];
     if (status) {
       where.push("status = @status");
       params["status"] = status;
     }
+    if (filter?.hypothesisId) {
+      where.push("hypothesis_id = @hypothesisId");
+      params["hypothesisId"] = filter.hypothesisId;
+    }
     const items = await this.db.query<ProgressTask>(
-      `SELECT * FROM progress_tasks WHERE ${where.join(" AND ")} ORDER BY created_at DESC`,
+      `SELECT * FROM progress_tasks WHERE ${where.join(" AND ")} ORDER BY created_at DESC, id DESC LIMIT @take`,
       params,
     );
-    return { items };
+    return { items, limit: take };
   }
 
   async updateTaskStatus(id: string, tenantId: string, actorId: string, status: ProgressStatus): Promise<ProgressTask> {
@@ -250,13 +348,11 @@ export class ProgressService {
     nextAction?: string | null;
   }, tenantId: string, actorId: string): Promise<ProgressDecision> {
     await this.getHypothesis(input.hypothesisId, tenantId);
+    // Same predicate the evidence *reads* use — see EVIDENCE_FOR_HYPOTHESIS.
+    // Sharing it is the point: the gate and the list can never disagree about
+    // what counts as evidence for this hypothesis.
     const evidence = await this.db.one<{ n: number }>(
-      `SELECT COUNT(*)::int AS n
-         FROM progress_evidence e
-         LEFT JOIN progress_tasks t
-           ON t.tenant_id = e.tenant_id AND t.id = e.task_id
-        WHERE e.tenant_id = @tenantId
-          AND (e.hypothesis_id = @hypothesisId OR t.hypothesis_id = @hypothesisId)`,
+      `SELECT COUNT(*)::int AS n ${EVIDENCE_FOR_HYPOTHESIS}`,
       { tenantId, hypothesisId: input.hypothesisId },
     );
     if (Number(evidence?.n ?? 0) === 0) throw badRequest("a hypothesis needs attached evidence before it can be validated or invalidated");
