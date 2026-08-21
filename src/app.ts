@@ -139,6 +139,27 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
       throw new Error(`FATAL: Missing required environment variables:\n${lines}\n\nSet them before starting the server.`);
     }
 
+    // JWT_SECRET being *set* isn't enough — .env.example ships a well-known
+    // placeholder value. If an operator copies that file to production without
+    // editing it, every JWT this server signs is forgeable by anyone who has
+    // read the public repo (sign any {tenantId, role: "owner"} claim with the
+    // published string and it verifies). Reject the placeholder and anything
+    // implausibly short/low-entropy outright, in production only.
+    const jwtSecret = process.env["JWT_SECRET"] ?? "";
+    const KNOWN_PLACEHOLDER_JWT_SECRETS = new Set([
+      "change-me-min-32-chars-random-string",
+      "changeme",
+      "secret",
+      "your-secret-key",
+    ]);
+    if (KNOWN_PLACEHOLDER_JWT_SECRETS.has(jwtSecret.trim().toLowerCase()) || jwtSecret.length < 32) {
+      throw new Error(
+        "FATAL: JWT_SECRET is unset, is the .env.example placeholder, or is shorter than 32 " +
+        "characters. This value signs every session token — generate a real random secret " +
+        "(e.g. `openssl rand -base64 48`) before starting the server in production.",
+      );
+    }
+
     const WARNED_VARS: [string, string][] = [
       ["APP_URL", "public URL of this service — email reset links will fall back to ascendhq-api.vercel.app"],
       ["SENDGRID_API_KEY", "password reset and transactional emails will silently fail"],
