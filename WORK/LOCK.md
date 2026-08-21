@@ -419,6 +419,41 @@ closing them, because closing another session's claim is a lead/human call.
 
 # Ascend — Multi-Agent Work Lock
 
+## Update 2026-08-03 (later still): 4 branches ready to push, session summary
+
+Four independent, non-overlapping branches from this session, each a clean
+fast-forward candidate onto current `origin/develop` (`801b7a4`) or, for the
+last one, onto `docs/forward-plan-phase8-guardrails` (`03e2e74`, already on
+`origin`, itself a clean ff onto `develop`):
+
+1. `fix/ponytail-phase-g-dead-setup-shims` — recovered orphaned commit
+   (dead `setup/*` shim deletion), see this file's earlier entry above.
+2. `fix/ponytail-phase-h-wave0-cleanup` — brand-string cleanup + fake-save/
+   mock-only nav gating, see this file's earlier entry above.
+3. `fix/security-jwt-secret-placeholder-guard` — production now rejects the
+   `.env.example` placeholder / low-entropy `JWT_SECRET` values instead of
+   only checking presence. `WORK/audits/AUDIT_2026-08-03T033000Z-security-
+   audit-jwt-secret-guard.md` has the full fresh security pass (auth/RBAC/
+   RLS/injection/XSS/CORS/webhook — all confirmed solid, this was the one
+   real fixable gap) plus why the Next.js CVE bump couldn't be completed in
+   this sandbox (macOS-built `node_modules` vs. this Linux container, `npm
+   install` exceeded the 45s execution ceiling on every attempt).
+4. `docs/forward-plan-phase9-session-continuity` — child of
+   `docs/forward-plan-phase8-guardrails` (another session's already-pushed
+   branch — landed on it by accident mid-task when `.git/HEAD` moved
+   underfoot, caught and fixed before pushing anything, see that commit's
+   message and `WORK/FORWARD_PLAN.md`'s new Phase 9 for the incident
+   record). Documents everything above plus an explicit priority queue.
+
+Push commands (any order):
+```
+git push origin fix/ponytail-phase-g-dead-setup-shims:develop
+git push origin fix/ponytail-phase-h-wave0-cleanup:develop
+git push origin fix/security-jwt-secret-placeholder-guard:develop
+git push origin docs/forward-plan-phase9-session-continuity:docs/forward-plan-phase8-guardrails
+```
+(The last one targets the existing remote branch, not `develop` directly,
+since Phase 8 itself is presumably headed to `develop` via its own PR first.)
 ## Update 2026-08-03: Phase G recovered from orphaned commit; ready to push
 
 Phase E+F (nav-reachability + loyalty/finance shim cleanup) merged to `develop` as
