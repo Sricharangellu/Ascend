@@ -283,11 +283,10 @@ CREATE INDEX IF NOT EXISTS inventory_transfers_tenant_idx ON inventory_transfers
       const tenantId = payload.tenantId ?? "";
       if (!tenantId) return; // no tenant context — skip (should not happen in prod)
       const lines = payload.lines ?? [];
-      for (const line of lines) {
-        await service.adjust(line.productId, -line.quantity, "sale", tenantId, orderId);
-        // FEFO: draw the sold quantity from the earliest-expiring lots (no-op if untracked).
-        await service.depleteFefo(line.productId, line.quantity, tenantId);
-      }
+      // One transaction for the whole basket — stock decrement, movement ledger
+      // and FEFO lot depletion together. See applyOrderSale() for why this is
+      // not a per-line loop any more.
+      if (lines.length > 0 && orderId) await service.applyOrderSale(lines, tenantId, orderId);
     });
 
     // order.refunded -> restock by reversing the recorded 'sale' movements.

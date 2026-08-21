@@ -188,6 +188,107 @@ export const RATE_TIERS: Record<string, TierLimit> = {
   enterprise: { capacity: 600, refillRate: 200 }, // ~12k req/min
 };
 
+/**
+ * Subscription plan → rate tier.
+ *
+ * The plan names are the ones `requirePlan()` already orders in gateway/auth.ts.
+ * Without this mapping the `premium` and `enterprise` rows above were
+ * unreachable: `tenantRateLimitMiddleware` defaulted every tenant to
+ * `standard`, so an enterprise customer running twelve tills across four stores
+ * was throttled at ten requests per second no matter what they paid — the tiers
+ * existed only as a table nothing read.
+ */
+export const PLAN_TIERS: Record<string, string> = {
+  starter: "standard",
+  growth: "standard",
+  professional: "premium",
+  enterprise: "enterprise",
+  platform: "enterprise",
+};
+
+export interface TenantTierResolver {
+  /** Synchronous read — the limiter runs per request and must not await. */
+  tierOf: (tenantId: string) => string;
+  /** Drop cached tiers (tests, and after a plan change). */
+  invalidate: (tenantId?: string) => void;
+}
+
+interface TierCacheEntry {
+  tier: string;
+  expiresAt: number;
+}
+
+/**
+ * Minimal DB surface — keeps this module free of a concrete DB import, and
+ * narrow enough that a test can supply a plain object. Deliberately not
+ * generic: this resolver issues exactly one query shape.
+ */
+interface TierLookupDb {
+  one(sql: string, params?: Record<string, unknown>): Promise<{ plan?: string } | undefined>;
+}
+
+/**
+ * Resolve a tenant's rate tier from its subscription plan, cached with a TTL.
+ *
+ * The read is synchronous because it runs inside the limiter on every request;
+ * a cache miss answers `standard` and refreshes in the background, so the first
+ * few requests after a cold start (or after the TTL lapses) are limited
+ * conservatively rather than blocking on a query or failing open. A plan lookup
+ * that errors is cached as `standard` for a shorter interval so a database blip
+ * cannot pin every tenant to the wrong tier for a full TTL.
+ */
+export function makeTenantTierResolver(
+  db: TierLookupDb,
+  options: { ttlMs?: number; errorTtlMs?: number; maxEntries?: number } = {},
+): TenantTierResolver {
+  const ttlMs = options.ttlMs ?? 60_000;
+  const errorTtlMs = options.errorTtlMs ?? 5_000;
+  const maxEntries = options.maxEntries ?? 50_000;
+  const cache = new Map<string, TierCacheEntry>();
+  const inflight = new Set<string>();
+
+  function refresh(tenantId: string): void {
+    if (inflight.has(tenantId)) return;
+    inflight.add(tenantId);
+    void db
+      .one("SELECT plan FROM subscriptions WHERE tenant_id = @t LIMIT 1", { t: tenantId })
+      .then((row) => {
+        const tier = PLAN_TIERS[row?.plan ?? "starter"] ?? "standard";
+        cache.set(tenantId, { tier, expiresAt: Date.now() + ttlMs });
+      })
+      .catch(() => {
+        cache.set(tenantId, { tier: "standard", expiresAt: Date.now() + errorTtlMs });
+      })
+      .finally(() => {
+        inflight.delete(tenantId);
+        // Bound the cache: 20,000 tenants of small entries is fine, an unbounded
+        // map keyed by anything a caller can influence is not.
+        if (cache.size > maxEntries) {
+          const now = Date.now();
+          for (const [k, v] of cache) if (v.expiresAt <= now) cache.delete(k);
+          while (cache.size > maxEntries) {
+            const oldest = cache.keys().next();
+            if (oldest.done) break;
+            cache.delete(oldest.value);
+          }
+        }
+      });
+  }
+
+  return {
+    tierOf(tenantId: string): string {
+      const hit = cache.get(tenantId);
+      if (hit && hit.expiresAt > Date.now()) return hit.tier;
+      refresh(tenantId);
+      return hit?.tier ?? "standard";
+    },
+    invalidate(tenantId?: string): void {
+      if (tenantId === undefined) cache.clear();
+      else cache.delete(tenantId);
+    },
+  };
+}
+
 export interface TenantRateLimitOptions {
   /** Tier table (defaults to RATE_TIERS). Override for tests. */
   tiers?: Record<string, TierLimit>;

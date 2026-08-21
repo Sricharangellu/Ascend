@@ -102,41 +102,71 @@ const config: Config = {
         },
 
         // ── Status ────────────────────────────────────────────────────────
-        // Ramp keys kept (50/100/500/600/700) for source compatibility; the
-        // values now come from the single token set and follow dark mode.
+        // Ramp keys kept for source compatibility; the values come from the
+        // single token set and follow dark mode.
+        //
+        // The 200/300/400/800/900 keys are here because the codebase already
+        // uses them at ~20 call sites (`border-danger-200`, `bg-success-300`,
+        // `text-warning-800`, …) and Tailwind emits NOTHING for a stop that is
+        // not declared — so those were rendering as a border-width with no
+        // border-colour, and text with no colour. They map onto the nearest
+        // real token rather than inventing new hexes, which is the same
+        // collapse this block already applies to 500/600: four honest tokens
+        // (bg / border / base / text) addressed through the ramp names the
+        // source happens to use.
         danger: {
           50: "var(--color-danger-bg)",
           100: "var(--color-danger-border)",
+          200: "var(--color-danger-border)",
+          300: "var(--color-danger-border)",
+          400: "var(--color-danger)",
           500: "var(--color-danger)",
           600: "var(--color-danger)",
           700: "var(--color-danger-text)",
+          800: "var(--color-danger-text)",
+          900: "var(--color-danger-text)",
           bg: "var(--color-danger-bg)",
           border: "var(--color-danger-border)",
         },
         success: {
           50: "var(--color-success-bg)",
           100: "var(--color-success-border)",
+          200: "var(--color-success-border)",
+          300: "var(--color-success-border)",
+          400: "var(--color-success)",
           500: "var(--color-success)",
           600: "var(--color-success)",
           700: "var(--color-success-text)",
+          800: "var(--color-success-text)",
+          900: "var(--color-success-text)",
           bg: "var(--color-success-bg)",
           border: "var(--color-success-border)",
         },
         warning: {
           50: "var(--color-warning-bg)",
           100: "var(--color-warning-border)",
+          200: "var(--color-warning-border)",
+          300: "var(--color-warning-border)",
+          400: "var(--color-warning)",
           500: "var(--color-warning)",
           600: "var(--color-warning)",
           700: "var(--color-warning-text)",
+          800: "var(--color-warning-text)",
+          900: "var(--color-warning-text)",
           bg: "var(--color-warning-bg)",
           border: "var(--color-warning-border)",
         },
         info: {
           50: "var(--color-info-bg)",
           100: "var(--color-info-border)",
+          200: "var(--color-info-border)",
+          300: "var(--color-info-border)",
+          400: "var(--color-info)",
           500: "var(--color-info)",
           600: "var(--color-info)",
           700: "var(--color-info-text)",
+          800: "var(--color-info-text)",
+          900: "var(--color-info-text)",
           bg: "var(--color-info-bg)",
           border: "var(--color-info-border)",
         },

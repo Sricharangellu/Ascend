@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { Input } from "@/components/Input";
@@ -21,6 +22,7 @@ import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import { fmtDateShort } from "@/lib/date";
 import { hasRole } from "@/lib/auth";
+import { startReceivingSession, receivingSessionHref } from "@/lib/receiving";
 import type {
   PurchaseOrderListRow,
   PurchaseOrdersResponse,
@@ -87,6 +89,7 @@ export function OrdersTab({
   const [pending, setPending] = useState<PendingAction | null>(null);
   const canManage = hasRole("manager");
   const noticeRef = useRef<HTMLParagraphElement>(null);
+  const router = useRouter();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -141,6 +144,35 @@ export function OrdersTab({
       setQuery((q) => ({ ...q, ...patch, cursorStack: [null] })),
     [],
   );
+
+  /**
+   * Open the scan workspace for this PO — the normal way to receive a delivery,
+   * and the one that can count, price, and record lots and expiry dates.
+   *
+   * Kept from PR #230 when this list was rewritten. Starting the session from
+   * the row is what removes the list → detail → tab → modal walk before the
+   * first box gets counted; the backend returns the existing open session
+   * rather than erroring, so two people at the same pallet land in one count.
+   */
+  const openReceiving = async (row: PurchaseOrderListRow) => {
+    setBusy(true);
+    setActionError(null);
+    setNotice(null);
+    try {
+      const session = await startReceivingSession(row.id);
+      router.push(receivingSessionHref(session.id));
+    } catch (err) {
+      // Deliberately routed through the same translator as "Receive all": the
+      // approval gate rejects both with 409 approval_pending, and "Forbidden"
+      // is not an instruction anyone can act on.
+      setActionError(
+        err instanceof ApiResponseError
+          ? explainReceiveError(err.code, err.message)
+          : "Could not open receiving for this order.",
+      );
+      setBusy(false);
+    }
+  };
 
   const runAction = async (action: PendingAction) => {
     setBusy(true);
@@ -336,7 +368,16 @@ export function OrdersTab({
         if (row.remaining_qty > 0 && row.approval_status === "approved" && row.status !== "cancelled") {
           return (
             <span className="flex justify-end gap-1">
-              <Button size="sm" variant="secondary" disabled={busy} onClick={() => setPending({ kind: "receive", row })}>
+              <Button size="sm" variant="primary" disabled={busy} onClick={() => void openReceiving(row)}>
+                Scan &amp; Receive
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy}
+                title="Post every open line at its full remaining quantity"
+                onClick={() => setPending({ kind: "receive", row })}
+              >
                 {/* Named for what it does. The API treats an empty body as
                     "receive every remaining line in full" — the old label just
                     said "Receive", next to two other entry points that let you

@@ -16,12 +16,14 @@ import {
   requestIdMiddleware,
   rateLimitMiddleware,
   tenantRateLimitMiddleware,
+  makeTenantTierResolver,
   makeAuthMiddleware,
   tenantResolver,
   metricsMiddleware,
   accessLogMiddleware,
   renderMetrics,
   requireRole,
+  readinessVerdict,
 } from "./gateway/index.js";
 import type { RuntimeGauges } from "./gateway/metrics.js";
 import { handler, errorMiddleware } from "./shared/http.js";
@@ -135,6 +137,27 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     if (missing.length > 0) {
       const lines = missing.map(([name, purpose]) => `  • ${name} — ${purpose}`).join("\n");
       throw new Error(`FATAL: Missing required environment variables:\n${lines}\n\nSet them before starting the server.`);
+    }
+
+    // JWT_SECRET being *set* isn't enough — .env.example ships a well-known
+    // placeholder value. If an operator copies that file to production without
+    // editing it, every JWT this server signs is forgeable by anyone who has
+    // read the public repo (sign any {tenantId, role: "owner"} claim with the
+    // published string and it verifies). Reject the placeholder and anything
+    // implausibly short/low-entropy outright, in production only.
+    const jwtSecret = process.env["JWT_SECRET"] ?? "";
+    const KNOWN_PLACEHOLDER_JWT_SECRETS = new Set([
+      "change-me-min-32-chars-random-string",
+      "changeme",
+      "secret",
+      "your-secret-key",
+    ]);
+    if (KNOWN_PLACEHOLDER_JWT_SECRETS.has(jwtSecret.trim().toLowerCase()) || jwtSecret.length < 32) {
+      throw new Error(
+        "FATAL: JWT_SECRET is unset, is the .env.example placeholder, or is shorter than 32 " +
+        "characters. This value signs every session token — generate a real random secret " +
+        "(e.g. `openssl rand -base64 48`) before starting the server in production.",
+      );
     }
 
     const WARNED_VARS: [string, string][] = [
@@ -373,7 +396,18 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   // gateway/accessLog.ts). Logging happens in a `finish` hook, so a request
   // rejected downstream is still logged, with the auth context resolved by then.
   app.use(accessLogMiddleware);
-  app.use(rateLimitMiddleware({ capacity: 120, refillRate: 40, redis }));
+  // Per-IP limiter in front of everything. Env-overridable because the right
+  // value depends on deployment topology, not on this code: behind a NAT, a
+  // corporate proxy or a misconfigured TRUST_PROXY_DEPTH, an entire customer
+  // site arrives as one IP and the default would throttle the whole site to
+  // 40 req/s. Defaults below are the previous hard-coded values.
+  app.use(
+    rateLimitMiddleware({
+      capacity: Number(process.env["GLOBAL_RATE_LIMIT_CAPACITY"] ?? 120),
+      refillRate: Number(process.env["GLOBAL_RATE_LIMIT_REFILL"] ?? 40),
+      redis,
+    }),
+  );
 
   // ── Liveness + readiness probes (no auth — infrastructure-level)
   app.get("/healthz", (_req, res) => {
@@ -408,19 +442,42 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   });
 
   app.get("/readyz", handler(async (_req, res) => {
-    await db.one("SELECT 1");
+    // The pool verdict is decided BEFORE touching the database on purpose: the
+    // probe must be able to answer when connections are scarce, which is
+    // exactly when it is asked. See gateway/readiness.ts for why a queue is no
+    // longer treated as unreadiness.
     const pool = db.poolStats();
     const poolMax = Number(process.env["PG_POOL_MAX"] ?? 10);
-    // Return 503 when all connections are in use — load balancer will stop routing.
-    if (pool && pool.waiting > 0) {
+    const verdict = readinessVerdict(pool, poolMax);
+    if (!verdict.ready) {
       res.status(503).json({
         status: "degraded",
-        reason: "connection pool exhausted",
+        reason: verdict.reason,
         pool,
+        waitingLimit: verdict.waitingLimit,
         ts: Date.now(),
       });
       return;
     }
+
+    // Reaching the database is still what "ready" means, so it is checked — but
+    // a failure here is 503 "not ready", not the 500 it used to be. A 500 reads
+    // as "this endpoint is broken" to a load balancer and to an on-call
+    // engineer; the truth is "this instance cannot serve traffic right now",
+    // which is what a readiness probe exists to say.
+    try {
+      await db.one("SELECT 1");
+    } catch (err) {
+      res.status(503).json({
+        status: "degraded",
+        reason: "database unreachable",
+        error: (err as Error).message,
+        pool: pool ?? undefined,
+        ts: Date.now(),
+      });
+      return;
+    }
+
     res.json({
       status: "ok",
       db: "connected",
@@ -499,7 +556,16 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
 
   // ── Auth + per-tenant tiered rate limit applied to all /api/v1/* routes.
   // makeAuthMiddleware handles both JWT sessions and API key tokens (fpk_ prefix).
-  app.use("/api/v1", makeAuthMiddleware(db), tenantResolver, tenantRateLimitMiddleware({ redis }));
+  // Per-tenant tiered limiter, sized by the tenant's subscription plan. Without
+  // the resolver every tenant fell through to `standard` (10 req/s sustained),
+  // which no multi-store enterprise customer can run a shift on.
+  const tierResolver = makeTenantTierResolver(db);
+  app.use(
+    "/api/v1",
+    makeAuthMiddleware(db),
+    tenantResolver,
+    tenantRateLimitMiddleware({ redis, tierOf: tierResolver.tierOf }),
+  );
 
   // ── Feature flags (tenant-scoped, requires auth)
   app.get(

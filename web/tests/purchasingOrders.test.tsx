@@ -12,6 +12,22 @@ import {
 } from "@/app/(protected)/purchasing/_lib/orders";
 import { OrdersTab } from "@/app/(protected)/purchasing/_components/OrdersTab";
 
+// The row's primary action navigates, so the component needs an app router.
+const routerPush = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: routerPush }),
+}));
+
+// `startReceivingSession` is the shared entry point every surface uses to open
+// a delivery (web/lib/receiving.ts). Mocked here so this file asserts that the
+// row calls it — not that the POST body is shaped right, which is that
+// module's own contract.
+const startReceivingSession = vi.fn();
+vi.mock("@/lib/receiving", () => ({
+  startReceivingSession: (...args: unknown[]) => startReceivingSession(...args),
+  receivingSessionHref: (id: string) => `/purchasing/receiving/${id}`,
+}));
+
 // jsdom does not implement <dialog>.showModal()/close(); stub them so
 // ConfirmDialog can open, matching tests/securityBackupCodes.test.tsx.
 beforeAll(() => {
@@ -262,6 +278,52 @@ describe("OrdersTab", () => {
     );
   });
 
+  // ── Scan & Receive (kept from PR #230 through the list rewrite) ───────────
+
+  it("offers Scan & Receive as the primary row action, alongside Receive all", async () => {
+    stubApi([mkRow({ remaining_qty: 20 })]);
+    render(<OrdersTab />);
+    await screen.findByRole("link", { name: "#4001" });
+
+    // Both entry points survive the rewrite. Counting a delivery is the normal
+    // path; posting the whole thing blind is the shortcut, not the default.
+    expect(screen.getByRole("button", { name: "Scan & Receive" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Receive all" })).toBeInTheDocument();
+  });
+
+  it("opens the scan workspace for the session the API returns", async () => {
+    stubApi([mkRow({ remaining_qty: 20 })]);
+    startReceivingSession.mockResolvedValue({ id: "rs_77" });
+    render(<OrdersTab />);
+    await screen.findByRole("link", { name: "#4001" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Scan & Receive" }));
+
+    // The PO id goes out; the SESSION id comes back and is what we navigate to.
+    // Routing to the PO id instead would land on a page that does not exist.
+    await waitFor(() => expect(startReceivingSession).toHaveBeenCalledWith("po_1"));
+    await waitFor(() => expect(routerPush).toHaveBeenCalledWith("/purchasing/receiving/rs_77"));
+  });
+
+  it("explains the approval block on Scan & Receive too, not just on Receive all", async () => {
+    stubApi([mkRow({ remaining_qty: 20 })]);
+    const { ApiResponseError } = await import("@/api-client/client");
+    startReceivingSession.mockRejectedValue(
+      new ApiResponseError("approval_pending", "purchase order is awaiting approval", "req_1", 409),
+    );
+    render(<OrdersTab />);
+    await screen.findByRole("link", { name: "#4001" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Scan & Receive" }));
+
+    // Same 409 gate, same translation. A raw "Forbidden" at the receiving dock
+    // is not something a receiver can act on.
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/approval/i);
+    expect(alert).not.toHaveTextContent(/Forbidden/);
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
   it("explains the approval block instead of surfacing the raw 409", async () => {
     stubApi([mkRow({ remaining_qty: 5 })]);
     const { ApiResponseError } = await import("@/api-client/client");
@@ -367,4 +429,6 @@ describe("OrdersTab", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/Database unavailable/);
     expect(screen.queryByText(/No purchase orders yet/)).not.toBeInTheDocument();
   });
+  routerPush.mockReset();
+  startReceivingSession.mockReset();
 });

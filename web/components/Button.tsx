@@ -22,12 +22,13 @@ export interface ButtonProps
 
 // ─── Variant styles ───────────────────────────────────────────────────────────
 const variantClasses: Record<ButtonVariant, string> = {
-  // #5D5FEF primary — matches Ascend ERP spec
+  // Signal Teal primary (brand-600). The hard-coded rgba(5,95,255,…) drop
+  // shadow that used to be here was the retired blue brand, so every primary
+  // button carried a 2px blue edge under a teal face.
   primary: [
     "bg-brand-600 text-white border-none",
     "hover:bg-brand-700 active:bg-brand-800",
     "disabled:opacity-50 disabled:cursor-not-allowed",
-    "shadow-[rgba(5,95,255,0.1)_0px_2px_0px_0px]",
     "focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2",
   ].join(" "),
 
@@ -66,11 +67,18 @@ const variantClasses: Record<ButtonVariant, string> = {
 };
 
 // ─── Size styles ─────────────────────────────────────────────────────────────
-// Spec: height 32px, padding 4px 15px, font-size 14px
+// Spec: height 32px, padding 4px 15px, font-size 14px.
+//
+// `min-w-[44px]` alone never satisfied the ≥44px touch target the design-system
+// rules require — a 32px-tall button fails on the axis a thumb actually misses.
+// `tap-target` (globals.css) holds `--tap-min` on a mouse and lifts the floor to
+// 44px on `pointer: coarse`, so desktop density is unchanged and touch devices
+// get a compliant target. The height comes from `--tap-min` only: a fixed `h-*`
+// would override the min-height and put the 32px button straight back.
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: "h-8 px-3 text-[13px] min-w-[44px]",
-  md: "h-8 px-[15px] text-[14px] min-w-[44px]",
-  lg: "h-10 px-5 text-[15px] min-w-[44px]",
+  sm: "tap-target [--tap-min:32px] px-3 text-[13px] min-w-[44px]",
+  md: "tap-target [--tap-min:32px] px-[15px] text-[14px] min-w-[44px]",
+  lg: "tap-target [--tap-min:40px] px-5 text-[15px] min-w-[44px]",
 };
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(

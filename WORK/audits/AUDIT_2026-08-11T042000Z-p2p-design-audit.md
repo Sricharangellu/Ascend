@@ -272,3 +272,72 @@ operator. What keeps it short of "Production Ready" for the brief as a whole is 
 reference was never readable, so the comparison the brief actually asked for is unperformed, and
 (b) the receiving desk still runs its own barcode matching in the browser while a better server
 implementation sits unused — item 1 in §7, and the thing to do next.
+
+---
+
+## 10. Addendum 2026-08-21 — re-merged `develop`; §7 item 1 was closed by someone else
+
+This branch sat in draft for ten days. `develop` moved from `43d7189` to `e693cd8` in that time,
+and PR #230 ("Mobile UX wave 1") landed **the exact gap this audit named as the highest-value
+remaining item**. That is a good outcome and is recorded as one, not quietly absorbed.
+
+### What `develop` closed
+
+§7 item 1 — *"`POST /receiving/sessions/:id/scan` has no caller anywhere in `web/`, while
+`receive-stock/page.tsx:114` runs its own client-side barcode match against one denormalised field
+per PO line, so a case UPC does not resolve and a successful scan only highlights a row"* — is
+**closed**, in both halves, verified on `origin/develop` on 2026-08-21:
+
+- `web/app/(protected)/purchasing/receiving/[id]/page.tsx:123` posts to the scan endpoint from a
+  real Scan & Receive workspace (`ScanBar`, `ReceivingLinesTable`, `CostIntelligencePanel`,
+  `ReviewPanel`), reachable in one click from a PO row through `web/lib/receiving.ts`.
+- `receive-stock/page.tsx` now resolves through the canonical `GET /catalog/barcode/:code/pos` —
+  the same endpoint the POS uses, so a case UPC, a vendor UPC and any second each-code all
+  resolve — and **counts** the scan instead of only highlighting a row.
+
+`GAPS.md` is updated to say so. Merging this branch with that row still reading "Open" would have
+reintroduced exactly the stale-premise defect §2 of this audit was written to catch.
+
+### What is still open (each re-verified against `origin/develop`, 2026-08-21, not carried forward on trust)
+
+| §7 item | State today | Evidence |
+|---|---|---|
+| Desk loads one page, filters client-side | **Open** | `receive-stock/page.tsx:46` still calls `/api/v1/purchasing/orders` with no params. The server-side filters this PR adds are what make it a one-line fix. |
+| Fabricated `size_bytes` | **Open** | `receive-stock/page.tsx:223` — `Math.round(Math.random() * 500000 + 50000)`. No bytes are read or uploaded. |
+| Swallowed API failures | **Open, narrowed** | `catch { session = null }` is gone (PR #230 restructured the path). Two bare `catch { /* ignore */ }` remain, at `page.tsx:61` and `:227`. |
+| Requisitions have zero frontend | **Open** | `grep -ril requisition web/` still returns nothing. |
+| Two supplier surfaces | **Open** | `purchasing/_components/SuppliersTab.tsx` and `vendors/[id]/page.tsx` both ship on `develop`. |
+| `exclude_from_po` never enforced | **Open** | Read only by `catalog/service.ts`'s own select/update; no purchasing code path consults it. |
+| Dual AP posting (GRNI) | **NEEDS-SRI** | Unchanged. Still an accounting-policy decision, not a patch. |
+
+### The merge itself
+
+Five conflicts, none taken on a coin-flip:
+
+1. **`WORK/LOCK.md`** — resolved by taking `develop`'s copy of every block and prepending only this
+   claim. That repairs a defect **in this branch's own earlier conflict resolution**: this PR's
+   `Status` line had been written into **seven other sessions' claim blocks**, clobbering their
+   `ACTIVE — implementing`. Found while resolving, not reported by anything.
+2. **`WORK/LOOP_STATE.md`** — both sides prepended to the iteration log; both kept. This branch's
+   row carried a forward-looking "not fixed" claim that is now false, so it carries a dated
+   correction rather than being left to read as current.
+3. **`docs/architecture/GAPS.md`** — union of this branch's P2P section and `develop`'s scalability
+   section, with the P2P rows re-verified row by row (table above) and line numbers refreshed.
+4. **`web/api-client/types.ts`** — both sides independently added `po_number` and `receive_status`
+   to `PurchaseOrder`. Resolved to the **stricter** shape (`po_number: number | null`, not `?:`):
+   the backend always sends it, and optionality is what made the raw-UUID fallback look reasonable.
+   Typecheck across the whole app confirms nothing depended on it being absent.
+5. **`web/app/(protected)/purchasing/_components/OrdersTab.tsx`** — the real one. This branch
+   rewrote the component onto `DataTable` with server-side filters, saved views and keyset paging;
+   PR #230 improved the component this rewrite replaced. Resolved by keeping the rewrite and
+   **grafting #230's Scan & Receive action into it**, routed through this branch's
+   `explainReceiveError` so the 409 approval gate reads the same on both receive paths. Dropping
+   the graft would have silently deleted a shipped feature — and would have left `@/lib/receiving`
+   imported and unused, which is the only reason lint would have caught it.
+
+Three new tests cover the grafted action, and each was **run against the un-grafted component
+first**: removing the button fails 3/3; routing to the PO id instead of the returned session id
+fails 1/1. `develop`'s own `paginationParamContract` guard also had to be fixed — it scanned
+comments as if they were code and flagged this audit's own prose describing the `pageSize=200`
+defect *that this PR removed*. It now skips comment lines, negative-tested both ways: a planted
+real offender still fails it; the same line commented out does not.

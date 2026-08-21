@@ -6,13 +6,162 @@
 | Queue item | Sri directive 2026-08-11: audit the Procure-to-Pay / Purchasing / Receiving implementation against a Claude Design reference and integrate the improvements that are actually justified. **The design URL (`claude.ai/design/p/424883f3-…`) is NOT reachable** — WebFetch returns 403 and it is not in the account's artifact list (shared or owned), so it could not be read. Reported as not done rather than invented. The audit therefore runs against code + the operational questions in the brief, cross-checked against the owner's own 2026-07-23 artifact "Product, Purchasing & Receiving — Enterprise Audit" (readable), with every claim in it re-verified against the current tree — several had already been closed by later work. |
 | Files/areas expected | `src/modules/purchasing/{index,service,routes,purchasing.test}.ts`; `web/api-client/types.ts` (purchasing section only); `web/components/DataTable.tsx` (additive `serverCursor` prop only); `web/app/(protected)/purchasing/_components/{OrdersTab,shared}.tsx`; NEW `web/app/(protected)/purchasing/_components/{OrderFilters,ApprovalActions}.tsx`; NEW `web/app/(protected)/purchasing/_lib/orders.ts` (+test); `web/app/(protected)/vendors/[id]/page.tsx` + `web/app/(protected)/catalog/[id]/_components/SupplierPriceComparisonTab.tsx` (dead `/purchasing/new` links only); `web/mocks/handlers.ts` (purchasing orders only); NEW `web/tests/purchasingOrders.test.tsx`; `docs/architecture/GAPS.md`; NEW `WORK/audits/AUDIT_2026-08-11T*-p2p-design-audit.md`; `WORK/{LOCK,LOOP_STATE}.md`. **NOT** `src/modules/purchasing/receiving-sessions.ts`, NOT `web/app/(protected)/inventory/**`, NOT `web/app/(protected)/dashboard/**`, NOT `src/modules/payments/**`, NOT `artifacts/**`. |
 | Started | 2026-08-11T04:20:00Z |
-| Status | **RELEASED — pushed to `claude/ascend-p2p-design-audit-grl7ez`, PR #227 → `develop` (draft).** Purchase-order spine delivered end-to-end; the receiving half is audited and filed, not built. Merged `origin/develop` (40 commits) and re-ran every gate on the merged tree. |
+| Status | **RELEASED — pushed to `claude/ascend-p2p-design-audit-grl7ez`, PR #227 → `develop` (draft).** Purchase-order spine delivered end-to-end; the receiving half is audited and filed, not built. **Re-merged `origin/develop` on 2026-08-21** after PR #230 (Mobile UX wave 1) landed: five conflicts resolved by hand, three of the gaps this audit filed are now CLOSED by #230 and are marked as such rather than merged in stale, and a defect in this branch's own earlier conflict resolution — this PR's Status line had been written into **7 other sessions' claim blocks**, clobbering their `ACTIVE — implementing` — is repaired by taking `develop`'s copy of every block except this one. |
 | Duplicate-work check | Ran per AGENTS.md. Two Cursor Cloud claims below are still marked `ACTIVE` (2026-08-03, 8 days stale): "Wave A/B trust leftovers + palette" scopes `web/app/(protected)/{gift-cards,dashboard,inventory,purchase}/**` and "POS customer + gift card" scopes `src/modules/payments/**` + `web/components/terminal/**`. **Neither overlaps this claim** — `purchase/**` (the singular Cost Entry page) is excluded here, `purchasing/**` is a different directory, and `inventory/**` is excluded. Not marking them STALE?; that is board maintenance, not this remit. |
 | Gates | Backend `typecheck` PASS · `npm test` **908/908, 0 fail** on real PostgreSQL 16 (~36.6 min) · `purchasing` **36/36** re-run post-merge · `smoke` **PASS, 20 steps** · `hygiene` PASS (2228) · `contract:scan` PASS · `gap:scan` PASS (475/386) · `table:scan` PASS · `authz:scan` PASS (0 unguarded). Web: `typecheck` PASS · `lint` **0 warnings** · `vitest` **272/272 across 33 files** (+29 here) · `NEXT_PUBLIC_MOCK=false build` PASS. Vercel preview Ready. |
 | Proof the new tests work | The 4 new filter tests were run against the **pre-fix** `GET /orders` route (filters stripped) before being accepted: **4/4 fail**, then pass with the fix. Each asserts exclusion as well as inclusion — a predicate that never reaches SQL still returns rows, so a test that only checks "my PO is in the list" passes against that bug. |
 | Two defects found in my own work | (1) The first draft rendered the same error twice — page-level `role="alert"` **and** `DataTable`'s error state; a test caught it as "Found multiple elements with the role alert". Load and action errors are now separate. (2) `refreshKey` tripped `react-hooks/exhaustive-deps` as an unnecessary `useCallback` dep; rather than disable the rule, the whole query became one state object whose identity is what the fetch effect keys off. |
 | Scope change (honest) | Claim excluded `web/app/(protected)/vendors/**` and `catalog/**` from edits; both were touched anyway — **one line each**, repointing the 5 dead `/purchasing/new` links. Leaving them would have shipped a fix for a 404 that still 404s from the pages that link to it. No behaviour beyond the href changed. Also added `contracts/openapi.yaml` (not in the claim): `develop` gained the F-18 contract scan mid-branch, and adding nine query params while leaving the operation documented as parameterless is the drift that scan exists to catch. |
 | Blockers | **The design reference itself: `claude.ai/design/p/424883f3-…` returns 403 to WebFetch in both URL forms, the `/code/artifact/` form says "not found or not shared", and it is absent from the account's artifact list at `scope: all`.** Phase 2 of the brief was therefore not performed against the actual design; reported, not invented. **Second, CORRECTED: CI did run and PR #227 is green** — run #868 on head `85d1fa7` succeeded (backend typecheck+test+smoke, frontend typecheck+lint+test+build, the 17-step production guard, Docker sanity). I first reported CI had never run and asked for a close+reopen; that was wrong. Opening the PR via an App token did not start CI, but the 16:20 push did — I queried the API ~60s after that push, before the run was indexed, and read the empty result as proof rather than as too-early. What survives: **an agent-opened PR that is never pushed to again can sit with no CI at all.** **Third, and still true: CI does NOT run e2e on a PR** — `ci.yml:432` gates Playwright on `github.event_name == 'push'`, so the golden paths only execute after a commit lands on a tier. No browser-level verification of the new list exists until this merges, and no visual QA has been done. |
+## Active Claim (Claude Code web — mobile design integration & mobile UX)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-mobile-design-integration-mb7l8e` |
+| Queue item | Sri directive 2026-08-11: review ASCEND against the "ASCEND Mobile" design reference, decide what materially improves mobile usability, and integrate it. Reference design (`claude.ai/design/p/424883f3-…`) is **not reachable from this container** — `WebFetch` returns 403 and `DesignSync` needs an interactive `/design-login`. Worked from ASCEND's own workflows + `docs/ENTERPRISE_UX_SPEC.md` instead, and reported the inaccessibility rather than inventing a reference. |
+| Files/areas expected | `web/app/layout.tsx`, `web/app/globals.css`, `web/components/{Button,DataTable,EnterpriseShell,Modal}.tsx`, NEW `web/components/MobileTabBar.tsx`, NEW `web/components/BarcodeScanButton.tsx`, `web/app/(protected)/inventory/receive-stock/**`, `src/modules/purchasing/receiving-sessions.ts`, `src/modules/purchasing/receiving-sessions.test.ts`, `web/tests/**`, `WORK/{LOCK,LOOP_STATE}.md`, `WORK/audits/AUDIT_<UTC>-mobile-ux.md`. **NOT** `artifacts/**`, NOT `db/**`, NOT `.github/**`, NOT `src/modules/**` beyond `purchasing/receiving-sessions*`. |
+| Started | 2026-08-11T04:20:00Z |
+| Status | **RELEASED — pushed to `claude/ascend-mobile-design-integration-mb7l8e`.** Wave 1 only; wave 2 is filed in `WORK/LOOP_STATE.md`, not implied as done. |
+| Gates | Backend: `typecheck` PASS · `npm test` **906/906, 0 fail** on real PostgreSQL 16 (19.5 min) · `npm run smoke` **PASS, 20 steps, full POS lifecycle** · `hygiene` PASS · `gap:scan` PASS · `authz:scan` PASS · `table:scan` PASS. Web: `typecheck` PASS · `lint` **0 warnings** · `vitest` **256/256 across 32 files** (was 234/31 — 22 added) · `NEXT_PUBLIC_MOCK=false build` PASS, shared JS **87.4 kB, unchanged**. |
+| Rendered-app QA (not just code inspection) | Real Chromium at 320/375/768/1440 across 8 pages: **no horizontal overflow at any width**. Card mode confirmed live on `/inventory`, `/orders`, `/customers`. Scan sheet driven end to end: each code → price; case code → "Case of 12" at 12x unit price; SKU → resolves; unknown → not-found state. Skip link: first Tab reaches it, Enter moves focus to `#main-content` **outside the rail**. Drawer: 220px → 0 on navigate, and the link still navigates. |
+| Guards proven to fail first | (1) The 3 case-UPC backend tests were run against the unfixed `resolveBarcode` and **all 3 failed** with the exact defects. (2) The DataTable "keeps every column" test fails when the card's body columns are sliced to one. (3) The ScanSheet camera test fails when the support flag is prevented from reaching render — the defect it was written for. |
+| Scope changes (honest) | Three, all forced rather than chosen. (a) `MarketingShell.tsx` was outside the claim; removing the root layout's `<main>`/skip link would otherwise have left marketing pages with no landmark and no skip link — a regression I would have caused. (b) `mocks/mockHandlers.ts` gained the `/catalog/barcode/:code/pos` handler the new code depends on and which never existed. (c) `AuthShell.tsx` was in the claim for the brand mark and also gained a landmark for the same reason as (a). |
+| Not run | **Playwright e2e** — needs a built-and-served real-stack pair; CI runs the golden paths on the PR. Stated rather than softened. |
+| False failure worth recording | One backend run reported 1 failure (`ai_assistant`: "expected the internal create-po call to fail in the test environment"). Not a regression — that test depends on nothing listening at `BACKEND_URL`, default `http://localhost:3000`, and a dev server started for visual QA was answering there. Re-run with the port free: 16/16. Exactly the coordination-conflict class `AGENTS.md` warns about; subsequent QA used port 3100. |
+| Duplicate-work check | Ran per AGENTS.md. Every other claim in this file is RELEASED. `git grep MobileTabBar origin/develop` → no hits; no bottom-nav / mobile-shell component exists to extend. The receiving-session scan path already exists and is **extended, not forked** — the frontend is repointed at it rather than given a second resolver. |
+| Blockers | Reference design unreachable (above). Playwright e2e needs a built-and-served real-stack pair; reported per gate results. |
+
+## Active Claim (Replit — PR-A2 gap-scan allowlist cleanup)
+
+| Field | Value |
+|---|---|
+| Agent/session | Replit Agent session (Sri-directed), branch `chore/gapscan-allowlist-cleanup` |
+| Queue item | PR-A2: gap:scan stale-allowlist warning — /api/v1/inventory/pipeline/receiving, .../receiving/:p/update, .../pipeline/summary now backed by real routes in src/modules/inventory/pipeline-routes.ts; remove from tools/api-gap-allowlist.json. Branch also restores the npm root (package.json, package-lock.json, tsconfig.json from 2c916be; removes pnpm-lock.yaml/pnpm-workspace.yaml/.npmrc) per the pre-push gates, reverting the earlier Replit workspace-merge contamination at root. |
+| Files/areas expected | `tools/api-gap-allowlist.json`; root `package.json`/`package-lock.json`/`tsconfig.json` (restore only); `WORK/LOCK.md` |
+| Started | 2026-08-03T191010Z |
+| Status | ACTIVE |
+## Active Claim (Claude Code web — 20k-user scalability audit: DB layer, POS query plans, load testing)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-erp-scale-20k-vmu1ha` |
+| Queue item | Sri directive 2026-08-15: end-to-end scalability/performance/reliability audit and implementation for 20,000 registered users (2,000–5,000 concurrent). Measured, not inspected: a production-shaped dataset (2.1M order lines, 300k orders, 40k products, 2.0M inventory movements) was generated and every claim below comes from `EXPLAIN (ANALYZE)` or a timed benchmark against real PostgreSQL 16. Three bottlenecks confirmed so far: (1) **every authenticated query was wrapped in its own transaction** — 4 round trips and 4× the connection hold time for one statement Postgres already runs atomically; (2) the **POS stock check sequentially scanned all 2.1M order lines once per basket line** (1,086 ms for a 3-line basket, growing forever with order history); (3) the **inventory levels page aggregated every order line in the tenant per page** (312 ms). This claim also closes the previous claim's own "Not run" item: load testing. |
+| Files/areas expected | `src/shared/db.ts`; NEW `src/shared/db-session-context.test.ts`; `src/modules/orders/service.ts`; `src/modules/inventory/service.ts`; NEW `scripts/perf/**`; NEW `docs/architecture/SCALABILITY.md`; NEW `WORK/audits/AUDIT_<UTC>-scale-20k.md`; `WORK/LOOP_STATE.md`; `WORK/LOCK.md`; `.env.example` (new PG_* tuning vars only). **NOT** `web/**` beyond measurement, NOT `src/modules/catalog/**` (the claim below owns the catalog query surface and is RELEASED but recent), NOT `artifacts/**`. |
+| Started | 2026-08-15T172000Z |
+| Overlap check | Ran per AGENTS.md. Every claim in this file is `RELEASED` except three from 2026-07 (Cursor Cloud Wave A/B `web/**`, POS customer + gift card `src/modules/payments/**`, outlet-filter `web/**`); none scopes `src/shared/db.ts`, `src/modules/orders/**`, `src/modules/inventory/**` or `scripts/**`. The catalog claim directly below is RELEASED and its files are excluded here. Stale 2026-07 `ACTIVE` claims left untouched for human review rather than silently closed, per this file's rules. |
+| Status | RELEASED — pushed to `claude/ascend-erp-scale-20k-vmu1ha`. |
+| Gates | Run against **real PostgreSQL 16** (not embedded): backend `typecheck` PASS · backend `npm test` **957/957, 0 fail** (22 new) · `hygiene` PASS (2,233 files) · `scripts/perf/explain.ts` PASS (6/6 critical queries within budget, no sequential scans) · load test baseline/target/stress run on an idle host. **Not run:** web gates (no `web/**` file changed), Playwright e2e, the `extreme` load profile (would only have measured queue depth behind a saturated core), failure-injection, frontend performance, and the security surface beyond rate limiting and tenant isolation — all listed explicitly in the audit rather than softened. |
+| Blockers | none |
+
+## Active Claim (Claude Code web — Replit worktree import: harvest `push_tokens` out of `artifacts/`)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/replit-import-ascend-sv4ykb` |
+| Queue item | Sri directive 2026-08-15: audit the Replit worktree (`Desktop/Prj/ascend-wt-v3`) and integrate whatever ASCEND is missing. **The named directory is not reachable from this container** (isolated remote clone; no shared filesystem — verified by full-filesystem scan, all mount points, `git worktree list`, `git stash`, and all 91 remote branches). Audited the Replit worktree content that *is* in-repo instead: the `@workspace/*` tree merged by `64758a5` and parked under `artifacts/`. That audit reproduces, independently, the finding `WORK/LOOP_STATE.md` already carries twice as **NEEDS-SRI**: `artifacts/api-server/` is a bidirectionally-diverged copy of the backend, and a finished, tested `push_tokens` module lives only there and ships to nobody. LOOP_STATE's own recommendation is **harvest-then-extract, never delete**. This claim does the harvest half. |
+| Files/areas expected | NEW `src/modules/push_tokens/{index,service,routes,batcher,batcher.test,quiet_hours.test}.ts`; `src/modules/index.ts` (two lines — import + registry entry); NEW `WORK/audits/AUDIT_2026-08-15T174500Z-replit-worktree-import.md`; `WORK/LOOP_STATE.md`; `WORK/LOCK.md`. **NOT** `artifacts/**` — nothing there is deleted or moved; the harvest is a copy, so the extract decision stays entirely Sri's. NOT `web/**` (no frontend consumer exists in `web/`; the mobile client lives in `artifacts/ascend-mobile`). NOT `lib/**`. NOT the S3/backup work (see the exclusion list in the audit). |
+| Started | 2026-08-15T174500Z |
+| Overlap check | Ran per AGENTS.md. No `ACTIVE` claim below names `src/modules/push_tokens/**` (the path did not exist in `src/`) or `src/modules/index.ts`. The nearest neighbours are the catalog claim (`src/modules/catalog/**`, RELEASED) and F-18 (`tools/**` + `contracts/openapi.yaml`, RELEASED); neither overlaps. Branch cut from `origin/develop` at `04eea87`, level with it. |
+| Status | RELEASED — pushed to `claude/replit-import-ascend-sv4ykb`. |
+| Blockers | The primary source named in the directive (`Desktop/Prj/ascend-wt-v3`) was never readable here. Everything below is an audit of in-repo Replit content, not of that directory — if the Desktop worktree has diverged from what `64758a5` merged, this import does not cover the difference. |
+
+## Active Claim (Cursor Cloud — debug: refund workflow refunded_cents)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud agent — `cursor/fix-refund-workflow-refunded-cents-6459` |
+| Queue item | `WORK/LOOP_STATE.md` NEW 2026-08-11: RefundWorkflow `validate_refund_eligibility` SELECTs nonexistent `orders.refunded_cents`. Proven against real PG; HTTP refund still 200 (errors swallowed). Also confirmed residual: `refunds` table missing + OrdersService payload uses `totalCents` not `refundCents`. |
+| Files/areas expected | `src/orchestration/workflows/refund.workflow.ts`; `src/orchestration/migrations.ts` (add `refunds` table only); `src/orchestration/tests/refund.workflow.test.ts`; NEW `src/orchestration/tests/refund.workflow.realdb.test.ts`; `WORK/{LOCK,LOOP_STATE}.md`; NEW audit. NOT `web/**`, NOT `src/modules/orders/**` (HTTP path is correct), NOT `artifacts/**`. |
+| Started | 2026-08-11T203000Z |
+| Status | RELEASED — pushed to `cursor/fix-refund-workflow-refunded-cents-6459` (PR #232). |
+| Gates | Backend `typecheck` PASS · `npm test` **940/940, 0 fail** (~8.7 min, embedded PG) · `npm run smoke` **20/20** incl. step 14 "orchestration recorded no failed workflow instances" after a live refund · `table:scan` PASS · `hygiene` PASS. No `web/**` changes. |
+| Overlap check | No ACTIVE claim scopes `src/orchestration/**`. Migration-lock claim (ACTIVE) scopes `src/app.ts` / `src/shared/db.ts` only. |
+| Blockers | none |
+
+## Active Claim (Claude Code web — click audit: POS/KDS pagination, receiving scan, catalog e2e)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-click-audit-optimization-sj5jko` (PR #228) |
+| Queue item | Sri directive 2026-08-11: ASCEND click audit — eliminate unnecessary clicks/screens/typing, then implement the highest-value workflow end to end. The audit picked **product lookup** and found it was not slow but **broken**: `catalog.list()` had no `q`, so three frontend search boxes sent `?q=` and the backend dropped it. |
+| Status | **RELEASED — scope cut hard after a duplicate-work collision.** The claim directly above this one (**PR #229**, `claude/ascend-product-ux-optimization-s6khv3`) built the same feature and **merged to `develop` first**. Per this repo's own precedent for the 2026-08-06 #197/#198 collision, develop's implementation wins wherever the two overlap. This branch was **reset onto `origin/develop`** and only the genuinely additive work re-applied — merging would have left two competing implementations of one endpoint. **The branch now changes ZERO backend files.** |
+| Ships (all `web/`, all verified) | (1) **5 × `pageSize` → `limit`** — `terminal/ProductGrid.tsx` (the POS grid showed a cashier 50 products of the catalog, not the 200 it asked for), `restaurant/kitchen/page.tsx` (**the KDS** asked for 50 open orders and got the default), `pricing/page.tsx` ×2, `setup/RetailSetupChecklist.tsx`. **All five were still broken on `develop`.** `pageSize` IS honoured by `inventory/levels`, so the 3 correct call sites there are deliberately untouched. (2) **Receiving case/box-barcode resolution** via the canonical resolver — absent on develop. (3) **`ConfirmDialog` `busy`** double-submit guard. (4) **`web/e2e/catalog-search.spec.ts`** — the first real-stack catalog test; develop has no catalog e2e at all, so this covers #229's own feature at the layer its tests cannot reach. |
+| Dropped, and why | Everything overlapping #229: catalog `q`/filters/sort, `/catalog/counts` (#229 ships `/catalog/facets`), the `ProductsTab` rewrite, MSW + OpenAPI catalog params, and `src/shared/product-search.ts`. Also **dropped the inventory `levels()` barcode fix** — a real defect still live on develop (`(p.name ILIKE @q OR p.sku ILIKE @q)`, no barcode leg, unescaped term) — because fixing it now needs either a shared module (a **third** predicate variant alongside #229's inlined one and ⌘K's) or a hand-copy (a fourth). Filed in `LOOP_STATE.md` as one deliberate unification task against #229 as the base, rather than made worse in a hurry. |
+| Gates (final tree) | Web `typecheck` PASS · `lint` **0 warnings** · `vitest` **251/251 across 33 files** · `hygiene` PASS (2227 files). No backend file changed, so backend gates are develop's own; they were nevertheless run green on the pre-reset tree at **922/922 + smoke 20 steps**. E2E `catalog-search.spec.ts` **5/5** against a real production-mode stack, and verified to FAIL when the backend is reverted to drop `q`. |
+| Honest notes | (1) **The reference design was never read** — `claude.ai/design/p/424883f3…` returns 403; benchmarked from the brief's own categories, and nothing about its contents is inferred. (2) An earlier revision of this branch **deferred the `pageSize` fix on a wrong reading of a Cursor Cloud lock** — that claim enumerates specific `terminal/` files and does not include `ProductGrid.tsx`. Corrected, and the sweep then found 5 call sites rather than 3. (3) **The E2E caught a flaw in its own first draft**: `toBeHidden` passed against a deliberately-broken backend, because it is satisfied by a non-existent element and the table is a loading skeleton mid-fetch. Rewritten to await the response and assert the settled row set. |
+| Blocker (external, unresolved) | **GitHub Actions never raised a check suite for PR #228** across five pushes, in both draft and ready-for-review states. Not a queue backlog — other branches' runs from the same window completed successfully, and `check-runs` returns only Vercel/Supabase. `ci.yml` declares only `push` (filtered to the three tiers) and `pull_request`, so there is **no `workflow_dispatch` to invoke** and no agent-side workaround. A human must close/reopen the PR, push from a user credential, or add `workflow_dispatch:` to `ci.yml` (the durable fix). |
+| Duplicate-work post-mortem | Second collision on this repo in a week, same root cause both times: **neither session claimed the area in `WORK/LOCK.md` before starting.** This session did claim it (2026-08-11T040000Z, scoped to `catalog/**`), but #229's branch was already open and unclaimed, so the lock could not prevent it. A lock only works if the *other* session reads it first — which is why the durable fix is the CI-enforced parameter scanner in `LOOP_STATE.md`, not more diligence. |
+
+## Active Claim (Claude Code web — desktop UI/UX + Scan & Receive workspace)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-desktop-ui-ux-fx9qif` |
+| Queue item | Sri directive 2026-08-11: improve the **existing** ASCEND desktop UI/UX (not a redesign) and cut clicks on supplier → purchase → receive → bill. Phases 1–4 of the directive's order: audit, design-system repair, sidebar/focused-workspace behaviour, and the Scan & Receive → review leg. |
+| Files/areas expected | `web/tailwind.config.ts`, `web/app/globals.css`, `web/components/{Badge,EnterpriseShell,index}.tsx`, NEW `web/components/{LifecycleTrail,WorkspaceHeader}.tsx`, NEW `web/app/(protected)/purchasing/receiving/[id]/**`, `web/app/(protected)/purchasing/{[id]/page.tsx,_components/OrdersTab.tsx,receiving/page.tsx}`, NEW `web/lib/receiving.ts`, `web/api-client/types.ts`, `web/mocks/mockHandlers.ts`, NEW `web/tests/receivingWorkspace.test.tsx`, NEW `WORK/audits/AUDIT_2026-08-11T035500Z-*.md`, `WORK/LOCK.md`, `WORK/LOOP_STATE.md`. **NOT `src/**`** (zero backend files changed — the receiving-session backend already existed and is consumed as-is), NOT `artifacts/**`, NOT `WORK/FORWARD_PLAN.md`. |
+| Started | 2026-08-11T035500Z |
+| Status | RELEASED — pushed to `claude/ascend-desktop-ui-ux-fx9qif`, PR into `develop`. Full report: `WORK/audits/AUDIT_2026-08-11T035500Z-desktop-ux-receiving-workspace.md`. |
+| Gates | Web `typecheck` PASS · `lint` PASS (0 warnings/0 errors) · `vitest` **239/239 across 30 files** (33 new) · `NEXT_PUBLIC_MOCK=false build` PASS (`/purchasing/receiving/[id]` emitted, 11.4 kB; shared JS unchanged at 87.4 kB) · `hygiene-check` PASS (2212 files). |
+| Headline finding | The Scan & Receive **backend was already complete** (scan, per-line patch, cost intelligence, close/cancel) with **zero client** — the only UI was a list that could close sessions it had no way to open. This claim builds that client rather than adding backend. Separately: 12 semantic Tailwind stops (all of `info-*`, plus `-200/-300/-400/-800` on success/warning/danger) were referenced across ~20 call sites but never declared, so `Badge variant="blue"` rendered with no colour at all and alert borders had no border colour; `--shadow-sm` was referenced by `Card` and never declared. |
+| Verified, not asserted | The Escape-to-cancel bug in inline editing was found **by a test that failed against the first implementation** (`setDraft` is async, so blur committed the abandoned edit), then fixed and re-verified. Badge contrast ratios were computed per variant, not eyeballed: green 3.37:1, orange 2.76:1, red 3.71:1 and purple 4.19:1 all failed AA for 10–11px text before this change. |
+| Blockers | none |
+| Not run | **Playwright e2e** (no built-and-served real-stack pair in this container; CI runs it on the PR) and **real-browser visual QA at 1280/1366/1440/1536/1920 (§35)** — the largest open item, reported rather than softened. Backend suite not run: zero `src/**` files changed. |
+| Scope, honestly | Phases 5–9 of the directive are **not** delivered: unpaid-bill correction, paid-bill controlled adjustments, returns/credits reconciliation, three-way-match UI + tolerances, exception centre, supplier-workspace action bar. |
+
+## Active Claim (Claude Code web — Phase 9 F-5: one test-request factory)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-f5-test-request-factory` |
+| Queue item | **Phase 9 backlog F-5** (`WORK/FORWARD_PLAN.md` §9.2/§9.3), the next unblocked item in the stated execution order. S-1 and F-3 are Sri-only, F-11 is ⛔ BLOCKED on Sri's "which tax authority wins", and F-14 depends on F-3 — F-5 is the first item with no blocker. `test-request.ts` is copied into 46 modules across 8 variants; 41 of those are byte-identical in 3 groups (31 + 5 + 5) and `dupe:scan` reports them on every PR. Collapse the identical ones onto one shared factory, each module re-exporting with its own pinned default role. |
+| Files/areas expected | `src/shared/test-request.ts` (add factory); the 41 identical `src/modules/*/test-request.ts` files (→ re-exports); `WORK/FORWARD_PLAN.md` (F-5 status), `WORK/LOOP_STATE.md`, `WORK/LOCK.md`. **NOT** the 5 genuinely-distinct helpers (`business`, `custom_roles`, `progress`, `reports`, `identity`) — they have real signature differences and are not duplication. NOT any `*.test.ts`, NOT `src/modules/*/service.ts` or `routes.ts`, NOT `web/**`, NOT `artifacts/**`. |
+| Started | 2026-08-10T190308Z |
+| Status | **RELEASED** — pushed to `claude/ascend-f5-test-request-factory`. F-5 done and F-9 found already done (its ⬜ READY status was stale, not the work). |
+| Gates (all run in this container against real PostgreSQL 16) | backend `typecheck` PASS · backend `npm test` **899/899, 0 fail** · `npm run smoke` **20/20** full POS lifecycle · `dupe:scan` **3 identical-file groups → 0** (was 41 files) · `hygiene` PASS (2202 files) · `authz:scan` PASS · `gap:scan` PASS (474/382, 17 allowlisted) · `table:scan` PASS (166 names) · web `typecheck` PASS · web `lint` 0 errors/0 warnings · web `vitest` **206/206 across 29 files** · web production `build` PASS |
+| Proof the roles were preserved | The `manager` set after the change — {discounts, insights, purchasing, sso, workflows} — was diffed against the same set computed from git before the change. Byte-identical. `workflows` stays `manager`, which is F-5's named acceptance criterion. Separately, every `request(` call site in the 31 fixed-`owner` modules was parsed (paren-balanced, string-aware) to confirm **none passes a 5th argument**, so adding a defaulted `role` parameter cannot change an existing call's meaning. |
+| Overlap check (per AGENTS.md, run before editing) | Two Cursor Cloud claims are `ACTIVE`: "Wave A/B trust leftovers" scopes `web/**` only, and "POS customer + gift card" scopes `src/modules/payments/{service,routes,payments.test}.ts` — **`test-request.ts` is not in either file list**, and this change does not touch any file they name. Seven `Claude session D` claims dated 2026-07-16 still read `ACTIVE — implementing`; their work demonstrably shipped as loop iterations 10–13 (`WORK/LOOP_STATE.md`), so they are stale rather than live. Flagged below rather than edited — per AGENTS.md a stale-looking lock is marked and left for review, not silently cleared. |
+| Blockers | none |
+
+### Stale-claim flag (raised 2026-08-10, not actioned)
+
+The seven `Claude session D` claims below dated `2026-07-16` and the two Cursor
+Cloud claims dated `2026-08-03` all still read `ACTIVE`. The session-D ones are
+provably finished — `WORK/LOOP_STATE.md` iterations 10–13 record the transfer
+atomicity, over-transfer, cycle-count double-close and stock-adjust race fixes
+as shipped and tested. Marking them `STALE?` per the protocol rather than
+closing them, because closing another session's claim is a lead/human call.
+## Active Claim (Claude Code web — mobile full-stack integration check)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/full-stack-integration-check-lnnvew` |
+| Queue item | Answer whether the ASCEND Mobile work is integrated and working end-to-end with the shipping full stack, and record the verification per the `AGENTS.md` handoff protocol. |
+| Files/areas expected | `WORK/audits/AUDIT_2026-08-11T035710Z-mobile-fullstack-integration.md` (new, collision-proof timestamp name), `WORK/LOOP_STATE.md` (one appended iteration row), `WORK/LOCK.md` (this claim). **Append-only in `WORK/**`; no existing content rewritten.** NOT `src/**`, NOT `web/**`, NOT `artifacts/**` (read-only inspection — another environment's tree, never modified), NOT `tools/**`, NOT `docs/**`. |
+| Started | 2026-08-11T035710Z |
+| Status | RELEASED — pushed to `claude/full-stack-integration-check-lnnvew`, **PR #223** (draft, into `develop`). Overlap check per protocol: the `ACTIVE` claims in this file scope `web/**`, `src/modules/payments/**` and `src/modules/inventory/**`; the only shared area is `WORK/**`, touched here as a new append-only audit file plus one new `LOOP_STATE` row — the same non-overlapping pattern the 2026-08-06 platform-audit claim used and documented. |
+| Outcome | **`partial` — the mobile client is not integrated.** Six findings, each cited to source. F-0 is the systemic one: `tools/api-gap-scan.mjs`'s `FE_DIRS` scopes to `web/*`, so the FE→BE drift guard cannot see the mobile client — `gap:scan` is green while three called endpoints do not exist in `src/`. Also: the package cannot be installed (pnpm protocols on an npm root), the API base encodes a Replit single-origin assumption against a split-origin production topology, catalog/orders casing mismatches return 200-with-`undefined`, and access+refresh tokens sit in plain `AsyncStorage`. Login and `reports/summary` verified as genuinely correct. |
+| Gates | `hygiene` PASS (2202 files) · backend `typecheck` PASS · `gap:scan` PASS (474 backend / 382 frontend, 17 allowlisted) · `authz:scan` PASS (49 route files, 6 allowlisted) · `table:scan` PASS (166 names). Docs-only diff, run to confirm the baseline is clean. |
+| Not run | `npm test` (894 backend tests) and `smoke` — need a Postgres instance not started in this container, and no `src/` file changed. Web typecheck/lint/vitest/build — no `web/` file changed, `web/node_modules` absent. Playwright e2e — no real-stack pair here. **Mobile typecheck/test/build — impossible, which is finding F-2 itself.** Node here is v22, repo pins 24. |
+| Blockers | **No fix was attempted, deliberately.** Every remedy lands in `artifacts/`, whose disposition is `NEEDS-SRI` (`WORK/LOOP_STATE.md:137`) and which `AGENTS.md` forbids an agent to resolve. Recommendation on record stays harvest-then-extract, never delete. The referenced Claude Design file could not be opened (DesignSync needs an interactive auth; WebFetch 403), so this claim makes **no** design-conformance claim. |
+## Superseded Claim (Claude Code web — migration advisory-lock statement_timeout)
+
+> **SUPERSEDED 2026-08-11 by PR #212, which fixed the same defect first and is merged to `develop` (`8d2c3be`).** This claim's code was **dropped, not merged** — `src/app.ts`, `src/shared/db.ts`, `.env.example` and `docs/architecture/PIPELINE.md` were resolved in favour of develop's implementation, and this claim's regression test `src/shared/db-tx-timeout.test.ts` was deleted because develop ships `src/app.migration-lock.test.ts` covering the same ground. Both fixes were correct; they differ only in mechanism (develop widens `statement_timeout` for the lock statement via `PG_MIGRATION_LOCK_WAIT_MS`; this claim used `statement_timeout = 0` + `lock_timeout`). Substituting a competing implementation for a merged mainline one would be churn, so develop's stands.
+>
+> **How the duplicate happened, for whoever tunes this protocol:** there was no competing entry in `WORK/LOCK.md` at this session's base commit (`5709a91`) — verified, not assumed. PR #212 was in flight on another branch, and its claim lived only in *that* branch's copy of `LOCK.md`, which is invisible until it merges. A per-branch lock file cannot prevent concurrent claims on the same queue item; only a lock recorded on a shared branch could. PR #212's own commit message records the same collision happening between #211 and #212, so this is the third instance, not the first.
+>
+> Nothing else from this claim is lost: the `PG_TX_TIMEOUT_MS` → exported `txTimeoutMs()` refactor was arrived at independently by develop, and the two findings filed along the way (the harness disk/`max_connections` traps, and the SSO token-claim correction) are recorded in `WORK/LOOP_STATE.md`.
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/supabase-connection-setup-v86psj` |
+| Queue item | `WORK/LOOP_STATE.md` backlog, **NEW 2026-08-07**, explicitly "Not fixed in PR #196": the backend suite's 30 s `statement_timeout` covers an unbounded migration-lock WAIT. `buildApp()` runs migrations inside `db.tx()`, and `db.tx()` issues `SET LOCAL statement_timeout` on BEGIN (`src/shared/db.ts:124`); the transaction's **first** statement is the *blocking* `SELECT pg_advisory_xact_lock(7381920)` (`src/app.ts:292`), so time spent **queuing** for the lock is charged against the same budget as real work. 123 call sites across 86 test files each build a fresh schema and serialize on that one global lock, so on a slow runner this surfaces as a bogus `57014` in a test that did nothing wrong (observed live: CI run 31138020800 attempt 1, 893/894, `settings.test.ts` at exactly 30014 ms). Fix: suspend the timeout for the lock statement only, restore it for the migrations so runaway DDL stays bounded. |
+| Files/areas expected | `src/shared/db.ts` (export `txTimeoutMs()` so `app.ts` reuses it rather than re-deriving it; add `migrationLockTimeoutMs()`), `src/app.ts` (bracket the advisory lock), `src/shared/db-tx-timeout.test.ts` (NEW — two-connection barrier regression test), `.env.example` (document the new dial next to `PG_TX_TIMEOUT_MS`), `WORK/LOOP_STATE.md`, `WORK/LOCK.md`. NOT `web/**`, NOT `.github/**`, NOT `scripts/deploy.sh`, NOT `artifacts/**` (carries its own copy of `app.ts` — another environment's tree, left untouched per the convention on every claim in this file). |
+| Started | 2026-08-10T192000Z |
+| Status | **SUPERSEDED — code dropped.** Was RELEASED as commit `a0b28d9` on `claude/supabase-connection-setup-v86psj`; PR #212 landed the same fix on `develop` first, so `a0b28d9`'s changes were resolved away during the merge. PR #216 now carries only the SSO token-minter fix. |
+| Scope note (honest) | The backlog offered two fixes; both are flawed and neither shipped as written. "Lock outside the transaction" requires session-level `pg_advisory_lock`, which does not auto-release on ROLLBACK and leaks a global lock when a boot crashes mid-migration. Bare `statement_timeout = 0` bounds nothing — it converts a spurious failure into an unbounded hang, which is a regression the original note did not account for. Shipped instead: keep the transaction-scoped lock, move the wait onto `lock_timeout`. That is a slightly wider change than "a few characters" but it is the difference between fixing the flake and relocating it. |
+| Gates | **CI `Backend — typecheck + test` PASSED on `a0b28d9`** — that job is `npm run typecheck` → `npm test` (full suite) → `npm run smoke`, on `postgres:16` with `--shm-size=1g`, so the full backend gate *and* smoke are both covered by that one green check. CI `Frontend — typecheck + lint + test + build` PASSED. CodeQL (both jobs), Secret scan (gitleaks), SBOM, Dependency vulnerabilities, Production guard, Docker build: all PASSED. Locally: backend typecheck clean, new `db-tx-timeout.test.ts` 5/5, targeted sample 48/48 (`settings`/`tenant-isolation`/`identity`) on real PostgreSQL 16.13, `hygiene-check` clean (2203 files), `api-gap-scan` clean. |
+| Not run locally (and why) | Full `npm test` and `npm run smoke` were attempted locally and produced no valid result — **not a test failure**. The container hit `ENOSPC` at ~11 min, which also destroyed the captured output so it presented as `exit 1`. Root cause is filed as its own backlog row: the documented system-Postgres workaround leaks a ~193-table schema per `freshApp()` because `pg-harness.ts` only self-cleans when `DATABASE_URL` is unset. CI covers both gates and is green. |
+| Also filed, not fixed | (1) SSO token-issuance drift — `sso/service.ts` hand-rolls `jwt.sign` without the `permissions`/`customRoleId` claims `identity.issueTokens()` sets, and `gateway/auth.ts` reads permissions straight off the JWT, so a custom-role user signing in via SSO is refused by every `requirePermission` check. (2) The test-schema disk leak above. Both are separate concerns with their own tests to write; one concern per PR. |
 ## Active Claim (Claude Code web — F-18 OpenAPI contract validation)
 
 | Field | Value |
@@ -51,8 +200,7 @@
 | Proof the new guard works | Negative-tested three ways before it was wired in, because a guard that cannot fail is this repo's recurring defect (F-1, F-2 — both inert for their entire lives). (1) A planted contract-only operation → exit 1, named. (2) A planted stale allowlist entry for an operation that *is* served → exit 1, named. (3) The document's indent shape shifted by one space → exit 1 on the parser floor, rather than "0 operations, all good" forever. It also arrived red on the real tree: 9 findings, of which 3 were fixed and 6 allowlisted with reasons. |
 | Scope line held (stated because it was tempting to cross) | The scan compares **paths and methods only**. Bodies drift too — `POST /rooms/{id}/charge` takes camelCase `amountCents` + `orderId` while the contract says snake_case `amount_cents` + a `category` that does not exist — and every one of those fixes would be unverifiable by any test in this PR. That is F-19's pass (DB↔API↔FE type consistency), recorded as a finding, not silently fixed here. Three path renames were in scope because each is provable from a route that already exists and a frontend call that already uses the corrected spelling. |
 | Overlap check (per AGENTS.md, run before editing) | The two `ACTIVE` Cursor Cloud claims scope `web/**` and `src/modules/payments/**`; this change touches neither. PR #215 (F-5) is open on a sibling branch — its only shared files are `WORK/FORWARD_PLAN.md` and `WORK/LOOP_STATE.md`, where it edits the F-5/F-9 rows and this edits the F-18 row, so the two do not overlap in content. This branch was cut from `origin/develop`, not from the F-5 branch, so the 41 `test-request.ts` files stay in exactly one PR. The seven `Claude session D` claims dated 2026-07-16 still read `ACTIVE` and are provably finished; flagged in the F-5 claim and left for review rather than closed here. |
-| Blockers | none |
-## Active Claim (Claude Code web — migration-lock wait must not masquerade as a statement timeout)
+| Blockers | none |## Active Claim (Claude Code web — migration-lock wait must not masquerade as a statement timeout)
 
 | Field | Value |
 |---|---|
@@ -60,7 +208,10 @@
 | Queue item | Top loop-selectable backlog row (`WORK/LOOP_STATE.md`, filed 2026-08-07): boot took the migration advisory lock with the **blocking** `pg_advisory_xact_lock`, which is a single statement, while `db.tx()` opens every transaction with `SET LOCAL statement_timeout` — so the *wait for the lock* was itself abortable with SQLSTATE 57014 and surfaced as an unrelated slow query. Cost a real CI attempt (run 31138020800, 893/894, `settings.test.ts` at 30014ms). 123 fresh-schema call sites across 86 test files serialize on this one global lock. |
 | Files/areas expected | `src/app.ts` (migration lock block only), NEW `src/app.migration-lock.test.ts`, `src/shared/db.ts` (exported `txTimeoutMs()` — see scope note), `.env.example`, `docs/architecture/PIPELINE.md` (env table rows), `WORK/LOOP_STATE.md`, `WORK/LOCK.md`. NOT `web/**`, NOT `.github/**`. |
 | Started | 2026-08-10T003600Z |
-| Status | **RELEASED — pushed to `claude/ascend-p2p-design-audit-grl7ez`, PR #227 → `develop` (draft).** Purchase-order spine delivered end-to-end; the receiving half is audited and filed, not built. Merged `origin/develop` (40 commits) and re-ran every gate on the merged tree. |
+| Status | **RELEASED — merged to `develop` as `8d2c3be` (PR #212, squash).** Verified on `origin/develop` after the merge, not assumed: the bounded-wait block and `PG_MIGRATION_LOCK_WAIT_MS` are present in `src/app.ts`, `src/app.migration-lock.test.ts` is tracked, `txTimeoutMs()` is exported from `src/shared/db.ts`, and `develop`'s own `frontend-required-name-shim` is still intact (this branch did not clobber it). Files in this claim are free for other sessions. |
+| Gates at merge | **CI `Backend — typecheck + test` = success** (job 93674097579, ~16.5 min) — that one job runs `typecheck` + `npm test` + **`npm run smoke`** against a real PostgreSQL 16 service container, so a non-zero exit anywhere fails it. `guard`, both frontend jobs, `docker-build`, CodeQL, gitleaks, SBOM, dependency-audit all green; deploy jobs skipped-by-design on PRs. Local corroboration on the same commit: **612 passing / 0 failing** across 521 lock acquisitions, plus `authz:scan`/`gap:scan`/`table:scan`/`hygiene-check` PASS. |
+| Measurement artifact, recorded because it cuts against the change | Mid-verification the local suite crawled and logged a **35348ms** lock wait. That was **not** the new code: a suite stopped earlier via `TaskStop` had left its child alive, so two full suites were competing for the same database and the same global lock. Killing the stale tree by PID restored throughput immediately. Written down so the number is not later mistaken for evidence *for* the fix — though it does show the suite finishing 0-fail under genuine 2× contention, where the old code dies at 30s. |
+| Not proven | That the original CI flake can no longer occur under any load. Reproducing it on demand has never been achieved by anyone. The claim made here is narrower and testable: the lock wait is no longer governed by `PG_TX_TIMEOUT_MS`, and the regression tests fail against the old implementation and pass against the new one. |
 | **Duplicate-work collision, caught and resolved** | This session ALSO built a `master` branch-protection check-name shim (`frontend-required-check-alias`) and pushed it as PR #212. While it sat open, PR #211 merged to `develop` carrying `frontend-required-name-shim` — the **same fix**: same required display name, same `needs: [frontend]`, same `if: always()`, same explicit non-success exit. Theirs is marginally better (it passes the result through `env:` rather than interpolating into the shell). Per `AGENTS.md`'s duplicate-work rule the duplicate was **dropped, not merged**: this branch was restarted from `origin/develop` and only the genuinely-new migration-lock work re-applied. `develop`'s shim stands untouched. Two jobs with an identical display name would have been actively harmful — branch protection's behaviour with duplicate check names is ambiguous. The overlap check *was* run before starting; `develop` simply moved underneath. |
 | Scope note (honest) | `src/shared/db.ts` was outside the original intent. Restoring the normal budget after the lock requires knowing what that budget is, and re-deriving `PG_TX_TIMEOUT_MS` in `app.ts` would have duplicated the parse across two files — the exact F-4/F-11 duplication class this repo tracks as a defect. Resolved by exporting the existing logic as `txTimeoutMs()` and calling it from both. **No behaviour change**: `db.tx()` computes exactly what it computed before. |
 | Mechanism verified, not assumed | Checked against a real PostgreSQL 16 before writing the fix, because the backlog entry's framing turned out to be partly wrong: (1) `statement_timeout` **does** abort a blocking `pg_advisory_xact_lock` wait — 2s timeout → cancel at 2093ms, SQLSTATE 57014; (2) it is per-**STATEMENT**, not per-transaction — two 1.5s sleeps both survive a 2s setting — so the migrations were never starved of budget, only the wait was killed, and the backlog/`.env.example`/`PIPELINE.md` wording saying otherwise is corrected; (3) a blocked waiter wakes **4ms** after the lock frees. |
@@ -310,8 +461,82 @@
 
 # Ascend — Multi-Agent Work Lock
 
+## Update 2026-08-03 (later still): 4 branches ready to push, session summary
+
+Four independent, non-overlapping branches from this session, each a clean
+fast-forward candidate onto current `origin/develop` (`801b7a4`) or, for the
+last one, onto `docs/forward-plan-phase8-guardrails` (`03e2e74`, already on
+`origin`, itself a clean ff onto `develop`):
+
+1. `fix/ponytail-phase-g-dead-setup-shims` — recovered orphaned commit
+   (dead `setup/*` shim deletion), see this file's earlier entry above.
+2. `fix/ponytail-phase-h-wave0-cleanup` — brand-string cleanup + fake-save/
+   mock-only nav gating, see this file's earlier entry above.
+3. `fix/security-jwt-secret-placeholder-guard` — production now rejects the
+   `.env.example` placeholder / low-entropy `JWT_SECRET` values instead of
+   only checking presence. `WORK/audits/AUDIT_2026-08-03T033000Z-security-
+   audit-jwt-secret-guard.md` has the full fresh security pass (auth/RBAC/
+   RLS/injection/XSS/CORS/webhook — all confirmed solid, this was the one
+   real fixable gap) plus why the Next.js CVE bump couldn't be completed in
+   this sandbox (macOS-built `node_modules` vs. this Linux container, `npm
+   install` exceeded the 45s execution ceiling on every attempt).
+4. `docs/forward-plan-phase9-session-continuity` — child of
+   `docs/forward-plan-phase8-guardrails` (another session's already-pushed
+   branch — landed on it by accident mid-task when `.git/HEAD` moved
+   underfoot, caught and fixed before pushing anything, see that commit's
+   message and `WORK/FORWARD_PLAN.md`'s new Phase 9 for the incident
+   record). Documents everything above plus an explicit priority queue.
+
+Push commands (any order):
+```
+git push origin fix/ponytail-phase-g-dead-setup-shims:develop
+git push origin fix/ponytail-phase-h-wave0-cleanup:develop
+git push origin fix/security-jwt-secret-placeholder-guard:develop
+git push origin docs/forward-plan-phase9-session-continuity:docs/forward-plan-phase8-guardrails
+```
+(The last one targets the existing remote branch, not `develop` directly,
+since Phase 8 itself is presumably headed to `develop` via its own PR first.)
+## Update 2026-08-03: Phase G recovered from orphaned commit; ready to push
+
+Phase E+F (nav-reachability + loyalty/finance shim cleanup) merged to `develop` as
+PR #144, then promoted to `staging` as PR #147 (develop/staging now in sync,
+1-commit cosmetic drift only — a docs commit on develop, PR #149). Confirmed via
+`git merge-base --is-ancestor` both ways.
+
+Phase G (delete 3 dead `setup/*` shims, commit `498092e`) was NOT part of that
+promotion — its branch (`pos-shared-metric-cleanup-rebased` → renamed
+`fix/ponytail-phase-ef-nav-loyalty-cleanup`) had been reset away locally after
+PR #144's squash-merge, leaving `498092e` reachable only via reflog (unreachable
+from any branch/tag, one `git gc` away from loss). Recovered by cherry-picking
+`498092e` onto a fresh branch off current `origin/develop`:
+
+- Branch: `fix/ponytail-phase-g-dead-setup-shims`, single commit `3e17389`
+  (cherry-pick of `498092e`), sitting directly on `origin/develop` tip
+  (`9fee56a`) — clean fast-forward candidate, no rebase/conflict needed.
+- Verified: hygiene / gap:scan / table:scan all pass on the branch.
+- Push command for Sri: `git push origin fix/ponytail-phase-g-dead-setup-shims:develop`
+  (or open as a normal PR against develop — either is a clean ff).
+- Lesson: after a squash-merged PR lands, always recreate any sibling
+  branch that shared the same pre-squash ancestry via cherry-pick of the
+  *specific commit* onto the new tip, not `git rebase` of the old branch —
+  rebase replays the whole pre-squash chain and conflicts against content
+  that's already present under different hashes.
+
 Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0 wave-dispatch coordination claim (started 2026-07-18) was closed 2026-07-30 as superseded — see its entry below; work since has shipped as independent claims rather than through that coordinator. Latest substantive work: Phase 7 items 1-2 (sales-velocity consolidation, demand-snapshot foundation) RELEASED; four-environment AI coordination workflow (Claude Code/Cursor/Replit) adopted 2026-07-30, see `docs/architecture/ORCHESTRATION.md` "Environment routing" + `tools/AGENT_PROMPT.md`. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B, RELEASED); Clean Architecture pilot (quotes + gateway auth) (session C, ABANDONED — see entry); SSO OIDC hardening (session D)
 
+
+## Active Claim (Cursor Cloud — Ponytail full-tree page audit)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud agent (`cursor/ponytail-page-audit-4fe7`) |
+| Queue item | Docs-only Ponytail page-by-page audit for **all 141** `page.tsx` routes. Clusters (101) + retail-ops Sell/Catalog/Inventory (40) + master index. Prefer CONSOLIDATE/REFACTOR; rewrite only when justified. |
+| Files/areas expected | `WORK/audits/AUDIT_2026-08-03T042838Z-ponytail-page-audit-clusters.md`, `WORK/audits/AUDIT_2026-08-03T043142Z-ponytail-page-audit-retail-ops.md`, `WORK/audits/AUDIT_2026-08-03T043142Z-ponytail-master-index.md`, `WORK/LOCK.md` |
+| Started | 2026-08-03T04:27:00Z |
+| Status | RELEASED — full tree covered (141/141); no product code changes this pass. |
+| Blockers | none |
+
+## Active Claim (Cursor Cloud — connectivity / API breaks / rate limiting audit+fix)
 ## Active Claim (Cursor Cloud — Wave A/B trust leftovers + palette)
 
 | Field | Value |
@@ -478,7 +703,7 @@ another session's state) — appending this note instead.
 | Queue item | createTransfer's transfer_number uses COUNT(*)+1 — the codebase's own banned pattern; concurrent transfers get duplicate numbers. Replace with the shared document_counters (nextDocNumber), seeded to the current transfer count on first use so numbering stays continuous. Deterministic barrier test (source-lock) proves duplicates without the fix. |
 | Files/areas expected | `src/modules/inventory/service.ts` + NEW/updated transfer test. inventory unclaimed by B/C. |
 | Started | 2026-07-16 |
-| Status | **RELEASED — pushed to `claude/ascend-p2p-design-audit-grl7ez`, PR #227 → `develop` (draft).** Purchase-order spine delivered end-to-end; the receiving half is audited and filed, not built. Merged `origin/develop` (40 commits) and re-ran every gate on the merged tree. |
+| Status | ACTIVE — implementing |
 | Blockers | none |
 
 ## Active Claim (Claude session D — FEATURE: receive per-line location + purchase cost-entry page) — RELEASED
@@ -500,7 +725,7 @@ another session's state) — appending this note instead.
 | Queue item | createTransfer never validates source on-hand. adjustStockTx clamps the source debit at 0 but the destination gets the FULL credit, so transferring more than available creates phantom stock (100 from a loc with 10 → source 0, dest +100 = 90 conjured). Fix: lock + check source availability inside the tx; throw 409 insufficient_stock if quantity > on-hand. (Cross-transfer deadlock deferred — hard to test deterministically; noted.) |
 | Files/areas expected | `src/modules/inventory/service.ts` + NEW over-transfer test. inventory unclaimed by B/C. |
 | Started | 2026-07-16 |
-| Status | **RELEASED — pushed to `claude/ascend-p2p-design-audit-grl7ez`, PR #227 → `develop` (draft).** Purchase-order spine delivered end-to-end; the receiving half is audited and filed, not built. Merged `origin/develop` (40 commits) and re-ran every gate on the merged tree. |
+| Status | ACTIVE — implementing |
 | Blockers | none |
 
 ## Active Claim (Claude session D — inventory hardening: cycle-count double-close) — RELEASED
@@ -511,7 +736,7 @@ another session's state) — appending this note instead.
 | Queue item | closeCycleCount reads session → checks status=='open' → loops applying variance adjustments (each own tx) → THEN flips to closed — not atomic, not single-winner. Two concurrent closes both pass the open-check and apply every variance TWICE (stock double-counted); a mid-loop crash + retry double-posts too. Fix: extract adjustTx(tdb) from adjust(), wrap closeCycleCount in one tx with session FOR UPDATE (serializes → 2nd close 409s), publish events post-commit. |
 | Files/areas expected | `src/modules/inventory/service.ts` + NEW cycle-count double-close test. inventory unclaimed by B/C. |
 | Started | 2026-07-16 |
-| Status | **RELEASED — pushed to `claude/ascend-p2p-design-audit-grl7ez`, PR #227 → `develop` (draft).** Purchase-order spine delivered end-to-end; the receiving half is audited and filed, not built. Merged `origin/develop` (40 commits) and re-ran every gate on the merged tree. |
+| Status | ACTIVE — implementing |
 | Blockers | none |
 
 ## Active Claim (Claude session D — inventory hardening: transfer atomicity) — RELEASED
@@ -522,7 +747,7 @@ another session's state) — appending this note instead.
 | Queue item | createTransfer moves stock via TWO separate adjustStock calls (each its own tx) + a separate INSERT — NOT atomic. A crash/error between legs loses stock (leaves source, never reaches dest). Fix: extract adjustStockTx(tdb,…) (with FOR UPDATE, same race as adjust()), run both legs + the transfer INSERT in ONE tx. Deferred (noted): COUNT(*)+1 transfer number → doc-counter (needs max-seeding; transfer_number is non-unique so race is cosmetic). |
 | Files/areas expected | `src/modules/inventory/service.ts` + NEW transfer atomicity test. inventory unclaimed by B/C. |
 | Started | 2026-07-16 |
-| Status | **RELEASED — pushed to `claude/ascend-p2p-design-audit-grl7ez`, PR #227 → `develop` (draft).** Purchase-order spine delivered end-to-end; the receiving half is audited and filed, not built. Merged `origin/develop` (40 commits) and re-ran every gate on the merged tree. |
+| Status | ACTIVE — implementing |
 | Blockers | none |
 
 ## Active Claim (Claude session D — inventory hardening: stock-adjust oversell race) — RELEASED
@@ -533,7 +758,7 @@ another session's state) — appending this note instead.
 | Queue item | inventory.adjust() is read-modify-write: SELECT stock_qty (no lock) → compute nextQty in JS → write absolute value. Concurrent adjusts on one product lose updates → oversell. (The FEFO lot path already uses FOR UPDATE; the main stock path didn't.) Fix: SELECT ... FOR UPDATE to serialize, + ON CONFLICT on the new-row INSERT for the first-receive race. Concurrency regression test via a 2nd DB connection. |
 | Files/areas expected | `src/modules/inventory/service.ts` + NEW concurrency test. inventory unclaimed by B/C. NOT payments/shared/orchestration (B), NOT quotes/gateway/sso (C). |
 | Started | 2026-07-16 |
-| Status | **RELEASED — pushed to `claude/ascend-p2p-design-audit-grl7ez`, PR #227 → `develop` (draft).** Purchase-order spine delivered end-to-end; the receiving half is audited and filed, not built. Merged `origin/develop` (40 commits) and re-ran every gate on the merged tree. |
+| Status | ACTIVE — implementing |
 | Blockers | none |
 
 ## Active Claim (Claude session D — authz sweep: reports + ecommerce mutation guards) — RELEASED
@@ -544,7 +769,7 @@ another session's state) — appending this note instead.
 | Queue item | Extended the iter-6 authz sweep across all modules. Real gaps (excluding POS-by-design orders/payments, and B/C-claimed payments/quotes; team verified guarded via in-handler requireManagement): reports POST /ar-aging/sweep (mutates AR/dunning state) + ecommerce PUT /products/:id/online (storefront publishing) were UNGUARDED. Added requireRole("manager") to both. |
 | Files/areas expected | `src/modules/reports/routes.ts` + reports.test.ts; `src/modules/ecommerce/routes.ts` + ecommerce.test.ts. gateway/auth imported only (NOT edited — C). NOT payments/quotes/shared/orchestration (B/C). |
 | Started | 2026-07-16 |
-| Status | **RELEASED — pushed to `claude/ascend-p2p-design-audit-grl7ez`, PR #227 → `develop` (draft).** Purchase-order spine delivered end-to-end; the receiving half is audited and filed, not built. Merged `origin/develop` (40 commits) and re-ran every gate on the merged tree. |
+| Status | ACTIVE — implementing |
 | Blockers | none |
 
 ## Active Claim (Claude session D — sync mutation authorization) — RELEASED
