@@ -113,6 +113,18 @@
      brand again (the old token was rgba(1,55,252,.3) = the RETIRED brand). */
   --focus-ring:            0 0 0 3px rgba(11,122,110,0.32);
 
+  /* ── Procure-to-pay lifecycle ─────────────────────────────────────────────
+     Ordered → Received → Billed → Paid are four different facts about one
+     purchase. Each owns a stage colour so the LifecycleTrail can show which
+     are true without four same-coloured badges. Derived from the status
+     tokens above rather than new hexes, so they follow dark mode for free. */
+  --color-stage-ordered:   var(--color-info);
+  --color-stage-received:  var(--color-success);
+  --color-stage-billed:    var(--color-info-text);
+  --color-stage-paid:      var(--color-success-text);
+  --color-stage-partial:   var(--color-warning);
+  --color-stage-exception: var(--color-danger);
+
   /* ── Density. Set data-density on <html>; every row/control height reads
      these, so one attribute retunes the whole app. ──────────────────────── */
   --row-h:                 40px; /* standard */
@@ -196,6 +208,18 @@
   --color-not-billed:      var(--color-warning);
 
   --focus-ring:            0 0 0 3px rgba(60,181,165,0.40);
+
+  /* ── Procure-to-pay lifecycle ─────────────────────────────────────────────
+     Ordered → Received → Billed → Paid are four different facts about one
+     purchase. Each owns a stage colour so the LifecycleTrail can show which
+     are true without four same-coloured badges. Derived from the status
+     tokens above rather than new hexes, so they follow dark mode for free. */
+  --color-stage-ordered:   var(--color-info);
+  --color-stage-received:  var(--color-success);
+  --color-stage-billed:    var(--color-info-text);
+  --color-stage-paid:      var(--color-success-text);
+  --color-stage-partial:   var(--color-warning);
+  --color-stage-exception: var(--color-danger);
 }
 
 /* ── Print receipt ────────────────────────────────────────────────────────── */

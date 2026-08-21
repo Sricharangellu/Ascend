@@ -222,6 +222,14 @@ export default function ReceivingHubPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant={s.status === "quality_hold" ? "yellow" : "blue"}>{s.status}</Badge>
+                      {/* The way in to the scan workspace. Without it this list
+                          could only ever close a session it had no way to open. */}
+                      <Link
+                        href={`/purchasing/receiving/${s.id}`}
+                        className="inline-flex min-h-touch items-center rounded bg-brand-600 px-[15px] text-[14px] font-medium text-white transition-colors hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+                      >
+                        Open
+                      </Link>
                       <Button
                         variant="secondary"
                         size="sm"
