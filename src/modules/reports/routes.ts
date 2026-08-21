@@ -84,9 +84,11 @@ export function registerRoutes(router: Router, service: ReportsService): void {
     res.json(await service.retailRecommendations(tenantId(res), recentDays));
   }));
 
-  // GET /api/v1/reports/ar-aging — Accounts Receivable aging buckets.
-  router.get("/ar-aging", handler(async (_req, res) => {
-    res.json(await service.arAging(tenantId(res)));
+  // GET /api/v1/reports/ar-aging?limit=… — Accounts Receivable aging buckets.
+  // `limit` caps the per-party list (default/cap 500); `totals` always sum every
+  // open invoice regardless (REPORTS_MODULE_REVIEW.md finding #4).
+  router.get("/ar-aging", requireRole("manager"), handler(async (req, res) => {
+    res.json(await service.arAging(tenantId(res), Date.now(), cappedLimit(req.query.limit, 500)));
   }));
 
   // POST /api/v1/reports/ar-aging/sweep — flag overdue invoices with dunning_level.
@@ -96,9 +98,11 @@ export function registerRoutes(router: Router, service: ReportsService): void {
     res.json(await service.sweepArAging(tenantId(res)));
   }));
 
-  // GET /api/v1/reports/ap-aging — Accounts Payable aging buckets.
-  router.get("/ap-aging", handler(async (_req, res) => {
-    res.json(await service.apAging(tenantId(res)));
+  // GET /api/v1/reports/ap-aging?limit=… — Accounts Payable aging buckets.
+  // `limit` caps the per-party list (default/cap 500); `totals` always sum every
+  // open bill regardless (REPORTS_MODULE_REVIEW.md finding #4).
+  router.get("/ap-aging", requireRole("manager"), handler(async (req, res) => {
+    res.json(await service.apAging(tenantId(res), Date.now(), cappedLimit(req.query.limit, 500)));
   }));
 
   // GET /api/v1/reports/sales-by-category?range=…
@@ -107,13 +111,13 @@ export function registerRoutes(router: Router, service: ReportsService): void {
   }));
 
   // GET /api/v1/reports/sales-by-customer?range=…&limit=…
-  router.get("/sales-by-customer", handler(async (req, res) => {
+  router.get("/sales-by-customer", requireRole("manager"), handler(async (req, res) => {
     const limit = cappedLimit(req.query.limit, 200);
     res.json({ items: await service.salesByCustomer(tenantId(res), sinceFromRange(req), limit) });
   }));
 
   // GET /api/v1/reports/inventory-valuation?limit=…&offset=… — on-hand value at cost and retail.
-  router.get("/inventory-valuation", handler(async (req, res) => {
+  router.get("/inventory-valuation", requireRole("manager"), handler(async (req, res) => {
     const limit = cappedLimit(req.query.limit, 500);
     const offset = typeof req.query.offset === "string" ? Math.max(0, Number(req.query.offset) || 0) : 0;
     res.json(await service.inventoryValuation(tenantId(res), limit, offset));
@@ -125,17 +129,17 @@ export function registerRoutes(router: Router, service: ReportsService): void {
   }));
 
   // GET /api/v1/reports/sales-by-vendor?range=… — revenue grouped by vendor.
-  router.get("/sales-by-vendor", handler(async (req, res) => {
+  router.get("/sales-by-vendor", requireRole("manager"), handler(async (req, res) => {
     res.json({ items: await service.salesByVendor(tenantId(res), sinceFromRange(req)) });
   }));
 
   // GET /api/v1/reports/p-l?range=… — P&L: revenue, COGS, gross profit, expenses, net.
-  router.get("/p-l", handler(async (req, res) => {
+  router.get("/p-l", requireRole("manager"), handler(async (req, res) => {
     res.json(await service.pnl(tenantId(res), sinceFromRange(req)));
   }));
 
   // GET /api/v1/reports/revenue-trend?range=7d|30d|90d — daily revenue series.
-  router.get("/revenue-trend", handler(async (req, res) => {
+  router.get("/revenue-trend", requireRole("manager"), handler(async (req, res) => {
     const r = typeof req.query.range === "string" ? req.query.range : "7d";
     const days: 7 | 30 | 90 = r === "30d" ? 30 : r === "90d" ? 90 : 7;
     res.json({ items: await service.revenueTrend(tenantId(res), days) });
@@ -149,7 +153,7 @@ export function registerRoutes(router: Router, service: ReportsService): void {
   }));
 
   // GET /api/v1/reports/margin-by-category?range=…
-  router.get("/margin-by-category", handler(async (req, res) => {
+  router.get("/margin-by-category", requireRole("manager"), handler(async (req, res) => {
     const items = await service.marginByCategory(tenantId(res), sinceFromRange(req));
     res.json({ items });
   }));
@@ -193,7 +197,7 @@ export function registerRoutes(router: Router, service: ReportsService): void {
   // ── BE-38: Purchase/AP Report ─────────────────────────────────────────────
 
   // GET /api/v1/reports/purchases?vendorId=&from=&to=&limit= (professional+)
-  router.get("/purchases", requirePlan("professional"), handler(async (req, res) => {
+  router.get("/purchases", requireRole("manager"), requirePlan("professional"), handler(async (req, res) => {
     const t = tenantId(res);
     const vendorId = typeof req.query.vendorId === "string" ? req.query.vendorId : undefined;
     const from = typeof req.query.from === "string" ? Number(req.query.from) : undefined;
@@ -205,7 +209,7 @@ export function registerRoutes(router: Router, service: ReportsService): void {
   // ── BE-40: Time Cards report ──────────────────────────────────────────────
 
   // GET /api/v1/reports/time-cards?employeeId=&from=&to= (growth+)
-  router.get("/time-cards", requirePlan("growth"), handler(async (req, res) => {
+  router.get("/time-cards", requireRole("manager"), requirePlan("growth"), handler(async (req, res) => {
     const t = tenantId(res);
     const employeeId = typeof req.query.employeeId === "string" ? req.query.employeeId : undefined;
     const from = typeof req.query.from === "string" ? Number(req.query.from) : undefined;

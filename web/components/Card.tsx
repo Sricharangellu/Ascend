@@ -24,7 +24,10 @@ export function Card({
       className={clsx(
         "rounded-xl border",
         "bg-[var(--color-surface)] border-[var(--color-border)]",
-        "shadow-[var(--shadow-sm)]",
+        // No shadow: this design system separates surfaces by border and
+        // luminance, and reserves shadow for things that genuinely float.
+        // (This line previously read shadow-[var(--shadow-sm)] against a
+        // variable that was never declared, so it had no effect anyway.)
         className
       )}
       {...props}

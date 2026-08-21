@@ -7,10 +7,8 @@
     ".": "./src/index.ts",
     "./schema": "./src/schema/index.ts"
   },
-  "scripts": {
-    "push": "drizzle-kit push --config ./drizzle.config.ts",
-    "push-force": "drizzle-kit push --force --config ./drizzle.config.ts"
-  },
+  "_comment": "No `push` script by design. src/schema/index.ts is intentionally empty — the API server owns the real schema (db/migrations/*.sql) and migrates at startup. A drizzle-kit push would diff that empty schema against the live database and offer to DROP every table; with --force it wipes silently. See .agents/memory/post-merge-drizzle-trap.md. Only reintroduce a push script if the real schema actually moves into this package.",
+  "scripts": {},
   "dependencies": {
     "drizzle-orm": "catalog:",
     "drizzle-zod": "^0.8.3",

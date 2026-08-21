@@ -47,34 +47,181 @@ This stricter guard blocks the local patterns that create unrelated dirty code:
 
 Run this before opening a PR or handing off a session. CI also runs it in the guard job.
 
+## `route-authz-scan.mjs` — every mutating route must carry an authz guard
+
+```bash
+npm run authz:scan
+```
+
+Fails if any `PUT`/`PATCH`/`DELETE` route in `src/` reaches its handler with no
+`requireRole` / `requirePermission` / `requireScope` / `requireCapability` /
+`requireModule` in front of it. A guard counts whether it is applied inline,
+through a `const mgr = requireRole("manager")` alias declared in the same file,
+or through an earlier `router.use(...)`.
+
+Replaces a CI grep step that was inert twice over: it ended in `|| echo "…✓"`,
+so it exited 0 on every run it ever made, and it only matched the literal text
+`requireRole` on the route's own line — which meant the 20+ files using the
+hoisted-alias convention all read as unguarded. Repaired as written it reported
+39 findings, ~35 of them false. This scanner reports **4**, all real, and one
+(`quotes DELETE /:id` — a hard delete of a commercial document by any cashier,
+with no soft-delete column and no audit entry) was fixed rather than
+allowlisted. Full reasoning in `docs/architecture/ADR/ADR-008`.
+
+`POST` is deliberately out of scope: in a POS it is the ordinary cashier action
+(ring a sale, take payment, open a tab), so gating it would be wrong for the
+product. The allowlist is **shrink-only** — an entry means "reviewed, and
+cashier-level access is correct here", and carries the reason. Never add one to
+make CI green.
+
+## `openapi-contract-scan.mjs` — every documented operation must have a route
+
+```bash
+npm run contract:scan
+```
+
+Fails if `contracts/openapi.yaml` documents a `<METHOD> <path>` that no backend
+route serves. The pair to `api-gap-scan`: that one asks "does the route the
+frontend *calls* exist?", this one asks "does the operation the contract
+*promises* exist?".
+
+Worth gating because the contract is not passive documentation here. Frontend
+work is written against it — "if it's not in the spec, you don't call it" — so a
+documented path with no route is a direction to build a call that 404s, which is
+the 2026-07-18 incident (pages green against MSW, real API 404) approached from
+the other side. `web/package.json` also still wires
+`generate:client: openapi-typescript ../contracts/openapi.yaml` at it, which
+would turn every documented path into a typed, autocompleting client method.
+(Read `web/api-client/types.ts`'s header before running that script: the file is
+hand-maintained, 218 files import named types from it, and the generator emits a
+different shape that would break all of them at once.)
+
+**One-way, deliberately.** The backend serves 626 operations and the contract
+documents 146. Checking code → contract as well would fail on arrival with ~480
+findings and be deleted inside a week. An undocumented route is a documentation
+gap; a documented-but-absent route is a lie told to whoever reads the spec.
+
+**Paths and methods only** — not request or response bodies. Those drift too
+(`POST /rooms/{id}/charge` takes camelCase `amountCents` and an `orderId`, while
+the contract says snake_case `amount_cents` and a `category` that does not
+exist), and reconciling them is F-19's job, not this scanner's.
+
+Express `:id` and OpenAPI `{id}` both normalize to `:p` via
+`lib/backend-routes.mjs`, shared with `api-gap-scan`. That is load-bearing:
+without it the first run reported 50 findings, 41 of them purely the
+brace-vs-colon difference.
+
+The allowlist follows the same rule as `api-gap-allowlist.json` — every entry
+carries a reason, and where the capability exists at a different address the
+reason names that route, so the fix is already researched for whoever takes it.
+A **stale** entry fails the scan too: once the route ships or the contract is
+corrected, the entry must go. The reader also asserts it parsed a plausible
+number of operations, so a change to the document's shape fails loudly instead
+of silently scanning nothing forever.
+
+## `duplicate-code-scan.mjs` — copy-paste detector (report-only)
+
+```bash
+npm run dupe:scan              # summary + top 10 groups
+npm run dupe:scan -- --verbose # every file in every group
+npm run dupe:scan -- --max 12  # exit 1 if groups exceed 12
+```
+
+Finds two things the other scanners structurally cannot: files that are
+identical after comments and whitespace are stripped, and blocks of ≥25
+identical lines shared across files. Everything else in this directory looks
+for something **missing** (`api-gap-scan`) or **colliding** (`table-collision-scan`,
+`hygiene-check`) — duplication is neither, which is how 48 copies of
+`test-request.ts` and a second `apiFetch` beside the canonical one both survived
+a full green pipeline until a human read the code.
+
+**Exits 0 by default, on purpose.** A new detector over a 2,195-file repo
+reports a backlog, and gating merges on it before that backlog is burned down
+blocks all work — at which point the check gets deleted rather than fixed. Same
+staged rollout `docker-build` and `e2e` got. Add `--max <n>` to the CI step once
+the number is small and stable.
+
+Scope is `src/` + `web/`, matching `api-gap-scan`. `artifacts/` is excluded: it
+is a known ~1,000-file duplicate of the whole app (audit finding H-1 / backlog
+F-3), and including it would bury every actionable finding under one already-
+tracked one. Re-scope when F-3 is resolved.
+
+## `dead-code-scan.mjs` — unreferenced exports (report-only)
+
+```bash
+npm run dead:scan               # summary, split by value vs type
+npm run dead:scan -- --verbose  # every file
+npm run dead:scan -- --max 40   # exit 1 above N *value* exports
+```
+
+Reports exports whose name appears nowhere outside the file declaring them.
+Results split into **value** exports (functions/classes/consts — the actionable
+list) and **type-only** exports (over-exposed surface, low priority), because a
+single undifferentiated number buries the ~95 that matter under ~276 that
+mostly do not.
+
+**The method can only under-report.** It is a word-boundary text match, not an
+import graph, so anything mentioned anywhere — a real import, a re-export, a
+dynamic `import()`, a string in a test — counts as live. That bias is chosen
+deliberately: this feeds *deletion* decisions, and proposing the removal of
+live code is the one outcome that must never happen. A clean run therefore does
+not mean "no dead code", only "none this method can prove".
+
+**Most hits are over-exported, not dead.** Verified examples: `CREATE_USERS_TABLE`
+in `src/identity/migrations.ts` is used at line 493 of its own file;
+`withStripeBreaker` is used only inside `stripe.ts`. Both are correctly
+"referenced nowhere else" — and neither should be deleted. Treat every hit as a
+candidate to investigate, and check dynamic imports, string-keyed registries and
+framework conventions before touching anything.
+
+Next.js App Router files (`page`/`layout`/`route`/…), `middleware.ts` and
+`src/server.ts` are excluded — the framework calls them, so nothing imports them.
+
+## `license-scan.mjs` — licence inventory over a CycloneDX SBOM (report-only)
+
+```bash
+npm sbom --sbom-format=cyclonedx > sbom.cdx.json
+node tools/license-scan.mjs sbom.cdx.json
+node tools/license-scan.mjs --fail-on copyleft,unknown sbom.cdx.json
+```
+
+Classifies every component into permissive / weak-copyleft / copyleft / other /
+unknown. Run against the real tree 2026-08-06: **858 unique components, 851
+permissive, 2 weak-copyleft (MPL-2.0), 0 copyleft, 2 with no declared licence.**
+
+It deliberately encodes **no policy** — which licence families are acceptable is
+a business decision, so it exits 0 unless `--fail-on` says otherwise. `unknown`
+is not benign: an undeclared licence is legally "all rights reserved" until
+proven otherwise. Runs in `.github/workflows/security.yml` alongside SBOM
+generation.
+
 ## `new-worktree.sh` — one isolated checkout per session
 
 ```bash
-tools/new-worktree.sh expenses-mvp
+tools/new-worktree.sh expenses-mvp              # -> ../ascend-wt-expenses-mvp, branch wt/expenses-mvp
+tools/new-worktree.sh fix/expenses-cents        # a slug with a type prefix becomes the branch as-is
+tools/new-worktree.sh hotfix/readyz-500 master  # the one sanctioned master base; warns
 ```
 
-Creates `../finder-wt-expenses-mvp` on a fresh branch off `origin/master`. Use this
-(or run sessions one at a time) so parallel work does not share the primary tree —
-the single biggest source of the collisions. **Never make a second clone**; a
+Creates `../ascend-wt-<slug>` on a fresh branch off `origin/develop`. The base is
+`develop` by design — promotion is forward-only (`feature/* → develop → staging →
+master`) and `master` is a release target, not a starting point. Pass a second
+argument only for a real hotfix.
+
+Use this (or run sessions one at a time) so parallel work does not share the primary
+tree — the single biggest source of the collisions. **Never make a second clone**; a
 worktree shares one object store, a clone diverges.
 
-## Sri-only: turn on PR protection (ends direct-to-master racing)
+## PR protection on `master` — already on
 
-The deepest fix is that no session pushes to `master` directly — every change goes
-through a short-lived branch + PR, so conflicts surface *before* landing. Enable it
-once (GitHub Settings → Branches → `master`), or via API:
+No session pushes to `master` directly. Branch protection requires the CI checks and is
+**admin-enforced** — there is no bypass, including for repo admins — and no workflow
+auto-merges anything, so a human clicks merge every time. The authoritative description
+of what is enforced, and the config registry behind it, live in
+`docs/architecture/PIPELINE.md`; the check names themselves are the `name:` fields in
+`.github/workflows/ci.yml`. Read them there rather than copying the list here — a copy
+made on 2026-08-05 was stale within a day, when the frontend job gained a `test` step
+and became `Frontend — typecheck + lint + test + build`.
 
-```bash
-gh api -X PUT repos/Sricharangellu/Ascend/branches/master/protection \
-  -F required_pull_request_reviews.required_approving_review_count=0 \
-  -F 'required_status_checks.contexts[]=Backend' \
-  -F 'required_status_checks.contexts[]=Frontend' \
-  -F 'required_status_checks.contexts[]=Production guard' \
-  -F 'required_status_checks.contexts[]=E2E' \
-  -F required_status_checks.strict=true \
-  -F enforce_admins=false -F restrictions=
-```
-
-Also enable Settings → General → "Allow squash merging" only + "Automatically
-delete head branches". After that, every session follows: branch → PR →
-`gh pr merge --auto --squash --delete-branch` (see `AGENTS.md` "Git: where and how").
+Every session therefore follows: branch off `develop` → PR into `develop` → green CI
+→ Sri merges. See `AGENTS.md` "Git: where and how" and `tools/AGENT_PROMPT.md`.

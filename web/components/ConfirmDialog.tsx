@@ -9,6 +9,11 @@ interface ConfirmDialogProps {
   message: string;
   confirmLabel?: string;
   destructive?: boolean;
+  /** In flight — disables both buttons so a second click cannot fire the same
+   *  action twice, and so Cancel cannot close the dialog out from under a
+   *  request that is already running. Callers doing async work must set this;
+   *  without it a double-click on a destructive confirm sends two requests. */
+  busy?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -19,6 +24,7 @@ export function ConfirmDialog({
   message,
   confirmLabel = "Confirm",
   destructive = false,
+  busy = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -46,15 +52,16 @@ export function ConfirmDialog({
     <dialog
       ref={ref}
       className="rounded-xl shadow-2xl p-6 max-w-sm w-full backdrop:bg-black/40 border-0 outline-none"
-      onKeyDown={(e) => { if (e.key === "Escape") onCancel(); }}
+      onKeyDown={(e) => { if (e.key === "Escape" && !busy) onCancel(); }}
     >
       <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
       <p className="mt-2 text-sm text-gray-600">{message}</p>
       <div className="mt-5 flex justify-end gap-3">
-        <Button variant="secondary" size="sm" onClick={onCancel}>Cancel</Button>
+        <Button variant="secondary" size="sm" onClick={onCancel} disabled={busy}>Cancel</Button>
         <Button
           variant={destructive ? "danger" : "primary"}
           size="sm"
+          disabled={busy}
           onClick={() => { onConfirm(); }}
         >
           {confirmLabel}

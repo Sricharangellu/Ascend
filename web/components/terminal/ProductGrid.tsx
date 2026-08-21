@@ -83,7 +83,7 @@ export function ProductGrid({ onAddProduct }: ProductGridProps) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    apiGet<CatalogListResponse>("/api/v1/catalog?pageSize=200")
+    apiGet<CatalogListResponse>("/api/v1/catalog?limit=200")
       .then((data) => {
         if (!cancelled) {
           // Normalize: the real backend returns snake_case (price_cents);

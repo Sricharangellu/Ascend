@@ -1,10 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/Button";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { formatMoney, parseToCents } from "@/lib/money";
 import { hasRole } from "@/lib/auth";
+import { startReceivingSession, receivingSessionHref } from "@/lib/receiving";
 import type {
   CreatePurchaseOrderLineRequest,
   InventoryLevelsResponse,
@@ -29,7 +33,9 @@ export function OrdersTab() {
   const [poSupplierId, setPoSupplierId] = useState("");
   const [lines, setLines]         = useState<DraftLine[]>([emptyLine()]);
   const [unitsByProduct, setUnitsByProduct] = useState<Record<string, ProductBarcode[]>>({});
+  const [confirmReceiveAll, setConfirmReceiveAll] = useState<PurchaseOrder | null>(null);
   const canManage                 = hasRole("manager");
+  const router                    = useRouter();
 
   const load = useCallback(async () => {
     setError(null);
@@ -75,7 +81,34 @@ export function OrdersTab() {
   const addLine    = () => setLines((cur) => [...cur, emptyLine()]);
   const removeLine = (index: number) => setLines((cur) => cur.filter((_, i) => i !== index));
 
-  const receiveOrder = async (id: string) => {
+  /**
+   * Open the scan workspace for this PO — the normal way to receive a delivery.
+   * Starting the session from the row is what removes the old
+   * list → detail → tab → modal walk before the first box gets counted.
+   */
+  const openReceiving = async (id: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const session = await startReceivingSession(id);
+      router.push(receivingSessionHref(session.id));
+    } catch (err) {
+      setError(err instanceof ApiResponseError ? err.message : "Could not open receiving for this order.");
+      setBusy(false);
+    }
+  };
+
+  /**
+   * "Receive all expected" — post every open line at its full remaining
+   * quantity in one shot.
+   *
+   * This is what the old `Receive` button did, unlabelled and unguarded: a
+   * single click posted a complete receipt into inventory with no counts, no
+   * costs, no lots and no way back. It is a genuinely useful mode when the
+   * delivery is known-good, so it stays — but it now says what it does and
+   * asks first.
+   */
+  const receiveAll = async (id: string) => {
     setBusy(true);
     setError(null);
     try {
@@ -83,7 +116,7 @@ export function OrdersTab() {
       await load();
     } catch (err) {
       setError(err instanceof ApiResponseError ? err.message : "Could not receive purchase order.");
-    } finally { setBusy(false); }
+    } finally { setBusy(false); setConfirmReceiveAll(null); }
   };
 
   const createOrder = async () => {
@@ -128,6 +161,19 @@ export function OrdersTab() {
 
   return (
     <div className="flex flex-col gap-5 p-4">
+      <ConfirmDialog
+        open={confirmReceiveAll !== null}
+        title="Receive everything on this order?"
+        message={
+          confirmReceiveAll
+            ? `Every open line on ${confirmReceiveAll.po_number != null ? `PO-${confirmReceiveAll.po_number}` : "this order"} will be posted at its full remaining quantity, at the ordered cost. Stock moves immediately. Use Scan & Receive instead if you need to count, price, or record lots and expiry dates.`
+            : ""
+        }
+        confirmLabel="Receive all"
+        onConfirm={() => { if (confirmReceiveAll) void receiveAll(confirmReceiveAll.id); }}
+        onCancel={() => setConfirmReceiveAll(null)}
+      />
+
       {error && <p role="alert" className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
       {confirmation && (
         <div className="rounded-md bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
@@ -155,7 +201,16 @@ export function OrdersTab() {
             ) : (
               orders.map((order) => (
                 <tr key={order.id} className="transition-colors hover:bg-slate-50">
-                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{order.id}</td>
+                  <td className="whitespace-nowrap px-4 py-3">
+                    {/* The PO number is what people say out loud and search for;
+                        the UUID was never useful here. */}
+                    <Link
+                      href={`/purchasing/${order.id}`}
+                      className="font-medium text-brand-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+                    >
+                      {order.po_number != null ? `PO-${order.po_number}` : order.id.slice(0, 8)}
+                    </Link>
+                  </td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-950">{supplierName(order.supplier_id)}</td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <span className={`inline-flex rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${STATUS_STYLE[order.status] ?? "bg-slate-100 text-slate-700 ring-slate-200"}`}>
@@ -165,9 +220,25 @@ export function OrdersTab() {
                   <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-950">{formatMoney(order.total_cost_cents)}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
                     {order.status === "ordered" && canManage && (
-                      <Button size="sm" variant="primary" disabled={busy} onClick={() => void receiveOrder(order.id)}>
-                        Receive
-                      </Button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          disabled={busy}
+                          onClick={() => void openReceiving(order.id)}
+                        >
+                          Scan &amp; Receive
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={busy}
+                          onClick={() => setConfirmReceiveAll(order)}
+                          title="Post every open line at its full remaining quantity"
+                        >
+                          Receive all
+                        </Button>
+                      </div>
                     )}
                   </td>
                 </tr>

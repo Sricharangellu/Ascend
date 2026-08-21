@@ -22,7 +22,23 @@ beforeEach(() => {
   clearSession();
 });
 
+/**
+ * Read a Blob as text, across both Blob implementations this suite sees.
+ *
+ * `Response.blob()` under jsdom does not return the same object on every Node
+ * version, and the two implementations support disjoint APIs:
+ *
+ *   - Node 22: a *native* (undici) Blob. It has `.text()`, but jsdom's
+ *     FileReader rejects it — "parameter 1 is not of type 'Blob'".
+ *   - Node 24 (what .nvmrc pins, so what CI runs): a *jsdom* Blob. FileReader
+ *     accepts it, but it has no `.text()` — "blob.text is not a function".
+ *
+ * Neither approach alone passes in both places, so feature-detect rather than
+ * pick one. Committing to `.text()` is what turned this suite red on CI while
+ * it was green locally.
+ */
 function readBlob(blob: Blob): Promise<string> {
+  if (typeof blob.text === "function") return blob.text();
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(reader.error);

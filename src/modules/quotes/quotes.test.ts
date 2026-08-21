@@ -189,18 +189,38 @@ test("quotes: cannot delete a converted quote", async () => {
 
 // ─── Role gating ────────────────────────────────────────────────────────────
 
-test("quotes: no requireRole guard on any route — cashier can create, convert, and delete", async () => {
+test("quotes: sales-floor actions stay cashier-level (create, send, convert)", async () => {
   const app = await freshApp();
   const created = await callAs(app, "POST", "/api/v1/quotes/", "tnt_demo", "cashier", { lines: sampleLines() });
-  assert.equal(created.status, 201, "cashier can create a quote (routes.ts has no requireRole calls)");
+  assert.equal(created.status, 201, "cashier can create a quote");
   const id = created.json.id;
 
-  const converted = await callAs(app, "POST", `/api/v1/quotes/${id}/convert`, "tnt_demo", "cashier", {});
-  assert.equal(converted.status, 200, "cashier can convert a quote");
+  const sent = await callAs(app, "PATCH", `/api/v1/quotes/${id}/status`, "tnt_demo", "cashier", { status: "sent" });
+  assert.equal(sent.status, 200, "cashier can move a quote through its lifecycle");
 
-  const del = await callAs(app, "DELETE", `/api/v1/quotes/${id}`, "tnt_demo", "cashier", undefined);
-  // a converted quote can't be deleted (state rule), not a role rule
-  assert.equal(del.status, 400);
+  const converted = await callAs(app, "POST", `/api/v1/quotes/${id}/convert`, "tnt_demo", "cashier", {});
+  assert.equal(converted.status, 200, "cashier can convert a quote to an order");
+});
+
+// DELETE is the one irreversible operation here: service.delete() issues a real
+// `DELETE FROM customer_quotations` (cascading its lines) with no soft-delete
+// column and no audit_log entry, so an unguarded mis-click is unrecoverable and
+// untraceable. Fails against the pre-fix routes.ts, which had no guard at all.
+test("quotes: hard delete is manager-gated — cashier gets 403, manager succeeds", async () => {
+  const app = await freshApp();
+  const created = await callAs(app, "POST", "/api/v1/quotes/", "tnt_demo", "cashier", { lines: sampleLines() });
+  assert.equal(created.status, 201);
+  const id = created.json.id;
+
+  const denied = await callAs(app, "DELETE", `/api/v1/quotes/${id}`, "tnt_demo", "cashier", undefined);
+  assert.equal(denied.status, 403, "a cashier must not be able to hard-delete a quote");
+  assert.equal(denied.json.error.code, "forbidden");
+
+  const stillThere = await callAs(app, "GET", `/api/v1/quotes/${id}`, "tnt_demo", "cashier");
+  assert.equal(stillThere.status, 200, "the denied delete must not have removed anything");
+
+  const allowed = await callAs(app, "DELETE", `/api/v1/quotes/${id}`, "tnt_demo", "manager", undefined);
+  assert.equal(allowed.status, 204, "a manager can still delete an unconverted quote");
 });
 
 // ─── Tenant isolation ───────────────────────────────────────────────────────

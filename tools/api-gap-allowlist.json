@@ -33,7 +33,6 @@
     "/api/v1/settings/b2b",
     "/api/v1/settings/custom-roles",
     "/api/v1/settings/custom-roles/:p",
-    "/api/v1/settings/permissions",
-    "/api/v1/things"
+    "/api/v1/settings/permissions"
   ]
 }

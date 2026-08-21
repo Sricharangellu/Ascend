@@ -29,7 +29,7 @@ export type NavKey =
   | "restaurant-dashboard" | "restaurant-floor-plan" | "restaurant-tabs"
   | "permissions" | "modes" | "kiosk-settings" | "b2b-settings"
   | "warehouse" | "pricing" | "edi-imports" | "promotions" | "documents"
-  | "inventory-errors" | "bills" | "delivery" | "ai-assistant";
+  | "inventory-errors" | "bills" | "delivery" | "ai-assistant" | "progress";
 
 // ── Section / nav tree ────────────────────────────────────────────────────────
 
@@ -43,6 +43,7 @@ const SECTION_MAP: Record<NavKey, RailSection> = {
   returns: "sell", "service-orders": "sell",
   ecommerce: "online",
   reports: "reporting", insights: "reporting", "ai-assistant": "reporting", "tax-compliance": "reporting",
+  progress: "reporting",
   catalog: "catalog", discounts: "catalog", "gift-cards": "catalog",
   loyalty: "catalog", promotions: "catalog", pricing: "catalog",
   inventory: "inventory", operations: "inventory", purchasing: "inventory",
@@ -144,6 +145,7 @@ const NAV_TREE: NavSection[] = [
       { label: "Insights",       href: "/insights",       featureGate: "insights" },
       { label: "AI Assistant",   href: "/ai-assistant",   featureGate: "ai-assistant" },
       { label: "Tax Compliance", href: "/tax-compliance", featureGate: "tax-compliance" },
+      { label: "Progress",       href: "/progress",       featureGate: "progress" },
     ],
   },
   {
@@ -225,6 +227,39 @@ const NAV_TREE: NavSection[] = [
   },
 ];
 
+// ── Focused-workspace routes ──────────────────────────────────────────────────
+
+/**
+ * Which routes are a *task* rather than a *place*.
+ *
+ * On a task page the global nav is dead weight — the operator is scanning a
+ * pallet or reconciling an invoice, not browsing — so the sidebar drops to its
+ * icon rail and the work gets the width. On a place page (dashboards, lists,
+ * settings) navigation is the point and stays open.
+ *
+ * Kept as one exported, testable predicate instead of a `focus` prop sprinkled
+ * across pages, so the policy can be audited in a single read. A page can still
+ * override it explicitly via `EnterpriseShell`'s `focus` prop.
+ */
+const FOCUSED_ROUTE_PREFIXES = [
+  "/purchasing/receiving/", // scan & receive workspace (a specific session)
+  "/inventory/receive-stock",
+  "/inventory/counts/",
+  "/inventory/adjustments",
+  "/terminal",              // POS
+  "/purchase",              // cost entry
+] as const;
+
+/** Routes that match a prefix above but are lists, not tasks — nav stays open. */
+const FOCUS_EXEMPT_EXACT = ["/purchasing/receiving", "/inventory/counts"] as const;
+
+export function isFocusedRoute(pathname: string): boolean {
+  if ((FOCUS_EXEMPT_EXACT as readonly string[]).includes(pathname)) return false;
+  return FOCUSED_ROUTE_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(p),
+  );
+}
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface EnterpriseShellProps {
@@ -234,6 +269,11 @@ interface EnterpriseShellProps {
   children: React.ReactNode;
   banner?: React.ReactNode;
   contentClassName?: string;
+  /**
+   * Force focused-workspace mode on or off, overriding `isFocusedRoute`.
+   * Leave undefined to let the route decide.
+   */
+  focus?: boolean;
 }
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
@@ -244,12 +284,27 @@ export function EnterpriseShell({
   children,
   banner,
   contentClassName,
+  focus,
 }: EnterpriseShellProps) {
+  const pathname = usePathname();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [compactViewport, setCompactViewport] = useState(false);
-  const [sidebarExpanded, setSidebarExpanded] = useState(() =>
-    typeof window === "undefined" ? true : window.innerWidth >= 768
-  );
+  const focused = focus ?? isFocusedRoute(pathname);
+
+  // The sidebar starts collapsed in a focused workspace and open everywhere
+  // else. Once the operator touches the toggle their choice wins for the rest
+  // of the session — auto-collapse is a helpful default, not a fight.
+  const userSetSidebar = useRef(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(() => {
+    if (typeof window === "undefined") return true;
+    if (window.innerWidth < 768) return false;
+    return !isFocusedRoute(window.location.pathname);
+  });
+
+  const toggleSidebar = useCallback(() => {
+    userSetSidebar.current = true;
+    setSidebarExpanded((e) => !e);
+  }, []);
 
   const handleGlobalKey = useCallback((e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "/")) {
@@ -274,15 +329,23 @@ export function EnterpriseShell({
     return () => media.removeEventListener("change", sync);
   }, []);
 
+  // Entering or leaving a focused workspace re-applies the default — unless the
+  // operator has already expressed a preference this session.
+  useEffect(() => {
+    if (userSetSidebar.current) return;
+    if (compactViewport) return;
+    setSidebarExpanded(!focused);
+  }, [focused, compactViewport]);
+
   const sidebarW = sidebarExpanded ? 220 : 52;
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#F5F5F5]">
+    <div className="flex min-h-screen flex-col bg-[var(--color-page-bg)]">
       <a href="#main-content" className="skip-link">Skip to content</a>
 
       <TopBar
         onSearchClick={() => setPaletteOpen(true)}
-        onMenuToggle={() => setSidebarExpanded((e) => !e)}
+        onMenuToggle={toggleSidebar}
       />
 
       <div className="flex flex-1 pt-12">
@@ -298,7 +361,8 @@ export function EnterpriseShell({
           active={active}
           expanded={sidebarExpanded}
           compact={compactViewport}
-          onCollapseToggle={() => setSidebarExpanded((e) => !e)}
+          focused={focused}
+          onCollapseToggle={toggleSidebar}
         />
 
         <main
@@ -377,8 +441,11 @@ function TopBar({
 
       {/* Right controls */}
       <div className="flex items-center gap-3 shrink-0">
+        {/* White on --color-warning is 5.06:1 (AA). The status ramp collapses
+            500 and 900 onto near-identical dark ambers, so a tonal pair here
+            would render dark-on-dark. */}
         {isOffline && (
-          <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[11px] font-semibold text-white">
+          <span className="rounded-full bg-warning-500 px-2 py-0.5 text-[11px] font-semibold text-white">
             Offline
           </span>
         )}
@@ -407,21 +474,21 @@ function TopBar({
             <ChevronDown />
           </button>
           {userMenuOpen && (
-            <div className="absolute right-0 top-9 z-50 w-48 rounded-lg border border-slate-200 bg-white py-1 shadow-xl">
-              <div className="border-b border-slate-100 px-3 py-2">
-                <p className="text-xs font-semibold text-slate-900 truncate">{user?.name}</p>
-                <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+            <div className="absolute right-0 top-9 z-50 w-48 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-popover">
+              <div className="border-b border-[var(--color-border-subtle)] px-3 py-2">
+                <p className="truncate text-xs font-semibold text-[var(--color-text-primary)]">{user?.name}</p>
+                <p className="truncate text-xs text-[var(--color-text-secondary)]">{user?.email}</p>
               </div>
               <Link
                 href="/settings"
-                className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                className="block px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-subtle)]"
               >
                 Settings
               </Link>
               <button
                 type="button"
                 onClick={() => void logout()}
-                className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                className="block w-full px-3 py-2 text-left text-sm text-danger-700 hover:bg-danger-50"
               >
                 Sign out
               </button>
@@ -439,11 +506,13 @@ function LeftRail({
   active,
   expanded,
   compact,
+  focused,
   onCollapseToggle,
 }: {
   active: NavKey;
   expanded: boolean;
   compact: boolean;
+  focused: boolean;
   onCollapseToggle: () => void;
 }) {
   const pathname = usePathname();
@@ -507,7 +576,7 @@ function LeftRail({
         {permissionsError && expanded && (
           <div
             role="alert"
-            className="mx-2 mb-2 rounded-md bg-amber-500/15 px-3 py-2 text-xs leading-snug text-amber-100"
+            className="mx-2 mb-2 rounded-md bg-warning-500/15 px-3 py-2 text-xs leading-snug text-warning-100"
           >
             Permissions couldn’t load. Some features are hidden until access is restored — refresh to retry.
           </div>
@@ -648,9 +717,13 @@ function LeftRail({
         <button
           type="button"
           onClick={onCollapseToggle}
-          title={expanded ? "Collapse sidebar" : "Expand sidebar"}
+          title={
+            expanded ? "Collapse sidebar"
+            : focused ? "Expand navigation — collapsed for this workflow"
+            : "Expand sidebar"
+          }
           aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-          className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-white/35 transition-colors hover:bg-white/5 hover:text-white/70"
+          className="flex min-h-touch w-full items-center gap-3 rounded-lg px-2 py-2 text-white/35 transition-colors hover:bg-white/5 hover:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/60"
         >
           <CollapseIcon flipped={expanded} />
           {expanded && (

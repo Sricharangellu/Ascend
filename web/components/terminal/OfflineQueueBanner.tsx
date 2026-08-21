@@ -89,7 +89,7 @@ export function OfflineQueueBanner() {
     setSyncing(false);
     refreshCounts();
     setLastSyncResult(failed === 0 ? "success" : "partial");
-  }, []);
+  }, [refreshCounts]);
 
   if (!isOffline && totalCount === 0 && lastSyncResult === null) return null;
 

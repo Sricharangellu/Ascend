@@ -1,13 +1,12 @@
 import express, { Router, type Express } from "express";
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import helmet from "helmet";
-import { openDb, type DB } from "./shared/db.js";
+import { openDb, txTimeoutMs, type DB } from "./shared/db.js";
 import { openRedis } from "./shared/redis.js";
 import { EventBus } from "./shared/events.js";
 import { Outbox } from "./shared/outbox.js";
 import { logger } from "./shared/logger.js";
 import { buildInfo } from "./shared/version.js";
-import { errorMiddleware } from "./shared/http.js";
 import { modules } from "./modules/index.js";
 import { parseCapabilitiesImpactQuery, SettingsService } from "./modules/settings/service.js";
 import { identityModule } from "./identity/index.js";
@@ -17,14 +16,17 @@ import {
   requestIdMiddleware,
   rateLimitMiddleware,
   tenantRateLimitMiddleware,
+  makeTenantTierResolver,
   makeAuthMiddleware,
   tenantResolver,
-  errorEnvelopeMiddleware,
   metricsMiddleware,
+  accessLogMiddleware,
   renderMetrics,
   requireRole,
+  readinessVerdict,
 } from "./gateway/index.js";
-import { handler } from "./shared/http.js";
+import type { RuntimeGauges } from "./gateway/metrics.js";
+import { handler, errorMiddleware } from "./shared/http.js";
 import { bootstrapOrchestration, ORCHESTRATION_MIGRATIONS } from "./orchestration/index.js";
 import { SseBroker } from "./shared/sse.js";
 import type { AuthPayload } from "./gateway/auth.js";
@@ -42,6 +44,81 @@ export interface App {
 export interface BuildAppOptions {
   connectionString?: string;
   schema?: string;
+}
+
+/**
+ * Constant-time comparison for infrastructure credentials (`/metrics` token,
+ * `/jobs/tick` scheduler secrets). A plain `!==` leaks the length of the
+ * shared prefix through response timing, and both of these endpoints are
+ * unauthenticated-by-position — they are reachable without a session, so the
+ * only thing standing between an attacker and Prometheus internals or the job
+ * runtime is the secret itself.
+ *
+ * The digests are hashed to a fixed width first so `timingSafeEqual`, which
+ * throws on length mismatch, cannot be turned into a length oracle either.
+ */
+function secretsMatch(provided: string | undefined, expected: string): boolean {
+  if (provided === undefined) return false;
+  const a = createHash("sha256").update(provided).digest();
+  const b = createHash("sha256").update(expected).digest();
+  return timingSafeEqual(a, b);
+}
+
+/**
+ * Read the live pool / job-queue / outbox depths for GET /metrics.
+ *
+ * Fail-soft by contract: a scrape must never 500, and it must never be the
+ * thing that takes the service down under load. Every read is individually
+ * wrapped, so a missing table (a fresh schema mid-migration), a permissions
+ * problem, or a slow query degrades that one gauge to "absent" — which
+ * Prometheus reads as no sample, not as a healthy zero — while the rest of the
+ * payload still renders.
+ *
+ * Both queries are index-backed (`job_queue_ready_idx`,
+ * `event_outbox_pending_idx`) and unauthenticated, so they run with no
+ * app.tenant_id set and therefore count across all tenants. That is what an
+ * operator gauge should report; per-tenant queue depth belongs on the
+ * owner-only /api/v1/jobs endpoint, which already exists.
+ */
+async function collectRuntimeGauges(db: DB): Promise<RuntimeGauges> {
+  const gauges: RuntimeGauges = {
+    pool: db.poolStats(),
+    poolMax: Number(process.env["PG_POOL_MAX"] ?? 10),
+    buildSha: buildInfo().sha,
+  };
+  const now = Date.now();
+
+  try {
+    const rows = await db.query<{ status: string; n: number }>(
+      "SELECT status, COUNT(*)::int AS n FROM job_queue GROUP BY status",
+    );
+    const byStatus: Record<string, number> = { pending: 0, running: 0, completed: 0, failed: 0 };
+    for (const r of rows) byStatus[r.status] = Number(r.n);
+    gauges.jobsByStatus = byStatus;
+
+    const oldest = await db.one<{ run_at: number | null }>(
+      "SELECT MIN(run_at) AS run_at FROM job_queue WHERE status = 'pending' AND run_at <= @now",
+      { now },
+    );
+    if (oldest?.run_at != null) gauges.oldestDueJobAgeMs = Math.max(0, now - Number(oldest.run_at));
+    else gauges.oldestDueJobAgeMs = 0;
+  } catch (err) {
+    logger.debug({ err }, "metrics: job_queue gauges unavailable");
+  }
+
+  try {
+    const row = await db.one<{ n: number; oldest: number | null }>(
+      "SELECT COUNT(*)::int AS n, MIN(created_at) AS oldest FROM event_outbox WHERE dispatched = FALSE",
+    );
+    if (row) {
+      gauges.outboxPending = Number(row.n);
+      gauges.outboxOldestPendingAgeMs = row.oldest == null ? 0 : Math.max(0, now - Number(row.oldest));
+    }
+  } catch (err) {
+    logger.debug({ err }, "metrics: event_outbox gauges unavailable");
+  }
+
+  return gauges;
 }
 
 /**
@@ -161,6 +238,10 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
         "https://finder-pos-frontend.vercel.app",
         "https://ascend-pos-frontend.vercel.app",
         "https://ascendhq-app.vercel.app",
+        // The live production frontend (Vercel project `ascend_hq_web`), confirmed
+        // by Sri 2026-08-07. The `ascendhq-app` host above it is dead
+        // (DEPLOYMENT_NOT_FOUND) but is kept per the additive policy in this block.
+        "https://ascendhqweb.vercel.app",
       ]);
 
   app.use((req, res, next) => {
@@ -205,12 +286,65 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   }
 
   // Acquire a transaction-level advisory lock before running any migrations.
-  // pg_advisory_xact_lock blocks until the lock is free, then holds it for the
-  // duration of the transaction. Concurrent instances wait here and then skip
-  // all migrations (hash-checked above). Prevents simultaneous ALTER TABLE races.
+  // The lock is held for the duration of the transaction, so concurrent
+  // instances wait here and then skip all migrations (hash-checked above).
+  // Prevents simultaneous ALTER TABLE races.
+  //
+  // The wait gets its own, much larger statement timeout. `db.tx()` opens every
+  // transaction with `SET LOCAL statement_timeout` (30s by default), and the
+  // lock wait is itself a single statement — so queuing behind another instance
+  // was abortable with SQLSTATE 57014, "canceling statement due to statement
+  // timeout". That surfaced as a query timeout in whichever test was unlucky,
+  // rather than as the contention it actually was. Widening the timeout for
+  // just this statement separates "waiting for a peer" from "this query hung",
+  // which are the same signal to Postgres but very different to an operator.
+  //
+  // It is not hypothetical: CI run 31138020800 attempt 1 failed 893/894, the
+  // loser being settings.test.ts "get and update feature flags" at exactly
+  // 30014ms with code 57014, while the Postgres service container was
+  // checkpointing heavily. Attempt 2 on a healthy runner passed 894/894. The
+  // backend suite builds a fresh schema at 123 call sites across 86 files, and
+  // every one of them serializes on this single global lock.
+  //
+  // Verified against PostgreSQL 16 rather than assumed:
+  //   - statement_timeout DOES abort a blocking pg_advisory_xact_lock wait
+  //     (2s timeout → "canceling statement due to statement timeout" at 2093ms,
+  //     SQLSTATE 57014);
+  //   - statement_timeout is per-STATEMENT, not per-transaction, so the
+  //     migrations themselves were never starved of budget — only the wait was;
+  //   - a later `SET LOCAL statement_timeout` overrides an earlier one, so the
+  //     normal budget can be restored for the migrations that follow.
+  //
+  // A bounded *blocking* wait is used rather than polling pg_try_advisory_xact_lock:
+  // Postgres wakes a blocked waiter the instant the lock frees (measured at 4ms),
+  // whereas a poll loop adds up to its own interval of latency to every one of
+  // the hundreds of acquisitions a full test run makes.
+  const MIGRATION_LOCK_KEY = 7381920; // stable magic int for finder migrations
+  const rawLockWait = Number(process.env["PG_MIGRATION_LOCK_WAIT_MS"] ?? 300_000);
+  const lockWaitMs = Number.isFinite(rawLockWait) && rawLockWait > 0 ? Math.floor(rawLockWait) : 300_000;
+
   await db.tx(async (tdb) => {
-    await tdb.exec("SELECT pg_advisory_xact_lock(7381920)"); // stable magic int for finder migrations
-    logger.info("migration lock acquired");
+    const startedAt = Date.now();
+    try {
+      await tdb.exec(`SET LOCAL statement_timeout = ${lockWaitMs}`);
+      await tdb.exec(`SELECT pg_advisory_xact_lock(${MIGRATION_LOCK_KEY})`);
+    } catch (err) {
+      // 57014 = query_canceled. Here it can only mean the wait hit lockWaitMs,
+      // so translate it into the cause rather than letting a boot blocked behind
+      // a peer report itself as an unrelated slow query.
+      if ((err as { code?: string }).code === "57014") {
+        throw new Error(
+          `migration lock ${MIGRATION_LOCK_KEY} not acquired after ${Date.now() - startedAt}ms — ` +
+          `another instance is holding it. Raise PG_MIGRATION_LOCK_WAIT_MS (currently ${lockWaitMs}) ` +
+          `if this is expected contention, or check for a stuck migration transaction.`,
+        );
+      }
+      throw err;
+    }
+    // Restore the normal per-statement budget for the migrations themselves, so
+    // the widened timeout covers only the queuing and never the DDL.
+    await tdb.exec(`SET LOCAL statement_timeout = ${txTimeoutMs()}`);
+    logger.info({ waitedMs: Date.now() - startedAt }, "migration lock acquired");
 
     for (const sql of identityModule.migrations) await runIfNew(sql, `identity`, tdb);
     for (const mod of modules) {
@@ -235,7 +369,24 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     next();
   });
   app.use(metricsMiddleware);
-  app.use(rateLimitMiddleware({ capacity: 120, refillRate: 40, redis }));
+  // One structured line per completed request. Mounted BEFORE the rate limiter
+  // on purpose: a 429 is exactly the response that needs to be visible, and it
+  // is the one an earlier incident investigation could not see at all (see
+  // gateway/accessLog.ts). Logging happens in a `finish` hook, so a request
+  // rejected downstream is still logged, with the auth context resolved by then.
+  app.use(accessLogMiddleware);
+  // Per-IP limiter in front of everything. Env-overridable because the right
+  // value depends on deployment topology, not on this code: behind a NAT, a
+  // corporate proxy or a misconfigured TRUST_PROXY_DEPTH, an entire customer
+  // site arrives as one IP and the default would throttle the whole site to
+  // 40 req/s. Defaults below are the previous hard-coded values.
+  app.use(
+    rateLimitMiddleware({
+      capacity: Number(process.env["GLOBAL_RATE_LIMIT_CAPACITY"] ?? 120),
+      refillRate: Number(process.env["GLOBAL_RATE_LIMIT_REFILL"] ?? 40),
+      redis,
+    }),
+  );
 
   // ── Liveness + readiness probes (no auth — infrastructure-level)
   app.get("/healthz", (_req, res) => {
@@ -245,7 +396,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
 
   // ── Prometheus metrics — bearer token required in production. In development
   // and tests, an unset METRICS_TOKEN keeps local smoke checks simple.
-  app.get("/metrics", (req, res) => {
+  app.get("/metrics", async (req, res) => {
     const expected = process.env["METRICS_TOKEN"];
     if (!expected && process.env["NODE_ENV"] === "production") {
       res.status(503).type("text/plain").send("metrics_unconfigured\n");
@@ -253,9 +404,11 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     }
     if (expected) {
       const provided = req.headers.authorization?.replace(/^Bearer\s+/i, "");
-      if (provided !== expected) { res.status(401).end(); return; }
+      if (!secretsMatch(provided, expected)) { res.status(401).end(); return; }
     }
-    res.set("content-type", "text/plain; version=0.0.4").send(renderMetrics());
+    res
+      .set("content-type", "text/plain; version=0.0.4")
+      .send(renderMetrics(await collectRuntimeGauges(db)));
   });
 
   // ── Service health (documented in README; lists the domain modules)
@@ -268,19 +421,42 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   });
 
   app.get("/readyz", handler(async (_req, res) => {
-    await db.one("SELECT 1");
+    // The pool verdict is decided BEFORE touching the database on purpose: the
+    // probe must be able to answer when connections are scarce, which is
+    // exactly when it is asked. See gateway/readiness.ts for why a queue is no
+    // longer treated as unreadiness.
     const pool = db.poolStats();
     const poolMax = Number(process.env["PG_POOL_MAX"] ?? 10);
-    // Return 503 when all connections are in use — load balancer will stop routing.
-    if (pool && pool.waiting > 0) {
+    const verdict = readinessVerdict(pool, poolMax);
+    if (!verdict.ready) {
       res.status(503).json({
         status: "degraded",
-        reason: "connection pool exhausted",
+        reason: verdict.reason,
         pool,
+        waitingLimit: verdict.waitingLimit,
         ts: Date.now(),
       });
       return;
     }
+
+    // Reaching the database is still what "ready" means, so it is checked — but
+    // a failure here is 503 "not ready", not the 500 it used to be. A 500 reads
+    // as "this endpoint is broken" to a load balancer and to an on-call
+    // engineer; the truth is "this instance cannot serve traffic right now",
+    // which is what a readiness probe exists to say.
+    try {
+      await db.one("SELECT 1");
+    } catch (err) {
+      res.status(503).json({
+        status: "degraded",
+        reason: "database unreachable",
+        error: (err as Error).message,
+        pool: pool ?? undefined,
+        ts: Date.now(),
+      });
+      return;
+    }
+
     res.json({
       status: "ok",
       db: "connected",
@@ -359,7 +535,16 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
 
   // ── Auth + per-tenant tiered rate limit applied to all /api/v1/* routes.
   // makeAuthMiddleware handles both JWT sessions and API key tokens (fpk_ prefix).
-  app.use("/api/v1", makeAuthMiddleware(db), tenantResolver, tenantRateLimitMiddleware({ redis }));
+  // Per-tenant tiered limiter, sized by the tenant's subscription plan. Without
+  // the resolver every tenant fell through to `standard` (10 req/s sustained),
+  // which no multi-store enterprise customer can run a shift on.
+  const tierResolver = makeTenantTierResolver(db);
+  app.use(
+    "/api/v1",
+    makeAuthMiddleware(db),
+    tenantResolver,
+    tenantRateLimitMiddleware({ redis, tierOf: tierResolver.tierOf }),
+  );
 
   // ── Feature flags (tenant-scoped, requires auth)
   app.get(
@@ -460,15 +645,31 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   // "trial_expiry", registered in bootstrapOrchestration) — a prospect's
   // trial signup enqueues/reschedules itself into the same job_queue this
   // endpoint drains, so no separate scheduler entry point is needed for it.
+  //
+  // Two credentials are accepted, because two kinds of scheduler exist:
+  //   CRON_SECRET      — Vercel Cron's convention; sent as `Authorization: Bearer`.
+  //   JOBS_TICK_SECRET — any other scheduler (Render cron job, GitHub Actions,
+  //                      an external uptime service); sent as `X-Jobs-Tick-Secret`.
+  // `.env.example` has documented both since the endpoint was written, but only
+  // CRON_SECRET was ever read — so an operator on a non-Vercel host who followed
+  // the documentation and set JOBS_TICK_SECRET got a 503 in production and no
+  // background jobs at all, silently. That matters more now than it did: prod is
+  // claimed to run on Render (docs/architecture/DEPLOYMENTS.md), where Vercel's
+  // Bearer convention does not exist.
   app.get("/jobs/tick", handler(async (req, res) => {
-    const expected = process.env["CRON_SECRET"];
-    if (!expected && process.env["NODE_ENV"] === "production") {
+    const cronSecret = process.env["CRON_SECRET"];
+    const tickSecret = process.env["JOBS_TICK_SECRET"];
+    if (!cronSecret && !tickSecret && process.env["NODE_ENV"] === "production") {
       res.status(503).json({ error: "cron_unconfigured" });
       return;
     }
-    if (expected) {
-      const provided = req.headers.authorization?.replace(/^Bearer\s+/i, "");
-      if (provided !== expected) { res.status(401).end(); return; }
+    if (cronSecret ?? tickSecret) {
+      const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, "");
+      const headerSecret = req.headers["x-jobs-tick-secret"];
+      const ok =
+        (cronSecret !== undefined && secretsMatch(bearer, cronSecret)) ||
+        (tickSecret !== undefined && secretsMatch(typeof headerSecret === "string" ? headerSecret : undefined, tickSecret));
+      if (!ok) { res.status(401).end(); return; }
     }
     const deadline = Date.now() + 10_000;
     let jobsProcessed = 0;
@@ -537,9 +738,22 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     }),
   );
 
-  // ── Error handling (errorEnvelope must be last)
+  // ── Error handling — ONE handler, deliberately.
+  // This used to be two: `errorMiddleware` followed by `errorEnvelopeMiddleware`,
+  // with a comment claiming the envelope "must be last". It was last, and it was
+  // never reached: errorMiddleware always responds and never calls next(err), so
+  // the envelope was unreachable dead code from the day it was mounted. The
+  // visible consequence was that the documented `{error:{code,message,requestId}}`
+  // contract was never delivered — no error response carried a requestId, so a
+  // customer reporting an error gave you nothing to correlate against the logs.
+  // The frontend had been reading that field all along (web/contexts/StoreAuthContext.tsx).
+  //
+  // Fixed by folding the envelope's one genuine advantage (requestId, plus
+  // logging 5xx HttpErrors) into errorMiddleware rather than by reordering the
+  // two: swapping them would have been a breaking change, since the envelope
+  // renames 5xx `internal` → `internal_error` and drops the `details` array that
+  // validation errors carry.
   app.use(errorMiddleware);
-  app.use(errorEnvelopeMiddleware);
 
   return { express: app, db, events, outbox, cleanup: cleanupEventBridge };
 }
