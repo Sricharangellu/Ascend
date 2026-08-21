@@ -665,13 +665,29 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      # Target is a repo variable (both | frontend | backend), default `both`.
-      # Set STAGING_DEPLOY_TARGET=frontend when the staging backend is hosted
-      # outside Vercel (e.g. Render git auto-deploy, as production already is) —
-      # otherwise deploy.sh tries to push the backend to a Vercel project that
-      # may not exist and fails the whole job.
+      # Target is a repo variable (both | frontend | backend), default `frontend`.
+      #
+      # The default was `both` and that guaranteed a red job. deploy.sh's
+      # deploy_backend pushes to Vercel, and DEPLOYMENTS.md records that this
+      # repo's Vercel backend project IDs are "either dead
+      # (DEPLOYMENT_NOT_FOUND) or serving an unrelated app", while the real
+      # backend runs on Render via git auto-deploy with "no representation in
+      # this repo's CI/CD at all — no workflow, no deploy hook, no render.yaml".
+      # So the backend half could not succeed on any tier, deploy.sh fails if
+      # either half fails, and the `Testing smoke test` step below is therefore
+      # SKIPPED. Net effect: the last three pushes to `staging` all went red
+      # after passing every quality gate (runs 31574160018, 31273743041,
+      # 31271109836), and staging has never once been smoke-verified.
+      #
+      # Defaulting to `frontend` deploys the half this repo can actually deploy
+      # and lets the smoke test run, so a red job now means "the staging backend
+      # is not answering" — a true, actionable signal — instead of "we tried to
+      # push a backend somewhere it does not live".
+      #
+      # Set STAGING_DEPLOY_TARGET=both if a Vercel-hosted staging backend is
+      # ever configured; the code path is unchanged and still supported.
       - name: Deploy testing → Vercel preview alias
-        run: ./scripts/deploy.sh "${{ vars.STAGING_DEPLOY_TARGET || 'both' }}"
+        run: ./scripts/deploy.sh "${{ vars.STAGING_DEPLOY_TARGET || 'frontend' }}"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           DEPLOY_ENV: testing
