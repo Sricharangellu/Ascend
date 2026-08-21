@@ -294,3 +294,228 @@ describe("DataTable", () => {
     });
   });
 });
+
+// ── Server-driven sort ───────────────────────────────────────────────────────
+// Client sorting reorders the loaded page. On a server-paginated list that
+// silently reorders 50 rows of a 5,000-row catalog while looking like it
+// reordered the catalog — which is exactly the defect the product list had
+// before its search/sort moved server-side. `serverSort` is the alternative.
+
+describe("DataTable — serverSort", () => {
+  const SERVER_COLUMNS: DataColumn<Row>[] = [
+    { key: "sku", header: "SKU", render: (r) => r.sku, sortKey: "sku" },
+    { key: "name", header: "Name", render: (r) => r.name, sortKey: "product_name" },
+    { key: "qty", header: "Qty", render: (r) => r.qty, numeric: true },
+  ];
+
+  it("calls back with the column's server key instead of reordering rows", async () => {
+    const user = userEvent.setup();
+    const onSortChange = vi.fn();
+    render(
+      <DataTable
+        caption="Products"
+        columns={SERVER_COLUMNS}
+        rows={ROWS}
+        rowKey={(r) => r.id}
+        serverSort={{ activeKey: "sku", direction: "asc", onSortChange }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Sort by Name" }));
+    // The server key, not the column key — they differ deliberately here.
+    expect(onSortChange).toHaveBeenCalledWith("product_name");
+
+    // Row order must be untouched: the server owns it.
+    const cells = screen.getAllByRole("cell").map((c) => c.textContent);
+    expect(cells[0]).toBe("APL-002");
+  });
+
+  it("reflects the server's active column and direction in aria-sort", () => {
+    render(
+      <DataTable
+        caption="Products"
+        columns={SERVER_COLUMNS}
+        rows={ROWS}
+        rowKey={(r) => r.id}
+        serverSort={{ activeKey: "product_name", direction: "desc", onSortChange: vi.fn() }}
+      />,
+    );
+    const headers = screen.getAllByRole("columnheader");
+    // A default the user never clicked still has to show as sorted, or the
+    // header claims the list is unsorted while the server has ordered it.
+    expect(headers[1]).toHaveAttribute("aria-sort", "descending");
+    expect(headers[0]).toHaveAttribute("aria-sort", "none");
+  });
+
+  it("leaves columns without a sortKey unsortable", () => {
+    render(
+      <DataTable
+        caption="Products"
+        columns={SERVER_COLUMNS}
+        rows={ROWS}
+        rowKey={(r) => r.id}
+        serverSort={{ activeKey: null, direction: "asc", onSortChange: vi.fn() }}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Sort by Qty" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("columnheader")[2]).not.toHaveAttribute("aria-sort");
+  });
+});
+
+// ── Server pagination with page size ─────────────────────────────────────────
+
+describe("DataTable — serverPagination with onLimitChange", () => {
+  it("renders the full shared pager, including rows-per-page", async () => {
+    const user = userEvent.setup();
+    const onLimitChange = vi.fn();
+    const onOffsetChange = vi.fn();
+    render(
+      <DataTable
+        caption="Products"
+        columns={COLUMNS}
+        rows={ROWS}
+        rowKey={(r) => r.id}
+        serverPagination={{ total: 863, offset: 50, limit: 50, onOffsetChange, onLimitChange }}
+      />,
+    );
+
+    expect(screen.getByText("51–100 of 863")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Rows per page"), "100");
+    expect(onLimitChange).toHaveBeenCalledWith(100);
+  });
+
+  it("keeps the bare Prev/Next pager when no page-size handler is given", () => {
+    render(
+      <DataTable
+        caption="Products"
+        columns={COLUMNS}
+        rows={ROWS}
+        rowKey={(r) => r.id}
+        serverPagination={{ total: 80, offset: 0, limit: 25, onOffsetChange: vi.fn() }}
+      />,
+    );
+    expect(screen.queryByLabelText("Rows per page")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next" })).toBeInTheDocument();
+  });
+});
+
+// ── Controlled selection ─────────────────────────────────────────────────────
+// Needed whenever something outside the table reads the selection — a bulk bar
+// above it, a print-labels modal, a count in the page header. Without this the
+// selection is trapped inside `bulkActions`.
+
+describe("DataTable — controlled selection", () => {
+  it("renders the caller's selection and reports changes back", async () => {
+    const user = userEvent.setup();
+    const onSelectionChange = vi.fn();
+    render(
+      <DataTable
+        caption="Products"
+        columns={COLUMNS}
+        rows={ROWS}
+        rowKey={(r) => r.id}
+        selectable
+        selectedKeys={new Set(["1"])}
+        onSelectionChange={onSelectionChange}
+      />,
+    );
+
+    const boxes = screen.getAllByRole("checkbox");
+    // boxes[0] is select-all; row 1 comes from the caller's Set.
+    expect(boxes[1]).toBeChecked();
+    expect(boxes[2]).not.toBeChecked();
+
+    await user.click(boxes[2]);
+    expect(onSelectionChange).toHaveBeenCalledWith(new Set(["1", "2"]));
+  });
+
+  it("select-all reports every row on the page", async () => {
+    const user = userEvent.setup();
+    const onSelectionChange = vi.fn();
+    render(
+      <DataTable
+        caption="Products"
+        columns={COLUMNS}
+        rows={ROWS}
+        rowKey={(r) => r.id}
+        selectable
+        selectedKeys={new Set()}
+        onSelectionChange={onSelectionChange}
+      />,
+    );
+    await user.click(screen.getByLabelText("Select all rows on this page"));
+    expect(onSelectionChange).toHaveBeenCalledWith(new Set(["1", "2", "3"]));
+  });
+
+  it("still manages its own selection when uncontrolled", async () => {
+    const user = userEvent.setup();
+    render(
+      <DataTable
+        caption="Products"
+        columns={COLUMNS}
+        rows={ROWS}
+        rowKey={(r) => r.id}
+        selectable
+        bulkActions={(sel) => <span>{sel.length} chosen</span>}
+      />,
+    );
+    await user.click(screen.getAllByRole("checkbox")[1]);
+    expect(screen.getByText("1 chosen")).toBeInTheDocument();
+  });
+});
+
+// ── Controlled expansion ─────────────────────────────────────────────────────
+// For rows whose panel is opened by an action button rather than a disclosure —
+// the shipments list reveals its "confirm shipment" form from "Mark shipped".
+
+describe("DataTable — controlled expansion", () => {
+  it("opens the panel the caller nominates, with no disclosure column", () => {
+    render(
+      <DataTable
+        caption="Rows"
+        columns={COLUMNS}
+        rows={ROWS}
+        rowKey={(r) => r.id}
+        expandedKey="2"
+        onExpandedChange={vi.fn()}
+        hideExpandControl
+        expandedContent={(r) => (r.id === "2" ? <p>Panel for {r.name}</p> : null)}
+      />,
+    );
+    expect(screen.getByText("Panel for Apple")).toBeInTheDocument();
+    // A disclosure button that cannot open anything would be a dead control.
+    expect(screen.queryByRole("button", { name: /expand details/i })).not.toBeInTheDocument();
+  });
+
+  it("renders no panel row when the content function returns null", () => {
+    render(
+      <DataTable
+        caption="Rows"
+        columns={COLUMNS}
+        rows={ROWS}
+        rowKey={(r) => r.id}
+        expandedKey="1"
+        onExpandedChange={vi.fn()}
+        hideExpandControl
+        expandedContent={() => null}
+      />,
+    );
+    // 1 header + 3 body rows. An empty panel row would make 5.
+    expect(screen.getAllByRole("row")).toHaveLength(4);
+  });
+
+  it("still self-manages expansion when uncontrolled", async () => {
+    const user = userEvent.setup();
+    render(
+      <DataTable
+        caption="Rows"
+        columns={COLUMNS}
+        rows={ROWS}
+        rowKey={(r) => r.id}
+        expandedContent={(r) => <p>Detail {r.sku}</p>}
+      />,
+    );
+    await user.click(screen.getAllByRole("button", { name: /expand details/i })[0]);
+    expect(screen.getByText("Detail APL-002")).toBeInTheDocument();
+  });
+});

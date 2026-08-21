@@ -6,6 +6,15 @@ import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-cl
 import { formatMoney } from "@/lib/money";
 import { fmtDate, fmtDateTime } from "@/lib/date";
 import { Can } from "@/components/rbac";
+import { Button } from "@/components/Button";
+import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
+
+/** Columns a coupon-code search can be scoped to. Filters the loaded code list. */
+const CODE_SEARCH_FIELDS: ListSearchField[] = [
+  { value: "all", label: "All columns" },
+  { value: "code", label: "Code" },
+  { value: "campaign", label: "Campaign" },
+];
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -435,24 +444,35 @@ function CampaignsTab() {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 px-5 py-3.5">
-          <input type="search" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search campaigns…"
-            className="h-9 w-56 rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20" />
-          <select value={status} onChange={e => setStatus(e.target.value)}
-            className="h-9 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 focus:border-brand-600 focus:outline-none">
-            <option value="">All statuses</option>
-            <option value="active">Active</option>
-            <option value="scheduled">Scheduled</option>
-            <option value="expired">Expired</option>
-            <option value="draft">Draft</option>
-          </select>
-          <Can permission="promotions.manage">
-            <button type="button" onClick={() => setShowCreate(true)}
-              className="ml-auto rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
-              + New Campaign
-            </button>
-          </Can>
+        <div className="border-b border-line px-5 py-3.5">
+          <ListControls
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search campaigns by name…"
+            searchLabel="Search campaigns"
+            activeFilterCount={status ? 1 : 0}
+            onReset={() => { setSearch(""); setStatus(""); }}
+            canReset={search.trim() !== "" || status !== ""}
+            resultCount={promos.length}
+            loading={loading}
+            filters={
+              <FilterField label="Campaign status" htmlFor="promo-status">
+                <select id="promo-status" value={status}
+                  onChange={e => setStatus(e.target.value)} className={filterControlClass}>
+                  <option value="">All statuses</option>
+                  <option value="active">Active</option>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="expired">Expired</option>
+                  <option value="draft">Draft</option>
+                </select>
+              </FilterField>
+            }
+            trailing={
+              <Can permission="promotions.manage">
+                <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>+ New Campaign</Button>
+              </Can>
+            }
+          />
         </div>
 
         {loading ? <Skeleton /> : error ? (
@@ -603,6 +623,7 @@ function CampaignsTab() {
 
 function CouponsTab() {
   const [codes, setCodes]     = useState<CouponCode[]>([]);
+  const [codeField, setCodeField] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const [search, setSearch]   = useState("");
@@ -626,9 +647,12 @@ function CouponsTab() {
     return codes.filter(c => {
       if (filter === "used" && !c.used) return false;
       if (filter === "unused" && c.used) return false;
-      return !q || c.code.toLowerCase().includes(q) || c.promotion_name.toLowerCase().includes(q);
+      if (!q) return true;
+      const fields: Record<string, string> = { code: c.code, campaign: c.promotion_name };
+      const haystack = codeField === "all" ? Object.values(fields) : [fields[codeField] ?? ""];
+      return haystack.some(v => v.toLowerCase().includes(q));
     });
-  }, [codes, search, filter]);
+  }, [codes, search, filter, codeField]);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -662,26 +686,41 @@ function CouponsTab() {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 px-5 py-3.5">
-          <input type="search" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search codes…"
-            className="h-9 w-48 rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20" />
-          {(["all", "used", "unused"] as const).map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              className={`rounded-full px-3 py-1 text-xs font-semibold capitalize transition-colors ${filter === f ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
-              {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
-          <Can permission="promotions.manage">
-            <button type="button" onClick={() => void handleGenerate()} disabled={generating}
-              className="ml-auto rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-              {generating ? "Generating…" : "Bulk Generate (10)"}
-            </button>
-            <button type="button"
-              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
-              + New Code
-            </button>
-          </Can>
+        <div className="border-b border-line px-5 py-3.5">
+          <ListControls
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search codes or campaign…"
+            searchLabel="Search coupon codes"
+            searchFields={CODE_SEARCH_FIELDS}
+            searchField={codeField}
+            onSearchFieldChange={setCodeField}
+            activeFilterCount={filter !== "all" ? 1 : 0}
+            onReset={() => { setSearch(""); setCodeField("all"); setFilter("all"); }}
+            canReset={search.trim() !== "" || codeField !== "all" || filter !== "all"}
+            resultCount={filtered.length}
+            totalCount={codes.length}
+            loading={loading}
+            filters={
+              <FilterField label="Redemption" htmlFor="code-filter">
+                <select id="code-filter" value={filter}
+                  onChange={e => setFilter(e.target.value as typeof filter)} className={filterControlClass}>
+                  <option value="all">All codes</option>
+                  <option value="used">Used</option>
+                  <option value="unused">Unused</option>
+                </select>
+              </FilterField>
+            }
+            trailing={
+              <Can permission="promotions.manage">
+                <Button variant="secondary" size="sm" onClick={() => void handleGenerate()} disabled={generating}>
+                  {generating ? "Generating…" : "Bulk Generate (10)"}
+                </Button>
+                {/* "+ New Code" used to sit here with no onClick — dead on
+                    arrival, removed rather than restyled. */}
+              </Can>
+            }
+          />
         </div>
 
         {loading ? <Skeleton /> : error ? <ErrorBanner msg={error} /> : (

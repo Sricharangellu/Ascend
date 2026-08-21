@@ -1156,6 +1156,16 @@ export type ProductSort =
 /** Position in the master/variant tree, derived server-side across the whole catalog. */
 export type ProductTypeFilter = "standalone" | "master" | "variant";
 
+/**
+ * Which column `q` is matched against on the product list.
+ *
+ * Mirrors the server's `PRODUCT_SEARCH_FIELDS`. The server 400s on anything
+ * else, so this union is the contract, not a UI convenience: adding an option
+ * here without adding it there produces a search box that errors on use.
+ */
+export type ProductSearchField =
+  | "all" | "name" | "sku" | "barcode" | "brand" | "category" | "tags";
+
 /** One value the catalog actually contains, with how many products carry it. */
 export interface FacetBucket {
   value: string;

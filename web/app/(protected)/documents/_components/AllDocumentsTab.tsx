@@ -5,6 +5,7 @@ import { apiGet, apiDelete, ApiResponseError } from "@/api-client/client";
 import { Badge, BadgeVariant } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { fmtDate, fmtDateTime } from "@/lib/date";
+import { ListControls, FilterField, filterControlClass } from "@/components/ListControls";
 
 type DocStatus = "active" | "archived" | "draft" | "expired";
 type DocType =
@@ -115,44 +116,44 @@ export function AllDocumentsTab({ refreshKey = 0, onUpload }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          type="search"
-          placeholder="Search documents…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          className="h-8 w-56 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-        />
-        <select
-          value={filterType}
-          onChange={(e) => setFilterType(e.target.value)}
-          className="h-8 rounded-lg border border-slate-200 px-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-        >
-          <option value="all">All types</option>
-          {(Object.keys(TYPE_LABELS) as DocType[]).map((t) => (
-            <option key={t} value={t}>
-              {TYPE_LABELS[t]}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="h-8 rounded-lg border border-slate-200 px-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-        >
-          <option value="all">All statuses</option>
-          <option value="active">Active</option>
-          <option value="draft">Draft</option>
-          <option value="expired">Expired</option>
-          <option value="archived">Archived</option>
-        </select>
-        <div className="ml-auto">
-          <Button variant="primary" onClick={onUpload}>
-            + Upload Document
-          </Button>
-        </div>
-      </div>
+      {/* Toolbar — shared list bar. No column selector: /api/v1/documents
+          implements `q` as a single free-text parameter with no per-column
+          scoping, so offering a selector would be decoration. */}
+      <ListControls
+        search={q}
+        onSearchChange={setQ}
+        searchPlaceholder="Search documents by name…"
+        searchLabel="Search documents"
+        activeFilterCount={(filterType !== "all" ? 1 : 0) + (filterStatus !== "active" ? 1 : 0)}
+        onReset={() => { setQ(""); setFilterType("all"); setFilterStatus("active"); }}
+        canReset={q.trim() !== "" || filterType !== "all" || filterStatus !== "active"}
+        resultCount={docs.length}
+        loading={loading}
+        filters={
+          <>
+            <FilterField label="Document type" htmlFor="doc-type">
+              <select id="doc-type" value={filterType}
+                onChange={(e) => setFilterType(e.target.value)} className={filterControlClass}>
+                <option value="all">All types</option>
+                {(Object.keys(TYPE_LABELS) as DocType[]).map((t) => (
+                  <option key={t} value={t}>{TYPE_LABELS[t]}</option>
+                ))}
+              </select>
+            </FilterField>
+            <FilterField label="Status" htmlFor="doc-status">
+              <select id="doc-status" value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)} className={filterControlClass}>
+                <option value="all">All statuses</option>
+                <option value="active">Active</option>
+                <option value="draft">Draft</option>
+                <option value="expired">Expired</option>
+                <option value="archived">Archived</option>
+              </select>
+            </FilterField>
+          </>
+        }
+        trailing={<Button variant="primary" onClick={onUpload}>+ Upload Document</Button>}
+      />
 
       {error && (
         <p role="alert" className="text-sm text-red-700">

@@ -4,7 +4,7 @@
  * Shipment registry — extracted from /shipping for Delivery hub (Wave 2).
  */
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
@@ -12,6 +12,8 @@ import { Input } from "@/components/Input";
 import { apiGet, apiPost } from "@/api-client/client";
 import { useToast } from "@/components/Toast";
 import type { Shipment } from "@/api-client/types";
+import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
+import { DataTable, type DataColumn } from "@/components/DataTable";
 
 const STATUS_BADGE: Record<string, "yellow" | "blue" | "green" | "red" | "gray"> = {
   pending_shipment: "yellow",
@@ -31,6 +33,14 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
+/** Columns a shipment search can be scoped to. Filters the loaded shipment list. */
+const SHIPMENT_SEARCH_FIELDS: ListSearchField[] = [
+  { value: "all", label: "All columns" },
+  { value: "ship", label: "Ship #" },
+  { value: "carrier", label: "Carrier" },
+  { value: "tracking", label: "Tracking #" },
+];
+
 export function ShipmentsPanel() {
   const [items, setItems] = useState<Shipment[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +50,7 @@ export function ShipmentsPanel() {
   const [trackingNumber, setTrackingNumber] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
+  const [searchField, setSearchField] = useState("all");
   const { addToast } = useToast();
 
   const load = useCallback(async () => {
@@ -116,11 +127,15 @@ export function ShipmentsPanel() {
     if (statusFilter !== "all" && s.status !== statusFilter) return false;
     if (search.trim()) {
       const q = search.toLowerCase();
-      return (
-        s.ship_number.toLowerCase().includes(q) ||
-        (s.carrier ?? "").toLowerCase().includes(q) ||
-        (s.tracking_number ?? "").toLowerCase().includes(q)
-      );
+      // Scoped search narrows which column is compared, across the whole
+      // loaded shipment list.
+      const fields: Record<string, string> = {
+        ship: s.ship_number,
+        carrier: s.carrier ?? "",
+        tracking: s.tracking_number ?? "",
+      };
+      const haystack = searchField === "all" ? Object.values(fields) : [fields[searchField] ?? ""];
+      return haystack.some((v) => v.toLowerCase().includes(q));
     }
     return true;
   });
@@ -131,6 +146,70 @@ export function ShipmentsPanel() {
     delivered: items.filter((s) => s.status === "delivered").length,
     cancelled: items.filter((s) => s.status === "cancelled").length,
   };
+
+
+  /** The inline "confirm shipment" form, revealed under the row being shipped. */
+  const shipForm = (s: Shipment) => (
+    <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-end sm:gap-4">
+      <div className="flex-1">
+        <Input label="Carrier" required autoFocus value={carrier}
+          onChange={(e) => setCarrier(e.target.value)}
+          placeholder="UPS / FedEx / USPS / DHL" />
+      </div>
+      <div className="flex-1">
+        <Input label="Tracking number (optional)" value={trackingNumber}
+          onChange={(e) => setTrackingNumber(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") void confirmShip(s.id); }}
+          placeholder="1Z999AA10123456784" />
+      </div>
+      <div className="flex shrink-0 gap-2">
+        <Button size="sm" variant="secondary" onClick={() => setShipFormId(null)}>Cancel</Button>
+        <Button size="sm" variant="primary"
+          disabled={!carrier.trim() || busy === s.id}
+          loading={busy === s.id}
+          onClick={() => void confirmShip(s.id)}>
+          Confirm
+        </Button>
+      </div>
+    </div>
+  );
+
+  const shipmentColumns: DataColumn<Shipment>[] = [
+    { key: "ship", header: "Ship #", hideable: false, sticky: true, sortValue: (s) => s.ship_number,
+      render: (s) => <span className="font-medium text-content-primary">{s.ship_number}</span> },
+    { key: "status", header: "Status", sortValue: (s) => s.status,
+      render: (s) => <Badge variant={STATUS_BADGE[s.status] ?? "gray"}>{s.status.replace(/_/g, " ")}</Badge> },
+    { key: "method", header: "Method", sortValue: (s) => s.method,
+      render: (s) => <span className="capitalize">{s.method}</span> },
+    { key: "carrier", header: "Carrier", sortValue: (s) => s.carrier ?? null,
+      render: (s) => s.carrier ?? "—" },
+    { key: "tracking", header: "Tracking", sortValue: (s) => s.tracking_number ?? null,
+      render: (s) => <span className="font-mono text-xs">{s.tracking_number ?? "—"}</span> },
+    {
+      key: "actions", header: "Actions", hideable: false, align: "right",
+      render: (s) => (
+        <div className="flex items-center justify-end gap-2">
+          {s.status === "pending_shipment" && shipFormId !== s.id && (
+            <Button size="sm" variant="secondary" disabled={!!busy}
+              onClick={() => { setShipFormId(s.id); setCarrier(""); setTrackingNumber(""); }}>
+              Mark shipped
+            </Button>
+          )}
+          {s.status === "shipped" && (
+            <Button size="sm" variant="secondary" loading={busy === s.id}
+              onClick={() => void deliver(s.id)}>
+              Mark delivered
+            </Button>
+          )}
+          {(s.status === "pending_shipment" || s.status === "shipped") && (
+            <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => void cancel(s.id)}>
+              Cancel
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-5">
@@ -155,156 +234,49 @@ export function ShipmentsPanel() {
       )}
 
       <Card className="overflow-hidden p-0">
-        <div className="flex flex-wrap items-center gap-3 border-b border-erp-table-border px-4 py-3">
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search ship #, carrier, tracking…"
-            className="w-56"
-            aria-label="Search shipments"
+        <div className="border-b border-line px-4 py-3">
+          <ListControls
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search ship #, carrier, tracking…"
+            searchLabel="Search shipments"
+            searchFields={SHIPMENT_SEARCH_FIELDS}
+            searchField={searchField}
+            onSearchFieldChange={setSearchField}
+            activeFilterCount={statusFilter !== "all" ? 1 : 0}
+            onReset={() => { setSearch(""); setSearchField("all"); setStatusFilter("all"); }}
+            canReset={search.trim() !== "" || searchField !== "all" || statusFilter !== "all"}
+            resultCount={filtered.length}
+            totalCount={items.length}
+            filters={
+              <FilterField label="Shipment status" htmlFor="ship-status">
+                <select id="ship-status" value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                  className={filterControlClass}>
+                  {STATUS_FILTERS.map((f) => <option key={f} value={f}>{STATUS_LABEL[f]}</option>)}
+                </select>
+              </FilterField>
+            }
           />
-          <div className="flex overflow-hidden rounded-lg border border-erp-table-border text-xs" role="group" aria-label="Status filter">
-            {STATUS_FILTERS.map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setStatusFilter(f)}
-                className={`min-h-touch px-3 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 ${
-                  statusFilter === f
-                    ? "bg-brand-600 text-white"
-                    : "bg-white text-erp-text-secondary hover:bg-erp-page"
-                }`}
-              >
-                {STATUS_LABEL[f]}
-              </button>
-            ))}
-          </div>
-          <span className="ml-auto text-xs text-erp-text-secondary">
-            {filtered.length} of {items.length}
-          </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-erp-table-border bg-erp-table-header text-left text-xs font-semibold uppercase tracking-[0.08em] text-erp-text-secondary">
-                <th className="px-5 py-3">Ship #</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Method</th>
-                <th className="px-4 py-3">Carrier</th>
-                <th className="px-4 py-3">Tracking</th>
-                <th className="px-5 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-erp-table-border">
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-5 py-8 text-center text-erp-text-secondary">
-                    No shipments match the current filter.
-                  </td>
-                </tr>
-              )}
-              {filtered.map((s) => (
-                <Fragment key={s.id}>
-                  <tr className="transition-colors hover:bg-erp-page">
-                    <td className="whitespace-nowrap px-5 py-3 font-medium">{s.ship_number}</td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <Badge variant={STATUS_BADGE[s.status] ?? "gray"}>
-                        {s.status.replace(/_/g, " ")}
-                      </Badge>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 capitalize">{s.method}</td>
-                    <td className="whitespace-nowrap px-4 py-3">{s.carrier ?? "—"}</td>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
-                      {s.tracking_number ?? "—"}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {s.status === "pending_shipment" && shipFormId !== s.id && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={!!busy}
-                            onClick={() => {
-                              setShipFormId(s.id);
-                              setCarrier("");
-                              setTrackingNumber("");
-                            }}
-                          >
-                            Mark shipped
-                          </Button>
-                        )}
-                        {s.status === "shipped" && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            loading={busy === s.id}
-                            onClick={() => void deliver(s.id)}
-                          >
-                            Mark delivered
-                          </Button>
-                        )}
-                        {(s.status === "pending_shipment" || s.status === "shipped") && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={!!busy}
-                            onClick={() => void cancel(s.id)}
-                          >
-                            Cancel
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                  {shipFormId === s.id && (
-                    <tr>
-                      <td colSpan={6} className="bg-erp-page px-5 py-4">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
-                          <div className="flex-1">
-                            <Input
-                              label="Carrier"
-                              required
-                              autoFocus
-                              value={carrier}
-                              onChange={(e) => setCarrier(e.target.value)}
-                              placeholder="UPS / FedEx / USPS / DHL"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <Input
-                              label="Tracking number (optional)"
-                              value={trackingNumber}
-                              onChange={(e) => setTrackingNumber(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") void confirmShip(s.id);
-                              }}
-                              placeholder="1Z999AA10123456784"
-                            />
-                          </div>
-                          <div className="flex shrink-0 gap-2">
-                            <Button size="sm" variant="secondary" onClick={() => setShipFormId(null)}>
-                              Cancel
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="primary"
-                              disabled={!carrier.trim() || busy === s.id}
-                              loading={busy === s.id}
-                              onClick={() => void confirmShip(s.id)}
-                            >
-                              Confirm
-                            </Button>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable<Shipment>
+          caption="Shipments with status, method, carrier and tracking number"
+          columns={shipmentColumns}
+          rows={filtered}
+          rowKey={(s) => s.id}
+          emptyTitle="No shipments match the current filter"
+          emptyDescription="Clear the status filter or search to see more."
+          storageKey="delivery-shipments"
+          className="px-0"
+          // Expansion here is opened by the "Mark shipped" action, not by a
+          // disclosure control — so it is controlled, and the disclosure column
+          // is dropped rather than rendered as a button that does nothing.
+          expandedKey={shipFormId}
+          onExpandedChange={setShipFormId}
+          hideExpandControl
+          expandedContent={(s) => (shipFormId === s.id ? shipForm(s) : null)}
+        />
       </Card>
     </div>
   );

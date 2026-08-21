@@ -6,6 +6,14 @@ import { apiGet } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import { fmtDate, fmtDateTime } from "@/lib/date";
 import { Can } from "@/components/rbac";
+import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
+
+/** Columns a warehouse-location search can be scoped to. Filters the loaded set. */
+const WMS_SEARCH_FIELDS: ListSearchField[] = [
+  { value: "all", label: "All columns" },
+  { value: "name", label: "Location name" },
+  { value: "code", label: "Location code" },
+];
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -200,6 +208,8 @@ function LocationsTab() {
   const [error, setError]         = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch]         = useState("");
+  const [searchField, setSearchField] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
 
   useEffect(() => {
     void apiGet<{ items: WmsLocation[] }>("/api/v1/warehouse/locations").then((r) => {
@@ -218,26 +228,50 @@ function LocationsTab() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return locations.filter(l => !q || l.name.toLowerCase().includes(q) || l.code.toLowerCase().includes(q));
-  }, [locations, search]);
+    return locations.filter(l => {
+      if (typeFilter !== "all" && l.type !== typeFilter) return false;
+      if (!q) return true;
+      const fields: Record<string, string> = { name: l.name, code: l.code };
+      const haystack = searchField === "all" ? Object.values(fields) : [fields[searchField] ?? ""];
+      return haystack.some((v) => v.toLowerCase().includes(q));
+    });
+  }, [locations, search, searchField, typeFilter]);
 
   if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
   if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <input
-          value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Search locations..."
-          className="h-9 w-64 rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
-        />
-        <Can permission="inventory.adjust">
-          <button className="ml-auto rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
-            + Add Location
-          </button>
-        </Can>
-      </div>
+      <ListControls
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search locations by name or code…"
+        searchLabel="Search warehouse locations"
+        searchFields={WMS_SEARCH_FIELDS}
+        searchField={searchField}
+        onSearchFieldChange={setSearchField}
+        activeFilterCount={typeFilter !== "all" ? 1 : 0}
+        onReset={() => { setSearch(""); setSearchField("all"); setTypeFilter("all"); }}
+        canReset={search.trim() !== "" || searchField !== "all" || typeFilter !== "all"}
+        resultCount={filtered.length}
+        totalCount={locations.length}
+        filters={
+          <FilterField label="Location type" htmlFor="wms-type">
+            <select id="wms-type" value={typeFilter}
+              onChange={e => setTypeFilter(e.target.value)} className={filterControlClass}>
+              <option value="all">All types</option>
+              {(Object.keys(TYPE_COLOR) as WmsLocation["type"][]).map(t => (
+                <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+              ))}
+            </select>
+          </FilterField>
+        }
+        /* "+ Add Location" used to sit here. It had no onClick and never had
+           one — a primary-styled button that does nothing is worse than an
+           absent one, because the user blames themselves for the dead click.
+           Same call the customers list made when it dropped its three dead
+           buttons. Restore it with a real handler, not as decoration. */
+      />
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="w-full text-sm">

@@ -18,6 +18,7 @@ import type {
   SuppliersResponse,
 } from "@/api-client/types";
 import { STATUS_STYLE, emptyLine, type DraftLine } from "./shared";
+import { DataTable, type DataColumn } from "@/components/DataTable";
 
 interface ProductBarcode { barcode: string; kind: string; pack_size: number }
 
@@ -159,6 +160,53 @@ export function OrdersTab() {
 
   const INPUT = "mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950";
 
+
+  /**
+   * Purchase-order columns. `Receive` stays permission-gated and only appears
+   * on an ordered PO — the same two conditions the inline cell applied.
+   */
+  const orderColumns: DataColumn<PurchaseOrder>[] = [
+    // The PO number is what people say out loud and search for; the UUID was
+    // never useful here (develop, PR #224).
+    { key: "id", header: "PO", hideable: false, sticky: true,
+      sortValue: (o) => o.po_number ?? o.id,
+      render: (o) => (
+        <Link
+          href={`/purchasing/${o.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="focus-ring rounded-control font-medium text-accent-700 hover:underline"
+        >
+          {o.po_number != null ? `PO-${o.po_number}` : o.id.slice(0, 8)}
+        </Link>
+      ) },
+    { key: "supplier", header: "Supplier", sortValue: (o) => supplierName(o.supplier_id),
+      render: (o) => <span className="text-content-primary">{supplierName(o.supplier_id)}</span> },
+    { key: "status", header: "Status", sortValue: (o) => o.status,
+      render: (o) => (
+        <span className={`inline-flex rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${STATUS_STYLE[o.status] ?? "bg-surface-3 text-content-secondary ring-line"}`}>
+          {o.status}
+        </span>
+      ) },
+    { key: "total", header: "Total", numeric: true, sortValue: (o) => o.total_cost_cents,
+      render: (o) => <span className="font-semibold text-content-primary">{formatMoney(o.total_cost_cents)}</span> },
+    { key: "actions", header: "Actions", hideable: false, align: "right",
+      render: (o) => (
+        o.status === "ordered" && canManage ? (
+          <div className="flex items-center justify-end gap-2">
+            <Button size="sm" variant="primary" disabled={busy}
+              onClick={() => void openReceiving(o.id)}>
+              Scan &amp; Receive
+            </Button>
+            <Button size="sm" variant="secondary" disabled={busy}
+              onClick={() => setConfirmReceiveAll(o)}
+              title="Post every open line at its full remaining quantity">
+              Receive all
+            </Button>
+          </div>
+        ) : null
+      ) },
+  ];
+
   return (
     <div className="flex flex-col gap-5 p-4">
       <ConfirmDialog
@@ -182,71 +230,16 @@ export function OrdersTab() {
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200 text-sm">
-          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-            <tr>
-              <th className="px-4 py-3">PO</th>
-              <th className="px-4 py-3">Supplier</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3 text-right">Total</th>
-              <th className="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 bg-white">
-            {orders.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-slate-400">No purchase orders yet.</td>
-              </tr>
-            ) : (
-              orders.map((order) => (
-                <tr key={order.id} className="transition-colors hover:bg-slate-50">
-                  <td className="whitespace-nowrap px-4 py-3">
-                    {/* The PO number is what people say out loud and search for;
-                        the UUID was never useful here. */}
-                    <Link
-                      href={`/purchasing/${order.id}`}
-                      className="font-medium text-brand-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
-                    >
-                      {order.po_number != null ? `PO-${order.po_number}` : order.id.slice(0, 8)}
-                    </Link>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-950">{supplierName(order.supplier_id)}</td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <span className={`inline-flex rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${STATUS_STYLE[order.status] ?? "bg-slate-100 text-slate-700 ring-slate-200"}`}>
-                      {order.status}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-950">{formatMoney(order.total_cost_cents)}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right">
-                    {order.status === "ordered" && canManage && (
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          disabled={busy}
-                          onClick={() => void openReceiving(order.id)}
-                        >
-                          Scan &amp; Receive
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          disabled={busy}
-                          onClick={() => setConfirmReceiveAll(order)}
-                          title="Post every open line at its full remaining quantity"
-                        >
-                          Receive all
-                        </Button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable<PurchaseOrder>
+        caption="Purchase orders with supplier, status and total"
+        columns={orderColumns}
+        rows={orders}
+        rowKey={(o) => o.id}
+        emptyTitle="No purchase orders yet"
+        emptyDescription="Create one below to start ordering stock from a supplier."
+        storageKey="purchasing-orders"
+        className="px-0"
+      />
 
       {canManage && (
         <div className="border-t border-slate-200 pt-4">

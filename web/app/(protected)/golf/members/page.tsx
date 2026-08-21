@@ -7,6 +7,15 @@ import { apiGet, apiPost, apiPatch, ApiResponseError } from "@/api-client/client
 import { formatMoney } from "@/lib/money";
 import type { GolfMember, MembershipTier } from "@/api-client/types";
 import { fmtDate } from "@/lib/date";
+import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
+
+/** Columns a member search can be scoped to. Filters the fully-loaded member list. */
+const MEMBER_SEARCH_FIELDS: ListSearchField[] = [
+  { value: "all", label: "All columns" },
+  { value: "name", label: "Name" },
+  { value: "email", label: "Email" },
+  { value: "number", label: "Membership #" },
+];
 
 type BadgeVariant = "green" | "yellow" | "red" | "gray" | "blue" | "purple";
 
@@ -167,6 +176,7 @@ export default function GolfMembersPage() {
   const [modal, setModal] = useState<"new" | GolfMember | null>(null);
   const [filterTier, setFilterTier] = useState("all");
   const [q, setQ] = useState("");
+  const [searchField, setSearchField] = useState("all");
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -185,14 +195,16 @@ export default function GolfMembersPage() {
     if (filterTier !== "all") list = list.filter(m => m.tier === filterTier);
     if (q.trim()) {
       const lq = q.toLowerCase();
-      list = list.filter(m =>
-        m.name.toLowerCase().includes(lq) ||
-        m.email.toLowerCase().includes(lq) ||
-        m.membership_number.toLowerCase().includes(lq),
-      );
+      list = list.filter(m => {
+        const fields: Record<string, string> = {
+          name: m.name, email: m.email, number: m.membership_number,
+        };
+        const haystack = searchField === "all" ? Object.values(fields) : [fields[searchField] ?? ""];
+        return haystack.some(v => v.toLowerCase().includes(lq));
+      });
     }
     return list;
-  }, [members, filterTier, q]);
+  }, [members, filterTier, q, searchField]);
 
   const expiring = members.filter(membershipExpiringSoon).length;
   const expired = members.filter(membershipExpired).length;
@@ -243,11 +255,32 @@ export default function GolfMembersPage() {
         </div>
 
         {/* Toolbar */}
-        <div className="flex items-center gap-2">
-          <input type="search" placeholder="Search name, email, number…" value={q} onChange={e => setQ(e.target.value)}
-                 className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
-          <Button variant="primary" size="sm" onClick={() => setModal("new")}>+ Add Member</Button>
-        </div>
+        <ListControls
+          search={q}
+          onSearchChange={setQ}
+          searchPlaceholder="Search name, email, membership #…"
+          searchLabel="Search members"
+          searchFields={MEMBER_SEARCH_FIELDS}
+          searchField={searchField}
+          onSearchFieldChange={setSearchField}
+          activeFilterCount={filterTier !== "all" ? 1 : 0}
+          onReset={() => { setQ(""); setSearchField("all"); setFilterTier("all"); }}
+          canReset={q.trim() !== "" || searchField !== "all" || filterTier !== "all"}
+          resultCount={visible.length}
+          totalCount={members.length}
+          filters={
+            <FilterField label="Tier" htmlFor="golf-tier">
+              <select id="golf-tier" value={filterTier}
+                onChange={e => setFilterTier(e.target.value)} className={filterControlClass}>
+                <option value="all">All tiers</option>
+                {(Object.keys(TIER_BADGE) as MembershipTier[]).map(t => (
+                  <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+                ))}
+              </select>
+            </FilterField>
+          }
+          trailing={<Button variant="primary" size="sm" onClick={() => setModal("new")}>+ Add Member</Button>}
+        />
 
         {error && <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 

@@ -1042,6 +1042,103 @@ test("search: supplier SKU and brand are searchable surfaces", async () => {
   assert.equal(byBrand.json.items[0].id, chips.id);
 });
 
+// ── Column-scoped search (searchField) ───────────────────────────────────────
+// The list UI offers "Search [ All columns ▾ ]". These tests exist because that
+// control is only honest if the server narrows the query — a selector the
+// backend ignores looks identical to a working one until you compare counts.
+
+test("searchField: scoping to a column excludes matches from other columns", async () => {
+  const app = await freshApp();
+  const { chips } = await seedSearchCatalog(app);
+
+  // "Pringles" is the brand of a product named "Salted Potato Chips".
+  const unscoped = await call(app, "GET", "/api/catalog/?q=Pringles");
+  assert.equal(unscoped.json.total, 1);
+
+  const byBrand = await call(app, "GET", "/api/catalog/?q=Pringles&searchField=brand");
+  assert.equal(byBrand.json.total, 1);
+  assert.equal(byBrand.json.items[0].id, chips.id);
+
+  // The same term scoped to a column it does not appear in must return nothing.
+  // If this returns 1, the parameter is being dropped.
+  const byName = await call(app, "GET", "/api/catalog/?q=Pringles&searchField=name");
+  assert.equal(byName.json.total, 0, "brand-only term must not match when scoped to name");
+
+  const bySku = await call(app, "GET", "/api/catalog/?q=Pringles&searchField=sku");
+  assert.equal(bySku.json.total, 0, "brand-only term must not match when scoped to sku");
+});
+
+test("searchField: barcode scope drops name matches but keeps alternate barcodes", async () => {
+  const app = await freshApp();
+  const { coke12, chips } = await seedSearchCatalog(app);
+  await call(app, "POST", `/api/catalog/${chips.id}/barcodes`, { barcode: "10038000845267", kind: "case", packSize: 12 });
+  // A decoy whose NAME contains the UPC digits — the reason a cashier scoping to
+  // UPC wants the name column out of the query.
+  await call(app, "POST", "/api/catalog/", {
+    sku: "DECOY-2", name: "Promo bundle 049000028904 reference card", price_cents: 100, category: "misc",
+  });
+
+  const unscoped = await call(app, "GET", "/api/catalog/?q=049000028904");
+  assert.equal(unscoped.json.total, 2, "unscoped search still matches the name mention");
+
+  const scoped = await call(app, "GET", "/api/catalog/?q=049000028904&searchField=barcode");
+  assert.equal(scoped.json.total, 1, "scoping to UPC must drop the name-only match");
+  assert.equal(scoped.json.items[0].id, coke12.id);
+
+  // Alternate/case UPCs live in product_barcodes, not products.barcode. Scoping
+  // to "UPC" has to keep searching them or a case scan would find nothing.
+  const caseScan = await call(app, "GET", "/api/catalog/?q=10038000845267&searchField=barcode");
+  assert.equal(caseScan.json.total, 1);
+  assert.equal(caseScan.json.items[0].id, chips.id);
+});
+
+test("searchField: an unknown field is rejected, not silently widened", async () => {
+  const app = await freshApp();
+  await seedSearchCatalog(app);
+
+  const res = await call(app, "GET", "/api/catalog/?q=Pringles&searchField=nonsense");
+  assert.equal(res.status, 400, "an ignored bad scope would return MORE rows than asked for");
+  // The message must name the parameter and its allowed values — a bare 400
+  // leaves an integrator guessing which of eight query params it rejected.
+  assert.match(JSON.stringify(res.json), /searchField/);
+  assert.match(JSON.stringify(res.json), /sku/);
+});
+
+test("searchField: facet counts describe the same scoped set as the list", async () => {
+  const app = await freshApp();
+  await seedSearchCatalog(app);
+
+  // Scoped to brand, only the Pringles row matches; the facet counts beside the
+  // list must agree with it or the header contradicts the rows underneath.
+  const list = await call(app, "GET", "/api/catalog/?q=Pringles&searchField=brand");
+  const facets = await call(app, "GET", "/api/catalog/facets?q=Pringles&searchField=brand");
+  assert.equal(facets.status, 200);
+  const activeCount = (facets.json.status as { value: string; count: number }[])
+    .find((b) => b.value === "active")?.count ?? 0;
+  assert.equal(activeCount, list.json.total);
+
+  const badFacets = await call(app, "GET", "/api/catalog/facets?q=x&searchField=nonsense");
+  assert.equal(badFacets.status, 400, "facets must validate the scope the list validates");
+});
+
+test("searchField: 'all' and an absent field behave identically", async () => {
+  const app = await freshApp();
+  await seedSearchCatalog(app);
+
+  const implicit = await call(app, "GET", "/api/catalog/?q=coke");
+  const explicit = await call(app, "GET", "/api/catalog/?q=coke&searchField=all");
+  assert.equal(explicit.json.total, implicit.json.total);
+  assert.deepEqual(
+    (explicit.json.items as { id: string }[]).map((p) => p.id),
+    (implicit.json.items as { id: string }[]).map((p) => p.id),
+  );
+
+  // A scope with no search term must not filter anything out on its own.
+  const noTerm = await call(app, "GET", "/api/catalog/?searchField=sku");
+  const noScope = await call(app, "GET", "/api/catalog/");
+  assert.equal(noTerm.json.total, noScope.json.total);
+});
+
 test("search: results are found regardless of which page they'd fall on", async () => {
   const app = await freshApp();
   for (let i = 0; i < 60; i++) {

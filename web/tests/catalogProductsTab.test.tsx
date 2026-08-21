@@ -65,6 +65,7 @@ let apiPost: ReturnType<typeof vi.fn>;
 let listResponse: () => unknown;
 
 beforeEach(() => {
+  window.history.replaceState({}, "", "/catalog");
   listCalls = [];
   facetCalls = [];
   searchParams = new URLSearchParams();
@@ -91,13 +92,25 @@ function lastListQuery(): URLSearchParams {
   return new URLSearchParams(listCalls[listCalls.length - 1].split("?")[1] ?? "");
 }
 
+/**
+ * Open the shared filter popover.
+ *
+ * The nine filters used to sit inline in a bespoke bar (with a "More filters"
+ * disclosure hiding four of them). They live in `ListControls`' popover now, so
+ * every filter is one click away instead of two-for-some-and-one-for-others.
+ */
+async function openFilters(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: /^filter/i }));
+  await screen.findByRole("dialog", { name: /filters/i });
+}
+
 describe("ProductsTab — server-side query", () => {
   it("sends the search term to the API instead of filtering locally", async () => {
     const user = userEvent.setup();
     render(<ProductsTab categories={CATEGORIES} />);
     await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
 
-    await user.type(screen.getByLabelText("Name or SKU"), "coke");
+    await user.type(screen.getByLabelText("Search products"), "coke");
     await waitFor(() => expect(lastListQuery().get("q")).toBe("coke"), { timeout: 3000 });
   });
 
@@ -105,6 +118,7 @@ describe("ProductsTab — server-side query", () => {
     const user = userEvent.setup();
     render(<ProductsTab categories={CATEGORIES} />);
     await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
+    await openFilters(user);
 
     await user.selectOptions(screen.getByLabelText("Product type"), "master");
     await waitFor(() => expect(lastListQuery().get("productType")).toBe("master"));
@@ -112,7 +126,6 @@ describe("ProductsTab — server-side query", () => {
     await user.type(screen.getByLabelText("Brand"), "Coca");
     await waitFor(() => expect(lastListQuery().get("brand")).toBe("Coca"));
 
-    await user.click(screen.getByRole("button", { name: "More filters" }));
     await user.selectOptions(screen.getByLabelText("Tax class"), "exempt");
     await waitFor(() => expect(lastListQuery().get("taxClass")).toBe("exempt"));
 
@@ -121,6 +134,44 @@ describe("ProductsTab — server-side query", () => {
 
     await user.type(screen.getByLabelText("Supplier"), "ABC");
     await waitFor(() => expect(lastListQuery().get("supplier")).toBe("ABC"));
+  });
+
+  it("sends the chosen search column, and only alongside a term", async () => {
+    const user = userEvent.setup();
+    render(<ProductsTab categories={CATEGORIES} />);
+    await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
+
+    // Scoping with an empty box must not narrow anything — there is nothing to
+    // narrow, and sending it would make the request differ from the old one for
+    // no reason.
+    await user.selectOptions(screen.getByLabelText(/search in which column/i), "sku");
+    await waitFor(() => expect(lastListQuery().get("searchField")).toBeNull());
+
+    await user.type(screen.getByLabelText("Search products"), "BEV");
+    await waitFor(() => {
+      const q = lastListQuery();
+      expect(q.get("q")).toBe("BEV");
+      // The parameter the server implements. If this is ever dropped, the
+      // column selector becomes decoration again.
+      expect(q.get("searchField")).toBe("sku");
+    }, { timeout: 3000 });
+  });
+
+  it("keeps the facet request scoped to the same search column as the list", async () => {
+    const user = userEvent.setup();
+    render(<ProductsTab categories={CATEGORIES} />);
+    await waitFor(() => expect(facetCalls.length).toBeGreaterThan(0));
+
+    await user.selectOptions(screen.getByLabelText(/search in which column/i), "brand");
+    await user.type(screen.getByLabelText("Search products"), "Coca");
+
+    await waitFor(() => {
+      const facetQuery = new URLSearchParams(facetCalls[facetCalls.length - 1].split("?")[1] ?? "");
+      // Counts drawn from a wider set than the rows beneath them is the bug
+      // this asserts against.
+      expect(facetQuery.get("searchField")).toBe("brand");
+      expect(facetQuery.get("q")).toBe("Coca");
+    }, { timeout: 3000 });
   });
 
   it("sends sort and direction to the API, and toggles direction on re-click", async () => {
@@ -144,7 +195,7 @@ describe("ProductsTab — server-side query", () => {
     render(<ProductsTab categories={CATEGORIES} />);
     await waitFor(() => expect(lastListQuery().get("sort")).toBe("name"));
 
-    await user.type(screen.getByLabelText("Name or SKU"), "049000028904");
+    await user.type(screen.getByLabelText("Search products"), "049000028904");
     await waitFor(() => expect(lastListQuery().get("sort")).toBe("relevance"), { timeout: 3000 });
   });
 
@@ -164,6 +215,7 @@ describe("ProductsTab — server-side query", () => {
     render(<ProductsTab categories={CATEGORIES} />);
     await waitFor(() => expect(facetCalls.length).toBeGreaterThan(0));
 
+    await openFilters(userEvent.setup());
     const select = screen.getByLabelText("Category") as HTMLSelectElement;
     const labels = [...select.options].map((o) => o.textContent);
     expect(labels).toContain("beverages (420)");
@@ -175,11 +227,103 @@ describe("ProductsTab — server-side query", () => {
     render(<ProductsTab categories={CATEGORIES} />);
     await waitFor(() => expect(facetCalls.length).toBeGreaterThan(0));
 
+    await openFilters(user);
     await user.selectOptions(screen.getByLabelText("Status"), "draft");
     await waitFor(() => {
       const facetQuery = new URLSearchParams(facetCalls[facetCalls.length - 1].split("?")[1] ?? "");
       expect(facetQuery.get("status")).toBe("draft");
     });
+  });
+});
+
+describe("ProductsTab — unified query state (useListQuery migration)", () => {
+  it("returns to page 1 when a filter changes, and does it in one request", async () => {
+    const user = userEvent.setup();
+    listResponse = () => ({ items: [product()], total: 863, limit: 50, offset: 100 });
+    render(<ProductsTab categories={CATEGORIES} />);
+    await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
+
+    await user.click(screen.getByRole("button", { name: /next page|next/i }));
+    await waitFor(() => expect(lastListQuery().get("offset")).toBe("50"));
+
+    const before = listCalls.length;
+    await openFilters(user);
+    await user.selectOptions(screen.getByLabelText("Status"), "active");
+
+    await waitFor(() => {
+      const q = lastListQuery();
+      expect(q.get("status")).toBe("active");
+      // Page 3 of the old result set is meaningless in the new one.
+      expect(q.get("offset")).toBe("0");
+    });
+
+    // The old code reset the page in an effect, which fetched once for the
+    // stale offset and again once the reset landed. One filter change must
+    // produce exactly one list request.
+    const listRequestsForThisChange = listCalls
+      .slice(before)
+      .filter((c) => c.includes("status=active"));
+    expect(listRequestsForThisChange).toHaveLength(1);
+    // Specifically: no request went out carrying the old offset with the new filter.
+    expect(listCalls.slice(before).some((c) => c.includes("offset=50") && c.includes("status=active")))
+      .toBe(false);
+  });
+
+  it("restores a deep-linked query from the URL on first render", async () => {
+    // A filtered catalog view is a shareable URL. Everything here must be in
+    // the FIRST request — fetching the unfiltered list first and correcting it
+    // afterwards would flash the wrong rows.
+    searchParams = new URLSearchParams(
+      "products_q=pepsi&products_field=sku&products_status=draft&products_ageRestricted=true",
+    );
+    render(<ProductsTab categories={CATEGORIES} />);
+    await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
+
+    const first = new URLSearchParams(listCalls[0].split("?")[1] ?? "");
+    expect(first.get("q")).toBe("pepsi");
+    expect(first.get("searchField")).toBe("sku");
+    expect(first.get("status")).toBe("draft");
+    expect(first.get("ageRestricted")).toBe("true");
+  });
+
+  it("writes active filters to the URL without a history entry per keystroke", async () => {
+    const user = userEvent.setup();
+    const historyLength = window.history.length;
+    render(<ProductsTab categories={CATEGORIES} />);
+    await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
+
+    await openFilters(user);
+    await user.selectOptions(screen.getByLabelText("Status"), "draft");
+
+    await waitFor(() =>
+      expect(new URLSearchParams(window.location.search).get("products_status")).toBe("draft"),
+    );
+    // replaceState, not push: Back must not walk through every filter change.
+    expect(window.history.length).toBe(historyLength);
+  });
+
+  it("Reset clears the query, the URL and the sort together", async () => {
+    const user = userEvent.setup();
+    searchParams = new URLSearchParams("products_q=pepsi&products_status=draft");
+    render(<ProductsTab categories={CATEGORIES} />);
+    await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
+
+    // Sort by something explicit so we can prove Reset clears it too — the old
+    // hand-written clearFilters left the list reordered.
+    await user.click(screen.getByRole("button", { name: /Sort by Retail price/ }));
+    await waitFor(() => expect(lastListQuery().get("sort")).toBe("price_cents"));
+
+    await user.click(screen.getByRole("button", { name: /^reset$/i }));
+
+    await waitFor(() => {
+      const q = lastListQuery();
+      expect(q.get("q")).toBeNull();
+      expect(q.get("status")).toBeNull();
+      // Back to the contextual default rather than the column the user picked.
+      expect(q.get("sort")).toBe("name");
+      expect(q.get("offset")).toBe("0");
+    });
+    expect(window.location.search).toBe("");
   });
 });
 
@@ -189,6 +333,7 @@ describe("ProductsTab — active filter chips", () => {
     render(<ProductsTab categories={CATEGORIES} />);
     await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
 
+    await openFilters(user);
     await user.selectOptions(screen.getByLabelText("Status"), "active");
     await user.selectOptions(screen.getByLabelText("Product type"), "variant");
     await waitFor(() => {
@@ -206,6 +351,51 @@ describe("ProductsTab — active filter chips", () => {
   });
 });
 
+describe("ProductsTab — DataTable migration", () => {
+  it("keeps sorting server-side after the table moved to DataTable", async () => {
+    const user = userEvent.setup();
+    render(<ProductsTab categories={CATEGORIES} />);
+    await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
+
+    // DataTable's default sorting reorders the LOADED page. This list must not
+    // use it: one page of a 5,000-row catalog reordered locally looks exactly
+    // like the catalog being reordered, which is the defect this page already
+    // had once. A header click has to reach the server.
+    await user.click(screen.getByRole("button", { name: /Sort by Brand/ }));
+    await waitFor(() => {
+      const q = lastListQuery();
+      expect(q.get("sort")).toBe("brand");
+      expect(q.get("dir")).toBe("asc");
+    });
+  });
+
+  it("marks the contextual default column as sorted, not just explicit choices", async () => {
+    render(<ProductsTab categories={CATEGORIES} />);
+    await waitFor(() => expect(listCalls.length).toBeGreaterThan(0));
+
+    // With no click, the server is ordering by name. The header must say so —
+    // showing every column as unsorted would misdescribe the list.
+    const nameHeader = screen.getAllByRole("columnheader")
+      .find((h) => h.textContent?.includes("Name"));
+    expect(nameHeader).toHaveAttribute("aria-sort", "ascending");
+  });
+
+  it("still drives the bulk bar from the table's selection", async () => {
+    const user = userEvent.setup();
+    listResponse = () => ({
+      items: [product({ id: "prod_1" }), product({ id: "prod_2", sku: "BEV-2", name: "Sprite" })],
+      total: 2, limit: 50, offset: 0,
+    });
+    render(<ProductsTab categories={CATEGORIES} />);
+    await waitFor(() => expect(screen.getByLabelText("Select all rows on this page")).toBeInTheDocument());
+
+    // The bulk bar lives OUTSIDE the table, so selection has to be controlled —
+    // an internally-managed selection would leave the bar empty.
+    await user.click(screen.getByLabelText("Select all rows on this page"));
+    expect(await screen.findByText("2 products selected")).toBeInTheDocument();
+  });
+});
+
 describe("ProductsTab — bulk actions", () => {
   it("updates the whole selection in one request, not one PATCH per product", async () => {
     const user = userEvent.setup();
@@ -216,8 +406,11 @@ describe("ProductsTab — bulk actions", () => {
     });
 
     render(<ProductsTab categories={CATEGORIES} />);
-    await waitFor(() => expect(screen.getByLabelText("Select all products")).toBeInTheDocument());
-    await user.click(screen.getByLabelText("Select all products"));
+    // DataTable's own label. More precise than the old "Select all products":
+    // it selects the loaded page, which is what it has always actually done.
+    const selectAll = "Select all rows on this page";
+    await waitFor(() => expect(screen.getByLabelText(selectAll)).toBeInTheDocument());
+    await user.click(screen.getByLabelText(selectAll));
 
     const bulkBar = await screen.findByText("2 products selected");
     const scope = within(bulkBar.parentElement!.parentElement!);

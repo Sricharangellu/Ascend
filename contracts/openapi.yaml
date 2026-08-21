@@ -676,6 +676,17 @@ paths:
             exact barcode > exact SKU > exact supplier SKU > SKU prefix > name
             prefix > brand prefix > name contains.
           schema: { type: string }
+        - name: searchField
+          in: query
+          description: >-
+            Narrows `q` to one column. Defaults to `all`. `name` also covers
+            alternative name and model; `brand` also covers manufacturer;
+            `barcode` covers the product barcode, supplier UPC and every
+            alternate/case UPC in product_barcodes. An unrecognised value is
+            rejected with 400 rather than silently widened back to `all`.
+          schema:
+            type: string
+            enum: [all, name, sku, barcode, brand, category, tags]
         - name: brand
           in: query
           description: Case-insensitive contains match on brand.
@@ -790,6 +801,15 @@ paths:
         - name: q
           in: query
           schema: { type: string }
+        - name: searchField
+          in: query
+          description: >-
+            Same column scoping as `GET /api/v1/catalog`. Must be sent whenever
+            the list request sends it, or the counts describe a wider set than
+            the rows beside them.
+          schema:
+            type: string
+            enum: [all, name, sku, barcode, brand, category, tags]
         - name: category
           in: query
           schema: { type: string }

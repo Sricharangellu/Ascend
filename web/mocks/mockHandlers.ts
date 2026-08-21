@@ -1620,7 +1620,8 @@ export const mockHandlers = [
      * existed. Anything added to the real query belongs here too.
      */
     interface CatalogQuery {
-      category?: string; status?: string; q?: string; brand?: string;
+      category?: string; status?: string; q?: string; searchField?: string;
+      brand?: string;
       supplier?: string; taxClass?: string; ageRestricted?: boolean;
       productType?: string; minPrice?: number; maxPrice?: number;
       topLevel?: boolean;
@@ -1665,11 +1666,26 @@ export const mockHandlers = [
         }
         if (f.q) {
           // AND across tokens, OR across the searchable columns.
+          //
+          // `searchField` narrows which columns are in play. It mirrors the
+          // server's SEARCH_FIELD_COLUMNS deliberately: when the mock searched
+          // everything regardless of scope, `npm run dev` made a broken column
+          // selector look like a working one — the same class of bug that hid
+          // `q` being ignored in production for months.
           const tokens = f.q.trim().toLowerCase().split(/\s+/).filter(Boolean).slice(0, 5);
-          const haystack = [p.name, p.sku, p.barcode, p.brand, p.category,
-            (p as { manufacturer?: string | null }).manufacturer,
-            (p as { vendor_upc?: string | null }).vendor_upc,
-          ].map((v) => String(v ?? "").toLowerCase());
+          const columns: Record<string, (string | null | undefined)[]> = {
+            name: [p.name,
+              (p as { alternative_name?: string | null }).alternative_name,
+              (p as { model_name?: string | null }).model_name],
+            sku: [p.sku],
+            barcode: [p.barcode, (p as { vendor_upc?: string | null }).vendor_upc],
+            brand: [p.brand, (p as { manufacturer?: string | null }).manufacturer],
+            category: [p.category],
+            tags: [(p as { tags?: string | null }).tags],
+          };
+          const field = f.searchField && f.searchField !== "all" ? f.searchField : null;
+          const haystack = (field ? (columns[field] ?? []) : Object.values(columns).flat())
+            .map((v) => String(v ?? "").toLowerCase());
           if (!tokens.every((t) => haystack.some((h) => h.includes(t)))) return false;
         }
         return true;
@@ -1719,6 +1735,7 @@ export const mockHandlers = [
       const type = str("productType");
       return {
         category: str("category"), status: str("status"), q: str("q"),
+        searchField: str("searchField"),
         brand: str("brand"), supplier: str("supplier"), taxClass: str("taxClass"),
         ageRestricted: url.searchParams.get("ageRestricted") === "true",
         topLevel: url.searchParams.get("topLevel") === "true",

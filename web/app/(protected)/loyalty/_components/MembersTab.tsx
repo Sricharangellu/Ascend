@@ -7,6 +7,7 @@ import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { fmtDate } from "@/lib/date";
 import type { LoyaltyTier, LoyaltyMember, LoyaltyMembersResponse, LoyaltyTierLevel } from "@/api-client/types";
+import { ListControls, FilterField, filterControlClass } from "@/components/ListControls";
 
 const TIER_BADGE: Record<LoyaltyTierLevel, "yellow" | "gray" | "green" | "purple"> = {
   bronze: "yellow",
@@ -119,18 +120,29 @@ export function MembersTab({ tiers }: { tiers: LoyaltyTier[] }) {
   return (
     <>
       <Card className="overflow-hidden p-0">
-        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 px-4 py-3">
-          <div className="min-w-48 flex-1">
-            <input className={inputCls} placeholder="Search members…"
-              value={search} onChange={e => setSearch(e.target.value)} />
-          </div>
-          <select
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={filterTier} onChange={e => setFilterTier(e.target.value)}>
-            <option value="all">All tiers</option>
-            {tiers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-          <span className="text-sm text-slate-500">{total} members</span>
+        {/* No column selector: /api/v1/loyalty/members implements `q` but has
+            no per-column scoping, so offering one would be decoration. */}
+        <div className="border-b border-line px-4 py-3">
+          <ListControls
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search members by name or email…"
+            searchLabel="Search loyalty members"
+            activeFilterCount={filterTier !== "all" ? 1 : 0}
+            onReset={() => { setSearch(""); setFilterTier("all"); }}
+            canReset={search.trim() !== "" || filterTier !== "all"}
+            resultCount={total}
+            loading={loading}
+            filters={
+              <FilterField label="Tier" htmlFor="loyalty-tier">
+                <select id="loyalty-tier" value={filterTier}
+                  onChange={e => setFilterTier(e.target.value)} className={filterControlClass}>
+                  <option value="all">All tiers</option>
+                  {tiers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </FilterField>
+            }
+          />
         </div>
 
         {error && <p role="alert" className="border-b border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}

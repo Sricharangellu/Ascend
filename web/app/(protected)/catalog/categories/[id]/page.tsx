@@ -6,6 +6,7 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import { Badge } from "@/components/Badge";
+import { ListControls } from "@/components/ListControls";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -404,21 +405,20 @@ export default function CategoryDetailPage() {
             </button>
           </div>
 
-          {/* Search bar */}
-          <div className="border-b border-slate-100 px-4 py-3">
-            <div className="relative">
-              <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 16 16" fill="none">
-                <circle cx="6.5" cy="6.5" r="4" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              <input
-                type="text"
-                value={prodQ}
-                onChange={(e) => setProdQ(e.target.value)}
-                placeholder="Search products in this category..."
-                className="w-full rounded-xl border border-slate-200 py-2 pl-9 pr-4 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
-              />
-            </div>
+          {/* Search bar — the shared list bar. No column selector: this queries
+              /api/v1/catalog/categories/:id/products with a single free-text
+              `q` and no per-column scoping. */}
+          <div className="border-b border-line px-4 py-3">
+            <ListControls
+              search={prodQ}
+              onSearchChange={setProdQ}
+              searchPlaceholder="Search products in this category…"
+              searchLabel="Search products in this category"
+              onReset={() => setProdQ("")}
+              canReset={prodQ.trim() !== ""}
+              resultCount={products.length}
+              loading={prodLoading}
+            />
           </div>
 
           {/* Table */}

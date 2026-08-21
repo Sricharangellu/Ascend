@@ -14,6 +14,7 @@ import { formatMoney } from "@/lib/money";
 import { fmtDate } from "@/lib/date";
 import { hasRole } from "@/lib/auth";
 import type { Order, OrderStatus } from "@/api-client/types";
+import { ListControls, FilterField, filterControlClass, type ListSearchField } from "@/components/ListControls";
 
 interface OrdersResponse {
   items: Order[];
@@ -40,12 +41,27 @@ const STATUS_BADGE: Record<OrderStatus, "green" | "blue" | "yellow" | "gray"> = 
 };
 
 
+/**
+ * Columns a returns search can be scoped to.
+ *
+ * Deliberately no customer option: `customerId` is a raw UUID a human would
+ * never type, so offering it would be a control that looks useful and never
+ * matches. A real customer search needs a name join first.
+ */
+const RETURN_SEARCH_FIELDS: ListSearchField[] = [
+  { value: "all", label: "All columns" },
+  { value: "receipt", label: "Receipt #" },
+  { value: "order", label: "Order ID" },
+  { value: "state", label: "State" },
+];
+
 export default function ReturnsPage() {
   const searchParams = useSearchParams();
   const preselectOrderId = searchParams.get("orderId");
   const [orders, setOrders] = useState<Order[]>([]);
   const [vendorReturns, setVendorReturns] = useState<VendorReturn[]>([]);
   const [query, setQuery] = useState("");
+  const [searchField, setSearchField] = useState("all");
   const [filter, setFilter] = useState<ReturnFilter>(preselectOrderId ? "all" : "eligible");
   const [selectedOrderId, setSelectedOrderId] = useState(preselectOrderId ?? "");
   const [loading, setLoading] = useState(true);
@@ -88,11 +104,17 @@ export default function ReturnsPage() {
       // Deliberately not matching customerId here — it's a raw UUID a human would
       // never type, so it isn't real "customer search" despite once being listed
       // as if it were. Fix that properly (a real customer-name join) if wanted.
-      return [order.orderNumber, order.id, order.stateCode]
+      const fields: Record<string, unknown[]> = {
+        receipt: [order.orderNumber],
+        order: [order.id],
+        state: [order.stateCode],
+      };
+      const haystack = searchField === "all" ? Object.values(fields).flat() : (fields[searchField] ?? []);
+      return haystack
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(q));
     });
-  }, [filter, orders, query]);
+  }, [filter, orders, query, searchField]);
 
   const selectedOrder = orders.find((order) => order.id === selectedOrderId);
   const summary = useMemo(() => {
@@ -146,32 +168,32 @@ export default function ReturnsPage() {
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
           <Card className="overflow-hidden p-0">
-            <div className="grid gap-3 border-b border-slate-200 px-4 py-3 lg:grid-cols-[minmax(220px,1fr)_auto]">
-              <label>
-                <span className="sr-only">Search receipts</span>
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search receipt #, order ID, or state..."
-                  className="min-h-[40px] w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
-                />
-              </label>
-              <div className="flex gap-1 overflow-x-auto" role="group" aria-label="Return filters">
-                {(["eligible", "refunded", "all"] as const).map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setFilter(item)}
-                    aria-pressed={filter === item}
-                    className={`min-h-[40px] whitespace-nowrap rounded-md px-3 text-sm font-medium capitalize transition-colors ${
-                      filter === item ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
+            <div className="border-b border-line px-4 py-3">
+              <ListControls
+                search={query}
+                onSearchChange={setQuery}
+                searchPlaceholder="Search receipt #, order ID, or state…"
+                searchLabel="Search receipts"
+                searchFields={RETURN_SEARCH_FIELDS}
+                searchField={searchField}
+                onSearchFieldChange={setSearchField}
+                activeFilterCount={filter !== "eligible" ? 1 : 0}
+                onReset={() => { setQuery(""); setSearchField("all"); setFilter("eligible"); }}
+                canReset={query.trim() !== "" || searchField !== "all" || filter !== "eligible"}
+                resultCount={filteredOrders.length}
+                totalCount={orders.length}
+                loading={loading}
+                filters={
+                  <FilterField label="Return status" htmlFor="returns-filter">
+                    <select id="returns-filter" value={filter}
+                      onChange={(event) => setFilter(event.target.value as ReturnFilter)} className={filterControlClass}>
+                      <option value="eligible">Eligible</option>
+                      <option value="refunded">Refunded</option>
+                      <option value="all">All</option>
+                    </select>
+                  </FilterField>
+                }
+              />
             </div>
 
             {loading ? (

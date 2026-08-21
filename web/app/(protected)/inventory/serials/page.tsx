@@ -7,6 +7,7 @@ import { apiGet, apiPost, apiPatch } from "@/api-client/client";
 import { fmtDate } from "@/lib/date";
 import type { SerialNumber, SerialStatus, SerialsResponse } from "@/api-client/types";
 import { clsx } from "clsx";
+import { ListControls } from "@/components/ListControls";
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 
@@ -280,6 +281,15 @@ export default function SerialsPage() {
   const [tab, setTab] = useState<SerialStatus | "all">("all");
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
+
+  // The search was submit-driven (a "Search" button next to the box). Live
+  // search is the pattern everywhere else in Ascend now, but this list is
+  // server-backed, so it is debounced — going live without that would put one
+  // request on the wire per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(query), 300);
+    return () => clearTimeout(t);
+  }, [query]);
   const [showReceive, setShowReceive] = useState(false);
   const [selected, setSelected] = useState<SerialNumber | null>(null);
 
@@ -303,11 +313,6 @@ export default function SerialsPage() {
     (acc, s) => { acc[s.status] = (acc[s.status] ?? 0) + 1; return acc; },
     {} as Record<string, number>
   );
-
-  function handleSearchSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSearch(query);
-  }
 
   function handleReceived(sn: SerialNumber) {
     setSerials(prev => [sn, ...prev]);
@@ -345,25 +350,19 @@ export default function SerialsPage() {
           ))}
         </div>
 
-        {/* Toolbar */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <form onSubmit={handleSearchSubmit} className="flex gap-2 flex-1">
-            <input
-              type="text"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="Search serial, product name, or SKU…"
-              className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <Button variant="secondary" type="submit" size="sm">Search</Button>
-            {search && (
-              <Button variant="secondary" type="button" size="sm" onClick={() => { setQuery(""); setSearch(""); }}>
-                Clear
-              </Button>
-            )}
-          </form>
-          <Button variant="primary" onClick={() => setShowReceive(true)}>+ Receive Serial</Button>
-        </div>
+        {/* Toolbar — no column selector: /api/v1/serial-numbers implements `q`
+            as one free-text parameter with no per-column scoping. */}
+        <ListControls
+          search={query}
+          onSearchChange={setQuery}
+          searchPlaceholder="Search serial, product name, or SKU…"
+          searchLabel="Search serial numbers"
+          onReset={() => { setQuery(""); setSearch(""); }}
+          canReset={query.trim() !== "" || search.trim() !== ""}
+          resultCount={serials.length}
+          loading={loading}
+          trailing={<Button variant="primary" onClick={() => setShowReceive(true)}>+ Receive Serial</Button>}
+        />
 
         {/* Status tabs */}
         <div className="flex gap-1 border-b border-slate-200 overflow-x-auto">
