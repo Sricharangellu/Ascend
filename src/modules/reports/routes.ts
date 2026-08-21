@@ -84,9 +84,11 @@ export function registerRoutes(router: Router, service: ReportsService): void {
     res.json(await service.retailRecommendations(tenantId(res), recentDays));
   }));
 
-  // GET /api/v1/reports/ar-aging — Accounts Receivable aging buckets.
-  router.get("/ar-aging", requireRole("manager"), handler(async (_req, res) => {
-    res.json(await service.arAging(tenantId(res)));
+  // GET /api/v1/reports/ar-aging?limit=… — Accounts Receivable aging buckets.
+  // `limit` caps the per-party list (default/cap 500); `totals` always sum every
+  // open invoice regardless (REPORTS_MODULE_REVIEW.md finding #4).
+  router.get("/ar-aging", requireRole("manager"), handler(async (req, res) => {
+    res.json(await service.arAging(tenantId(res), Date.now(), cappedLimit(req.query.limit, 500)));
   }));
 
   // POST /api/v1/reports/ar-aging/sweep — flag overdue invoices with dunning_level.
@@ -96,9 +98,11 @@ export function registerRoutes(router: Router, service: ReportsService): void {
     res.json(await service.sweepArAging(tenantId(res)));
   }));
 
-  // GET /api/v1/reports/ap-aging — Accounts Payable aging buckets.
-  router.get("/ap-aging", requireRole("manager"), handler(async (_req, res) => {
-    res.json(await service.apAging(tenantId(res)));
+  // GET /api/v1/reports/ap-aging?limit=… — Accounts Payable aging buckets.
+  // `limit` caps the per-party list (default/cap 500); `totals` always sum every
+  // open bill regardless (REPORTS_MODULE_REVIEW.md finding #4).
+  router.get("/ap-aging", requireRole("manager"), handler(async (req, res) => {
+    res.json(await service.apAging(tenantId(res), Date.now(), cappedLimit(req.query.limit, 500)));
   }));
 
   // GET /api/v1/reports/sales-by-category?range=…
