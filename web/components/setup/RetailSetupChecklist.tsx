@@ -40,7 +40,7 @@ export async function evaluateRetailSetupTasks(): Promise<SetupTaskState[]> {
     apiGet<OutletsResponse>("/api/v1/outlets"),
     apiGet<{ items: unknown[] }>("/api/v1/settings/tax-rates"),
     apiGet<{ items: unknown[] }>("/api/v1/settings/payment-modes"),
-    apiGet<{ items: unknown[]; total?: number }>("/api/v1/catalog?pageSize=1"),
+    apiGet<{ items: unknown[]; total?: number }>("/api/v1/catalog?limit=1"),
     apiGet<{ items: Array<Record<string, unknown>> }>("/api/v1/inventory/levels?pageSize=50"),
   ]);
 

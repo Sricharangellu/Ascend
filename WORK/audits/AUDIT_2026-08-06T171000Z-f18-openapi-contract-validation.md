@@ -1,0 +1,360 @@
+# AUDIT 2026-08-06T171000Z — F-18: OpenAPI contract validation
+
+**Session:** Claude Code web — `claude/status-staging-vs-develop-0vv2gg`
+**Base:** branched at `develop@41f6eda`; merged `develop@5709a91` mid-PR (45 commits landed
+from other sessions while this was in flight — see §5b)
+**Scope:** Phase 9.9 finding **F-18**. Build the CI check that validates
+`contracts/openapi.yaml` against the real backend, and fix the drift it finds.
+**Not in scope:** any `src/**` behaviour change, `artifacts/**`, and the F-28
+decision this pass surfaced.
+
+---
+
+## 1. Why this item
+
+Phase 9's execution order is `S-1 → F-11 → F-3 → F-15/F-16/F-17 → F-5, F-14,
+F-9 → F-19 → F-12, F-18 → F-20`. Walking it against the real tree:
+
+| Item | State found | Actionable? |
+|---|---|---|
+| S-1, S-2 | repo settings | no — Sri-only |
+| F-11 (tax authority) | needs a decision on which of 3 authorities wins | no |
+| F-3 (`artifacts/` tree) | NEEDS-SRI | no |
+| F-15, F-16, F-17 | ✅ done 2026-08-04 | — |
+| **F-5** | table said `⬜ READY`; **already shipped in PR #185** | corrected |
+| **F-9** | table said `⬜ READY`; **already shipped in PR #185** | corrected |
+| F-14, F-19, F-22, F-23, F-27 | all declare `Depends on: F-3` | no |
+| F-12 | waits on F-11 | no |
+| **F-18** | genuinely unblocked, no dependencies | **taken** |
+| F-24, F-25 | unblocked but framework/test-runner majors | deferred |
+| F-20 | explicitly sequenced last | deferred |
+
+F-18 was the last unblocked, non-major item in the stated order.
+
+### 1a. Two stale board rows, corrected
+
+Both were verified against the tree, not assumed:
+
+- **F-5** — `src/shared/test-request.ts` exists; all 46 per-module copies are
+  thin re-exports of `sendRequest`/`resolveApiPath`/`bearer` that pin their own
+  default role. Spot-checked the exact case the acceptance criteria named:
+  `workflows` still defaults to `manager`, `catalog` to `owner`, and `identity`
+  deliberately signs no token and does not upgrade the path. Shipped `409f617`.
+- **F-9** — `web/tests/setup.ts` reads `process.versions.node`, compares against
+  `.nvmrc`, and prints a named warning. Shipped `df1a45f`.
+
+A row that says READY for work already done is the same failure mode Phase 9
+exists to correct, so this is recorded as a finding rather than a silent edit.
+
+---
+
+## 2. The check
+
+`tools/openapi-contract-scan.mjs` — `npm run contract:scan`, wired into CI's
+guard job and into `npm run verify`.
+
+Dependency-free, matching every other tool in `tools/`: they must be able to run
+as a bare `node` call before `npm ci`, which is the property that let
+`hygiene-check` survive the root-manifest hijack (F-2).
+
+Route extraction mirrors `tools/api-gap-scan.mjs` — same registration model
+(module `mountPath` + `app.ts` direct routes + `identity`) — extended to keep the
+**HTTP method**, since a path documented for `GET` but only served for `POST` is
+real drift a path-only comparison cannot see. Verified the extraction is complete
+for this repo before relying on it: no module has nested route directories, every
+`router.use()` in `src/modules` mounts middleware rather than a sub-router, and
+`registerPublicRoutes` attaches to `/api/v1/sso`, the same path the `sso` module
+already declares.
+
+### Gate design — deliberately asymmetric
+
+| Direction | Treatment | Why |
+|---|---|---|
+| **Phantom** — documented, not served | **FATAL** | The check is exact and the count is already zero. Gating a zero costs nobody anything and stops the drift coming back. See §3a — no compiler will ever catch this class, so nothing else can. |
+| **Undocumented** — served, not documented | report-only | 478 of them. The contract covers the public surface, not the 626-route internal total. Gating today would fail every PR on arrival, and Phase 9.6 is explicit that such a check gets deleted rather than fixed. |
+
+This is a departure from "non-blocking first" for the phantom half, and the
+justification is narrow: the count it gates on is **already zero**, because all
+9 findings were corrected in the same PR. A gate that is green on arrival does
+not block anyone.
+
+### The naive YAML reader, and why it is safe
+
+A YAML library would break the dependency-free property. The reader models the
+narrow part of the format — path keys at two-space indent, method keys at four —
+which is what the file uses throughout. Two guards keep
+it from silently degrading:
+
+1. Cross-validated against PyYAML on the real file: **148 operations vs 148**,
+   no misses, no extras.
+2. It throws on any two-space key inside `paths:` that is not a path, on a
+   missing `paths:` block, and on parsing zero operations. A parser that
+   silently sees fewer operations turns this gate into a green light, which is
+   worse than no gate.
+
+---
+
+## 3. What it found — 9 phantom operations
+
+All confirmed against the real handlers, not inferred from the scanner:
+
+| Documented | Reality |
+|---|---|
+| `PATCH /api/v1/appointments/{id}/status` | real route is `PATCH /appointments/{id}` |
+| `POST /api/v1/healthcare/prescriptions` | real is `POST /patients/{id}/prescriptions` — patient comes from the path |
+| `PATCH /api/v1/automotive/work-orders/{id}/status` | real is `PATCH /work-orders/{id}` |
+| `POST /api/v1/hospitality/rooms/{id}/charges` | real is `/charge`, **singular** |
+| `GET /api/v1/hospitality/rooms/{id}/folio` | never built; `GET /rooms/{id}/charges` is the real one |
+| `PATCH /api/v1/entertainment/events/{id}/status` | never built at all — no PATCH on events |
+| `POST /api/v1/entertainment/tickets` | real is `POST /events/{id}/sell` |
+| `POST /api/v1/education/fees` | real is `POST /students/{id}/fees` |
+| `GET /api/v1/audit_log` | module registers as `audit-log` (hyphen) |
+
+**The frontend was innocent in every case** — checked each: it calls
+`/prescriptions/{id}/dispense`, `/work-orders/{id}`, `/rooms/{id}/charges`,
+`/tickets/redeem`, `/fees/{id}/collect`, all real. `gap:scan` is green and none
+of these are allowlisted, which is consistent: nothing calls the phantoms.
+
+So the contract was wrong, not the backend. **Corrected the contract rather than
+inventing backend routes** — building `PATCH /events/{id}/status` because a
+document mentioned it would be inventing product surface, which is the opposite
+of what this program is for. The two operations with no real counterpart at all
+(`events/{id}/status`, and `folio` as a distinct concept) were removed.
+
+While rewriting those blocks, four real but undocumented routes were added,
+since they are the natural contents of paths being created anyway:
+`GET /patients/{id}/prescriptions`, `GET /events/{id}/tickets`,
+`DELETE /appointments/{id}`, and the real `GET /rooms/{id}/charges`.
+
+### 3a. A correction to this audit's own first draft — and F-29
+
+The obvious justification for gating this check was that `contracts/openapi.yaml`
+feeds orval, so a phantom ships as generated client code that 404s. **That is
+false, and it was written into the scanner header, the CI comment and this
+report before being checked.** Recording it rather than quietly deleting it,
+because the near-miss is the point: it is a plausible, repo-shaped claim that
+would have justified a gate on a reason that does not exist.
+
+What is actually true:
+
+| Spec | Lines | Paths | Consumed by |
+|---|---|---|---|
+| `contracts/openapi.yaml` | 3,170 | 109 (unchanged — 8 renames, one removed, one added) | **nothing programmatic** — docs and archived orchestration files only |
+| `lib/api-spec/openapi.yaml` | 36 | 1 (`/healthz`) | orval → `lib/api-client-react`, `lib/api-zod` |
+
+`web/api-client/types.ts` is hand-maintained despite archived docs
+(`orchestration/_archive/AGENT_FRONTEND.md`) calling it "GENERATED from
+contracts/openapi.yaml (do not hand-edit)" — its own header admits this and
+F-21 already tracks it.
+
+So the real justification is weaker but still sufficient: **no compiler, type
+error, or existing check has ever looked at this file.** Drift here is silent by
+construction, which is exactly how 9 phantoms and 11 wrong request bodies
+accumulated. The gate stands on a narrower footing — the check is exact and the
+count is already zero, so gating costs nothing and prevents regression.
+
+The two-spec split is itself a finding: two files named `openapi.yaml`, one the
+3,170-line contract of record and one a 36-line stub wired to codegen, with
+nothing relating them. Recorded as **F-29**, same class as F-10 (`scripts/` has
+two owners).
+
+---
+
+## 4. The second class — 11 lying request bodies (and F-28 underneath)
+
+Measured while fixing the above, not guessed: of 68 documented operations with a
+JSON request body, 15 declared snake_case properties. Checking each against its
+module's actual zod schema split them cleanly:
+
+- **4 were correct.** `catalog` and `service_orders` genuinely accept
+  snake_case (`price_cents`, `tax_class`, `estimate_cents`). My first read of
+  this was wrong — the initial assumption that "requests are camelCase
+  everywhere" does not hold, and the contract was right for these.
+- **11 were wrong.** The eight vertical modules take camelCase, so
+  `starts_at`, `labour_cents`, `vehicle_id`, `room_number`, `qty_consumed`,
+  `daily_rate_cents`, `ticket_price_cents` and friends would all be rejected.
+  `POST /rental/contracts/{id}/return` documented a `damage_cents` on an
+  endpoint that **reads no request body at all**.
+
+All 11 corrected against the real zod schemas; re-measured **11 → 0**. Query
+parameters in the same operations were fixed alongside (`employee_id` →
+`employeeId`, plus the undocumented `from`/`to`; dropped `customer_id` and
+`vehicle_id` filters that no handler reads).
+
+### F-28 — the part that is *not* fixed
+
+Fixing the documentation does not fix why it drifted. **The repo has two
+request-field naming conventions**: snake_case in `catalog`/`service_orders`,
+camelCase in the eight verticals. Responses are raw DB rows and therefore
+snake_case everywhere — so a caller of a camelCase module sends one convention
+and reads back another.
+
+Recorded as **F-28, NEEDS-SRI**. Renaming accepted request fields is a breaking
+API change, not a cleanup, and this program's own governing rule is that an
+agent turned loose to "fix everything" trades known defects for unknown
+regressions. Picking the convention is Sri's call.
+
+---
+
+## 5. Gates
+
+Run on the working tree, against real Postgres 16.13 (embedded-postgres cannot
+`initdb` as root in this sandbox — same limit the 2026-08-04 audit hit; a system
+cluster on port 55432 was used via `DATABASE_URL`).
+
+| Gate | Result |
+|---|---|
+| `npm run typecheck` (backend) | exit 0 |
+| `npm run hygiene` | PASS — 2216 files |
+| `npm run gap:scan` | PASS — no unexplained FE→BE gaps |
+| `npm run authz:scan` | PASS — every mutating route carries a guard |
+| `npm run contract:scan` | PASS — 148 documented operations, 626 backend routes, 0 phantom |
+| `npm run table:scan` | PASS — 166 table names, no collisions |
+| `npm run prevent:drift` | PASS (after commit; it correctly flagged this session's own uncommitted edits first) |
+| `npm test` (backend) | **CI: PASS.** Locally 902/903 — see the flake note below |
+| web typecheck / lint / test / build | exit 0 / clean / **234 pass across 31 files** / build succeeds |
+
+**The one local test failure, and why it is not a regression.** The final local
+run reported `not ok 229 - list returns created roles`
+(`custom_roles.test.ts`). It is not an assertion failure: the error is
+`canceling statement due to statement timeout` (SQLSTATE 57014) after 30s,
+raised inside `buildApp`'s migration transaction — the harness never reached
+the test body. Three independent checks say environmental:
+
+1. Tests 230, 231 and 232 in the **same file** passed immediately after, in
+   4–6s each.
+2. Re-running `custom_roles.test.ts` alone: **10/10 pass**.
+3. **CI's own backend job passed the full suite** on its Postgres service
+   container.
+
+Cause is local: this sandbox's Postgres had just completed a 160-second crash
+recovery over a data directory carrying ~105k files from repeated full-suite
+runs, so a migration transaction that normally takes ~1.5s exceeded the
+statement timeout once. Same class as PR #118 (`ci(backend): CI-only headroom
+for the tx statement_timeout`). Recorded rather than re-run-until-green and
+reported as 903/903, which would have hidden it.
+
+### 5a. Verification of the scanner itself
+
+Failure modes proven, not asserted — the standard this repo applies to any new
+guard:
+
+| Scenario | Expected | Actual |
+|---|---|---|
+| Clean tree | exit 0 | exit 0 |
+| Inject a phantom operation | exit 1, names it | exit 1, `GET /api/v1/totally-made-up` |
+| Undocumented count grows | warn, exit 0 | warn, exit 0 — `400 → 478` reported (see §5b) |
+| Two-space non-path key in `paths:` | hard error | `unexpected key "notAPath"` |
+| Pre-fix contract (`git HEAD`) | exit 1 | exit 1 — reproduces the drift unaided |
+
+`contracts/openapi.yaml` was confirmed byte-identical after each destructive
+test, and re-parsed cleanly by PyYAML after all edits. Also verified no
+duplicate path keys (109 raw path-key lines = 109 PyYAML keys, so nothing is
+being silently merged) and no duplicate `operationId`s.
+
+Route extraction was checked for completeness in the direction that matters:
+a *missed* route would produce a **false phantom** and fail CI on correct code.
+Confirmed there is no `router.route()`, `.all()`, dynamically-registered method,
+or variable route path anywhere in `src/` — every route is a literal path on
+`router.<method>` or `app.<method>`, and every `app.use` mounts middleware.
+
+### 5b. The ratchet was wrong, and merging `develop` proved it
+
+The undocumented-route count was first written as a **gating** ratchet: fail if
+the number grows. Merging `develop` mid-PR — 45 commits from other sessions,
+none touching the contract — pushed it 475 → 478 and turned the build red on
+work with nothing to do with this change.
+
+That is the exact failure Phase 9.6 warns about, applied to the derivative
+rather than the total: with several agents landing routes on `develop` in
+parallel, a growth gate turns unrelated PRs red until someone edits a JSON file
+in this repo, and a check that does that gets deleted rather than fixed.
+
+Changed to warn-and-continue. The direction is still printed on every run (and
+the scan says so explicitly when the gap *shrinks*, prompting the baseline to be
+lowered), but it cannot fail a build. Gate it once the number is small and
+stable — the same sequence `docker-build` and `e2e` followed. Recorded here
+rather than quietly changed, because the first design shipped in the same PR.
+
+The phantom half is unaffected and still fatal; it was re-proven on the merged
+tree after the change.
+
+---
+
+## 6. What remains in Phase 9
+
+Nothing unblocked is left except two dependency majors and one burndown:
+**F-24** (Next 14→16), **F-25** (vitest 2→4), **F-20** (suppressions, sequenced
+last). Everything else waits on a decision: **S-1**/**S-2** (repo settings),
+**F-11** (tax authority), **F-3** (the `artifacts/` tree — which alone gates
+F-14, F-19, F-22, F-23 and F-27), **F-13** (pricing owner), and now **F-28**.
+
+The honest read: Phase 9's remaining surface is decision-bound, not
+effort-bound.
+
+---
+
+## 7. STAND-DOWN — PR #222 shipped F-18 first (recorded 2026-08-11)
+
+Everything above describes an implementation that **was not merged**. While this
+branch was in flight, another session built the same gate and landed it via
+**PR #222** (`7b5b079`, merged at `32f8796`). `develop`'s Phase 9.9 row already
+reads F-18 ✅ DONE. Two sessions produced `tools/openapi-contract-scan.mjs`
+independently — an **add/add conflict on the same filename**, the third
+concurrent duplicate this week after PR #212/#214 and #219.
+
+**PR #222 is the surviving implementation.** This is not deference for its own
+sake — it is better on three counts:
+
+1. **Better engineered.** Route extraction lives in a shared
+   `tools/lib/backend-routes.mjs`; the parser asserts a plausible operation
+   floor rather than trusting itself; the allowlist demands a written reason per
+   entry and *fails* on a stale one.
+2. **It corrected a claim this audit got wrong.** §3a asserted nothing generates
+   from `contracts/openapi.yaml`. False: `web/package.json` wires
+   `generate:client: openapi-typescript ../contracts/openapi.yaml -o
+   api-client/types.ts`. It is a footgun nobody runs rather than a build step,
+   but it exists, and PR #222 found it while this audit asserted its absence.
+3. **It made the better product call.** On `PATCH /automotive/work-orders/{id}/status`
+   the contract describes a *bodyless auto-advance*; the code requires a
+   caller-supplied status. PR #222: *"Address and semantics both differ, so this
+   one needs a decision, not a rename."* This branch renamed it, silently
+   discarding documented intent — a unilateral product decision.
+
+**Merging this branch would have broken `develop`, proven rather than assumed.**
+Swapping this branch's corrected contract under develop's scanner and allowlist:
+
+```
+openapi-contract-scan: STALE ALLOWLIST
+  PATCH /api/v1/appointments/{id}/status
+  POST  /api/v1/healthcare/prescriptions
+  PATCH /api/v1/automotive/work-orders/{id}/status
+  PATCH /api/v1/entertainment/events/{id}/status
+  POST  /api/v1/entertainment/tickets
+  POST  /api/v1/education/fees
+exit=1
+```
+
+Correcting the contract resolves the six mismatches the allowlist describes, and
+that scanner treats a stale entry as fatal. Two valid designs, mutually
+incompatible; the merged one wins.
+
+### What survived, and why
+
+| Item | Kept? | Reason |
+|---|---|---|
+| Scanner, allowlist/baseline, CI step, `package.json` script | ❌ | Duplicates PR #222 |
+| The 9 contract path corrections | ❌ | Would strand develop's 6 allowlist entries |
+| F-18 plan row, F-28 (ID taken by develop) | ❌ | Superseded / renumbered to **F-30** |
+| **F-5 and F-9 board corrections** | ✅ | **Still `⬜ READY` on develop despite both shipping in PR #185.** Verified against the tree; nobody else caught this |
+| **F-29** — two files named `openapi.yaml` | ✅ | Not filed by PR #222 |
+| **F-30** — two request-field naming conventions | ✅ | Renumbered; distinct from develop's F-28 |
+| The 11 request-body corrections | ❌ *(evidence kept)* | PR #222 scopes bodies to F-19 because unverified schema rewrites can make the contract *more* wrong. Mine were mechanically verified (11 → 0 against each zod schema) and the per-operation list is in §4 — a down-payment for F-19, not a merge for this PR |
+
+### The real finding
+
+Three concurrent duplicates in one week (#212/#214, #219, #222) is a coordination
+failure, not bad luck. `WORK/LOCK.md` is claim-on-start, but nothing makes an
+agent *read* it against a board item before building — this branch claimed F-18
+in LOCK.md and still collided. Worth a board item of its own; the cost here was
+a full implementation, its verification, and two develop merges.
