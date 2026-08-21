@@ -3,6 +3,7 @@ import {
   applyScanToEntries,
   buildReceiveLines,
   computeTotal,
+  findScannedLine,
   type POLine,
   type ReceiveEntry,
   type ResolvedScan,
@@ -173,5 +174,48 @@ describe("applyScanToEntries", () => {
     const { entries } = applyScanToEntries(scan({ id: "p2" }), lines, before);
     expect(entries.find((e) => e.lineId === "l1")!.highlighted).toBe(false);
     expect(entries.find((e) => e.lineId === "l2")!.highlighted).toBe(true);
+describe("findScannedLine", () => {
+  const lines: POLine[] = [
+    {
+      id: "line_coffee", product_id: "prod_coffee", product_name: "Colombian Roast",
+      product_sku: "COF-1", product_barcode: "0111111111111",
+      quantity: 24, unit_cost_cents: 800, received_qty: 0, remaining_qty: 24,
+      expiry_date: null, lot_code: null,
+    },
+    {
+      id: "line_mug", product_id: "prod_mug", product_name: "Ceramic Mug",
+      product_sku: "MUG-1", product_barcode: "0222222222222",
+      quantity: 6, unit_cost_cents: 400, received_qty: 0, remaining_qty: 6,
+      expiry_date: null, lot_code: null,
+    },
+  ];
+
+  it("matches the each-barcode denormalised onto the line", () => {
+    expect(findScannedLine(lines, "0222222222222")?.id).toBe("line_mug");
+  });
+
+  it("matches the SKU", () => {
+    expect(findScannedLine(lines, "COF-1")?.id).toBe("line_coffee");
+  });
+
+  it("matches a case barcode via the canonical resolver's product id", () => {
+    // The receiving desk's normal scan: a case UPC that lives in
+    // product_barcodes and appears on no PO line. Exact matching alone reported
+    // "not found on this PO" for a product that is plainly on the PO.
+    expect(findScannedLine(lines, "CASE-UPC-9988", "prod_coffee")?.id).toBe("line_coffee");
+  });
+
+  it("prefers the line's own barcode over a resolved id when both match", () => {
+    expect(findScannedLine(lines, "0111111111111", "prod_mug")?.id).toBe("line_coffee");
+  });
+
+  it("returns undefined for a code that resolves to a product not on this PO", () => {
+    expect(findScannedLine(lines, "7777777777777", "prod_not_ordered")).toBeUndefined();
+  });
+
+  it("returns undefined for blank input or an empty PO", () => {
+    expect(findScannedLine(lines, "   ")).toBeUndefined();
+    expect(findScannedLine([], "COF-1")).toBeUndefined();
+    expect(findScannedLine(undefined, "COF-1")).toBeUndefined();
   });
 });

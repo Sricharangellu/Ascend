@@ -15,6 +15,23 @@ import jwt from "jsonwebtoken";
  * no token at all, progress takes a tenant), so each module keeps a small
  * helper that composes these primitives with its own defaults. Collapsing
  * those into one signature would silently re-role existing tests.
+ *
+ * `makeRequest()` below closes the rest of that gap (backlog F-5). Sharing the
+ * plumbing still left 41 of the 46 module helpers byte-identical in three
+ * groups (31 + 5 + 5) — the same composition, differing only in which role they
+ * pin — and `dupe:scan` reported them on every PR. Those now call the factory.
+ * Each module keeps its own one-line file rather than importing the factory
+ * directly from its tests, so the module's default role stays visible and
+ * greppable next to the tests that depend on it.
+ *
+ * Five helpers deliberately stay hand-written, because they differ in ways the
+ * factory would have to grow options to express — and an options bag with five
+ * one-off flags is the duplication back again, wearing a hat:
+ *   identity      — signs no token and does not rewrite the path
+ *   progress      — takes the `App` wrapper, requires a role, allows a tenant
+ *   business      — signs an arbitrary {sub, tenantId, role} for isolation tests
+ *   custom_roles  — attaches customRoleId / permissions claims
+ *   reports       — types its role parameter as `Role`, not `string`
  */
 
 export interface TestResponse {
@@ -102,4 +119,40 @@ export function sendRequest(
       req.end();
     });
   });
+}
+
+/**
+ * Build a module's test client, pinning the role its tests assume by default.
+ *
+ * The returned function is the signature 41 module helpers had already
+ * converged on independently:
+ *
+ *   request(app, method, path, body?, role?)
+ *
+ * `role` is a superset of what the 31 fixed-`owner` helpers accepted — they
+ * declared four parameters and every one of their call sites passes at most
+ * four, verified before this change, so gaining a defaulted fifth cannot alter
+ * an existing call. The subject is derived as `usr_demo_<role>`, which for
+ * `owner` is the exact `usr_demo_owner` those helpers hard-coded.
+ *
+ * The default is per-module and load-bearing: `workflows` and the other four
+ * `manager` modules have tests that would start passing for the wrong reason if
+ * they were silently promoted to `owner`. That is why this is a factory rather
+ * than one shared function with a single global default.
+ *
+ * @param defaultRole role signed when a caller does not pass one.
+ */
+export function makeRequest(defaultRole: string) {
+  return function request(
+    app: http.RequestListener,
+    method: string,
+    path: string,
+    body?: unknown,
+    role: string = defaultRole,
+  ): Promise<TestResponse> {
+    return sendRequest(app, method, resolveApiPath(path), {
+      body,
+      headers: bearer({ sub: `usr_demo_${role}`, tenantId: "tnt_demo", role }),
+    });
+  };
 }

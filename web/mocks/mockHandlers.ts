@@ -277,6 +277,117 @@ function seed() {
 }
 seed();
 
+// ── Receiving sessions (scan & receive) ──────────────────────────────────────
+// Stateful on purpose: scanning the same barcode twice has to increment, an
+// over-scan has to report itself, and edits have to stick — a stub that always
+// returns the same payload would make the workspace look like it works while
+// hiding exactly the behaviour worth exercising.
+
+interface MockReceivingLine {
+  id: string; session_id: string; po_line_id: string; product_id: string;
+  expected_qty: number; scanned_qty: number; accepted_qty: number;
+  held_qty: number; rejected_qty: number;
+  unit_cost_cents: number | null; cost_override_reason: string | null;
+  lot_code: string | null; expiry_date: number | null; manufacture_date: number | null;
+  location_id: string | null; barcode_scanned: string | null; status: string;
+  created_at: number; updated_at: number;
+  product_name: string; sku: string; barcode: string; po_unit_cost_cents: number;
+}
+
+interface MockReceivingSession {
+  id: string; po_id: string; session_number: string; status: string; mode: string;
+  receiver_id: string | null; receiver_name: string | null;
+  dock_code: string | null; notes: string | null;
+  started_at: number; completed_at: number | null;
+  created_at: number; updated_at: number;
+  lines: MockReceivingLine[];
+  po_number: number; supplier_id: string; supplier_name: string;
+}
+
+const recvNow = Date.now();
+
+function mockRecvLine(
+  n: number,
+  productId: string,
+  name: string,
+  sku: string,
+  barcode: string,
+  expected: number,
+  poCostCents: number,
+): MockReceivingLine {
+  return {
+    id: `rsl_${n}`, session_id: "rcv_1", po_line_id: `pol_${n}`, product_id: productId,
+    expected_qty: expected, scanned_qty: 0, accepted_qty: 0, held_qty: 0, rejected_qty: 0,
+    unit_cost_cents: null, cost_override_reason: null,
+    lot_code: null, expiry_date: null, manufacture_date: null,
+    location_id: null, barcode_scanned: null, status: "pending",
+    created_at: recvNow, updated_at: recvNow,
+    product_name: name, sku, barcode, po_unit_cost_cents: poCostCents,
+  };
+}
+
+const receivingSessions = new Map<string, MockReceivingSession>([
+  ["rcv_1", {
+    id: "rcv_1", po_id: "po_1", session_number: "RCV-1042", status: "receiving",
+    mode: "standard", receiver_id: "usr_demo", receiver_name: "Demo Operator",
+    dock_code: "D2", notes: null,
+    started_at: recvNow - 1_200_000, completed_at: null,
+    created_at: recvNow - 1_200_000, updated_at: recvNow,
+    po_number: 118, supplier_id: "sup_acme", supplier_name: "Acme Wholesale",
+    lines: [
+      mockRecvLine(1, "prod_1", "Organic Dark Roast Beans", "COF-001", "0700000000011", 48, 850),
+      mockRecvLine(2, "prod_2", "Wildflower Honey", "HON-002", "0700000000028", 24, 320),
+      mockRecvLine(3, "prod_4", "Ceramic Coffee Mug", "MUG-004", "0700000000042", 12, 640),
+    ],
+  }],
+]);
+
+/** Cost history is per product, so the intelligence panel has something real to show. */
+const recvIntelligence: Record<string, Record<string, unknown>> = {
+  prod_1: {
+    product_id: "prod_1", last_purchase_cost_cents: 825, prev_vendor_cost_cents: 810,
+    avg_purchase_cost_cents: 831, lowest_historical_cost_cents: 780,
+    highest_historical_cost_cents: 899, cost_trend: "up",
+    variance_vs_po_pct: 0, variance_band: "green",
+    preferred_supplier_id: "sup_acme", preferred_supplier_name: "Acme Wholesale",
+    lead_time_days: 5, moq: 24, fill_rate_pct: 96.4, stock_on_hand: 62,
+    previous_lot_code: "L-2402", previous_lot_expiry: recvNow + 12 * 86_400_000,
+    previous_lot_qty: 18, rotation_warning: null,
+  },
+  prod_2: {
+    product_id: "prod_2", last_purchase_cost_cents: 300, prev_vendor_cost_cents: 295,
+    avg_purchase_cost_cents: 304, lowest_historical_cost_cents: 280,
+    highest_historical_cost_cents: 330, cost_trend: "up",
+    variance_vs_po_pct: 6.67, variance_band: "yellow",
+    preferred_supplier_id: "sup_acme", preferred_supplier_name: "Acme Wholesale",
+    lead_time_days: 9, moq: 12, fill_rate_pct: 88.1, stock_on_hand: 14,
+    previous_lot_code: "L-2310", previous_lot_expiry: recvNow - 3 * 86_400_000,
+    previous_lot_qty: 4, rotation_warning: "Older lot L-2310 is already past expiry — pull it before shelving this delivery.",
+  },
+  prod_4: {
+    product_id: "prod_4", last_purchase_cost_cents: 640, prev_vendor_cost_cents: null,
+    avg_purchase_cost_cents: 640, lowest_historical_cost_cents: 640,
+    highest_historical_cost_cents: 640, cost_trend: "flat",
+    variance_vs_po_pct: 0, variance_band: "green",
+    preferred_supplier_id: null, preferred_supplier_name: null,
+    lead_time_days: null, moq: null, fill_rate_pct: null, stock_on_hand: 31,
+    previous_lot_code: null, previous_lot_expiry: null, previous_lot_qty: null,
+    rotation_warning: null,
+  },
+};
+
+function recvTouch(session: MockReceivingSession): MockReceivingSession {
+  session.updated_at = Date.now();
+  return session;
+}
+
+function recvLineStatus(line: MockReceivingLine): string {
+  if (line.rejected_qty > 0) return "rejected";
+  if (line.held_qty > 0) return "held";
+  if (line.accepted_qty === 0) return "pending";
+  return line.accepted_qty >= line.expected_qty ? "accepted" : "scanning";
+}
+
 
 export const mockHandlers = [
   // ── Inventory overview ────────────────────────────────────────────────────
@@ -359,6 +470,168 @@ export const mockHandlers = [
       expiry_date: l.expiryDate ?? null, lot_code: l.lotCode ?? null,
     }));
     return HttpResponse.json({ id: String(params.id), tenant_id: "tnt_demo", supplier_id: "sup_acme", status: "received", receive_status: "received", total_cost_cents: 24000, created_at: Date.now() - 3600000, received_at: Date.now(), lines });
+  }),
+
+  // ── Receiving sessions ────────────────────────────────────────────────────
+  http.get(`${V1}/purchasing/receiving/dashboard`, async () => {
+    await lat();
+    const active = [...receivingSessions.values()].filter((s) => !["completed", "cancelled"].includes(s.status));
+    return HttpResponse.json({
+      generated_at: Date.now(),
+      todays_receipts: 3, todays_units_received: 214,
+      pending_receipts: 2, late_pos: 1,
+      active_sessions: active.length, quality_holds: 0, quality_hold_units: 0,
+      invoices_pending: 2, bills_open: 4,
+      near_expiry_lots: 3, expired_lots: 1,
+      receiving_errors_today: 0, avg_receiving_time_ms: 512_000,
+      receiving_accuracy_pct: 97.8,
+      receiving_trend: [
+        { day: "Mon", receipts: 4 }, { day: "Tue", receipts: 2 }, { day: "Wed", receipts: 5 },
+        { day: "Thu", receipts: 3 }, { day: "Fri", receipts: 6 },
+      ],
+      ai_suggestions: { status: "idle" },
+    });
+  }),
+
+  http.get(`${V1}/purchasing/receiving/sessions`, async () => {
+    await lat();
+    return HttpResponse.json({
+      items: [...receivingSessions.values()].filter(
+        (s) => !["completed", "cancelled"].includes(s.status),
+      ),
+    });
+  }),
+
+  http.post(`${V1}/purchasing/receiving/sessions`, async ({ request }) => {
+    await lat();
+    const b = (await request.json().catch(() => ({}))) as { poId?: string; mode?: string; dockCode?: string | null };
+    // One open session per PO — hand back the existing one rather than forking
+    // a second set of counts against the same delivery.
+    const existing = [...receivingSessions.values()].find(
+      (s) => s.po_id === b.poId && !["completed", "cancelled"].includes(s.status),
+    );
+    if (existing) return HttpResponse.json(existing, { status: 201 });
+
+    const n = receivingSessions.size + 1;
+    const created: MockReceivingSession = {
+      ...structuredClone(receivingSessions.get("rcv_1")!),
+      id: `rcv_${n}`, po_id: b.poId ?? "po_1",
+      session_number: `RCV-10${41 + n}`, status: "open",
+      mode: b.mode ?? "standard", dock_code: b.dockCode ?? null,
+      started_at: Date.now(), created_at: Date.now(), updated_at: Date.now(),
+      completed_at: null,
+    };
+    created.lines = created.lines.map((l) => ({
+      ...l, session_id: created.id,
+      scanned_qty: 0, accepted_qty: 0, held_qty: 0, rejected_qty: 0,
+      unit_cost_cents: null, lot_code: null, expiry_date: null, status: "pending",
+    }));
+    receivingSessions.set(created.id, created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
+
+  http.get(`${V1}/purchasing/receiving/sessions/:id`, async ({ params }) => {
+    await lat();
+    const s = receivingSessions.get(String(params["id"]));
+    if (!s) return HttpResponse.json({ error: "not_found", message: "No such receiving session." }, { status: 404 });
+    return HttpResponse.json(s);
+  }),
+
+  http.post(`${V1}/purchasing/receiving/sessions/:id/scan`, async ({ params, request }) => {
+    await lat();
+    const s = receivingSessions.get(String(params["id"]));
+    if (!s) return HttpResponse.json({ error: "not_found", message: "No such receiving session." }, { status: 404 });
+
+    const b = (await request.json().catch(() => ({}))) as { barcode?: string; qty?: number };
+    const code = (b.barcode ?? "").trim();
+    const qty = b.qty && b.qty > 0 ? Math.trunc(b.qty) : 1;
+
+    const line = s.lines.find((l) => l.barcode === code || l.sku.toLowerCase() === code.toLowerCase());
+    if (!line) {
+      return HttpResponse.json({
+        session: s, matched_line_id: null, result: "unknown",
+        detail: `${code} is not on this purchase order. Check the item, or add it as an unexpected receipt.`,
+        intelligence: null,
+      });
+    }
+
+    line.scanned_qty += qty;
+    line.accepted_qty += qty;
+    line.barcode_scanned = code;
+    line.status = recvLineStatus(line);
+    s.status = "receiving";
+    recvTouch(s);
+
+    const over = line.accepted_qty > line.expected_qty;
+    return HttpResponse.json({
+      session: s,
+      matched_line_id: line.id,
+      result: over ? "over_qty" : "matched",
+      detail: over
+        ? `${line.product_name}: ${line.accepted_qty} counted against ${line.expected_qty} ordered — ${line.accepted_qty - line.expected_qty} over.`
+        : `${line.product_name} — ${line.accepted_qty} of ${line.expected_qty}.`,
+      intelligence: recvIntelligence[line.product_id] ?? null,
+    });
+  }),
+
+  http.patch(`${V1}/purchasing/receiving/sessions/:id/lines/:lineId`, async ({ params, request }) => {
+    await lat();
+    const s = receivingSessions.get(String(params["id"]));
+    if (!s) return HttpResponse.json({ error: "not_found", message: "No such receiving session." }, { status: 404 });
+    const line = s.lines.find((l) => l.id === String(params["lineId"]));
+    if (!line) return HttpResponse.json({ error: "not_found", message: "No such line." }, { status: 404 });
+
+    const b = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    if (typeof b["acceptedQty"] === "number") line.accepted_qty = Math.max(0, Math.trunc(b["acceptedQty"]));
+    if (typeof b["heldQty"] === "number") line.held_qty = Math.max(0, Math.trunc(b["heldQty"]));
+    if (typeof b["rejectedQty"] === "number") line.rejected_qty = Math.max(0, Math.trunc(b["rejectedQty"]));
+    if (typeof b["unitCostCents"] === "number") line.unit_cost_cents = Math.max(0, Math.trunc(b["unitCostCents"]));
+    if ("lotCode" in b) line.lot_code = (b["lotCode"] as string | null) ?? null;
+    if ("expiryDate" in b) line.expiry_date = (b["expiryDate"] as number | null) ?? null;
+    if ("costOverrideReason" in b) line.cost_override_reason = (b["costOverrideReason"] as string | null) ?? null;
+    line.status = recvLineStatus(line);
+    line.updated_at = Date.now();
+    recvTouch(s);
+    return HttpResponse.json(s);
+  }),
+
+  http.get(`${V1}/purchasing/receiving/sessions/:id/intelligence/:productId`, async ({ params }) => {
+    await lat();
+    const intel = recvIntelligence[String(params["productId"])];
+    if (!intel) {
+      return HttpResponse.json({
+        product_id: String(params["productId"]),
+        last_purchase_cost_cents: null, prev_vendor_cost_cents: null,
+        avg_purchase_cost_cents: null, lowest_historical_cost_cents: null,
+        highest_historical_cost_cents: null, cost_trend: "unknown",
+        variance_vs_po_pct: null, variance_band: "neutral",
+        preferred_supplier_id: null, preferred_supplier_name: null,
+        lead_time_days: null, moq: null, fill_rate_pct: null, stock_on_hand: 0,
+        previous_lot_code: null, previous_lot_expiry: null, previous_lot_qty: null,
+        rotation_warning: null,
+      });
+    }
+    return HttpResponse.json(intel);
+  }),
+
+  http.post(`${V1}/purchasing/receiving/sessions/:id/close`, async ({ params }) => {
+    await lat();
+    const s = receivingSessions.get(String(params["id"]));
+    if (!s) return HttpResponse.json({ error: "not_found", message: "No such receiving session." }, { status: 404 });
+    s.status = "completed";
+    s.completed_at = Date.now();
+    s.lines.forEach((l) => { l.status = "posted"; });
+    recvTouch(s);
+    return HttpResponse.json(s);
+  }),
+
+  http.post(`${V1}/purchasing/receiving/sessions/:id/cancel`, async ({ params }) => {
+    await lat();
+    const s = receivingSessions.get(String(params["id"]));
+    if (!s) return HttpResponse.json({ error: "not_found", message: "No such receiving session." }, { status: 404 });
+    s.status = "cancelled";
+    recvTouch(s);
+    return HttpResponse.json(s);
   }),
 
   // ── Inventory: near-expiry report ─────────────────────────────────────────

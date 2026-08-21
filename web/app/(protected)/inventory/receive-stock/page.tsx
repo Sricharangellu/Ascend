@@ -8,7 +8,7 @@ import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { formatMoney } from "@/lib/money";
 import { apiGet, apiPost, apiPatch, ApiResponseError } from "@/api-client/client";
-import { computeTotal, receiveStatusBadge, docTypeLabel, fmtBytes, buildReceiveLines, applyScanToEntries } from "./_components/receiveStockTypes";
+import { computeTotal, receiveStatusBadge, docTypeLabel, fmtBytes, buildReceiveLines, applyScanToEntries, findScannedLine } from "./_components/receiveStockTypes";
 import type { PendingPO, ReceiveEntry, PODocument, SortMode, LocationOption, ResolvedScan } from "./_components/receiveStockTypes";
 import { ReceiveLinesCard } from "./_components/ReceiveLinesCard";
 import { PendingPOsTable } from "./_components/PendingPOsTable";
@@ -118,6 +118,22 @@ export default function ReceiveStockPage() {
    *    change no quantity, so scanner-first receiving still required typing
    *    every case count by hand — which is the whole cost the scanner exists to
    *    remove, and is worst on a phone.
+   *
+   * MERGE NOTE — develop's PR #228 fixed the same defect independently, and the
+   * two are not equivalent. #228 resolved through the plain
+   * `/catalog/barcode/:code` and only HIGHLIGHTED the matched row; this path
+   * resolves through `/pos` (the only variant returning `pack_size`) and COUNTS.
+   * Both are kept where each is stronger: #228's `findScannedLine` now does the
+   * line matching — it matches the line's denormalised barcode, the SKU, *or*
+   * the resolved product id, where this branch matched product id alone — and
+   * this branch's `applyScanToEntries` does the counting.
+   *
+   * One piece of #228 is deliberately NOT carried: its `catch {}` fall-through
+   * to exact matching when resolution fails. That is safe when a scan only
+   * highlights, and unsafe now that a scan counts — a case UPC that failed to
+   * resolve would match the line by its each-barcode and book 1 instead of
+   * pack_size, which is the exact defect this branch exists to fix. A failed
+   * lookup therefore counts nothing and says so.
    */
   const handleScan = async () => {
     const code = scanInput.trim();
@@ -150,9 +166,8 @@ export default function ReceiveStockPage() {
 
     // No PO chosen yet — jump to the one that actually contains this product.
     if (!selectedPO?.lines) {
-      const matchingPO = pendingPOs.find((po) =>
-        po.lines?.some((l) => l.product_id === resolved.id),
-      );
+      // #228's matcher: line barcode, then SKU, then resolved product id.
+      const matchingPO = pendingPOs.find((po) => findScannedLine(po.lines, code, resolved.id));
       if (matchingPO) setSelectedPOId(matchingPO.id);
       else setScanError(`${resolved.name} (${resolved.sku}) is not on any pending purchase order.`);
       return;
