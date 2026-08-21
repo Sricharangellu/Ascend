@@ -29,6 +29,13 @@ new instruction/status/pipeline/design files; update the mapped file instead.
 | Architecture | `docs/architecture/ARCHITECTURE.md` (+ ADRs under `docs/architecture/ADR/`) |
 | Gaps (what's actually still missing, code-verified) | `docs/architecture/GAPS.md` |
 | CI/CD & release pipeline | `docs/architecture/PIPELINE.md` (feature → develop → staging → master; master merges are Sri-only) |
+| Orchestration: loop program | `WORK/LOOP_PROTOCOL.md` |
+| Orchestration: session lock | `WORK/LOCK.md` |
+| Project plan | `WORK/FORWARD_PLAN.md` |
+| **Work updates (ALL of them)** | `WORK/LOOP_STATE.md` — heartbeat, iteration log, backlog, NEEDS-SRI, delivery/release status. One file, updated in place. |
+| Point-in-time audits | `WORK/audits/AUDIT_<UTC>-<slug>.md` (append-only snapshots — the only sanctioned new files) |
+| Cross-session traps already paid for | `.agents/memory/MEMORY.md` (index) + the notes it links |
+
 (2026-07-20 consolidation: `ENGINEERING_CONSTITUTION.md`, `CODING_STANDARDS.md`,
 `ENGINEERING_ORG.md`, `ACPA_ROADMAP.md`, `DOMAIN_MODEL.md`,
 `PLATFORM_ROADMAP.md`, `CTO_CHARTER.md`, and `orchestration/gaps/*.md` were
@@ -58,11 +65,6 @@ folded into the four files above per Sri's directive — archived under
   still be cleared out periodically so `git branch -r` stays legible — just
   not treated as an immediate per-merge requirement for active `develop`
   branches.
-| Orchestration: loop program | `WORK/LOOP_PROTOCOL.md` |
-| Orchestration: session lock | `WORK/LOCK.md` |
-| Project plan | `WORK/FORWARD_PLAN.md` |
-| **Work updates (ALL of them)** | `WORK/LOOP_STATE.md` — heartbeat, iteration log, backlog, NEEDS-SRI, delivery/release status. One file, updated in place. |
-| Point-in-time audits | `WORK/audits/AUDIT_<UTC>-<slug>.md` (append-only snapshots — the only sanctioned new files) |
 
 Before making changes, read in order:
 
@@ -75,6 +77,11 @@ Before making changes, read in order:
 3. `WORK/LOOP_STATE.md` (current work state) and `WORK/FORWARD_PLAN.md` (plan)
 4. `WORK/LOCK.md`
 5. Latest relevant file in `WORK/audits/`
+6. `.agents/memory/MEMORY.md` — a one-line index of traps already hit and paid
+   for (typecheck pitfalls, demo/mock activation, the `origin/develop` revert
+   trap, the drizzle-push trap). Cheap to skim, and each entry exists because
+   someone lost a session to it. Read the linked note before touching the area
+   it names.
 
 There is only one active agent instruction file:
 
@@ -307,11 +314,27 @@ npm test
 npm run build
 ```
 
+Structural guards (fast, no DB needed — CI's `guard` job runs these, so a PR that
+skips them goes red for reasons `typecheck` and `npm test` cannot catch):
+
+```bash
+npm run hygiene        # copy-junk, collision backups, merge leftovers, >1 AGENTS.md
+npm run prevent:drift  # dirty tracked edits, stray src/modules/, revived obsolete docs
+npm run gap:scan       # every frontend API path literal resolves to a real backend route
+npm run contract:scan  # every operation documented in contracts/openapi.yaml has a route
+npm run authz:scan     # every PUT/PATCH/DELETE reaches its handler behind an authz guard
+npm run table:scan     # no two modules create the same table name with different schemas
+```
+
 Before release / for the full backend + web gate in one shot:
 
 ```bash
-npm run verify   # hygiene + backend typecheck/test/smoke + web typecheck/lint/build
+npm run verify   # hygiene + gap/contract/authz/table scans
+                 # + backend typecheck/test/smoke + web typecheck/lint/build
 ```
+
+`verify` does NOT include `prevent:drift`, web `npm test`, or Playwright — run
+those separately (CI runs the first two; e2e runs on push, not on PRs).
 
 Full production confidence:
 
@@ -370,6 +393,104 @@ Be honest. Do not overstate readiness.
 
 > The Operating Contract above is authoritative. This section fills in the concrete
 > details it points to and does not restate them. Where they conflict, the contract wins.
+
+## Repository map (where the code actually lives)
+
+Domain-driven **modular monolith**: Express/TypeScript backend (`src/`), Next.js 14
+frontend (`web/`), one PostgreSQL. Shape, invariants and module→team ownership are in
+`docs/architecture/ARCHITECTURE.md`; code idioms are in
+`docs/architecture/DESIGN_PRINCIPLES.md`. This map is only *where to look* — it does not
+restate either.
+
+```
+src/                  Backend. The only tree `npm run typecheck` + `npm test` cover
+                      (with scripts/) — see "What the gates do NOT cover" below.
+  app.ts              buildApp(): opens DB, runs every module's migrations in
+                      registration order, mounts each module's router.
+  server.ts           HTTP entry (`npm run dev` / `npm start`).
+  gateway/            Cross-cutting request path, in app.ts order: requestId →
+                      metrics → accessLog → global rateLimit; then per-path auth
+                      (JWT/API-key), with `/api/v1` behind auth + tenantResolver +
+                      per-tenant rate limit. errorMiddleware terminates.
+  identity/           Users, JWT, MFA, API keys, devices, signup/trial lifecycle.
+                      Its own module, NOT under modules/.
+  modules/<name>/     53 bounded contexts. index.ts exports a PosModule; see anatomy below.
+  modules/index.ts    The registry. Registration order IS migration order — append,
+                      and keep dependencies earlier (catalog → inventory → orders → …).
+  orchestration/      The ENGINE: sagas, workflows, queues, idempotency, outbox wiring.
+  shared/             Shared kernel — import, don't fork: money.ts (integer cents),
+                      db.ts (named-param SQL), http.ts (handler/HttpError/ERROR_CODES),
+                      events.ts, outbox.ts, pagination.ts (keyset), docnumber.ts.
+
+web/                  Next.js 14 app router, ~123 pages. Its own package.json, own
+                      typecheck/lint/test — root `npm test` does not touch it.
+  app/(protected)/    Authenticated pages, one dir per domain area.
+  app/store/          Public storefront (unauthenticated).
+  components/         THE design system. Build with these primitives, never raw
+                      <button>/<input>/<select> — see Design System Rules above.
+  api-client/         apiGet/apiPost/… + types.ts generated from contracts/openapi.yaml.
+  mocks/              MSW handlers. `npm run dev` ALWAYS mocks; a mock, its frontend
+                      call and its backend route are ONE unit of work.
+  middleware.ts       Auth gate. Separate system from next.config.mjs rewrites — a
+                      proxied public route must be allowlisted in BOTH.
+
+contracts/openapi.yaml  The API contract. `contract:scan` and web's generate:client
+                        both read THIS file.
+db/                   Canonical DDL (`migrations/`, `rls/policies.sql`, `seeds/`,
+                      `backup/`). Per-module migrations mirror it; see the trap below.
+tools/                Repo guards, all dependency-free. See Command Gates + tools/README.md.
+scripts/              Runners: test.ts (embedded PG harness), smoke.ts, seed-e2e.ts,
+                      seed-demo.ts, db-check.ts, deploy.sh.
+docs/                 Architecture, ADRs, UX spec, vertical guides. Mapped in the
+                      source-of-truth table above.
+WORK/                 Live work state, plan, lock, audits. Not product docs.
+.agents/memory/       Traps already paid for. Read before touching what they name.
+api/index.js          Vercel serverless entry wrapping dist/src/app.js.
+Dockerfile            Production build (backend runs as a long-lived process).
+```
+
+### Anatomy of a backend module
+
+Every `src/modules/<name>/` follows one shape — match it rather than inventing another:
+
+| File | Role |
+|---|---|
+| `index.ts` | Exports `const <name>Module: PosModule = { name, mountPath?, migrations[], register(ctx) }`. Migration SQL lives here as idempotent `CREATE TABLE IF NOT EXISTS` / `ALTER … ADD COLUMN IF NOT EXISTS` consts — **appended, never edited**. |
+| `service.ts` | All business logic. Handlers stay thin. |
+| `routes.ts` | zod `parseBody`, authz guard, `tenantId(res)`, delegate to the service. |
+| `<name>.test.ts` | `node:test` + `node:assert/strict`, colocated, driving the HTTP surface. |
+| `test-request.ts` | Local test helper where the module needs one. |
+
+Routes mount at `/api/v1/<name>` unless `mountPath` overrides it (`store_locations`
+serves top-level `/product-locations` and `/store-locations` that way).
+
+**Modules never import each other's TypeScript.** They integrate through shared tables
+and `EventBus` events only. Before adding a module, endpoint or table, check it does not
+already exist (`git grep -n "<name>" origin/develop`), then find the owner in
+`ARCHITECTURE.md`'s "Domain → owning implementation" table and extend that file.
+
+### Traps: things that exist twice
+
+Each pair below is a real ambiguity in this tree, where the wrong one looks entirely
+plausible. Two are recorded incidents (the table collision, the `lib/` tree); the other two
+are structural traps not yet known to have caused damage.
+
+- **`src/orchestration/` is the engine; `orchestration/` at root is process docs.** Different
+  things, near-identical names. Code changes go in `src/`.
+- **`contracts/openapi.yaml` is the real contract; `lib/api-spec/openapi.yaml` is not.**
+  Nothing in `src/` or `web/` imports `lib/` at all — it is an unwired parallel
+  client/spec tree. Editing it changes nothing and no gate will tell you.
+- **`db/migrations/*.sql` is the canonical DDL, but boot runs the per-module `migrations[]`
+  in `src/modules/*/index.ts`.** A table added in only one of the two drifts silently.
+- **Two modules creating the same table name with different schemas** silently 500s every
+  write. `npm run table:scan` is the guard; grep the tree before writing a migration.
+
+### What the gates do NOT cover
+
+Root `tsconfig.json` includes only `src/**` and `scripts/**`. `api/`, `lib/`, `desktop/`,
+and the sub-projects under `artifacts/` are outside root typecheck, root tests, and web's
+gates — they are tracked but unverified by the standard gate set. Treat a change there as
+untested unless you verify it another way, and prefer not to make one at all.
 
 ## Transitional note — governance consolidation
 
@@ -499,7 +620,9 @@ lost-then-recovered work). These rules exist so it cannot recur:
 
 ## Handoff protocol (every session, no exceptions)
 
-1. Update live state (`WORK/WORK_STATE.md` until it's consolidated): what was done, next 3 actions, blockers.
+1. Update live state in **`WORK/LOOP_STATE.md`**: what was done, next 3 actions, blockers.
+   (Consolidation is done — see the Transitional note above. Do NOT create
+   `WORK/WORK_STATE.md`; `npm run prevent:drift` and CI's guard job both fail if it exists.)
 2. New verification results → new audit `WORK/audits/AUDIT_<UTC-ISO-timestamp>-<short-slug>.md`
    (collision-proof — never the next-free-letter); never edit old audits.
 3. Working tree clean, no stray root files, no leftover worktrees/branches, servers stopped.
