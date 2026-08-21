@@ -174,6 +174,9 @@ describe("applyScanToEntries", () => {
     const { entries } = applyScanToEntries(scan({ id: "p2" }), lines, before);
     expect(entries.find((e) => e.lineId === "l1")!.highlighted).toBe(false);
     expect(entries.find((e) => e.lineId === "l2")!.highlighted).toBe(true);
+  });
+});
+
 describe("findScannedLine", () => {
   const lines: POLine[] = [
     {
