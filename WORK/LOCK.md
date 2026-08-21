@@ -1,3 +1,67 @@
+## Active Claim (Claude Code web — Phase 9 F-5: one test-request factory)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/ascend-f5-test-request-factory` |
+| Queue item | **Phase 9 backlog F-5** (`WORK/FORWARD_PLAN.md` §9.2/§9.3), the next unblocked item in the stated execution order. S-1 and F-3 are Sri-only, F-11 is ⛔ BLOCKED on Sri's "which tax authority wins", and F-14 depends on F-3 — F-5 is the first item with no blocker. `test-request.ts` is copied into 46 modules across 8 variants; 41 of those are byte-identical in 3 groups (31 + 5 + 5) and `dupe:scan` reports them on every PR. Collapse the identical ones onto one shared factory, each module re-exporting with its own pinned default role. |
+| Files/areas expected | `src/shared/test-request.ts` (add factory); the 41 identical `src/modules/*/test-request.ts` files (→ re-exports); `WORK/FORWARD_PLAN.md` (F-5 status), `WORK/LOOP_STATE.md`, `WORK/LOCK.md`. **NOT** the 5 genuinely-distinct helpers (`business`, `custom_roles`, `progress`, `reports`, `identity`) — they have real signature differences and are not duplication. NOT any `*.test.ts`, NOT `src/modules/*/service.ts` or `routes.ts`, NOT `web/**`, NOT `artifacts/**`. |
+| Started | 2026-08-10T190308Z |
+| Status | **RELEASED** — pushed to `claude/ascend-f5-test-request-factory`. F-5 done and F-9 found already done (its ⬜ READY status was stale, not the work). |
+| Gates (all run in this container against real PostgreSQL 16) | backend `typecheck` PASS · backend `npm test` **899/899, 0 fail** · `npm run smoke` **20/20** full POS lifecycle · `dupe:scan` **3 identical-file groups → 0** (was 41 files) · `hygiene` PASS (2202 files) · `authz:scan` PASS · `gap:scan` PASS (474/382, 17 allowlisted) · `table:scan` PASS (166 names) · web `typecheck` PASS · web `lint` 0 errors/0 warnings · web `vitest` **206/206 across 29 files** · web production `build` PASS |
+| Proof the roles were preserved | The `manager` set after the change — {discounts, insights, purchasing, sso, workflows} — was diffed against the same set computed from git before the change. Byte-identical. `workflows` stays `manager`, which is F-5's named acceptance criterion. Separately, every `request(` call site in the 31 fixed-`owner` modules was parsed (paren-balanced, string-aware) to confirm **none passes a 5th argument**, so adding a defaulted `role` parameter cannot change an existing call's meaning. |
+| Overlap check (per AGENTS.md, run before editing) | Two Cursor Cloud claims are `ACTIVE`: "Wave A/B trust leftovers" scopes `web/**` only, and "POS customer + gift card" scopes `src/modules/payments/{service,routes,payments.test}.ts` — **`test-request.ts` is not in either file list**, and this change does not touch any file they name. Seven `Claude session D` claims dated 2026-07-16 still read `ACTIVE — implementing`; their work demonstrably shipped as loop iterations 10–13 (`WORK/LOOP_STATE.md`), so they are stale rather than live. Flagged below rather than edited — per AGENTS.md a stale-looking lock is marked and left for review, not silently cleared. |
+| Blockers | none |
+
+### Stale-claim flag (raised 2026-08-10, not actioned)
+
+The seven `Claude session D` claims below dated `2026-07-16` and the two Cursor
+Cloud claims dated `2026-08-03` all still read `ACTIVE`. The session-D ones are
+provably finished — `WORK/LOOP_STATE.md` iterations 10–13 record the transfer
+atomicity, over-transfer, cycle-count double-close and stock-adjust race fixes
+as shipped and tested. Marking them `STALE?` per the protocol rather than
+closing them, because closing another session's claim is a lead/human call.
+## Active Claim (Claude Code web — mobile full-stack integration check)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/full-stack-integration-check-lnnvew` |
+| Queue item | Answer whether the ASCEND Mobile work is integrated and working end-to-end with the shipping full stack, and record the verification per the `AGENTS.md` handoff protocol. |
+| Files/areas expected | `WORK/audits/AUDIT_2026-08-11T035710Z-mobile-fullstack-integration.md` (new, collision-proof timestamp name), `WORK/LOOP_STATE.md` (one appended iteration row), `WORK/LOCK.md` (this claim). **Append-only in `WORK/**`; no existing content rewritten.** NOT `src/**`, NOT `web/**`, NOT `artifacts/**` (read-only inspection — another environment's tree, never modified), NOT `tools/**`, NOT `docs/**`. |
+| Started | 2026-08-11T035710Z |
+| Status | RELEASED — pushed to `claude/full-stack-integration-check-lnnvew`, **PR #223** (draft, into `develop`). Overlap check per protocol: the `ACTIVE` claims in this file scope `web/**`, `src/modules/payments/**` and `src/modules/inventory/**`; the only shared area is `WORK/**`, touched here as a new append-only audit file plus one new `LOOP_STATE` row — the same non-overlapping pattern the 2026-08-06 platform-audit claim used and documented. |
+| Outcome | **`partial` — the mobile client is not integrated.** Six findings, each cited to source. F-0 is the systemic one: `tools/api-gap-scan.mjs`'s `FE_DIRS` scopes to `web/*`, so the FE→BE drift guard cannot see the mobile client — `gap:scan` is green while three called endpoints do not exist in `src/`. Also: the package cannot be installed (pnpm protocols on an npm root), the API base encodes a Replit single-origin assumption against a split-origin production topology, catalog/orders casing mismatches return 200-with-`undefined`, and access+refresh tokens sit in plain `AsyncStorage`. Login and `reports/summary` verified as genuinely correct. |
+| Gates | `hygiene` PASS (2202 files) · backend `typecheck` PASS · `gap:scan` PASS (474 backend / 382 frontend, 17 allowlisted) · `authz:scan` PASS (49 route files, 6 allowlisted) · `table:scan` PASS (166 names). Docs-only diff, run to confirm the baseline is clean. |
+| Not run | `npm test` (894 backend tests) and `smoke` — need a Postgres instance not started in this container, and no `src/` file changed. Web typecheck/lint/vitest/build — no `web/` file changed, `web/node_modules` absent. Playwright e2e — no real-stack pair here. **Mobile typecheck/test/build — impossible, which is finding F-2 itself.** Node here is v22, repo pins 24. |
+| Blockers | **No fix was attempted, deliberately.** Every remedy lands in `artifacts/`, whose disposition is `NEEDS-SRI` (`WORK/LOOP_STATE.md:137`) and which `AGENTS.md` forbids an agent to resolve. Recommendation on record stays harvest-then-extract, never delete. The referenced Claude Design file could not be opened (DesignSync needs an interactive auth; WebFetch 403), so this claim makes **no** design-conformance claim. |
+## Superseded Claim (Claude Code web — migration advisory-lock statement_timeout)
+
+> **SUPERSEDED 2026-08-11 by PR #212, which fixed the same defect first and is merged to `develop` (`8d2c3be`).** This claim's code was **dropped, not merged** — `src/app.ts`, `src/shared/db.ts`, `.env.example` and `docs/architecture/PIPELINE.md` were resolved in favour of develop's implementation, and this claim's regression test `src/shared/db-tx-timeout.test.ts` was deleted because develop ships `src/app.migration-lock.test.ts` covering the same ground. Both fixes were correct; they differ only in mechanism (develop widens `statement_timeout` for the lock statement via `PG_MIGRATION_LOCK_WAIT_MS`; this claim used `statement_timeout = 0` + `lock_timeout`). Substituting a competing implementation for a merged mainline one would be churn, so develop's stands.
+>
+> **How the duplicate happened, for whoever tunes this protocol:** there was no competing entry in `WORK/LOCK.md` at this session's base commit (`5709a91`) — verified, not assumed. PR #212 was in flight on another branch, and its claim lived only in *that* branch's copy of `LOCK.md`, which is invisible until it merges. A per-branch lock file cannot prevent concurrent claims on the same queue item; only a lock recorded on a shared branch could. PR #212's own commit message records the same collision happening between #211 and #212, so this is the third instance, not the first.
+>
+> Nothing else from this claim is lost: the `PG_TX_TIMEOUT_MS` → exported `txTimeoutMs()` refactor was arrived at independently by develop, and the two findings filed along the way (the harness disk/`max_connections` traps, and the SSO token-claim correction) are recorded in `WORK/LOOP_STATE.md`.
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/supabase-connection-setup-v86psj` |
+| Queue item | `WORK/LOOP_STATE.md` backlog, **NEW 2026-08-07**, explicitly "Not fixed in PR #196": the backend suite's 30 s `statement_timeout` covers an unbounded migration-lock WAIT. `buildApp()` runs migrations inside `db.tx()`, and `db.tx()` issues `SET LOCAL statement_timeout` on BEGIN (`src/shared/db.ts:124`); the transaction's **first** statement is the *blocking* `SELECT pg_advisory_xact_lock(7381920)` (`src/app.ts:292`), so time spent **queuing** for the lock is charged against the same budget as real work. 123 call sites across 86 test files each build a fresh schema and serialize on that one global lock, so on a slow runner this surfaces as a bogus `57014` in a test that did nothing wrong (observed live: CI run 31138020800 attempt 1, 893/894, `settings.test.ts` at exactly 30014 ms). Fix: suspend the timeout for the lock statement only, restore it for the migrations so runaway DDL stays bounded. |
+| Files/areas expected | `src/shared/db.ts` (export `txTimeoutMs()` so `app.ts` reuses it rather than re-deriving it; add `migrationLockTimeoutMs()`), `src/app.ts` (bracket the advisory lock), `src/shared/db-tx-timeout.test.ts` (NEW — two-connection barrier regression test), `.env.example` (document the new dial next to `PG_TX_TIMEOUT_MS`), `WORK/LOOP_STATE.md`, `WORK/LOCK.md`. NOT `web/**`, NOT `.github/**`, NOT `scripts/deploy.sh`, NOT `artifacts/**` (carries its own copy of `app.ts` — another environment's tree, left untouched per the convention on every claim in this file). |
+| Started | 2026-08-10T192000Z |
+| Status | **SUPERSEDED — code dropped.** Was RELEASED as commit `a0b28d9` on `claude/supabase-connection-setup-v86psj`; PR #212 landed the same fix on `develop` first, so `a0b28d9`'s changes were resolved away during the merge. PR #216 now carries only the SSO token-minter fix. |
+| Scope note (honest) | The backlog offered two fixes; both are flawed and neither shipped as written. "Lock outside the transaction" requires session-level `pg_advisory_lock`, which does not auto-release on ROLLBACK and leaks a global lock when a boot crashes mid-migration. Bare `statement_timeout = 0` bounds nothing — it converts a spurious failure into an unbounded hang, which is a regression the original note did not account for. Shipped instead: keep the transaction-scoped lock, move the wait onto `lock_timeout`. That is a slightly wider change than "a few characters" but it is the difference between fixing the flake and relocating it. |
+| Gates | **CI `Backend — typecheck + test` PASSED on `a0b28d9`** — that job is `npm run typecheck` → `npm test` (full suite) → `npm run smoke`, on `postgres:16` with `--shm-size=1g`, so the full backend gate *and* smoke are both covered by that one green check. CI `Frontend — typecheck + lint + test + build` PASSED. CodeQL (both jobs), Secret scan (gitleaks), SBOM, Dependency vulnerabilities, Production guard, Docker build: all PASSED. Locally: backend typecheck clean, new `db-tx-timeout.test.ts` 5/5, targeted sample 48/48 (`settings`/`tenant-isolation`/`identity`) on real PostgreSQL 16.13, `hygiene-check` clean (2203 files), `api-gap-scan` clean. |
+| Not run locally (and why) | Full `npm test` and `npm run smoke` were attempted locally and produced no valid result — **not a test failure**. The container hit `ENOSPC` at ~11 min, which also destroyed the captured output so it presented as `exit 1`. Root cause is filed as its own backlog row: the documented system-Postgres workaround leaks a ~193-table schema per `freshApp()` because `pg-harness.ts` only self-cleans when `DATABASE_URL` is unset. CI covers both gates and is green. |
+| Also filed, not fixed | (1) SSO token-issuance drift — `sso/service.ts` hand-rolls `jwt.sign` without the `permissions`/`customRoleId` claims `identity.issueTokens()` sets, and `gateway/auth.ts` reads permissions straight off the JWT, so a custom-role user signing in via SSO is refused by every `requirePermission` check. (2) The test-schema disk leak above. Both are separate concerns with their own tests to write; one concern per PR. |
+## Active Claim (Claude Code web — F-18 OpenAPI contract validation)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude Code web session — `claude/status-staging-vs-develop-0vv2gg` |
+| Queue item | Phase 9.9 **F-18**: build the CI check that validates `contracts/openapi.yaml` against real backend routes, and correct the drift it finds. Picked as the next unblocked item in Phase 9's stated execution order — F-11/F-3/F-13/S-1/S-2 are all Sri-gated, and F-5/F-9 turned out to have already shipped in PR #185 with the plan table left stale. |
+| Files/areas expected | Ended as `WORK/**` only. The scanner, allowlist, CI step, `package.json` script and `contracts/openapi.yaml` edits were all stood down in favour of PR #222, which shipped the same gate first. NO `src/**` changes at any point. NO `artifacts/**`. |
+| Started | 2026-08-06T17:10Z |
+| Status | RELEASED — **stood down as a duplicate.** PR #222 shipped F-18 first; this branch defers to it and keeps only the non-overlapping work (F-5/F-9 board corrections, F-29, F-30). PR #217. Full report: `WORK/audits/AUDIT_2026-08-06T171000Z-f18-openapi-contract-validation.md` |
+| Blockers | none. F-28 (the underlying request-field naming split) is recorded as NEEDS-SRI rather than resolved unilaterally — renaming accepted request fields is a breaking API change. |
 ## Active Claim (Claude Code web — product search/filter/sort: server-side catalog query)
 
 | Field | Value |
@@ -287,6 +351,19 @@
 
 Status: no single active coordinator claim as of 2026-07-30. Session G's Phase 0 wave-dispatch coordination claim (started 2026-07-18) was closed 2026-07-30 as superseded — see its entry below; work since has shipped as independent claims rather than through that coordinator. Latest substantive work: Phase 7 items 1-2 (sales-velocity consolidation, demand-snapshot foundation) RELEASED; four-environment AI coordination workflow (Claude Code/Cursor/Replit) adopted 2026-07-30, see `docs/architecture/ORCHESTRATION.md` "Environment routing" + `tools/AGENT_PROMPT.md`. Prior status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B, RELEASED); Clean Architecture pilot (quotes + gateway auth) (session C, ABANDONED — see entry); SSO OIDC hardening (session D)
 
+
+## Active Claim (Cursor Cloud — Ponytail full-tree page audit)
+
+| Field | Value |
+|---|---|
+| Agent/session | Cursor Cloud agent (`cursor/ponytail-page-audit-4fe7`) |
+| Queue item | Docs-only Ponytail page-by-page audit for **all 141** `page.tsx` routes. Clusters (101) + retail-ops Sell/Catalog/Inventory (40) + master index. Prefer CONSOLIDATE/REFACTOR; rewrite only when justified. |
+| Files/areas expected | `WORK/audits/AUDIT_2026-08-03T042838Z-ponytail-page-audit-clusters.md`, `WORK/audits/AUDIT_2026-08-03T043142Z-ponytail-page-audit-retail-ops.md`, `WORK/audits/AUDIT_2026-08-03T043142Z-ponytail-master-index.md`, `WORK/LOCK.md` |
+| Started | 2026-08-03T04:27:00Z |
+| Status | RELEASED — full tree covered (141/141); no product code changes this pass. |
+| Blockers | none |
+
+## Active Claim (Cursor Cloud — connectivity / API breaks / rate limiting audit+fix)
 ## Active Claim (Cursor Cloud — Wave A/B trust leftovers + palette)
 
 | Field | Value |

@@ -155,6 +155,16 @@ still true.
   authoritative — confirmed repeatedly this session via isolated re-runs
   before trusting a "failure." Never dismiss a failure without checking
   whether the diff even touches the failing file first.
+- One such "flake" turned out to be a real defect, so treat the category as
+  suspicious rather than settled: every `freshApp()` serializes on one global
+  migration advisory lock, and the time spent *queuing* for it used to be
+  charged against the transaction's `statement_timeout` — so under load a file
+  that had done nothing wrong died with `57014`. Fixed 2026-08-10 in PR #212 by
+  running the wait under its own larger budget, `PG_MIGRATION_LOCK_WAIT_MS`
+  (`src/app.ts`, regression test `src/app.migration-lock.test.ts`). The tell was
+  that the failure time was *exactly* the timeout (30014 ms), which is a queue
+  hitting a limit, not work taking too long. If a flake's duration keeps landing
+  on a round configured number, it is a budget being exhausted, not noise.
 - `npm run smoke` (20 steps) is the e2e backstop.
 - A test asserting an exact count/total against a "clean" database is
   fragile if anything else (boot-time seeding, another test's leftover
