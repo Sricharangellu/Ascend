@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildApp, type App } from "../../app.js";
+import { ReportsService } from "./service.js";
 
 let __seq = 0;
 const __schema = () => `test_${process.pid}_${Date.now().toString(36)}_${__seq++}`;
@@ -490,6 +491,114 @@ test("AR aging joins customer names; AP aging joins supplier names", async () =>
   assert.ok(apParty, "supplier appears in AP aging");
   assert.equal(apParty.partyName, "Northwind Supply");
   assert.equal(apParty.buckets.total, 8_000);
+});
+
+// ─── AR/AP aging: SQL bucket aggregation (REPORTS_MODULE_REVIEW.md finding #4) ──
+// arAging/apAging moved bucketing + grand totals from JS (which pulled every open
+// invoice/bill into app memory) into SQL, and bound the per-party list with a
+// `limit`. These tests lock two properties the rewrite had to preserve: identical
+// bucket placement (incl. the day-boundary and NULL-due-date edges the old
+// addToBucket() had), and — the whole point of the fix — `totals` that still sum
+// EVERY open row even when the parties list is capped.
+
+test("AR aging places each open invoice in the same bucket the old JS did (day boundaries + NULL due date)", async () => {
+  const app = await freshApp();
+  const svc = new ReportsService(app.db);
+  const NOW = 1_800_000_000_000; // fixed clock so day-bucketing is deterministic
+  const DAY = 86_400_000;
+
+  const cust = await call(app, "POST", "/api/customers/", { name: "Boundary Co" });
+  assert.equal(cust.status, 201);
+  const customerId = cust.json.id;
+
+  // Distinct powers-of-two-ish balances so a misplacement changes a bucket sum
+  // detectably. dueDate is relative to NOW; daysOverdue = floor((NOW-due)/DAY).
+  const mk = async (totalCents: number, dueDate: number) => {
+    const r = await call(app, "POST", "/api/billing/invoices", { customerId, totalCents, dueDate });
+    assert.equal(r.status, 201, `invoice create failed: ${JSON.stringify(r.json)}`);
+    return r.json.id as string;
+  };
+  await mk(100, NOW);                 // 0 days overdue  → current (<= 0)
+  await mk(200, NOW - 1 * DAY);       // 1 day           → d1_30 (lower edge)
+  await mk(400, NOW - 30 * DAY);      // 30 days         → d1_30 (upper edge)
+  await mk(800, NOW - 31 * DAY);      // 31 days         → d31_60 (lower edge)
+  await mk(1_600, NOW - 60 * DAY);    // 60 days         → d31_60 (upper edge)
+  await mk(3_200, NOW - 61 * DAY);    // 61 days         → d61_90 (lower edge)
+  await mk(6_400, NOW - 90 * DAY);    // 90 days         → d61_90 (upper edge)
+  await mk(12_800, NOW - 91 * DAY);   // 91 days         → d90_plus (lower edge)
+  // A NULL due date must fall in `current` (old code: `dueDate ? … : 0`). The API
+  // always sets a due date, so null it directly to exercise the CASE branch.
+  const nullDue = await mk(50, NOW + 30 * DAY);
+  await app.db.query("UPDATE invoices SET due_date = NULL WHERE id = @id AND tenant_id = @t", {
+    id: nullDue, t: "tnt_demo",
+  });
+
+  const ar = await svc.arAging("tnt_demo", NOW);
+  const party = ar.parties.find((p) => p.partyId === customerId);
+  assert.ok(party, "customer present in AR aging");
+  assert.equal(party.buckets.current, 150, "current = 0-day (100) + NULL-due (50)");
+  assert.equal(party.buckets.d1_30, 600, "d1_30 = 1-day (200) + 30-day (400)");
+  assert.equal(party.buckets.d31_60, 2_400, "d31_60 = 31-day (800) + 60-day (1600)");
+  assert.equal(party.buckets.d61_90, 9_600, "d61_90 = 61-day (3200) + 90-day (6400)");
+  assert.equal(party.buckets.d90_plus, 12_800, "d90_plus = 91-day (12800)");
+  assert.equal(party.buckets.total, 25_550, "total = sum of every open balance");
+  // Single customer ⇒ the grand totals equal that party's buckets, bucket for bucket.
+  assert.deepEqual(ar.totals, party.buckets, "totals mirror the only party's buckets");
+});
+
+test("AR aging `limit` caps the parties list but `totals` still sum EVERY open invoice", async () => {
+  const app = await freshApp();
+
+  // Four debtors, distinct outstanding balances (all default-due ⇒ current bucket).
+  const amounts = [1_000, 2_000, 3_000, 4_000];
+  for (let i = 0; i < amounts.length; i++) {
+    const c = await call(app, "POST", "/api/customers/", { name: `Debtor ${i}` });
+    assert.equal(c.status, 201);
+    const inv = await call(app, "POST", "/api/billing/invoices", {
+      customerId: c.json.id, totalCents: amounts[i],
+    });
+    assert.equal(inv.status, 201);
+  }
+
+  // Route path: ?limit=2 must return only the top 2 parties by outstanding total…
+  const ar = await call(app, "GET", "/api/reports/ar-aging?limit=2");
+  assert.equal(ar.status, 200);
+  assert.equal(ar.json.parties.length, 2, "parties list is capped at the limit");
+  assert.equal(ar.json.parties[0].buckets.total, 4_000, "sorted by total DESC");
+  assert.equal(ar.json.parties[1].buckets.total, 3_000);
+  // …while the grand total still reflects all four (1000+2000+3000+4000), NOT just
+  // the two returned rows — the exact regression the SQL rewrite exists to prevent.
+  assert.equal(ar.json.totals.total, 10_000, "totals sum every open invoice, not just the page");
+  assert.equal(ar.json.totals.current, 10_000, "all four are in the current bucket");
+});
+
+test("AP aging buckets supplier bills and honors `limit`, with exact totals over all bills", async () => {
+  const app = await freshApp();
+  const svc = new ReportsService(app.db);
+  const NOW = 1_800_000_000_000;
+  const DAY = 86_400_000;
+
+  const mkSupplierBill = async (name: string, totalCents: number, dueDate?: number) => {
+    const s = await call(app, "POST", "/api/purchasing/suppliers", { name });
+    assert.equal(s.status, 201);
+    const body: Record<string, unknown> = { supplierId: s.json.id, totalCents };
+    if (dueDate !== undefined) body.dueDate = dueDate;
+    const bill = await call(app, "POST", "/api/billing/bills", body);
+    assert.equal(bill.status, 201, `bill create failed: ${JSON.stringify(bill.json)}`);
+    return s.json.id as string;
+  };
+  await mkSupplierBill("Vendor A", 5_000, NOW - 45 * DAY);  // 45 days overdue → d31_60
+  await mkSupplierBill("Vendor B", 3_000, NOW + 30 * DAY);  // due in the future → current
+  await mkSupplierBill("Vendor C", 1_000, NOW - 100 * DAY); // 100 days overdue → d90_plus
+
+  const ap = await svc.apAging("tnt_demo", NOW, 2);
+  assert.equal(ap.parties.length, 2, "AP parties list is capped at the limit");
+  assert.equal(ap.parties[0].buckets.total, 5_000, "top party by total");
+  assert.equal(ap.parties[1].buckets.total, 3_000);
+  assert.equal(ap.totals.total, 9_000, "totals sum all three bills, not just the 2 returned");
+  assert.equal(ap.totals.d31_60, 5_000, "45-day bill bucketed d31_60");
+  assert.equal(ap.totals.current, 3_000, "future-due bill bucketed current");
+  assert.equal(ap.totals.d90_plus, 1_000, "100-day bill bucketed d90_plus");
 });
 
 test("top-products: a non-numeric limit falls back to the default instead of producing NaN, and a huge limit is capped", async () => {

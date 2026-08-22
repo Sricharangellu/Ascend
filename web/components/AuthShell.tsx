@@ -42,6 +42,8 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-950 lg:flex-row">
+      {/* Owned by the shell, not the root layout — see app/layout.tsx. */}
+      <a href="#main-content" className="skip-link">Skip to content</a>
       {/* Left — brand / marketing panel (60%) */}
       <div className="relative hidden overflow-hidden bg-gradient-to-br from-brand-700 via-brand-800 to-indigo-950 lg:flex lg:w-[60%] lg:flex-col lg:justify-between lg:p-12 xl:p-16">
         <DashboardPreview />
@@ -51,7 +53,9 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
             aria-hidden="true"
             className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-xl font-bold text-brand-700 shadow-lg"
           >
-            F
+            {/* "F" — the initial of the retired Finder brand — sat here next to
+                the word "Ascend" on the first screen every user sees. */}
+            A
           </div>
           <span className="text-xl font-semibold text-white">Ascend</span>
         </div>
@@ -103,7 +107,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
               aria-hidden="true"
               className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-base font-bold text-white"
             >
-              F
+              A
             </div>
             <span className="text-base font-semibold text-slate-900 dark:text-white">Ascend</span>
           </div>
@@ -119,9 +123,13 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
 
-        <div className="flex flex-1 items-center justify-center px-4 py-6 sm:px-8">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="flex flex-1 items-center justify-center px-4 py-6 outline-none sm:px-8"
+        >
           <div className="w-full max-w-md">{children}</div>
-        </div>
+        </main>
 
         <AuthFooter />
       </div>
